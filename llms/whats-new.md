@@ -5,6 +5,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The `deprecated-api-tool` lint, which only warned while `kay upgrade` moved an app from before 1.51, is gone ([Checks](checks.md)).
+- An `_error.kay` drawn for a hook that threw reads the locals your `derive` added before it threw.
+- A sitemap built with a `lastmod` left out is kept for a minute, not an hour.
+- The analytics notice is fetched again after a failed load and carries the tracker's CSP nonce.
 
 ## 1.55.0
 
