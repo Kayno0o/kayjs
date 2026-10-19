@@ -123,7 +123,7 @@ describe('service worker', () => {
   // Installs the worker on a cache that outlives it, returning the URLs the install fetched.
   async function install(script: string, store: Map<string, string>): Promise<string[]> {
     const fetched: string[] = []
-    const path = (key: Request | string) => new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname
+    const path = (key: Request | string) => decodeURI(new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname)
     const cache = {
       match: async (key: string) => store.has(path(key)) ? new Response(store.get(path(key))) : undefined,
       put: async (key: string, response: Response) => void store.set(path(key), await response.text()),
@@ -135,8 +135,8 @@ describe('service worker', () => {
         for (const key of keys)
           await cache.add(key)
       },
-      keys: async () => [...store.keys()].map(key => ({ url: `http://localhost${key}` })),
-      delete: async (key: { url: string }) => store.delete(path(key.url)),
+      keys: async () => [...store.keys()].map(key => ({ url: new URL(key, 'http://localhost').href })),
+      delete: async (key: { url: string } | string) => store.delete(path(typeof key === 'string' ? key : key.url)),
     }
     const listeners = new Map<string, (event: unknown) => void>()
     const sandbox = { self: { addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener), skipWaiting: async () => undefined }, caches: { open: async () => cache }, location: { origin: 'http://localhost' }, Response, URL }
@@ -174,6 +174,30 @@ describe('service worker', () => {
       expect(await install(await build('a', { '/': '"a"', '/about': '"a"' }), store)).toEqual([])
       expect(await install(await build('a', { '/': '"a"', '/about': '"b"' }), store)).toEqual(['/about'])
       expect(await install(await build('b', { '/': '"a"', '/about': '"b"' }), store)).toEqual(['/_kay/entry.js'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the copies of a path written with a space, and the old ones when an install fails', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+    const store = new Map<string, string>()
+    const build = async (etag: string) => {
+      await Bun.write(join(dir, 'assets/Open Sans-a.woff2'), 'a')
+
+      const app = new Elysia()
+      const client = { dir, pages: new Map([['/caf\u00E9', { pattern: '/caf\u00E9', file: 'index.html', status: 200, headers: {}, etag, renderedAt: 0 }]]) } as unknown as ClientBuild
+
+      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: ['/caf\u00E9'] })
+
+      return (await worker(app)).text
+    }
+
+    try {
+      await install(await build('"a"'), store)
+      expect(await install(await build('"a"'), store)).toEqual([])
+      expect(await install(await build('"b"'), store)).toEqual(['/caf\u00E9'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

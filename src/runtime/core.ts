@@ -29,6 +29,8 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
   return withSetter(read, write)
 }
 
+const MAX_TIMER = 2_147_483_647
+
 export interface EveryOptions {
   // Read as an effect reads: the timer starts as it turns true and stops as it turns false.
   while?: (() => boolean) | undefined
@@ -46,12 +48,16 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
   const ms = durationMs(interval)
   let paused = false
 
-  if (!(ms > 0 && Number.isFinite(ms)))
-    throw new Error(`kay: every() takes a positive duration such as '3s' or '250ms', not ${JSON.stringify(interval)}`)
+  // A timer waits 2^31 - 1 ms at most and takes anything under a millisecond for one.
+  if (!(ms >= 1 && ms <= MAX_TIMER))
+    throw new Error(`kay: every() takes a duration of 1 ms to 24 days such as '3s' or '250ms', not ${typeof interval === 'string' ? JSON.stringify(interval) : String(interval)}`)
 
   effect(() => {
-    if (options?.while && !options.while())
+    if (options?.while && !options.while()) {
+      paused = false
+
       return
+    }
 
     if (!options?.background && !tabVisible()) {
       paused = true

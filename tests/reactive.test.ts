@@ -1284,8 +1284,8 @@ describe('every, paused and checked', () => {
   withTab()
 
   it('throws for an interval that is not a positive duration', () => {
-    for (const interval of [0, -5, Number.NaN, '3 s', '', '0s', 'fast'] as never[])
-      expect(() => root(() => every(interval, () => undefined))).toThrow('every() takes a positive duration')
+    for (const interval of [0, 0.5, -5, Number.NaN, '3 s', '', '0s', 'fast', '30d'] as never[])
+      expect(() => root(() => every(interval, () => undefined))).toThrow('every() takes a duration')
   })
 
   it('pauses while the tab is hidden and runs as it shows again, unless it is told to keep going', async () => {

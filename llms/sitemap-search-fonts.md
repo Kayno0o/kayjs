@@ -165,7 +165,7 @@ export default defineConfig({
 - Pages are kept and matched under the path `trailingSlash` writes them at, `/menu/` with `always`, and a visit to the other form finds the same copy.
 - On its install the worker fetches the build's scripts, stylesheets and fonts, every page `pages` lists, as paths of the site, every prerendered page no guard covers without it, and the `fallback` page.
 - The server warns past 100 prerendered pages, since each visitor downloads them on their first visit.
-- A font of several subsets is fetched ahead only when a character of the pages kept falls in its `unicode-range`; the others are kept as a visit loads them.
+- A font of several subsets is fetched ahead only when a character of the pages kept falls in its `unicode-range`, read from the pages' HTML text and none when no page is prerendered; the others are kept as a visit loads them.
 - The build's other files, such as images, are kept as they are first loaded.
 - It answers the build's files from what it keeps, so islands hydrate offline.
 - A page is fetched from the network first, a kept page's copy refreshed each time, unless its response says `private` or `no-store`.

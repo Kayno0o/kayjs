@@ -51,25 +51,35 @@ self.addEventListener('install', (event) => {
     }
     catch {}
 
-    // A copy stays while its version is the one recorded, so a deploy fetches only what it changed.
-    for (const request of await cache.keys()) {
-      const path = new URL(request.url).pathname
+    // A copy stays while its version is the one recorded, and one that changed is replaced by its download, so a failed install leaves the old copies; keys are decoded, as the URLs listed are written raw.
+    const have = new Set()
 
-      if (path !== KAY.env && path !== KAY.index && (KAY.versions[path] === undefined || (before[path] ?? '') !== KAY.versions[path]))
+    for (const request of await cache.keys()) {
+      const path = decodeURI(new URL(request.url).pathname)
+
+      if (path === KAY.env || path === KAY.index)
+        continue
+
+      if (KAY.versions[path] === undefined)
+        await cache.delete(request)
+      else if ((before[path] || '') === KAY.versions[path])
+        have.add(path)
+      else if (!KAY.precache.includes(path))
         await cache.delete(request)
     }
 
-    const have = new Set((await cache.keys()).map(request => new URL(request.url).pathname))
     const missing = KAY.precache.filter(url => !have.has(url))
 
     await cache.addAll(missing.filter(url => !pages.has(url) && url !== KAY.fallback))
 
-    // A page that fails, such as one a guard now covers, is left out rather than failing the install.
+    // A page that fails, such as one a guard now covers, is left out rather than failing the install, and its old copy goes.
     for (const url of missing.filter(url => pages.has(url) || url === KAY.fallback)) {
       try {
         await cache.add(url)
       }
-      catch {}
+      catch {
+        await cache.delete(url)
+      }
     }
 
     await cache.put(KAY.index, new Response(JSON.stringify(KAY.versions)))
@@ -239,16 +249,20 @@ async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[])
     return unused
   }
 
+  // Without any text read, such as pages the server renders, nothing says which subsets are unused.
+  if (characters.size === 0)
+    return unused
+
   const codes = [...characters]
 
   for (const [, url, ranges] of css.matchAll(FACE_RANGE)) {
-    const used = ranges!.split(',').some((range) => {
+    const spans = ranges!.split(',').map((range) => {
       const [low, high = low] = range.trim().slice(2).split('-')
 
-      return codes.some(code => code >= Number.parseInt(low!.replaceAll('?', '0'), 16) && code <= Number.parseInt(high!.replaceAll('?', 'F'), 16))
+      return [Number.parseInt(low!.replaceAll('?', '0'), 16), Number.parseInt(high!.replaceAll('?', 'F'), 16)] as const
     })
 
-    if (!used)
+    if (!codes.some(code => spans.some(([from, to]) => code >= from && code <= to)))
       unused.add(decodeURIComponent(url!))
   }
 
@@ -276,7 +290,6 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
   if (rendered.length > 0)
     kayLog('warn', `offline.pages lists ${rendered.join(', ')}, whose server islands render per request: offline, a visitor gets the copy cached when the worker installed`)
 
-  // Each one is fetched on every deploy's install, by every visitor who has the worker.
   if (config.pages === undefined && pages.length > MANY_PAGES)
     kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on their first visit; list the ones worth reading offline in offline.pages`)
 
@@ -299,7 +312,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     cache: `kay-w${WORKER_VERSION}`,
     index: `${base}${ASSET_PREFIX}sw-versions`,
     versions,
-    precache: [...files.filter(file => PRECACHED.test(file) && !skipped.has(decodeURIComponent(file.slice(base.length)))), ...pages, ...fallback === undefined ? [] : [fallback]],
+    precache: [...files.filter(file => PRECACHED.test(file) && !skipped.has(file.slice(base.length))), ...pages, ...fallback === undefined ? [] : [fallback]],
     files,
     pages,
     fallback,
