@@ -1,4 +1,5 @@
-import { readdir, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
@@ -56,5 +57,35 @@ describe('writing the shadow tree again', () => {
 
     expect(codes(whole.diagnostics)).toContain('browser-only-read')
     expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).text()).toBe(types)
+  })
+
+  it('runs no project check for the types alone, and every one for a check', async () => {
+    const root = await scratchDir('shadow-types-only-checks-')
+
+    await Promise.all([
+      Bun.write(join(root, 'tsconfig.json'), '{}\n'),
+      Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n'),
+    ])
+
+    const options = { redirects: { '/old': '/nowhere' } }
+
+    expect((await writeShadowTypes(root, { ...options, typesOnly: true })).problems).toEqual([])
+    expect((await writeShadowTypes(root, options)).problems.length).toBeGreaterThan(0)
+  })
+
+  it('answers an unchanged component from memory, and compiles it again once its source changes', async () => {
+    const root = await scratchDir('shadow-memory-')
+    const page = join(root, 'src/routes/index.kay')
+
+    await Promise.all([Bun.write(join(root, 'tsconfig.json'), '{}\n'), Bun.write(page, 'p Home\n')])
+    await writeShadowTypes(root)
+    await rm(join(root, '.kay/cache'), { recursive: true, force: true })
+    await writeShadowTypes(root)
+
+    // A component read from the cache entry again would be written back, which the memory spares.
+    expect(existsSync(join(root, '.kay/cache'))).toBe(false)
+    await Bun.write(page, 'p Home again\n')
+    await writeShadowTypes(root)
+    expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).text()).toContain('Home again')
   })
 })

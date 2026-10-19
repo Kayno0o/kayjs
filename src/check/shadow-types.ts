@@ -1,5 +1,6 @@
 // The shadow tree `kay check` and the editor type the project through: each component compiled to TSX, and the modules declaring what types cannot find on their own.
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { CacheSlot } from '../build/cache'
 import type { KayLibrary } from '../build/libraries'
 import type { Diagnostic } from '../compiler/ast'
 import type { I18nConfig, KayExtension } from '../config'
@@ -109,7 +110,11 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
-  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options))
+
+  // A types-only write discards the problems, so none of their checks run.
+  if (options.typesOnly !== true)
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options))
+
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
   await tree.write('kay-icons.d.ts', iconTypes(root))
@@ -402,17 +407,58 @@ function redirectChecks(root: string, options: CheckOptions, project: ServedProj
   return [...configured, ...runtime]
 }
 
+interface ShadowEntry {
+  tsx: string
+  map: ReturnType<SourceMap['toJSON']>
+  diagnostics: Diagnostic[]
+  typesOnly?: boolean
+}
+
+// The cache entries this process read or made, by file: a long-lived process (the types one, the editor's) answers an unchanged component without reading its entry again, as the key holds the source.
+const memory = new Map<string, { key: bigint, value: unknown }>()
+// Held by hash, as a key carries the whole source.
+const stamp = (slot: CacheSlot) => Bun.hash.wyhash(slot.key)
+const maps = new WeakMap<ShadowEntry, SourceMap>()
+
+function mapOf(entry: ShadowEntry): SourceMap {
+  let map = maps.get(entry)
+
+  if (map === undefined) {
+    map = SourceMap.fromJSON(entry.map)
+    maps.set(entry, map)
+  }
+
+  return map
+}
+
+async function remembered<Value>(slot: CacheSlot, read: () => Promise<Value | undefined>): Promise<Value | undefined> {
+  const held = memory.get(slot.file)
+
+  if (held?.key === stamp(slot))
+    return held.value as Value
+
+  const value = await read()
+
+  if (value === undefined)
+    memory.delete(slot.file)
+  else
+    memory.set(slot.file, { key: stamp(slot), value })
+
+  return value
+}
+
 // Whether a component renders as an island, through the build's cache of compiles.
 async function rendersAsIslandCached(cacheDir: string, file: string, source: string): Promise<boolean> {
   const signals = importedSignals(file, source)
   const slot = cacheEntry(cacheDir, file, 'renders-island', JSON.stringify([signals, source]))
-  const cached = await readCacheEntry<boolean>(slot)
+  const cached = await remembered(slot, async () => readCacheEntry<boolean>(slot))
 
   if (cached !== undefined)
     return cached
 
   const island = rendersAsIsland(source, signals)
 
+  memory.set(slot.file, { key: stamp(slot), value: island })
   await writeCacheEntry(slot, island)
 
   return island
@@ -425,15 +471,19 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
   const signals = importedSignals(file, source)
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, shadowOf?.(file), source]))
-  const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[], typesOnly?: boolean }>(slot)
+  const cached = await remembered(slot, async () => readCacheEntry<ShadowEntry>(slot))
 
   // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.
   if (cached !== undefined && (typesOnly || cached.typesOnly !== true))
-    return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics, queries }
+    return { shadow: { source, file, tsx: cached.tsx, map: mapOf(cached) }, diagnostics: cached.diagnostics, queries }
 
   const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, typesOnly, signals, shadowOf })
 
-  await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } })
+  const entry: ShadowEntry = { tsx: compiled.shadow.tsx, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
+
+  maps.set(entry, compiled.shadow.map)
+  memory.set(slot.file, { key: stamp(slot), value: entry })
+  await writeCacheEntry(slot, entry)
 
   return compiled
 }
