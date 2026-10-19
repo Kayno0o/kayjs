@@ -31,7 +31,7 @@ test('the buttons of a list item move it, reorder the saved value and say the it
 
   expect(drafts.value(ENTRY, 'tags')).toEqual(['b', 'a', 'c'])
   // The live region speaks after a short first-use delay.
-  for (let wait = 0; wait < 50 && !said(); wait++)
+  for (let wait = 0; wait < 50 && (said() ?? '') === ''; wait++)
     await Bun.sleep(20)
 
   expect(said()).toBe('Moved Item 1 to 2 of 3')
