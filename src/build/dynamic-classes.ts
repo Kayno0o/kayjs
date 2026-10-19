@@ -666,11 +666,31 @@ function shadowed(text: string, name: string): boolean {
 }
 
 const WHITESPACE_CHAR = /\s/
-const REGEX_AFTER = /[(,=:[!&|?{};+\-*%<>~^]$/
+const REGEX_AFTER = /[(,=:[!&|?{};*%<>~^]$/
 const KEYWORD_BEFORE_REGEX = /\b(?:return|typeof|case|void|delete|throw|in|of)$/
 
-// The text with the inside of every comment, string, template text and regular expression blanked, newlines kept, so a name read in it is read in code and every index is the text's own.
+const FENCE = /^---.*$/gm
+
+// `codeOf` of a source: the scripts of a `.kay` file are masked and its template, after the last fence, is left as it is, where a quote or a backtick of the markup's text is no string.
 function codeOf(text: string): string {
+  const fences = [...text.matchAll(FENCE)]
+
+  if (fences.length === 0)
+    return maskScript(text)
+
+  let out = ''
+  let from = 0
+
+  for (const fence of fences) {
+    out += maskScript(text.slice(from, fence.index)) + fence[0]
+    from = fence.index + fence[0].length
+  }
+
+  return out + text.slice(from)
+}
+
+// The text with the inside of every comment, string, template text and regular expression blanked, newlines kept, so a name read in it is read in code and every index is the text's own.
+function maskScript(text: string): string {
   const out = text.split('')
   // The `${` of the templates being read, for a `}` to tell its end.
   const templates: number[] = []
@@ -708,9 +728,8 @@ function codeOf(text: string): string {
       }
     }
 
-    blank(from, text.length)
-
-    return text.length
+    // A backtick never closed is no template: it is left as it is.
+    return from
   }
 
   while (at < text.length) {
@@ -725,8 +744,10 @@ function codeOf(text: string): string {
     else if (char === '/' && text[at + 1] === '*') {
       const end = text.indexOf('*/', at + 2)
 
-      blank(at, end === -1 ? text.length : end + 2)
-      at = end === -1 ? text.length : end + 2
+      if (end !== -1)
+        blank(at, end + 2)
+
+      at = end === -1 ? at + 2 : end + 2
     }
     else if (char === '"' || char === '\'') {
       let end = at + 1

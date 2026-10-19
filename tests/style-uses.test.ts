@@ -285,6 +285,13 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('const tone = \'mt-1\'\nconst note = `a ${tone = dyn()} b`\nel.classList.add(tone)\n')).toEqual(['3 classList.add mt-1'])
   })
 
+  it('never blanks a real assignment because of a quote, a backtick or a slash it misreads', async () => {
+    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
+    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\ntone = dyn()\n---\np src/*.css\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
+    expect(await unresolved('let tone = \'mt-1\'\nconst s = 1 `\ntone = dyn()\nel.classList.add(tone)\n')).toEqual(['4 classList.add mt-1'])
+    expect(await unresolved('let tone = \'mt-1\'\nlet i = 0\ni++ / 2; tone = dyn(); i / 3\nel.classList.add(tone)\n')).toEqual(['4 classList.add mt-1'])
+  })
+
   it('judges the keys of an object inside an array handed to a class joiner', async () => {
     expect(await unresolved('el.classList.add(cn([{ [kind]: true }]))\n')).toEqual(await unresolved('el.classList.add(cn({ [kind]: true }))\n'))
     expect(await unresolved('el.classList.add(cn([{ [kind]: true }]))\n')).toEqual(['1 classList.add '])
