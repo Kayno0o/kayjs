@@ -161,6 +161,12 @@ export default api().post(
 )
 ```
 
+A source that waits on a quiet feed never gets to stop by itself, so give `eventStream()` a function instead: it receives a `signal` that aborts when the visitor leaves, to pass to whatever the source waits on.
+
+```ts
+export default api().get('/news', () => eventStream(signal => watchNews(signal)))
+```
+
 ```kay
 ---
 import { stream } from 'kay'
