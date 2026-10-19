@@ -44,10 +44,12 @@ export async function collectionNamed(name: string): Promise<CollectionInfo> {
 // What an entry's screen shows: the collection as findCollection gives it and the entry, read together so a loader that cannot count or give one entry runs once for both.
 // Undefined for an unknown collection; `entry` is undefined when the collection fails to read, `problem` then saying why, or when it holds no such entry.
 export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCollection, entry: StoredEntry | undefined } | undefined> {
-  if (!await bareCollection(ref.collection))
+  const bare = await bareCollection(ref.collection)
+
+  if (!bare)
     return undefined
 
-  const [collection, entry] = await Promise.allSettled([findCollection(ref.collection), entryOf(ref)])
+  const [collection, entry] = await Promise.allSettled([findCollection(ref.collection), entryOf(ref, bare.kind)])
 
   if (collection.status === 'rejected')
     throw collection.reason
@@ -72,15 +74,16 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
   return { collection: collection.value, entry: collection.value.problem === undefined ? entry.value : undefined }
 }
 
-export async function entryOf(ref: EntryRef): Promise<StoredEntry | undefined> {
+// `kind` is the collection's when the caller has it, else it is read.
+export async function entryOf(ref: EntryRef, kind?: CollectionInfo['kind']): Promise<StoredEntry | undefined> {
   const entry = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 
   if (!entry)
     return entry
 
-  // A loaded entry has no file: its version is a hash of what its loader gave.
+  // A loaded entry has no file: its version is a hash of what its loader gave. A folder entry outside the repository has no path either, and no version.
   if (entry.path === undefined)
-    return { ...entry, version: contentVersion(entry) }
+    return (kind ?? (await bareCollection(ref.collection))?.kind) === 'loaded' ? { ...entry, version: contentVersion(entry) } : entry
 
   const version = await versionOf(ref)
 
@@ -124,17 +127,20 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
 
   if (collection.kind === 'loaded') {
     const versioned = required || version !== undefined
-    const stale = versioned && !create ? await staleLoaded(entry, version, required) : undefined
 
-    if (stale)
-      return stale
+    return inTurn(collection.name, async () => {
+      const stale = versioned && !create ? await staleLoaded(entry, version, required) : undefined
 
-    const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
+      if (stale)
+        return stale
 
-    if (issues !== undefined && issues.length > 0)
-      return { issues }
+      const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
-    return versioned ? { saved: true, version: await loadedVersion(entry) } : { saved: true }
+      if (issues !== undefined && issues.length > 0)
+        return { issues }
+
+      return versioned ? { saved: true, version: await loadedVersion(entry) } : { saved: true }
+    })
   }
 
   if (required && !create && version === undefined && await versionOf(entry) !== undefined)
@@ -161,14 +167,16 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
   const collection = await collectionNamed(ref.collection)
 
   if (collection.kind === 'loaded') {
-    const stale = required || version !== undefined ? await staleLoaded(ref, version, required, true) : undefined
+    return inTurn(collection.name, async () => {
+      const stale = required || version !== undefined ? await staleLoaded(ref, version, required, true) : undefined
 
-    if (stale)
-      return stale
+      if (stale)
+        return stale
 
-    const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
+      const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
 
-    return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+    })
   }
 
   if (collection.dir === undefined)
@@ -251,6 +259,34 @@ async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit
     log.error(`saving ${change.repoPath} failed`, error)
 
     return refused(ref, error.message)
+  }
+}
+
+const turns = new Map<string, Promise<unknown>>()
+
+// Runs the check, the write and the re-read of a loaded entry's save or delete one after another per collection, so a second editor's check never lands between another's write and its re-read.
+async function inTurn<T>(collection: string, run: () => Promise<T>): Promise<T> {
+  const previous = turns.get(collection) ?? Promise.resolve()
+  const turn = (async () => {
+    await previous
+
+    return run()
+  })()
+  const tail = (async () => {
+    try {
+      await turn
+    }
+    catch {}
+  })()
+
+  turns.set(collection, tail)
+
+  try {
+    return await turn
+  }
+  finally {
+    if (turns.get(collection) === tail)
+      turns.delete(collection)
   }
 }
 

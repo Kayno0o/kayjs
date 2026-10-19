@@ -3,7 +3,7 @@ import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { contentVersion, fileVersion, ForgeError, SaveConflict } from '../src/files'
@@ -311,6 +311,53 @@ describe('a loaded entry\'s version', () => {
     expect(first).toBe(contentVersion({ data: { name: 'Mug' } }))
   })
 
+  test('hashes the values JSON cannot hold, telling different ones apart', () => {
+    const version = (value: unknown) => contentVersion({ data: { value } })
+
+    expect(version(1n)).not.toBe(version(2n))
+    expect(version(new Date(0))).not.toBe(version(new Date(1000)))
+    expect(version({ toJSON: () => 'a' })).not.toBe(version({ toJSON: () => 'b' }))
+    expect(version(new Map([['a', 1]]))).not.toBe(version(new Map([['a', 2]])))
+    expect(version({ b: 1, a: [{ d: 1, c: 2 }] })).toBe(version({ a: [{ c: 2, d: 1 }], b: 1 }))
+  })
+
+  test('gives a folder entry outside the repository no content version', async () => {
+    stored.outside = [{ slug: 'x', data: { title: 'X' }, draft: false }]
+
+    expect(await entryOf({ collection: 'outside', slug: 'x' })).not.toHaveProperty('version')
+  })
+
+  test('runs two saves of one collection one after the other, the second checked after the first', async () => {
+    const version = await opened()
+    const [first, second] = await Promise.all([saveEntry(named('From A'), { version, required: true }), saveEntry(named('From B'), { version, required: true })])
+
+    expect(first).toHaveProperty('saved', true)
+    expect(second).toHaveProperty('conflict')
+    expect(loaded.map(entry => entry.data)).toEqual([{ name: 'From A' }])
+  })
+
+  test('answers the version of the row the loader keeps, which may differ from what was typed', async () => {
+    const version = await opened()
+    const saved = await saveEntry(named('typed'), { version, required: true }) as { version: string }
+
+    stored.products = [{ slug: 'mug', data: { name: 'TYPED' }, draft: false }]
+    expect(saved.version).not.toBe(await opened())
+    expect(await saveEntry(named('again'), { version: await opened(), required: true })).toHaveProperty('saved', true)
+  })
+
+  test('publishes a loaded entry through the versioned path', async () => {
+    stored.products = [{ slug: 'mug', data: { name: 'Mug', live: false }, draft: true }]
+    collectionList[1] = { ...products, draftField: 'live' }
+
+    try {
+      expect(await publishEntry({ collection: 'products', slug: 'mug' })).toHaveProperty('saved', true)
+      expect(loaded.map(entry => entry.data)).toEqual([{ name: 'Mug', live: false }])
+    }
+    finally {
+      collectionList[1] = products
+    }
+  })
+
   test('refuses the save of the editor that saves second, naming the version the first left', async () => {
     const [a, b] = [await opened(), await opened()]
     const first = await saveEntry(named('From A'), { version: a, required: true })
@@ -386,8 +433,12 @@ describe('a loaded entry\'s version', () => {
   })
 
   test('saves and deletes without reading the loader again when no version is asked for', async () => {
+    const read = spyOn(content, 'entries')
+
     expect(await saveEntry(named('Plain'))).toEqual({ saved: true })
     expect(await deleteEntry(mug)).toEqual({ saved: true })
+    expect(read).not.toHaveBeenCalled()
+    read.mockRestore()
   })
 
   test('hands a new entry the version it was saved at', async () => {
