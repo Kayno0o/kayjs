@@ -44,7 +44,7 @@ Some classes come from a value kay cannot read: `classList.add(name)`, `el.class
 
 A value picked from an object of class names you write out (`GLASS[tone]`), also one imported from another module of your app, needs no listing. Neither does a call to a function whose every `return` is a class name or a choice between some.
 
-A value read back from the element (`el.className = el.className`), a name that only ever holds classes the file writes out, and `cn(...)`, `clsx(...)` or `twMerge(...)` of such values need no listing. A name that gets another value somewhere else in the file is judged by all of them, and a parameter or a loop's variable is not read at all.
+A value read back from the element (`el.className = el.className`), a name that only ever holds classes the file writes out, and `cn(...)`, `clsx(...)` or `twMerge(...)` of such values need no listing. A value read back from `this.el`, a call result such as `document.querySelector('a')` or any longer chain counts too, and so does an object inside an array given to `cn(...)`. A name that gets another value somewhere else in the file, or is also imported, is judged by all of them, and a parameter or a loop's variable is not read at all.
 
 A static export has no server to render pages, so it gives no warning for a class a server template builds.
 

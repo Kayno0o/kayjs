@@ -265,6 +265,34 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolvedIn({ 'island.ts': 'import { pick } from \'./d\'\nfunction other() {\n  const pick = () => dyn()\n}\nel.className = pick()\n', 'd.ts': 'export const pick = () => \'mt-1\'\n' })).toEqual(['island.ts:5 className = mt-1'])
   })
 
+  it('reads back the class of a receiver that is a call result, `this` or a long chain', async () => {
+    const long = `this.${'a'.repeat(130)}`
+
+    expect(await unresolved('class Menu {\n  open() {\n    this.el.className = this.el.className + \' x\'\n    this.el.classList.add(this.el.className)\n  }\n}\n')).toEqual([])
+    expect(await unresolved('document.querySelector(\'a\').classList.add(document.querySelector(\'a\').className)\n')).toEqual([])
+    expect(await unresolved('document.querySelector("a")?.classList.add(document.querySelector(\'a\')?.className)\n')).toEqual([])
+    expect(await unresolved('items[0].children[1].className = items[0].children[1].className\n')).toEqual([])
+    expect(await unresolved(`${long}.className = ${long}.className + ' x'\n`)).toEqual([])
+    expect(await unresolved('(root.first()).classList.add(root.first().className)\n')).toEqual([])
+    expect(await unresolved('pick(1).classList.add(pick(2).className)\n')).toEqual(['1 classList.add '])
+    expect(await unresolved('this.a.classList.add(this.b.className)\n')).toEqual(['1 classList.add '])
+    expect(await unresolved('pick(x).classList.add(pick(x).className)\n')).toEqual([])
+  })
+
+  it('ignores an assignment written in a string, a template or a comment', async () => {
+    expect(await unresolved('const tone = \'mt-1\'\n// tone = dyn()\n/* tone = dyn() */\nconst note = \'tone = dyn()\'\nconst more = `tone = ${1}`\nel.classList.add(tone)\n')).toEqual([])
+    expect(await unresolved('const tone = \'mt-1\'\nconst url = \'http://x\'\nconst re = /[\'"]/\ntone = dyn()\nel.classList.add(tone)\n')).toEqual(['5 classList.add mt-1'])
+    expect(await unresolved('const tone = \'mt-1\'\nconst note = `a ${tone = dyn()} b`\nel.classList.add(tone)\n')).toEqual(['3 classList.add mt-1'])
+  })
+
+  it('judges the keys of an object inside an array handed to a class joiner', async () => {
+    expect(await unresolved('el.classList.add(cn([{ [kind]: true }]))\n')).toEqual(await unresolved('el.classList.add(cn({ [kind]: true }))\n'))
+    expect(await unresolved('el.classList.add(cn([{ [kind]: true }]))\n')).toEqual(['1 classList.add '])
+    expect(await unresolved('el.classList.add(cn([\'mt-1\', [{ [kind]: on }]]))\n')).toEqual(['1 classList.add mt-1'])
+    expect(await unresolved('el.classList.add(cn([{ \'p-1\': true }, { mt: on }]))\n')).toEqual([])
+    expect(await unresolved('el.classList.add(cn([...more]))\n')).toEqual(['1 classList.add '])
+  })
+
   it('leaves an async function, a generator, a namespace or default import, a method and an import cycle open', async () => {
     expect(await unresolved('async function f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
     expect(await unresolved('function* f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])

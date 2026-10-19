@@ -3,7 +3,7 @@ import type { SizeReport } from '../build/report'
 import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
-import { readdir, rm } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { version } from '../../package.json'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
@@ -201,6 +201,8 @@ export async function readInlineStyles(client: ClientBuild, base: string): Promi
 // What a page's stylesheets may add to it compressed and still be inlined: about what the first round trip carries, past which a linked stylesheet costs no more.
 export const INLINE_LIMIT = 14_000
 
+const ROUTE_COPY = /\.r-[a-z0-9]+\.css$/
+
 const restyling = new WeakMap<ClientBuild, Restyle>()
 
 // `inlineStyles: true` makes every stylesheet inlinable, `false` none, and unset the ones that compress under `INLINE_LIMIT`, the page deciding by the sum of its own.
@@ -231,7 +233,7 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
   }
 
   if (client.styleUses !== undefined) {
-    const restyle: Restyle = { texts, parsed: new Map(), copies, late, base, names: new Map() }
+    const restyle: Restyle = { texts, parsed: new Map(), copies, late, base, names: new Map(), superseded: new Set() }
 
     restyling.set(client, restyle)
     client.pageStyles = await pageStyles(client, base, texts, chains, restyle)
@@ -247,6 +249,8 @@ interface Restyle {
   base: string
   // The classes each chain's files name, by chain.
   names: Map<string, Set<string>>
+  // The route copies a chain's head linked before its classes were added, which may be orphans now.
+  superseded: Set<string>
   // Every class the stylesheets style, once asked for.
   styled?: Set<string>
   index?: Map<string, number>
@@ -328,6 +332,11 @@ export async function keepClasses(client: ClientBuild, files: string[], names: s
   client.styles = new Map(client.styles)
 
   const head = again.get(key)
+
+  for (const link of client.pageStyles.get(key)?.links ?? []) {
+    if (ROUTE_COPY.test(link))
+      restyle.superseded.add(link.slice(link.lastIndexOf('/') + 1))
+  }
 
   if (head === undefined)
     client.pageStyles.delete(key)
@@ -430,24 +439,17 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Prom
   }
 }
 
-const ROUTE_COPY = /\.r-[a-z0-9]+\.css$/
-
 // Removes the route copies no head and no page links: choosing a chain's head again after a page showed more classes writes a new copy, and the first one stays on disk when every page rendered since links the new one.
 export async function dropOrphanCopies(client: ClientBuild, pagesDir: string, pages: Record<string, PrerenderedPage>): Promise<void> {
-  let names: string[] = []
+  const superseded = restyling.get(client)?.superseded
 
-  try {
-    names = await readdir(client.dir)
-  }
-  catch {}
-
-  const copies = names.filter(name => ROUTE_COPY.test(name))
-
-  if (copies.length === 0)
+  if (superseded === undefined || superseded.size === 0)
     return
 
   const linked = [...client.pageStyles?.values() ?? []].map(head => head.html).join('\n')
-  const orphans = new Set(copies.filter(name => !linked.includes(name)))
+  const orphans = new Set([...superseded].filter(name => !linked.includes(name)))
+
+  superseded.clear()
 
   for (const page of Object.values(pages)) {
     if (orphans.size === 0)

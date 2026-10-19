@@ -1,6 +1,6 @@
 import type { ClientOptions } from '../src/build/client'
 import { mkdir, rm, symlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
@@ -178,6 +178,28 @@ describe('a library\'s stylesheet in an app', () => {
     expect(css).toContain('outline: 1px solid')
     expect(css).toContain('padding: 7px')
   })
+
+  it('follows the real imports of a kayjs-ui component, a class its helper module names included', async () => {
+    const root = await scratchDir('prune-ui-')
+
+    projects.push(root)
+    await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
+    await symlink(resolve('packages/ui'), join(root, 'node_modules/@kaynooo/kayjs-ui'))
+    await symlink(resolve('node_modules/@iconify-json'), join(root, 'node_modules/@iconify-json'))
+    await Promise.all(Object.entries({
+      ...project('@import "@kaynooo/kayjs-ui/theme.css";\n'),
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
+      'src/routes/index.kay': '--- script\nimport \'../app.css\'\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(tone="danger") Delete\n',
+    }).map(async ([name, text]) => Bun.write(join(root, name), text)))
+
+    const client = await buildClient(root, {})
+    const css = await Bun.file(join(client.dir, client.styles.get(join(root, 'src/routes/index.kay'))!.slice('/_kay/'.length))).text()
+
+    expect(css).toContain('.kui-btn-danger')
+    expect(css).toContain('.kui-btn-accent')
+    expect(css).not.toContain('.kui-avatar')
+    expect(client.unresolved ?? []).toEqual([])
+  }, 60_000)
 
   it('reads the classes of the stylesheets the library exports alone', async () => {
     const root = await newProject(PLAIN_CSS)

@@ -145,19 +145,98 @@ interface Reads {
 const EXTENSION = /\.\w+$/
 const ASYNC_BEFORE = /\basync\s*$/
 const TRAILING_DOT = /\??\.$/
-const RECEIVER = /[\w$]+(?:(?:\?\.|\.)[\w$]+)*$/
 
-// The chain `a.b.c` a node reads, or undefined for anything else.
+// The chain `a.b.c`, `this.a`, `a[0].b` or `a.b('x').c` a node reads, written the same whatever the spacing and `?.`, or undefined for anything else.
 function chainOf(node: Node): string | undefined {
   if (node.type === 'Identifier')
     return node.name
 
-  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
+  if (node.type === 'ThisExpression')
+    return 'this'
+
+  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+    const inner = chainOf(node.object)
+
+    if (inner === undefined)
+      return undefined
+
+    if (!node.computed)
+      return node.property.type === 'Identifier' ? `${inner}.${node.property.name}` : undefined
+
+    return node.property.type === 'StringLiteral' || node.property.type === 'NumericLiteral' ? `${inner}[${JSON.stringify(node.property.value)}]` : undefined
+  }
+
+  if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression')
     return undefined
 
-  const inner = chainOf(node.object)
+  const callee = chainOf(node.callee)
+  const args = node.arguments.map(argument => argument.type === 'StringLiteral' || argument.type === 'NumericLiteral' ? JSON.stringify(argument.value) : chainOf(argument))
 
-  return inner === undefined || node.computed || node.property.type !== 'Identifier' ? undefined : `${inner}.${node.property.name}`
+  return callee === undefined || args.includes(undefined) ? undefined : `${callee}(${args.join(',')})`
+}
+
+const NAME_END = /[\w$]+$/
+const DOT_END = /(?:\?\.|\.)\s*$/
+const RECEIVER_LIMIT = 2000
+
+// The chain written right before `end` of the text, whatever its length: names, dots, and the brackets and parentheses between them.
+function receiverBefore(text: string, end: number): string | undefined {
+  const floor = Math.max(0, end - RECEIVER_LIMIT)
+  let at = end
+
+  for (;;) {
+    const start = at
+
+    while (at > floor && (text[at - 1] === ')' || text[at - 1] === ']')) {
+      const opened = openerBefore(text, at - 1, floor)
+
+      if (opened === undefined)
+        return undefined
+
+      at = opened
+    }
+
+    const name = NAME_END.exec(text.slice(floor, at))
+
+    if (name !== null)
+      at -= name[0].length
+
+    if (at === start)
+      break
+
+    const dot = DOT_END.exec(text.slice(floor, at))
+
+    if (dot === null)
+      break
+
+    at -= dot[0].length
+  }
+
+  if (at === end)
+    return undefined
+
+  try {
+    return chainOf(parseExpression(text.slice(at, end), { plugins: ['typescript'] }))
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The index of the bracket opening the one that closes at `close`.
+function openerBefore(text: string, close: number, floor: number): number | undefined {
+  let depth = 0
+
+  for (let at = close; at >= floor; at--) {
+    const char = text[at]!
+
+    if (char === ')' || char === ']')
+      depth++
+    else if ((char === '(' || char === '[') && --depth === 0)
+      return at
+  }
+
+  return undefined
 }
 
 const CLOSED: Verdict = { parts: [], open: false }
@@ -200,6 +279,9 @@ function valuesOf(object: ObjectExpression, scope: Scope, depth: number): Verdic
 
 // An argument of a class joiner: an object adds its keys, so a computed one is a name of the runtime.
 function joined(argument: Expression, scope: Scope, depth: number): Verdict {
+  if (argument.type === 'ArrayExpression')
+    return merged(argument.elements.map(element => element === null || element.type === 'SpreadElement' ? OPEN : joined(element, scope, depth)))
+
   if (argument.type !== 'ObjectExpression')
     return verdictOf(argument, scope, depth)
 
@@ -330,6 +412,10 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     return merged(node.elements.map(element => element === null || element.type === 'SpreadElement' ? OPEN : verdictOf(element, scope, depth)))
 
   if (node.type === 'Identifier' || node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+    // What the element being written holds in `className` or `classList` is what the page already set on it.
+    if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name) && scope.receiver !== undefined && chainOf(node.object) === scope.receiver)
+      return CLOSED
+
     const root = rootOf(node)
 
     if (root === undefined)
@@ -337,10 +423,6 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
 
     // A prop is what the component using this one writes, where the classes are named.
     if (scope.props.has(root))
-      return CLOSED
-
-    // What the element being written holds in `className` or `classList` is what the page already set on it.
-    if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name) && scope.receiver !== undefined && chainOf(node.object) === scope.receiver)
       return CLOSED
 
     const found = depth < RESOLVE_DEPTH ? lookup(root, scope) : []
@@ -387,7 +469,7 @@ function* setters(text: string, file: string | undefined, reads: Reads): Generat
   for (const match of text.matchAll(SETTER)) {
     const how = setterName(match[0])
     const before = text.slice(0, match.index).replace(TRAILING_DOT, '')
-    const scope: Scope = { ...whole, receiver: RECEIVER.exec(before.slice(-120))?.[0].replaceAll('?.', '.') }
+    const scope: Scope = { ...whole, receiver: receiverBefore(before, before.length) }
     let from = match.index + match[0].length
 
     for (let index = 0; index < classArguments(how); index++) {
@@ -452,6 +534,7 @@ function scopeOf(text: string, file: string | undefined, reads: Reads, component
     }
   }
 
+  let code: string | undefined
   const initialized = new Map<string, Expression[] | undefined>()
   const declared = new Map<string, FunctionNode[] | undefined>()
   const imports = new Map<string, { scope: Scope, name: string } | undefined>()
@@ -460,7 +543,7 @@ function scopeOf(text: string, file: string | undefined, reads: Reads, component
     props,
     initializers(name) {
       if (!initialized.has(name))
-        initialized.set(name, initializersOf(text, name))
+        initialized.set(name, initializersOf(text, code ??= codeOf(text), name))
 
       return initialized.get(name)
     },
@@ -582,19 +665,150 @@ function shadowed(text: string, name: string): boolean {
   return new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b|\\bfor\\s*\\(\\s*${escaped}\\s+(?:of|in)\\b|\\bfunction\\b[^(]*\\([^)]*(?<![\\w$.])${escaped}\\b|(?<![\\w$.])${escaped}\\s*=>|\\([^()]*(?<![\\w$.])${escaped}\\b[^()]*\\)\\s*(?::[^=>{;]+)?=>|\\[[^\\]]*(?<![\\w$.])${escaped}\\b[^\\]]*\\]\\s*=(?![=>])|\\{[^{}]*(?<![\\w$.])${escaped}\\b[^{}]*\\}\\s*=(?![=>])|(?<![\\w$.])${escaped}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*=(?![=>])`).test(text)
 }
 
+const WHITESPACE_CHAR = /\s/
+const REGEX_AFTER = /[(,=:[!&|?{};+\-*%<>~^]$/
+const KEYWORD_BEFORE_REGEX = /\b(?:return|typeof|case|void|delete|throw|in|of)$/
+
+// The text with the inside of every comment, string, template text and regular expression blanked, newlines kept, so a name read in it is read in code and every index is the text's own.
+function codeOf(text: string): string {
+  const out = text.split('')
+  // The `${` of the templates being read, for a `}` to tell its end.
+  const templates: number[] = []
+  let depth = 0
+  let at = 0
+
+  const blank = (from: number, to: number) => {
+    for (let index = from; index < to; index++) {
+      if (out[index] !== '\n')
+        out[index] = ' '
+    }
+  }
+
+  // Blanks the text of the template that opens at `from - 1` up to its `${` or closing backtick, and returns where code resumes.
+  const template = (from: number): number => {
+    for (let index = from; index < text.length; index++) {
+      if (text[index] === '\\') {
+        index++
+
+        continue
+      }
+
+      if (text[index] === '`') {
+        blank(from, index)
+
+        return index + 1
+      }
+
+      if (text[index] === '$' && text[index + 1] === '{') {
+        blank(from, index)
+        templates.push(depth)
+        depth++
+
+        return index + 2
+      }
+    }
+
+    blank(from, text.length)
+
+    return text.length
+  }
+
+  while (at < text.length) {
+    const char = text[at]!
+
+    if (char === '/' && text[at + 1] === '/') {
+      const end = text.indexOf('\n', at)
+
+      blank(at, end === -1 ? text.length : end)
+      at = end === -1 ? text.length : end
+    }
+    else if (char === '/' && text[at + 1] === '*') {
+      const end = text.indexOf('*/', at + 2)
+
+      blank(at, end === -1 ? text.length : end + 2)
+      at = end === -1 ? text.length : end + 2
+    }
+    else if (char === '"' || char === '\'') {
+      let end = at + 1
+
+      while (end < text.length && text[end] !== char && text[end] !== '\n')
+        end += text[end] === '\\' ? 2 : 1
+
+      blank(at + 1, Math.min(end, text.length))
+      at = end + 1
+    }
+    else if (char === '`') {
+      at = template(at + 1)
+    }
+    else if (char === '/') {
+      let last = at
+
+      while (last > 0 && WHITESPACE_CHAR.test(text[last - 1]!))
+        last--
+
+      const before = text.slice(Math.max(0, last - 8), last)
+
+      if (last === 0 || REGEX_AFTER.test(before) || KEYWORD_BEFORE_REGEX.test(before)) {
+        let end = at + 1
+        let inClass = false
+
+        while (end < text.length && text[end] !== '\n' && (inClass || text[end] !== '/')) {
+          if (text[end] === '\\')
+            end++
+          else if (text[end] === '[')
+            inClass = true
+          else if (text[end] === ']')
+            inClass = false
+
+          end++
+        }
+
+        if (text[end] === '/') {
+          blank(at + 1, end)
+          at = end + 1
+
+          continue
+        }
+      }
+
+      at++
+    }
+    else {
+      if (char === '{') {
+        depth++
+      }
+      else if (char === '}') {
+        depth--
+
+        if (templates.at(-1) === depth) {
+          templates.pop()
+          at = template(at + 1)
+
+          continue
+        }
+      }
+
+      at++
+    }
+  }
+
+  return out.join('')
+}
+
 // Every value a `const`, `let`, `var` or assignment gives `name`, undefined when it is also a parameter, a loop's variable, a destructuring target or a record some line writes into, whose values no initializer tells.
-function initializersOf(text: string, name: string): Expression[] | undefined {
+// `code` is `text` with the comments and the strings blanked, where the declarations and assignments are looked for.
+function initializersOf(text: string, code: string, name: string): Expression[] | undefined {
   const escaped = RegExp.escape(name)
   const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`)
 
-  if (!declared.test(text) || shadowed(text, name))
+  if (!declared.test(code) || shadowed(text, name))
     return undefined
 
   const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
   const assigned = new RegExp(`(?<![\\w$.])${escaped}\\s*(?:\\+|\\|\\||\\?\\?|&&)?=(?![=>])\\s*`, 'g')
   const starts = new Set<number>()
 
-  for (const match of [...text.matchAll(initialized), ...text.matchAll(assigned)])
+  for (const match of [...code.matchAll(initialized), ...code.matchAll(assigned)])
     starts.add(match.index + match[0].length)
 
   const found: Expression[] = []
