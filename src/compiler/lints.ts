@@ -326,15 +326,6 @@ export const LINTS = {
     wrong: '---\n// src/components/caller.kay\nconst { run } = props<{ run: (input: { name: string }) => Promise<string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
     right: '---\n// src/components/caller.kay\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
   },
-  'deprecated-api-tool': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.51',
-    site: true,
-    summary: 'With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`, reported while `kay upgrade` moves an app from before 1.51 and not by a plain `kay check`, as an app turning `mcp` on since never had those routes as tools. Before 1.51 every API route was an MCP tool unless hidden, and an API route is one only when it sets `detail: { tool: true }` now, as an action sets `tool`: the route stays in the OpenAPI document and an agent no longer finds it. Add `tool` to the routes an agent should call, and `tool: false` to the others to silence this. No fix is safe, as adding it to every route offers the ones the app never meant to.',
-    wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
-    right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
-  },
   'deprecated-provider-url': {
     level: 'warn',
     group: 'deprecated',

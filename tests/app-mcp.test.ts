@@ -1,10 +1,8 @@
 import { join, relative } from 'node:path'
-import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
-import { UPGRADE_FROM } from '../src/compiler/lints'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { encodeValue } from '../src/runtime/wire'
 import { toolCall } from '../src/server'
@@ -48,14 +46,6 @@ async function rpc(target: typeof site, method: string, params: object = {}, hea
 
   return { response, body: await response.json() as { result?: Record<string, unknown> & { capabilities?: Record<string, unknown> }, error?: { code: number, message: string } } }
 }
-
-// `kay upgrade` sets the version the app came from, which the lint about the old default needs.
-beforeAll(() => {
-  process.env[UPGRADE_FROM] = '1.50.0'
-})
-afterAll(() => {
-  delete process.env[UPGRADE_FROM]
-})
 
 describe('the endpoint', () => {
   it('is not served without mcp', async () => {
@@ -736,10 +726,10 @@ describe('kay check', () => {
 
   it('reports each route where it is written, not at the start of its chain', async () => {
     const dir = await fixtureCopy('mcp')
-    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'deprecated-api-tool')!
+    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'hidden-tool')!
     const line = (await Bun.file(found.file).text()).split('\n')[found.line - 1]!
 
-    expect(line).toContain('/internal')
+    expect(line).toContain('/both')
   })
 
   it('says nothing without mcp, or when the lint is allowed', async () => {
@@ -893,48 +883,38 @@ describe('a tool call an app can tell', () => {
 })
 
 describe('kay check on routes that opt in', () => {
-  const codes = async (dir: string, mcp = true, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'deprecated-api-tool' || found.code === 'hidden-tool').map(found => [found.code, found.message.match(/`([A-Z]+ [^`]+)`/)![1]])
+  const codes = async (dir: string, mcp = true, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'hidden-tool').map(found => [found.code, found.message.match(/`([A-Z]+ [^`]+)`/)![1]])
+  const both = '{ detail: { hide: true, tool: true } }'
 
-  it('reports a route relying on the old default, and the one that hides and opts in, and nothing else', async () => {
+  it('reports the route that hides and opts in, and nothing else', async () => {
     const dir = await fixtureCopy('mcp')
 
-    expect((await codes(dir)).sort()).toEqual([
-      ['deprecated-api-tool', 'GET /internal'],
-      ['hidden-tool', 'GET /both'],
-    ])
+    expect(await codes(dir)).toEqual([['hidden-tool', 'GET /both']])
   })
 
-  it('offers a fix that opts the route in, which is none for kay check --fix to apply', async () => {
-    const dir = await fixtureCopy('mcp')
-    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'deprecated-api-tool')!
-
-    expect(found.fixes?.[0]?.safe).toBeUndefined()
-    expect(found.fixes?.[0]?.edits[0]?.text).toBe(', { detail: { tool: true } }')
-  })
-
-  it('reads a route with no options, a detail without tool, and leaves out what it cannot read', async () => {
+  it('reads a route written in several ways, and leaves out what it cannot read', async () => {
     const dir = await fixtureCopy('mcp')
 
     await Bun.write(join(dir, 'src/api/more.ts'), [
       'import { api } from \'kay/server\'',
-      'const options = { detail: { hide: true } }',
+      `const options = ${both}`,
       'export default api()',
-      '  .post(\'/bare\', () => 1)',
-      '  .put(\'/summary\', () => 1, { detail: { summary: \'x\' } })',
+      `  .post('/bare', () => 1, ${both})`,
+      '  .put(\'/summary\', () => 1, { detail: { summary: \'x\', hide: true, tool: \'y\' } })',
       '  .get(\'/held\', () => 1, options)',
-      '  .patch(\'/off\', () => 1, { detail: { tool: false } })',
+      '  .patch(\'/off\', () => 1, { detail: { hide: true, tool: false } })',
       'const cache = new Map()',
       'cache.get(\'key\', () => 1)',
       'const app = api()',
-      'app.get(\'/named\', () => 1)',
+      `app.get('/named', () => 1, ${both})`,
       '  .delete(\'/hidden\', () => 1, { detail: { hide: true } })',
       '  .get(\'/spread\', () => 1, { ...options })',
       '',
     ].join('\n'))
 
-    const found = (await codes(dir)).filter(([, route]) => !route!.endsWith('/internal') && !route!.endsWith('/both'))
+    const found = (await codes(dir)).filter(([, route]) => !route!.endsWith('/both'))
 
-    expect(found.sort()).toEqual([['deprecated-api-tool', 'GET /named'], ['deprecated-api-tool', 'POST /bare'], ['deprecated-api-tool', 'PUT /summary']])
+    expect(found.sort()).toEqual([['hidden-tool', 'GET /named'], ['hidden-tool', 'POST /bare'], ['hidden-tool', 'PUT /summary']])
   })
 
   it('reads api() under an aliased import, a namespace import, a reassigned let and a helper of the file, and not an api of another module', async () => {
@@ -942,39 +922,22 @@ describe('kay check on routes that opt in', () => {
     const only = async (name: string, lines: string[]) => {
       await Bun.write(join(dir, 'src/api/more.ts'), `${lines.join('\n')}\n`)
 
-      return (await codes(dir)).filter(([, route]) => !route!.endsWith('/internal') && !route!.endsWith('/both')).map(([, route]) => `${name} ${route}`)
+      return (await codes(dir)).filter(([, route]) => !route!.endsWith('/both')).map(([, route]) => `${name} ${route}`)
     }
 
-    expect(await only('alias', ['import { api as server } from \'kay/server\'', 'export default server().get(\'/a\', () => 1)'])).toEqual(['alias GET /a'])
-    expect(await only('aliased-const', ['import { api as server } from \'kay/server\'', 'const app = server()', 'export default app.get(\'/a\', () => 1)'])).toEqual(['aliased-const GET /a'])
-    expect(await only('namespace', ['import * as kay from \'kay/server\'', 'export default kay.api().get(\'/a\', () => 1)'])).toEqual(['namespace GET /a'])
-    expect(await only('let', ['import { api } from \'kay/server\'', 'let app', 'app = api()', 'export default app.get(\'/a\', () => 1)'])).toEqual(['let GET /a'])
-    expect((await only('helper', ['import { api } from \'kay/server\'', 'function base() { return api().get(\'/b\', () => 1) }', 'const arrow = () => api()', 'const one = base()', 'export default one.get(\'/a\', () => 1)', 'arrow().post(\'/c\', () => 1)'])).sort()).toEqual(['helper GET /a', 'helper GET /b', 'helper POST /c'])
-    expect(await only('other', ['import { api } from \'./my-api\'', 'export default api().get(\'/a\', () => 1)'])).toEqual([])
-    expect(await only('none', ['const api = () => ({ get: (path: string, run: () => number) => run() })', 'export default api().get(\'/a\', () => 1)'])).toEqual([])
+    expect(await only('alias', ['import { api as server } from \'kay/server\'', `export default server().get('/a', () => 1, ${both})`])).toEqual(['alias GET /a'])
+    expect(await only('aliased-const', ['import { api as server } from \'kay/server\'', 'const app = server()', `export default app.get('/a', () => 1, ${both})`])).toEqual(['aliased-const GET /a'])
+    expect(await only('namespace', ['import * as kay from \'kay/server\'', `export default kay.api().get('/a', () => 1, ${both})`])).toEqual(['namespace GET /a'])
+    expect(await only('let', ['import { api } from \'kay/server\'', 'let app', 'app = api()', `export default app.get('/a', () => 1, ${both})`])).toEqual(['let GET /a'])
+    expect((await only('helper', ['import { api } from \'kay/server\'', `function base() { return api().get('/b', () => 1, ${both}) }`, 'const arrow = () => api()', 'const one = base()', `export default one.get('/a', () => 1, ${both})`, `arrow().post('/c', () => 1, ${both})`])).sort()).toEqual(['helper GET /a', 'helper GET /b', 'helper POST /c'])
+    expect(await only('other', ['import { api } from \'./my-api\'', `export default api().get('/a', () => 1, ${both})`])).toEqual([])
+    expect(await only('none', ['const api = () => ({ get: (path: string, run: () => number) => run() })', `export default api().get('/a', () => 1, ${both})`])).toEqual([])
   })
 
-  it('says nothing without mcp, or when the lints are allowed', async () => {
+  it('says nothing without mcp, or when the lint is allowed', async () => {
     const dir = await fixtureCopy('mcp')
 
     expect(await codes(dir, false)).toEqual([])
-    expect(await codes(dir, true, { 'deprecated-api-tool': 'allow', 'hidden-tool': 'allow' })).toEqual([])
-  })
-
-  it('speaks to an app upgrading from before 1.51 alone, not to one turning mcp on since', async () => {
-    const dir = await fixtureCopy('mcp')
-    const before = process.env[UPGRADE_FROM]
-
-    try {
-      delete process.env[UPGRADE_FROM]
-      expect(await codes(dir)).toEqual([['hidden-tool', 'GET /both']])
-      process.env[UPGRADE_FROM] = '1.51.2'
-      expect(await codes(dir)).toEqual([['hidden-tool', 'GET /both']])
-      process.env[UPGRADE_FROM] = '1.50.4'
-      expect((await codes(dir)).map(([code]) => code).sort()).toEqual(['deprecated-api-tool', 'hidden-tool'])
-    }
-    finally {
-      process.env[UPGRADE_FROM] = before
-    }
+    expect(await codes(dir, true, { 'hidden-tool': 'allow' })).toEqual([])
   })
 })
