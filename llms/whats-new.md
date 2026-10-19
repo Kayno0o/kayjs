@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.57.0
 
 - The analytics tracker counts nothing for a page a guard covers, with no `exclude` ([Privacy](privacy.md)); see [Upgrading](upgrading.md).
 - kayjs-auth binds OAuth tokens to the `resource` asked at authorize: the token request and a refresh may name it again or leave it out, any other is `invalid_target`, several `resource` parameters are refused at authorize as at the token endpoint, and a refresh refused for its resource or scope, or a code exchange refused for its resource or `redirect_uri`, keeps its token or code for the retry (with a store that has `oauth.refresh.get` or `oauth.codes.get`) ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md)); see [Upgrading](upgrading.md).
