@@ -366,7 +366,7 @@ describe('pages', () => {
       }
 
       expect(pieces.strings).toHaveLength(pieces.texts.length + 1)
-      expect(pieces.strings.flatMap((string, index) => [string, pieces.texts[index]?.text ?? '']).join('')).toBe(opening + sheets + closing)
+      expect(pieces.strings.flatMap((string, index) => [string, pieces.texts[index]?.bytes.toString() ?? '']).join('')).toBe(opening + sheets + closing)
     }
   })
 

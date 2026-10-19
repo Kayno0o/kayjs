@@ -2078,12 +2078,14 @@ describe('compression', () => {
 
         expect(sent.headers.get('content-encoding')).toBe('gzip')
         expect(new TextDecoder().decode(Bun.gunzipSync(await sent.bytes()))).toBe(page)
-
-        // From the third sighting the kept copy answers, found without reading the body.
-        if (round >= 2)
-          expect(response.bodyUsed).toBe(false)
       }
     }
+
+    // From the third sighting the kept copy answers from the pieces alone: a body that differs from them is not looked at.
+    const [first, firstStrings, firstTexts] = pages[0]!
+    const unread = wholeResponse(first.replace('café', 'cafe'), { headers: { 'content-type': 'text/html' } }, { strings: firstStrings, texts: firstTexts })
+
+    expect(new TextDecoder().decode(Bun.gunzipSync(await (await compressResponse(new Request('http://localhost/', accept), unread, fixed))!.bytes()))).toBe(first)
 
     // The same page without pieces finds the copy the pieces kept, and the reverse.
     const [page, , texts] = pages[0]!

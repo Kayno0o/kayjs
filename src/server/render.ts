@@ -39,7 +39,7 @@ import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
-import { preferredEncoding, wholeResponse } from './compress'
+import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT } from './dev'
 import { noteRedirect } from './dev-notes'
@@ -991,8 +991,6 @@ function outcomeScript(outcome: Outcome | null): string {
   return `<script type="application/json" ${OUTCOME_SCRIPT}>${text.replaceAll('<', '\\u003c')}</script>`
 }
 
-const STYLE_OPEN = '<style>'
-
 // The sheets of a chain cut at the fixed texts they hold, with the text cut, which the same chain keeps writing as one string.
 interface SheetSplit { sheets: string, strings: string[], texts: FixedText[] }
 
@@ -1000,15 +998,17 @@ const splitSheets = new WeakMap<FixedText[], Map<string, SheetSplit>>()
 
 function splitAtFixed(sheets: string, fixed: FixedText[]): SheetSplit {
   const split: SheetSplit = { sheets, strings: [], texts: [] }
+  // Read back from the bytes only while cutting, so no second copy of a stylesheet stays held.
+  const written = fixed.map(one => ({ one, string: one.bytes.toString() }))
   let cursor = 0
 
-  for (let at = sheets.indexOf(STYLE_OPEN); at >= 0; at = sheets.indexOf(STYLE_OPEN, at + 1)) {
-    const text = at < cursor ? undefined : fixed.find(one => sheets.startsWith(one.text, at))
+  for (let at = sheets.indexOf(STYLE_TAG); at >= 0; at = sheets.indexOf(STYLE_TAG, at + 1)) {
+    const found = at < cursor ? undefined : written.find(({ string }) => sheets.startsWith(string, at))
 
-    if (text) {
+    if (found) {
       split.strings.push(sheets.slice(cursor, at))
-      split.texts.push(text)
-      cursor = at + text.text.length
+      split.texts.push(found.one)
+      cursor = at + found.string.length
     }
   }
 

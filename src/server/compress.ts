@@ -257,8 +257,6 @@ async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding)
 export interface FixedText {
   // Tells the texts of a process apart, for the key of a page's kept copy.
   readonly id: number
-  // The text as the render writes it into a page.
-  readonly text: string
   bytes: Buffer
   head: Buffer
   // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it. Deflated the first time a page carries the text, at the strongest level.
@@ -278,7 +276,6 @@ export function fixedText(text: string): FixedText {
   const bytes = Buffer.from(text)
   const fixed: FixedText = {
     id: fixedTextIds++,
-    text,
     bytes,
     head: bytes.subarray(0, HEAD_BYTES),
     get deflated() {
@@ -294,7 +291,9 @@ export function fixedText(text: string): FixedText {
   return fixed
 }
 
-const STYLE_OPEN = Buffer.from('<style>')
+export const STYLE_TAG = '<style>'
+
+const STYLE_OPEN = Buffer.from(STYLE_TAG)
 
 // The fixed texts by their head, and the lengths a head has: a response is searched at its `<style>` tags alone, not once per text.
 interface FixedIndex {
@@ -703,6 +702,10 @@ async function compressBody(response: Response, source: Response | ReadableStrea
   const kept = pieced && keptPieces(pieced.pieces, pieced.size)
 
   if (kept) {
+    // The page's text, never read, is let go at once rather than held until a collection: about 20 MiB of peak memory at 16 connections.
+    if (source instanceof Response)
+      void source.body?.cancel()
+
     varyOnEncoding(headers)
 
     return new Response(lateBody(kept), { status, statusText, headers: compressedHeaders(headers, 'gzip') })
