@@ -12,6 +12,17 @@ import { parseKay } from '../compiler/parser'
 export const LARGE_IMAGE_BYTES = 256 * 1024
 const RASTER = /\.(?:png|jpe?g|gif|webp|avif|bmp)$/i
 const QUERY_OR_HASH = /[?#].*$/
+const TRAILING_SLASHES = /\/+$/
+
+// A url as the server compares it, percent-escapes decoded; a malformed escape is left as written.
+function decoded(url: string): string {
+  try {
+    return decodeURIComponent(url)
+  }
+  catch {
+    return url
+  }
+}
 
 // The `img` of a template whose static `src` is a public raster over `LARGE_IMAGE_BYTES`, which is served as it is: the file is sent whole to every visitor, however small it is drawn.
 // An `img` with its own `srcset` is left alone, as is a `src` written as an expression.
@@ -24,7 +35,13 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   const rasters = publicPaths.filter(file => RASTER.test(file.url))
   const sizes = new Map<string, number>()
 
-  await Promise.all(rasters.map(async file => sizes.set(file.url, (await stat(file.path)).size)))
+  // A file that vanished between the scan and now has nothing to report.
+  await Promise.all(rasters.map(async (file) => {
+    try {
+      sizes.set(decoded(file.url), (await stat(file.path)).size)
+    }
+    catch {}
+  }))
 
   const large = new Map([...sizes].filter(([, size]) => size > LARGE_IMAGE_BYTES))
 
@@ -32,6 +49,8 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
     return []
 
   const found: CheckDiagnostic[] = []
+  const base = (options.base ?? '').replace(TRAILING_SLASHES, '')
+  const bySrc = (url: string) => large.get(decoded(url)) ?? (base !== '' && url.startsWith(`${base}/`) ? large.get(decoded(url.slice(base.length))) : undefined)
 
   for (const file of await findKayFiles(root, { project: true, ownKayOnly: true })) {
     const source = await Bun.file(file).text()
@@ -46,7 +65,7 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
       const named = (name: string) => node.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
       const src = named('src')
       const url = src?.kind === 'static' ? src.text.replace(QUERY_OR_HASH, '') : undefined
-      const size = url === undefined ? undefined : large.get(url)
+      const size = url === undefined ? undefined : bySrc(url)
 
       if (src === undefined || size === undefined || named('srcset'))
         return undefined
