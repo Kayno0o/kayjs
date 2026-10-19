@@ -524,7 +524,7 @@ Agents sign in with PKCE, never a client secret. An access token lasts an hour. 
 
 A whole sign-in ends 90 days after it began. One refresh token used twice ends it at once.
 
-An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`, naming one where none was asked included. Tokens issued before this keep working, bound to nothing, and a refresh of one may name a resource of your site.
+An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Signing in with a code that asked for none refuses one named at the token endpoint. Tokens issued before this keep working, bound to nothing, and a refresh of one may name a resource of your site.
 
 An approval given while your app declared no `scopes` asks the user again once it declares some.
 
