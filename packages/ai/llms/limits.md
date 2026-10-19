@@ -17,7 +17,7 @@ export default defineConfig({
 
 ## The options
 
-- In production, a `limit` or `budget` left out is not unlimited: a visitor gets `limit: { max: 20, window: '10m' }` and `budget: { tokens: 100_000, window: '1d' }` (no `total`), in this process's memory, also in an app that never calls `ai()`. `limit: false` or `budget: false` lifts that one, for an app counting elsewhere (an action's `rateLimit`, a gateway). Development and tests have no default. Set `total` to cap what many addresses or accounts spend together.
+- In production, a `limit` or `budget` left out is not unlimited: a visitor gets `limit: { max: 20, window: '10m' }` and `budget: { tokens: 100_000, window: '1d' }` (no `total`), in this process's memory, also in an app that never calls `ai()`. `limit: false` or `budget: false` lifts that one, for an app counting elsewhere (an action's `rateLimit`, a gateway). Development and tests have no default. Set `total` to cap what many addresses or accounts spend together. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, so the defaults cap the whole site: set `proxy`.
 
 - `limit: { max, window, store? }`: at most `max` asks per visitor every `window`. Counted when the reply is first read, so a reply never read counts nothing.
 - `budget: { tokens, total?, window, store? }`: the tokens (input plus output) the replies to one visitor may use every `window`, and across all visitors with `total`. `tokens` and `total` are whole numbers of at least 1.
@@ -36,7 +36,7 @@ export default defineConfig({
 - The budget is compared with the tokens already counted plus what the replies running in this process hold: each holds its worst case, its input plus `maxTokens`, until it ends. So asks started together are refused past the budget rather than all passing, at the price that a visitor near the budget cannot start a second reply while one runs. Holds are not seen by other processes sharing a `store`, which can each pass by their own running replies.
 - When the reply ends, finished, failed or stopped, its tokens are added with the provider's `usage` as the weight. Cache reads and writes count too, one token each like any other (`inputTokens` leaves them out, so the sum is the whole input), so a cached chat cannot spend past its budget unseen; the budget is a cap on tokens, not on price, which a cache read lowers. With no usage reported, the characters sent and received stand for it (4 per token, low for code and CJK text); a reply that failed before any text and any usage counts nothing, while one stopped before the provider said anything counts its input. One stopped before it began is not asked and counts nothing.
 - A reply that overruns the budget mid-stream finishes, bounded by its input and `maxTokens`, and all of it is counted; the next ask is refused. A reply ending after its window rolled over counts in the new window.
-- `ai()` replaces the settings on every config reload and keeps the counts in memory, whose windows keep the length they opened with until they close. Calling `ai()` with no options clears the limits.
+- `ai()` replaces the settings on every config reload and keeps the counts in memory, whose windows keep the length they opened with until they close. Calling `ai()` with no options clears what an earlier call set: no limits in development, the production defaults in production.
 - Tokens, not money: prices change too often to ship a table; set `tokens` from the price of the model you use.
 
 ## Over a limit

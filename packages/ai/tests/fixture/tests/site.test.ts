@@ -74,6 +74,15 @@ test('a visitor over the limit gets 429 and words from the chat action, nothing 
   }
 })
 
+test('a conversation past the input cap gets 413 and words from the chat action, nothing asked of the model', async () => {
+  const input = { messages: Array.from({ length: 14 }, () => ({ role: 'user' as const, content: 'x'.repeat(4000) })) }
+  const refusal = await site.refusal(reply, input)
+
+  expect(refusal.status).toBe(413)
+  expect(refusal.errors['']).toContain('too long')
+  expect(fakeAi.asked).toHaveLength(0)
+})
+
 test('a chat tells the visitor they talk to an AI whose provider gets their messages, a prop words it and an empty one hides it', async () => {
   const shown = (await site.visit('/assistant')).html
   const line = /<p class="kai-chat-disclosure">([^<]*)<\/p>/

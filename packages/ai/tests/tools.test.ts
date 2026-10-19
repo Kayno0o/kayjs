@@ -13,7 +13,7 @@ import { done } from './fixture/src/testing'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, watch, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, watch, unconfirmed, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
@@ -451,6 +451,16 @@ describe('confirm', () => {
       expect(text).toContain('has not confirmed')
       expect(text).toContain('"failed":true')
     }
+  })
+
+  it('is the one ask passes to the loop', async () => {
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('ok')
+
+    const steps = await site.call(unconfirmed, { prompt: 'go' })
+
+    expect(done).toEqual([])
+    expect(steps.at(-1)!.calls).toMatchObject([{ name: 'add_note', status: 'failed' }])
   })
 
   it('runs nothing when confirm throws', async () => {

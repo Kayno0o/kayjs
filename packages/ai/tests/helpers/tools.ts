@@ -19,4 +19,5 @@ export interface Tools {
   refusedTools: Action<{ which: 'vetoed' | 'upload' }, string>
   upload: ToolAction
   watch: Action<{ prompt: string }, Step[]>
+  unconfirmed: Action<{ prompt: string }, Step[]>
 }

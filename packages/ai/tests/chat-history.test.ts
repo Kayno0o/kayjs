@@ -95,3 +95,12 @@ test('the oldest turns go when the conversation outgrows the cap, and a refusing
   stored('old', [{ role: 'user', content: 'new' }])
   expect(restored('old')).toEqual([])
 })
+
+test('long turns drop the oldest first so a send stays under what ask takes, keeping the last message and an opening user turn', () => {
+  const long = 'x'.repeat(15_000)
+  const turns = [user(long), assistant(long), user(long), assistant(long), user('last')]
+
+  expect(roles(posted(turns, 20)).map(turn => turn.slice(0, 2))).toEqual(['u:', 'a:', 'u:'])
+  expect(posted(turns, 20).reduce((sum, { content }) => sum + content.length, 0)).toBeLessThanOrEqual(40_000)
+  expect(posted([user('x'.repeat(60_000))], 20)).toHaveLength(1)
+})

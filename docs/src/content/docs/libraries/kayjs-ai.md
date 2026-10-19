@@ -190,7 +190,9 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
 
-To make a call wait for the visitor's yes, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first. You decide what counts as a yes, such as a token your page issued after a button, or a read tool answering `true` at once. `Chat` has no confirm button of its own.
+To make a call wait for the visitor's yes, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
+
+You decide what counts as a yes, such as the last message of the visitor saying so (what `Chat` can send, as it posts only the messages), a token your page issued after a button, or a read tool answering `true` at once. `Chat` has no confirm button of its own.
 
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
 
@@ -222,7 +224,7 @@ export default defineConfig({
 })
 ```
 
-Those defaults count in memory and set no `total`, so give `budget` a `total` to cap what many accounts spend together.
+Those defaults count in memory and set no `total`, so give `budget` a `total` to cap what many accounts spend together. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and the defaults cap the whole site.
 
 `limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 

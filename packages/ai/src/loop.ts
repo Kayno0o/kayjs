@@ -65,7 +65,6 @@ async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<
     return failed(`There is no tool named ${JSON.stringify(clip(use.name, MAX_NAME))}; the tools are ${[...tools.keys()].join(', ')}`)
 
   try {
-    // A confirmation that throws fails the call like a tool that throws.
     if (confirm && await confirm({ name: use.name, input, request }) !== true)
       return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
 

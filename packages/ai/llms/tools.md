@@ -31,10 +31,10 @@ p Assistant
 
 ## Confirming a call
 
-`ask(messages, { tools, confirm })` calls `confirm({ name, input, request })` before each call runs, `name` being the tool's (`book_slot`): only `true` lets it through. Anything else, such as `false`, runs nothing and tells the model `The visitor has not confirmed this call, so it did not run; ask them, then call it again`; a throw fails the call like a tool that throws. A read answers `true`, a write checks what the visitor agreed to, such as a token the page issued after a button, or that their last message says yes. There is no confirm button in `Chat`: the app decides what confirmation is.
+`ask(messages, { tools, confirm })` calls `confirm({ name, input, request })` before each call runs, `name` being the tool's (`book_slot`): only `true` lets it through. Anything else, such as `false`, runs nothing and tells the model `The visitor has not confirmed this call, so it did not run; ask them, then call it again`; a throw fails the call like a tool that throws. A read answers `true`, a write checks what the visitor agreed to, such as that their last message says yes (all `Chat` posts is the messages), or, from a page of your own, a token issued after a button. There is no confirm button in `Chat`: the app decides what confirmation is.
 
 ```ts
-ask(messages, { tools: [findSlot, bookSlot], confirm: ({ name, request }) => name === 'find_slot' || request.headers.get('x-confirmed') === 'yes' })
+ask(messages, { tools: [findSlot, bookSlot], confirm: ({ name }) => name === 'find_slot' || lastSaysYes(messages) })
 ```
 
 ## What the model is told when a call goes wrong

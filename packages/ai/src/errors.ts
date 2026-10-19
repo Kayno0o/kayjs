@@ -59,8 +59,9 @@ export class AiError extends Error {
     this.partial = partial
     this.limit = limit
 
-    if (kind === 'too-long')
+    if (kind === 'too-long') {
       Object.defineProperty(this, REFUSED, { value: { status: 413, retryAfter: undefined, message: 'That conversation is too long; shorten it or start a new one' } })
+    }
 
     if (kind === 'limited') {
       Object.defineProperty(this, REFUSED, { value: { status: 429, retryAfter, message: `${VISITOR_WORDS[limit ?? 'asks']}; try again${retryAfter === undefined ? ' later' : ` in ${retryAfter} s`}` } })
