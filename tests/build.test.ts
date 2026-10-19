@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
-import { buildClient, keepMaps, readClientSources } from '../src/build/client'
+import { buildClient, islandManifest, keepMaps, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
@@ -1970,13 +1970,20 @@ describe('the build report', () => {
     }
   })
 
+  it('finds the hydrate-when chunk whatever separator the metafile names its source with, and with no directory before it', () => {
+    for (const input of ['runtime/hydrate-when.ts', '/app/node_modules/kay/src/runtime/hydrate-when.ts', 'C:\\app\\runtime\\hydrate-when.ts'])
+      expect(islandManifest('/app', { 'when.js': { imports: [], inputs: { [input]: {} } } }, new Map(), 'entry.js', false).hydrateWhen).toEqual([expect.stringContaining('when.js')])
+
+    expect(islandManifest('/app', { 'when.js': { imports: [], inputs: { 'src/my-runtime/hydrate-when.ts': {} } } }, new Map(), 'entry.js', false).hydrateWhen).toBeUndefined()
+  })
+
   it('estimates an unprerendered route through helpers, dynamic imports and aliases, counts a shared chunk once, and charges the entry to a form or a deferred island', async () => {
     const dir = await scratchDir('route-sizes-')
 
     try {
       const chunk = async (name: string, size: number) => Bun.write(join(dir, 'out', name), Array.from({ length: size }, (_, index) => `export const v${index} = ${index * 7919 % 1013}\n`).join(''))
 
-      await Promise.all([chunk('entry.js', 60), chunk('a.js', 40), chunk('b.js', 40), chunk('shared.js', 80)])
+      await Promise.all([chunk('entry.js', 60), chunk('a.js', 40), chunk('b.js', 40), chunk('shared.js', 80), chunk('when.js', 30)])
       await Promise.all(Object.entries({
         'tsconfig.json': JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '~/*': ['src/*'] } } }),
         'src/a.kay': 'p A\n',
@@ -1989,6 +1996,8 @@ describe('the build report', () => {
         'src/routes/form.kay': 'form(action={add})\n  input(name="title")\n',
         'src/routes/defer.kay': '---\nimport A from \'../a.kay\'\n---\nA(server="defer")\n',
         'src/routes/plain.kay': 'p Plain\n',
+        'src/routes/visible.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="visible")\n',
+        'src/routes/eager.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="load")\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 
       const url = (name: string) => `/_kay/${name}`
@@ -1999,16 +2008,18 @@ describe('the build report', () => {
           { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js'), url('shared.js')] },
         ],
       }
-      const routes = ['helper', 'dynamic', 'alias', 'both', 'form', 'defer', 'plain'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
-      const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map(), navigation: true } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each.js]))
-      const [entry, a, b, shared] = await Promise.all(['entry.js', 'a.js', 'b.js', 'shared.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
+      const routes = ['helper', 'dynamic', 'alias', 'both', 'form', 'defer', 'plain', 'visible', 'eager'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map(), navigation: true, hydrateWhen: [url('when.js'), url('shared.js')] } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each.js]))
+      const [entry, a, b, shared, when] = await Promise.all(['entry.js', 'a.js', 'b.js', 'shared.js', 'when.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
 
+      expect(sizes['/visible']).toBe(entry! + a! + shared! + when!)
+      expect(sizes['/eager']).toBe(entry! + a! + shared!)
       expect(sizes['/helper']).toBe(entry! + a! + shared!)
       expect(sizes['/alias']).toBe(entry! + a! + shared!)
       expect(sizes['/dynamic']).toBe(entry! + b! + shared!)
       expect(sizes['/both']).toBe(entry! + a! + b! + shared!)
       expect(sizes['/form']).toBe(entry)
-      expect(sizes['/defer']).toBe(entry! + a! + shared!)
+      expect(sizes['/defer']).toBe(entry! + a! + shared! + when!)
       expect(sizes['/plain']).toBe(0)
     }
     finally {

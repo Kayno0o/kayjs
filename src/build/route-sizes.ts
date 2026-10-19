@@ -1,4 +1,5 @@
 import type { RenderedPage } from '../check/seo'
+import type { ElementNode, NamedAttribute } from '../compiler/ast'
 import type { ClientBuild } from '../server/client'
 import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
@@ -74,6 +75,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     const facts = await factsOf(file, root, reads)
 
     found.ships ||= (facts.posts && client.navigation === true) || facts.defers
+    found.waits ||= facts.waits || facts.defers
 
     for (const imported of facts.imports)
       await reach(imported, found, seen)
@@ -100,14 +102,15 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
       continue
     }
 
-    const found: Reach = { islands: new Set(), ships: false }
+    const found: Reach = { islands: new Set(), ships: false, waits: false }
     const seen = new Set<string>()
 
     for (const file of [...route.layouts, route.file])
       await reach(file, found, seen)
 
     // A chunk two islands share is weighed once, and the entry ships with an island or when a form or a deferred island needs it.
-    const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
+    // A page holding an island that waits to be visible or idle, or a deferred server island, preloads the code waiting for it too.
+    const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...found.waits ? client.hydrateWhen ?? [] : [], ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
 
     bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, islands: [...found.islands].sort(), pages: 0, kept, ...why !== undefined && { stop: why }, estimated: true })
   }
@@ -122,11 +125,14 @@ interface SourceFacts {
   posts: boolean
   // A server island the entry fetches once the page has loaded.
   defers: boolean
+  // An island marked to hydrate when visible or idle, or by a value the build cannot read.
+  waits: boolean
 }
 
 interface Reach {
   islands: Set<string>
   ships: boolean
+  waits: boolean
 }
 
 async function factsOf(file: string, root: string, memo: Map<string, Promise<SourceFacts>>): Promise<SourceFacts> {
@@ -139,20 +145,33 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         const imports = [...source.matchAll(IMPORT)].flatMap(([, specifier]) => followed(resolveFrom(specifier!, file), root) ?? [])
 
         if (!file.endsWith('.kay'))
-          return { imports, posts: false, defers: false }
+          return { imports, posts: false, defers: false, waits: false }
 
         const elements = [...elementsIn(parseKay(source).template)]
 
-        return { imports, posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer') }
+        return { imports, posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
-        return { imports: [], posts: false, defers: false }
+        return { imports: [], posts: false, defers: false, waits: false }
       }
     })()
     memo.set(file, facts)
   }
 
   return facts
+}
+
+// Whether a component call is marked `hydrate="visible"` or `hydrate="idle"`, or by a value the build cannot read.
+function waitsToHydrate(element: ElementNode, source: string): boolean {
+  if (!element.component)
+    return false
+
+  const mark = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'hydrate')
+
+  if (mark === undefined || mark.kind === 'boolean')
+    return false
+
+  return mark.kind !== 'static' || mark.text === 'visible' || mark.text === 'idle'
 }
 
 // A component anywhere, as a package may ship islands; a script only of the app, as the rest is a library whose islands an app imports as components.

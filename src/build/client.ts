@@ -546,9 +546,9 @@ export function warnUnresolved(root: string, found: UnresolvedClass[], islands: 
 }
 
 // The source of the code waiting for an island to be visible or idle, whose chunk the pages holding such an island preload.
-const HYDRATE_WHEN_SOURCE = '/runtime/hydrate-when.ts'
+const HYDRATE_WHEN_SOURCE = /(?:^|[/\\])runtime[/\\]hydrate-when\.ts$/
 
-function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {
+export function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {
   const idByFile = new Map([...islands].map(([id, file]) => [file, id]))
   const files = new Set(islands.values())
   const entries = new Set([entry])
@@ -566,7 +566,7 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
     return seen
   }
   const manifest: Omit<ClientManifest, 'styles'> = { entryImports: [], islands: {} }
-  const whenOutput = Object.entries(outputs).find(([, meta]) => Object.keys(meta.inputs ?? {}).some(input => input.endsWith(HYDRATE_WHEN_SOURCE)))?.[0]
+  const whenOutput = Object.entries(outputs).find(([, meta]) => Object.keys(meta.inputs ?? {}).some(input => HYDRATE_WHEN_SOURCE.test(input)))?.[0]
 
   if (whenOutput !== undefined)
     manifest.hydrateWhen = [...closure(whenOutput)].map(assetUrl)
