@@ -5,11 +5,11 @@ import Panel from './chat-panel.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icon, closeIcon, sendIcon, stopIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember = 'kai-chat', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'sendIcon' | 'stopIcon'> & {
+const { icon, closeIcon, sendIcon, stopIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'sendIcon' | 'stopIcon'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
-  // The tab's session storage key the conversation is kept under, so a reload finds it; `kai-chat` by default.
+  // The tab's session storage key the conversation is kept under, so a reload finds it; none by default, as the next visitor to use the tab would read it. A site with sign-in gives one per visitor.
   remember?: string | undefined
   // What the button and the panel's close button draw, in place of a chat bubble and a cross.
   icon?: JSX.Element

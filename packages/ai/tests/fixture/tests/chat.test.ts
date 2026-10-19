@@ -442,7 +442,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(page.errors).toEqual([])
     })
 
-    test('the conversation stays across a page swap, a source link navigates in place, and a reload of the tab finds it again', async () => {
+    test('the conversation stays across a page swap and a source link navigates in place, and a reload of the tab starts afresh', async () => {
       const page = await site.open('/launcher/one')
 
       await page.click('.kai-launcher-button')
@@ -465,12 +465,35 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(await page.count(opened)).toBe(1)
       expect(await page.count('.kai-chat-turn')).toBe(2)
 
+      // The next visitor to use the tab must not read it: nothing is kept unless the site names a key.
+      expect(await page.evaluate(() => sessionStorage.length)).toBe(0)
+
+      await page.reload()
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      await page.waitFor('.kai-chat-empty')
+
+      expect(await page.count('.kai-chat-turn')).toBe(0)
+      expect(page.errors).toEqual([])
+    })
+
+    test('a launcher given remember keeps the conversation over a reload under that key', async () => {
+      const page = await site.open('/kept')
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply('Hi back')
+      await page.fill('textarea', 'Hello')
+      await page.press('Enter')
+      await page.waitFor('[data-pending]', { gone: true })
       await page.reload()
       await page.click('.kai-launcher-button')
       await page.waitUntil(chatHydrated)
       await page.waitFor('.kai-chat-turn[data-role="user"]', { text: 'Hello' })
 
       expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(await page.evaluate(() => sessionStorage.getItem('kai-chat'))).toBeNull()
+      expect(await page.evaluate(() => sessionStorage.getItem('kept-chat'))).toContain('Hello')
       expect(page.errors).toEqual([])
     })
 
@@ -537,7 +560,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.waitFor('.kai-chat-empty')
 
       expect(await page.count('.kai-chat-turn')).toBe(0)
-      expect(await page.evaluate(() => sessionStorage.getItem('kai-chat'))).toBe('[]')
+      expect(await page.evaluate(() => sessionStorage.length)).toBe(0)
       expect(page.errors).toEqual([])
     })
 

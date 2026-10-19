@@ -127,7 +127,7 @@ slot
 ChatLauncher(action={reply} label="Ask the docs")
 ```
 
-The chat's code loads the first time the panel opens, so a visitor who never opens it downloads the button and nothing more. The panel stays open across pages, with the conversation in it, and a link in an answer to a page of your site opens in place instead of in a new tab. A reload of the tab finds the conversation again, kept in the tab's session storage.
+The chat's code loads the first time the panel opens, so a visitor who never opens it downloads the button and nothing more. The panel stays open across pages, with the conversation in it, and a link in an answer to a page of your site opens in place instead of in a new tab. The conversation is kept only in the page, so a reload of the tab starts a new one.
 
 The button works from the keyboard: Enter or Space opens the panel and puts the focus in the field, and Escape closes it and gives the focus back to the button. A reply under way stops on the first Escape.
 
@@ -137,7 +137,7 @@ Its header has a New conversation button, which clears the log and the kept hist
 
 A site restyles the panel with custom properties, all optional: `--kai-chat-accent`, `--kai-chat-bubble`, `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width`, `--kai-chat-width-large`, `--kai-chat-height` and `--kai-chat-height-large`. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
 
-The conversation is kept in the tab's session storage under the `remember` prop (`kai-chat`), so on a site with sign-in, give it a key per visitor or clear it when they sign out.
+To let a reload of the tab find the conversation again, give `remember` a name, and it is kept in the tab's session storage under it. Nothing is kept by default, because the next person to use the tab after a sign-out would read it. On a site with sign-in, make the name per visitor, such as `` `kai-chat-${user.id}` ``.
 
 ## The reply
 

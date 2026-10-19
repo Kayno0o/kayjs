@@ -19,6 +19,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-cms edit links no longer write in production without a guard
 
 - A server with no `cms({ guard })` used to let an edit link or cookie save, publish, delete and upload with no user; it now answers 403 to each and warns at boot. Set `cms({ guard })` to let editors write (`kay dev` keeps working without one; any other server, `NODE_ENV` unset included, counts as production). An edit cookie also reads only the entries the pages it rendered read, so an app that called the cms API for another collection with one signs in through the guard. No lint, as the guard is a runtime setting.
+### `ChatLauncher` keeps nothing by default
+
+- `ChatLauncher` stored the conversation under `kai-chat` in the tab's session storage and now stores nothing: a reload starts afresh. An app that wants the old behaviour passes `remember="kai-chat"`, on a site with sign-in a name per visitor. No lint, as the old form is still valid.
 
 ### kayjs-ai limits a public chat by default
 
