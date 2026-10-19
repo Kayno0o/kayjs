@@ -1348,7 +1348,7 @@ describe('SQLite stores', () => {
       // The rates and session stores open their file on first use, so a config naming them creates nothing until then.
       await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', 60_000)
       await sqliteStore(join(dir, 'sessions/sessions.sqlite')).get('a')
-      sqliteCache(join(dir, 'cache/cache.sqlite'))
+      sqliteCache(join(dir, 'cache/cache.sqlite')).set('a', '["a"]', 0)
       // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.
       await sqliteJobs(join(dir, 'jobs/jobs.sqlite')).lock('report', 0)
 

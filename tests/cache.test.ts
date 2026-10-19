@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -148,6 +149,28 @@ describe('cached with a store', () => {
     // Stale: given as it is, refreshed in the background for the next process.
     expect(await inProcess(path, 3)).toEqual({ edition: 1, date: true })
     expect(await inProcess(path, 4)).toEqual({ edition: 3, date: true })
+  })
+
+  it('creates no file, nor its directory, until a value is set or an invalidation published', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
+
+    dirs.push(dir)
+
+    const path = join(dir, 'data/cache.sqlite')
+    const store = sqliteCache(path)
+
+    // Naming it, reading it and an invalidation that drops nothing find nothing and write nothing.
+    expect(store.get('a')).toBeUndefined()
+    expect(store.keys()).toEqual([])
+    expect(store.dependencies!().size).toBe(0)
+    store.delete('a')
+    invalidate(key => key.startsWith('b'))
+    await Bun.sleep(600)
+    expect(existsSync(join(dir, 'data'))).toBe(false)
+
+    store.set('a', '["a"]', Date.now() + 60_000)
+    expect(existsSync(path)).toBe(true)
+    expect(store.get('a')?.text).toBe('["a"]')
   })
 
   it('drops a key a store kept before any call named it, as an action does after a restart', async () => {
@@ -314,6 +337,9 @@ describe('cached with a store', () => {
   it('follows rows another process writes straight into the file, one of an older version included', async () => {
     const path = await storePath()
     const store = sqliteCache(path)
+
+    store.set('seed', '["seed"]', Date.now() + 60_000)
+
     const other = new Database(path)
     const insert = (key: string, value: string) => other.run('INSERT OR REPLACE INTO kay_cache VALUES (?, ?, ?)', [key, value, Date.now() + 60_000])
 

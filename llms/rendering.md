@@ -140,7 +140,7 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 - The processes of one machine share a SQLite store.
 - Each keeps its copy in memory, and an `invalidate` in one process empties the store at once and reaches the others' copies within about half a second, through an events table each process polls once it has opened the store: a string key always, a function's keys as far as that process and the store know them.
 - A load another process had already started may still write the old value back.
-- `invalidate` empties a `sqliteCache` from the moment it opens, so an action after a restart reaches what it kept; a store of your own, once a `cached` call has named it.
+- `invalidate` empties a `sqliteCache` from the moment a module names it, so an action after a restart reaches what it kept; a store of your own, once a `cached` call has named it. A `sqliteCache` opens its file on first use, a value set or an invalidation published, so a module naming it creates no file in `kay build`, `kay check` or a test; until then it finds nothing in a file that does not exist, and hears the other processes as soon as one makes it.
 - A key belongs to one store: once in memory, it is read and written there whatever store a later call names.
 - A store that fails to write, locked or full, is logged and the value kept in memory.
 - Rows are never swept, since a stale one is still served: `invalidate` keys a site stops using, such as those of deleted posts.

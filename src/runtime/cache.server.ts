@@ -1,4 +1,5 @@
 import type { CacheStore } from './cache'
+import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
 import { ALL_READS, trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
@@ -24,10 +25,9 @@ function readsOf(line: string): string[] {
   }
 }
 
-// Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
-export function sqliteCache(path: string): CacheStore {
+// The file with its tables, triggers and statements ready.
+function openCache(path: string) {
   const db = openSqlite(path)
-  const polls: ReturnType<typeof setInterval>[] = []
 
   db.run('CREATE TABLE IF NOT EXISTS kay_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, fresh_until INTEGER NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_events (id INTEGER PRIMARY KEY AUTOINCREMENT, origin TEXT NOT NULL, message TEXT NOT NULL, at INTEGER NOT NULL)')
@@ -48,45 +48,67 @@ export function sqliteCache(path: string): CacheStore {
   if (!hadDeps)
     db.run(`INSERT OR REPLACE INTO kay_cache_deps SELECT key, ${reads('kay_cache')} FROM kay_cache WHERE ${built('kay_cache')}`)
 
-  const select = db.query<{ value: string, fresh_until: number }, [string]>('SELECT value, fresh_until FROM kay_cache WHERE key = ?')
-  const upsert = db.query('INSERT INTO kay_cache (key, value, fresh_until) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until')
-  const remove = db.query('DELETE FROM kay_cache WHERE key = ?')
-  const names = db.query<{ key: string }, []>('SELECT key FROM kay_cache')
-  const allDeps = db.query<{ key: string, reads: string }, []>('SELECT key, reads FROM kay_cache_deps')
-  const insertEvent = db.query('INSERT INTO kay_events (origin, message, at) VALUES (?, ?, ?)')
-  const pruneEvents = db.query('DELETE FROM kay_events WHERE at < ?')
-  const lastEvent = db.query<{ id: number | null }, []>('SELECT max(id) AS id FROM kay_events')
-  const eventsAfter = db.query<{ id: number, message: string }, [number, string]>('SELECT id, message FROM kay_events WHERE id > ? AND origin != ? ORDER BY id')
+  return {
+    db,
+    select: db.query<{ value: string, fresh_until: number }, [string]>('SELECT value, fresh_until FROM kay_cache WHERE key = ?'),
+    upsert: db.query('INSERT INTO kay_cache (key, value, fresh_until) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until'),
+    remove: db.query('DELETE FROM kay_cache WHERE key = ?'),
+    names: db.query<{ key: string }, []>('SELECT key FROM kay_cache'),
+    allDeps: db.query<{ key: string, reads: string }, []>('SELECT key, reads FROM kay_cache_deps'),
+    insertEvent: db.query('INSERT INTO kay_events (origin, message, at) VALUES (?, ?, ?)'),
+    pruneEvents: db.query('DELETE FROM kay_events WHERE at < ?'),
+    lastEvent: db.query<{ id: number | null }, []>('SELECT max(id) AS id FROM kay_events'),
+    eventsAfter: db.query<{ id: number, message: string }, [number, string]>('SELECT id, message FROM kay_events WHERE id > ? AND origin != ? ORDER BY id'),
+  }
+}
+
+// Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
+// The file is created by the first value set or invalidation published, so a module naming the store creates nothing in a build, a check or a test: a read opens a file that exists and finds nothing in one that does not.
+export function sqliteCache(path: string): CacheStore {
+  let opened: ReturnType<typeof openCache> | undefined
+  let closed = false
+  const polls: ReturnType<typeof setInterval>[] = []
+  const open = (create: boolean) => {
+    if (closed)
+      throw new Error('kay: the cache store was closed')
+
+    if (opened === undefined && (create || existsSync(path)))
+      opened = openCache(path)
+
+    return opened
+  }
 
   const store: CacheStore = {
     get(key) {
-      const row = select.get(key)
+      const row = open(false)?.select.get(key)
 
       return row ? { text: row.value, freshUntil: row.fresh_until } : undefined
     },
     set(key, text, freshUntil) {
-      upsert.run(key, text, freshUntil)
+      open(true)!.upsert.run(key, text, freshUntil)
     },
     delete(key) {
-      remove.run(key)
+      open(false)?.remove.run(key)
     },
     dependencies() {
-      return new Map(allDeps.all().map(row => [row.key, readsOf(row.reads)]))
+      return new Map(open(false)?.allDeps.all().map(row => [row.key, readsOf(row.reads)]))
     },
     keys() {
-      return names.all().map(row => row.key)
+      return open(false)?.names.all().map(row => row.key) ?? []
     },
     publish(message) {
+      const { insertEvent, pruneEvents } = open(true)!
+
       insertEvent.run(PROCESS, message, Date.now())
       pruneEvents.run(Date.now() - EVENT_TTL_MS)
     },
     subscribe(listener) {
-      // What was published before this process opened the store is in what it reads from the store already.
-      let seen = lastEvent.get()?.id ?? 0
+      // What was published before this process opened a file that exists is in what it reads from the store already; a file made later, by this process or another, holds only what came after.
+      let seen = open(false)?.lastEvent.get()?.id ?? 0
 
       const poll = setInterval(() => {
         try {
-          for (const event of eventsAfter.all(seen, PROCESS)) {
+          for (const event of open(false)?.eventsAfter.all(seen, PROCESS) ?? []) {
             seen = event.id
             listener(event.message)
           }
@@ -102,13 +124,15 @@ export function sqliteCache(path: string): CacheStore {
   }
 
   trackStore(store)
-  // A reload runs the module that opened the store again, which opens its own.
+  // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
   onReload(() => {
+    closed = true
+
     for (const poll of polls)
       clearInterval(poll)
 
     untrackStore(store)
-    db.close()
+    opened?.db.close()
   })
 
   return store
