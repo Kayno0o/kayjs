@@ -105,7 +105,10 @@ describe('images.remote caps', () => {
     const fetchRemote = remoteImages(join(cache, 'capped'), remotePatterns([`${origin}/`]), undefined, undefined, limits)
 
     expect(limits).toEqual({ bytes: 1024, timeoutMs: 100 })
-    expect(await fetchRemote(`${origin}/big.jpg`)).toEqual({ status: 413, message: 'The image is over 1024 bytes' })
+    // The size cap is checked under a timeout a loaded runner cannot reach, so a slow local answer is not taken for a slow host.
+    const sized = remoteImages(join(cache, 'sized'), remotePatterns([`${origin}/`]), undefined, undefined, remoteLimits({ remoteMaxSize: '1kb', remoteTimeout: '10s' }))
+
+    expect(await sized(`${origin}/big.jpg`)).toEqual({ status: 413, message: 'The image is over 1024 bytes' })
     expect(await fetchRemote(`${origin}/slow.jpg`)).toEqual({ status: 502, message: 'The host did not give the image' })
   })
 
