@@ -1513,6 +1513,42 @@ describe('routeUrl', () => {
     expect(routeUrl(users, '/files/*', { params: { '*': '%2e%2e/b' } })).toBe('/api/users/files/%252e%252e/b')
   })
 
+  it('refuses an empty param, which would reach the collection route, and lets a wildcard stay empty', () => {
+    expect(() => routeUrl(users, '/:id', { params: { id: '' } })).toThrow(TypeError)
+    expect(() => routeUrl(users, '/:org/:id', { params: { org: 'a', id: '' } })).toThrow(TypeError)
+    expect(routeUrl(users, '/:id', { params: { id: 0 } })).toBe('/api/users/0')
+    expect(routeUrl(users, '/:id', { params: { id: ' ' } })).toBe('/api/users/%20')
+  })
+
+  it('rejects a call with an empty param before any fetch', async () => {
+    const fetched = spyOn(globalThis, 'fetch')
+
+    try {
+      await expect(call(users as never, '/:id' as never, { method: 'delete', params: { id: '' } } as never)).rejects.toThrow(TypeError)
+      expect(fetched).not.toHaveBeenCalled()
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('throws a refused param from stream() and socket() at the call', () => {
+    globalThis.document = { querySelector: () => null } as unknown as Document
+
+    try {
+      expect(() => root(() => stream(users as never, '/:id' as never, { start: false } as never))).not.toThrow()
+
+      for (const id of ['', '..']) {
+        expect(() => root(() => stream(users as never, '/:id' as never, { params: { id } } as never))).toThrow(TypeError)
+        expect(() => root(() => stream(users as never, '/:id' as never, { start: false } as never).start({ params: { id } } as never))).toThrow(TypeError)
+        expect(() => root(() => socket(users as never, '/:id' as never, { params: { id } }))).toThrow(TypeError)
+      }
+    }
+    finally {
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+  })
+
   it('rejects a call whose param is a dot segment before any fetch', async () => {
     await expect(call(users as never, '/:id' as never, { params: { id: '..' } } as never)).rejects.toThrow(TypeError)
   })

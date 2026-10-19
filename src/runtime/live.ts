@@ -458,6 +458,9 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
     if (value === undefined)
       throw new TypeError(`kay: ${path} takes the param ${param}`)
 
+    if (value === '')
+      throw new TypeError(`kay: ${path} cannot take an empty ${param}, it would reach the collection route`)
+
     return encodeSegment(String(value), path)
   })
   const query = new URLSearchParams()
@@ -497,12 +500,13 @@ export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Rec
 // Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
 // Reconnects after a drop, and closes with the component that opened it.
 export function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path> {
-  // The URL is made in the browser only: a page prerendering the island imports the module unmounted.
+  // The URL is made in the browser only, as a page prerendering the island imports the module unmounted; a refused param throws here, at the call, rather than from the mount.
+  const route = typeof document === 'undefined' ? undefined : routeUrl(module, path, options as UrlInput | undefined)
   const client = openSocket<Sent<SocketRoute<Module, Path>>, Received<SocketRoute<Module, Path>>>(() => {
-    if (typeof document === 'undefined')
+    if (route === undefined)
       return undefined
 
-    const target = new URL(withBase(routeUrl(module, path, options as UrlInput | undefined)), location.href)
+    const target = new URL(withBase(route), location.href)
 
     target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:'
 
@@ -584,7 +588,7 @@ export function stream<Module, const Path extends StreamPath<Module>, const M ex
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
 // Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone, and it has to stop on it, as a source ignoring the signal is not released while it waits for its next value. The stream is `done` once the iterable ends and `failed` when it throws.
 export function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
-export function stream(module: unknown, path?: string, options?: { method?: string, start?: boolean }): EventReader<unknown> {
+export function stream(module: unknown, path?: string, options?: UrlInput & { method?: string, start?: boolean }): EventReader<unknown> {
   if (typeof module === 'function')
     return iterate(module as (signal: AbortSignal) => AsyncIterable<unknown>)
 
@@ -592,11 +596,16 @@ export function stream(module: unknown, path?: string, options?: { method?: stri
     throw new TypeError('kay: stream() takes the default export of a module under src/api and a path, or a function returning an async iterable')
 
   const lazy = options?.start === false
-  const opened = (given: object | undefined) => {
+  const opened = (given: UrlInput | undefined) => {
     const init = streamRequest(given)
 
     return async (signal: AbortSignal) => fetch(withBase(routeUrl(module, path, given)), { ...init, signal })
   }
+
+  // A refused param throws at the call and not inside the request, where a GET stream would retry it.
+  if (!lazy && typeof document !== 'undefined')
+    routeUrl(module, path, options)
+
   const reader = readEvents(opened(options), (options?.method ?? 'get') === 'get', lazy)
 
   onMount(() => {
@@ -608,7 +617,15 @@ export function stream(module: unknown, path?: string, options?: { method?: stri
   if (!lazy)
     return reader
 
-  const run: StreamRun<unknown, object> = { ...reader, start: given => reader.start(opened({ ...given, method: options.method })) }
+  const run: StreamRun<unknown, UrlInput> = {
+    ...reader,
+    start: (given) => {
+      const next = { ...given, method: options.method }
+
+      routeUrl(module, path, next)
+      reader.start(opened(next))
+    },
+  }
 
   return run
 }

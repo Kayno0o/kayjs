@@ -199,7 +199,7 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - `call(module, path, options)` from `kay` calls any of its routes over HTTP from an event handler, or any code running in the browser, a module several islands share included: `await call(notes, '/', { method: 'post', body: { title } })`.
 - `method` is GET unless named, and named where the path answers no GET.
 - `params`, `query` and `body` are typed from the route, and the answer as `resource()` reads it, a number or a boolean arriving as the text Elysia sends and nothing as `''`.
-- A param is encoded as one path segment, each segment of a `*` too, and a param or a `*` segment that is `.` or `..` is refused with a `TypeError` (thrown by `call()`, and failing the request of `stream()`, `socket()` and `resource()`), as it would reach the parent route. Pass a `*` value decoded.
+- A param is encoded as one path segment, each segment of a `*` too, and an empty param or a param or a `*` segment that is `.` or `..` is refused with a `TypeError` (thrown by `call()`, by `stream()` and `socket()` at the call or at `start()`, and failing the request of `resource()`), as it would reach the collection or the parent route. A `*` may be empty. Pass a `*` value decoded.
 - A file or a `Blob` the route answers arrives as a `Blob`, or as text when its type is text, and a `Response` it builds is typed `unknown`, read as JSON, text or a `Blob` by its content type.
 - A refusal throws `ApiError` from `kay` with `status`, `message` and `answer`, its text when its JSON does not parse, `HTTP 503` when it says nothing; status 0 when no answer came or it was cut off.
 - `signal` aborts the call, which rejects with the signal's reason, while the answer is read too.

@@ -56,7 +56,7 @@ input(bind:value={title})
 button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() } })}) Add
 ```
 
-`method` is GET unless named. `params`, `query` and `body` are typed from the route, and so is the answer. A route answering nothing gives `''`, and a file arrives as a `Blob`. A param is encoded as one path segment, and `.` or `..` as a param, or as a segment of a `*`, is refused with a `TypeError`, as it would reach the parent route. Pass a `*` value decoded.
+`method` is GET unless named. `params`, `query` and `body` are typed from the route, and so is the answer. A route answering nothing gives `''`, and a file arrives as a `Blob`. A param is encoded as one path segment, and an empty param, or `.` or `..` as a param or as a segment of a `*`, is refused with a `TypeError`, as it would reach the collection or the parent route. A `*` may be empty. Pass a `*` value decoded.
 
 A refusal throws an `ApiError` with its `status` and `message`. Its status is 0 when no answer came.
 
