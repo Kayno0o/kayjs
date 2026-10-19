@@ -16,7 +16,7 @@ export interface FontMetrics {
 }
 
 // A system font a page can draw in before the web font arrives, and what it measures in the same units.
-interface Fallback {
+export interface Fallback {
   names: string[]
   unitsPerEm: number
   ascent: number
@@ -31,11 +31,19 @@ const FREQUENCIES = [8.17, 1.49, 2.78, 4.25, 12.7, 2.23, 2.02, 6.09, 6.97, 0.15,
 const CODEPOINTS = [...Array.from({ length: 26 }, (_, index) => 97 + index), 32]
 const TOTAL = FREQUENCIES.reduce((sum, frequency) => sum + frequency, 0)
 
-// The metrics of Arial, Times New Roman and Courier New, whose widths the Liberation, Arimo, Tinos and Cousine fonts share.
-export const FALLBACKS: Record<FallbackKind, Fallback> = {
-  sans: { names: ['Arial', 'ArialMT', 'Liberation Sans', 'Arimo'], unitsPerEm: 2048, ascent: 1854, descent: 434, lineGap: 67, widths: [556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 278] },
-  serif: { names: ['Times New Roman', 'TimesNewRomanPSMT', 'Liberation Serif', 'Tinos'], unitsPerEm: 2048, ascent: 1825, descent: 443, lineGap: 87, widths: [444, 500, 444, 500, 444, 333, 500, 500, 278, 278, 500, 278, 778, 500, 500, 500, 500, 333, 389, 278, 500, 500, 722, 500, 500, 444, 250] },
-  mono: { names: ['Courier New', 'CourierNewPSMT', 'Liberation Mono', 'Cousine'], unitsPerEm: 2048, ascent: 1705, descent: 615, lineGap: 0, widths: Array.from<number>({ length: 27 }).fill(600) },
+// The metrics of Arial, Times New Roman and Courier New, whose widths the Liberation, Arimo, Tinos and Cousine fonts share, then those of Roboto and Noto Serif, which Android draws sans-serif and serif text in and which has none of the first. Each face of a kind is fitted on its own, as the descriptors depend on the face they resize.
+export const FALLBACKS: Record<FallbackKind, Fallback[]> = {
+  sans: [
+    { names: ['Arial', 'ArialMT', 'Liberation Sans', 'Arimo'], unitsPerEm: 2048, ascent: 1854, descent: 434, lineGap: 67, widths: [556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 278] },
+    { names: ['Roboto', 'Roboto-Regular', 'Roboto Regular'], unitsPerEm: 2048, ascent: 1900, descent: 500, lineGap: 0, widths: [544, 562, 523, 564, 530, 348, 562, 551, 243, 239, 507, 243, 877, 552, 570, 562, 568, 339, 516, 327, 551, 484, 751, 496, 473, 496, 248] },
+  ],
+  serif: [
+    { names: ['Times New Roman', 'TimesNewRomanPSMT', 'Liberation Serif', 'Tinos'], unitsPerEm: 2048, ascent: 1825, descent: 443, lineGap: 87, widths: [444, 500, 444, 500, 444, 333, 500, 500, 278, 278, 500, 278, 778, 500, 500, 500, 500, 333, 389, 278, 500, 500, 722, 500, 500, 444, 250] },
+    { names: ['Noto Serif', 'NotoSerif-Regular', 'Noto Serif Regular'], unitsPerEm: 1000, ascent: 1069, descent: 293, lineGap: 0, widths: [563, 614, 492, 614, 535, 369, 538, 635, 320, 300, 585, 310, 945, 645, 577, 614, 614, 471, 451, 352, 635, 579, 862, 578, 565, 511, 260] },
+  ],
+  mono: [
+    { names: ['Courier New', 'CourierNewPSMT', 'Liberation Mono', 'Cousine'], unitsPerEm: 2048, ascent: 1705, descent: 615, lineGap: 0, widths: Array.from<number>({ length: 27 }).fill(600) },
+  ],
 }
 
 // Not the tables' own order in a WOFF2 directory but the one the format numbers its known tags by.
@@ -279,8 +287,7 @@ export function fontMetrics(bytes: Uint8Array): FontMetrics | undefined {
 const percent = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`
 
 // The descriptors that make a system font take the room the web font will, so the text does not move once it arrives.
-export function fallbackDescriptors(metrics: FontMetrics): string {
-  const fallback = FALLBACKS[metrics.kind]
+export function fallbackDescriptors(metrics: FontMetrics, fallback: Fallback = FALLBACKS[metrics.kind][0]!): string {
   const fallbackWidth = FREQUENCIES.reduce((sum, frequency, index) => sum + frequency * fallback.widths[index]!, 0) / TOTAL / 1000
   const adjust = metrics.average / metrics.unitsPerEm / fallbackWidth
 

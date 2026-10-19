@@ -1,15 +1,50 @@
-import { copyFile, rm, utimes } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
+import { copyFile, mkdir, rm, utimes } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
+import process from 'node:process'
+import { brotliCompressSync, brotliDecompressSync, inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'bun:test'
+import { chromium } from 'playwright-core'
 import { buildClient } from '../src/build/client'
-import { fallbackDescriptors, fontMetrics } from '../src/server/font-metrics'
+import { fallbackDescriptors, FALLBACKS, fontMetrics } from '../src/server/font-metrics'
 import { fontFallbacks, prepareFonts, withFontFallbacks } from '../src/server/fonts'
+import { browserPath } from '../src/test'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const ROOT = process.cwd()
 const WOFF2 = 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2'
 const WOFF = 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff'
+
+// The TrueType file a WOFF holds, which fontconfig can install and `local()` then find.
+function sfnt(woff: Uint8Array): Uint8Array {
+  const file = new DataView(woff.buffer, woff.byteOffset, woff.byteLength)
+  const count = file.getUint16(12)
+  const tables = Array.from({ length: count }, (_, index) => {
+    const entry = 44 + index * 20
+    const data = woff.subarray(file.getUint32(entry + 4), file.getUint32(entry + 4) + file.getUint32(entry + 8))
+
+    return { tag: Buffer.from(woff.subarray(entry, entry + 4)).toString('latin1'), data: file.getUint32(entry + 8) < file.getUint32(entry + 12) ? inflateSync(data) : data }
+  }).toSorted((a, b) => a.tag.localeCompare(b.tag))
+  const header = Buffer.alloc(12 + count * 16)
+  let offset = header.length
+
+  header.writeUInt32BE(0x00010000, 0)
+  header.writeUInt16BE(count, 4)
+
+  const parts: Uint8Array[] = [header]
+
+  for (const [index, { tag, data }] of tables.entries()) {
+    const padding = Buffer.alloc((4 - data.length % 4) % 4)
+
+    header.write(tag, 12 + index * 16, 'latin1')
+    header.writeUInt32BE(offset, 12 + index * 16 + 8)
+    header.writeUInt32BE(data.length, 12 + index * 16 + 12)
+    parts.push(data, padding)
+    offset += data.length + padding.length
+  }
+
+  return Buffer.concat(parts)
+}
 
 // The same WOFF2 with its hmtx kept in the transformed form the format allows: a flags byte with both side bearings left out, then the advance widths.
 function withTransformedHmtx(bytes: Uint8Array): Uint8Array {
@@ -210,4 +245,93 @@ describe('metric-matched font fallbacks', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+})
+
+describe('a fallback for each system sans and serif', () => {
+  const rulesOf = (family: string, src: string) => fontFallbacks(ROOT, [{ family, src }]).get(family)!.rule.match(/@font-face\{[^}]*\}/g)!
+  const adjustOf = (rule: string) => Number((/size-adjust:([\d.]+)%/).exec(rule)![1])
+
+  it('declares a rule per system sans under the one name, each fitted to its own metrics', () => {
+    const rules = rulesOf('Archivo Black', WOFF2)
+
+    expect(rules).toHaveLength(2)
+    expect(rules.every(rule => rule.startsWith('@font-face{font-family:"Archivo Black Fallback";src:local('))).toBe(true)
+    expect(rules[0]).toContain('local("Arial")')
+    expect(rules[1]).toContain('local("Roboto"),local("Roboto-Regular"),local("Roboto Regular")')
+    expect(adjustOf(rules[1]!)).not.toBe(adjustOf(rules[0]))
+    // Roboto draws a little wider than Arial, so its rule enlarges less.
+    expect(adjustOf(rules[1]!)).toBeLessThan(adjustOf(rules[0]))
+  })
+
+  it('keeps the Arial rule as it was, before and without Roboto', () => {
+    const [arial] = rulesOf('Archivo Black', WOFF2)
+    const metrics = fontMetrics(new Uint8Array(readFileSync(WOFF2)))!
+
+    expect(arial).toBe(`@font-face{font-family:"Archivo Black Fallback";src:local("Arial"),local("ArialMT"),local("Liberation Sans"),local("Arimo");${fallbackDescriptors(metrics, FALLBACKS.sans[0])}}`)
+  })
+
+  it('declares Times New Roman and Noto Serif for a serif, Courier New alone for a monospace', () => {
+    const serif = { unitsPerEm: 1000, ascent: 900, descent: 200, lineGap: 0, average: 500, coverage: 1, kind: 'serif' as const }
+
+    expect(FALLBACKS.serif.map(({ names }) => names[0])).toEqual(['Times New Roman', 'Noto Serif'])
+    expect(FALLBACKS.mono.map(({ names }) => names[0])).toEqual(['Courier New'])
+    expect(fallbackDescriptors(serif, FALLBACKS.serif[1])).not.toBe(fallbackDescriptors(serif, FALLBACKS.serif[0]))
+  })
+
+  it('declares a variable font\'s fallback the same way', () => {
+    const fallbacks = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2, weight: '100 900' }])
+
+    expect(fallbacks.get('Archivo Black')!.rule.match(/@font-face/g)).toHaveLength(2)
+  })
+
+  it('declares no fallback when no font is configured', () => {
+    expect(fontFallbacks(ROOT, []).size).toBe(0)
+    expect(withFontFallbacks('p{font-family:Inter}', new Map())).toBe('p{font-family:Inter}')
+  })
+})
+
+// A machine with Roboto and no Arial, as Android is: fontconfig is pointed at a directory of Roboto alone, which Chromium reads at launch.
+const browser = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+
+describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('a fallback in Chromium on a machine with Roboto alone', () => {
+  it('loads the Roboto-fitted face and draws within a few percent of the web font', async () => {
+    const dir = resolve(await scratchDir('system-fonts-'))
+    const sample = 'Pokemon shared reviews and a pangram of quick brown foxes'
+
+    try {
+      await mkdir(join(dir, 'fonts'))
+      await Bun.write(join(dir, 'fonts/roboto.ttf'), sfnt(readFileSync('tests/fixtures/system-fonts/roboto-latin-400-normal.woff')))
+      await Bun.write(join(dir, 'fonts.conf'), `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>${join(dir, 'fonts')}</dir><cachedir>${join(dir, 'cache')}</cachedir></fontconfig>`)
+
+      const { rule } = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2 }]).get('Archivo Black')!
+      const real = `data:font/woff2;base64,${readFileSync(WOFF2).toString('base64')}`
+      const chrome = await chromium.launch({ executablePath: browser ?? chromium.executablePath(), env: { ...process.env, FONTCONFIG_FILE: join(dir, 'fonts.conf') } })
+
+      try {
+        const page = await chrome.newPage()
+
+        await page.setContent(`<style>${rule}@font-face{font-family:"Real";src:url(${real})}span{font:20px/1 Real;white-space:nowrap}#fallback{font-family:"Archivo Black Fallback"}</style><span id=real>${sample}</span><br><span id=fallback>${sample}</span>`)
+
+        const result = await page.evaluate(async () => {
+          await document.fonts.load('20px Real')
+          await document.fonts.ready
+
+          return {
+            statuses: [...document.fonts].map(face => `${face.family} ${face.status}`).toSorted(),
+            real: document.getElementById('real')!.getBoundingClientRect().width,
+            fallback: document.getElementById('fallback')!.getBoundingClientRect().width,
+          }
+        })
+
+        expect(result.statuses).toEqual(['Archivo Black Fallback error', 'Archivo Black Fallback loaded', 'Real loaded'])
+        expect(Math.abs(result.fallback / result.real - 1)).toBeLessThan(0.08)
+      }
+      finally {
+        await chrome.close()
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
 })

@@ -133,9 +133,10 @@ export function fontFallbacks(root: string, fonts: (FontConfig | FontsourceConfi
         continue
 
       const name = `${family} Fallback`
-      const sources = FALLBACKS[metrics.kind].names.map(local => `local("${local}")`).join(',')
+      // The same name on one rule per system face: a rule whose `local()` finds nothing is skipped, and the next one is used.
+      const rule = FALLBACKS[metrics.kind].map(fallback => `@font-face{font-family:"${name.replace(QUOTE, '\\$&')}";src:${fallback.names.map(local => `local("${local}")`).join(',')};${fallbackDescriptors(metrics, fallback)}}`).join('')
 
-      fallbacks.set(family, { name, rule: `@font-face{font-family:"${name.replace(QUOTE, '\\$&')}";src:${sources};${fallbackDescriptors(metrics)}}` })
+      fallbacks.set(family, { name, rule })
 
       break
     }

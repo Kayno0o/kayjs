@@ -9,7 +9,7 @@ import { constants, cpus } from 'node:os'
 import { join } from 'node:path'
 import { launch } from '../browser'
 import { kilobytes, milliseconds, table } from '../format'
-import { PROFILES, vitals } from './browser'
+import { hasSystemFallback, PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
@@ -158,6 +158,7 @@ try {
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless, ${nginxVersion()}`,
+    await hasSystemFallback(browser) ? 'System font for the metric-matched fallbacks: found' : 'System font for the metric-matched fallbacks: none (no Arial, Liberation, Arimo or Roboto), so the layout shift figures leave them out',
     ...await Promise.all(SITES.filter(site => VARIANTS.some(variant => variant.site === site)).map(async (site) => {
       const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `${variant.site.before?.label ?? 'Astro'} at ${commitOf(variant)}` : `kay ${await versionIn(producing ? variant.dir : variant.devDir, 'kay')} at ${commitOf(variant)}`))
 

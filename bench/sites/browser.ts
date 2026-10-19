@@ -1,5 +1,6 @@
 import type { Browser } from 'playwright-core'
 import type { Variant } from './sites'
+import { FALLBACKS } from '../../src/server/font-metrics'
 import { median } from '../format'
 
 export interface Profile {
@@ -99,4 +100,31 @@ export async function vitals(browser: Browser, variant: Variant, path: string, p
   }
 
   return Object.fromEntries((Object.keys(runs[0]!) as (keyof Vitals)[]).map(key => [key, median(runs.map(run => run[key]))])) as unknown as Vitals
+}
+
+// Whether the machine has a system font kay's metric-matched fallbacks resolve to; without one, the layout shift figures leave the fallback out.
+export async function hasSystemFallback(browser: Browser): Promise<boolean> {
+  const page = await browser.newPage()
+
+  try {
+    const names = Object.values(FALLBACKS).flat().flatMap(fallback => fallback.names)
+
+    await page.setContent(`<style>${names.map((name, index) => `@font-face{font-family:f${index};src:local("${name}")}`).join('')}</style>`)
+
+    return await page.evaluate(async (count) => {
+      const loaded = await Promise.all(Array.from({ length: count }, async (_, index) => {
+        try {
+          return (await document.fonts.load(`16px f${index}`)).length > 0
+        }
+        catch {
+          return false
+        }
+      }))
+
+      return loaded.some(Boolean)
+    }, names.length)
+  }
+  finally {
+    await page.close()
+  }
 }
