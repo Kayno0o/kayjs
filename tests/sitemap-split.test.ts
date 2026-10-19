@@ -1,7 +1,7 @@
 import type { LocaleSettings } from '../src/runtime/i18n'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { pages } from '../src/server'
 import { setSitemapLimits, SITEMAP_LIMITS, sitemapParts } from '../src/server/sitemap'
 import { fixtureCopy } from './scratch'
@@ -179,6 +179,41 @@ describe('a lastmod that cannot be read', () => {
       }
     }
     finally {
+      logged.mockRestore()
+    }
+  })
+})
+
+describe('a sitemap built without a lastmod', () => {
+  it('is rebuilt after a minute instead of an hour, and answers with that lifetime', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const copy = await fixtureCopy('site-output')
+    const down = globalThis as { sitemapDatabaseDown?: boolean }
+
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { if ((globalThis as { sitemapDatabaseDown?: boolean }).sitemapDatabaseDown) throw new Error(\'Database down\'); return \'2026-05-06\' } }\n---\nh1 Post\n')
+
+    try {
+      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported) })
+      const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
+
+      down.sitemapDatabaseDown = true
+
+      const first = await fetched()
+
+      expect(await first.text()).not.toContain('<lastmod>')
+      expect(first.headers.get('cache-control')).toBe('public, max-age=60')
+      down.sitemapDatabaseDown = false
+      expect(await (await fetched()).text()).not.toContain('<lastmod>')
+      setSystemTime(Date.now() + 61_000)
+
+      const rebuilt = await fetched()
+
+      expect(await rebuilt.text()).toContain('<lastmod>2026-05-06</lastmod>')
+      expect(rebuilt.headers.get('cache-control')).toBe('public, max-age=3600')
+    }
+    finally {
+      setSystemTime()
+      delete down.sitemapDatabaseDown
       logged.mockRestore()
     }
   })

@@ -98,7 +98,7 @@ h1 {post.title}
 
 `lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `lastmod: async ({ slug }) => (await findPost(slug)).updatedAt`. Every locale's copy of a URL carries it; a `null` or `undefined` lists the URL with none, and so does any other value, a day that does not exist or a date and time naming no zone included, or a function that throws: that URL goes out without it, and the first such error of a page is logged and handed to `onError` (`page-settings-invalid` for a value that is no date). Only the page's own `lastmod` is read, never a layout's. `robots: { disallow: ['/'] }` drops the default `Allow: /`, which would tie with it.
 
-In production the sitemap is built on the first request and kept for an hour; development builds it per request.
+In production the sitemap is built on the first request and kept for an hour, a minute when a `lastmod` was left out, so it is rebuilt once the database answers; development builds it per request.
 
 Past 50,000 URLs or 50 MB (the protocol's limits) `/sitemap.xml` is a sitemap index and the URLs go into `/sitemap-1.xml`, `/sitemap-2.xml` and so on, each within both limits, named in the index with the site's public origin and the `base` (each host's own with locales by domain). `robots.txt` still points at `/sitemap.xml`, and a static export writes every part. Under the limits `/sitemap.xml` is the one file, as before.
 

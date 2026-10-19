@@ -39,6 +39,8 @@ export function setSitemapLimits(limits = SITEMAP_LIMITS): void {
 const MAX_PARTS = 100
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
+// How long a sitemap built without some of its lastmods is kept, so the next crawl finds them back once the database answers.
+const DEGRADED_MS = 60 * 1000
 
 export interface SitemapOptions {
   dev?: boolean | undefined
@@ -54,16 +56,22 @@ export interface SitemapOptions {
 export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRoute[], origin: string, options: SitemapOptions = {}): void {
   // With locales by domain, each host lists its own pages: a sitemap may only name URLs of the host it is on.
   // `files` holds the documents of the sitemap: the one `/sitemap.xml`, or its index followed by each part.
-  const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number }>()
+  const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number, degraded: boolean }>()
   const settings = options.locales
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
   const reading = (locale: string | undefined, report: (error: unknown) => void) => {
     let sitemap = cached.get(locale)
 
-    if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS) {
+    if (options.dev || !sitemap || Date.now() - sitemap.at > (sitemap.degraded ? DEGRADED_MS : CACHE_MS)) {
       const publicOrigin = settings?.hosts && locale !== undefined ? `https://${settings.hosts[locale]}${options.base ?? ''}` : origin
 
-      cached.set(locale, sitemap = { files: sitemapFiles(routes, origin, options.trailingSlash, settings, locale, report, publicOrigin, options.base), replies: new Map(), at: Date.now() })
+      const built: typeof sitemap = { files: Promise.resolve([]), replies: new Map(), at: Date.now(), degraded: false }
+
+      built.files = sitemapFiles(routes, origin, options.trailingSlash, settings, locale, (error) => {
+        built.degraded = true
+        report(error)
+      }, publicOrigin, options.base)
+      cached.set(locale, sitemap = built)
     }
 
     return sitemap
@@ -81,7 +89,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
       let reply = sitemap.replies.get(index)
 
       if (!reply)
-        sitemap.replies.set(index, reply = fixedReply(files[index], { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${CACHE_MS / 1000}` }))
+        sitemap.replies.set(index, reply = fixedReply(files[index], { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${(sitemap.degraded ? DEGRADED_MS : CACHE_MS) / 1000}` }))
 
       return await reply(request)
     }
