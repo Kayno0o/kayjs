@@ -27,7 +27,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `sqliteRooms` wakes on the file changing instead of reading every 25 ms while a socket is open, falling back to a 250 ms read, which `poll` still sets ([Rooms](api-from-islands.md)).
 - A hidden tab closes its live-values connection and stops renewing the proof, and opens the connection again, with every value as it is then, when shown; the entry of a page with live values is about 40 bytes gzip heavier for it ([Live values](api-from-islands.md)).
 - The variants the image route draws on request (runtime, stored and remote images) are removed after 30 days, at start and once a day, where they stayed for good ([Images](images.md)).
-- The default image ladder stops at 2560 px and no variant is wider than the ladder's last width, so a large photograph builds and serves fewer, smaller files; list `3840` in `images.widths` for wider screens, see [Upgrading](upgrading.md).
+- The default image ladder stops at 2560 px and no variant is wider than its last width, so a large photograph builds and serves fewer, smaller files; list `3840` in `images.widths` for wider screens, see [Upgrading](upgrading.md).
 
 ## 1.55.1
 

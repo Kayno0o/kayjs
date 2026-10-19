@@ -107,7 +107,7 @@ describe('image()', () => {
     expect(image(registerImage('/_kay/assets/icon-1.svg', 24, 24))).toEqual({ src: '/_kay/assets/icon-1.svg', width: 24, height: 24 })
   })
 
-  it('stops the ladder at 2560 whatever the image\'s size, and goes wider only where images.widths lists it', () => {
+  it('stops the ladder at 2560 whatever the image\'s size, and a list of its own keeps the image\'s own size', () => {
     const widths = (width: number, sizes?: string) => image('/uploads/big.jpg', { width, height: 1000, ...sizes === undefined ? {} : { sizes } }).srcset!.split(', ').map(entry => Number(entry.slice(entry.indexOf(' ') + 1, -1)))
 
     expect(widths(6000)).toEqual([320, 640, 960, 1280, 1920, 2560])
@@ -119,7 +119,7 @@ describe('image()', () => {
 
     try {
       setImageWidths([480, 3840])
-      expect(widths(6000)).toEqual([480, 3840])
+      expect(widths(6000)).toEqual([480, 3840, 6000])
       expect(widths(3000)).toEqual([480, 3000])
     }
     finally {

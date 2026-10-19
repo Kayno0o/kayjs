@@ -197,7 +197,7 @@ export default defineConfig({
 
 ### Widths and quality
 
-An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `images.widths: [320, 960, 1920, 3840]`. `images.widths` sets another list: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
+An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `images.widths: [320, 960, 1920, 3840]`. `images.widths` sets another list, which also gets the image's own size: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
 `image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too; `images.webp: { quality }` sets the WebP variants alone, as `images.avif` does the AVIF ones. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 

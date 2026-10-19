@@ -17,7 +17,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### The default image ladder stops at 2560 px
 
-- `images.widths` defaults to `[320, 640, 960, 1280, 1920, 2560]`, and an image is served at no width past the last one, its own size included, where it also had a 3840 px variant and one at its own size. A site whose photographs must stay sharp on 4K screens sets `images: { widths: [320, 640, 960, 1280, 1920, 2560, 3840] }`; a list of its own is cut at its last width the same way, and the image route refuses a width past it, so a cached page still linking `w=3840` or an image's own size gets a 400 until it is rebuilt. `kay check` cannot recognise a changed default, so there is no lint.
+- `images.widths` defaults to `[320, 640, 960, 1280, 1920, 2560]`, and an image is served at no width past the last one, its own size included, where it also had a 3840 px variant and one at its own size. A site whose photographs must stay sharp on 4K screens sets `images: { widths: [320, 640, 960, 1280, 1920, 2560, 3840] }`; a list of `images.widths` of your own is unchanged, own size included. The image route refuses a width past the default ladder, so a cached page still linking `w=3840` or an image's own size gets a 400 until it is rebuilt. `kay check` cannot recognise a changed default, so there is no lint.
 
 ### kayjs-auth passkeys carry `userVerified`
 

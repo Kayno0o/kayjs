@@ -339,9 +339,18 @@ function fixedWidths(drawn: number, density: number, most: number): number[] {
   return [...new Set(densities.map(at => Math.min(most, routeWidth(drawn * at))))].sort((a, b) => a - b)
 }
 
-// The widths an image `width` wide gets: those of the ladder below it, then its own when the ladder reaches it. Nothing is wider than the ladder's last width, so a photograph larger than that gets no variant of its own size.
+// Whether the default ladder is in use, which stops at its last width where a list the app wrote adds the image's own size.
+export function defaultLadder(): boolean {
+  return imageWidths() === IMAGE_WIDTHS
+}
+
+// The widths an image `width` wide gets: those of the ladder below it, then its own. With the default ladder nothing is wider than its last width, so a photograph larger than that gets no variant of its own size.
 export function ladderFor(width: number): number[] {
   const steps = imageWidths()
+
+  if (!defaultLadder())
+    return [...steps.filter(step => step < width), width]
+
   const reach = steps.findIndex(step => step >= width)
 
   return reach === -1 ? [...steps] : [...steps.slice(0, reach), width]
@@ -351,7 +360,7 @@ export function ladderFor(width: number): number[] {
 function routeWidth(width: number): number {
   const steps = imageWidths()
 
-  return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? steps.at(-1)!
+  return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? (defaultLadder() ? steps.at(-1)! : Infinity)
 }
 
 // Qualities come in steps, so a visitor asking the route for every one cannot fill the cache.

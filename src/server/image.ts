@@ -12,7 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
@@ -488,7 +488,7 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   const most = aspect ? croppedSize(own, aspect).width : own.width
   const steps = imageWidths()
 
-  if (!Number.isInteger(width) || !((madeWidth(width) && width < most) || (width === most && most <= steps.at(-1)!)))
+  if (!Number.isInteger(width) || !((madeWidth(width) && width < most) || (width === most && (!defaultLadder() || most <= steps.at(-1)!))))
     return `Width ${url.searchParams.get('w')} is neither one of ${steps.join(', ')} or a multiple of ${SMALL_STEP} under ${steps[0]} below the image's own, nor its own, ${most}`
 
   return { width, ...aspect && { aspect }, ...quality !== undefined && { quality } }
