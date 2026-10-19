@@ -2,6 +2,7 @@ import type { TestPage, TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { analytics } from '../src/server/analytics'
 import { NOTICE_SCRIPT } from '../src/server/analytics-script'
@@ -416,6 +417,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     expect(await opened.evaluate(() => document.activeElement?.id)).toBe('settings')
   })
 
+  it('shows the notice again when an answer is taken back, with the focus where it was', async () => {
+    await opened.evaluate(() => document.getElementById('settings')!.focus())
+    await opened.click('#settings')
+    await opened.waitFor(`${NOTICE} button`)
+    await opened.evaluate(() => (window as unknown as { kayAnalytics: { decide: (value: string) => void } }).kayAnalytics.decide(''))
+    await opened.waitFor(`${NOTICE} button`)
+
+    expect(await opened.count(NOTICE)).toBe(1)
+    expect(await opened.evaluate(() => document.activeElement?.id)).toBe('settings')
+    await opened.click(`${NOTICE} button:first-of-type`)
+    expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=yes')
+  })
+
   it('counts a page, and counts nothing for an excluded one', async () => {
     const before = received.length
 
@@ -473,5 +487,52 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     }, NOTICE_SCRIPT)
 
     expect(hrefs).toEqual(['/shop/privacy', '/privacy', 'https://example.com/policy'])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice that failed to load, in a browser', () => {
+  let flaky: TestSite
+  let opened: TestPage
+  let failures = 1
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    flaky = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      use: [new Elysia().onRequest(({ request }) => {
+        return request.url.endsWith('/notice.js') && failures-- > 0 ? new Response('down', { status: 503 }) : undefined
+      })],
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true })],
+    })
+    opened = await flaky.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await flaky?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('asks again on the next ask, and a click\'s opener survives the automatic one', async () => {
+    await Bun.sleep(300)
+    expect(await opened.count('section[aria-labelledby]')).toBe(0)
+    expect(await opened.count('script[src$="/notice.js"]')).toBe(0)
+
+    await opened.evaluate(() => {
+      const link = document.createElement('button')
+
+      link.setAttribute('data-analytics-consent', '')
+      link.id = 'settings'
+      document.body.append(link)
+    })
+    await opened.click('#settings')
+    await opened.waitFor('section[aria-labelledby] button')
+
+    expect(await opened.evaluate(() => document.activeElement?.textContent)).toBe('Agree')
   })
 })

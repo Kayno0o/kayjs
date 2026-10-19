@@ -65,6 +65,7 @@ export const ANALYTICS_SCRIPT = `(() => {
 
     element.src = load.src
     element.defer = true
+    element.nonce = script.nonce
 
     for (const [key, value] of Object.entries(load.attrs))
       element.setAttribute(key, value)
@@ -104,11 +105,17 @@ export const ANALYTICS_SCRIPT = `(() => {
       return
     }
 
-    wanted = clicked
+    wanted = clicked ?? wanted
 
     if (!asking) {
-      asking = Object.assign(document.createElement('script'), { src: path + '/notice.js', defer: true })
-      document.head.append(asking)
+      const notice = asking = Object.assign(document.createElement('script'), { src: path + '/notice.js', defer: true, nonce: script.nonce })
+
+      // A failed fetch lets the next ask try again.
+      notice.addEventListener('error', () => {
+        notice.remove()
+        asking = undefined
+      })
+      document.head.append(notice)
     }
   }
 

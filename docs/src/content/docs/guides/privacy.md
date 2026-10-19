@@ -136,6 +136,8 @@ It stays on screen through page swaps until the visitor chooses. With Fathom or 
 
 Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes. An app with its own banner uses `consent` instead, below.
 
+If the notice fails to load, say when the visitor is offline, it is fetched again the next time kay asks. A policy of nonces with no `'self'` works too: kay gives the notice and the provider's script the nonce of the tracker that loads them.
+
 ### Leaving pages out
 
 Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`.
