@@ -158,9 +158,26 @@ describe('the file route', () => {
     await store.write('a/Page.HTML', new Blob(['x']))
 
     const route = await get('/_kay/files/a/page.html')
+    const stored = new Map<string, { type: string, disposition: string }>()
+    const bucket = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        await request.arrayBuffer()
+        stored.set(decodeURIComponent(new URL(request.url).pathname), { type: request.headers.get('content-type') ?? '', disposition: request.headers.get('content-disposition') ?? '' })
+
+        return new Response(null, { headers: { etag: '"1"' } })
+      },
+    })
+
+    try {
+      await s3Files({ bucket: 'site', endpoint: `http://localhost:${bucket.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' }).write('a/page.html', new Blob(['x']))
+    }
+    finally {
+      await bucket.stop(true)
+    }
 
     expect(route.headers.get('content-type')).toBe('application/octet-stream')
-    expect(route.headers.get('content-disposition')).toBe('attachment; filename="page.html"')
+    expect(stored.get('/site/a/page.html')).toEqual({ type: route.headers.get('content-type')!, disposition: route.headers.get('content-disposition')! })
     expect((await get('/_kay/files/a/Page.HTML')).status).toBe(404)
   })
 

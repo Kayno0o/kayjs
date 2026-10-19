@@ -3,6 +3,7 @@ import type { KayConfig } from '../config'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
+import { requestUrl } from './request-url'
 
 // Where the browser reports what the Content-Security-Policy blocked, when `security.reports` is `true`.
 export const CSP_REPORTS = '/_kay/csp'
@@ -46,7 +47,7 @@ export class CspViolation extends Error {
 
 const seen = new Set<string>()
 
-// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused, and a report about a page of another origin than `site` is answered but dropped, as anyone can post one.
+// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused, and a report about a page of neither the `site` nor the request's own origin is answered but dropped: noise filtering, not authentication, as a report can name any page.
 export function serveViolationReports(app: Elysia, onError: KayConfig['onError'], site?: string): void {
   const origin = site === undefined ? undefined : URL.parse(site)?.origin
 
@@ -68,7 +69,7 @@ export function serveViolationReports(app: Elysia, onError: KayConfig['onError']
       return new Response(null, { status: 400 })
 
     for (const violation of violations) {
-      if (origin !== undefined && URL.parse(violation.url)?.origin !== origin)
+      if (origin !== undefined && ![origin, requestUrl(request).origin].includes(URL.parse(violation.url)?.origin ?? ''))
         continue
 
       const key = `${violation.disposition} ${violation.directive} ${violation.blocked} ${violation.url}`

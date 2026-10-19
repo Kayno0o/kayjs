@@ -120,7 +120,7 @@ export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSche
   const exposed = Object.keys(values).filter(name => SERVER_ONLY.test(name))
 
   if (exposed.length > 0) {
-    throw new Error(`kay: publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
+    throw new KayError('config-invalid', `kay: publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
   }
 
   (globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values

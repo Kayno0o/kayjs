@@ -23,8 +23,8 @@ const GZIP_HEADER = new Uint8Array([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 0xFF])
 // Enough of a fixed text to tell it from the others at a `<style>` tag, past that tag every stylesheet starts with.
 const HEAD_BYTES = 72
 const HTML_TYPE = /^text\/html/i
-// Text the build writes; images, fonts and media come compressed already.
-const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm)$/i
+// Text the build writes, and the fonts with no compression of their own; images, woff fonts and media come compressed already.
+const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm|ttf|otf)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
 // Below this a response fits in a packet or two anyway.
 const MIN_SIZE = 256

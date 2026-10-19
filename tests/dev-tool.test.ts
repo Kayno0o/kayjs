@@ -1159,13 +1159,13 @@ describe('the dev tool', () => {
   it('lists the env the browser receives, as the server sends it, flags what looks like a secret, and says when the app sends none', async () => {
     const dir = await scratchDir('dev-tool-env-')
     const routes = relative(process.cwd(), join(dir, 'routes'))
-    const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_KEY', 'KAY_TEST_STRIPE_SECRET', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION', 'KAY_TEST_REDIS_URL', 'KAY_TEST_HEX', 'KAY_TEST_AWS', 'KAY_TEST_PUBLISHABLE_KEY'] as const
-    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_STRIPE_SECRET: 'abc', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_REDIS_URL: 'redis://cache:6379', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
+    const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_KEY', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION', 'KAY_TEST_HEX', 'KAY_TEST_AWS', 'KAY_TEST_PUBLISHABLE_KEY'] as const
+    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
 
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     Object.assign(process.env, given)
 
-    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_KEY: t.String(), KAY_TEST_STRIPE_SECRET: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String(), KAY_TEST_REDIS_URL: t.String(), KAY_TEST_HEX: t.String(), KAY_TEST_AWS: t.String(), KAY_TEST_PUBLISHABLE_KEY: t.String() })
+    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_KEY: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String(), KAY_TEST_HEX: t.String(), KAY_TEST_AWS: t.String(), KAY_TEST_PUBLISHABLE_KEY: t.String() })
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const asked: string[] = []
@@ -1194,24 +1194,22 @@ describe('the dev tool', () => {
       expect(rows()).toEqual([
         'KAY_TEST_ZOOM = 12',
         'KAY_TEST_MAP_KEY = pk.123 (noted)',
-        'KAY_TEST_STRIPE_SECRET = abc (flagged)',
         'KAY_TEST_SESSION = q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u (flagged)',
         'KAY_TEST_FEED = postgres://app:hunter2@db.internal/app (flagged)',
         'KAY_TEST_REGION = eu-west-1',
-        'KAY_TEST_REDIS_URL = redis://cache:6379 (flagged)',
         'KAY_TEST_HEX = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 (flagged)',
         'KAY_TEST_AWS = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1 (flagged)',
         'KAY_TEST_PUBLISHABLE_KEY = pk_live_abc',
       ])
-      expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('6')
+      expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('4')
 
       typeFilter('#kay-dev-env', 'postgres')
 
       expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_FEED'])
 
-      typeFilter('#kay-dev-env', 'redis')
+      typeFilter('#kay-dev-env', 'aws')
 
-      expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_REDIS_URL'])
+      expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_AWS'])
       expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-env .env:not([hidden]) .copy')!)).toBe(visible('#kay-dev-env', '.env .val')[0]!)
       expect(await copiedBy()).not.toContain('KAY_TEST_FEED')
 

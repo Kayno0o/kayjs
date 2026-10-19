@@ -157,7 +157,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', timeout })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  if (child.signalCode !== null)
+  if (child.signalCode === 'SIGTERM')
     return { output, errors: `kay: tsgo did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
 
   const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined

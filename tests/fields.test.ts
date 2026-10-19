@@ -104,7 +104,7 @@ describe('servePublicEnv', () => {
   })
 
   it('refuses to boot with a variable named as a secret, a token, an API key or a database address', () => {
-    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL']
+    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'KAY_TEST_STRIPE_API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL']
 
     Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', ...Object.fromEntries(names.map(name => [name, 'sk'])) })
 
