@@ -5,6 +5,6 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 const posts = signal(0)
 const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma' }]
 ---
-form#filter(method="get" action="/x" onSubmit={event => { event.preventDefault(); posts.set(posts() + 1) }})
+form#filter(onSubmit={event => { event.preventDefault(); posts.set(posts() + 1) }})
   Select#kind(name="kind" options={options} value="a" aria-label="Kind" submit)
 output#posts {posts()}
