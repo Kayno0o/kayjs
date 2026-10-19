@@ -1968,6 +1968,28 @@ describe.concurrent('kay check, a redirect source is served', () => {
     }
   })
 
+  it('re-checks every page\'s links when the redirects or the routes change between two checks of one root', async () => {
+    const root = await scratchProject({ 'src/routes/other.kay': 'a(href="/old") old\na(href="/nope") none\n' })
+    const served = async (options?: CheckOptions) => unserved(await turn(async () => checkProject(root, options))).map(row => row[2])
+
+    try {
+      expect(await served({ redirects: { '/old': '/other' } })).toEqual(['/nope'])
+      expect(await served({})).toEqual(['/old', '/nope'])
+      expect(await served({ redirects: { '/old': '/other' } })).toEqual(['/nope'])
+
+      await Bun.write(join(root, 'src/routes/nope.kay'), 'p here\n')
+
+      expect(await served({ redirects: { '/old': '/other' } })).toEqual([])
+
+      await rm(join(root, 'src/routes/nope.kay'))
+
+      expect(await served({ redirects: { '/old': '/other' } })).toEqual(['/nope'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('counts a source of / with no page of it, and a source written with a trailing slash', async () => {
     const files = { 'src/routes/other.kay': 'a(href="/") home\na(href="/trail") bare\na(href="/trail/") slashed\na(href="/nope") none\n' }
     const root = await scratchProject(files)

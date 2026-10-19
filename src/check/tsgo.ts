@@ -1,7 +1,8 @@
 // The tsgo run `kay check` makes, skipped where its last run was clean and nothing it read has changed since, and what it prints read back as diagnostics.
 import type { CheckDiagnostic } from '.'
 import type { TsgoDiagnostic } from './diagnose'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { treeEntries } from '../build/files'
@@ -19,6 +20,8 @@ const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'type
 const TSGO_TIMEOUT = 5 * 60_000
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
 const CLOCK_SLACK = 1000
+// The declarations kay writes at the top of the shadow tree, which every file of the app is typed against.
+const APP_DECLARATIONS = /^kay-.*\.d\.ts$/
 
 // What tsgo printed, one diagnostic a line, the lines after one that start no other added to its message.
 export function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {
@@ -154,6 +157,8 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   if (checked?.clean)
     return { output: '', errors: '', code: 0 }
 
+  await dropStaleBuildInfo(state, buildInfo, shadowDir)
+
   const generated = checked?.hashes ?? await contentHashes(shadowDir)
   const started = Date.now()
   const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
@@ -176,6 +181,19 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
     await writeCacheEntry(slot, { started, ...read, files: read.files.filter(file => !Object.hasOwn(generated, file)), generated } satisfies CleanRun)
 
   return { output, errors, code }
+}
+
+// tsgo's incremental mode does not re-check a file whose own text is unchanged when only a global declaration it reads changes, as the routes and redirects in `kay-env.d.ts` do: the build info goes when those declarations differ from the last run's.
+// A build info with no stamp beside it is kept, as one lent to a project is.
+async function dropStaleBuildInfo(state: string, buildInfo: string, shadowDir: string): Promise<void> {
+  const stampFile = Bun.file(join(state, 'declarations'))
+  const names = existsSync(shadowDir) ? readdirSync(shadowDir).filter(name => APP_DECLARATIONS.test(name)).sort() : []
+  const stamp = JSON.stringify(await Promise.all(names.map(async name => [name, Bun.hash(await Bun.file(join(shadowDir, name)).bytes()).toString(36)])))
+
+  if (await stampFile.exists() && await stampFile.text() !== stamp)
+    await rm(buildInfo, { force: true })
+
+  await Bun.write(stampFile, stamp)
 }
 
 interface CleanRun {
