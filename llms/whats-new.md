@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.55.0
 
 - A page rendered per request draws its ids (`uid()`, island prefixes, `await` block numbers) from its route and URL instead of at random, so a page that reads nothing from its visitor renders the same bytes every time and its compressed copy is kept: a 68 KB page with a deferred block and inlined styles serves 3.3k req/s at 377 us of CPU per request where it served 2.1k at 582 ([Compression](proxy-and-security.md#compression)).
 - A new app's CI workflow reads the repository alone and pins its actions to a release's commit, and a static site's `Dockerfile` serves it with `nginxinc/nginx-unprivileged` on port 8080 instead of root nginx on 80, see [Project setup](project.md#project-setup).
@@ -74,10 +74,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth counts wrong passwords against an account per client (`signInAccount`, 6, now per client rather than account-wide) and in total (`signInAccountAll`, 60), so a stranger can no longer keep a holder locked out by guessing at their email from another address; the total mails the holder once, as the new `sign-in-locked` event, and a right password costs nothing ([kayjs-auth](../packages/auth/llms.txt)).
 - An `onRequest` hook, param matcher, `rewrite` or extension hook that throws is answered with a logged 500 and handed to `onError`, instead of a 200 whose body is the error message ([API routes](api-routes.md)).
 
-## 1.54.1
-
-- The `kay dev` class check no longer reports a class whose only rules mention it inside `:is()`, `:where()` or a variant (`.prose { & :is(.stats) }`, `group-open:`): it judges a class by the rules that need it, as the build does ([Styles and assets](styles-and-assets.md)).
-- A constant exported inside a default-exported object or array (`export default { CONTACT }`), or exported later from a `--- server` fence, is judged like one exported where it is declared, so a write through the default import keeps its pages per request ([Prerendering](prerendering.md#prerendering)).
-- The build warns of fewer classes it can read: a value read back from the element's own class, `cn`/`clsx`/`twMerge` of names the source writes, a member of a `const` record of literals (`GLASS[tone]`, also one imported from a relative module), a call to a function whose every return is a literal, a ternary or a template of literals, a `let` or `const` read by all its values, and a static export are no longer warned about, and a head's route stylesheet copy no longer outlives the page that replaced it, and a warning names the pages reaching the file ([Styles and assets](styles-and-assets.md)).
-
-Releases before 1.54.1 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.55 are in [What's new, older releases](whats-new-archive.md).
