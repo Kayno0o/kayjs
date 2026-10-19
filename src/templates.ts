@@ -243,8 +243,12 @@ const count = signal(start)
 ---
 button(onClick={() => count++}) Clicked {count()} times
 `,
-    'src/routes/_404.kay': lines('head', '  title Nothing here', `h1${setup.tw('.text-2xl.font-bold')} Nothing here`, 'a(href="/") Back home'),
+    'src/routes/_404.kay': notFoundPage(setup),
   }
+}
+
+function notFoundPage(setup: Setup): string {
+  return lines('head', '  title Nothing here', `h1${setup.tw('.text-2xl.font-bold')} Nothing here`, 'a(href="/") Back home')
 }
 
 function homeTest({ has }: Setup): string {
@@ -606,9 +610,13 @@ CMD ["./server"]
   }
 }
 
-// The static site's container: the same files, served by nginx with the compressed copies the build wrote, and the starter's 404 page for a path it lacks.
-function staticContainerFiles({ has }: Setup): Record<string, string> {
+// The static site's container: the same files, served by nginx with the compressed copies the build wrote, and a 404 page for a path it lacks.
+function staticContainerFiles(setup: Setup): Record<string, string> {
+  const { has } = setup
+
   return {
+    // The 404 page nginx serves is the one the export writes from this file.
+    ...!has('starter') && { 'src/routes/_404.kay': notFoundPage(setup) },
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
 COPY . .
@@ -662,7 +670,9 @@ RUN find /usr/share/nginx/html -name '*.br' -delete && mv /usr/share/nginx/html/
 
   location / {
     try_files $uri $uri.html $uri/index.html =404;
-  }${has('starter') ? '\n\n  error_page 404 /404.html;' : ''}
+  }
+
+  error_page 404 /404.html;
 }
 `,
     '.dockerignore': 'node_modules\n.kay\ndist\n.git\n.env\n.env.*\n',

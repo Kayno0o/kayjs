@@ -46,8 +46,10 @@ export class CspViolation extends Error {
 
 const seen = new Set<string>()
 
-// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused.
-export function serveViolationReports(app: Elysia, onError: KayConfig['onError']): void {
+// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused, and a report about a page of another origin than `site` is answered but dropped, as anyone can post one.
+export function serveViolationReports(app: Elysia, onError: KayConfig['onError'], site?: string): void {
+  const origin = site === undefined ? undefined : URL.parse(site)?.origin
+
   app.post(CSP_REPORTS, async ({ request, server }) => {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES)
       return new Response(null, { status: 413 })
@@ -66,6 +68,9 @@ export function serveViolationReports(app: Elysia, onError: KayConfig['onError']
       return new Response(null, { status: 400 })
 
     for (const violation of violations) {
+      if (origin !== undefined && URL.parse(violation.url)?.origin !== origin)
+        continue
+
       const key = `${violation.disposition} ${violation.directive} ${violation.blocked} ${violation.url}`
 
       if (seen.has(key))

@@ -144,7 +144,7 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
       // The key's extension decides how the bucket serves the object, never the uploader's declared type, so a page or SVG uploaded from a browser never runs from the bucket's public URL.
       const served = servedAs(key)
 
-      await bucket.write(key, data, { type: served.type, contentDisposition: served.inline ? 'inline' : `attachment; filename="${basename(key)}"` })
+      await bucket.write(key, data, { type: served.type, contentDisposition: served.inline ? 'inline' : attachment(key) })
     },
     async read(key) {
       return await bucket.exists(key) ? bucket.file(key) : undefined
@@ -468,6 +468,22 @@ function servedAs(key: string): { type: string, inline: boolean } {
   return { type: inline || IMAGE.test(type) ? type : 'application/octet-stream', inline }
 }
 
+const PLAIN_NAME = /^[\w. -]+$/
+const UNSAFE_NAME_CHARACTER = /[^\x20-\x7E]|["\\%;]/g
+const RFC5987_RESERVED = /['()*]/g
+
+// A download's `content-disposition`: the name as it is when plain, else an ASCII fallback beside the exact name percent-encoded, so a quote or a non-ASCII character in a key never breaks the header.
+function attachment(key: string): string {
+  const name = basename(key)
+
+  if (PLAIN_NAME.test(name))
+    return `attachment; filename="${name}"`
+
+  const encoded = encodeURIComponent(name).replace(RFC5987_RESERVED, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+
+  return `attachment; filename="${name.replace(UNSAFE_NAME_CHARACTER, '_')}"; filename*=UTF-8''${encoded}`
+}
+
 // `own` finishes the headers of an answer from a route, which carries the context's headers itself.
 async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers): Promise<Response> {
   const data = await (await activeStore()).read(key)
@@ -479,7 +495,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const headers: Record<string, string> = {
     'content-type': type,
     'x-content-type-options': 'nosniff',
-    'content-disposition': inline ? 'inline' : `attachment; filename="${basename(key)}"`,
+    'content-disposition': inline ? 'inline' : attachment(key),
     'cache-control': cacheControl,
   }
 

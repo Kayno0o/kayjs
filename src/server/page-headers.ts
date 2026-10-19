@@ -24,7 +24,7 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
     let own = byRoute.get(key)
 
     if (!own)
-      byRoute.set(key, own = routeHeaders(route, options, site))
+      byRoute.set(key, own = loadHeaders(byRoute, key, route, options, site))
 
     const [response, headers] = await Promise.all([respond(route, params, context, url), own])
 
@@ -44,6 +44,18 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
     }
 
     return response
+  }
+}
+
+// A failed load is forgotten, so the next request tries again instead of meeting the same rejection for good.
+async function loadHeaders(known: Map<string, Promise<RouteHeaders | undefined>>, key: string, route: ServedRoute, options: SecurityOptions, site: Record<string, string> | undefined): Promise<RouteHeaders | undefined> {
+  try {
+    return await routeHeaders(route, options, site)
+  }
+  catch (error) {
+    known.delete(key)
+
+    throw error
   }
 }
 

@@ -781,7 +781,7 @@ describe('kay new', () => {
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
       expect(await Bun.file(join(dir, 'dist/index.html')).text()).toContain('<main><h1>my-app</h1></main>')
-      // With no _404.kay, no 404.html, which the nginx.conf of a site without the starter pages does not name.
+      // With no _404.kay, no 404.html: a container's scaffold brings the page its nginx.conf names.
       expect(await Bun.file(join(dir, 'dist/404.html')).exists()).toBe(false)
     }
     finally {
@@ -848,7 +848,8 @@ describe('kay new', () => {
           const dockerfile = contents.Dockerfile!
 
           expect({ features, br: dockerfile.includes('-name \'*.br\' -delete'), include: dockerfile.includes('mv /usr/share/nginx/html/headers.nginx.conf /etc/nginx/kay-headers.conf') }).toEqual({ features, br: true, include: true })
-          expect({ features, notFound: contents['nginx.conf']!.includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
+          // The 404 page the export writes comes from a `_404.kay`, which the starter or the container brings.
+          expect({ features, notFound: nginx.includes('error_page 404 /404.html'), page: 'src/routes/_404.kay' in contents }).toEqual({ features, notFound: true, page: true })
         }
       }
       finally {

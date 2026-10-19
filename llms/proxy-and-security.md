@@ -127,7 +127,7 @@ export default defineConfig({
 - An app's `x-frame-options` in `headers` still wins; with `csp: false` it stays `SAMEORIGIN`.
 - `reports: true` has browsers report what the policy blocks to kay's own route, `/_kay/csp` under the site's `base`, through `report-to` and its `Reporting-Endpoints` header, and `report-uri` for browsers that predate them.
 - The route takes both formats, logs each violation once per process for its directive, what it blocked and the page, and hands it to `onError` as a `CspViolation` from `kay/server`, with `directive`, `blocked`, a URL or `inline` or `eval`, `url`, the page without query or hash, `disposition`, `enforce` or `report`, and, when the browser says, `source`, the script that tried as `file:line:column`, and `sample`, the start of a blocked inline script or style when the directive lists `'report-sample'`.
-- A client posting more than 30 reports a minute or 64 KB at once is refused.
+- A client posting more than 30 reports a minute or 64 KB at once is refused, and with `site` set, a report about a page of another origin is answered `204` but neither logged nor handed to `onError`, as anyone can post one.
 - `reports: 'https://...'` sends them to that collector instead, and kay serves no route.
 - `reportOnly` merges directives over the enforced policy and sends the result as `Content-Security-Policy-Report-Only`: the browser blocks nothing it allows, but reports what that stricter policy would have blocked, with `disposition: 'report'`, to try it before moving it into `csp`.
 - With `csp: false`, it merges over kay's directives.
@@ -150,7 +150,7 @@ export default defineConfig({
 
 ### Compression
 
-- With NODE_ENV production, kay compresses responses itself unless kay.config.ts sets `compress: false`, as behind a proxy or CDN that compresses already (`compress: true` turns it on elsewhere): pages rendered per request, action results, and any `Response` the app's routes registered after `.use(await pages())` return go out with zstd, brotli or gzip, whichever the browser's `Accept-Encoding` prefers (zstd, then gzip, then brotli on a tie), and `Vary: Accept-Encoding`.
+- With NODE_ENV production, kay compresses responses itself unless kay.config.ts sets `compress: false`, as behind a proxy or CDN that compresses already (`compress: true` turns it on elsewhere): pages rendered per request, action results, and any `Response` the app's routes registered after `.use(await pages())` return go out (text, JSON, JavaScript, XML, SVG, ndjson and `ttf` and `otf` fonts) with zstd, brotli or gzip, whichever the browser's `Accept-Encoding` prefers (zstd, then gzip, then brotli on a tie), and `Vary: Accept-Encoding`.
 - A response whose body is whole within a tick, as a rendered page is, is compressed in one go at zstd 3, brotli 4 or gzip 6, within its request's tick up to 128 KB and at most four at once off the main thread past it, the copy of a body rendered alike a second time kept (2 MB in all) so later ones are not compressed again, and a streamed body or a reply compressed once (sitemap, worker) as brotli or gzip, except a page carrying inlined stylesheets, which goes as gzip to a browser taking it, whatever weight it gives zstd or brotli, only what lies around them compressed, and its copy kept like any other's when the same bytes lie around them again (see [Styles](styles-and-assets.md#styles)).
 - A streamed page is flushed chunk by chunk, so what it sends early still arrives early.
 - A strong ETag becomes weak.

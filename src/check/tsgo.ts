@@ -15,6 +15,8 @@ const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 
 // The options that name a place, which do not change what a file's types are.
 const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'typeRoots', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'configFilePath', 'pathsBasePath'])
+// The longest one tsgo run may take, which a hung one would otherwise hold `kay check` for good.
+const TSGO_TIMEOUT = 5 * 60_000
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
 const CLOCK_SLACK = 1000
 
@@ -138,7 +140,7 @@ function extendedConfig(dir: string, name: string): string | undefined {
 
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
 // `program` names the run among the several of one project, each keeping its own state.
-export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = ''): Promise<{ output: string, errors: string, code: number }> {
+export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = '', timeout = TSGO_TIMEOUT): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
   const state = join(cache, 'check', program)
   const buildInfo = join(state, 'tsbuildinfo')
@@ -152,8 +154,12 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
 
   const generated = await contentHashes(shadowDir)
   const started = Date.now()
-  const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', timeout })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  if (child.signalCode !== null)
+    return { output, errors: `kay: tsgo did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
+
   const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined
 
   if (slot && read)

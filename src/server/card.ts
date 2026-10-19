@@ -80,6 +80,7 @@ const QUERY = /\?.*$/
 const COLOR = /^#(?:[\da-f]{3}|[\da-f]{6})$/i
 const SPACES = /\s+/g
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
+const NOSNIFF = { 'x-content-type-options': 'nosniff' }
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 // Raised whenever the way a card is drawn changes, which renames every card.
 const DRAWING = 1
@@ -495,9 +496,9 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 
     // A URL from before the look changed still answers, with the card as it looks now, which may change again.
     if (url.searchParams.get('v') === cards.look && (!source || source.immutable))
-      return new Response(Bun.file(file), { headers: { 'cache-control': IMMUTABLE } })
+      return new Response(Bun.file(file), { headers: { 'cache-control': IMMUTABLE, ...NOSNIFF } })
 
-    return revalidated(request, `W/"${name}"`, () => Bun.file(file))
+    return revalidated(request, `W/"${name}"`, () => Bun.file(file), NOSNIFF)
   })
 }
 

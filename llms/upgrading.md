@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.55.0
 
+### `publicEnv` refuses a secret-looking name
+
+- The server stops at boot, where it only warned, when `publicEnv` declares a name with `SECRET`, `PASSWORD`, `PASSWD`, `PRIVATE` or `TOKEN` in it, one ending in `API_KEY` or `APIKEY`, or a database address such as `DATABASE_URL`. Move it to `defineEnv` and read it on the server, or rename a value that is public by design (`MAP_KEY` passes). `kay check` cannot recognise this, as `publicEnv` is a schema read when the server boots, so there is no lint.
+
 ### kayjs-mail keeps a failed mail 7 days, without its body
 
 - A mail given up is kept 7 days instead of 30, with its `html`, `text`, `headers` and `attachments` emptied: `mail.failed()` still lists recipients, subject and error. Code re-enqueuing a payload from `failed()` would send an empty mail; enqueue again from the app's own data, or keep the old behaviour with `queue: { keepFailed: '30d', redact: mail => mail }`. `kay check` cannot recognise this, so there is no lint.

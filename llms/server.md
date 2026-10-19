@@ -261,7 +261,7 @@ export default defineConfig({ requireGuards: true })
 - They are read from the environment as the server boots, as `defineEnv` reads its own, a missing or refused one stopping it.
 - The browser gets them from `/_kay/env.js`, which the server answers from its environment and the island entry imports before any island hydrates, so an executable, or a page prerendered at build time, carries the values of the environment it runs in; `kay build --static` writes that file with the build's.
 - The markup a prerendered page rendered holds the build's values, though: an island showing a variable that differs at runtime hydrates with a mismatch, so a page showing one renders per request.
-- The server warns as it boots when `publicEnv` declares a name such as `STRIPE_SECRET`, `DB_PASSWORD`, `PRIVATE_KEY` or `DATABASE_URL`, which every visitor would read.
+- The server refuses to boot when `publicEnv` declares a name such as `STRIPE_SECRET`, `DB_PASSWORD`, `PRIVATE_KEY`, `ACCESS_TOKEN`, `API_KEY` or `DATABASE_URL`, which every visitor would read; keep those in `defineEnv`. A name ending in `_KEY` otherwise, such as `MAP_KEY`, passes.
 - Only the declared variables leave the server, and nothing else of the environment reaches an island: a module reading `process.env` or `defineEnv`'s values fails the browser build.
 - Reading `publicEnv` when the config declares none throws; a name it does not declare is a type error.
 

@@ -12,7 +12,7 @@ import { pageHooks } from '../config'
 import { cacheDir, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
-import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
+import { localePath, splitLocale, textDirection, untranslatedPath } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { pagesApp } from '../server/app'
 import { basePath } from '../server/base'
@@ -156,9 +156,9 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   written.push(...await writeHeaders(out, config, pages))
 
-  written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
+  written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin, pages.locale))
 
-  written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin))
+  written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin, pages.locale))
 
   await compressPaths(written, cachedCopies(cacheDir(root, 'compressed')))
   await pruneCopies(cacheDir(root, 'compressed'))
@@ -167,7 +167,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 }
 
 // The paths the server sends to a page in its locale, each written as a page sending there: with every locale prefixed, the page's path without its prefix, and the path a locale translates, untranslated.
-async function writeLocaleRedirects(app: App, out: string, config: KayConfig, paths: string[], base: string, origin: string): Promise<string[]> {
+async function writeLocaleRedirects(app: App, out: string, config: KayConfig, paths: string[], base: string, origin: string, lang: string): Promise<string[]> {
   const settings = config.i18n && localeSettings(config.i18n)
 
   if (!settings || settings.hosts)
@@ -194,7 +194,7 @@ async function writeLocaleRedirects(app: App, out: string, config: KayConfig, pa
     const location = await localeRedirect(app, source, base)
 
     if (location !== undefined)
-      written.push(...await writeRefresh(out, source, location, origin))
+      written.push(...await writeRefresh(out, source, location, origin, lang))
   }
 
   return written
@@ -274,7 +274,7 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
 }
 
 // A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.
-async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string): Promise<string[]> {
+async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string, lang: string): Promise<string[]> {
   const entries = Object.entries(redirects).map(([from, target]) => ({ from, to: typeof target === 'string' ? target : target.to, status: hostedStatus(from, target) }))
 
   if (entries.length === 0)
@@ -283,7 +283,7 @@ async function writeRedirects(out: string, redirects: Redirects, base: string, o
   const written: string[] = []
 
   for (const { from, to } of entries.filter(entry => !PARAM_OR_REST.test(entry.from)))
-    written.push(...await writeRefresh(out, from, joinBase(base, to), origin))
+    written.push(...await writeRefresh(out, from, joinBase(base, to), origin, lang))
 
   const lines = entries.map(({ from, to, status }) => `${joinBase(base, from)} ${joinBase(base, to).replace(REST, ':splat')} ${status}`)
 
@@ -293,9 +293,9 @@ async function writeRedirects(out: string, redirects: Redirects, base: string, o
 }
 
 // A page at `from` that sends the browser to `to` at once, telling search engines the page that counts; a file a page already took is left alone.
-async function writeRefresh(out: string, from: string, to: string, origin: string): Promise<string[]> {
+async function writeRefresh(out: string, from: string, to: string, origin: string, lang: string): Promise<string[]> {
   const canonical = to.startsWith('/') && !to.startsWith('//') ? origin + to : to
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${escapeAttribute(to)}"><link rel="canonical" href="${escapeAttribute(canonical)}"><title>${escape(to)}</title></head><body><a href="${escapeAttribute(to)}">${escape(to)}</a></body></html>`
+  const html = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${escapeAttribute(to)}"><link rel="canonical" href="${escapeAttribute(canonical)}"><title>${escape(to)}</title></head><body><a href="${escapeAttribute(to)}">${escape(to)}</a></body></html>`
   const written: string[] = []
 
   for (const target of pageFiles(from)) {

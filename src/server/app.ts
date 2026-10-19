@@ -375,7 +375,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveLive(app, options.live)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
-    serveViolationReports(app, options.onError)
+    serveViolationReports(app, options.onError, site)
 
   if (hasPreview) {
     servePreview(app)

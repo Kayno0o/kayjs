@@ -1,6 +1,6 @@
 import type { FieldSchema } from '../src/runtime/form'
 import process from 'node:process'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { formInput, nativeConstraints } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
@@ -103,21 +103,20 @@ describe('servePublicEnv', () => {
     expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
   })
 
-  it('warns when it declares a variable named as a secret or a database address', () => {
-    const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+  it('refuses to boot with a variable named as a secret, a token, an API key or a database address', () => {
+    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL']
 
-    Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', KAY_TEST_STRIPE_SECRET: 'sk' })
+    Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', ...Object.fromEntries(names.map(name => [name, 'sk'])) })
 
     try {
-      servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))
-      expect(logged).not.toHaveBeenCalled()
-      servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String(), KAY_TEST_STRIPE_SECRET: t.String() }))
-      expect(logged).toHaveBeenCalledWith(expect.stringContaining('publicEnv declares KAY_TEST_STRIPE_SECRET, which every visitor reads'))
+      expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))).not.toThrow()
+
+      for (const name of names)
+        expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String(), [name]: t.String() })), name).toThrow(`kay: publicEnv declares ${name}, which every visitor reads`)
     }
     finally {
-      logged.mockRestore()
-      delete process.env.KAY_TEST_MAP_KEY
-      delete process.env.KAY_TEST_STRIPE_SECRET
+      for (const name of ['KAY_TEST_MAP_KEY', ...names])
+        delete process.env[name]
     }
   })
 })

@@ -77,6 +77,15 @@ describe('kay build --static localizes links as the server render does', () => {
         }
       }
 
+      // A page sending the browser on names the default locale as its language.
+      const refreshes = (await Array.fromAsync(new Bun.Glob('**/*.html').scan(join(copy, 'dist')))).filter(file => file.endsWith('.html'))
+      const sending = (await Promise.all(refreshes.map(async file => Bun.file(join(copy, 'dist', file)).text()))).filter(html => html.includes('http-equiv="refresh"'))
+
+      expect(sending.length > 0 || variant.prefixDefault !== true).toBe(true)
+
+      for (const html of sending)
+        expect(html).toStartWith('<!doctype html><html lang="fr">')
+
       // Not vacuously: the English copy of a page links the English copies of its siblings, and what is no page, another site's or a locale's own stays as written.
       const english = hrefs(await exported(join(copy, 'dist'), '/en/about'))
 

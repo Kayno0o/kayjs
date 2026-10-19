@@ -115,6 +115,55 @@ describe('the file route', () => {
     }
   })
 
+  it('names a download with an escaped filename, whatever the key holds', async () => {
+    const store = memoryFiles()
+    const get = await serve(store)
+    const names = ['we"ird.html', 'back\\slash.html', 'a;b%c.html', 'caf\u00E9.html', 'line\nbreak.html']
+
+    for (const name of names) {
+      const objects = new Map<string, string>()
+      const bucket = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          await request.arrayBuffer()
+          objects.set('disposition', request.headers.get('content-disposition') ?? '')
+
+          return new Response(null, { headers: { etag: '"1"' } })
+        },
+      })
+
+      try {
+        await s3Files({ bucket: 'site', endpoint: `http://localhost:${bucket.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' }).write(`dir/${name}`, new Blob(['x']))
+      }
+      finally {
+        await bucket.stop(true)
+      }
+
+      const disposition = objects.get('disposition') ?? ''
+
+      expect(disposition, name).toMatch(/^attachment; filename="[\x20-\x7E]*"; filename\*=UTF-8''[\w%.-]+$/)
+      expect(disposition, name).not.toMatch(/filename="[^"\\]*(?:"[^"]*|\\[^"]*(?:"[^"]*)?)";/)
+      expect(decodeURIComponent((/filename\*=UTF-8''(.+)$/).exec(disposition)![1]!), name).toBe(name)
+    }
+
+    await store.write('plain-name.html', new Blob(['x']))
+    expect((await get('/_kay/files/plain-name.html')).headers.get('content-disposition')).toBe('attachment; filename="plain-name.html"')
+  })
+
+  it('serves a key as its bucket does, and an upper-case extension is no route key', async () => {
+    const store = memoryFiles()
+    const get = await serve(store)
+
+    await store.write('a/page.html', new Blob(['x']))
+    await store.write('a/Page.HTML', new Blob(['x']))
+
+    const route = await get('/_kay/files/a/page.html')
+
+    expect(route.headers.get('content-type')).toBe('application/octet-stream')
+    expect(route.headers.get('content-disposition')).toBe('attachment; filename="page.html"')
+    expect((await get('/_kay/files/a/Page.HTML')).status).toBe(404)
+  })
+
   it('answers the range a player asks for', async () => {
     const get = await serve(memoryFiles())
     const url = files.url(await files.put(new File(['0123456789'], 'clip.txt')))

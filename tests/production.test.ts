@@ -410,6 +410,27 @@ describe('security headers', () => {
       logged.mockRestore()
     }
   })
+
+  it('answers a report about another origin without logging it or handing it to onError, once the site is known', async () => {
+    const caught: unknown[] = []
+    const app = await pages({ routes: ROUTES, prebuilt: false, security: { reports: true }, site: 'https://site.example', proxy: { header: 'x-real-ip' }, onError: error => void caught.push(error) })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const report = (url: string, directive = 'script-src-elem') => JSON.stringify({ 'csp-report': { 'document-uri': url, 'blocked-uri': 'inline', 'violated-directive': directive, 'disposition': 'enforce' } })
+    const post = async (body: string) => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/csp-report', 'x-real-ip': '10.0.0.1' }, body }))).status
+
+    try {
+      for (const url of ['https://evil.example/about', 'http://site.example/about', 'https://site.example.evil.example/', 'https://site.example:8443/', 'not a url'])
+        expect(await post(report(url)), url).toBe(204)
+
+      expect(caught).toHaveLength(0)
+      expect(logged).not.toHaveBeenCalled()
+      expect(await post(report('https://site.example/about'))).toBe(204)
+      expect(caught).toHaveLength(1)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
 })
 
 describe('action protection', () => {

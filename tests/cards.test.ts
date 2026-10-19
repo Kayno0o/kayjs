@@ -155,6 +155,7 @@ describe('share cards', () => {
     expect(card.status).toBe(200)
     expect(card.headers.get('content-type')).toBe('image/jpeg')
     expect(card.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(card.headers.get('x-content-type-options')).toBe('nosniff')
     expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
   })
 
@@ -217,6 +218,7 @@ describe('share cards', () => {
 
     expect(card.status).toBe(200)
     expect(card.headers.get('cache-control')).not.toContain('immutable')
+    expect(card.headers.get('x-content-type-options')).toBe('nosniff')
     expect(card.headers.get('etag')).toMatch(/^W\/"card-\w+\.jpg"$/)
   })
 

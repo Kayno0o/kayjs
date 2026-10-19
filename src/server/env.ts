@@ -5,7 +5,6 @@ import process from 'node:process'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
-import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
 import { building, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
@@ -110,8 +109,8 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
   })
 }
 
-// Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret or a database address never is.
-const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
+// Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret, a token, an API key or a database address never is.
+const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
 
 // Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
 export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSchema): void {
@@ -120,10 +119,11 @@ export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSche
   const values = defineEnv(schema) as Record<string, unknown>
   const exposed = Object.keys(values).filter(name => SERVER_ONLY.test(name))
 
-  if (exposed.length > 0)
-    kayLog('warn', `publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
+  if (exposed.length > 0) {
+    throw new Error(`kay: publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
+  }
 
-  ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
+  (globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
 
   let reply: ReturnType<typeof fixedReply> | undefined
 
