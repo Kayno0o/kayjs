@@ -1018,7 +1018,7 @@ function splitAtFixed(sheets: string, fixed: FixedText[]): SheetSplit {
 }
 
 // A page's body in pieces around the fixed texts its stylesheets hold, or undefined when it holds none: the sheets are cut once, as a chain writes the same text every time.
-function piecesOf(fixed: FixedText[] | undefined, files: string[], sheets: string, opening: string, closing: string): BodyPieces | undefined {
+export function piecesOf(fixed: FixedText[] | undefined, files: string[], sheets: string, opening: string, closing: string): BodyPieces | undefined {
   if (!fixed || fixed.length === 0)
     return undefined
 

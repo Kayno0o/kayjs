@@ -672,8 +672,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
 
   const splice = fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 
-  // The pieces are the body's only while it is unread.
-  const pieces = splice && !response.bodyUsed ? wholePieces.get(response) : undefined
+  const pieces = splice ? wholePieces.get(response) : undefined
 
   return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: wholeSizes.get(response)! })
 }

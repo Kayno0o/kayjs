@@ -347,6 +347,29 @@ describe('pages', () => {
     }
   })
 
+  it('cuts a page into pieces that put together are its text, around the inline stylesheets it holds', async () => {
+    const { fixedTexts } = await import('../src/server/compress')
+    const { piecesOf } = await import('../src/server/render')
+    const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
+    const b = `<style>.b{color:blue}${'.y{margin:0}'.repeat(40)}</style>`
+    const fixed = fixedTexts([a, b])
+    const opening = '<!doctype html><head>'
+    const closing = '</head><body>café</body></html>'
+
+    for (const sheets of [`<link rel="x">${a}${b}<link rel="y">`, a, `${b}<style>.other{}</style>${a}${a}`, '<link rel="z">']) {
+      const pieces = piecesOf(fixed, ['a.kay'], sheets, opening, closing)
+
+      if (!pieces) {
+        expect(sheets).toBe('<link rel="z">')
+
+        continue
+      }
+
+      expect(pieces.strings).toHaveLength(pieces.texts.length + 1)
+      expect(pieces.strings.flatMap((string, index) => [string, pieces.texts[index]?.text ?? '']).join('')).toBe(opening + sheets + closing)
+    }
+  })
+
   it('reads a stylesheet to inline with its relative URLs made absolute, the mount point the build added taken off, its line breaks read as the browser hashes them, and no way to close its element', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
 
