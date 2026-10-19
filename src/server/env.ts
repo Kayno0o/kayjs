@@ -12,7 +12,6 @@ import { building, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
 
 const OPTIONAL = Symbol.for('TypeBox.Optional')
-const LOOPBACK = /^(?:localhost|127\.\d+\.\d+\.\d+|\[?::1\]?)$/i
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
@@ -35,7 +34,7 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   }
 
   // Outside production a required-in-production field left out is not read against the schema: its placeholder is added to the result, so a pattern or minLength cannot refuse it.
-  const placeholders = production ? {} : placeholdersFor(declared, input, source)
+  const placeholders = production ? {} : placeholdersFor(declared, input, source.NODE_ENV)
   const schema = production ? requiredInProduction(declared) : without(declared, placeholders)
   const read = readFields(schema, input, false)
 
@@ -72,7 +71,7 @@ function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<
 }
 
 // What development and tests give a `requiredInProduction` string with no default that the environment leaves out: a derived value for a secret, `''` otherwise.
-function placeholdersFor(schema: EnvSchema, input: Record<string, string>, source: Record<string, string | undefined>): Record<string, string> {
+function placeholdersFor(schema: EnvSchema, input: Record<string, string>, mode: string | undefined): Record<string, string> {
   const placeholders: Record<string, string> = {}
 
   for (const [name, field] of Object.entries(schema.properties)) {
@@ -81,23 +80,14 @@ function placeholdersFor(schema: EnvSchema, input: Record<string, string>, sourc
     if (production !== true || name in input || fallback !== undefined || OPTIONAL in field || type !== 'string')
       continue
 
-    placeholders[name] = secret === true ? devSecret(name) : ''
+    // A secret is derived only where it is surely development, `kay dev` and `bun test` setting these; anywhere else it is required as any string is.
+    if (secret === true && mode !== 'development' && mode !== 'test')
+      continue
 
-    if (secret === true)
-      warnOfDerived(name, source)
+    placeholders[name] = secret === true ? devSecret(name) : ''
   }
 
   return placeholders
-}
-
-// A deploy that is not `NODE_ENV=production`, or that listens beyond the machine, signs with a value derived here, which only this checkout's `.kay/` keeps secret.
-function warnOfDerived(name: string, source: Record<string, string | undefined>): void {
-  const { NODE_ENV: mode, HOST: host } = source
-  const beyondLocal = host !== undefined && host !== '' && !LOOPBACK.test(host)
-  const deployed = mode !== undefined && mode !== '' && mode !== 'development' && mode !== 'test'
-
-  if (beyondLocal || deployed)
-    console.warn(`kay: ${name} is not set, so a value derived for development is in use (${deployed ? `NODE_ENV is ${mode}` : `the server listens on ${host}`}); set ${name}, and NODE_ENV=production for a deploy, which refuses to start without it`)
 }
 
 // Stable for a checkout and a name, so a session signed before a restart still reads; a random seed kept in the git-ignored `.kay/` folder keeps the value from being computed by anyone who only knows the path.
@@ -105,23 +95,17 @@ function devSecret(name: string): string {
   return new Bun.CryptoHasher('sha256').update(`kay dev secret\0${devSeed()}\0${process.cwd()}\0${name}`).digest('hex')
 }
 
+const SEED_LENGTH = 64
+let seed: string | undefined
+
+// Read once per process; a file that is missing, empty or cut short is written again.
 function devSeed(): string {
-  const file = join(process.cwd(), '.kay', 'dev-secret')
+  if (seed !== undefined)
+    return seed
 
-  try {
-    return readFileSync(file, 'utf8')
-  }
-  catch {
-    // Created on first use; a second process creating it at once loses and reads the winner's.
-  }
-
-  try {
-    mkdirSync(join(process.cwd(), '.kay'), { recursive: true })
-    writeFileSync(file, crypto.randomUUID() + crypto.randomUUID(), { flag: 'wx', mode: 0o600 })
-
-    return readFileSync(file, 'utf8')
-  }
-  catch {
+  const folder = join(process.cwd(), '.kay')
+  const file = join(folder, 'dev-secret')
+  const read = (): string => {
     try {
       return readFileSync(file, 'utf8')
     }
@@ -129,6 +113,31 @@ function devSeed(): string {
       return ''
     }
   }
+
+  seed = read()
+
+  if (seed.length >= SEED_LENGTH)
+    return seed
+
+  try {
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(file, crypto.randomUUID() + crypto.randomUUID(), { mode: 0o600 })
+  }
+  catch {
+    seed = undefined
+
+    throw new KayError('env-invalid', `kay: the development secret cannot be kept in ${folder}; make it writable, or set the secret's variable`)
+  }
+
+  seed = read()
+
+  if (seed.length < SEED_LENGTH) {
+    seed = undefined
+
+    throw new KayError('env-invalid', `kay: the development secret in ${file} cannot be read back; make ${folder} writable, or set the secret's variable`)
+  }
+
+  return seed
 }
 
 // The schema with every `requiredInProduction` field made required and stripped of its default.

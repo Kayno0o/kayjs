@@ -1,7 +1,7 @@
 import { rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
@@ -62,18 +62,18 @@ describe('s.Secret and a required-in-production string with no default', () => {
   const secret = s.Object({ SESSION_SECRET: s.Secret(), HOST_NAME: s.String({ requiredInProduction: true, pattern: '^[a-z]+$' }), SMTP: s.Optional(s.String({ requiredInProduction: true })) })
 
   it('is derived in development and tests, the same twice, and as long as a secret', () => {
-    const first = defineEnv(secret, {})
+    const first = defineEnv(secret, { NODE_ENV: 'development' })
     const typed: string = first.SESSION_SECRET
 
     expect(typed.length).toBeGreaterThanOrEqual(32)
     expect(defineEnv(secret, { NODE_ENV: 'test' }).SESSION_SECRET).toBe(typed)
     expect(first.HOST_NAME).toBe('')
     expect(first.SMTP).toBeUndefined()
-    expect(defineEnv(s.Object({ OTHER: s.Secret() }), {}).OTHER).not.toBe(typed)
+    expect(defineEnv(s.Object({ OTHER: s.Secret() }), { NODE_ENV: 'test' }).OTHER).not.toBe(typed)
   })
 
   it('differs between project paths', async () => {
-    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), {}).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
     const a = await project({ 'a.txt': '' })
     const b = await project({ 'a.txt': '' })
 
@@ -82,7 +82,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('mixes in a random seed kept in the checkout\'s .kay, so the same path elsewhere gives another value', async () => {
-    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), {}).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
     const root = await project({ 'a.txt': '' })
     const first = await run(root)
 
@@ -92,27 +92,26 @@ describe('s.Secret and a required-in-production string with no default', () => {
     expect(await run(root)).not.toBe(first)
   })
 
-  it('warns once a derived secret is in use beyond development: another NODE_ENV or a HOST that is not loopback', () => {
-    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const names = (source: Record<string, string>) => {
-      warn.mockClear()
-      defineEnv(secret, source)
+  it('is derived only under development and test: any other NODE_ENV, or none, refuses a missing secret', () => {
+    expect(() => defineEnv(secret, {})).toThrow('SESSION_SECRET')
+    expect(() => defineEnv(secret, { HOST: '0.0.0.0' })).toThrow('SESSION_SECRET')
+    expect(() => defineEnv(secret, { NODE_ENV: 'staging' })).toThrow('SESSION_SECRET')
+    expect(defineEnv(secret, { NODE_ENV: 'staging', SESSION_SECRET: 'x'.repeat(40) }).SESSION_SECRET).toBe('x'.repeat(40))
+    expect(defineEnv(secret, { NODE_ENV: 'development' }).SESSION_SECRET).toHaveLength(64)
+  })
 
-      return warn.mock.calls.length
-    }
+  it('writes the seed again when its file is empty or cut short, and fails clearly when .kay cannot be written', async () => {
+    const run = async (cwd: string) => Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; try { console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A) } catch (error) { console.log(error.message) }`}`.cwd(cwd).quiet().text()
+    const root = await project({ '.kay/dev-secret': 'short' })
+    const first = (await run(root)).trim()
 
-    try {
-      expect(names({})).toBe(0)
-      expect(names({ NODE_ENV: 'development', HOST: '127.0.0.1' })).toBe(0)
-      expect(names({ NODE_ENV: 'test', HOST: 'localhost' })).toBe(0)
-      expect(names({ NODE_ENV: 'staging' })).toBe(1)
-      expect(names({ HOST: '0.0.0.0' })).toBe(1)
-      expect(warn.mock.calls[0]![0]).toContain('SESSION_SECRET is not set')
-      expect(names({ NODE_ENV: 'staging', SESSION_SECRET: 'x'.repeat(40), HOST_NAME: 'a' })).toBe(0)
-    }
-    finally {
-      warn.mockRestore()
-    }
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect((await Bun.file(join(root, '.kay/dev-secret')).text()).length).toBeGreaterThanOrEqual(64)
+    expect((await run(root)).trim()).toBe(first)
+
+    const blocked = await project({ '.kay': 'a file, not a folder' })
+
+    expect(await run(blocked)).toContain('the development secret cannot be kept in')
   })
 
   it('keeps 32 characters whatever minLength is given', () => {
@@ -123,14 +122,14 @@ describe('s.Secret and a required-in-production string with no default', () => {
   it('takes a set value, an empty one counting as unset, and refuses a short one', () => {
     const long = 'x'.repeat(40)
 
-    expect(defineEnv(secret, { SESSION_SECRET: long, HOST_NAME: 'abc' })).toMatchObject({ SESSION_SECRET: long, HOST_NAME: 'abc' })
-    expect(defineEnv(secret, { SESSION_SECRET: '' }).SESSION_SECRET).toHaveLength(64)
-    expect(() => defineEnv(secret, { SESSION_SECRET: 'short' })).toThrow('SESSION_SECRET')
-    expect(() => defineEnv(secret, { HOST_NAME: 'A1' })).toThrow('HOST_NAME')
+    expect(defineEnv(secret, { NODE_ENV: 'test', SESSION_SECRET: long, HOST_NAME: 'abc' })).toMatchObject({ SESSION_SECRET: long, HOST_NAME: 'abc' })
+    expect(defineEnv(secret, { NODE_ENV: 'test', SESSION_SECRET: '' }).SESSION_SECRET).toHaveLength(64)
+    expect(() => defineEnv(secret, { NODE_ENV: 'test', SESSION_SECRET: 'short' })).toThrow('SESSION_SECRET')
+    expect(() => defineEnv(secret, { NODE_ENV: 'test', HOST_NAME: 'A1' })).toThrow('HOST_NAME')
   })
 
   it('never uses the derived value in production', () => {
-    const dev = defineEnv(secret, {}).SESSION_SECRET
+    const dev = defineEnv(secret, { NODE_ENV: 'test' }).SESSION_SECRET
 
     expect(() => defineEnv(secret, { NODE_ENV: 'production' })).toThrow(/SESSION_SECRET: .*\n.*HOST_NAME: .*\n.*SMTP: /)
     expect(() => defineEnv(secret, { NODE_ENV: 'production', SESSION_SECRET: 'short', HOST_NAME: 'a', SMTP: 'x' })).toThrow('SESSION_SECRET')
@@ -138,7 +137,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('still works with overrideEnv', () => {
-    const env = defineEnv(secret, {})
+    const env = defineEnv(secret, { NODE_ENV: 'test' })
 
     using override = overrideEnv(env, { SESSION_SECRET: 'y'.repeat(32) })
 
@@ -169,12 +168,12 @@ describe('kay env', () => {
     expect((await kay(['env'], root)).stdout).toContain('SESSION_SECRET  src/env.ts  string (secret)  production')
   })
 
-  it('builds with no value for an s.Secret the page reads, and without throwing', async () => {
+  it('builds with no value for an s.Secret, kay env and kay check listing it without throwing', async () => {
     const root = await project({
       'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n',
       'kay.config.ts': 'export default { favicon: false }\n',
       'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SESSION_SECRET: s.Secret() }))\n',
-      'src/routes/index.kay': '---\nimport { env } from \'../env\'\n---\np {String(env.SESSION_SECRET.length)}\n',
+      'src/routes/index.kay': '---\nimport { env } from \'../env\'\n---\np {String(env === undefined)}\n',
     })
     const built = Bun.spawn([process.execPath, cli, 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { PATH: process.env.PATH! } })
 

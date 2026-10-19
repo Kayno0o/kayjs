@@ -96,10 +96,13 @@ describe('checks in kay.config.ts', () => {
     expect(problems.filter(({ file }) => file.endsWith('.txt')).map(({ message }) => message)).toEqual(['b'])
   })
 
-  it('names an entry that is not a function', async () => {
+  it('refuses an entry that is not a function as a config error', async () => {
     const root = await project('{ favicon: false, checks: [\'nope\'] }\n')
 
-    expect((await check(root)).problems.map(({ message }) => message)).toEqual(['the check checks[0] of kay.config.ts threw: it is not a function'])
+    const { code, problems } = await check(root)
+
+    expect(code).toBe(1)
+    expect(problems.map(({ message }) => message)).toEqual([expect.stringContaining('`checks[0]` in kay.config.ts is not a function')])
   })
 
   it('cuts off a check that does not finish, drops its late findings and keeps the others', async () => {

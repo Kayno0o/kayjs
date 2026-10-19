@@ -520,6 +520,11 @@ function checkedConfig({ checks, env }: KayConfig): void {
   if (checks !== undefined && !Array.isArray(checks))
     throw new KayError('config-invalid', `kay: \`checks\` in ${CONFIG_FILE} is a list of functions, not ${typeof checks}`)
 
+  const notFunction = (checks ?? []).findIndex(check => typeof check !== 'function')
+
+  if (notFunction >= 0)
+    throw new KayError('config-invalid', `kay: \`checks[${notFunction}]\` in ${CONFIG_FILE} is not a function`)
+
   if (env === undefined)
     return
 
