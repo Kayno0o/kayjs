@@ -40,3 +40,11 @@ Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
 
   return server
 }) as typeof Bun.serve
+
+// As `kay dev` has it, so a module the entry imports before it calls `pages()`, such as one importing `~icons` or a `.kay` mail, loads; a project that cannot load its config fails in `pages()` instead.
+try {
+  const { registerEarlyLoader } = await import('../server/loader')
+
+  await registerEarlyLoader(process.cwd())
+}
+catch {}

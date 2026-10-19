@@ -218,6 +218,19 @@ p {user} via {via}
     expect((await render('/', other)).code).toBe(0)
   })
 
+  it('loads ~icons imported from a module the entry imports before it calls pages()', async () => {
+    const icons = await fixtureCopy('icons')
+
+    await writeFile(join(icons, 'src', 'server.ts'), `import { Elysia } from 'elysia'\nimport { pages } from 'kay/server'\nimport { ICONS } from './content'\n\nnew Elysia().use(await pages()).listen(3000)\nconsole.log(Object.keys(ICONS))\n`)
+    await writeFile(join(icons, 'src', 'content.ts'), `import home from '~icons/tabler/home'\n\nexport const ICONS = { home }\n`)
+    await writeFile(join(icons, 'src', 'routes', 'chip.kay'), `---\nimport { ICONS } from '../content'\n---\nsvg({...ICONS.home} class="chip")\n`)
+
+    const { out, code } = await render('/chip', icons)
+
+    expect(code).toBe(0)
+    expect(out).toContain('class="chip"')
+  })
+
   it('gives a full URL\'s host to the request', async () => {
     const dir = await project(undefined, SERVER)
 
