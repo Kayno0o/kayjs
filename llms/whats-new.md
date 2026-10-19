@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `attempt` and ConfirmDelete read the `ApiError` that `call()` throws as they do an action's refusal: the route's own words are toasted for a 4xx when they read as a message (not markup, a status code or a page), `refused` reads its `answer`, and `failure` stands for status 0 or a 5xx ([kayjs-ui](../packages/ui/llms/basics.md)).
 - kayjs-ui `Segmented` takes number option values, and `onChange` hears the option's own type ([Tables, navigation and layout](../packages/ui/llms/tables-navigation-and-layout.md)).
 - The metric-matched font fallback also fits Roboto and Noto Serif, so on Android and on a Linux machine without Arial-compatible fonts it loads instead of leaving the text to shift as the font swaps in ([Fonts](sitemap-search-fonts.md#fonts)); the page's inline `<style>` grows by about 200 bytes (40 gzipped) per family.
+- The metric-matched font fallback also covers Roboto (a sans) and fits Noto Serif (a serif), so on Android and on a Linux machine without Arial-compatible fonts it loads instead of leaving the text to shift as the font swaps in ([Fonts](sitemap-search-fonts.md#fonts)); the page's inline `<style>` grows by about 200 bytes (40 gzipped) per serif family and nothing for a sans, which only lists Roboto more.
 
 ## 1.57.1
 

@@ -1,4 +1,5 @@
 import type { Browser } from 'playwright-core'
+import type { FallbackKind } from '../../src/server/font-metrics'
 import type { Variant } from './sites'
 import { FALLBACKS } from '../../src/server/font-metrics'
 import { median } from '../format'
@@ -102,27 +103,35 @@ export async function vitals(browser: Browser, variant: Variant, path: string, p
   return Object.fromEntries((Object.keys(runs[0]!) as (keyof Vitals)[]).map(key => [key, median(runs.map(run => run[key]))])) as unknown as Vitals
 }
 
-// Whether the machine has a system font kay's metric-matched fallbacks resolve to; without one, the layout shift figures leave the fallback out.
-export async function hasSystemFallback(browser: Browser): Promise<boolean> {
+// The kinds of fallback kay's metric-matched fallbacks have a system font for on this machine; for a kind without, the layout shift figures leave its fallback out.
+export async function systemFallbacks(browser: Browser): Promise<FallbackKind[]> {
   const page = await browser.newPage()
 
   try {
-    const names = Object.values(FALLBACKS).flat().flatMap(fallback => fallback.names)
+    const kinds = Object.entries(FALLBACKS).map(([kind, fallbacks]) => ({ kind: kind as FallbackKind, names: fallbacks.flatMap(fallback => fallback.names) }))
 
-    await page.setContent(`<style>${names.map((name, index) => `@font-face{font-family:f${index};src:local("${name}")}`).join('')}</style>`)
+    await page.setContent(`<style>${kinds.flatMap(({ kind, names }) => names.map((name, index) => `@font-face{font-family:${kind}${index};src:local("${name}")}`)).join('')}</style>`)
 
-    return await page.evaluate(async (count) => {
-      const loaded = await Promise.all(Array.from({ length: count }, async (_, index) => {
-        try {
-          return (await document.fonts.load(`16px f${index}`)).length > 0
+    const loaded = await page.evaluate(async (wanted) => {
+      const found: string[] = []
+
+      for (const { kind, count } of wanted) {
+        for (let index = 0; index < count; index++) {
+          try {
+            if ((await document.fonts.load(`16px ${kind}${index}`)).length > 0) {
+              found.push(kind)
+
+              break
+            }
+          }
+          catch {}
         }
-        catch {
-          return false
-        }
-      }))
+      }
 
-      return loaded.some(Boolean)
-    }, names.length)
+      return found
+    }, kinds.map(({ kind, names }) => ({ kind, count: names.length })))
+
+    return kinds.map(({ kind }) => kind).filter(kind => loaded.includes(kind))
   }
   finally {
     await page.close()

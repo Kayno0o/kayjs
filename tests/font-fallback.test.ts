@@ -182,7 +182,7 @@ describe('metric-matched font fallbacks', () => {
   })
 
   it('describes a fallback that is wider than Arial with a size adjust above 100%', () => {
-    const descriptors = fallbackDescriptors({ unitsPerEm: 1000, ascent: 900, descent: 200, lineGap: 0, average: 600, coverage: 1, kind: 'sans' })
+    const descriptors = fallbackDescriptors({ unitsPerEm: 1000, ascent: 900, descent: 200, lineGap: 0, average: 600, coverage: 1, kind: 'sans' }, FALLBACKS.sans[0]!)
 
     expect(descriptors).toMatch(/^size-adjust:1\d{2}(\.\d+)?%;ascent-override:\d+(\.\d+)?%;descent-override:\d+(\.\d+)?%;line-gap-override:0%$/)
   })
@@ -247,41 +247,29 @@ describe('metric-matched font fallbacks', () => {
   })
 })
 
-describe('a fallback for each system sans and serif', () => {
+describe('a fallback for the system fonts of Android and Linux', () => {
   const rulesOf = (family: string, src: string) => fontFallbacks(ROOT, [{ family, src }]).get(family)!.rule.match(/@font-face\{[^}]*\}/g)!
-  const adjustOf = (rule: string) => Number((/size-adjust:([\d.]+)%/).exec(rule)![1])
 
-  it('declares a rule per system sans under the one name, each fitted to its own metrics', () => {
+  it('lists Roboto beside Arial in the one sans rule, with Arial\'s descriptors', () => {
     const rules = rulesOf('Archivo Black', WOFF2)
-
-    expect(rules).toHaveLength(2)
-    expect(rules.every(rule => rule.startsWith('@font-face{font-family:"Archivo Black Fallback";src:local('))).toBe(true)
-    expect(rules[0]).toContain('local("Arial")')
-    expect(rules[1]).toContain('local("Roboto"),local("Roboto-Regular"),local("Roboto Regular")')
-    expect(adjustOf(rules[1]!)).not.toBe(adjustOf(rules[0]))
-    // Roboto draws a little wider than Arial, so its rule enlarges less.
-    expect(adjustOf(rules[1]!)).toBeLessThan(adjustOf(rules[0]))
-  })
-
-  it('keeps the Arial rule as it was, before and without Roboto', () => {
-    const [arial] = rulesOf('Archivo Black', WOFF2)
     const metrics = fontMetrics(new Uint8Array(readFileSync(WOFF2)))!
 
-    expect(arial).toBe(`@font-face{font-family:"Archivo Black Fallback";src:local("Arial"),local("ArialMT"),local("Liberation Sans"),local("Arimo");${fallbackDescriptors(metrics, FALLBACKS.sans[0])}}`)
+    expect(rules).toEqual([`@font-face{font-family:"Archivo Black Fallback";src:local("Arial"),local("ArialMT"),local("Liberation Sans"),local("Arimo"),local("Roboto"),local("Roboto-Regular"),local("Roboto Regular");${fallbackDescriptors(metrics, FALLBACKS.sans[0]!)}}`])
   })
 
-  it('declares Times New Roman and Noto Serif for a serif, Courier New alone for a monospace', () => {
+  it('declares Times New Roman and Noto Serif rules for a serif, fitted apart, Courier New alone for a monospace', () => {
     const serif = { unitsPerEm: 1000, ascent: 900, descent: 200, lineGap: 0, average: 500, coverage: 1, kind: 'serif' as const }
 
+    expect(FALLBACKS.sans.map(({ names }) => names[0])).toEqual(['Arial'])
     expect(FALLBACKS.serif.map(({ names }) => names[0])).toEqual(['Times New Roman', 'Noto Serif'])
     expect(FALLBACKS.mono.map(({ names }) => names[0])).toEqual(['Courier New'])
-    expect(fallbackDescriptors(serif, FALLBACKS.serif[1])).not.toBe(fallbackDescriptors(serif, FALLBACKS.serif[0]))
+    expect(fallbackDescriptors(serif, FALLBACKS.serif[1]!)).not.toBe(fallbackDescriptors(serif, FALLBACKS.serif[0]!))
   })
 
   it('declares a variable font\'s fallback the same way', () => {
     const fallbacks = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2, weight: '100 900' }])
 
-    expect(fallbacks.get('Archivo Black')!.rule.match(/@font-face/g)).toHaveLength(2)
+    expect(fallbacks.get('Archivo Black')!.rule.match(/@font-face/g)).toHaveLength(1)
   })
 
   it('declares no fallback when no font is configured', () => {
@@ -290,27 +278,33 @@ describe('a fallback for each system sans and serif', () => {
   })
 })
 
-// A machine with Roboto and no Arial, as Android is: fontconfig is pointed at a directory of Roboto alone, which Chromium reads at launch.
+// A machine with one system font and no Arial, as Android is: fontconfig is pointed at a directory of it alone, which Chromium reads at launch.
 const browser = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const SYSTEM = 'tests/fixtures/system-fonts'
+// What each case measures: the width of the fallback over the web font's, within `tolerance` of 1. Unfitted, Roboto draws 25% off Archivo Black. Fitted it is 3.1% off, since Arial's descriptors stand for Roboto and one average for this sample's letters; Noto Serif fitted to itself is exact.
+const CASES = [
+  { name: 'Roboto, the sans of Android', local: 'roboto-latin-400-normal.woff', family: 'Archivo Black', web: WOFF2, statuses: ['Archivo Black Fallback loaded', 'Real loaded'], tolerance: 0.035 },
+  { name: 'Noto Serif, the serif of Android', local: 'noto-serif-latin-400-normal.woff', family: 'Noto Serif Web', web: `${SYSTEM}/noto-serif-latin-400-normal.woff`, statuses: ['Noto Serif Web Fallback error', 'Noto Serif Web Fallback loaded', 'Real loaded'], tolerance: 0.005 },
+]
 
-describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('a fallback in Chromium on a machine with Roboto alone', () => {
-  it('loads the Roboto-fitted face and draws within a few percent of the web font', async () => {
+describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('a fallback in Chromium on a machine with one system font', () => {
+  it.each(CASES)('loads the fallback fitted to $name and draws as wide as the web font', async ({ local, family, web, statuses, tolerance }) => {
     const dir = resolve(await scratchDir('system-fonts-'))
     const sample = 'Pokemon shared reviews and a pangram of quick brown foxes'
 
     try {
       await mkdir(join(dir, 'fonts'))
-      await Bun.write(join(dir, 'fonts/roboto.ttf'), sfnt(readFileSync('tests/fixtures/system-fonts/roboto-latin-400-normal.woff')))
+      await Bun.write(join(dir, 'fonts/system.ttf'), sfnt(readFileSync(join(SYSTEM, local))))
       await Bun.write(join(dir, 'fonts.conf'), `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>${join(dir, 'fonts')}</dir><cachedir>${join(dir, 'cache')}</cachedir></fontconfig>`)
 
-      const { rule } = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2 }]).get('Archivo Black')!
-      const real = `data:font/woff2;base64,${readFileSync(WOFF2).toString('base64')}`
+      const { rule } = fontFallbacks(ROOT, [{ family, src: web }]).get(family)!
+      const real = `data:font/${web.endsWith('.woff2') ? 'woff2' : 'woff'};base64,${readFileSync(web).toString('base64')}`
       const chrome = await chromium.launch({ executablePath: browser ?? chromium.executablePath(), env: { ...process.env, FONTCONFIG_FILE: join(dir, 'fonts.conf') } })
 
       try {
         const page = await chrome.newPage()
 
-        await page.setContent(`<style>${rule}@font-face{font-family:"Real";src:url(${real})}span{font:20px/1 Real;white-space:nowrap}#fallback{font-family:"Archivo Black Fallback"}</style><span id=real>${sample}</span><br><span id=fallback>${sample}</span>`)
+        await page.setContent(`<style>${rule}@font-face{font-family:"Real";src:url(${real})}span{font:20px/1 Real;white-space:nowrap}#fallback{font-family:"${family} Fallback"}</style><span id=real>${sample}</span><br><span id=fallback>${sample}</span>`)
 
         const result = await page.evaluate(async () => {
           await document.fonts.load('20px Real')
@@ -323,8 +317,8 @@ describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('a fallb
           }
         })
 
-        expect(result.statuses).toEqual(['Archivo Black Fallback error', 'Archivo Black Fallback loaded', 'Real loaded'])
-        expect(Math.abs(result.fallback / result.real - 1)).toBeLessThan(0.08)
+        expect(result.statuses).toEqual(statuses)
+        expect(Math.abs(result.fallback / result.real - 1)).toBeLessThan(tolerance)
       }
       finally {
         await chrome.close()

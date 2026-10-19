@@ -9,13 +9,20 @@ import { constants, cpus } from 'node:os'
 import { join } from 'node:path'
 import { launch } from '../browser'
 import { kilobytes, milliseconds, table } from '../format'
-import { hasSystemFallback, PROFILES, vitals } from './browser'
+import { PROFILES, systemFallbacks, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
 import { serverMemory, startAll, stopEverything } from './serve'
 import { authOf, commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, startServices, stopServices, VARIANTS, versionIn } from './sites'
 import { checkPages, VIEWPORTS, weigh } from './weigh'
+
+// A kind without a system font draws unfitted, so the layout shift figures leave its fallback out.
+function systemFallbackLine(found: string[]): string {
+  const missing = ['sans', 'serif', 'mono'].filter(kind => !found.includes(kind))
+
+  return missing.length === 0 ? 'System fonts for the metric-matched fallbacks: sans, serif and mono found' : `System fonts for the metric-matched fallbacks: ${found.join(', ') || 'none'} found, so the layout shift figures leave out the ${missing.join(' and ')} fallback`
+}
 
 interface Result {
   builds: BuildTime[]
@@ -158,7 +165,7 @@ try {
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless, ${nginxVersion()}`,
-    await hasSystemFallback(browser) ? 'System font for the metric-matched fallbacks: found' : 'System font for the metric-matched fallbacks: none (no Arial, Liberation, Arimo or Roboto), so the layout shift figures leave them out',
+    systemFallbackLine(await systemFallbacks(browser)),
     ...await Promise.all(SITES.filter(site => VARIANTS.some(variant => variant.site === site)).map(async (site) => {
       const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `${variant.site.before?.label ?? 'Astro'} at ${commitOf(variant)}` : `kay ${await versionIn(producing ? variant.dir : variant.devDir, 'kay')} at ${commitOf(variant)}`))
 

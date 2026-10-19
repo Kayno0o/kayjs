@@ -287,7 +287,7 @@ export default defineConfig({
 
 Then use the family as usual: `font-family: Inter, system-ui, sans-serif`. With Tailwind, write `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 
-While a font loads, kay shows the text in a stand-in sized like it. It reads the font's metrics and declares a fallback such as `"Inter Fallback"`, a resized system font: Arial or Roboto (Android's), Times New Roman or Noto Serif, Courier New.
+While a font loads, kay shows the text in a stand-in sized like it. It reads the font's metrics and declares a fallback such as `"Inter Fallback"`, a resized system font: Arial or Roboto (Android's), Times New Roman or Noto Serif (Android's), Courier New.
 
 kay adds the fallback right after the family in your stylesheets' `font-family`, `font` and `--font-*` values. The page then barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
 
@@ -299,7 +299,7 @@ export default defineConfig({
 })
 ```
 
-The fallback is Arial or Roboto, Times New Roman or Noto Serif, or Courier New, whichever the device has, resized with `size-adjust` and the `ascent-override`, `descent-override` and `line-gap-override` that fit your font. A family with no Latin letters gets none. Where kay does not rewrite the stack, such as a `style` element or an inline attribute, list `"Inter Fallback"` yourself.
+The fallback is Arial or Roboto, Times New Roman or Noto Serif, or Courier New, whichever the device has, resized with `size-adjust` and the `ascent-override`, `descent-override` and `line-gap-override` that fit your font. A family with no Latin letters gets none. On Android a monospace family stays unfitted, as only Courier New is listed. Where kay does not rewrite the stack, such as a `style` element or an inline attribute, list `"Inter Fallback"` yourself.
 
 <Callout type="note">
 
