@@ -1,0 +1,14 @@
+---
+import { Sortable } from '@kaynooo/kayjs-ui/dnd'
+import { signal } from 'kay'
+
+// An item whose text changes and which holds a control of its own, to see what its bare handle is named after.
+const title = signal('Milk')
+
+const sortable = new Sortable({ onReorder: () => undefined })
+---
+ul
+  li(ref={sortable.item(1)})
+    span.grip(tabindex="0" ref={sortable.handle(1)})
+    | {title()}
+    button.rename(type="button" onClick={() => title.set('Bread')}) Delete

@@ -1,0 +1,7 @@
+--- server
+import { capped } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Capped
+Chat(action={capped} label="Capped")

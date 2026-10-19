@@ -5,7 +5,7 @@ import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtm
 import { markdownHtml } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { MARK, MARKED, withoutMarker } from './marker'
-import { posted, POSTED_CHARACTERS, restored, stored } from './chat-history'
+import { posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import './chat.css'
 
@@ -50,7 +50,7 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`; the history posted opens on a user message, so an assistant one at its start is left out.
   keep?: number | undefined
-  // The most characters each send posts, the oldest messages leaving first; set it to the `maxInputChars` of the action's `ask` when that is below 40,000, else a long conversation is refused with a 413.
+  // The most characters each send posts, the oldest messages leaving first; the chat lowers it by itself when the action answers 413, so it is only set to avoid that first refusal.
   maxChars?: number | undefined
   // Names a table of a reply, which scrolls sideways inside its bubble when it is wider; a reply with several numbers them, `Table 1`, `Table 2`.
   tableLabel?: string | undefined
@@ -250,6 +250,26 @@ effect(() => {
     queueMicrotask(() => log?.scrollTo({ top: log.scrollHeight }))
 })
 
+// What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
+let learned = Infinity
+
+// Posts the history; a 413 shrinks what is posted below what it just was, until the action takes it or only the last message is left.
+async function call(signal: AbortSignal): Promise<ActionStream<string | Progress>> {
+  for (;;) {
+    const sent = posted(history(), keep, Math.min(maxChars, learned))
+
+    try {
+      return await action({ messages: sent }, { signal, refresh: false })
+    }
+    catch (error) {
+      if (!(error instanceof ActionError) || error.status !== 413 || sent.length < 2 || signal.aborted)
+        throw error
+
+      learned = shrunk(sent)
+    }
+  }
+}
+
 async function send(again = false, question?: string) {
   const text = question ?? draft().trim()
 
@@ -279,7 +299,7 @@ async function send(again = false, question?: string) {
 
   try {
     // A turn that only called tools has no text to post, which a provider refuses.
-    const stream = await action({ messages: posted(history(), keep, maxChars) }, { signal: mine.signal, refresh: false })
+    const stream = await call(mine.signal)
 
     if (mine.signal.aborted) {
       stream.close()

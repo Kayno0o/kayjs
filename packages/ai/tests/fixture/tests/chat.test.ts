@@ -226,6 +226,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(fakeAi.asked.map(asked => asked.messages.map(message => `${message.role}:${message.content}`))).toEqual([['user:First'], ['user:Second']])
   })
 
+  test('a chat given no maxChars learns the cap of the action\'s ask from its 413 and posts less, keeping the last message', async () => {
+    const page = await site.open('/capped')
+
+    await page.fill('textarea', 'a'.repeat(30))
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-turn:nth-of-type(2):not([data-pending])', { text: 'Fake reply to: aaaa' })
+    await page.fill('textarea', 'b'.repeat(20))
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-turn:nth-of-type(4)', { text: 'Fake reply to: bbbb' })
+
+    expect(await page.count('[role="alert"]')).toBe(0)
+    expect(fakeAi.asked.at(-1)?.messages.map(message => message.content)).toEqual(['b'.repeat(20)])
+  })
+
   test('a message the schema refuses returns to the field, on a fresh send and on a retry, and a draft typed since stays after it', async () => {
     const page = await site.open('/refusing')
 

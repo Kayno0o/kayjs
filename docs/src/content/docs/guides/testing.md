@@ -144,6 +144,8 @@ it('opens its panel on a click', async () => {
 })
 ```
 
+A component that calls a route of an API module, your own or a library's, can be mounted too. The call goes out as a `fetch`, so stub `fetch` in the test to answer it.
+
 ## A database for each test file
 
 kay holds no database code. An app that keeps its data with `@kaynooo/pg-orm` gets a database for each test file from its `testDatabase()`. `kay new --template app` writes the setup.

@@ -14,6 +14,9 @@ export const refusing = action(messages, ({ messages }, ctx) => {
   return status === undefined ? ask(messages) : ctx.fail(status, status === 422 ? 'That message is refused' : undefined)
 })
 
+// An `ask` taking 60 characters of messages, which a Chat given no `maxChars` must learn from the 413.
+export const capped = action(messages, ({ messages }) => ask(messages, { maxInputChars: 60 }))
+
 // A reply whose stream breaks after its first words.
 export const flaky = action(messages, async function* () {
   yield 'Half a reply'

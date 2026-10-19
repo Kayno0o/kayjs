@@ -204,6 +204,19 @@ describe('Sortable, from the keyboard', () => {
     expect(at('grip-c').hasAttribute('aria-label')).toBe(false)
   })
 
+  test('names a handle in a rendered list after its item\'s text without the controls beside it, and again when the text changes', async () => {
+    mounted = await mountComponent('src/components/named-sortable.kay')
+
+    const { root } = mounted
+    const grip = root.querySelector<HTMLElement>('.grip')!
+
+    expect(grip.getAttribute('aria-label')).toBe('Reorder Milk')
+    root.querySelector<HTMLElement>('.rename')!.click()
+    await settle()
+
+    expect(grip.getAttribute('aria-label')).toBe('Reorder Bread')
+  })
+
   test('starts each move from where the rows stand now, and keeps focus on the handle a keyed list moved', async () => {
     mounted = await mountComponent('src/components/sortable-list.kay')
 

@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { mount, readPersisted, settle, writePersisted } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -121,6 +121,39 @@ describe('mount', () => {
 
     expect({ code, errors }).toEqual({ code: 0, errors: '' })
     expect(JSON.parse(output)).toEqual({ focused: true, open: false })
+  })
+
+  it('mounts a component that calls an API module, which the browser build knows only by where it is served', async () => {
+    const saved = process.env.KAY_ROOT
+    const asked: string[] = []
+    const stub = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+      asked.push(`${init?.method} ${new URL(input instanceof Request ? input.url : String(input), 'http://localhost').pathname}`)
+
+      return Response.json({ title: 'Milk' })
+    }) as typeof fetch)
+
+    process.env.KAY_ROOT = join(import.meta.dir, 'fixtures/mount-api')
+
+    try {
+      const { root, unmount } = await mount('src/components/add-note.kay')
+
+      root.querySelector('button')!.click()
+
+      for (let tries = 0; root.querySelector('.added')?.textContent === '' && tries < 200; tries++)
+        await Bun.sleep(5)
+
+      expect(asked).toEqual(['POST /api/notes'])
+      expect(root.querySelector('.added')?.textContent).toBe('{"title":"Milk"}')
+      unmount()
+    }
+    finally {
+      stub.mockRestore()
+
+      if (saved === undefined)
+        delete process.env.KAY_ROOT
+      else
+        process.env.KAY_ROOT = saved
+    }
   })
 
   it('reveals nothing for a field that cannot take focus', async () => {

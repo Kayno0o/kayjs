@@ -29,12 +29,24 @@ export interface SortableOptions {
   onReorder: (from: number, to: number) => void | Promise<void>
 }
 
+const CONTROLS = 'button,input,select,textarea,[role="button"]'
+
+// The item's text without that of the controls it holds, which name themselves (`Milk` for `Milk` and a `Delete` button).
+function ownText(item: HTMLElement): string | null {
+  const copy = item.cloneNode(true) as HTMLElement
+
+  for (const control of copy.querySelectorAll(CONTROLS))
+    control.remove()
+
+  return copy.textContent
+}
+
 // What the item holds, in a few words: its own label, else the alt of its first image, else its text.
 function itemName(item: HTMLElement | undefined): string {
   if (!item)
     return ''
 
-  const candidates = [item.getAttribute('aria-label'), item.querySelector('img[alt]:not([alt=""])')?.getAttribute('alt'), item.textContent]
+  const candidates = [item.getAttribute('aria-label'), item.querySelector('img[alt]:not([alt=""])')?.getAttribute('alt'), ownText(item)]
   const text = (candidates.find(candidate => candidate !== null && candidate !== undefined && candidate.trim() !== '') ?? '').replaceAll(/\s+/g, ' ').trim()
 
   return text.length > 40 ? `${text.slice(0, 39)}…` : text
@@ -42,6 +54,8 @@ function itemName(item: HTMLElement | undefined): string {
 
 // Handles named here rather than by the page, which are named again once their item registers.
 const named = new WeakSet<HTMLElement>()
+// Watches the item of each, so the name follows its text.
+const watchers = new WeakMap<HTMLElement, { watcher: MutationObserver, item: HTMLElement }>()
 
 function nameHandle(el: HTMLElement, item?: HTMLElement): void {
   if (!el.matches('[role],a,button,input,summary'))
@@ -57,6 +71,16 @@ function nameHandle(el: HTMLElement, item?: HTMLElement): void {
 
   el.setAttribute('aria-label', what === '' ? wording('ui.dnd.handleLabel', 'Reorder') : wording('ui.dnd.handleItemLabel', 'Reorder {item}', { item: what }))
   named.add(el)
+
+  if (!item || watchers.get(el)?.item === item)
+    return
+
+  watchers.get(el)?.watcher.disconnect()
+
+  const watcher = new MutationObserver(() => nameHandle(el, item))
+
+  watcher.observe(item, { childList: true, characterData: true, subtree: true })
+  watchers.set(el, { watcher, item })
 }
 
 function clearSelection(): void {
