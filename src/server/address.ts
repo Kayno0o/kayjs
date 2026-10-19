@@ -1,6 +1,3 @@
-import { lookup as dnsLookup } from 'node:dns/promises'
-import { isIPv4, isIPv6 } from 'node:net'
-
 const ZONE = /%.*$/
 const DOTTED_TAIL = /(\d+\.\d+\.\d+\.\d+)$/
 
@@ -10,7 +7,30 @@ export type Resolver = (host: string) => Promise<{ address: string, family: numb
 // Thrown when a host answers with an address that is not public, so a download can tell it from a failing host.
 export class PrivateAddressError extends Error {}
 
-export const resolveHost: Resolver = async host => dnsLookup(host, { all: true, verbatim: true })
+// Loaded when a name is first resolved, so an executable that fetches no remote image never loads it.
+export const resolveHost: Resolver = async (host) => {
+  const { lookup } = await import('node:dns/promises')
+
+  return lookup(host, { all: true, verbatim: true })
+}
+
+const DOTTED_QUAD = /^\d{1,3}(?:\.\d{1,3}){3}$/
+
+export function isIPv4(address: string): boolean {
+  return DOTTED_QUAD.test(address) && v4Number(address) !== undefined
+}
+
+export function isIPv6(address: string): boolean {
+  return address.includes(':') && v6Groups(address) !== undefined
+}
+
+// 4 or 6 for a literal address as a URL host writes it (IPv6 without its brackets), 0 for a name.
+export function ipVersion(host: string): 0 | 4 | 6 {
+  if (isIPv4(host))
+    return 4
+
+  return isIPv6(host) ? 6 : 0
+}
 
 // IPv4 ranges a public host never has: this network, private, shared, loopback, link-local (cloud metadata), documentation, benchmarking, multicast and reserved.
 const NON_PUBLIC_V4: readonly (readonly [string, number])[] = [

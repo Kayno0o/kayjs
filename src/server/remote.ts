@@ -1,13 +1,9 @@
 import type { Resolver } from './address'
 import type { RemoteLimits } from './config-limits'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
-import { isIP } from 'node:net'
 import { join } from 'node:path'
-import { Readable } from 'node:stream'
 import { JSON_FILE, writeAtomically } from '../build/files'
-import { isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
+import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { overLimit } from './protection'
 
@@ -142,7 +138,7 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
     if (wildcard && (!base.includes('.') || PUBLIC_SUFFIXES.has(base)))
       throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
 
-    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (isIP(url.hostname.replace(BRACKETS, '')) !== 0 || url.hostname === 'localhost') }
+    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (ipVersion(url.hostname.replace(BRACKETS, '')) !== 0 || url.hostname === 'localhost') }
   })
 }
 
@@ -352,9 +348,11 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
 async function pinnedGet(url: URL, headers: Record<string, string>, signal: AbortSignal, resolve: Resolver, allowPrivate: boolean): Promise<Response> {
   const hostname = url.hostname.replace(BRACKETS, '')
 
-  if (!allowPrivate && isIP(hostname) !== 0 && !isPublicAddress(hostname))
+  if (!allowPrivate && ipVersion(hostname) !== 0 && !isPublicAddress(hostname))
     throw new PrivateAddressError(`${hostname} is not a public address`)
 
+  // Loaded here, so an executable that downloads no remote image never loads them.
+  const [{ request: httpRequest }, { request: httpsRequest }, { Readable }] = await Promise.all([import('node:http'), import('node:https'), import('node:stream')])
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest
 
   return new Promise((done, fail) => {
