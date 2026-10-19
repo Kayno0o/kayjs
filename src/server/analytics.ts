@@ -146,10 +146,10 @@ export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
 export const NOTICE_SCRIPT_PATH = `${ANALYTICS_PATH}/notice.js`
 export const CUSTOM_SCRIPT_PATH = `${ANALYTICS_PATH}/script.js`
+export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
 
 // The head tags kay put there for a custom tracker, which an app's own tag of the same `src` is not one of.
 export const TRACKER_TAGS = new WeakSet<HeadTag>()
-export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
 export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare', 'custom'])
 const SITE_ID = /^[A-Z\d]{1,32}$/i
 const TOKEN = /^[\w-]{1,128}$/
