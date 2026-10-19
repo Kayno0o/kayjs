@@ -24,7 +24,6 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
   if (typeof document === 'undefined')
     return
 
-  navigation.navigations = (navigation.navigations ?? 0) + 1
   navigation.flush?.()
 
   // A query change keeps the path and the other params, and leaves the hash out.
@@ -45,6 +44,8 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
 
   if (!await mayLeave(url))
     return
+
+  navigation.navigations = (navigation.navigations ?? 0) + 1
 
   if (!navigation.hooks || !swappable(url)) {
     leave(url)

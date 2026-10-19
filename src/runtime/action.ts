@@ -909,28 +909,36 @@ export async function readActionResponse<Output>(response: Response, action: str
   return (body === '' ? undefined : decodeServerValue(body)) as Output
 }
 
-// The page's loads again through the swap, whose code loads on the first call; a chunk a deploy removed means the page is stale, so it is loaded whole.
-async function refreshed(): Promise<void> {
-  const navigations = navigation.navigations
-
+// The code of `navigate()` and `refresh()`, loaded on first use; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and gives undefined.
+async function navigateApi(): Promise<typeof import('./navigate-api') | undefined> {
   try {
-    const api = await import('./navigate-api')
-
-    if (navigation.navigations === navigations)
-      await api.refresh()
+    return await import('./navigate-api')
   }
   catch {
-    location.reload()
+    await skew()
+
+    return undefined
   }
+}
+
+// The page's loads again through the swap, unless the visitor or the app went elsewhere while its code loaded, as a refresh started before them would have given way to them.
+async function refreshed(): Promise<void> {
+  const [navigations, current] = [navigation.navigations, navigation.current]
+  const api = await navigateApi()
+
+  if (api && navigation.navigations === navigations && navigation.current === current)
+    await api.refresh()
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.
 // Whether the page went, or a leave guard kept the visitor on it.
 async function goTo(target: string): Promise<boolean> {
-  if (navigation.hooks) {
+  const api = navigation.hooks ? await navigateApi() : undefined
+
+  if (api) {
     const [before, released] = [navigation.current, navigation.released]
 
-    await (await import('./navigate-api')).navigate(target)
+    await api.navigate(target)
 
     return navigation.current !== before || (!released && navigation.released)
   }

@@ -293,6 +293,21 @@ function onShown(): void {
   schedule()
 }
 
+// A refresh that cannot run, as when a deploy removed the chunk holding it, leaves the page stale: it is loaded whole unless a change is waiting to be typed over.
+async function refreshed(): Promise<void> {
+  try {
+    await (await import('./navigate-api')).refresh()
+  }
+  catch {
+    reloaded()
+  }
+}
+
+function reloaded(): void {
+  if (!dirtyGuard())
+    location.reload()
+}
+
 // Shows the page with what its loads give now, which followCaches then finds the new proofs of; an app swapping no pages reloads it, unless a change is waiting to be typed over.
 async function load(): Promise<void> {
   timer = undefined
@@ -313,9 +328,9 @@ async function load(): Promise<void> {
     due.clear()
 
     if (navigation.hooks)
-      await (await import('./navigate-api')).refresh()
-    else if (!dirtyGuard())
-      location.reload()
+      await refreshed()
+    else
+      reloaded()
   }
   finally {
     running = false

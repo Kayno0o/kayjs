@@ -141,8 +141,10 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
 
 // Its own chunk, which only a page with an island hydrating on `visible` or `idle`, or a deferred server island, loads. One that fails to load is a missing chunk like an island's.
 async function whenHydrating(start: (when: typeof import('./hydrate-when')) => void): Promise<void> {
+  let when: typeof import('./hydrate-when')
+
   try {
-    start(await import('./hydrate-when'))
+    when = await import('./hydrate-when')
   }
   catch (error) {
     if (await skew())
@@ -150,6 +152,8 @@ async function whenHydrating(start: (when: typeof import('./hydrate-when')) => v
 
     throw error
   }
+
+  start(when)
 }
 
 // Its own chunk, which only a page deferring a server island loads.
