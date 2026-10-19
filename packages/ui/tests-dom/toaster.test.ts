@@ -133,18 +133,6 @@ test('Alt+T moves focus to the toasts and Escape dismisses the focused one', asy
 
   expect([...mounted.root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Refused'])
   expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast-message')?.textContent).toBe('Refused')
-  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast-message')?.textContent).toBe('Refused')
-})
-
-test('Alt+T leaves the key alone when no toast is on screen', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
-
-  const event = new KeyboardEvent('keydown', { key: 't', altKey: true, bubbles: true, cancelable: true })
-
-  window.dispatchEvent(event)
-  await settle()
-
-  expect(event.defaultPrevented).toBe(false)
 })
 
 test('Alt+T leaves the key alone when no toast is on screen', async () => {
