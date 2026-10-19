@@ -6,7 +6,7 @@ import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, n
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
 // This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and form posting, in `./forms`, once a form takes focus or is submitted, so a page nobody leaves never fetches them.
 
-export const SPECULATION = 'script[type="speculationrules"]'
+const SPECULATION = 'script[type="speculationrules"]'
 
 let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./forms')> | undefined
@@ -38,8 +38,10 @@ export function startNavigation(given: NavigationHooks): void {
   // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself, from code only a site with speculation rules loads.
   const rules = document.querySelector(SPECULATION)
 
-  if (rules)
-    void startPrefetch(rules)
+  if (rules) {
+    rules.remove()
+    void startPrefetch(rules.textContent)
+  }
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
     element._$s = element.outerHTML
@@ -73,9 +75,9 @@ async function preloadSwap(): Promise<void> {
   catch {}
 }
 
-async function startPrefetch(rules: Element): Promise<void> {
+async function startPrefetch(rules: string | null): Promise<void> {
   try {
-    (await import('./prefetch')).startPrefetch(rules.textContent)
+    (await import('./prefetch')).startPrefetch(rules)
   }
   catch {}
 }

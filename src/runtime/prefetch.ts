@@ -1,4 +1,4 @@
-import { followable, linkOf, loadSwap, SPECULATION } from './navigate'
+import { followable, linkOf, loadSwap } from './navigate'
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
@@ -10,9 +10,6 @@ let hoverTimer: ReturnType<typeof setTimeout> | undefined
 // Prefetches the links the way the server's speculation rules say, which the swap follows.
 export function startPrefetch(rules: string | null): void {
   eagerness = eagernessOf(rules)
-
-  for (const script of document.querySelectorAll(SPECULATION))
-    script.remove()
 
   if (eagerness === 'conservative') {
     document.addEventListener('pointerdown', onPrefetchHint, { passive: true })

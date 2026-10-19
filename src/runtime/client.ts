@@ -53,23 +53,24 @@ setErrorReporter((error, island) => {
     (globalThis as { $kayProblems?: DevProblems }).$kayProblems?.push({ level: 'error', kind: 'uncaught', text: String(error), error, island })
 
   if (typeof KAY_STATIC_EXPORT === 'undefined')
-    void sendError(error, island)
+    void reportLazily(error, island)
 })
 
 if (typeof window !== 'undefined' && typeof KAY_STATIC_EXPORT === 'undefined') {
   // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
   window.addEventListener('error', (event) => {
     if (event.error !== undefined && event.error !== null)
-      void sendError(event.error)
+      void reportLazily(event.error)
   })
-  window.addEventListener('unhandledrejection', event => void sendError(event.reason))
+  window.addEventListener('unhandledrejection', event => void reportLazily(event.reason))
 }
 
 // Loads the code posting errors to the server on the first one, so a page that never fails never ships it.
-async function sendError(error: unknown, island?: string): Promise<void> {
+async function reportLazily(error: unknown, island?: string): Promise<void> {
   try {
     (await import('./report-error')).sendError(error, island)
   }
+  // A chunk that fails to load, as after a deploy, loses the report and later ones: the browser keeps it failed.
   catch {}
 }
 

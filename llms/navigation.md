@@ -164,7 +164,7 @@ ol(ref={element => list = element} style="height: 20rem; overflow-y: auto")
 
 ### Full loads and prefetching
 
-- The page loads only a small listener up front; the code doing the swap is fetched once a visitor points at or presses a link of the app, or an island calls `navigate()` or `refresh()`.
+- The page loads only a small listener up front; the code doing the swap is fetched once a visitor points at or presses a link of the app, or an island calls `navigate()` or `refresh()`. A page with speculation rules also fetches the small code prefetching its links on hover or press, at once.
 - The code posting and checking forms is fetched once a form takes focus or is submitted.
 - A link clicked before the code arrived is swapped once it has, and if it cannot load, the link and the form load pages fully as without JavaScript.
 - A link or a form with `data-reload`, or inside an element with it, loads the next page fully.
