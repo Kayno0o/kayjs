@@ -128,7 +128,13 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 | `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
 | `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
 
-`purge(queue, before)`, `jobs(queue)` and `release(id, until)` are optional. `release` gives a claimed job back with its attempt not counted, which a shutdown does, only while `until`, the hold it was claimed with, is still the job's; without it, a job stopped by a shutdown is retried after its backoff. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+`purge(queue, before)`, `jobs(queue)`, `release(id, until, runAt?)`, `progress(id, until, progress)` and `state(queue, ref, now)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+
+`release` gives a claimed job back with its attempt not counted, which a shutdown does, and due at `runAt` when given. It works only while `until`, the hold the job was claimed with, is still the job's. Without it, a job stopped by a shutdown is retried after its backoff.
+
+`progress` stores what a run reports, again only while `until` is the job's, and the next claim clears it. `state` finds the waiting or running job with a key or an id, else its last failed one.
+
+`add` takes a job's optional `key`. When a waiting or running job of the queue has it, a store with `state` keeps nothing and resolves with that job's id.
 
 ```ts
 export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })

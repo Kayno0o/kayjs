@@ -24,20 +24,36 @@ export interface StoredJob {
   runAt: number
   // Why its last run failed.
   error?: string
+  // What the app named it for, one live job (waiting or running) per queue and key.
+  key?: string
+  // What its run last reported, as devalue text.
+  progress?: string
+}
+
+// A job as the app reads it back: where it stands, and what its last run reported.
+export interface StoredJobState extends StoredJob {
+  // `running` while a process holds it, `waiting` for a job due or retried, `failed` once given up.
+  status: 'waiting' | 'running' | 'failed'
 }
 
 type Maybe<T> = T | Promise<T>
 
 // Where queued jobs wait, shared by every process opening it: `sqliteJobs` by default, or one of an app's own, Redis or Postgres say.
 export interface JobStore {
-  add: (job: StoredJob) => Maybe<void>
+  // Keeps a job, unless it has a `key` that a waiting or running job of its queue holds already: then it keeps nothing and resolves with that job's id, atomically, whichever process added it. A store without `state` ignores keys.
+  add: (job: StoredJob) => Maybe<string | void>
   // Takes the queue's next job whose time has come and that no process holds, holding it until `until`, past which a process that died running it is taken as gone; one process at a time gets a job.
   claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
   complete: (id: string) => Maybe<void>
   // Runs it again at `runAt`.
   retry: (id: string, runAt: number, error: string) => Maybe<void>
   // Gives a job back untouched, its attempt not counted, for the next process to take: a run stopped by a shutdown. Only while the hold `until` it was claimed with is still the job's, so a late release never clears another process's claim. A store without it has the job retried after its backoff as any failed run.
-  release?: ((id: string, until: number) => Maybe<void>) | undefined
+  // With `runAt`, the job is due then rather than at once: a run that wants another go later without spending an attempt.
+  release?: ((id: string, until: number, runAt?: number) => Maybe<void>) | undefined
+  // Writes what the run holding the job until `until` reports, devalue text, only while that hold is still the job's; a claim clears it.
+  progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
+  // The waiting or running job of the queue with that key or id, else its last failed one, `now` telling a held job from one whose hold ran out; undefined for a job that completed.
+  state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => Maybe<StoredJobState | undefined>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole.
   fail: (id: string, error: string, payload?: string) => Maybe<void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
@@ -138,7 +154,20 @@ export function sqliteJobs(path: string): JobStore {
 
   return {
     add(job) {
-      open(true)!.insert.run(job.id, job.queue, job.payload, job.attempts, job.runAt)
+      const { insert, holder } = open(true)!
+
+      // A holder that completes between the refused insert and the read leaves the key free: insert again.
+      for (let tries = 0; tries < 3; tries++) {
+        if (insert.run(job.id, job.queue, job.payload, job.attempts, job.runAt, job.key ?? null).changes === 1 || job.key === undefined)
+          return undefined
+
+        const held = holder.get(job.queue, job.key)
+
+        if (held)
+          return held.id
+      }
+
+      throw new Error(`kay: the key '${job.key}' of queue('${job.queue}') kept changing hands while a job was added`)
     },
     claim(queue, now, until) {
       const row = open(false)?.claim.get(until, queue, now, now)
@@ -151,8 +180,21 @@ export function sqliteJobs(path: string): JobStore {
     retry(id, runAt, error) {
       open(true)!.retry.run(runAt, error, id)
     },
-    release(id, until) {
-      open(true)!.release.run(id, until)
+    release(id, until, runAt) {
+      open(true)!.release.run(runAt ?? null, id, until)
+    },
+    progress(id, until, progress) {
+      open(true)!.progress.run(progress, id, until)
+    },
+    state(queue, ref, now) {
+      const statements = open(false)
+
+      if (!statements)
+        return undefined
+
+      const row = 'key' in ref ? statements.byKey.get(queue, ref.key) : statements.byId.get(queue, ref.id)
+
+      return row ? { ...toJob(row), status: statusOf(row.failed === 1, row.held_until ?? 0, now) } : undefined
     },
     fail(id, error, payload) {
       open(true)!.fail.run(error, payload ?? null, id)
@@ -181,32 +223,56 @@ export function sqliteJobs(path: string): JobStore {
   }
 }
 
-interface JobRow { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null }
+interface JobRow { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null, job_key: string | null, progress: string | null }
+type StateRow = JobRow & { failed: number, held_until: number | null }
+
+function statusOf(failed: boolean, heldUntil: number, now: number): StoredJobState['status'] {
+  if (failed)
+    return 'failed'
+
+  return heldUntil > now ? 'running' : 'waiting'
+}
+
+const JOB_COLUMNS = 'id, queue, payload, attempts, run_at, error, job_key, progress'
 
 function toJob(row: JobRow): StoredJob {
-  return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: row.run_at, ...row.error !== null && { error: row.error } }
+  return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: row.run_at, ...row.error !== null && { error: row.error }, ...row.job_key !== null && { key: row.job_key }, ...row.progress !== null && { progress: row.progress } }
 }
 
 function prepareJobs(db: Database) {
   db.run('CREATE TABLE IF NOT EXISTS kay_jobs (id TEXT PRIMARY KEY, queue TEXT NOT NULL, payload TEXT NOT NULL, attempts INTEGER NOT NULL, run_at INTEGER NOT NULL, held_until INTEGER, failed INTEGER NOT NULL DEFAULT 0, error TEXT)')
+  // A file made before keys and progress gains their columns.
+  const columns = new Set(db.query<{ name: string }, []>('PRAGMA table_info(kay_jobs)').all().map(column => column.name))
+
+  for (const column of ['job_key', 'progress']) {
+    if (!columns.has(column))
+      db.run(`ALTER TABLE kay_jobs ADD COLUMN ${column} TEXT`)
+  }
+
   db.run('CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)')
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS kay_jobs_key ON kay_jobs (queue, job_key) WHERE job_key IS NOT NULL AND failed = 0')
   db.run('CREATE TABLE IF NOT EXISTS kay_locks (name TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY (name, slot))')
 
-  const insert = db.query('INSERT INTO kay_jobs (id, queue, payload, attempts, run_at) VALUES (?, ?, ?, ?, ?)')
-  const claim = db.query<JobRow, [number, string, number, number]>('UPDATE kay_jobs SET held_until = ?, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING id, queue, payload, attempts, run_at, error')
+  const insert = db.query('INSERT OR IGNORE INTO kay_jobs (id, queue, payload, attempts, run_at, job_key) VALUES (?, ?, ?, ?, ?, ?)')
+  const holder = db.query<{ id: string }, [string, string]>('SELECT id FROM kay_jobs WHERE queue = ? AND job_key = ? AND failed = 0')
+  const claim = db.query<JobRow, [number, string, number, number]>(`UPDATE kay_jobs SET held_until = ?, progress = NULL, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING ${JOB_COLUMNS}`)
   const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
-  const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1 WHERE id = ? AND held_until = ?')
+  const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1, run_at = coalesce(?, run_at) WHERE id = ? AND held_until = ?')
+  const progress = db.query('UPDATE kay_jobs SET progress = ? WHERE id = ? AND held_until = ?')
+  // A live job comes before a failed one of the same key, the latest failed first.
+  const byKey = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND job_key = ? ORDER BY failed, run_at DESC LIMIT 1`)
+  const byId = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND id = ?`)
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ?')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
-  const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
-  const all = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? ORDER BY run_at')
+  const failed = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at`)
+  const all = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? ORDER BY run_at`)
   // A held job counts from when its hold ends, as it runs again then if its process died.
   const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, claim, remove, retry, release, fail, purge, failed, all, next, lock, pruneLocks }
+  return { insert, holder, claim, remove, retry, release, progress, byKey, byId, fail, purge, failed, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -214,10 +280,18 @@ export function memoryJobs(): JobStore {
   const jobs = new Map<string, StoredJob & { heldUntil?: number, failed?: boolean }>()
   const locks = new Set<string>()
   const waiting = (queue: string) => [...jobs.values()].filter(job => job.queue === queue && !job.failed)
+  const stored = ({ heldUntil: _, failed: __, ...job }: StoredJob & { heldUntil?: number, failed?: boolean }): StoredJob => job
 
   return {
     add(job) {
+      const holder = job.key === undefined ? undefined : waiting(job.queue).find(other => other.key === job.key)
+
+      if (holder)
+        return holder.id
+
       jobs.set(job.id, { ...job })
+
+      return undefined
     },
     claim(queue, now, until) {
       const job = waiting(queue).filter(job => job.runAt <= now && (job.heldUntil ?? 0) <= now).sort((a, b) => a.runAt - b.runAt)[0]
@@ -227,8 +301,9 @@ export function memoryJobs(): JobStore {
 
       job.heldUntil = until
       job.attempts++
+      delete job.progress
 
-      return { id: job.id, queue, payload: job.payload, attempts: job.attempts, runAt: job.runAt, ...job.error !== undefined && { error: job.error } }
+      return stored(job)
     },
     complete(id) {
       jobs.delete(id)
@@ -236,13 +311,28 @@ export function memoryJobs(): JobStore {
     retry(id, runAt, error) {
       Object.assign(jobs.get(id) ?? {}, { runAt, error, heldUntil: undefined })
     },
-    release(id, until) {
+    release(id, until, runAt) {
       const job = jobs.get(id)
 
       if (job?.heldUntil === until) {
         delete job.heldUntil
         job.attempts--
+
+        if (runAt !== undefined)
+          job.runAt = runAt
       }
+    },
+    progress(id, until, progress) {
+      const job = jobs.get(id)
+
+      if (job?.heldUntil === until)
+        job.progress = progress
+    },
+    state(queue, ref, now) {
+      const matches = [...jobs.values()].filter(job => job.queue === queue && ('key' in ref ? job.key === ref.key : job.id === ref.id))
+      const job = matches.find(other => !other.failed) ?? matches.filter(other => other.failed).sort((a, b) => b.runAt - a.runAt)[0]
+
+      return job ? { ...stored(job), status: statusOf(job.failed === true, job.heldUntil ?? 0, now) } : undefined
     },
     fail(id, error, payload) {
       Object.assign(jobs.get(id) ?? {}, { failed: true, error, heldUntil: undefined, ...payload !== undefined && { payload } })
@@ -256,10 +346,10 @@ export function memoryJobs(): JobStore {
       return purged.length
     },
     failed(queue) {
-      return [...jobs.values()].filter(job => job.queue === queue && job.failed).map(({ heldUntil: _, failed: __, ...job }) => job)
+      return [...jobs.values()].filter(job => job.queue === queue && job.failed).map(stored)
     },
     jobs(queue) {
-      return [...jobs.values()].filter(job => job.queue === queue).map(({ heldUntil: _, failed: __, ...job }) => job)
+      return [...jobs.values()].filter(job => job.queue === queue).map(stored)
     },
     nextRunAt(queue) {
       const times = waiting(queue).map(job => Math.max(job.runAt, job.heldUntil ?? 0))
