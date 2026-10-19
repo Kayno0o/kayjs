@@ -40,7 +40,7 @@ describe('the ids of a page rendered per request', () => {
 
     expect(ids(first).length).toBe(4)
     expect(new Set(ids(first)).size).toBe(4)
-    expect(ids(first).some(id => id.includes("_0_0-"))).toBe(true)
+    expect(ids(first).some(id => id.includes('_0_0-'))).toBe(true)
     expect(second).toBe(first)
   })
 
