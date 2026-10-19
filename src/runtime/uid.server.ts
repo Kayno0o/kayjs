@@ -11,6 +11,11 @@ export async function withPageToken<T>(token: string, run: () => Promise<T>): Pr
   return fixedToken.run(token, run)
 }
 
+// Whether a render already runs under a token, as a prerendered page's or a kept one's check does.
+export function hasPageToken(): boolean {
+  return fixedToken.getStore() !== undefined
+}
+
 // A page render on the server: its static components draw from the page, each island from a prefix of its own.
 // A streamed block renders on its own, so under a fixed token its `salt`, the block's id, keeps its ids from those of the page.
 export function pageIds<T>(run: () => T, salt?: string): T {

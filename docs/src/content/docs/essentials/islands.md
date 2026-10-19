@@ -222,7 +222,7 @@ An island reads nothing its page's static components provide. Provide inside the
 
 ## Tie a label to its control
 
-`uid()` from `kay` gives an id unique on the page. It is the same on the server and in the browser, so `for` and `aria-controls` keep matching once the island hydrates.
+`uid()` from `kay` gives an id unique on the page. It is the same on the server and in the browser, so `for` and `aria-controls` keep matching once the island hydrates. The ids come from the page's address, so every visit to a URL gets the same ones, and a page that shows the same to everyone is compressed once and not again for each visitor.
 
 ```kay
 ---

@@ -45,7 +45,7 @@ export interface Shipped {
 
 // A static render, as pages and layouts are: only islands carry the markers hydration claims.
 export function renderStatic(view: () => unknown, salt?: string, chunks?: Record<string, string>): Rendered {
-  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt, chunks))
+  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt, chunks), salt)
 
   return { html, islands, deferred }
 }

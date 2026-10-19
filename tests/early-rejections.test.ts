@@ -29,7 +29,7 @@ describe('an await block given a promise that rejected before it rendered', () =
   })
 
   it('streams a page whose blocks read a fence value\'s properties, one rejecting only while the stream is open, and takes the promise of a block inside a streamed one', () => {
-    expect(result.page).toContain('<template data-kay-await="4"><p class="failed">Comments are down</p></template>')
+    expect(result.page).toContain('<template data-kay-await="0"><p class="failed">Comments are down</p></template>')
     expect(result.page).toContain('<p class="again">Comments are down again</p>')
     expect(result.page).toContain('<p class="now">3</p>')
     expect(result.page).toContain('<p class="plain">x</p>')

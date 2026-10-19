@@ -60,18 +60,25 @@ function installEarlyRejections(): EarlyRejections {
 }
 
 // Renders are synchronous, so the blocks of the one in progress can live here, like the islands it renders.
-let deferred: PendingBlock[] | undefined
-let nextId = 0
+interface Collecting {
+  blocks: PendingBlock[]
+  // What a block's id starts with: the id of the streamed block this render is the content of, none for the page.
+  prefix: string
+  next: number
+}
+
+let deferred: Collecting | undefined
 
 // Runs a synchronous render and lists the `await` blocks it left pending.
-export function collectDeferred<T>(render: () => T): { result: T, deferred: PendingBlock[] } {
+// Ids count from zero in each render, under the id of the block it renders, so a page gives the same bytes every time it renders the same and its compressed copy is kept; they only have to differ within one document.
+export function collectDeferred<T>(render: () => T, within?: string): { result: T, deferred: PendingBlock[] } {
   const previous = deferred
-  const blocks: PendingBlock[] = []
+  const collecting: Collecting = { blocks: [], prefix: within === undefined ? '' : `${within}.`, next: 0 }
 
-  deferred = blocks
+  deferred = collecting
 
   try {
-    return { result: render(), deferred: blocks }
+    return { result: render(), deferred: collecting.blocks }
   }
   finally {
     deferred = previous
@@ -95,13 +102,13 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
     return props.pending?.()
   }
 
-  const id = (nextId++).toString(36)
-  const blocks = deferred
+  const id = `${deferred.prefix}${(deferred.next++).toString(36)}`
+  const collecting = deferred
   // Rendered once the value settles, under the component that declared it, for what it provided.
   const parent = getOwner()
   const failed = props.failed
 
-  blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))) })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))) })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 
@@ -111,6 +118,6 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
     return markup
   }
   finally {
-    deferred = blocks
+    deferred = collecting
   }
 }

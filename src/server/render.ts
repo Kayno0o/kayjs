@@ -34,6 +34,7 @@ import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { editing } from '../runtime/preview'
 import { BUILD_META } from '../runtime/swap'
+import { hasPageToken, withPageToken } from '../runtime/uid.server'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
@@ -52,6 +53,7 @@ import { followsCaches, inLiveReads, liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
+import { pageToken } from './prerendered'
 import { noteEditedEntries } from './preview'
 import { requestId } from './protection'
 import { matchesEtag } from './public'
@@ -201,8 +203,11 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options)
+  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options))))
+  const { pathname, search } = rendering.ctx.url
 
-  return inLiveReads(async () => withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options))))
+  // The ids a page draws only have to differ from those of the page it is swapped for, so its route and URL give them: a page rendering the same bytes for every visitor is compressed once, not once per visit.
+  return hasPageToken() ? render() : withPageToken(pageToken(`${route.file}\n${pathname}${search}`), render)
 }
 
 async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
