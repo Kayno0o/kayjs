@@ -1,4 +1,4 @@
-import type { KayExtension } from '../config'
+import type { Manifest } from './manifests'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -6,6 +6,7 @@ import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles, KAY_FILE, readSource, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { GLOB_CALL, globbedFiles } from './glob'
+import { APP_DEPENDENCIES, dependencyNames, packageDir, readManifest } from './manifests'
 
 // A package shipping `.kay` components, which the consuming project compiles as its own.
 export interface KayLibrary {
@@ -32,20 +33,9 @@ interface Imports {
   globbed: boolean
 }
 
-interface Manifest {
-  name?: string
-  dependencies?: Record<string, string>
-  devDependencies?: Record<string, string>
-  peerDependencies?: Record<string, string>
-  optionalDependencies?: Record<string, string>
-  exports?: unknown
-  kay?: { settings?: string, messages?: string }
-}
-
 // The names kay is installed under: the alias projects import it as, its own, and the one it was published as up to 0.3.
 const KAY_PACKAGES = new Set(['kay', '@kaynooo/kayjs', '@kaynooo/kay'])
 const KAY_EXTENSION = '.kay'
-const APP_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'devDependencies', 'optionalDependencies']
 const LIBRARY_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'optionalDependencies']
 // Where a library names kay, a peer most often.
 const KAY_DEPENDENCIES: (keyof Manifest)[] = ['peerDependencies', 'dependencies', 'devDependencies']
@@ -81,21 +71,6 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
 
   // In the UTF-16 code unit order of their directories, so what is generated from them reads the same from one run and one machine to the next.
   return [...found.values()].sort((a, b) => a.dir < b.dir ? -1 : 1)
-}
-
-// The message catalogs the libraries the app depends on ship, as extensions listing nothing else: a library whose package.json declares `"kay": { "messages": "./src/messages" }` gives its `<locale>.ts` texts to every app that installs it, with no line in `kay.config.ts`.
-export function libraryMessageExtensions(root: string): KayExtension[] {
-  const manifest = readManifest(root)
-
-  if (!manifest)
-    return []
-
-  return dependencyNames(manifest, APP_DEPENDENCIES).flatMap((name) => {
-    const dir = packageDir(root, name)
-    const messages = dir === undefined ? undefined : readManifest(dir)?.kay?.messages
-
-    return dir === undefined || typeof messages !== 'string' ? [] : [{ name, messages: resolve(dir, messages) }]
-  })
 }
 
 // What the app's `settings` replaces: each library's settings module, by its path under `node_modules` and its real one, and the app's module taking its place.
@@ -167,32 +142,6 @@ export function libraryOf(libraries: KayLibrary[], file: string): KayLibrary | u
 // A library file as the project reaches it, under its `node_modules`, when it is given by its real path.
 export function throughNodeModules(library: KayLibrary, file: string): string {
   return file.startsWith(library.realDir + sep) ? join(library.dir, relative(library.realDir, file)) : file
-}
-
-function dependencyNames(manifest: Manifest, fields: (keyof Manifest)[]): string[] {
-  return [...new Set(fields.flatMap(field => Object.keys(manifest[field] as Record<string, string> | undefined ?? {})))]
-}
-
-// Where `name` is installed as Bun resolves it from `from`: its `node_modules`, or one above.
-function packageDir(from: string, name: string): string | undefined {
-  for (let dir = from; ; dir = resolve(dir, '..')) {
-    const candidate = join(dir, 'node_modules', name)
-
-    if (existsSync(join(candidate, 'package.json')))
-      return candidate
-
-    if (dir === resolve(dir, '..'))
-      return undefined
-  }
-}
-
-function readManifest(dir: string): Manifest | undefined {
-  try {
-    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as Manifest
-  }
-  catch {
-    return undefined
-  }
 }
 
 // Each `.kay` file by the specifier a project imports it as: through the exports map, its `./*.kay` patterns included, or by its path when there is none.

@@ -25,7 +25,7 @@ import type { Tracer } from './server/trace'
 import { existsSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { libraryMessageExtensions } from './build/libraries'
+import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { bundled, importModule } from './server/bundle'
 
