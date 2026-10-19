@@ -68,8 +68,8 @@ describe('attribute', () => {
     for (const name of ['href', 'HREF', 'Src', 'formaction', 'xlink:href', 'poster', 'data'])
       dom.attribute(link, name, ' java\tscript:alert(1)')
 
-    expect([...link.attributes].map(({ value }) => value)).toEqual(Array.from({ length: link.attributes.length }, () => ' java\tscript:alert(1)'.replace(/^/, 'unsafe:')))
-    expect(link.attributes.length).toBeGreaterThan(0)
+    expect(link.attributes.length).toBe(6)
+    expect([...link.attributes].every(({ value }) => value === 'unsafe: java\tscript:alert(1)')).toBe(true)
   })
 
   it('removes an attribute set to null or false', () => {
@@ -226,6 +226,35 @@ describe('choose', () => {
     setCount(2)
     await settle()
     expect([parent.innerHTML, built]).toEqual(['<p></p>', 2])
+  })
+})
+
+describe('an optimistic action call', () => {
+  it('puts the signal back when the post fails, its pending following the call', async () => {
+    const refused = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      await Bun.sleep(5)
+
+      return new Response('no', { status: 500 })
+    }) as unknown as typeof fetch)
+
+    try {
+      const save = actionStub('/_kay/action/test/optimistic') as unknown as { (input: object, options: { optimistic: () => void }): Promise<unknown>, pending: () => boolean }
+      const [value, setValue] = reactive.createSignal(1)
+      const running = save({}, { optimistic: () => setValue(2) })
+
+      expect([value(), save.pending()]).toEqual([2, true])
+
+      try {
+        await running
+      }
+      catch {}
+
+      await settle()
+      expect([value(), save.pending()]).toEqual([1, false])
+    }
+    finally {
+      refused.mockRestore()
+    }
   })
 })
 

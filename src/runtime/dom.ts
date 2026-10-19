@@ -690,7 +690,9 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
 export function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void {
   const block = blockIn(new Region(element, start, end))
   const index = memo(() => {
-    for (const [at, [test]] of list.entries()) {
+    for (let at = 0; at < list.length; at++) {
+      const test = list[at]![0]
+
       if (!test || Boolean(test()))
         return at
     }
