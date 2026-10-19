@@ -277,6 +277,8 @@ function config({ has, settings }: Setup): string {
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
     has('tailwind') && '  plugins: [tailwind],',
+    server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s.',
+    server && has('docker') && '  proxy: true,',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )
@@ -516,12 +518,15 @@ const APP_COMPOSE = `services:
       DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
       # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
       DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
+    volumes:
+      - data:/app/data
     depends_on:
       migrate:
         condition: service_completed_successfully
 
 volumes:
   db:
+  data:
 `
 
 // An app on SQLite: the file lives on a volume, which a one-shot service migrates before the app starts.
@@ -566,8 +571,8 @@ function databaseCompose(postgres: boolean): string {
 
 // The binary `kay build --compile` makes carries the pages, their assets and the browser build, so the image holds it alone.
 function serverContainerFiles({ has }: Setup): Record<string, string> {
-  // The members' SQLite file is written under `data`, which the image holds for the volume compose mounts there.
-  const sqlite = has('auth') && !has('postgres')
+  // The members' SQLite file with SQLite, and the sessions' with either, are written under `data`, which the image holds for the volume compose mounts there.
+  const data = has('auth')
 
   return {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
@@ -581,13 +586,13 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
-${sqlite ? 'RUN mkdir data && chown nobody data\n' : ''}ENV NODE_ENV=production PORT=3000
+${data ? 'RUN mkdir data && chown nobody data\n' : ''}ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
 USER nobody
 HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
-    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\n${sqlite ? 'data\n' : ''}`,
+    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\n${data ? 'data\n' : ''}`,
     'compose.prod.yaml': has('auth')
       ? databaseCompose(has('postgres'))
       : `services:
@@ -769,11 +774,11 @@ volumes:
   db:
 `,
     },
-    'src/session.ts': `import { session } from 'kay/server'
+    'src/session.ts': `import { session, sqliteStore } from 'kay/server'
 import { env } from './env'
 
-// The data travels sealed in the cookie; pass a \`store\`, such as \`sqliteStore('sessions.sqlite')\`, to keep it on the server.
-export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET })
+// The data stays on the server, so signing out ends a session for good; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
+export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('data/sessions.sqlite') })
 `,
     'src/server.ts': `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
@@ -986,7 +991,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   return {
     // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
     '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && !has('postgres') && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
+    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),

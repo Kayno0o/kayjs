@@ -806,6 +806,22 @@ describe('kay new', () => {
         if (variant.has('docker') && !variant.has('server'))
           expect({ features, caching: ['location ^~ /_kay/ {', 'woff2?|ttf|otf|eot', 'max-age=2592000', 'max-age=86400'].filter(part => !contents['nginx.conf']!.includes(part)) }).toEqual({ features, caching: [] })
 
+        // The container binds 127.0.0.1 for a reverse proxy, so the visitor's address is read through it, and a session lives on the server where sign-out can revoke it.
+        if (variant.has('server') && variant.has('docker'))
+          expect({ features, proxy: contents['kay.config.ts']!.includes('\n  proxy: true,') }).toEqual({ features, proxy: true })
+
+        if (variant.has('auth')) {
+          const dockerfile = contents.Dockerfile
+          const compose = contents['compose.prod.yaml']
+
+          expect({ features, store: contents['src/session.ts']!.includes('store: sqliteStore(\'data/sessions.sqlite\')'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: true, ignored: true })
+
+          // The sessions file is written by the user the image runs as, in a folder a volume keeps across deploys.
+          if (variant.has('docker')) {
+            expect({ features, dir: dockerfile?.includes('RUN mkdir data && chown nobody data\n'), ignored: contents['.dockerignore']!.split('\n').includes('data'), volume: compose?.includes('- data:/app/data') && compose.includes('\nvolumes:\n') && compose.includes('\n  data:') }).toEqual({ features, dir: true, ignored: true, volume: true })
+          }
+        }
+
         if (variant.has('docker') && !variant.has('server')) {
           // A static export writes no headers file, so the container's nginx sends HSTS for a site published at https.
           // nginx drops a server-level add_header from a location with its own, so every location setting one repeats it.

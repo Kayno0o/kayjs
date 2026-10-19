@@ -61,7 +61,7 @@ Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 With a store, the cookie only carries an id. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
 
-Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. Production logs a warning at the first sign-in that says so.
+Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. In production the server logs a warning as it boots that says so.
 
 To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. Use it when someone asks to be erased or changes their password.
 

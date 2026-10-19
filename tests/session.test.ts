@@ -95,7 +95,7 @@ describe('sessions', () => {
     setSystemTime(Date.now())
   })
 
-  it('warns once in production that a sign-in on a session without a store cannot be revoked, and not with one', async () => {
+  it('warns at boot in production that a session without a store cannot be revoked, and not with one or outside production', () => {
     const SINK = Symbol.for('kay.log')
     const global = globalThis as { [SINK]?: unknown }
     const sink = global[SINK]
@@ -103,14 +103,14 @@ describe('sessions', () => {
     const environment = process.env.NODE_ENV
 
     global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
-    process.env.NODE_ENV = 'production'
 
     try {
-      const sealed = counter({})
-      const stored = counter({ store: memoryStore() })
-
-      for (const app of [sealed, sealed, stored])
-        await app.handle(new Request('http://localhost/rotate'))
+      process.env.NODE_ENV = 'development'
+      counter({})
+      process.env.NODE_ENV = 'production'
+      counter({ store: memoryStore() })
+      expect(warnings).toEqual([])
+      counter({})
     }
     finally {
       global[SINK] = sink
@@ -121,7 +121,7 @@ describe('sessions', () => {
         process.env.NODE_ENV = environment
     }
 
-    expect(warnings).toEqual([expect.stringContaining('a sign-in regenerated a session kept in its session cookie alone, with no store')])
+    expect(warnings).toEqual([expect.stringContaining('a session kept in its session cookie alone, with no store')])
   })
 
   it('writes a whole Max-Age for a sub-second or fractional maxAge', async () => {

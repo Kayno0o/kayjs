@@ -224,7 +224,7 @@ export default defineConfig({ requireGuards: true })
 - A list rotates secrets: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use. A key derived from the first also signs form stamps, links to private files and the flash cookie, so a rotation refuses those already out, as a restart does without any secret.
 - Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so.
 - Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store.
-- In production the first `regenerate()` on a session without a store logs a warning saying so.
+- In production `session()` without a store logs a warning as the server boots saying so.
 - With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself.
 - `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart, the oldest going past 100,000.
 - `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; called again with the same file, it gives the store already open. A file deleted or replaced under a running server is noticed within seconds and opened afresh; a file put in its place takes its `-wal` and `-shm` along, or none, as SQLite would otherwise replay the old ones over it.

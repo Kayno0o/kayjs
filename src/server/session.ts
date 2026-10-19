@@ -117,6 +117,9 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
+  if (!options.store && process.env.NODE_ENV === 'production')
+    kayLog('warn', `a session kept in its ${options.cookie ?? 'session'} cookie alone, with no store, cannot be revoked: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
+
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
   useStampSecret(secrets[0]!, 'session')
@@ -162,8 +165,6 @@ interface SessionConfig {
   domain?: string | undefined
   store?: SessionStore | undefined
   keys: Buffer[]
-  // Whether production was told, once, that a sign-in rests on cookies sign-out cannot revoke.
-  warned?: boolean
 }
 
 class RequestSession<Data extends object> implements Session<Data> {
@@ -215,11 +216,6 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 
   async regenerate(): Promise<void> {
-    if (!this.config.store && !this.config.warned && process.env.NODE_ENV === 'production') {
-      this.config.warned = true
-      kayLog('warn', `a sign-in regenerated a session kept in its ${this.config.name} cookie alone, with no store, so signing out only clears the browser's cookie: a copy taken before stays valid until it expires; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
-    }
-
     await this.load()
     this.retired = this.id
     this.id = undefined
