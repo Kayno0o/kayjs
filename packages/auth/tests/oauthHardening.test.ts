@@ -493,13 +493,12 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await app.store.oauth!.refresh.get!(digest('ended')))?.usedAt).not.toBeNull()
   })
 
-  test('a code refused for its resource, redirect_uri or verifier is not spent, and the right request then succeeds', async () => {
+  test('a code refused for its resource or redirect_uri is not spent, and the right request then succeeds', async () => {
     const app = server()
     const { clientId, code } = await approvedFor(app, { resource: MCP })
 
     expect((await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
     expect((await exchangeWith(app, clientId, code, { redirect_uri: 'http://127.0.0.1/other' })).body.error).toBe('invalid_grant')
-    expect((await exchangeWith(app, clientId, code, { code_verifier: 'x'.repeat(43) })).body.error).toBe('invalid_grant')
 
     const retry = await exchangeWith(app, clientId, code, { resource: MCP })
 
@@ -518,12 +517,16 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await exchangeWith(app, clientId, code, { resource: MCP })).body.error).toBe('invalid_grant')
   })
 
-  test('a malformed code_verifier leaves the code for the right one', async () => {
+  test('a wrong or malformed code_verifier spends the code, even beside a wrong resource', async () => {
     const app = server()
-    const { clientId, code } = await approvedFor(app)
+    const other = server()
+    const first = await approvedFor(app, { resource: MCP })
+    const second = await approvedFor(other)
 
-    expect((await exchangeWith(app, clientId, code, { code_verifier: 'short' })).body.error).toBe('invalid_grant')
-    expect((await exchangeWith(app, clientId, code)).status).toBe(200)
+    expect((await exchangeWith(app, first.clientId, first.code, { code_verifier: 'x'.repeat(43), resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(app, first.clientId, first.code, { resource: MCP })).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(other, second.clientId, second.code, { code_verifier: 'short' })).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(other, second.clientId, second.code)).body.error).toBe('invalid_grant')
   })
 
   test('a spent code still revokes what it issued, whatever the reuse names', async () => {

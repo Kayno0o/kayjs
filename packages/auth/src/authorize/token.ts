@@ -72,12 +72,16 @@ async function liveGrant(core: Core, userId: string, clientId: string): Promise<
   return grant && record && !banned(record) ? grant : undefined
 }
 
+function verified(verifier: string, issued: OAuthCodeRecord): boolean {
+  return VERIFIER.test(verifier) && matches(verifier, issued.challenge)
+}
+
 // What a code exchange asks for against the code: the resource the tokens are bound to, or the reply refusing a redirect_uri, a verifier or a resource the code does not hold.
 function codeAsk(form: URLSearchParams, root: string, issued: OAuthCodeRecord, verifier: string): { resource: string | null } | TokenReply {
   if (issued.redirectUri !== form.get('redirect_uri'))
     return refused('invalid_grant', 'The code does not match this request')
 
-  if (!VERIFIER.test(verifier) || !matches(verifier, issued.challenge))
+  if (!verified(verifier, issued))
     return refused('invalid_grant', 'The code_verifier does not match the code_challenge')
 
   return boundResource(form, root, issued.resource)
@@ -99,8 +103,8 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
   const key = digest(code)
   const peeked = await core.store.oauth!.codes.get?.(key)
 
-  // A request refused for what it asks leaves a live code unspent, so a mistake once does not cost the sign-in on the retry. A spent code goes on to `use`, which revokes what it issued, and so does a code another client presented.
-  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && peeked.expiresAt > new Date()) {
+  // A request refused for its redirect_uri or resource leaves a live code unspent, so a mistake once does not cost the sign-in on the retry. A wrong verifier signals a stolen code, so it goes on to `use` and spends the code, as does a spent code (which revokes what it issued) and a code another client presented.
+  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && peeked.expiresAt > new Date() && verified(verifier, peeked)) {
     const asked = codeAsk(form, root, peeked, verifier)
 
     if ('status' in asked)

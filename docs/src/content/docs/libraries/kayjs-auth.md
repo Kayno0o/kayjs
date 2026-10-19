@@ -526,7 +526,7 @@ A whole sign-in ends 90 days after it began. One refresh token used twice ends i
 
 An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
 
-A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource, `redirect_uri` or `code_verifier`, within the code's 60 seconds.
+A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource or `redirect_uri`, within the code's 60 seconds.
 
 That holds with the built-in stores and any custom store that can read a refresh token or a code without spending it (`oauth.refresh.get`, `oauth.codes.get`). A refresh token past its 30 days unused is refused, and spent, whatever it asks for. Signing in with a code that asked for none refuses one named at the token endpoint. Tokens issued before this keep working, bound to nothing, and a refresh of one may name a resource of your site.
 
