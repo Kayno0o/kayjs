@@ -12,7 +12,7 @@ import { isClassToken, scanClassName } from '../src/compiler/class-name'
 import { formatKay } from '../src/compiler/format'
 import { parseKay } from '../src/compiler/parser'
 import { htmlToKay } from '../src/migrate/html'
-import { modeOf, resolveProject } from '../src/project'
+import { modeOf, projectPaths, resolveProject } from '../src/project'
 import { child } from '../src/runtime/html'
 import { servePages } from '../src/server/app'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -321,7 +321,7 @@ describe('Tailwind', () => {
       await Bun.write(join(root, 'src/routes/brackets.kay'), `h1 Brackets\ndiv.${CLASSES.join('.')} x\n`)
 
       const built = await buildClient(root, { plugins: [tailwind] })
-      const words = (await Bun.file(join(root, '.kay/classes.txt')).text()).split('\n')
+      const words = (await Bun.file(projectPaths(root).classes).text()).split('\n')
       const css = await head(root, built, '/brackets')
 
       for (const name of CLASSES) {
