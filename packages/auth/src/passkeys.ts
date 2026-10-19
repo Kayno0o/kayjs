@@ -13,7 +13,7 @@ import { notify } from './notify'
 import { endOtherSessions } from './sessions'
 import { plainName } from './text'
 import { reprove, secondFactorLimited } from './twoFactor'
-import { countsAsWayIn, hasWayIn, putBack } from './wayIn'
+import { hasWayIn, putBack } from './wayIn'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
@@ -177,13 +177,13 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
 
   const removed = { passkey }
 
-  if (countsAsWayIn(removed) && !await hasWayIn(core, record.id, removed))
+  if (!await hasWayIn(core, record.id, removed))
     return { ok: false, error: 'last-way-in' }
 
   await core.store.passkeys.delete(record.id, id)
 
   // Two requests can each see the other way in still there: when none is left, the passkey goes back.
-  if (countsAsWayIn(removed) && !await hasWayIn(core, record.id)) {
+  if (!await hasWayIn(core, record.id)) {
     await putBack(async () => core.store.passkeys.create(passkey))
 
     return { ok: false, error: 'last-way-in' }
@@ -358,7 +358,7 @@ async function check(core: Core, passkey: PasskeyRecord, response: Authenticatio
     if (!verified)
       return false
 
-    await core.store.passkeys.update(passkey.id, { counter: authenticationInfo.newCounter, backedUp: authenticationInfo.credentialBackedUp, userVerified: passkey.userVerified || authenticationInfo.userVerified, lastUsedAt: new Date() })
+    await core.store.passkeys.update(passkey.id, { counter: authenticationInfo.newCounter, backedUp: authenticationInfo.credentialBackedUp, ...authenticationInfo.userVerified && !passkey.userVerified && { userVerified: true }, lastUsedAt: new Date() })
 
     return true
   }

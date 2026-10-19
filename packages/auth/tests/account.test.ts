@@ -300,6 +300,26 @@ describe('deleting the account', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
   })
 
+  test('an admin whose deletion fails keeps their roles', async () => {
+    const app = testApp({ admin: 'admin', onDelete: () => {
+      throw new Error('app down')
+    } })
+    const ids: string[] = []
+    const browsers = []
+
+    for (const email of ['ada@example.com', 'grace@example.com']) {
+      const browser = app.browser()
+      const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
+
+      await app.store.users.update(user.id, { roles: ['admin'] })
+      ids.push(user.id)
+      browsers.push(browser)
+    }
+
+    expect((await browsers[0]!.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect((await app.store.users.get(ids[0]!))?.roles).toEqual(['admin'])
+  })
+
   test('an onDelete that throws leaves the account in place, to delete again', async () => {
     let fail = true
     const { ada, store } = await registered({

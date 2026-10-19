@@ -300,6 +300,20 @@ describe('a passkey as second factor and as proof', () => {
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
   })
 
+  test('a sole passkey that is not proven stays while it is the only way in', async () => {
+    const app = await setup()
+    const ada = await registered(app)
+    const { device } = await addPasskey(ada)
+    const user = await app.store.users.findByEmail('ada@example.com')
+    const id = device.credentials[0]!.id
+
+    await app.store.users.update(user!.id, { passwordHash: null })
+    await app.store.passkeys.update(id, { userVerified: false })
+
+    expect(await ada.call('removePasskey', id, {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('passkeys')).toHaveLength(1)
+  })
+
   test('a user-verified sign-in proves a stored passkey, which then counts as a way in', async () => {
     const app = await setup()
     const ada = await registered(app)

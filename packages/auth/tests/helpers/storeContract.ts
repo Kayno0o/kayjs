@@ -226,9 +226,9 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
       const at = new Date('2026-02-01T00:00:00Z')
 
-      await store.passkeys.update('p1', { name: 'Laptop', counter: 4_000_000_000, backedUp: true, lastUsedAt: at })
+      await store.passkeys.update('p1', { name: 'Laptop', counter: 4_000_000_000, backedUp: true, userVerified: false, lastUsedAt: at })
 
-      expect(await store.passkeys.get('p1')).toEqual({ ...passkey('p1', '2026-01-01T00:00:00Z'), name: 'Laptop', counter: 4_000_000_000, backedUp: true, lastUsedAt: at })
+      expect(await store.passkeys.get('p1')).toEqual({ ...passkey('p1', '2026-01-01T00:00:00Z'), name: 'Laptop', counter: 4_000_000_000, backedUp: true, userVerified: false, lastUsedAt: at })
       expect((await store.passkeys.listByUser('u1')).map(found => found.id)).toEqual(['p1', 'p2'])
       expect(async () => store.passkeys.create(passkey('p1', '2026-01-03T00:00:00Z'))).toThrow()
       expect(await store.passkeys.delete('u2', 'p1')).toBe(false)
