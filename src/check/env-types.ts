@@ -14,11 +14,15 @@ import { OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-module
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
+import { NOT_FOUND_FILE } from '../server/not-found'
 import { patternShapes } from '../server/routes'
+import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { matcherSource, shadowPath } from './shadow'
 
 const PARAM_SEGMENT = /:([^/]+)/g
+// A redirect's `:name` segment, whole.
+const REDIRECT_PARAM = /(?<=\/):[^/]+(?=\/|$)/g
 
 // The manifests of the locales reading a name or description of their own, served beside the default one.
 const LOCALE_MANIFESTS = `\`/manifest.\${string}.webmanifest\``
@@ -81,6 +85,9 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
       ...settings.locales.flatMap(locale => routes.flatMap(route => shapesOf(route, localePattern(settings, route.pattern, locale)).map(shape => prefixes.includes(locale) ? `/${locale}${shape === '/' ? '' : shape}` : shape))),
     ])]
     : routes.flatMap(route => shapesOf(route, route.pattern))
+  // A redirect's source is a path a visitor reaches as a page's is, at the path as written whatever the locale; its params match any segment, no matcher checks them.
+  const sources = [...Object.keys(options.redirects ?? {}), ...readRuntimeRedirects(join(root, NOT_FOUND_FILE)).map(({ from }) => from)].map(source => source.replace(REDIRECT_PARAM, ':'))
+  const reachable = localized.length > 0 ? [...new Set([...localized, ...sources])] : localized
   const modulePath = (file: string) => relative(shadowDir, file).replace(TS_FILE, '')
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
@@ -95,7 +102,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
   const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
 
-  return environment(localized, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
+  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.

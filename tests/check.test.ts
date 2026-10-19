@@ -16,6 +16,8 @@ import { compileKay } from '../src/compiler'
 import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
+import { NOT_FOUND_FILE } from '../src/server/not-found'
+import { addRuntimeRedirect } from '../src/server/runtime-redirect-api'
 import { alive } from './alive'
 import { kayCheck, keepBuildInfo, warmBuildInfo } from './check-helper'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -1801,6 +1803,65 @@ describe('kay check, string fields an action leaves unbounded', () => {
 
   it('leaves bounded fields, secrets that never come back, options it cannot read and schemas outside actions alone', () => {
     expect(fields('const options = { maxLength: 9 }\nexport const page = { query: t.Object({ q: t.String() }) }\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
+  })
+})
+
+describe.concurrent('kay check, a redirect source is served', () => {
+  type Row = (string | number | undefined)[]
+  const key = (row: Row) => `${String(row[0])}${String(row[1]).padStart(3)}`
+  const unserved = (found: Awaited<ReturnType<typeof check>>) => found.map(d => [basename(d.file), d.line, d.message.match(/serves ([^"\s]+)/)?.[1]]).filter(row => row[2] !== undefined).sort((a, b) => key(a).localeCompare(key(b)))
+  const sorted = (rows: Row[]) => rows.toSorted((a, b) => key(a).localeCompare(key(b)))
+  const files = {
+    'src/routes/index.kay': [
+      '---',
+      'import { navigate } from \'kay\'',
+      '',
+      'const go = () => navigate(\'/old\')',
+      '---',
+      'a(href="/old") source',
+      'a(href="/old/") source with a slash',
+      'a(href="/old?tab=1#top") source with a query',
+      'a(href="/legacy/anything") param source',
+      'a(href="/docs/a/b") catch-all source',
+      'a(href="/later") source added while the site runs',
+      'a(href="/nowhere") not a source',
+      'a(href="/en/old") not a source in a locale',
+      'button(onClick={go}) go',
+      '',
+    ].join('\n'),
+    'src/routes/jump.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const move = action(t.Object({}), async (_input, ctx) => ctx.redirect(\'/old\'))\n\nif (ctx.url.searchParams.has(\'a\'))\n  ctx.redirect(\'/legacy/x\')\n\nif (ctx.url.searchParams.has(\'b\'))\n  ctx.redirect(\'/missing\')\n---\np jump\n',
+    'src/routes/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ redirect }) => {\n  if (Math.random() > 2)\n    redirect(\'/old\')\n\n  if (Math.random() > 3)\n    redirect(\'/absent\')\n})\n',
+  }
+  const redirects = { '/old': '/', '/legacy/:slug': '/', '/docs/*': '/' }
+  const left = [['index.kay', 12, '/nowhere'], ['index.kay', 13, '/en/old'], ['jump.kay', 11, '/missing'], ['_guard.ts', 8, '/absent']]
+  const sources = [['index.kay', 4, '/old'], ['index.kay', 6, '/old'], ['index.kay', 7, '/old/'], ['index.kay', 8, '/old'], ['index.kay', 9, '/legacy/anything'], ['index.kay', 10, '/docs/a/b'], ['index.kay', 11, '/later'], ['jump.kay', 5, '/old'], ['jump.kay', 8, '/legacy/x'], ['_guard.ts', 5, '/old']]
+
+  it('counts a source in a link, ctx.redirect, a guard and navigate(), a param or a catch-all one too, and still fails a path that is none', async () => {
+    const root = await scratchProject(files)
+
+    try {
+      addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
+
+      expect(unserved(await check(root, { redirects }))).toEqual(sorted(left))
+      expect(unserved(await check(root, { redirects: {} }))).toEqual(sorted([...left, ...sources.filter(row => row[2] !== '/later')]))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('counts a source under a base and across locales, at the path as written', async () => {
+    const root = await scratchProject(files)
+
+    try {
+      addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
+
+      expect(unserved(await check(root, { redirects, base: '/app' }))).toEqual(sorted(left))
+      expect(unserved(await check(root, { redirects, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } }))).toEqual(sorted(left))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 

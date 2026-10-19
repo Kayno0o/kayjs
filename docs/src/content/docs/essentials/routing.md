@@ -226,6 +226,8 @@ export default defineConfig({
 
 A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
 
+A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes.
+
 ### Find the old URLs visitors still use
 
 After a site moves, old links keep answering 404. A production server counts the pages visitors asked for and found nothing at, in `data/not-found.sqlite`. It keeps the path, how often it was hit and the host of the page that linked to it, never anything about the visitor. A path nobody asked for in 90 days is forgotten. The counts reach the file in one write a second, so `kay not-found` can lag the running site by that much.

@@ -22,7 +22,7 @@ The editor shows each problem of an open file with the same message, note and he
 ## What it verifies
 
 - Expressions, props and server data, as TypeScript does.
-- Links to pages, public files and API routes, including `ctx.redirect`, `navigate()` and form `action`s.
+- Links to pages, public files, API routes and the sources of your redirects, including `ctx.redirect`, `navigate()` and form `action`s.
 - Form field names against the action's schema.
 - Content collection entries against their schema.
 - With `i18n`, every `t()` key and placeholder in every locale.
