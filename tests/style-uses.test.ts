@@ -249,12 +249,20 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('el.className = position(i)\n')).toEqual(['1 className = '])
   })
 
-  it('judges a parameter by its caller even when a prop has its name, and the import before an unrelated local name', async () => {
+  it('judges a parameter by its caller even when a prop has its name, and an import beside an unrelated local name', async () => {
     const props = 'const { tone } = props<{ tone: string }>()\n'
 
     expect(await unresolved(`${props}function f(tone: string) {\n  return tone\n}\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['6 class attribute '])
     expect(await unresolved(`${props}const f = ({ tone }: Tone) => tone\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['4 class attribute '])
-    expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = { a: \'mt-1\' }\n}\n---\np(class={BG[k]}) a\n', 'd.ts': 'export const BG = { a: dyn() }\n' })).toEqual(['page.kay:7 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = { a: \'mt-1\' }\n}\n---\np(class={BG[k]}) a\n', 'd.ts': 'export const BG = { a: dyn() }\n' })).toEqual(['page.kay:7 class attribute mt-1'])
+  })
+
+  it('judges a name both imported and given a local value by both', async () => {
+    const closed = 'export const BG = { a: \'mt-1\' }\n'
+
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = dyn()\n}\n---\np(class={BG[k]}) a\n', 'd.ts': closed })).toEqual(['page.kay:7 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = { b: \'p-1\' }\n}\n---\np(class={BG[k]}) a\n', 'd.ts': closed })).toEqual([])
+    expect(await unresolvedIn({ 'island.ts': 'import { pick } from \'./d\'\nfunction other() {\n  const pick = () => dyn()\n}\nel.className = pick()\n', 'd.ts': 'export const pick = () => \'mt-1\'\n' })).toEqual(['island.ts:5 className = mt-1'])
   })
 
   it('leaves an async function, a generator, a namespace or default import, a method and an import cycle open', async () => {

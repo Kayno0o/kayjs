@@ -211,9 +211,15 @@ function joined(argument: Expression, scope: Scope, depth: number): Verdict {
   }))
 }
 
-// Where a name is declared: the module it is imported from, else this scope.
-function lookup(name: string, scope: Scope): { scope: Scope, name: string } | undefined {
-  return scope.imported(name) ?? (scope.initializers(name) !== undefined || scope.functions(name) !== undefined ? { scope, name } : undefined)
+// Where a name is declared: the module it is imported from and this scope, each when it holds it, so a name imported and also given a local value is judged by both.
+function lookup(name: string, scope: Scope): { scope: Scope, name: string }[] {
+  const imported = scope.imported(name)
+  const found = imported === undefined ? [] : [imported]
+
+  if (scope.initializers(name) !== undefined || scope.functions(name) !== undefined)
+    found.push({ scope, name })
+
+  return found
 }
 
 const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassDeclaration', 'ClassExpression'])
@@ -337,19 +343,20 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name) && scope.receiver !== undefined && chainOf(node.object) === scope.receiver)
       return CLOSED
 
-    const found = depth < RESOLVE_DEPTH ? lookup(root, scope) : undefined
+    const found = depth < RESOLVE_DEPTH ? lookup(root, scope) : []
+    const values = found.map(({ scope: declared, name }) => ({ scope: declared, initial: declared.initializers(name) }))
+
+    if (values.length === 0 || values.some(({ initial }) => initial === undefined))
+      return OPEN
 
     // A member of a `const` object holding only literals is one of its values.
-    if (node.type !== 'Identifier' && found !== undefined) {
-      const objects = found.scope.initializers(found.name)?.map(unwrapped)
+    if (node.type !== 'Identifier') {
+      const objects = values.flatMap(({ scope: declared, initial }) => initial!.map(value => ({ scope: declared, object: unwrapped(value) })))
 
-      if (objects?.every(object => object.type === 'ObjectExpression') === true)
-        return merged(objects.map(object => valuesOf(object, found.scope, depth + 1)))
+      return objects.every(({ object }) => object.type === 'ObjectExpression') ? merged(objects.map(({ scope: declared, object }) => valuesOf(object as ObjectExpression, declared, depth + 1))) : OPEN
     }
 
-    const initial = node.type === 'Identifier' && found !== undefined ? found.scope.initializers(found.name) : undefined
-
-    return found === undefined || initial === undefined ? OPEN : merged(initial.map(value => verdictOf(value, found.scope, depth + 1)))
+    return merged(values.flatMap(({ scope: declared, initial }) => initial!.map(value => verdictOf(value, declared, depth + 1))))
   }
 
   if (node.type === 'CallExpression') {
@@ -357,11 +364,11 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
       return merged(node.arguments.map(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder' ? OPEN : joined(argument, scope, depth)))
 
     // A function whose every return is a value judged as any other is those values.
-    const called = node.callee.type === 'Identifier' && depth < RESOLVE_DEPTH ? lookup(node.callee.name, scope) : undefined
-    const functions = called?.scope.functions(called.name)
+    const called = node.callee.type === 'Identifier' && depth < RESOLVE_DEPTH ? lookup(node.callee.name, scope) : []
+    const functions = called.map(({ scope: declared, name }) => ({ scope: declared, fns: declared.functions(name) }))
 
-    if (called !== undefined && functions !== undefined)
-      return callVerdict(functions, called.scope, depth)
+    if (functions.length > 0 && functions.every(({ fns }) => fns !== undefined))
+      return merged(functions.map(({ scope: declared, fns }) => callVerdict(fns!, declared, depth)))
 
     // `el.getAttribute('class')` reads back what the element has.
     const [argument] = node.arguments
