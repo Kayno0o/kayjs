@@ -159,18 +159,21 @@ function refusalOfApi<Data>(error: ApiError, refused: ((data: Data) => string | 
   return [said, error.status < 500 ? answerMessage(error.answer) : undefined].find(message => message !== undefined && message !== '')
 }
 
-// A `refused` that throws on data it did not expect says nothing, so `failure` is toasted and the caller is not left waiting.
+// A `refused` that throws on data it did not expect says nothing, so `failure` is toasted and the caller is not left waiting; the throw goes to the console, as a bug in the app's own code.
 function readRefused<Data>(refused: ((data: Data) => string | undefined) | undefined, data: Data): string | undefined {
   try {
     return refused?.(data)
   }
-  catch {
+  catch (error) {
+    console.error('kayjs-ui: the `refused` of a toast threw', error)
+
     return undefined
   }
 }
 
 const MAX_WORDS = 200
-const CODE = /^[A-Z0-9_ -]+$/
+// A code is one word with an underscore, or digits: `NOT_FOUND`, `404`. A short all-caps message such as `ACCESS DENIED` or `FULL` is still a message.
+const CODE = /^[A-Z0-9]+(?:_[A-Z0-9]+)+$|^\d+$/
 
 // The words of a route's answer, as `refusal()` in kay's runtime reads them, kept only when they read as a message: not markup from a proxy, a status code, several lines or a page.
 function answerMessage(answer: unknown): string | undefined {

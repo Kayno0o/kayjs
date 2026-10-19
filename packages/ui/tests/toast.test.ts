@@ -232,12 +232,40 @@ describe('attempt', () => {
 
     test('calls `refused` only for an answer that is an object, and survives one that throws', async () => {
       const refused = (data: { reason?: string }) => data.reason!.toUpperCase()
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
 
       expect(await said(new ApiError(409, 'Conflict', null), refused)).toEqual(['Could not delete'])
       expect(await said(new ApiError(409, 'Conflict', ''), refused)).toEqual(['Could not delete'])
       expect(await said(new ApiError(409, 'Conflict', new Blob(['x'])), refused)).toEqual(['Could not delete'])
       expect(await said(new ApiError(409, 'Taken', { message: 'Taken' }), refused)).toEqual(['Taken'])
+
       expect(await attempt(reject(new ApiError(409, 'Conflict', {})), 'Could not delete', refused)).toBeUndefined()
+      spy.mockRestore()
+    })
+
+    test('tells a code from a short message: only underscored words or digits are codes', async () => {
+      expect(await said(new ApiError(403, 'ACCESS DENIED', 'ACCESS DENIED'))).toEqual(['ACCESS DENIED'])
+      expect(await said(new ApiError(409, 'FULL', 'FULL'))).toEqual(['FULL'])
+      expect(await said(new ApiError(409, 'OK', { message: 'OK' }))).toEqual(['OK'])
+      expect(await said(new ApiError(404, 'E_CODE_1', 'E_CODE_1'))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(404, '404', '404'))).toEqual(['Could not delete'])
+    })
+
+    test('reports a `refused` that throws with console.error, and still toasts `failure`', async () => {
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      const boom = new TypeError('bad read')
+      const refused = (): string => {
+        throw boom
+      }
+
+      try {
+        expect(await said(new ApiError(409, 'Conflict', {}), refused)).toEqual(['Could not delete'])
+        expect(spy).toHaveBeenCalledTimes(1)
+        expect(spy.mock.calls[0]).toContain(boom)
+      }
+      finally {
+        spy.mockRestore()
+      }
     })
 
     test('resolves to undefined, and an ActionError keeps reading as before', async () => {
