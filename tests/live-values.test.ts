@@ -21,9 +21,9 @@ const idOf = (name: string) => liveId('/app/src/live.ts', '/app', name)
 const VISITORS = idOf('visitors')
 const ROOM = idOf('room')
 const SECRET = idOf('secret')
-// The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures, as the budget in tests/static.test.ts is.
+// The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures (12,605), as the budget in tests/static.test.ts is.
 // The live runtime is a chunk of the islands reading it, not of every page: the home page pays for that chunk, about 180 bytes, where the pages reading no live value save its whole runtime.
-const LIVE_EAGER_JS_BUDGET = 12_582
+const LIVE_EAGER_JS_BUDGET = 12_618
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')
@@ -39,6 +39,16 @@ function idsOf(page: LivePage): string[] {
 
 async function tick(): Promise<void> {
   await Bun.sleep(10)
+}
+
+// The connection opens once the island hydrated, after the server's own render showed its value.
+async function until(holds: () => boolean): Promise<void> {
+  for (let waited = 0; !holds(); waited += 10) {
+    if (waited > 5000)
+      throw new Error('the connection never opened')
+
+    await tick()
+  }
 }
 
 describe('live values on the server', () => {
@@ -553,6 +563,34 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     expect(connections).toHaveLength(1)
   })
 
+  it('closes the connection of a hidden tab, and opens it again with the values as they are once the tab is shown', async () => {
+    connections.length = 0
+    live.visitors.set(30)
+
+    await using page = await site.open('/')
+
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '30 online')
+    await until(() => connections.length === 1)
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await Bun.sleep(100)
+    live.visitors.set(31)
+    await Bun.sleep(300)
+    expect(await page.text('p.online')).toBe('30 online')
+    expect(connections).toHaveLength(1)
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, 'hidden')
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '31 online')
+    expect(connections).toHaveLength(2)
+    live.visitors.set(32)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '32 online')
+    expect(connections).toHaveLength(2)
+  })
+
   it('opens no connection and loads no script for a page reading none', async () => {
     connections.length = 0
 
@@ -714,6 +752,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await using page = await site.open('/other')
 
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '70 online')
+    await until(() => server.posts.length === 1)
     // The first request is still waiting for its refusal.
     await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }))
     await Bun.sleep(3000)

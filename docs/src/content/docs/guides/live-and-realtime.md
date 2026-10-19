@@ -69,6 +69,8 @@ A page reading a live value is rendered for each request. `kay build` does not k
 
 A client holds at most 20 live connections, a few tabs, and opens at most 120 a minute. The next one is refused until another closes. `live: { connections: 50, perMinute: 240 }` in kay.config.ts changes both. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
 
+While a tab is hidden it holds no connection for live values, and it opens one again, with every value as it is then, when the tab is shown.
+
 <ReadMore href="/llms/api-from-islands#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 
 ### Data from the cache

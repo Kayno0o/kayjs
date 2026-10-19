@@ -380,6 +380,14 @@ function renewLater(delay = PROOF_LIFETIME_MS / 2): void {
   renewing = setTimeout(() => void renew(), delay)
 }
 
+// Closes the connection and stops renewing its proof.
+function release(): void {
+  clearTimeout(renewing)
+  renewing = undefined
+  current?.reader.close()
+  current = undefined
+}
+
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
 function sync(): void {
   settling = undefined
@@ -387,13 +395,13 @@ function sync(): void {
   const keys = new Set(wanted.keys())
 
   if (keys.size === 0) {
-    clearTimeout(renewing)
-    renewing = undefined
-    current?.reader.close()
-    current = undefined
+    release()
 
     return
   }
+
+  if (document.hidden)
+    return
 
   if (current && current.keys.size === keys.size && [...keys].every(key => current!.keys.has(key)))
     return
@@ -429,6 +437,16 @@ function sync(): void {
     renewLater()
 
   reader.start()
+}
+
+// A hidden tab holds no connection and renews no proof; shown again, it opens one that starts with every value as it is then.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden)
+      release()
+    else
+      sync()
+  })
 }
 
 function apply(updates: LiveUpdate[]): void {
