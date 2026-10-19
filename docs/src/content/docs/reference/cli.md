@@ -438,7 +438,11 @@ This checks your deploy files against what the project declares. It reports an e
 
 A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warning. `NODE_ENV` and test files are left out.
 
-`--compose` can be given several times. The command exits with 1 on an error, and `--format json` adds the problems as `findings`.
+`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely.
+
+A module under `src` that does not load is reported, and nothing is then called undeclared. A variable set to an empty string counts as not set.
+
+Raw reads are found in one-line forms only: `process.env.X`, `process.env['X']`, `Bun.env.X` and `const { X } = process.env`. The command exits with 1 on an error, and `--format json` adds the problems as `findings`.
 
 To run it with `kay check`, name the files in `kay.config.ts`.
 

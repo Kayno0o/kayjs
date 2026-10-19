@@ -667,6 +667,9 @@ describe('kay new', () => {
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('env: { compose: \'compose.prod.yaml\', example: \'.env.example\' }')
+      // The config names the compose and example files, so `kay check` compares them with src/env.ts.
+      expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
@@ -726,6 +729,9 @@ describe('kay new', () => {
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('env: { compose: \'compose.prod.yaml\', example: \'.env.example\' }')
+      // The config names the compose and example files, so `kay check` compares them with src/env.ts.
+      expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 

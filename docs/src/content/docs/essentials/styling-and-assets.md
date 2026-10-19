@@ -277,10 +277,12 @@ To serve files from a folder, use `safePath` from `kay/server`. It gives the rea
 ```ts
 import { safePath } from 'kay/server'
 
-resolve: src => src.startsWith('/media/') ? safePath('media', src.slice(7)) : undefined,
+resolve: src => src.startsWith('/media/') ? safePath('media', src.slice('/media/'.length)) : undefined,
 ```
 
 A name that climbs out with `../`, a symlink that leads out of the folder, an empty name, a name with a null byte, a directory and a missing file all give `undefined`. A leading slash is read as the folder itself.
+
+`safePath` reads the filesystem synchronously, and checks when it is called: a link swapped afterwards is not seen, so open the path it gives at once. It does not stop a hard link to a file outside the folder.
 
 ## Fonts
 

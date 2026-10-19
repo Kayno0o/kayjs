@@ -276,5 +276,7 @@ async function envProblems(root: string, config: KayConfig, scope: string[]): Pr
 
   const [{ listEnv }, { compareEnv }] = await Promise.all([import('./env'), import('./env-compare')])
 
-  return (await compareEnv(root, (await listEnv(root)).variables, config.env)).filter(diagnostic => inScope(diagnostic, scope))
+  const { variables, unread } = await listEnv(root)
+
+  return (await compareEnv(root, variables, config.env, unread)).filter(diagnostic => inScope(diagnostic, scope))
 }

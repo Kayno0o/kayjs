@@ -283,6 +283,8 @@ function config({ has, settings }: Setup): string {
     has('tailwind') && '  plugins: [tailwind],',
     server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s. It trusts private-range peers, so a dev server bound to 0.0.0.0 believes a LAN client\'s X-Forwarded-For.',
     server && has('docker') && '  proxy: true,',
+    server && has('docker') && has('auth') && '  // `kay check` compares the variables src/env.ts declares with what production sets.',
+    server && has('docker') && has('auth') && '  env: { compose: \'compose.prod.yaml\', example: \'.env.example\' },',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )

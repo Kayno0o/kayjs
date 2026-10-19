@@ -145,8 +145,6 @@ export interface KayConfig {
   extensions?: KayExtension[] | undefined
 }
 
-// What every page's head starts from; a layout or the page setting the same tag wins.
-// Each of `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` is a string, or a record of one string per locale for a site with `i18n`: `description: { en: 'The shop', fr: 'La boutique' }`. A locale the record lacks reads the default locale's.
 // A problem an app's own check reports; `level` is `'error'` unless it says `'warning'`, `file` is relative to the project and defaults to kay.config.ts, and `line` and `column` default to 1.
 export interface ProjectFinding {
   level?: 'error' | 'warning' | undefined
@@ -167,6 +165,8 @@ export interface ProjectCheckContext {
 
 export type ProjectCheck = (context: ProjectCheckContext) => void | Promise<void>
 
+// What every page's head starts from; a layout or the page setting the same tag wins.
+// Each of `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` is a string, or a record of one string per locale for a site with `i18n`: `description: { en: 'The shop', fr: 'La boutique' }`. A locale the record lacks reads the default locale's.
 export interface SeoConfig {
   // The site's name: the title of a page that sets none, and `og:site_name`.
   name?: Localized | undefined
@@ -510,7 +510,24 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
   if (typeof config !== 'object' || config === null)
     throw new KayError('config-default-export', `kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
 
+  checkedConfig(config)
+
   return config
+}
+
+// The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
+function checkedConfig({ checks, env }: KayConfig): void {
+  if (checks !== undefined && !Array.isArray(checks))
+    throw new KayError('config-invalid', `kay: \`checks\` in ${CONFIG_FILE} is a list of functions, not ${typeof checks}`)
+
+  if (env === undefined)
+    return
+
+  const { compose, example } = (typeof env === 'object' && env !== null ? env : {}) as { compose?: unknown, example?: unknown }
+  const files = Array.isArray(compose) ? compose : [compose]
+
+  if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
+    throw new KayError('config-invalid', `kay: \`env\` in ${CONFIG_FILE} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them)`)
 }
 
 // The config with each extension's own laid under it, a later extension's over an earlier one's.

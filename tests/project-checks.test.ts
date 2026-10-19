@@ -70,6 +70,24 @@ describe('checks in kay.config.ts', () => {
     expect((await check(root, '--since', '1.40')).problems).toEqual([])
   })
 
+  it('computes the routes once however often asked, and not at all when no check asks', async () => {
+    const api = 'import { appendFileSync } from \'node:fs\'\nimport { Elysia } from \'elysia\'\n\nappendFileSync(`${import.meta.dir}/../../loaded.txt`, \'x\')\nexport default new Elysia()\n'
+    const asking = await project('{ favicon: false, checks: [async ({ routes }) => { await Promise.all([routes(), routes()]); await routes() }] }\n', { 'src/api/count.ts': api })
+    const idle = await project('{ favicon: false, checks: [({ report }) => report({ level: \'warning\', message: \'idle\' })] }\n', { 'src/api/count.ts': api })
+
+    await check(asking)
+    await check(idle)
+    expect(await Bun.file(join(asking, 'loaded.txt')).text()).toBe('x')
+    expect(await Bun.file(join(idle, 'loaded.txt')).exists()).toBe(false)
+  })
+
+  it('runs the checks once with --fix, after the fixes', async () => {
+    const root = await project('{ favicon: false, checks: [async ({ root, report }) => { const { appendFileSync, readFileSync } = await import(\'node:fs\'); appendFileSync(`${root}/runs.txt`, readFileSync(`${root}/src/routes/index.kay`, \'utf8\').includes(\'onClick\') ? \'fixed\\n\' : \'unfixed\\n\') }] }\n', { 'src/routes/index.kay': 'button(onclick={() => undefined}) Hi\n' })
+
+    await check(root, '--fix')
+    expect(await Bun.file(join(root, 'runs.txt')).text()).toBe('fixed\n')
+  })
+
   it('reports only the findings in the paths given', async () => {
     const root = await project('{ favicon: false, checks: [({ report }) => { report({ message: \'a\', file: \'src/a.txt\' }); report({ message: \'b\', file: \'docs/b.txt\' }) }] }\n', { 'src/a.txt': '', 'docs/b.txt': '' })
     const child = Bun.spawn([process.execPath, cli, 'check', root, 'docs', '--format', 'json'], { cwd: root, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })

@@ -38,12 +38,17 @@ describe('s from kay', () => {
   it('leaves Elysia out of an island, and throws saying why when one calls it', async () => {
     const plain = await browserBundle('import { signal } from \'kay\'\n\nexport const count = signal(1)\n')
     const calling = await browserBundle('import { s } from \'kay\'\n\nexport const schema = () => s.String()\n')
+    const secret = await browserBundle('import { s } from \'kay\'\n\nexport const schema = () => s.Secret()\n')
 
+    expect(secret).toContain('builds a schema on the server')
     expect(plain).not.toContain('elysia')
     expect(plain.length).toBeLessThan(20_000)
     expect(calling.length).toBeLessThan(20_000)
 
     const { schema } = await import(`data:text/javascript;base64,${Buffer.from(calling).toString('base64')}`) as { schema: () => unknown }
+    const { schema: secretSchema } = await import(`data:text/javascript;base64,${Buffer.from(secret).toString('base64')}`) as { schema: () => unknown }
+
+    expect(secretSchema).toThrow('s.Secret() builds a schema on the server')
 
     expect(schema).toThrow('kay: s.String() builds a schema on the server, and kay\'s `s` is not in the browser; keep schemas in a module only the server imports')
   })

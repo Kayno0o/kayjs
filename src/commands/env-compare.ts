@@ -13,17 +13,33 @@ interface Assignment {
   line: number
   // Whether a value is given that does not take the variable from the environment it is set in.
   literal: boolean
+  value?: string
 }
 
-const TEST_FILE = /\.test\.[cm]?[jt]sx?$/
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const ENV_LINE = /^\s*(?:export\s+)?([a-z_]\w*)\s*=(.*)$/i
 const QUOTED = /^(["'])(.*)\1$/
 const COMMENT_LINE = /^\s*(?:\/\/|\*|\/\*)/
 const RAW_READ = /\b(?:process\.env|Bun\.env)(?:\.([a-z_]\w*)|\[\s*['"]([a-z_]\w*)['"]\s*\])/gi
-const INTERPOLATED = /\$\{?([a-z_]\w*)/gi
+// `$$VAR` is an escaped dollar, not a reference.
+const INTERPOLATED = /(?<!\$)\$\{?([a-z_]\w*)/gi
+const TRAILING_COMMENT = /\s\/\/.*$/
+const DESTRUCTURED_ENV = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:process\.env|Bun\.env)\b/
+const LEADING_NAME = /^\s*([a-z_]\w*)\s*(?:[:=,]|$)/i
 const LINE_BREAK = /\r?\n/
 // Read by kay or the runtime itself, never by a schema.
 const IGNORED_READS = new Set(['NODE_ENV'])
+
+// Every string of a parsed compose file, where its `${VAR}` references are read from: a comment or a key is no reference.
+function strings(value: unknown): string[] {
+  if (typeof value === 'string')
+    return [value]
+
+  if (Array.isArray(value))
+    return value.flatMap(strings)
+
+  return typeof value === 'object' && value !== null ? Object.values(value).flatMap(strings) : []
+}
 
 // What `KEY=value` lines of an env file assign: comments and blank lines skipped, a quoted value read as it is.
 function parseEnvFile(text: string): Assignment[] {
@@ -33,7 +49,7 @@ function parseEnvFile(text: string): Assignment[] {
     const match = ENV_LINE.exec(row)
 
     if (match !== null)
-      found.push({ name: match[1]!, line: index + 1, literal: match[2]!.trim().replace(QUOTED, '$2') !== '' })
+      found.push({ name: match[1]!, line: index + 1, literal: false, value: match[2]!.trim().replace(QUOTED, '$2') })
   }
 
   return found
@@ -46,7 +62,7 @@ function refersTo(value: string, name: string): boolean {
 // What the services of a compose file set for the container: each `environment` entry, and every variable an `env_file` holds.
 async function composeAssignments(file: string, text: string, problem: (message: string, line?: number) => void): Promise<{ set: Map<string, Assignment>, interpolated: Set<string> }> {
   const set = new Map<string, Assignment>()
-  const interpolated = new Set([...text.matchAll(INTERPOLATED)].map(match => match[1]!))
+  const interpolated = new Set<string>()
   let document: unknown
 
   try {
@@ -58,6 +74,11 @@ async function composeAssignments(file: string, text: string, problem: (message:
     return { set, interpolated }
   }
 
+  for (const value of strings(document)) {
+    for (const match of value.matchAll(INTERPOLATED))
+      interpolated.add(match[1]!)
+  }
+
   const services = (document as { services?: Record<string, unknown> } | null)?.services
 
   for (const service of Object.values(services ?? {})) {
@@ -66,13 +87,17 @@ async function composeAssignments(file: string, text: string, problem: (message:
     if (Array.isArray(environment)) {
       for (const entry of environment) {
         const [name, ...value] = String(entry).split('=')
+        const given = value.join('=')
 
-        set.set(name!, { name: name!, line: 1, literal: value.length > 0 && !refersTo(value.join('='), name!) })
+        // `FOO=` is how a file says it is not set, as `defineEnv` reads it.
+        if (value.length === 0 || given !== '')
+          set.set(name!, { name: name!, line: 1, literal: given !== '' && !refersTo(given, name!) })
       }
     }
     else if (typeof environment === 'object' && environment !== null) {
       for (const [name, value] of Object.entries(environment)) {
-        set.set(name, { name, line: 1, literal: value !== null && value !== undefined && !refersTo(String(value), name) })
+        if (value !== '')
+          set.set(name, { name, line: 1, literal: value !== null && value !== undefined && !refersTo(String(value), name) })
       }
     }
 
@@ -93,26 +118,35 @@ async function composeAssignments(file: string, text: string, problem: (message:
         continue
       }
 
-      for (const assignment of parseEnvFile(await source.text()))
-        set.set(assignment.name, { ...assignment, line: 1, literal: false })
+      for (const { name, value = '' } of parseEnvFile(await source.text())) {
+        if (value !== '')
+          set.set(name, { name, line: 1, literal: !refersTo(value, name) })
+      }
     }
   }
 
   return { set, interpolated }
 }
 
-// The reads of `process.env.X` and `Bun.env.X` in the project's own sources, tests apart.
+// The reads of `process.env.X`, `process.env['X']`, `Bun.env.X` and a one-line `const { X } = process.env` in the project's own sources, tests apart; a read on several lines, through a variable name or `import.meta.env` is not seen, and a trailing `//` comment is dropped.
 async function rawReads(root: string): Promise<{ name: string, file: string, line: number }[]> {
   const found: { name: string, file: string, line: number }[] = []
-  const files = [...new Bun.Glob('src/**/*.{ts,tsx,js,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && !file.endsWith('.d.ts'))
+  const files = [...new Bun.Glob('src/**/*.{ts,tsx,js,jsx,mjs,mts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && !file.endsWith('.d.ts'))
 
   for (const file of files) {
-    for (const [index, row] of (await Bun.file(join(root, file)).text()).split('\n').entries()) {
-      if (COMMENT_LINE.test(row))
+    for (const [index, source] of (await Bun.file(join(root, file)).text()).split('\n').entries()) {
+      if (COMMENT_LINE.test(source))
         continue
 
-      for (const match of row.matchAll(RAW_READ))
-        found.push({ name: (match[1] ?? match[2])!, file: join(root, file), line: index + 1 })
+      const row = source.replace(TRAILING_COMMENT, '')
+      const names = [...row.matchAll(RAW_READ)].map(match => (match[1] ?? match[2])!)
+      const destructured = DESTRUCTURED_ENV.exec(row)?.[1]
+
+      if (destructured !== undefined)
+        names.push(...destructured.split(',').flatMap(part => LEADING_NAME.exec(part)?.[1] ?? []))
+
+      for (const name of names)
+        found.push({ name, file: join(root, file), line: index + 1 })
     }
   }
 
@@ -124,8 +158,10 @@ function diagnostic(severity: 'error' | 'warning', file: string, line: number, m
 }
 
 // What the declared variables, the compose files and the example env file say of each other, as problems: a variable production needs that no compose service sets, one the example lacks or has with nothing behind it, and a raw read of the environment no schema declares.
-export async function compareEnv(root: string, variables: Listed[], files: EnvFiles): Promise<CheckDiagnostic[]> {
-  const problems: CheckDiagnostic[] = []
+// A module that did not load (`unread`) may hold schemas the declared set lacks, so it is an error of its own and nothing is judged undeclared.
+export async function compareEnv(root: string, variables: Listed[], files: EnvFiles, unread: { file: string, error: string }[] = []): Promise<CheckDiagnostic[]> {
+  const problems: CheckDiagnostic[] = unread.map(({ file, error }) => diagnostic('error', resolve(root, file), 1, `${file} did not load (${error}), so the variables it declares are not compared`))
+  const complete = unread.length === 0
   const composes = (files.compose === undefined ? [] : [files.compose].flat()).map(path => resolve(root, path))
   const examplePath = files.example === undefined ? undefined : resolve(root, files.example)
   const declared = new Set(variables.map(variable => variable.name))
@@ -171,7 +207,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
       const listed = new Set(example.map(({ name }) => name))
 
       for (const { name, line } of example) {
-        if (!declared.has(name) && !set.has(name) && !interpolated.has(name))
+        if (complete && !declared.has(name) && !set.has(name) && !interpolated.has(name))
           problems.push(diagnostic('error', examplePath, line, `${name} is in ${relative(root, examplePath)} and no schema declares it${composeRead ? ', no compose service sets it and none interpolates it' : ''}`))
       }
 
@@ -182,7 +218,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     }
   }
 
-  for (const { name, file, line } of await rawReads(root)) {
+  for (const { name, file, line } of complete ? await rawReads(root) : []) {
     if (!declared.has(name) && !IGNORED_READS.has(name))
       problems.push(diagnostic('warning', file, line, `process.env.${name} is read with no schema declaring it: declare it with defineEnv so kay env lists it`))
   }

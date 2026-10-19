@@ -172,7 +172,7 @@ export const env = defineEnv(s.Object({
 }))
 ```
 
-For a secret, use `s.Secret()`. It is a string of at least 32 characters that production must set. In development and tests kay derives a value from the project path, so sessions survive a restart and no placeholder is committed. That value is never used in production.
+For a secret, use `s.Secret()`. It is a string of at least 32 characters that production must set. In development and tests kay derives a value from the project path, so sessions survive a restart and no placeholder is committed. That value is never used in production, and it is kept in the git-ignored `.kay` folder, so a deploy must set `NODE_ENV=production` and the variable: with another `NODE_ENV`, or a `HOST` that is not local, kay warns at boot that a derived secret is in use.
 
 ```ts
 export const env = defineEnv(s.Object({
@@ -192,7 +192,7 @@ kay env
 
 ```
 DATABASE_URL    src/env.ts  string   always
-SESSION_SECRET  src/env.ts  string   production  "dev-secret"
+SESSION_SECRET  src/env.ts  string (secret)  production
 SMTP_HOST       the extension @kaynooo/kayjs-mail  string  production
 PORT            kay         integer  optional    3000
 ```

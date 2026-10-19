@@ -1,7 +1,7 @@
-import { rm } from 'node:fs/promises'
+import { rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
@@ -81,6 +81,45 @@ describe('s.Secret and a required-in-production string with no default', () => {
     expect(await run(a)).not.toBe(await run(b))
   })
 
+  it('mixes in a random seed kept in the checkout\'s .kay, so the same path elsewhere gives another value', async () => {
+    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), {}).A)`}`.cwd(cwd).quiet().text()).trim()
+    const root = await project({ 'a.txt': '' })
+    const first = await run(root)
+
+    expect(await run(root)).toBe(first)
+    expect(((await stat(join(root, '.kay/dev-secret'))).mode & 0o777)).toBe(0o600)
+    await rm(join(root, '.kay/dev-secret'))
+    expect(await run(root)).not.toBe(first)
+  })
+
+  it('warns once a derived secret is in use beyond development: another NODE_ENV or a HOST that is not loopback', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const names = (source: Record<string, string>) => {
+      warn.mockClear()
+      defineEnv(secret, source)
+
+      return warn.mock.calls.length
+    }
+
+    try {
+      expect(names({})).toBe(0)
+      expect(names({ NODE_ENV: 'development', HOST: '127.0.0.1' })).toBe(0)
+      expect(names({ NODE_ENV: 'test', HOST: 'localhost' })).toBe(0)
+      expect(names({ NODE_ENV: 'staging' })).toBe(1)
+      expect(names({ HOST: '0.0.0.0' })).toBe(1)
+      expect(warn.mock.calls[0]![0]).toContain('SESSION_SECRET is not set')
+      expect(names({ NODE_ENV: 'staging', SESSION_SECRET: 'x'.repeat(40), HOST_NAME: 'a' })).toBe(0)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('keeps 32 characters whatever minLength is given', () => {
+    expect(s.Secret({ minLength: 8 }).minLength).toBe(32)
+    expect(s.Secret({ minLength: 64 }).minLength).toBe(64)
+  })
+
   it('takes a set value, an empty one counting as unset, and refuses a short one', () => {
     const long = 'x'.repeat(40)
 
@@ -128,6 +167,18 @@ describe('kay env', () => {
     expect(rows.find(row => row.name === 'SESSION_SECRET')).toEqual({ name: 'SESSION_SECRET', source: 'src/env.ts', type: 'string', required: 'production', secret: true })
     expect(rows.find(row => row.name === 'CLIENT_ID')).toEqual({ name: 'CLIENT_ID', source: 'src/env.ts', type: 'string', required: 'production' })
     expect((await kay(['env'], root)).stdout).toContain('SESSION_SECRET  src/env.ts  string (secret)  production')
+  })
+
+  it('builds with no value for an s.Secret the page reads, and without throwing', async () => {
+    const root = await project({
+      'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n',
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SESSION_SECRET: s.Secret() }))\n',
+      'src/routes/index.kay': '---\nimport { env } from \'../env\'\n---\np {String(env.SESSION_SECRET.length)}\n',
+    })
+    const built = Bun.spawn([process.execPath, cli, 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { PATH: process.env.PATH! } })
+
+    expect(await built.exited, await new Response(built.stderr).text()).toBe(0)
   })
 
   it('lists the variables of the app\'s schemas and of the extensions\', and kay\'s own, with whether each is required and its default, without the environment', async () => {
@@ -339,7 +390,7 @@ describe('kay env against compose and .env.example', () => {
     expect((await run(root, ['--compose', 'compose.yaml', '--compose', 'compose.override.yaml'])).findings).toEqual([])
   })
 
-  it('names a variable only in .env.example, and one declared but missing from it unless compose gives it a literal', async () => {
+  it('names a variable only in .env.example, and counts a literal of compose or of an env_file as needing no line there', async () => {
     const root = await project({ ...files, '.env.example': 'STRAY=\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n' })
     const { code, findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
     const messages = findings!.map(({ file, line, message }) => `${file}:${line} ${message}`)
@@ -347,7 +398,6 @@ describe('kay env against compose and .env.example', () => {
     expect(code).toBe(1)
     expect(messages).toEqual([
       '.env.example:1 STRAY is in .env.example and no schema declares it, no compose service sets it and none interpolates it',
-      '.env.example:1 DISCORD_ID is required in production (src/env.ts) and .env.example does not list it',
     ])
   })
 
@@ -388,6 +438,59 @@ describe('kay env against compose and .env.example', () => {
 
     expect(code).toBe(1)
     expect(findings).toHaveLength(1)
+  })
+
+  it('reads env_file entries with required: false and a list KEY=value, an empty value counting as unset', async () => {
+    const root = await project({
+      ...files,
+      'app.env': '',
+      'compose.yaml': 'services:\n  app:\n    env_file:\n      - { path: gone.env, required: false }\n      - path: app.env\n    environment:\n      - DISCORD_ID=\n      - SESSION_SECRET=abc\n      - DATABASE_URL=postgres://x\n',
+    })
+    const { findings } = await run(root, ['--compose', 'compose.yaml'])
+
+    expect(findings!.map(({ message }) => message)).toEqual(['DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it'])
+  })
+
+  it('names a .env.example that is missing on disk', async () => {
+    const root = await project(files)
+
+    expect((await run(root, ['--example', 'nope.example'])).findings!.map(({ message }) => message)).toEqual(['nope.example does not exist'])
+  })
+
+  it('reads a $$ escape, a comment and a one-line destructuring as they are', async () => {
+    const root = await project({
+      ...files,
+      'compose.yaml': `${files['compose.yaml']}    command: echo $$HOME\n# $COMMENTED\n`,
+      '.env.example': `${files['.env.example']}HOME=\nCOMMENTED=\n`,
+      'src/lib.ts': 'const { ONE, TWO: two = 1 } = process.env // process.env.TRAILING\nexport const a = [ONE, two]\n',
+      'src/lib.spec.ts': 'export const t = process.env.IN_SPEC\n',
+      'src/lib.mjs': 'export const m = process.env.IN_MJS\n',
+    })
+    const { findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
+
+    expect(findings!.map(({ severity, message }) => `${severity} ${message.split(' ', severity === 'warning' ? 1 : 2).join(' ')}`).sort()).toEqual([
+      'error COMMENTED is',
+      'error HOME is',
+      'warning process.env.IN_MJS',
+      'warning process.env.ONE',
+      'warning process.env.TWO',
+    ])
+  })
+
+  it('reports a module that does not load and judges nothing undeclared against an incomplete set', async () => {
+    const root = await project({ ...files, 'src/broken.ts': 'import { defineEnv } from \'kay/server\'\nimport \'./missing\'\n\nexport const env = defineEnv({} as never)\n', '.env.example': `${files['.env.example']}STRAY=\n`, 'src/lib.ts': 'export const a = process.env.FOO\n' })
+    const { code, findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
+
+    expect(code).toBe(1)
+    expect(findings!.map(({ file, message }) => `${file} ${message.slice(0, 26)}`)).toEqual(['src/broken.ts src/broken.ts did not load'])
+  })
+
+  it('refuses a config whose checks or env are the wrong shape, naming the key', async () => {
+    const bad = async (config: string) => kay(['check', await project({ ...files, 'kay.config.ts': config })], process.cwd())
+
+    expect((await bad('export default { checks: 42 }\n')).stderr).toContain('`checks` in kay.config.ts is a list of functions')
+    expect((await bad('export default { env: { compose: 42 } }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
+    expect((await bad('export default { env: \'x\' }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
   })
 
   it('prints the findings as text and exits 1 on an error', async () => {

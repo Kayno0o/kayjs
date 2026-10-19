@@ -19,7 +19,7 @@ export interface Listed extends EnvVariable {
 }
 
 const DEFINE_ENV = /\bdefineEnv\s*\(/
-const TEST_FILE = /\.test\.[cm]?[jt]sx?$/
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 
 // What kay itself reads from the environment, apart from any schema.
 const KAY_VARIABLES: EnvVariable[] = [
@@ -53,7 +53,7 @@ export const env: Command = {
         const listed = await listEnv(root)
         const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : (await loadConfig(root)).env
 
-        return { ...listed, findings: files === undefined ? undefined : await compareEnv(root, listed.variables, files) }
+        return { ...listed, findings: files === undefined ? undefined : await compareEnv(root, listed.variables, files, listed.unread) }
       })
 
       if (format === 'json') {
