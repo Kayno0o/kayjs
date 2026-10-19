@@ -16,6 +16,13 @@ main
     p Edge to edge
   Card#outlined(title="Orbits" level={2})
     p Elliptic
+  Card#page(title="<i>Sign in</i>" level={1})
+    @head
+      span 1
+    p Welcome
+  h2#after-page Details
+  Card#untitled(level={1})
+    p No title
   Badge#badge Draft
   Badge#solid(tone="success" solid label="<b>Done</b>")
   a.group#solid-stamp(href="/data")

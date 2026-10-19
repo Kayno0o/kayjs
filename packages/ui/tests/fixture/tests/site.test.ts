@@ -182,6 +182,8 @@ describe('content', () => {
     expect(await find('/content', '#bare .kui-card-body')).toEqual([])
     expect((await one('/content', '#bare p')).text).toBe('Edge to edge')
     expect((await one('/content', '#outlined .kui-card-title')).tag).toBe('h2')
+    expect((await find('/content', '#page .kui-card-head > *')).map(found => [found.tag, found.text])).toEqual([['h1', '<i>Sign in</i>'], ['span', '1']])
+    expect(await find('/content', '#untitled h1, #untitled h2, #untitled h3, #untitled .kui-card-head')).toEqual([])
   })
 
   test('Notice is a status, or an alert for a danger, drawn as a box or as a bare line', async () => {

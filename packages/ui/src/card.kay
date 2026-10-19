@@ -4,8 +4,8 @@ import type { JSX } from 'kay'
 const { title, level = 3, head, bare = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   // Engraved along the top, on a rule of its own.
   title?: string | undefined
-  // The title's heading level, under the page's outline.
-  level?: 2 | 3 | 4 | 5 | 6 | undefined
+  // The title's heading level, under the page's outline; `1` for a card that is the whole page, such as a sign-in panel.
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // The rest of the title's line, held at its far end: a count, a control, a link out.
   head?: JSX.Element
   // No inset body, for content that runs to the card's edge: a chart, a table, a console.
@@ -18,7 +18,9 @@ section.kui-card({...rest} class={className})
   if title !== undefined || head
     .kui-card-head
       if title !== undefined
-        if level === 2
+        if level === 1
+          h1.kui-card-title {title}
+        else if level === 2
           h2.kui-card-title {title}
         else if level === 3
           h3.kui-card-title {title}

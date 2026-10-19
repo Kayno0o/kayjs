@@ -18,4 +18,4 @@ description: The frame a page's content is written on, with an optional title an
 
 ## Heading level
 
-The title is an `h3`. `level` sets another, from 2 to 6, to fit the page's outline.
+The title is an `h3`. `level` sets another, from 1 to 6, to fit the page's outline. A card that is the whole page, such as a sign-in panel, takes `level={1}` and its title is the page's `h1`.
