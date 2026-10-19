@@ -994,6 +994,17 @@ describe.concurrent('kay check, edge cases', () => {
       '      p {dossier.latest.id}{done}{again}',
       'await work then done',
       '  p {dossier.latest.id}',
+      'if dossier.latest',
+      '  await work',
+      '    p {dossier.latest.id}',
+      '  then',
+      '    p {dossier.latest.id}',
+      '  catch',
+      '    p {dossier.latest.id}',
+      '  try',
+      '    p {dossier.latest.id}',
+      '  catch',
+      '    p {dossier.latest.id}',
       '',
     ].join('\n')
     const script = '---\ntype Stage = { id: string }\nconst { dossier, name, entries } = props<{ dossier: { latest: Stage | null }, name: string | null, entries: { id: string, next: Stage | null }[] }>()\nconst work = Promise.resolve(1)\n'

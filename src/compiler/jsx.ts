@@ -294,7 +294,7 @@ export class JsxTemplate {
     })
   }
 
-  // Called with the block's value on the spot, which TypeScript reads as running inline.
+  // Called with the block's value on the spot, which TypeScript reads as running inline; a block with no name is called with nothing.
   private emitAwaitBranch(prop: 'ready' | 'failed', branch: AwaitBranch, argument: string) {
     const { b } = this
 
@@ -306,7 +306,7 @@ export class JsxTemplate {
 
       b.add(') => ')
       this.emitRoot(branch.children)
-      b.add(`)(${argument})}`)
+      b.add(`)(${branch.alias ? argument : ''})}`)
     })
   }
 
