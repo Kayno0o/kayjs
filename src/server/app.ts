@@ -43,7 +43,7 @@ import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
-import { countWrites } from './kept-pages'
+import { countWrites, countWritesEnd } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
@@ -218,6 +218,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const served = new ServedPaths()
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
+  const writes = countWrites(app)
   // Hashed as they go out, under the mount point.
   const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)))] }
   const security = securityHeaders(securityOptions)
@@ -437,7 +438,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (!mode.dev && !exported)
     countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: options.trailingSlash })
 
-  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
+  countWritesEnd(app, writes)
+
+  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
   const fallback = source.fallback(paths.routes, mounts)
 

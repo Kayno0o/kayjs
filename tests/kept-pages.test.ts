@@ -223,9 +223,11 @@ interface Tally {
 
 const ACTION_HEADERS = { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/' }
 const post = (file: string, name: string): Asked => ({ path: `/_kay/action/src/routes/${file}/${name}`, method: 'POST', headers: ACTION_HEADERS, body: '[{}]' })
+const noise = (path: string): Asked => ({ path, method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
 const read = (path: string, headers?: Record<string, string>): Asked => headers ? { path, headers } : { path }
 // The value is built by a call, which the build cannot see an action change; `tally` counts the renders the server makes.
 const GUESTBOOK: Record<string, string> = {
+  'src/api/notes.ts': 'import { api } from \'kay/server\'\nimport { add } from \'../guestbook\'\n\nexport default api().post(\'/\', () => {\n  add()\n\n  return { ok: true }\n})\n',
   'src/guestbook.ts': 'export const messages = seed()\nexport const counts = tally()\n\nfunction seed(): string[] {\n  return [\'first\']\n}\n\nfunction tally() {\n  return { stable: 0, asked: 0 }\n}\n\nexport function add(): void {\n  messages.push(`m${messages.length}`)\n}\n\nexport function stable(): string {\n  counts.stable++\n\n  return \'Stable\'\n}\n\nexport function asked(): string {\n  counts.asked++\n\n  return messages.join(\',\')\n}\n',
   'src/routes/index.kay': '---\nimport { messages } from \'../guestbook\'\n---\np {messages.join(\',\')}\n',
   'src/routes/about.kay': '---\nimport { stable } from \'../guestbook\'\n---\np {stable()}\n',
@@ -236,6 +238,14 @@ const GUESTBOOK: Record<string, string> = {
   'src/routes/calls.json.ts': 'import { counts } from \'../guestbook\'\n\nexport function GET(): Response {\n  return Response.json(counts)\n}\n',
   'src/routes/private/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-pass\'))\n    deny(403)\n})\n',
   'src/routes/private/index.kay': '---\nimport { messages } from \'../../guestbook\'\n---\np {messages.join(\',\')}\n',
+}
+
+const under: Record<string, string> = {
+  ...GUESTBOOK,
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+  'src/messages/fr.ts': MESSAGES.fr,
+  'src/messages/en.ts': MESSAGES.en,
+  'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
 }
 
 describe('a kept page after a request that can write', () => {
@@ -342,14 +352,38 @@ describe('a kept page after a request that can write', () => {
     expect(stableHead!.status).toBe(200)
   }, 120_000)
 
+  it('is not rechecked after a request no app handler answers', async () => {
+    const root = await guestbook()
+    const rounds = 5
+    const requests: Asked[] = []
+
+    for (let round = 0; round < rounds; round++)
+      requests.push(noise('/_kay/analytics'), noise('/_kay/error'), noise('/_kay/csp'), noise('/_kay/analytics/collect'), noise('/_kay/error/'), noise('/_kay/%65rror'), noise('/_kay/analytics?x=1'), noise('/nowhere'), noise('/about'), read('/about'))
+
+    const answers = await served(root, [...requests, read('/calls.json')])
+    const counts = JSON.parse(answers.at(-1)!.text) as Tally
+
+    expect(answers.filter((_, at) => at % 10 === 9 && at < rounds * 10).every(answer => answer.status === 200)).toBe(true)
+    expect(counts.stable).toBe(0)
+  }, 120_000)
+
+  it('is rechecked after an API write', async () => {
+    const root = await guestbook()
+    const [, written, after] = await served(root, [read('/'), noise('/api/notes'), read('/')])
+
+    expect(written!.status).toBe(200)
+    expect(after!.text).toContain('first,m1')
+  }, 120_000)
+
+  it('is not rechecked after a request no handler answers, under a base, a locale and a trailing slash', async () => {
+    const root = await guestbook(under)
+    const answers = await served(root, [noise('/_kay/analytics'), noise('/_kay/error'), noise('/en/nowhere/'), noise('/en/_kay/analytics'), read('/about/'), read('/en/about/'), read('/calls.json')])
+
+    expect((JSON.parse(answers.at(-1)!.text) as Tally).stable).toBe(0)
+  }, 120_000)
+
   it('is checked per locale, under a base and a trailing slash', async () => {
-    const root = await guestbook({
-      ...GUESTBOOK,
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
-      'src/messages/fr.ts': MESSAGES.fr,
-      'src/messages/en.ts': MESSAGES.en,
-      'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
-    })
+    const root = await guestbook(under)
     const [, fr, en, again] = await served(root, [post('add.kay', 'save'), read('/'), read('/en/'), read('/en/')])
 
     expect(fr!.text).toContain('Bonjour first,m1')
