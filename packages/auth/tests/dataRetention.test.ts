@@ -263,7 +263,7 @@ describe('exporting a user\'s data', () => {
 })
 
 describe('erasing a user, the entry recording it', () => {
-  test('a failure stripping it fails the erase after the account is gone and the organizations were handed over', async () => {
+  test('a failure stripping it fails the erase once the account is gone', async () => {
     const base = memoryStore()
     let calls = 0
     const store: AuthStore = { ...base, audit: { ...base.audit!, forget: async (userId, pseudonym) => {
