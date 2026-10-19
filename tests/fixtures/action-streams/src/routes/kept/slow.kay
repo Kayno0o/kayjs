@@ -1,5 +1,9 @@
 --- server
-await Bun.sleep(400)
+import { seen } from '../../seen'
+
+seen.pages.slow++
+await seen.slowGate.promise
+seen.pages.slowServed++
 --- script
 import Streamer from '../../components/streamer.kay'
 ---

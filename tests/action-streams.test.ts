@@ -38,7 +38,7 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   libraryForbidden: Action<Record<never, never>, AsyncIterable<string>>
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
-const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number } }
+const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number, pages: { slow: number, await: number, slowServed: number }, slowGate: PromiseWithResolvers<void> } }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
 afterAll(async () => {
@@ -53,10 +53,20 @@ async function posted(action: Action<never, unknown>, input?: unknown): Promise<
 }
 
 // Waits for the endless stream's source, or another `seen` counts, to have been stopped `times` times in all.
-async function stoppedTimes(times: number, counter: keyof typeof seen = 'stopped'): Promise<void> {
+async function stoppedTimes(times: number, counter: 'stopped' | 'slowStopped' | 'quietStopped' = 'stopped'): Promise<void> {
   for (let tries = 0; seen[counter] < times; tries++) {
     if (tries === 200)
       throw new Error(`the stream stopped ${seen[counter]} times, not ${times}`)
+
+    await Bun.sleep(10)
+  }
+}
+
+// Waits for the `/kept/slow` and `/kept/await` pages to have been requested, or the slow one answered, `pages` times in all.
+async function pagesServed(pages: Partial<typeof seen.pages>): Promise<void> {
+  for (let tries = 0; Object.entries(pages).some(([name, times]) => seen.pages[name as keyof typeof seen.pages] < times); tries++) {
+    if (tries === 1000)
+      throw new Error(`the pages were requested ${JSON.stringify(seen.pages)}, not ${JSON.stringify(pages)}`)
 
     await Bun.sleep(10)
   }
@@ -448,10 +458,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await page.click('button.begin')
     await page.waitFor('p.status', { text: 'open' })
-    // The slow page is still being fetched when the visitor asks for this one again.
+    // The slow page is held until this page has been asked for again, so the visitor's second click always supersedes the first however loaded the host is.
+    const { slow, await: self, slowServed } = seen.pages
+
     await page.click('a.slow')
+    await pagesServed({ slow: slow + 1 })
     await page.click('a.self')
-    await Bun.sleep(600)
+    await pagesServed({ await: self + 1 })
+    seen.slowGate.resolve()
+    await pagesServed({ slowServed: slowServed + 1 })
+    // Two frames, for the superseded response to have been handled.
+    await page.evaluate(async () => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
 
     expect(await page.path()).toBe('/kept/await')
     expect(seen.quietStopped).toBe(before)
