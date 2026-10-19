@@ -19,7 +19,7 @@ const sites = {
   basedLocales: { base: '/shop', i18n, trailingSlash: 'always' },
 } as const
 
-const PATHS = ['/', '/about', '/about/', '/caf%C3%A9', '/café', '/posts/first', '/posts/other', '/dyn/a%20b', '/dyn/%E2%82%AC', '/dyn//x', '/admin', '/admin/', '/nope', '/nope/deep', '/en', '/en/about', '/en/nope', '/fr/about', '/%2e%2e/about', '/a%2Fb', '/a%ZZ']
+const PATHS = ['/', '/about', '/about/', '/caf%C3%A9', '/café', '/posts/first', '/posts/other', '/dyn/a%20b', '/dyn/%E2%82%AC', '/dyn//x', '/search?n=2', '/search?n=0', '/search', '/search?n=2', '/admin', '/admin/', '/nope', '/nope/deep', '/en', '/en/about', '/en/nope', '/fr/about', '/%2e%2e/about', '/a%2Fb', '/a%ZZ']
 
 async function seen(response: Response) {
   // The request id and the build stamp change per run and per checkout: their presence and place stay.

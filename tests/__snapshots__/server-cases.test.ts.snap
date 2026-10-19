@@ -1260,6 +1260,168 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
     ],
     "status": 200,
   },
+  "GET /search": {
+    "body": "Invalid query: n: Property 'n' is missing",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "GET /search?n=0": {
+    "body": "Invalid query: n: Property 'n' should be one of: 'integer', 'integer'",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "GET /search?n=2": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><link rel="canonical" href="https://x.example/search"><meta property="og:type" content="website"><meta property="og:url" content="https://x.example/search"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/_kay/*"}},{"not":{"href_matches":"/api/*"}},{"not":{"href_matches":"/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/">Home</a><a class="about" href="/about">About</a></nav><main><h1>Page 2</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 200,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -2434,6 +2596,180 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "content-length",
         "1167",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 200,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "41",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "69",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "HEAD /search?n=2": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1153",
       ],
       [
         "content-security-policy",
@@ -3741,6 +4077,168 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
     ],
     "status": 308,
   },
+  "GET /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
+  "GET /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/?n=0",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
+  "GET /search?n=2": {
+    "body": "",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/?n=2",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -4931,6 +5429,180 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
       [
         "location",
         "/posts/other/",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "0",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "0",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/?n=0",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 308,
+  },
+  "HEAD /search?n=2": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "0",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "location",
+        "/search/?n=2",
       ],
       [
         "permissions-policy",
@@ -6214,6 +6886,168 @@ exports[`the page answers of a site with based answers every path as pinned 1`] 
     ],
     "status": 404,
   },
+  "GET /search": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=0": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=2": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -7375,6 +8209,180 @@ exports[`the page answers of a site with based answers every path as pinned 1`] 
     "status": 404,
   },
   "HEAD /posts/other": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=2": {
     "body": "",
     "headers": [
       [
@@ -8679,6 +9687,168 @@ exports[`the page answers of a site with basedSlash answers every path as pinned
     ],
     "status": 404,
   },
+  "GET /search": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=0": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=2": {
+    "body": "<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -9840,6 +11010,180 @@ exports[`the page answers of a site with basedSlash answers every path as pinned
     "status": 404,
   },
   "HEAD /posts/other": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=2": {
     "body": "",
     "headers": [
       [
@@ -11160,6 +12504,168 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
     ],
     "status": 200,
   },
+  "GET /search": {
+    "body": "Invalid query: n: Property 'n' is missing",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "GET /search?n=0": {
+    "body": "Invalid query: n: Property 'n' should be one of: 'integer', 'integer'",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "GET /search?n=2": {
+    "body": "<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><link rel="canonical" href="https://x.example/search"><link rel="alternate" hreflang="fr" href="https://x.example/search"><link rel="alternate" hreflang="en" href="https://x.example/en/search"><link rel="alternate" hreflang="x-default" href="https://x.example/search"><meta property="og:type" content="website"><meta property="og:url" content="https://x.example/search"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/_kay/*"}},{"not":{"href_matches":"/api/*"}},{"not":{"href_matches":"/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/">Home</a><a class="about" href="/about">About</a></nav><main><h1>Page 2</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 200,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -12334,6 +13840,180 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "content-length",
         "1396",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 200,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "41",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "69",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-YeWzODuqGsCFCJPsc1VjQ6gQvM04SeFWJd/0rZ6X6bg=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/plain; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 400,
+  },
+  "HEAD /search?n=2": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1367",
       ],
       [
         "content-security-policy",
@@ -13633,6 +15313,168 @@ exports[`the page answers of a site with basedLocales answers every path as pinn
     ],
     "status": 404,
   },
+  "GET /search": {
+    "body": "<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=0": {
+    "body": "<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "GET /search?n=2": {
+    "body": "<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/shop/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/shop/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/shop/apple-touch-icon.png"><link rel="manifest" href="/shop/manifest.webmanifest"><meta property="og:type" content="website"><meta name="kay-base" content="/shop"><script type="speculationrules">{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/shop/*"},{"not":{"href_matches":"/shop/_kay/*"}},{"not":{"href_matches":"/shop/api/*"}},{"not":{"href_matches":"/shop/api"}},{"not":{"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script><script data-kay-history>{const u=location.pathname+location.search;addEventListener("popstate",e=>{e.state?.kay&&location.pathname+location.search!==u&&location.reload()})}</script></head><body><nav><a class="home" href="/shop/">Home</a><a class="about" href="/shop/about">About</a></nav><main><h1>Nothing here</h1></main></body></html>",
+    "headers": [
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
   "HEAD /": {
     "body": "",
     "headers": [
@@ -14794,6 +16636,180 @@ exports[`the page answers of a site with basedLocales answers every path as pinn
     "status": 404,
   },
   "HEAD /posts/other": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=0": {
+    "body": "",
+    "headers": [
+      [
+        "content-length",
+        "1134",
+      ],
+      [
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'sha256-D5r0df3BO8X/Sqpj5sN6xdcXoSG6DQnH1fxnD3Hg/PU=' 'sha256-VhYhFd/1zGrhC7SBMBYnvdZZ1l5TAl4StEbMZ+84PHw=' 'sha256-V7cCDNnYcYCb4FmmmB01lL6u9MhuGPl7mV3CwzHVGYM=' 'sha256-Xaq4BN7FESorQc2/t8dtNBYnpRUbrGviTUahMvWULPE=' 'sha256-LVAlJaKeR4XSHLYjjcmMniX/ZPE8ZbB8lYawhcbiAug='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      ],
+      [
+        "content-type",
+        "text/html; charset=utf-8",
+      ],
+      [
+        "cross-origin-opener-policy",
+        "same-origin",
+      ],
+      [
+        "cross-origin-resource-policy",
+        "same-site",
+      ],
+      [
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      ],
+      [
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      ],
+      [
+        "strict-transport-security",
+        "max-age=31536000",
+      ],
+      [
+        "x-content-type-options",
+        "nosniff",
+      ],
+      [
+        "x-frame-options",
+        "SAMEORIGIN",
+      ],
+      [
+        "x-kay-build",
+        "<set>",
+      ],
+      [
+        "x-permitted-cross-domain-policies",
+        "none",
+      ],
+      [
+        "x-request-id",
+        "<set>",
+      ],
+    ],
+    "status": 404,
+  },
+  "HEAD /search?n=2": {
     "body": "",
     "headers": [
       [

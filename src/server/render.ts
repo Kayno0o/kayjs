@@ -360,6 +360,7 @@ async function loadAfterGuards(refusing: Promise<Response | undefined>, route: S
   return loadChain(route, rendering, client, options, timing, route.guards.length > 0 ? performance.now() - guardsStarted : undefined)
 }
 
+// Answers at once when the modules are imported, none loads and nothing is timed; any other chain goes the async way.
 function loadChain(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions, timing: boolean, guards: number | undefined): LoadedRoute | Response | Promise<LoadedRoute | Response> {
   const { files } = routeChain(route)
   const modules = timing || options.dev ? undefined : knownModules(files, options)

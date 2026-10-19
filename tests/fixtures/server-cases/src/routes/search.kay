@@ -1,0 +1,8 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ n: s.Integer({ minimum: 1 }) }) }
+
+const { n } = ctx.query
+---
+h1 Page {n}
