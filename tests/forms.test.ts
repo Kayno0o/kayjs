@@ -190,7 +190,7 @@ describe('the messages a refused form is described by', () => {
     const source = '---\nimport { add } from \'./page.kay\'\nconst { label } = props<{ label: string }>()\n---\nform(action={add})\n  button Add\n  pending\n    p {label}\n'
     const { tsx } = compileKay(source, 'page.kay', { output: 'dom' })
 
-    expect(tsx).toContain('<div role=\\"status\\"><div data-kay-pending hidden><p></p></div><style>form[aria-busy] [data-kay-pending]{display:block}</style></div>')
+    expect(tsx).toContain('<div role=\\"status\\"><div data-kay-pending hidden><p></p></div><style>form[aria-busy=true] [data-kay-pending]{display:block!important}</style></div>')
   })
 
   it('describes the fields and the form of an island alike', () => {
@@ -406,11 +406,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   it('renders a pending block hidden, in a status region that is always there', async () => {
     const { html } = await site.visit('/pending')
 
-    expect(html.match(/<div role="status"><div data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island)<\/p><\/div><style>form\[aria-busy\] \[data-kay-pending\]\{display:block\}<\/style><\/div>/g)).toHaveLength(4)
+    expect(html.match(/<div role="status"><div data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island)<\/p><\/div><style>form\[aria-busy=true\] \[data-kay-pending\]\{display:block!important\}<\/style><\/div>/g)).toHaveLength(4)
   })
 
   it('shows a form\'s pending block while that form posts, and no other\'s, hiding it with the answer', async () => {
     const page = await site.open('/pending', { path })
+
+    // The reset Tailwind's preflight writes for `hidden`, which a rule of the page's own must beat.
+    await page.evaluate(() => {
+      document.head.insertAdjacentHTML('beforeend', '<style>[hidden]:where(:not([hidden=until-found])){display:none!important}</style>')
+    })
 
     expect(await shown(page)).toEqual({ slow: false, refused: false, leaves: false, island: false })
 
