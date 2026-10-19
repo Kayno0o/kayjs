@@ -400,6 +400,11 @@ export function pgStore(db: Database): AuthStore {
         async create(code) {
           await oauthCodes.write.insertOne({ digest: code.digest, user_id: code.userId, client_id: code.clientId, redirect_uri: code.redirectUri, challenge: code.challenge, scopes: code.scopes, family: code.family, resource: code.resource ?? null, created_at: code.createdAt, expires_at: code.expiresAt, used_at: code.usedAt })
         },
+        async get(digest) {
+          const row = await oauthCodes.read.findById(digest)
+
+          return row ? toOAuthCode(row) : undefined
+        },
         async use(digest, at) {
           // One UPDATE on the unspent row, so of two requests spending the code only one finds it unspent.
           const [spent] = await oauthCodes.write.updateMany({ used_at: at }, e => e.and(e.eq('digest', digest), e.isNull('used_at')))

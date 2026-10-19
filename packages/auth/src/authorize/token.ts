@@ -1,5 +1,5 @@
 import type { Core } from '../core'
-import type { OAuthGrantRecord, OAuthRefreshRecord } from '../store'
+import type { OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord } from '../store'
 import type { TokenReply } from './reply'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { banned } from '../core'
@@ -72,6 +72,22 @@ async function liveGrant(core: Core, userId: string, clientId: string): Promise<
   return grant && record && !banned(record) ? grant : undefined
 }
 
+// What a code exchange asks for against the code: the resource the tokens are bound to, or the reply refusing a redirect_uri, a verifier or a resource the code does not hold.
+function codeAsk(form: URLSearchParams, root: string, issued: OAuthCodeRecord, verifier: string): { resource: string | null } | TokenReply {
+  if (issued.redirectUri !== form.get('redirect_uri'))
+    return refused('invalid_grant', 'The code does not match this request')
+
+  if (!VERIFIER.test(verifier) || !matches(verifier, issued.challenge))
+    return refused('invalid_grant', 'The code_verifier does not match the code_challenge')
+
+  return boundResource(form, root, issued.resource)
+}
+
+// A refresh token past the thirty days it may sit unused, or past the end of its family.
+function lapsed(held: OAuthRefreshRecord): boolean {
+  return held.expiresAt <= new Date() || held.createdAt.getTime() + REFRESH_LIFETIME * 1000 <= Date.now()
+}
+
 async function exchangeCode(core: Core, form: URLSearchParams, root: string): Promise<TokenReply> {
   const code = form.get('code')
   const verifier = form.get('code_verifier')
@@ -80,7 +96,18 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
   if (code === null || verifier === null || clientId === null)
     return refused('invalid_request', 'code, code_verifier and client_id are required')
 
-  const spent = await core.store.oauth!.codes.use(digest(code), new Date())
+  const key = digest(code)
+  const peeked = await core.store.oauth!.codes.get?.(key)
+
+  // A request refused for what it asks leaves a live code unspent, so a mistake once does not cost the sign-in on the retry. A spent code goes on to `use`, which revokes what it issued, and so does a code another client presented.
+  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && peeked.expiresAt > new Date()) {
+    const asked = codeAsk(form, root, peeked, verifier)
+
+    if ('status' in asked)
+      return asked
+  }
+
+  const spent = await core.store.oauth!.codes.use(key, new Date())
 
   if (!spent)
     return refused('invalid_grant', 'The code is not valid')
@@ -93,16 +120,13 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
 
   const issued = spent.code
 
-  if (issued.expiresAt <= new Date() || issued.clientId !== clientId || issued.redirectUri !== form.get('redirect_uri'))
+  if (issued.expiresAt <= new Date() || issued.clientId !== clientId)
     return refused('invalid_grant', 'The code does not match this request')
 
-  if (!VERIFIER.test(verifier) || !matches(verifier, issued.challenge))
-    return refused('invalid_grant', 'The code_verifier does not match the code_challenge')
+  const asked = codeAsk(form, root, issued, verifier)
 
-  const bound = boundResource(form, root, issued.resource)
-
-  if ('status' in bound)
-    return bound
+  if ('status' in asked)
+    return asked
 
   // A code issued with every scope before the app declared some does not give them all now.
   if (issued.scopes === null && core.scopes.size > 0)
@@ -110,7 +134,7 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
 
   const grant = await liveGrant(core, issued.userId, issued.clientId)
 
-  return grant ? issue(core, grant, issued.scopes, issued.family, undefined, bound.resource) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, issued.scopes, issued.family, undefined, asked.resource) : refused('invalid_grant', 'The client is not approved')
 }
 
 // What a refresh asks for: the scopes and the resource the new tokens get, or the reply refusing a scope the token lacks or a resource it is not bound to.
@@ -137,7 +161,7 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   const peeked = await core.store.oauth!.refresh.get?.(key)
 
   // A request refused for what it asks leaves a live token unspent, so a mistake once does not cost the family on the retry. A spent token goes on to `use`, which revokes the family.
-  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && peeked.expiresAt > new Date()) {
+  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && !lapsed(peeked)) {
     const asked = refreshAsk(form, root, peeked)
 
     if ('status' in asked)
@@ -158,7 +182,7 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   }
 
   // `expiresAt` is where the family ends, so a token also lapses when it sat unused for thirty days.
-  if (held.expiresAt <= new Date() || held.createdAt.getTime() + REFRESH_LIFETIME * 1000 <= Date.now() || held.clientId !== clientId)
+  if (lapsed(held) || held.clientId !== clientId)
     return refused('invalid_grant', 'The refresh token does not match this request')
 
   // A token holding every scope, issued while the app declared none, does not cover those it declares since.

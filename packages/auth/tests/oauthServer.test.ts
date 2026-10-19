@@ -305,14 +305,14 @@ describe('the token endpoint', () => {
     expect(await ada.call('oauthClients')).toEqual([expect.objectContaining({ scopes: [] })])
   })
 
-  test('refuses a wrong PKCE verifier, and the code is spent by the try', async () => {
+  test('refuses a wrong PKCE verifier, and the code stays for the right one', async () => {
     const app = server()
     const { client_id } = await register(app)
     const ada = await signedIn(app)
     const code = await approved(ada, client_id)
 
     expect((await exchange(app, client_id, code, { code_verifier: 'w'.repeat(64) })).body.error).toBe('invalid_grant')
-    expect((await exchange(app, client_id, code)).body.error).toBe('invalid_grant')
+    expect((await exchange(app, client_id, code)).status).toBe(200)
   })
 
   test('refuses a code of another client, or another redirect URI', async () => {

@@ -354,6 +354,8 @@ export interface AuthStore {
     }
     codes: {
       create: (code: OAuthCodeRecord) => MaybePromise<void>
+      // Reads the code without spending it, so a request can be refused for what it asks before the code is used up. A store without it refuses after spending, as before.
+      get?: (digest: string) => MaybePromise<OAuthCodeRecord | undefined>
       // Marks the code spent and answers it, `reused` when it was spent already: once only, even when two requests spend it together. Undefined for one never issued.
       use: (digest: string, at: Date) => MaybePromise<{ code: OAuthCodeRecord, reused: boolean } | undefined>
     }

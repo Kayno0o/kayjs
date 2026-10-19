@@ -354,6 +354,11 @@ export function memoryStore(): AuthStore {
         create(code) {
           oauthCodes.set(code.digest, copyOAuth(code))
         },
+        get(digest) {
+          const code = oauthCodes.get(digest)
+
+          return code && copyOAuth(code)
+        },
         use(digest, at) {
           const code = oauthCodes.get(digest)
 

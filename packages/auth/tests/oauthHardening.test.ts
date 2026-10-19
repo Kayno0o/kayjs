@@ -469,6 +469,73 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await app.store.oauth!.refresh.use(digest(presented), new Date()))?.reused).toBe(true)
   })
 
+  test('a refresh past its 30 days unused is invalid_grant and spent, whatever it names', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const presented = first.body.refresh_token as string
+
+    setSystemTime(Date.now() + 31 * 24 * 60 * 60 * 1000)
+
+    expect((await refreshWith(app, clientId, presented, { resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
+    expect((await app.store.oauth!.refresh.get!(digest(presented)))?.usedAt).not.toBeNull()
+  })
+
+  test('a refresh whose family ended is invalid_grant and spent, whatever it names', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const held = (await app.store.oauth!.refresh.get!(digest(first.body.refresh_token as string)))!
+
+    await app.store.oauth!.refresh.create({ ...held, digest: digest('ended'), expiresAt: new Date(Date.now() - 1000) })
+
+    expect((await refreshWith(app, clientId, 'ended', { resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
+    expect((await app.store.oauth!.refresh.get!(digest('ended')))?.usedAt).not.toBeNull()
+  })
+
+  test('a code refused for its resource, redirect_uri or verifier is not spent, and the right request then succeeds', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+
+    expect((await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
+    expect((await exchangeWith(app, clientId, code, { redirect_uri: 'http://127.0.0.1/other' })).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(app, clientId, code, { code_verifier: 'x'.repeat(43) })).body.error).toBe('invalid_grant')
+
+    const retry = await exchangeWith(app, clientId, code, { resource: MCP })
+
+    expect(retry.status).toBe(200)
+    expect((await bearerOf(app, retry))?.oauth?.resource).toBe(MCP)
+  })
+
+  test('a spent code still revokes what it issued, whatever the reuse names', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+
+    expect((await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
+    expect(await bearerOf(app, first)).toBeUndefined()
+    expect((await refreshWith(app, clientId, first.body.refresh_token as string)).body.error).toBe('invalid_grant')
+  })
+
+  test('a code presented by another client is spent', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+
+    expect((await exchangeWith(app, 'someone-else', code)).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(app, clientId, code, { resource: MCP })).body.error).toBe('invalid_grant')
+  })
+
+  test('a store without codes.get refuses the same, spending the code first as before', async () => {
+    const app = server()
+
+    delete app.store.oauth!.codes.get
+
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+
+    expect((await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
+    expect((await exchangeWith(app, clientId, code, { resource: MCP })).body.error).toBe('invalid_grant')
+  })
+
   test('several resources are invalid_target at authorize as at the token endpoint', async () => {
     const app = server()
     const { body } = await register(app)
