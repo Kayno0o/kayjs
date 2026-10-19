@@ -146,9 +146,11 @@ async function whenHydrating(start: (when: typeof import('./hydrate-when')) => v
   try {
     when = await import('./hydrate-when')
   }
-  catch {
-    if (!await skew())
+  catch (error) {
+    if (!await skew()) {
+      console.error(error)
       await now()
+    }
 
     return
   }

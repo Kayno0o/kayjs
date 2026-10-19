@@ -121,7 +121,7 @@ function unsaved(): boolean {
 }
 
 // Reloads the current URL, the browser putting the scroll position back, unless it would lose what was typed or has reloaded a minute ago; then the next link followed loads in full instead.
-function reload(): boolean {
+export function reload(): boolean {
   navigation.stale = true
 
   // The document answered a form posted without the page swap, which a reload would post again.

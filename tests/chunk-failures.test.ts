@@ -9,6 +9,7 @@ const MODULES = ['navigate-api', 'hydrate-when', 'focus', 'live-props'] as const
 type Chunk = typeof MODULES[number]
 type Behaviour = 'real' | 'fail' | 'held'
 
+// The plugin is process-wide and a chunk that loaded stays loaded, so this file needs a process of its own (`bun test --parallel` gives each file one) and a chunk is failed or held before anything imports it.
 // What each lazy chunk does when something first imports it: loads, fails as with the build unchanged (offline, a dev server restarting), or waits for `release()` and then does what the test left it as. A chunk that loaded stays loaded, so the tests that need one to load come last.
 const behaviours = new Map<Chunk, Behaviour>(MODULES.map(name => [name, 'real']))
 let release: () => void = () => undefined
@@ -52,6 +53,9 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  for (const name of MODULES)
+    behave(name, 'real')
+
   await GlobalRegistrator.unregister()
 })
 
@@ -77,6 +81,10 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     // As `startNavigation` registers it.
     navigation.hooks = {} as NavigationHooks
     navigation.released = false
+    delete navigation.stale
+    sessionStorage.clear()
+    document.body.innerHTML = ''
+    document.head.innerHTML = ''
   }
 
   afterEach(() => {
@@ -96,6 +104,34 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     await settle()
 
     expect(reloaded).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a page holding what was typed, which the next link then loads in full', async () => {
+    answer(new Response(stringify('ok')))
+    behave('navigate-api', 'fail')
+    document.body.innerHTML = '<input value="a">'
+    document.querySelector('input')!.value = 'typed'
+
+    const call = actionStub('/_kay/action/test/refresh') as unknown as (input: object) => Promise<unknown>
+
+    await call({})
+    await settle()
+
+    expect(reloaded).not.toHaveBeenCalled()
+    expect(navigation.stale).toBe(true)
+  })
+
+  it('keeps a document that answered a form post, which a reload would post again', async () => {
+    answer(new Response(stringify('ok')))
+    behave('navigate-api', 'fail')
+    document.head.innerHTML = '<meta name="kay-posted">'
+
+    const call = actionStub('/_kay/action/test/refresh') as unknown as (input: object) => Promise<unknown>
+
+    await call({})
+    await settle()
+
+    expect(reloaded).not.toHaveBeenCalled()
   })
 
   it('keeps the page when the call says refresh: false', async () => {
@@ -120,7 +156,7 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     await call({})
     await settle()
     navigation.visits = (navigation.visits ?? 0) + 1
-    behaviours.set('navigate-api', 'fail')
+    behave('navigate-api', 'fail')
     release()
     await settle()
 
@@ -151,7 +187,7 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     await call({})
     await settle()
     navigation.visits = (navigation.visits ?? 0) + 1
-    behaviours.set('navigate-api', 'real')
+    behave('navigate-api', 'real')
     release()
     await settle()
 
