@@ -1,5 +1,7 @@
 import type { Bar, Box, Point } from './geometry'
 import { signal } from 'kay'
+import { wording } from 'kay/words'
+import { announce } from '../announce'
 import { boardKeyTarget, edgeScroll, insertionBar, nearestBox, readingIndex } from './geometry'
 import { armPointerDrag, boundsOf, ghostOf, on, scrollerOf, swallowClick } from './pointer'
 
@@ -226,7 +228,7 @@ export class Board {
     const fromIndex = from?.items.findIndex(item => item.id === drag.id) ?? -1
 
     if (target.container !== drag.from || target.index !== fromIndex)
-      void this.#move({ item: drag.id, from: drag.from, to: target.container, index: target.index }, false)
+      void this.#move({ item: drag.id, from: drag.from, to: target.container, index: target.index })
   }
 
   #step(id: Id, event: KeyboardEvent): void {
@@ -246,10 +248,11 @@ export class Board {
     const to = containers[target.container]
 
     if (to && (target.container !== from || target.index !== index) && !this.#drag && !this.#moving)
-      void this.#move({ item: id, from: containers[from]!.id, to: to.id, index: target.index }, true)
+      void this.#move({ item: id, from: containers[from]!.id, to: to.id, index: target.index }, to.items.length + (target.container === from ? 0 : 1))
   }
 
-  async #move(move: BoardMove, refocus: boolean): Promise<void> {
+  // `kept` is the number of items in the container the item lands in, for a move by key, which is announced and refocused, and left out for a drop.
+  async #move(move: BoardMove, kept?: number): Promise<void> {
     this.#moving = true
 
     try {
@@ -259,8 +262,10 @@ export class Board {
       this.#moving = false
     }
 
-    if (!refocus)
+    if (kept === undefined)
       return
+
+    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: move.index + 1, count: kept }))
 
     // A keyed list moving the item into another container remounts it, so focus goes to its new node, drawn by the time this continuation runs, as `Sortable` does for its handles.
     const item = this.#items.get(move.item)

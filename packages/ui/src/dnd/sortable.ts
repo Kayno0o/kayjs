@@ -1,3 +1,5 @@
+import { wording } from 'kay/words'
+import { announce } from '../announce'
 import { edgeScroll, keyTarget, offsetOf, targetIndex } from './geometry'
 import { armPointerDrag, boundsOf, on, scrollerOf, swallowClick } from './pointer'
 
@@ -27,6 +29,16 @@ export interface SortableOptions {
   onReorder: (from: number, to: number) => void | Promise<void>
 }
 
+const NATIVE_ROLES = new Set(['A', 'BUTTON', 'INPUT', 'SUMMARY'])
+
+function nameHandle(el: HTMLElement): void {
+  if (!el.hasAttribute('role') && !NATIVE_ROLES.has(el.tagName))
+    el.setAttribute('role', 'button')
+
+  if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby') && !el.textContent?.trim())
+    el.setAttribute('aria-label', wording('ui.dnd.handleLabel', 'Reorder'))
+}
+
 function clearSelection(): void {
   window.getSelection()?.removeAllRanges()
 }
@@ -52,8 +64,9 @@ export class Sortable {
 
   handle = (id: Id) => (el: HTMLElement): void => {
     this.#handles.set(id, el)
-    // Tells assistive technology what the keyboard can do with the handle.
+    // Tells assistive technology what the keyboard can do with the handle, and gives one the page left bare a role and a name.
     el.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown')
+    nameHandle(el)
     on(el, 'pointerdown', event => this.#arm(id, event))
     on(el, 'keydown', event => this.#step(id, event))
   }
@@ -107,7 +120,7 @@ export class Sortable {
     event.preventDefault()
 
     if (to !== from && !this.#drag && !this.#moving)
-      void this.#move(id, from, to, true)
+      void this.#move(id, from, to, entries.length)
   }
 
   #start(id: Id, originY: number): void {
@@ -209,10 +222,11 @@ export class Sortable {
     swallowClick()
 
     if (drop && drag.to !== drag.from)
-      void this.#move(drag.id, drag.from, drag.to, false)
+      void this.#move(drag.id, drag.from, drag.to)
   }
 
-  async #move(id: Id, from: number, to: number, refocus: boolean): Promise<void> {
+  // `kept` is the list's length for a move by key, which is announced and refocused, and left out for a drop, whose result the pointer shows.
+  async #move(id: Id, from: number, to: number, kept?: number): Promise<void> {
     this.#moving = true
 
     try {
@@ -222,8 +236,10 @@ export class Sortable {
       this.#moving = false
     }
 
-    if (!refocus)
+    if (kept === undefined)
       return
+
+    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: to + 1, count: kept }))
 
     // A keyed list can drop focus while it moves the item's node, so focus goes back to the handle now on the page, which the list's effects have already drawn.
     const handle = this.#handles.get(id)

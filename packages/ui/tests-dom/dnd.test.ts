@@ -42,6 +42,11 @@ function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): 
   return event
 }
 
+// What the page's shared live region says now.
+function said(): string {
+  return document.querySelector('[data-kui-announce]')?.textContent?.trim() ?? ''
+}
+
 function button(root: ParentNode, label: string): HTMLButtonElement {
   const found = [...root.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
 
@@ -88,6 +93,51 @@ describe('Sortable, from the keyboard', () => {
 
     expect(moves).toEqual([[1, 2], [1, 0]])
     expect(middle!.getAttribute('aria-keyshortcuts')).toBe('ArrowUp ArrowDown')
+  })
+
+  test('says where the item landed to a screen reader through one shared polite live region', async () => {
+    const { handles: [, middle] } = listOf()
+
+    press(middle!, 'ArrowDown')
+    await Bun.sleep(0)
+
+    expect(said()).toBe('Moved to 3 of 3')
+
+    press(middle!, 'ArrowUp')
+    await Bun.sleep(0)
+    press(middle!, 'ArrowUp')
+    await Bun.sleep(0)
+
+    expect(said()).toBe('Moved to 1 of 3')
+    expect(document.querySelectorAll('[data-kui-announce]').length).toBe(1)
+  })
+
+  test('says nothing for a key that moves nothing', async () => {
+    const { handles: [first] } = listOf()
+
+    press(first!, 'ArrowDown')
+    await Bun.sleep(0)
+
+    const before = said()
+
+    press(first!, 'ArrowUp')
+    await Bun.sleep(0)
+
+    expect(said()).toBe(before)
+  })
+
+  test('gives a bare handle a role and a name, and leaves a button, a text and a label of the page\'s own alone', () => {
+    const sortable = new Sortable({ onReorder: () => undefined })
+    const area = stage()
+
+    area.innerHTML = '<span id="bare" tabindex="0"></span><button id="button" type="button">Drag me</button><span id="named" tabindex="0" aria-label="Grip"></span><span id="roled" role="slider" tabindex="0">3</span>'
+
+    for (const [index, id] of ['bare', 'button', 'named', 'roled'].entries())
+      sortable.handle(index)(area.querySelector<HTMLElement>(`#${id}`)!)
+
+    const read = (id: string) => [area.querySelector(`#${id}`)!.getAttribute('role'), area.querySelector(`#${id}`)!.getAttribute('aria-label')]
+
+    expect(['bare', 'button', 'named', 'roled'].map(read)).toEqual([['button', 'Reorder'], [null, null], ['button', 'Grip'], ['slider', null]])
   })
 
   test('starts each move from where the rows stand now, and keeps focus on the handle a keyed list moved', async () => {
@@ -357,6 +407,20 @@ describe('Board, from the keyboard', () => {
     expect(titles('todo')).toEqual(['Build'])
     expect(titles('done')).toEqual(['Ship', 'Plan'])
     expect(button(root, 'Plan').getAttribute('aria-keyshortcuts')).toBe('ArrowLeft ArrowRight ArrowUp ArrowDown')
+  })
+
+  test('says where the card landed in its container, counting the card a move into another one adds', async () => {
+    const { root } = await board()
+
+    press(button(root, 'Plan'), 'ArrowRight')
+    await settle()
+
+    expect(said()).toBe('Moved to 2 of 2')
+
+    press(button(root, 'Ship'), 'ArrowUp')
+    await settle()
+
+    expect(said()).toBe('Moved to 1 of 3')
   })
 
   test('keeps focus on a card its keyed list moved into another container', async () => {

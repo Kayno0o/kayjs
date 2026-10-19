@@ -17,7 +17,7 @@ import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
 import Reorder from './reorder.kay'
-import { followFocus, reordered, reorderKey } from './reorder'
+import { announceMove, followFocus, reordered, reorderKey } from './reorder'
 import { uploadFile } from './upload'
 import './fields.css'
 
@@ -43,8 +43,12 @@ function set(next: unknown): void {
   drafts.set(entry, path, next)
 }
 
+// A move is said to a screen reader, whose focus follows the item but does not read where it landed.
 function moveItem(from: number, to: number): void {
   set(reordered(items(), from, to))
+
+  if (field.kind === 'list')
+    announceMove(itemAt(field, from).label, to, items().length)
 }
 
 // Alt with an arrow in any control of an item moves it, as the buttons beside it do.

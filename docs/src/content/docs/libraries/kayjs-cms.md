@@ -96,7 +96,7 @@ A literal with no `title` shows its value.
 
 ## Lists
 
-An array field is a list of items, each with a button to remove it. Up and down buttons beside an item move it, and Alt with the up or down arrow does the same from inside its fields. The order saved is the order shown.
+An array field is a list of items, each with a button to remove it. Up and down buttons beside an item move it, and Alt with the up or down arrow does the same from inside its fields. A screen reader is told where the item landed, such as `Moved Tag to 2 of 3`. The order saved is the order shown.
 
 ## Field kinds of your own
 

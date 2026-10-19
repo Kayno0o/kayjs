@@ -1,4 +1,6 @@
+import { announce } from '@kaynooo/kayjs-ui/announce'
 import { flush } from 'kay'
+import { wording } from 'kay/words'
 
 export type Direction = 'up' | 'down'
 
@@ -52,4 +54,9 @@ export function followFocus(row: Element | null, to: number, direction: Directio
   const button = buttons.find(candidate => candidate.dataset.kcmsMove === direction && !candidate.disabled) ?? buttons.find(candidate => !candidate.disabled)
 
   button?.focus()
+}
+
+// Focus follows a moved item but a screen reader is not told where it landed, so the move is said through kayjs-ui's shared live region.
+export function announceMove(item: string, to: number, count: number): void {
+  announce(wording('cms.reorder.moved', 'Moved {item} to {position} of {count}', { item, position: to + 1, count }))
 }
