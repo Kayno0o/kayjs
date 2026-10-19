@@ -45,12 +45,21 @@ function fakeProvider(): ReturnType<typeof Bun.serve> {
   return server
 }
 
-// Polls until a condition holds, five seconds at most.
+// Polls until a condition holds, five seconds at most; a page reloading as it is asked answers nothing, so a throw counts as not yet.
 async function waitUntil(done: () => Promise<boolean>): Promise<void> {
   const until = Date.now() + 5000
 
-  while (Date.now() < until && !await done())
+  while (Date.now() < until && !await settled(done))
     await Bun.sleep(25)
+}
+
+async function settled(done: () => Promise<boolean>): Promise<boolean> {
+  try {
+    return await done()
+  }
+  catch {
+    return false
+  }
 }
 
 // The visits reaching the provider so far, once `count` have.
