@@ -381,13 +381,17 @@ export async function kayDevClient(root: string, options: ClientOptions): Promis
 // `kay dev` answers once its build is done: `built`, `failed`, or `none` when it has none for this server.
 async function askKayDev(): Promise<string> {
   const { promise, resolve } = Promise.withResolvers<string>()
+  // The channel `kay dev` opened is let go of by the preload, and Bun spins a core while a process waits on nothing but a message from a channel that is: held for the wait, it sleeps.
+  const channel = (process as { channel?: { ref?: () => void, unref?: () => void } }).channel
   const answered = (message: unknown) => {
     if (typeof message === 'object' && message !== null && 'client' in message && typeof message.client === 'string') {
       process.off('message', answered)
+      channel?.unref?.()
       resolve(message.client)
     }
   }
 
+  channel?.ref?.()
   process.on('message', answered)
   process.send!({ wantsClient: true })
 
