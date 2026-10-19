@@ -47,14 +47,16 @@ describe('a room\'s state in memory', () => {
   it('serves two joiners at once the same latest state, and reads each update from the one before', () => {
     const live = rooms<Message, undefined, State>(options)
     const joiners = [connection(), connection(), connection()]
+    const [first, ...later] = joiners
 
+    live.join(first!, 'hall')
     live.update('hall', state => ({ ...state, round: 1 }))
     live.update('hall', state => ({ ...state, round: state.round + 1 }))
 
-    for (const joiner of joiners)
+    for (const joiner of later)
       live.join(joiner, 'hall')
 
-    for (const joiner of joiners)
+    for (const joiner of later)
       expect(joiner.received).toEqual([snapshotOf({ round: 2, scores: {} })])
   })
 
@@ -92,6 +94,7 @@ describe('a room\'s state in memory', () => {
   it('keeps the state as JSON: a Date comes back as text, a value with none is refused before anything is stored', () => {
     const live = rooms<Message, undefined, State>(options)
 
+    live.join(connection(), 'hall')
     live.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
     expect(live.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
     expect(() => live.update('hall', () => undefined as never)).toThrow('must be JSON')
@@ -103,6 +106,7 @@ describe('a room\'s state in memory', () => {
   it('keeps a __proto__ key of the state as data', () => {
     const live = rooms<Message, undefined, State>(options)
 
+    live.join(connection(), 'hall')
     live.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}}}') as State)
     expect(({} as { admin?: number }).admin).toBeUndefined()
     expect(Object.keys(live.state('hall').scores)).toEqual(['__proto__'])
@@ -126,6 +130,34 @@ describe('a room\'s state in memory', () => {
     live.join(ada, 'hall')
     expect(ada.received).toEqual([])
     expect(live.update('hall', state => ({ ...state, round: 3 })).round).toBe(3)
+  })
+
+  it('lists the joiner among the members before its snapshot is made', () => {
+    const seen: string[][] = []
+    const live: ReturnType<typeof rooms<Message, string, State>> = rooms<Message, string, State>({ ...options, snapshot: (state, room) => {
+      seen.push(live.members(room))
+
+      return { type: 'state', state }
+    } })
+
+    live.join(connection(), 'hall', 'ada')
+    live.join(connection(), 'hall', 'bob')
+    expect(seen).toEqual([['ada'], ['ada', 'bob']])
+  })
+
+  it('stores nothing for a room no one is in, answering the state it computed', () => {
+    const store = memoryRooms()
+    const live = rooms<Message, undefined, State>({ ...options, store })
+
+    expect(live.update('nobody', state => ({ ...state, round: 4 })).round).toBe(4)
+    expect(live.state('nobody').round).toBe(0)
+    expect(store.state?.('nobody')).toBeUndefined()
+  })
+
+  it('has one shape before and after an update: the initial state goes through JSON too', () => {
+    const live = rooms<Message, undefined, State>({ ...options, state: () => ({ round: 0, scores: {}, at: new Date(Date.UTC(2026, 0, 1)) }) })
+
+    expect(live.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
   })
 
   it('refuses a store that cannot keep a state', () => {
@@ -253,6 +285,105 @@ describe('a room\'s state in a SQLite file', () => {
     }
   })
 
+  it('keeps the JSON limits and a __proto__ key through the file', () => {
+    const { first, second, close } = processes('json')
+
+    try {
+      first.join(connection(), 'hall', 'ada')
+      first.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}},"at":"x"}') as State)
+      expect(Object.keys(second.state('hall').scores)).toEqual(['__proto__'])
+      expect(({} as { admin?: number }).admin).toBeUndefined()
+      first.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
+      expect(second.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
+      expect(() => first.update('hall', () => ({ round: 1n }) as never)).toThrow()
+      expect(() => first.update('hall', () => undefined as never)).toThrow('must be JSON')
+      expect(second.state('hall').round).toBe(1)
+    }
+    finally {
+      close()
+    }
+  })
+
+  it('stores nothing for a room no live process has a member in', () => {
+    const { first, close } = processes('nobody')
+    const file = new Database(join(dir, 'nobody.sqlite'))
+
+    try {
+      expect(first.update('ghost', state => ({ ...state, round: 3 })).round).toBe(3)
+      expect(file.query('SELECT 1 FROM kay_room_state').all()).toEqual([])
+    }
+    finally {
+      file.close()
+      close()
+    }
+  })
+
+  it('reads the state from a store opened again on the file while members remain', () => {
+    const path = join(dir, 'restart.sqlite')
+    const [one, two] = [sqliteRooms(path), sqliteRooms(path)]
+
+    try {
+      const first = rooms<Message, string, State>({ ...options, store: one })
+
+      first.join(connection(), 'hall', 'ada')
+      first.update('hall', state => ({ ...state, round: 6 }))
+
+      const second = rooms<Message, string, State>({ ...options, store: two })
+      const late = connection()
+
+      second.join(late, 'hall', 'bob')
+      expect(late.received).toEqual([snapshotOf({ round: 6, scores: {} })])
+    }
+    finally {
+      one.close()
+      two.close()
+    }
+  })
+
+  it('loses no update to a second real process changing the same room at once', async () => {
+    const path = join(dir, 'spawned.sqlite')
+    const script = join(dir, 'child.ts')
+    const [ready, go] = [join(dir, 'ready'), join(dir, 'go')]
+
+    await Bun.write(script, `
+      import { existsSync, writeFileSync } from 'node:fs'
+      import { rooms, sqliteRooms } from ${JSON.stringify(join(import.meta.dir, '../src/server/rooms'))}
+      const live = rooms({ store: sqliteRooms(${JSON.stringify(path)}), state: () => ({ round: 0 }) })
+      live.join({ raw: { sendText() {} } }, 'hall')
+      writeFileSync(${JSON.stringify(ready)}, '')
+      while (!existsSync(${JSON.stringify(go)})) await Bun.sleep(1)
+      for (let turn = 0; turn < 200; turn++) live.update('hall', s => ({ round: s.round + 1 }))
+      process.exit(0)
+    `)
+
+    const child = Bun.spawn(['bun', script], { stdout: 'inherit', stderr: 'inherit' })
+    const store = sqliteRooms(path)
+
+    try {
+      const live = rooms<Message, undefined, { round: number }>({ store, state: () => ({ round: 0 }) })
+
+      for (let waited = 0; !await Bun.file(ready).exists(); waited += 10) {
+        if (waited > 10_000)
+          throw new Error('the child never joined')
+
+        await Bun.sleep(10)
+      }
+
+      live.join(connection(), 'hall')
+      await Bun.write(go, '')
+
+      for (let turn = 0; turn < 200; turn++)
+        live.update('hall', state => ({ round: state.round + 1 }))
+
+      expect(await child.exited).toBe(0)
+      expect(live.state('hall').round).toBe(400)
+    }
+    finally {
+      child.kill()
+      store.close()
+    }
+  }, 30_000)
+
   it('opens a file from before room states, adding the table', () => {
     const path = join(dir, 'old.sqlite')
     const old = new Database(path)
@@ -265,7 +396,9 @@ describe('a room\'s state in a SQLite file', () => {
     try {
       const live = rooms<Message, undefined, State>({ ...options, store })
 
+      live.join(connection(), 'hall')
       expect(live.update('hall', state => ({ ...state, round: 1 })).round).toBe(1)
+      expect(live.state('hall').round).toBe(1)
     }
     finally {
       store.close()

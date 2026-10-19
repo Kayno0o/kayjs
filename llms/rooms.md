@@ -99,14 +99,15 @@ export default api()
 - `leave(ws, room)` takes it out, and `leave(ws)` out of every room, as `close` does.
 - `members(room)` lists the members, and `roomsOf(ws)` the rooms a connection is in.
 - A room no one is in is gone.
-- `rooms({ state: () => initial, snapshot: (state, room) => message })` keeps a state per room, `State` required once it is typed: `state(room)` reads it, `initial()` while no `update` made another, and `update(room, state => next)` replaces it with what the function returns, resolving with the new state.
+- `rooms({ state: () => initial, snapshot: (state, room) => message })` keeps a state per room, `State` required once it is typed: `state(room)` reads it, `initial()` while no `update` made another, passed through JSON as a stored state is, and `update(room, state => next)` replaces it with what the function returns, resolving with the new state.
 - Each `update` reads the latest state, one at a time, with `sqliteRooms` across every process sharing the file, so two updates never overwrite each other; its function runs in that turn, so it is quick and reads only its argument. Nothing is sent: publish the change, or `snapshot`'s message, as `publish(room, message)`.
 - `snapshot` sends a connection joining the message it makes from the state as it then stands, to that connection alone and after it is listed, again each time it joins (a reconnect says `join` again): an update made while it joins reaches it in the snapshot or as what is published after, never neither, so publish whole states or changes that are safe to apply twice.
 - The state is JSON, kept whole: a `Date` comes back as text, an `update` returning no JSON throws and keeps the old state, and a big state costs every `update` its size.
 - Only the app's own code writes it, never a client's message, which `update` may read.
-- A room's state goes with its last member, any process's, as the dropped members of a crashed process count; an `update` to a room no one has joined yet is kept until its members came and went.
+- A room's state goes with its last member, any process's, as the dropped members of a crashed process count; an `update` to a room no one is in resolves with the state it computed and stores nothing, so a room a client names costs no state.
 - Without `state` and `snapshot`, nothing changes: no state is kept and nothing is sent on a join.
-- A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text, else `rooms({ state })` throws.- `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
+- A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text, else `rooms({ state })` throws.
+- `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
 - It goes out as Elysia sends one, a string as it is and anything else as JSON, not checked against the route's `response`.
 - `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait`, a duration, `'50ms'` by default: a burst of moves sends the board once, as it stands.
 - `dispatch(message, handlers)` from `kay` calls the handler a message's `type` names with the message, typed to that variant, and gives what it returns.

@@ -1,6 +1,6 @@
 // Bun's own web classes, as they were when the test process first loaded kay/test, its preload doing so before any test file.
 // A DOM a test registers, such as happy-dom's, replaces the globals in every file of the run, and Elysia reads Bun's: `headers.toJSON()` among others.
-export const { Request: NativeRequest, Headers: NativeHeaders, URL: NativeURL, FormData: NativeFormData, WebSocket: NativeWebSocket } = globalThis
+export const { Request: NativeRequest, Headers: NativeHeaders, URL: NativeURL, FormData: NativeFormData, WebSocket: NativeWebSocket, fetch: NativeFetch } = globalThis
 
 // Every global class of Bun's, `Response` and `Event` among them, as they were then; a function such as `fetch` or a timer stays whatever the test made it, a stub included.
 const CLASS_NAME = /^[A-Z]/

@@ -38,7 +38,7 @@ import { servedThrough } from '../server/visit'
 import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
 import { cookieJar, withKept } from './cookies'
-import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
+import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
@@ -167,6 +167,8 @@ export type TestStream<Client> = Client & {
 }
 
 const ORIGIN = 'http://localhost'
+// How long a refused upgrade may take to answer.
+const REFUSAL_TIMEOUT_MS = 5_000
 const UPGRADE = { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' }
 // The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
 const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
@@ -427,11 +429,22 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         return sitemapUrls(await withNatives(async () => response.text()))
       },
       fetch: async (path, init = {}) => send(path, init),
-      as: who => scoped(Object.fromEntries(withDefaults(defaults, typeof who === 'string' ? { cookie: who } : who))),
+      as: (who) => {
+        const given = withDefaults({}, typeof who === 'string' ? { cookie: who } : who)
+        const merged = withDefaults(defaults, Object.fromEntries(given))
+
+        // Cookies stack by name, the newer winning, as headers do.
+        if (defaults.cookie !== undefined && given.has('cookie'))
+          merged.set('cookie', withKept(given.get('cookie'), defaults.cookie))
+
+        return scoped(Object.fromEntries(merged))
+      },
       api: async (module, path, ...[options]) => withNatives(async () => {
         const { method = 'get', body, headers } = (options ?? {}) as { method?: string, body?: unknown, headers?: Record<string, string> }
         const sent = callBody(body)
-        const response = await send(routeUrl(module, path, options as Parameters<typeof routeUrl>[2]), { method: method.toUpperCase(), headers: { accept: 'application/json', ...sent.headers, ...headers }, body: sent.body ?? null })
+        // JSON unless the site or the call asks for another type.
+        const implicitAccept = new NativeHeaders(defaults).has('accept') ? {} : { accept: 'application/json' }
+        const response = await send(routeUrl(module, path, options as Parameters<typeof routeUrl>[2]), { method: method.toUpperCase(), headers: { ...implicitAccept, ...sent.headers, ...headers }, body: sent.body ?? null })
 
         return { ok: response.ok, status: response.status, headers: response.headers, body: await readAnswer(response) } as ApiResult<never>
       }),
@@ -447,15 +460,29 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       },
       socketRefusal: async (module, path, ...[options]) => {
         const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-        const response = await fetch(`http://localhost:${listening().port}${url}`, { headers: { ...UPGRADE, ...upgradeHeaders(url, options?.headers) }, redirect: 'manual' })
+        const attempt = new AbortController()
+        const timer = setTimeout(() => attempt.abort(), REFUSAL_TIMEOUT_MS)
+        const connection = { close: () => attempt.abort() }
 
-        if (response.status === 101) {
-          await response.body?.cancel()
+        connections.add(connection)
 
-          throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
+        try {
+          const response = await NativeFetch(`http://localhost:${listening().port}${url}`, { headers: { ...UPGRADE, ...upgradeHeaders(url, options?.headers) }, redirect: 'manual', signal: attempt.signal })
+
+          if (response.status === 101) {
+            await response.body?.cancel()
+
+            throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
+          }
+
+          jar.keep(response)
+
+          return response
         }
-
-        return response
+        finally {
+          clearTimeout(timer)
+          connections.delete(connection)
+        }
       },
       stream: (module, path, ...[options]) => {
         const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
@@ -483,7 +510,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         if (options.browser === undefined || options.browser === false)
           throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
 
-        const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
+        // A site made with `as(cookie)` signs the browser in too.
+        const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...defaults.cookie !== undefined && { cookies: defaults.cookie }, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
         const close = page.close
 
         opened.add(page)

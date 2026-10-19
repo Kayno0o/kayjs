@@ -90,7 +90,12 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
     throw new Error('kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
 
-  const initial = (): State => options.state?.() as State
+  // Through JSON as a stored state is, so a state has one shape before and after an update.
+  const initial = (): State => {
+    const text = JSON.stringify(options.state?.())
+
+    return (text === undefined ? undefined : JSON.parse(text)) as State
+  }
   const readState = (room: string): State => {
     const kept = store.state?.(room)
 
@@ -229,7 +234,8 @@ export function memoryRooms(): RoomStore {
     update(room, change) {
       const next = change(states.get(room))
 
-      states.set(room, next)
+      if (byRoom.has(room))
+        states.set(room, next)
 
       return next
     },
@@ -268,6 +274,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
   const remove = db.query('DELETE FROM kay_room_members WHERE room = ? AND connection = ?')
   const kept = db.query<{ state: string }, [string]>('SELECT state FROM kay_room_state WHERE room = ?')
   const keep = db.query('INSERT OR REPLACE INTO kay_room_state (room, state) VALUES (?, ?)')
+  const occupied = db.query<{ present: number }, [string, number]>('SELECT 1 AS present WHERE EXISTS (SELECT 1 FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ?)')
   // A room's state goes once no live process has a member in it.
   const drop = db.query('DELETE FROM kay_room_state WHERE room = ? AND NOT EXISTS (SELECT 1 FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ?)')
   const members = db.query<{ member: string }, [string, number]>('SELECT member FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ? ORDER BY kay_room_members.rowid')
@@ -315,7 +322,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
       }
 
       prune(now)
-    })()
+    }).immediate()
   }
 
   const read = () => {
@@ -393,7 +400,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
       db.transaction(() => {
         remove.run(room, connection)
         drop.run(room, room, Date.now() - EXPIRY)
-      })()
+      }).immediate()
       sync()
     },
     state: room => kept.get(room)?.state,
@@ -401,7 +408,9 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
     update: (room, change) => db.transaction(() => {
       const next = change(kept.get(room)?.state)
 
-      keep.run(room, next)
+      // A room no live process has a member in keeps nothing, so a room named by a client costs no row.
+      if (occupied.get(room, Date.now() - EXPIRY) !== null)
+        keep.run(room, next)
 
       return next
     }).immediate(),
@@ -417,7 +426,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
       // A process only publishing has no beat, so its publishes prune, as often as a beat would; the message is stored and delivered by now, so a failing prune is only logged.
       if (!beating && now - pruned >= HEARTBEAT) {
         pruned = now
-        guarded('pruning the rooms store', () => prune(now))()
+        guarded('pruning the rooms store', () => prune.immediate(now))()
       }
     },
     subscribe(listener) {

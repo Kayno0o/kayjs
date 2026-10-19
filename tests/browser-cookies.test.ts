@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
-import { browse, browserPath } from '../src/test'
+import { browse, browserPath, testSite } from '../src/test'
 import { cookiePairs } from '../src/test/browser'
 
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
@@ -54,6 +54,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('browse wit
     }
     finally {
       stranger.close()
+    }
+  }, 60_000)
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('site.as(cookie).open', () => {
+  it('signs the browser in with the cookie it was made with', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/base-site/src/routes', api: 'tests/fixtures/base-site/src/api', browser: { path } })
+
+    try {
+      const page = await site.as('session=abc').open('/api/cookies/read')
+
+      expect(await page.text('body')).toBe('session=abc')
+    }
+    finally {
+      await site.close()
     }
   }, 60_000)
 })

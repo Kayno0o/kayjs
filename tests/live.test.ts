@@ -1769,6 +1769,14 @@ describe('site.api, default headers and socketRefusal', () => {
     room.close()
   })
 
+  it('lets a socket\'s own header win over the site\'s in any case', async () => {
+    const room = site.as({ 'x-user': 'ada' }).socket(chat, '/:room', { params: { room: 'general' }, headers: { 'X-User': 'grace' } })
+
+    room.send({ text: 'hi' })
+    expect(await room.next()).toEqual({ room: 'general', from: 'grace', text: 'hi' })
+    room.close()
+  })
+
   it('types socketRefusal on websocket routes only', () => {
     const typed = async () => {
       // @ts-expect-error: /ticks is no websocket route

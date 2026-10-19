@@ -3,6 +3,8 @@ export interface CookieJar {
   cookies: Bun.CookieMap
   // The `cookie` header the jar sends to the page at `path`, `''` when it holds none; without a `path`, every cookie.
   header: (path?: string) => string
+  // Keeps the cookies a response sets and drops those it expires, for one that did not go through `send`.
+  keep: (response: Response) => void
   // Sends `request` through `handle` with the cookies whose `Path` covers `path` (the URL path as the browser shows it, `base` included; the request's own without it), keeps those its response sets and drops those it expires.
   send: (handle: (request: Request) => Response | Promise<Response>, request: Request, path?: string) => Promise<Response>
 }
@@ -26,9 +28,25 @@ export function cookieJar(): CookieJar {
   const scopes = new Map<string, string>()
   const header = (path?: string) => [...cookies].filter(([name]) => path === undefined || covers(scopes.get(name) ?? '/', path)).map(([name, value]) => `${name}=${value}`).join('; ')
 
+  const keep = (response: Response) => {
+    for (const line of response.headers.getSetCookie()) {
+      const cookie = Bun.Cookie.parse(line)
+
+      if (cookie.isExpired()) {
+        cookies.delete(cookie.name)
+        scopes.delete(cookie.name)
+      }
+      else {
+        cookies.set(cookie)
+        scopes.set(cookie.name, cookie.path)
+      }
+    }
+  }
+
   return {
     cookies,
     header,
+    keep,
     send: async (handle, request, path = new URL(request.url).pathname) => {
       const sent = withKept(request.headers.get('cookie'), header(path))
 
@@ -37,18 +55,7 @@ export function cookieJar(): CookieJar {
 
       const response = await handle(request)
 
-      for (const line of response.headers.getSetCookie()) {
-        const cookie = Bun.Cookie.parse(line)
-
-        if (cookie.isExpired()) {
-          cookies.delete(cookie.name)
-          scopes.delete(cookie.name)
-        }
-        else {
-          cookies.set(cookie)
-          scopes.set(cookie.name, cookie.path)
-        }
-      }
+      keep(response)
 
       return response
     },

@@ -312,7 +312,7 @@ games.update(room, ({ cells }) => ({ cells: [...cells, 'x'] }))
 
 `update` replaces the state with what your function returns, one change at a time, and gives the new state. `games.state(room)` reads it. Nothing is sent to the room by an `update`: publish the change yourself, or use `coalesce`.
 
-The state is kept as JSON, so a `Date` comes back as text. It goes when the last member leaves, in every process that shares the rooms, so a late joiner always starts from the latest state while anyone is there.
+The state is kept as JSON, so a `Date` comes back as text. An `update` to a room no one is in stores nothing. The state goes when the last member leaves, in every process that shares the rooms, so a late joiner always starts from the latest state while anyone is there.
 
 ### Sending a snapshot
 
