@@ -260,7 +260,16 @@ export function memoryRooms(): RoomStore {
 export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}): RoomStore {
   const askedMs = poll === undefined ? undefined : optionMs(poll, '`sqliteRooms` poll')
   let opened: RoomStore | undefined
-  const open = (): RoomStore => opened ??= openRooms(path, askedMs)
+  let closed = false
+  const open = (): RoomStore => {
+    if (closed)
+      throw new Error('kay: the rooms store was closed')
+
+    return opened ??= openRooms(path, askedMs)
+  }
+
+  // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
+  onReload(() => opened?.close())
 
   return {
     add: (room, connection, member) => open().add(room, connection, member),
@@ -270,7 +279,10 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
     update: (room, change) => open().update!(room, change),
     publish: (room, text, recipients) => open().publish(room, text, recipients),
     subscribe: listener => open().subscribe(listener),
-    close: () => opened?.close(),
+    close: () => {
+      closed = true
+      opened?.close()
+    },
   }
 }
 
@@ -464,9 +476,6 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
       db.close()
     },
   }
-
-  // A reload runs the module that opened the store again, which opens its own.
-  onReload(() => !closed && store.close())
 
   return store
 }

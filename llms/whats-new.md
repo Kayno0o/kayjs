@@ -10,7 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `persistedCookie(name, value)` from `kay/test` sets a cookie-kept `persisted` value by name, for `site.as()` ([Testing](testing.md#requests-jobs-sockets-and-sessions)).
 - `kay check` keeps what an enclosing `if`, `match` or `for` narrows inside the blocks of an `await` and a `try`, a property path such as `dossier.latest` included ([Rendering](rendering.md#streaming)).
 - An action prop typed with the handler's success output, `Action<{ name: string }, string>`, accepts a handler that can also `ctx.fail`, where it failed with an error about `failed()` and `FormFailure`; `FailureData` is `unknown` for an output naming no `Failure` ([Pass an action to a component](actions.md#pass-an-action-to-a-component)).
-- `sqliteRates`, `sqliteRooms` and `sqliteStore` create their file on first use, not when they are called, so a `kay.config.ts` naming one makes no file in `kay build`, `kay check` or a test run ([Privacy](privacy.md)).
+- `sqliteRates`, `sqliteRooms` and `sqliteStore` create their file on first use, not when they are called, so a `kay.config.ts` naming one makes no file in `kay build`, `kay check` or a test run, and an unwritable path now fails on the first use rather than when the config loads ([Privacy](privacy.md)).
 
 ## 1.58.0
 

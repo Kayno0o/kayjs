@@ -375,7 +375,7 @@ describe.concurrent('kay dev reloading', () => {
     const jobs = join(project.root, 'jobs.sqlite')
 
     try {
-      const probes = ['previous.cache.get(\'k\')', 'previous.rates.peek(\'k\')']
+      const probes = ['previous.cache.get(\'k\')', 'await previous.rates.peek(\'k\')']
       const check = probes.map(probe => `try { ${probe}; state += 'open ' } catch { state += 'closed ' }`).join('\n')
       // The job store opens lazily and reopens when used again, so what shows is the files this process holds open.
       const held = `readdirSync('/proc/self/fd').filter((fd) => { try { return readlinkSync('/proc/self/fd/' + fd).endsWith('jobs.sqlite') } catch { return false } }).length`

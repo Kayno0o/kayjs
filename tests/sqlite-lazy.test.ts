@@ -1,8 +1,19 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { sqliteRates, sqliteRooms, sqliteStore } from '../src/server'
+import { disposeOwned } from '../src/server/reload'
 import { scratchDir } from './scratch'
+
+afterEach(() => {
+  delete process.env.KAY_DEV_CODE
+})
+
+async function useBoth(rates: ReturnType<typeof sqliteRates>, rooms: ReturnType<typeof sqliteRooms>): Promise<void> {
+  await rates.hit('a', 1000)
+  rooms.add('r', 'c', '"m"')
+}
 
 describe('a sqlite store given in a config', () => {
   it('creates no file until it is first used', async () => {
@@ -39,5 +50,20 @@ describe('a sqlite store given in a config', () => {
 
     sqliteRooms(file).close()
     expect(existsSync(file)).toBe(false)
+  })
+
+  it('is closed with the module that named it, whichever module used it first', async () => {
+    const dir = await scratchDir('sqlite-lazy-')
+
+    process.env.KAY_DEV_CODE = '1'
+
+    const rates = sqliteRates(join(dir, 'rates.sqlite'))
+    const rooms = sqliteRooms(join(dir, 'rooms.sqlite'))
+
+    // Used from another module than the one naming it: the stores only get their owner at construction.
+    await useBoth(rates, rooms)
+    await disposeOwned(new Set([import.meta.path]))
+    await expect(rates.hit('a', 1000)).rejects.toThrow()
+    expect(() => rooms.members('r')).toThrow()
   })
 })

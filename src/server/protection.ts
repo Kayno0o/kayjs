@@ -210,16 +210,21 @@ function ratesKeyFile(path: string): Buffer {
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
 // A key is stored pseudonymised: an HMAC keyed by the session's, the app's or the preview's secret once one is set, else by a random key kept in a file beside the store (`<path>.key`, the server's user alone), so the store's file alone cannot be checked against a guessed address.
 export function sqliteRates(path: string): RateStore {
-  let opened: RateStore | undefined
+  let opened: OpenRates | undefined
+
+  // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
+  onReload(() => opened?.close())
 
   // The file is opened by the first call, so loading a config that names it, to build or check, creates nothing.
   return {
     hit: async (key, windowMs, weight) => (opened ??= openRates(path)).hit(key, windowMs, weight),
-    peek: async key => (opened ??= openRates(path)).peek!(key),
+    peek: async key => (opened ??= openRates(path)).peek(key),
   }
 }
 
-function openRates(path: string): RateStore {
+type OpenRates = RateStore & { peek: NonNullable<RateStore['peek']>, close: () => void }
+
+function openRates(path: string): OpenRates {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
@@ -238,10 +243,8 @@ function openRates(path: string): RateStore {
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
 
-  // A reload runs the module that opened the store again, which opens its own.
-  onReload(() => db.close())
-
   return {
+    close: () => db.close(),
     hit(key, windowMs, weight = 1) {
       const now = Date.now()
 

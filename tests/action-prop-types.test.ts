@@ -1,4 +1,4 @@
-import type { Action, Failure, FailureOf, SuccessOf } from '../src/runtime/action'
+import type { Action, Failure, FailureData, FailureOf, SuccessOf } from '../src/runtime/action'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { action } from '../src/runtime/action'
@@ -45,5 +45,14 @@ describe('an action prop typed with the success output', () => {
     const wrong: FailureOf<typeof claim> = { status: 409, values: {}, errors: {}, data: { reason: 1 } }
 
     expect([failure, success, wrong]).toHaveLength(3)
+  })
+
+  it('leaves the failure data of an action that cannot fail unknown', () => {
+    const plain = action(t.Object({ id: t.String() }), input => input.id)
+    const data: FailureData<string> = undefined
+    // @ts-expect-error an action that never fails does not stand for one failing with a reason
+    const typed: Action<{ id: string }, string | Failure<{ reason: string }>> = plain
+
+    expect([data, typed]).toHaveLength(2)
   })
 })
