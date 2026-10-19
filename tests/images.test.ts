@@ -1253,4 +1253,85 @@ describe('pruneVariants', () => {
       await app.stop(true)
     }
   })
+
+  it('prunes again every day while the server runs, and stops with it', async () => {
+    const dir = await cacheWith()
+    const app = new Elysia()
+    const realInterval = setInterval
+    const daily: (() => void)[] = []
+    const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void, delay?: number) => {
+      if (delay === 24 * 3_600_000) {
+        daily.push(run)
+
+        return realInterval(() => undefined, 1_000_000)
+      }
+
+      return realInterval(run, delay)
+    }) as typeof setInterval)
+    const cleared = spyOn(globalThis, 'clearInterval')
+    let stopped = false
+
+    try {
+      serveImages(app, { clientDir: dir, cacheDir: dir })
+      app.listen(0)
+      expect(daily).toHaveLength(1)
+
+      // The prune at start has run; a file that ages afterwards goes with the next day's.
+      for (let waited = 0; await Bun.file(join(dir, 'old-640.webp')).exists(); waited += 20) {
+        expect(waited).toBeLessThan(3000)
+        await Bun.sleep(20)
+      }
+
+      const late = join(dir, 'late-640.webp')
+
+      await Bun.write(late, 'x')
+      await utimes(late, new Date(0), new Date(0))
+      daily[0]!()
+
+      for (let waited = 0; await Bun.file(late).exists(); waited += 20) {
+        expect(waited).toBeLessThan(3000)
+        await Bun.sleep(20)
+      }
+
+      expect(await Bun.file(join(dir, 'fresh-640.webp')).exists()).toBe(true)
+
+      const before = cleared.mock.calls.length
+
+      await app.stop(true)
+      stopped = true
+      expect(cleared.mock.calls.length).toBeGreaterThan(before)
+    }
+    finally {
+      intervals.mockRestore()
+      cleared.mockRestore()
+
+      if (!stopped)
+        await app.stop(true)
+    }
+  })
+
+  it('keeps a variant a request just served, however long since it was written', async () => {
+    const dir = await scratchDir('image-prune-served-')
+    const app = new Elysia()
+    const url = `http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`
+
+    serveImages(app, { clientDir: join(dir, 'client'), cacheDir: dir, dirs: { '/uploads/': uploads } })
+    expect((await app.handle(new Request(url, { headers: { accept: 'image/webp' } }))).status).toBe(200)
+
+    const [name] = (await readdir(dir)).filter(entry => entry.endsWith('.webp'))
+    const old = new Date(Date.now() - 40 * 24 * 3_600_000)
+
+    await utimes(join(dir, name!), old, old)
+
+    const response = await app.handle(new Request(url, { headers: { accept: 'image/webp' } }))
+
+    expect(response.status).toBe(200)
+    expect(await pruneVariants(dir, VARIANT_KEEP_MS)).toBe(0)
+    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0)
+
+    // A variant pruned between two requests is written again rather than served missing.
+    await rm(join(dir, name!))
+    expect((await (await app.handle(new Request(url, { headers: { accept: 'image/webp' } }))).arrayBuffer()).byteLength).toBeGreaterThan(0)
+    expect(await Bun.file(join(dir, name!)).exists()).toBe(true)
+  })
 })

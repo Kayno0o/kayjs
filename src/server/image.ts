@@ -6,7 +6,7 @@ import type { LoadedGuard } from './guards'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
-import { readdir, rm, stat } from 'node:fs/promises'
+import { readdir, rm, stat, utimes } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
@@ -363,7 +363,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     let writing = pending.get(cached)
 
     // Requests for a variant being written wait for that one write.
-    if (file === cached && (writing || !await Bun.file(cached).exists())) {
+    if (file === cached && (writing || !await touched(cached))) {
       if (!writing) {
         // Counted before it waits its turn, so the variants a burst asks for share the decode.
         const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
@@ -434,6 +434,20 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   }
 }
 
+// Whether a cached variant exists, marking it as just used so the prune that may run meanwhile leaves it, and a request finding it gone writes it again.
+async function touched(file: string): Promise<boolean> {
+  try {
+    const now = new Date()
+
+    await utimes(file, now, now)
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 // Removes the files of `dir`, not its folders, that nothing wrote for `keepMs`; returns how many went.
 export async function pruneVariants(dir: string, keepMs: number): Promise<number> {
   if (!existsSync(dir))
@@ -446,7 +460,8 @@ export async function pruneVariants(dir: string, keepMs: number): Promise<number
     const file = join(dir, name)
 
     try {
-      if ((await stat(file)).mtimeMs < oldest) {
+      // Read again just before removing, so a variant a request touched since the first read stays.
+      if ((await stat(file)).mtimeMs < oldest && (await stat(file)).mtimeMs < oldest) {
         await rm(file, { force: true })
         removed++
       }

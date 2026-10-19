@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events'
+import * as fs from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -1174,32 +1176,56 @@ describe('rooms', () => {
       expect(() => sqliteRooms(join(dir, 'bad.sqlite'), { poll: '0ms' })).toThrow('sqliteRooms` poll')
     })
 
-    it('reaches the other process as the file changes, well inside the interval it also reads at', async () => {
+    it('reaches the other process as the file changes, not at the interval it also reads at', async () => {
       const file = join(dir, 'woken.sqlite')
-      const stores = [sqliteRooms(file), sqliteRooms(file)] as const
+      // A poll far past the wait of `until`, so only the file changing can deliver in time.
+      const stores = [sqliteRooms(file, { poll: '1h' }), sqliteRooms(file, { poll: '1h' })] as const
       const [first, second] = [rooms<{ text: string }>({ store: stores[0] }), rooms<{ text: string }>({ store: stores[1] })]
       const [ada, bob] = [connection(), connection()]
 
-      first.join(ada, 'hall')
-      second.join(bob, 'hall')
-      await Bun.sleep(300)
+      try {
+        first.join(ada, 'hall')
+        second.join(bob, 'hall')
 
-      // The interval is 250 ms: every delivery under 100 ms came from the file changing.
-      const times: number[] = []
-
-      for (let message = 1; message <= 5; message++) {
-        const start = performance.now()
-
-        first.publish('hall', { text: String(message) })
-        await until(() => bob.received.length === message)
-        times.push(performance.now() - start)
-        await Bun.sleep(37)
+        for (let message = 1; message <= 5; message++) {
+          first.publish('hall', { text: String(message) })
+          await until(() => bob.received.length === message)
+        }
       }
+      finally {
+        for (const store of stores)
+          store.close()
+      }
+    })
 
-      expect(Math.max(...times)).toBeLessThan(100)
+    it('reads every 250 ms while the file is watched, and every 25 ms once the watcher fails', async () => {
+      const delays: (number | undefined)[] = []
+      const realInterval = setInterval
+      const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void, delay?: number) => {
+        delays.push(delay)
 
-      for (const store of stores)
+        return realInterval(run, delay)
+      }) as typeof setInterval)
+      const watcher = Object.assign(new EventEmitter(), { close: () => undefined })
+      const watching = spyOn(fs, 'watch').mockImplementation((() => watcher) as unknown as typeof fs.watch)
+      const store = sqliteRooms(join(dir, 'fails.sqlite'))
+
+      try {
+        store.add('hall', 'c', 'ada')
+        const stop = store.subscribe(() => undefined)
+
+        // The read's interval follows the heartbeat's.
+        expect(delays.slice(-1)).toEqual([250])
+        watcher.emit('error', new Error('watch failed'))
+        expect(delays.slice(-1)).toEqual([25])
+        stop()
+        store.remove('hall', 'c')
+      }
+      finally {
+        watching.mockRestore()
+        intervals.mockRestore()
         store.close()
+      }
     })
 
     it('lists the members of every process and reaches them, but the sender or to the member named', async () => {
