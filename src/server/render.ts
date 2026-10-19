@@ -863,9 +863,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const liveText = liveScript()
   // A page following cached values loads the entry too, which opens the connection telling it they changed.
   const follows = client.entry !== undefined && followsCaches()
-  const shipsEntry = hasIslands || posts || follows || (client.entry !== undefined && scan?.modes.includes('defer') === true)
+  const defers = client.entry !== undefined && scan?.modes.includes('defer') === true
+  const shipsEntry = hasIslands || posts || follows || defers
   const checked = posts ? formsScript(forms, options.dev) : ''
-  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0) + checked + workScript(forms, options.prerendering === true) : ''
+  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers) + checked + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
@@ -1001,13 +1002,13 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   })
 }
 
-// Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` one when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
+// Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` island or a deferred server island when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
 // A page without islands needs no hydration script, only the entry swapping pages.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean): string {
   return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}`, () => {
     const chunks = new Set(client.entryImports)
 
-    // Waiting for an island to be visible or idle needs its own chunk, which the entry would ask for only once it ran.
+    // Waiting for an island to be visible or idle, or a deferred server island to near the viewport, needs its own chunk, which the entry would ask for only once it ran.
     if (lazy) {
       for (const chunk of client.hydrateWhen ?? [])
         chunks.add(chunk)

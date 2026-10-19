@@ -229,6 +229,31 @@ describe('an island hydrating on visible or idle, hydrate-when failing to load w
 
     expect(loaded.sort()).toEqual(['a', 'b'])
   })
+
+  it('fetches a deferred server island at once instead of leaving its inert copy', async () => {
+    behave('hydrate-when', 'fail')
+
+    const asked: string[] = []
+    const fetching = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => {
+      asked.push(String(input))
+
+      return new Response('<p class="stamp">fresh</p>')
+    }) as typeof fetch)
+
+    try {
+      document.body.innerHTML = '<slot data-kay-server="0" inert><p class="stamp">built</p></slot>'
+      await (await hydrated()).hydrateIslands({})
+      await settle()
+
+      expect(asked).toHaveLength(1)
+      expect(asked[0]).toContain('kay_island=0')
+      expect(document.querySelector('.stamp')!.textContent).toBe('fresh')
+      expect(document.querySelector('slot')!.hasAttribute('inert')).toBe(false)
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
 })
 
 describe('a persistent island, live-props failing to load with the build unchanged', () => {

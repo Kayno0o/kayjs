@@ -57,6 +57,12 @@ describe('server islands', () => {
       // Opted in with `noscript`, a link leads a browser without JavaScript to the page with the island in place.
       expect(placeholder).toEndWith('</slot><noscript><a href="?kay_island" rel="nofollow">Show the form</a></noscript><!--/kay-server:1-->')
 
+      // The entry fetches a deferred island through the code waiting for it to near the viewport, which the page preloads as it does for an island hydrating on `visible`: the entry would ask for it only once it ran.
+      const WHEN = /<link rel="modulepreload" href="[^"]*hydrate-when-\w+\.js">/
+
+      expect(await Bun.file(join(build.pages, 'deferred.html')).text()).toMatch(WHEN)
+      expect(await Bun.file(join(build.pages, 'plain.html')).text()).not.toMatch(WHEN)
+
       const app = await build.serve({ routes, security: false })
       // Its loads run per request, so they are timed as a page rendered afresh is.
       const timed = await build.serve({ routes, security: false, serverTiming: true })

@@ -107,7 +107,7 @@ An island hydrates as soon as the page loads. Put `hydrate` on its tag, in a sta
 Comments(postId={post.id} hydrate="visible")
 ```
 
-`hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle. A page with such an island loads the code that does the waiting along with the page, so it is ready sooner.
+`hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle. A page with such an island, or with a deferred server island, loads the code that does the waiting along with the page, so it is ready sooner.
 
 `hydration: { visible: '640px' }` in `kay.config.ts` changes how early that is, `200px` before the viewport by default, and `hydration.serverIslands` does the same for a deferred server island, a screen ahead by default. Both are CSS root margins.
 
