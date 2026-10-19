@@ -551,6 +551,50 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await sameDocument()).toBe(true)
   })
 
+  it('matches the opaque selector for the slots, scripts and templates of a long list only, and reads a head element once between mutations', async () => {
+    await page.goto(`${origin}/rows`)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      const counts = { matches: 0, html: 0 }
+      // eslint-disable-next-line ts/unbound-method -- called back on the element it is read from
+      const matches = Element.prototype.matches
+      const original = Object.getOwnPropertyDescriptor(Element.prototype, 'outerHTML')!
+
+      Element.prototype.matches = function (this: Element, selector: string) {
+        counts.matches++
+
+        return matches.call(this, selector)
+      } as Element['matches']
+      Object.defineProperty(Element.prototype, 'outerHTML', { ...original, get(this: Element) {
+        counts.html++
+
+        return original.get!.call(this) as string
+      } })
+      ;(window as { counts?: typeof counts }).counts = counts
+    })
+
+    const swap = async (link: string, led: boolean) => {
+      await page.evaluate(() => {
+        const counts = (window as { counts?: { matches: number, html: number } }).counts!
+
+        counts.matches = 0
+        counts.html = 0
+      })
+      await page.click(`a.${link}`)
+      await page.waitForFunction(wanted => (document.querySelector('li.new') !== null) === wanted, led)
+
+      return page.evaluate(() => ({ ...(window as { counts?: { matches: number, html: number } }).counts! }))
+    }
+
+    const first = await swap('lead', true)
+    const second = await swap('rows', false)
+
+    expect(first.matches).toBeLessThan(500)
+    expect(second.matches).toBeLessThan(500)
+    expect(second.html).toBeLessThan(first.html)
+    expect(await sameDocument()).toBe(true)
+  })
+
   it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

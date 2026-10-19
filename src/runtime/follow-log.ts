@@ -14,6 +14,23 @@ interface Anchor {
 
 const DEFAULT_THRESHOLD = 32
 
+// The first item whose bottom is under `top`, by bisection as the items stack down the container, so a long log reads a few rects per scroll, not one per line.
+function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined {
+  let low = 0
+  let high = items.length
+
+  while (low < high) {
+    const middle = (low + high) >>> 1
+
+    if (items[middle]!.getBoundingClientRect().bottom > top)
+      high = middle
+    else
+      low = middle + 1
+  }
+
+  return items[low]
+}
+
 // Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server.
 export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): void {
   if (typeof document === 'undefined')
@@ -35,7 +52,7 @@ export function followLog(container: Element | (() => Element | null | undefined
     // Instant, so a container with `scroll-behavior: smooth` is not measured halfway.
     const scrollTo = (top: number): void => element.scrollTo({ top, behavior: 'instant' })
 
-    const items = (): Element[] => options.items === undefined ? [...element.children] : [...element.querySelectorAll(options.items)]
+    const items = (): ArrayLike<Element> => options.items === undefined ? element.children : element.querySelectorAll(options.items)
 
     // Against the sizes measured last, so only the reader's scrolling can end the following, never the container shrinking.
     const away = (): number => height - element.scrollTop - viewport
@@ -51,7 +68,7 @@ export function followLog(container: Element | (() => Element | null | undefined
         return
 
       const top = element.getBoundingClientRect().top
-      const item = items().find(each => each.getBoundingClientRect().bottom > top)
+      const item = firstBelow(items(), top)
 
       anchor = item && { item, offset: item.getBoundingClientRect().top - top }
     }
@@ -95,7 +112,7 @@ export function followLog(container: Element | (() => Element | null | undefined
       settle()
     })
 
-    for (const item of items())
+    for (const item of Array.from(items()))
       watch(item)
 
     scrollTo(element.scrollHeight)

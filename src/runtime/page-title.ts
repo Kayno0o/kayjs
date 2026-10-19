@@ -45,11 +45,25 @@ function followed(host: Element): boolean {
   return false
 }
 
+// The settings parsed once for each content the meta holds, so an island's title following a signal does not parse them per keystroke.
+let parsed: { content: string | null, settings: TitleSettings } | undefined
+
 function titleSettings(): TitleSettings {
+  const content = document.head.querySelector(`meta[name="${TITLE_SETTINGS}"]`)?.getAttribute('content') ?? null
+
+  if (parsed?.content === content)
+    return parsed.settings
+
+  let settings: TitleSettings = {}
+
   try {
-    return JSON.parse(document.head.querySelector(`meta[name="${TITLE_SETTINGS}"]`)?.getAttribute('content') ?? '{}') as TitleSettings
+    settings = JSON.parse(content ?? '{}') as TitleSettings
   }
   catch {
-    return {}
+    // Cut short or written by hand: the page has no settings.
   }
+
+  parsed = { content, settings }
+
+  return settings
 }

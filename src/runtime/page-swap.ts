@@ -42,6 +42,8 @@ const POLICIES: Record<Intent, Policy> = {
 const PERSISTENT = 'slot[data-persist]'
 // What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
 const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
+// The tags OPAQUE can match, so the selector is only matched for them.
+const OPAQUE_TAGS = new Set(['slot', 'script', 'template'])
 const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 
@@ -434,14 +436,50 @@ function headKey(element: Element): string {
   return element.outerHTML
 }
 
+// The markup of each element of this head as the last swap read it, kept until a mutation touches the element: a long inline style or script is serialized once, not per swap.
+const headMarkups = new WeakMap<Element, string>()
+let headWatch: MutationObserver | undefined
+
+function forgetHead(records: MutationRecord[]): void {
+  for (const { target, addedNodes } of records) {
+    let node: Node | null = target
+
+    while (node && node.parentNode !== document.head)
+      node = node.parentNode
+
+    if (node)
+      headMarkups.delete(node as Element)
+
+    for (const added of addedNodes)
+      headMarkups.delete(added as Element)
+  }
+}
+
+function liveKey(element: Element): string {
+  let key = headMarkups.get(element)
+
+  if (key === undefined)
+    headMarkups.set(element, key = headKey(element))
+
+  return key
+}
+
 // Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
 // An element a script changed or added since stays the script's, and the next page's copy of it is not added again, nor its meta of the same name serving another value.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
   const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
+
+  if (!headWatch) {
+    headWatch = new MutationObserver(forgetHead)
+    headWatch.observe(document.head, { subtree: true, attributes: true, characterData: true, childList: true })
+  }
+
+  forgetHead(headWatch.takeRecords())
+
   // Each element serialized once, as every `take` compares against all that are left.
   const markup = new Map<Element, string>()
   const html = (element: Element) => {
-    const known = markup.get(element) ?? headKey(element)
+    const known = markup.get(element) ?? (element.ownerDocument === document ? liveKey(element) : headKey(element))
 
     markup.set(element, known)
 
@@ -487,7 +525,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
 
   for (const element of incoming) {
     const key = html(element)
-    const added: HeadElement = adopted(element)
+    const added: HeadElement = adopted(element, key)
 
     added._$s = key
 
@@ -527,9 +565,9 @@ function metaName(element: Element): string | undefined {
   return by === undefined ? undefined : `${by}=${element.getAttribute(by)!.toLowerCase()} ${element.getAttribute('media') ?? ''}`
 }
 
-function adopted(element: Element): HeadElement {
+function adopted(element: Element, markup: string): HeadElement {
   if (element.tagName === 'SCRIPT')
-    return runnable(element as HTMLScriptElement)
+    return runnable(element as HTMLScriptElement, markup)
 
   return element.tagName === 'NOSCRIPT' ? asText(element) : document.adoptNode(element)
 }
@@ -552,14 +590,19 @@ function ranAlready(element: Element): boolean {
 const scriptMarkups = new WeakMap<HTMLScriptElement, string>()
 
 function scriptMarkup(script: HTMLScriptElement): string {
-  return scriptMarkups.get(script) ?? script.outerHTML
+  let markup = scriptMarkups.get(script)
+
+  if (markup === undefined)
+    scriptMarkups.set(script, markup = script.outerHTML)
+
+  return markup
 }
 
 // A script a parser made never runs once moved into another document, so it is made again.
-function runnable(script: HTMLScriptElement): HTMLScriptElement {
+function runnable(script: HTMLScriptElement, markup: string = script.outerHTML): HTMLScriptElement {
   const copy = document.createElement('script')
 
-  scriptMarkups.set(copy, script.outerHTML)
+  scriptMarkups.set(copy, markup)
 
   for (const { name, value } of script.attributes)
     copy.setAttribute(name, value)
@@ -571,9 +614,16 @@ function runnable(script: HTMLScriptElement): HTMLScriptElement {
 
 async function loaded(link: HTMLLinkElement): Promise<unknown> {
   return new Promise((resolve) => {
-    link.addEventListener('load', resolve)
-    link.addEventListener('error', resolve)
-    setTimeout(resolve, STYLESHEET_TIMEOUT_MS)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const done = () => {
+      clearTimeout(timer)
+      resolve(undefined)
+    }
+
+    timer = setTimeout(done, STYLESHEET_TIMEOUT_MS)
+
+    link.addEventListener('load', done)
+    link.addEventListener('error', done)
   })
 }
 
@@ -635,10 +685,12 @@ function swapBody(next: Document, policy: Policy): void {
   const ran = new Set([...document.scripts].map(scriptMarkup))
 
   for (const script of body.querySelectorAll('script')) {
-    if (ran.has(script.outerHTML))
+    const markup = script.outerHTML
+
+    if (ran.has(markup))
       script.remove()
     else
-      script.replaceWith(runnable(script))
+      script.replaceWith(runnable(script, markup))
   }
 
   // The server writes `<body>` bare, so every attribute it holds is a script's.
@@ -711,7 +763,7 @@ function alike(live: Node, next: Node): boolean {
 
   const other = next as Element
 
-  return !live.matches(OPAQUE) && !other.matches(OPAQUE) && live.id === other.id && live.getAttribute('class') === other.getAttribute('class')
+  return live.id === other.id && live.getAttribute('class') === other.getAttribute('class') && (!OPAQUE_TAGS.has(live.localName) || (!live.matches(OPAQUE) && !other.matches(OPAQUE)))
 }
 
 // Whether a field keeps what was typed into it: it is the same field and the edit left what the server renders in it as it was, so only a visitor changed it.

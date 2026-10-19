@@ -87,11 +87,54 @@ describe('transitions of a list', () => {
     }
   })
 
+  it('write the classes of every row of a frame before reading the style of any, one recalculation for the list', async () => {
+    const { parent, setItems, dispose } = await mountList(true)
+    const events: string[] = []
+    const tokens = Object.getPrototypeOf(document.createElement('p').classList) as DOMTokenList
+    // eslint-disable-next-line ts/unbound-method -- called back on the list it is read from
+    const add = tokens.add
+    // eslint-disable-next-line ts/unbound-method -- called back on the list it is read from
+    const remove = tokens.remove
+    const computed = globalThis.getComputedStyle
+
+    try {
+      setItems(range(30))
+      await settle()
+      tokens.add = function (...names: string[]) {
+        events.push('w')
+        add.apply(this, names)
+      }
+      tokens.remove = function (...names: string[]) {
+        events.push('w')
+        remove.apply(this, names)
+      }
+      globalThis.getComputedStyle = (element: Element) => {
+        events.push('r')
+
+        return computed(element)
+      }
+      await twoFrames()
+      expect(events.filter(event => event === 'r')).toHaveLength(30)
+      expect(events.join('')).toMatch(/^w+r+$/)
+      await finished()
+      expect(parent.querySelectorAll('p')).toHaveLength(30)
+    }
+    finally {
+      tokens.add = add
+      tokens.remove = remove
+      globalThis.getComputedStyle = computed
+      dispose()
+    }
+  })
+
   it('leave a row at once, no class written, under reduced motion, as it is asked at each change', async () => {
     const original = globalThis.matchMedia
     let reduced = true
 
-    globalThis.matchMedia = ((query: string) => ({ matches: reduced && query.includes('reduce') })) as typeof matchMedia
+    // A media query list is live: its `matches` follows the visitor's setting.
+    globalThis.matchMedia = ((query: string) => ({ get matches() {
+      return reduced && query.includes('reduce')
+    } })) as typeof matchMedia
 
     const { parent, setItems, dispose } = await mountList(true, range(3))
 
@@ -193,6 +236,50 @@ describe('the title an island sets', () => {
       expect(document.title).toBe('Bare')
     }
     finally {
+      dispose()
+      meta.remove()
+    }
+  })
+
+  it('parses the settings once for each content the meta holds', async () => {
+    const { pageTitle } = await import('../src/runtime/page-title')
+    const { createSignal, root } = await import('../src/runtime/reactive')
+    const meta = document.createElement('meta')
+    const [text, setText] = createSignal('a')
+    const parse = JSON.parse
+    let parses = 0
+
+    meta.name = 'kay-title'
+    meta.content = JSON.stringify({ template: '%s!' })
+    document.head.append(meta)
+    JSON.parse = ((...args: Parameters<typeof JSON.parse>) => {
+      parses++
+
+      return parse(...args) as unknown
+    }) as typeof JSON.parse
+
+    const dispose = root((stop) => {
+      pageTitle(text, false)
+
+      return stop
+    })
+
+    try {
+      for (const word of ['b', 'c', 'd', 'e']) {
+        setText(word)
+        await settle()
+      }
+
+      expect(document.title).toBe('e!')
+      expect(parses).toBe(1)
+      meta.content = JSON.stringify({ template: '%s?' })
+      setText('f')
+      await settle()
+      expect(document.title).toBe('f?')
+      expect(parses).toBe(2)
+    }
+    finally {
+      JSON.parse = parse
       dispose()
       meta.remove()
     }

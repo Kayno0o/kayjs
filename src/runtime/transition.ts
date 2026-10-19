@@ -43,9 +43,53 @@ function classes(phases: Phases, phase: Phase, step: '' | '-from' | '-to'): stri
   return phases.name !== undefined && phases.name !== '' ? [`${phases.name}-${phase}${step || '-active'}`, ...own] : own
 }
 
+let motion: { ask: typeof matchMedia, query: MediaQueryList } | undefined
+
 // No animation for a visitor asking for less motion, nor in a hidden tab, which draws no frames: a row leaving there would stay until the tab shows.
 function still(): boolean {
-  return (typeof matchMedia === 'function' && matchMedia(REDUCED_MOTION).matches) || document.hidden
+  if (typeof matchMedia !== 'function')
+    return document.hidden
+
+  // One list asked once, which the browser keeps current.
+  if (motion?.ask !== matchMedia)
+    motion = { ask: matchMedia, query: matchMedia(REDUCED_MOTION) }
+
+  return motion.query.matches || document.hidden
+}
+
+// A step waits two frames, then writes, hands back what reads, which hands back what acts: every step due in a frame writes before any reads, and a list of rows costs one style recalculation, not one per row.
+type Step = () => () => () => void
+
+let frame = 0
+let primed = new Set<Step>()
+let waiting = new Set<Step>()
+
+function tick(): void {
+  frame = 0
+
+  const due = waiting
+
+  waiting = primed
+  primed = new Set()
+
+  const reads = [...due].map(step => step())
+  const acts = reads.map(read => read())
+
+  for (const act of acts)
+    act()
+
+  if (waiting.size > 0 || primed.size > 0)
+    frame = requestAnimationFrame(tick)
+}
+
+function afterTwoFrames(step: Step): () => void {
+  primed.add(step)
+  frame ||= requestAnimationFrame(tick)
+
+  return () => {
+    primed.delete(step)
+    waiting.delete(step)
+  }
 }
 
 function milliseconds(time: string): number {
@@ -82,10 +126,12 @@ function play(element: Element, phase: Phase, done: () => void): void {
   const from = classes(phases, phase, '-from')
   const to = classes(phases, phase, '-to')
   const list = element.classList
-  let frame = 0
+  let live = true
   let timer: ReturnType<typeof setTimeout> | undefined
+  let cancel = (): void => undefined
   const stop = () => {
-    cancelAnimationFrame(frame)
+    live = false
+    cancel()
     clearTimeout(timer)
     list.remove(...from, ...active, ...to)
     playing.delete(element)
@@ -97,19 +143,26 @@ function play(element: Element, phase: Phase, done: () => void): void {
 
   list.add(...from, ...active)
   // Two frames, so the browser has drawn the element with the `from` classes before they go.
-  frame = requestAnimationFrame(() => {
-    frame = requestAnimationFrame(() => {
-      list.remove(...from)
-      list.add(...to)
+  cancel = afterTwoFrames(() => {
+    list.remove(...from)
+    list.add(...to)
 
+    return () => {
       const time = runningTime(element)
 
-      if (time > 0)
-        timer = setTimeout(end, time)
-      else
-        end()
-    })
+      // Another element's end may have stopped this one since it wrote.
+      return () => {
+        if (!live)
+          return
+
+        if (time > 0)
+          timer = setTimeout(end, time)
+        else
+          end()
+      }
+    }
   })
+
   playing.set(element, stop)
 }
 

@@ -100,6 +100,46 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('finds the first line showing by reading a few rects of a long log, not one per line', async () => {
+    const page = await open()
+
+    await page.evaluate(() => {
+      const list = document.querySelector<HTMLElement>('ol.list')!
+
+      for (let line = 0; line < 3000; line++) {
+        const item = document.createElement('li')
+
+        item.style.minHeight = '20px'
+        item.textContent = `more ${line}`
+        list.append(item)
+      }
+    })
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('ol.list')!.scrollTop = 20_000
+    })
+    await page.waitUntil(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop === 20_000)
+
+    const reads = await page.evaluate(async () => {
+      // eslint-disable-next-line ts/unbound-method -- called back on the element it is read from
+      const original = Element.prototype.getBoundingClientRect
+      let count = 0
+
+      Element.prototype.getBoundingClientRect = function (this: Element) {
+        count++
+
+        return original.call(this)
+      }
+      document.querySelector<HTMLElement>('ol.list')!.scrollTop = 21_000
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50))))
+      Element.prototype.getBoundingClientRect = original
+
+      return count
+    })
+
+    expect(reads).toBeLessThan(200)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('stays at the bottom on a prepend while the reader is there', async () => {
     const page = await open()
 
