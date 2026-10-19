@@ -11,7 +11,7 @@ import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, pages, processImage } from '../src/server'
-import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, decodeAvif as decodeAvifOnWorker, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
+import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantLevel, variantName, writeImageVariants } from '../src/server/image'
 import { stripImageMetadata } from '../src/server/image-metadata'
@@ -457,23 +457,33 @@ describe('AVIF', () => {
   it('stops a worker whose task does not answer in time, frees the limiter slots it held and encodes the next task on a new worker', async () => {
     const png = encodePng(new Uint8Array(32 * 16 * 4).fill(200), 32, 16)
 
-    // A worker cannot start and answer within a millisecond, which stands for a decode that never answers.
-    setAvifTaskTimeout(1)
+    const { Worker: RealWorker } = globalThis
+    // A copy of the module with no worker yet, as one already started by an earlier test would answer.
+    const avif = await import(`../src/server/avif.ts?hang=${Date.now()}`) as typeof import('../src/server/avif')
+
+    // Every worker started meanwhile swallows its tasks, which stands for a decode that never answers.
+    globalThis.Worker = class HangingWorker extends RealWorker {
+      constructor(url: string | URL) {
+        super(url, { preload: [join(import.meta.dir, 'fixtures/avif-hang/preload.ts')] })
+      }
+    }
+    avif.setAvifTaskTimeout(100)
 
     try {
       const hung = await Promise.allSettled([
-        ...Array.from({ length: 6 }, async () => drawing(async () => encodeAvif(new Bun.Image(png), 50))),
-        drawing(async () => decodeAvifOnWorker(new Uint8Array(64), { width: 32, height: 16 })),
+        ...Array.from({ length: 6 }, async () => drawing(async () => avif.encodeAvif(new Bun.Image(png), 50))),
+        drawing(async () => avif.decodeAvif(new Uint8Array(64), { width: 32, height: 16 })),
       ])
 
       expect(hung.every(result => result.status === 'rejected')).toBe(true)
-      expect(hung.every(result => result.status === 'rejected' && String(result.reason).includes('the AVIF encoder stopped: no answer in 1 ms'))).toBe(true)
+      expect(hung.every(result => result.status === 'rejected' && String(result.reason).includes('the AVIF encoder stopped: no answer in 100 ms'))).toBe(true)
     }
     finally {
-      setAvifTaskTimeout()
+      globalThis.Worker = RealWorker
+      avif.setAvifTaskTimeout()
     }
 
-    expect(isAvif(await drawing(async () => encodeAvif(new Bun.Image(png), 50)))).toBe(true)
+    expect(isAvif(await drawing(async () => avif.encodeAvif(new Bun.Image(png), 50)))).toBe(true)
   })
 
   it('does not count the wait in a long queue as a hang', async () => {
