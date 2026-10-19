@@ -80,7 +80,11 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
         served.set(spelled, known)
     }
 
-    // Only development writes maps, and a `.kay` edit can move lines without changing the chunk the map is named after.
+    // Only development serves maps: a production build moves them out of the directory, and one left would hold the app's sources.
+    if (known.map && !dev)
+      return status(404)
+
+    // A `.kay` edit can move lines without changing the chunk the map is named after.
     if (known.map) {
       await mapBundleToKay(known.path)
 

@@ -265,6 +265,21 @@ describe('the asset route\'s cache of build files', () => {
     }
   }
 
+  it('serves a source map in development only', async () => {
+    for (const dev of [true, false]) {
+      const { dir, get } = await serve(dev)
+
+      try {
+        await Bun.write(join(dir, 'chunk.js.map'), '{"version":3,"sources":[],"mappings":""}')
+        expect((await get('/chunk.js.map')).status).toBe(dev ? 200 : 404)
+        expect((await get('/plain.js')).status).toBe(200)
+      }
+      finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('keeps a file whose name needs encoding under the spelling the build lists', async () => {
     expect(await cached(false, '/a%20b.js', '/a%20b.js', 'a b.js')).toBe(200)
     expect(await cached(false, '/dir%20name/%C3%A9.js', '/dir%20name/%C3%A9.js', 'dir name/é.js')).toBe(200)

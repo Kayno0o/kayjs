@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
-import { buildClient, readClientSources } from '../src/build/client'
+import { buildClient, keepMaps, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
@@ -419,6 +419,24 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+
+  it('removes a source map it could not keep from the served directory', async () => {
+    const dir = await scratchDir('kept-maps-')
+
+    try {
+      const served = join(dir, '.kay', 'client')
+      const broken = join(served, 'broken-aaaaaaaa.js.map')
+
+      await Bun.write(broken, '{')
+      await keepMaps(dir, [broken])
+
+      expect(await Bun.file(broken).exists()).toBe(false)
+      expect(await readdir(served)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 

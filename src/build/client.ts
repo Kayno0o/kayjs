@@ -173,8 +173,8 @@ function sourcemapOf(option: ClientOptions['sourcemap']): 'linked' | 'external' 
   return option === true ? 'linked' : 'none'
 }
 
-// A map that cannot be pointed at `.kay` lines is left out: the report then keeps its minified frames.
-async function keepMaps(root: string, maps: string[]): Promise<void> {
+// A map that cannot be pointed at `.kay` lines is removed: the report then keeps its minified frames.
+export async function keepMaps(root: string, maps: string[]): Promise<void> {
   const dir = join(outputDir(root), MAPS_DIR)
 
   await rm(dir, { recursive: true, force: true })
@@ -185,6 +185,8 @@ async function keepMaps(root: string, maps: string[]): Promise<void> {
     }
     catch (error) {
       kayLog('warn', `the source map of ${basename(map)} could not be kept, so island errors from it report minified frames`, error)
+      // Left behind, the map would be served and embedded with the island sources it holds.
+      await rm(map, { force: true })
     }
   }
 }
