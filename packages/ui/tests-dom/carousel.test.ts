@@ -188,3 +188,38 @@ test('starts paused in a tab mounted hidden, and turns once it shows', async () 
       delete (document as { hidden?: boolean }).hidden
   }
 })
+
+// Stands in for the browser's observer, which the test drives by hand.
+const nothing = () => undefined
+
+test('holds its autoplay while scrolled out of view, and turns again once back', async () => {
+  const real = globalThis.IntersectionObserver
+  const callbacks: ((entries: { isIntersecting: boolean }[]) => void)[] = []
+
+  globalThis.IntersectionObserver = class {
+    constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+      callbacks.push(callback)
+    }
+
+    observe = nothing
+    disconnect = nothing
+  } as unknown as typeof IntersectionObserver
+
+  try {
+    await carousel(AUTOPLAY_MS)
+    callbacks.at(-1)!([{ isIntersecting: false }])
+    await clock.settle()
+    await clock.elapse(TWO_TURNS_MS)
+
+    expect(turns).toEqual([])
+
+    callbacks.at(-1)!([{ isIntersecting: true }])
+    await clock.settle()
+    await clock.elapse(TWO_TURNS_MS)
+
+    expect(turns.length).toBeGreaterThan(0)
+  }
+  finally {
+    globalThis.IntersectionObserver = real
+  }
+})

@@ -8,6 +8,7 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 const { onClose, onDelete, dirty = false } = props<{ onClose: () => void, onDelete: () => Promise<void>, dirty?: boolean }>()
 
 const open = signal(false)
+const bareOpen = signal(false)
 
 // An archive the action's handler refuses, as `ctx.fail(409, { error })` reaches an island.
 async function archive() {
@@ -38,3 +39,6 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neu
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="ghost" class="n-ghost")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
 Toaster
+button#open-bare(onClick={() => bareOpen.set(true)}) Open bare
+Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen.set(false)})
+  input#bare-name(name="bare")

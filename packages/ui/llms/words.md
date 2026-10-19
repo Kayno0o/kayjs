@@ -23,7 +23,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)
 - `ui.dnd.*`: `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)
 - `ui.formDialog.*`: `cancelLabel` (`Cancel`), `savingLabel` (`Saving…`)
-- `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)
+- `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `errorLabel` (`The icons could not be loaded.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)
 - `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`)
 - `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)

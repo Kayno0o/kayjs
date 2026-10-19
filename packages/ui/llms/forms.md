@@ -34,6 +34,7 @@
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, an accent bar marking the one the keyboard is on, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
+  - A search that rejects is logged and shown as `errorLabel` (`ui.iconPicker.errorLabel`), the last grid kept.
   - A search box over a grid of the icons `search(query, limit, offset)` returns, from the `offset`th on, as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit, offset) => findIcons({ query, limit, offset })}`. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
 
     ```ts

@@ -11,8 +11,8 @@ import { wording } from 'kay/words'
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 200
 
-const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker.searchLabel', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.gridLabel', 'Icons'), searchingLabel = wording('ui.iconPicker.searchingLabel', 'Searching…'), emptyLabel = wording('ui.iconPicker.emptyLabel', 'No icons found.'), clearLabel = wording('ui.iconPicker.clearLabel', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.moreLabel', 'Show more'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
-  // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection goes unhandled and leaves the last grid on screen.
+const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker.searchLabel', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.gridLabel', 'Icons'), searchingLabel = wording('ui.iconPicker.searchingLabel', 'Searching…'), emptyLabel = wording('ui.iconPicker.emptyLabel', 'No icons found.'), errorLabel = wording('ui.iconPicker.errorLabel', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clearLabel', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.moreLabel', 'Show more'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+  // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
   search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
   value?: string | undefined
@@ -26,6 +26,7 @@ const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker
   gridLabel?: string | undefined
   searchingLabel?: string | undefined
   emptyLabel?: string | undefined
+  errorLabel?: string | undefined
   clearLabel?: string | undefined
   moreLabel?: string | undefined
   class?: string | undefined
@@ -38,6 +39,8 @@ const icons = signal<IconChoice[]>([])
 // Whether the last page came back full, so another may follow.
 const more = signal(false)
 const pending = signal(true)
+// Whether the last search was rejected.
+const failed = signal(false)
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
@@ -83,7 +86,14 @@ async function load(needle: string, offset: number) {
       icons.set(offset === 0 ? found : [...icons(), ...fresh])
       // An app that ignores the offset gives the same page again: nothing new ends the paging.
       more.set(found.length >= PAGE_SIZE && fresh.length > 0)
+      failed.set(false)
     })
+  }
+  catch (error) {
+    if (mine === request) {
+      console.error('kayjs-ui: an IconPicker\'s search failed', error)
+      failed.set(true)
+    }
   }
   finally {
     if (mine === request)
@@ -151,7 +161,7 @@ function keepEnter(event: KeyboardEvent) {
         button.kui-icon-grid-option(type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
-      li.kui-icon-grid-empty {pending() ? searchingLabel : emptyLabel}
+      li.kui-icon-grid-empty {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
   .kui-icon-grid-bar
     if picked()
       span.kui-icon-grid-selection(aria-live="polite")
@@ -159,5 +169,7 @@ function keepEnter(event: KeyboardEvent) {
           Icon(icon={icon})
         | {nameOf(picked())}
         IconButton(icon="close" label={clearLabel} size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
+    if failed() && icons().length > 0
+      span.kui-icon-grid-error(role="alert") {errorLabel}
     if more()
       button.kui-icon-grid-more(type="button" onClick={showMore}) {moreLabel}

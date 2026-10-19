@@ -160,7 +160,12 @@ function keyDown(event: KeyboardEvent) {
   event.preventDefault()
 
   if (isPaletteLink(entry) && (event.ctrlKey || event.metaKey)) {
-    window.open(entry.href, '_blank', 'noopener')
+    // The rendered option's own href, which went through the script-URL guard that a bound attribute gets.
+    const option = document.getElementById(optionId(active()))
+
+    if (option instanceof HTMLAnchorElement)
+      window.open(option.href, '_blank', 'noopener')
+
     followed(entry, row.snippet !== undefined)
 
     return

@@ -8,7 +8,7 @@ const { open, title, level = 2, dirty = false, onOpenChange, onClose, footer, cl
   title: string
   // The title's heading level: a modal opens over the page's own `h1`.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
-  // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own.
+  // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
   footer?: JSX.Element
   class?: string | undefined
@@ -42,6 +42,17 @@ effect(() => {
     dialog.close()
 })
 
+// Work in flight or typed text keeps a click outside from closing it; a dialog with no footer to close it from still closes with Escape once typed in.
+function closeWatcher() {
+  if (dirty)
+    return 'none'
+
+  if (!edited())
+    return 'any'
+
+  return footer ? 'none' : 'closerequest'
+}
+
 function closed(event: Event) {
   if (onOpenChange)
     onOpenChange(false)
@@ -52,7 +63,7 @@ function closed(event: Event) {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog.kui-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
+dialog.kui-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed} class={className})
   if open
     if level === 2
       h2.kui-dialog-title {title}

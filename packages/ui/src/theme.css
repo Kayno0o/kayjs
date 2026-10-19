@@ -204,7 +204,7 @@
     &::after {
       content: '';
       order: -1;
-      @apply size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
+      @apply size-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent;
     }
   }
 
@@ -303,7 +303,7 @@
   }
 
   .kui-spinner {
-    @apply animate-spin;
+    @apply animate-spin motion-reduce:animate-none;
   }
 
   .kui-icon-btn {
@@ -464,6 +464,11 @@
 
   .kui-command-palette-input {
     @apply h-11 min-w-0 flex-1 bg-transparent text-sm text-kui-text outline-none placeholder:text-kui-overlay1;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: -2px;
+    }
   }
 
   .kui-command-palette-list {
@@ -811,6 +816,10 @@
 
   .kui-icon-grid-bar {
     @apply flex items-center justify-between text-xs text-kui-subtext0;
+  }
+
+  .kui-icon-grid-error {
+    @apply text-kui-error;
   }
 
   .kui-icon-grid-selection {

@@ -61,6 +61,18 @@ describe('Dialog', () => {
     expect(dialog.getAttribute('closedby')).toBe('any')
   })
 
+  test('lets Escape close a dialog with no footer once something was typed, a click outside still held', async () => {
+    const root = await dialogs()
+    const dialog = root.querySelector<HTMLDialogElement>('#bare')!
+
+    click(root.querySelector('#open-bare'))
+    await settle()
+    dialog.querySelector('#bare-name')!.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect(dialog.getAttribute('closedby')).toBe('closerequest')
+  })
+
   test('holds while its parent says it is dirty', async () => {
     const root = await dialogs(undefined, true)
 
@@ -157,7 +169,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(15)
+    expect(root.querySelectorAll('dialog')).toHaveLength(16)
 
     click(trigger)
     await settle()

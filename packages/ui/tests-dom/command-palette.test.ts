@@ -23,7 +23,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean } = {}) {
+async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean } = {}) {
   mounted = await mountComponent('src/components/palette.kay', {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -119,6 +119,34 @@ describe('CommandPalette', () => {
     await settle()
 
     expect(active()).toBe('New moon')
+  })
+
+  test('opens a link from Ctrl+Enter through the script-URL guard', async () => {
+    const opened: string[] = []
+    // eslint-disable-next-line ts/unbound-method -- put back as it was
+    const open = window.open
+
+    window.open = (url?: string | URL) => {
+      opened.push(String(url))
+
+      return null
+    }
+
+    try {
+      const { input } = await palette({ hostile: true })
+
+      press(window, 'k', { ctrlKey: true })
+      await settle()
+      await search(input()!, 'hostile')
+      press(input()!, 'Enter', { ctrlKey: true })
+      await settle()
+
+      expect(opened).toHaveLength(1)
+      expect(opened[0]).toStartWith('unsafe:')
+    }
+    finally {
+      window.open = open
+    }
   })
 
   test('runs an action on Enter once it has closed, and remembers a followed link', async () => {

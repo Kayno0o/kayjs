@@ -117,3 +117,19 @@ test('a second Toaster renders nothing while the first is mounted, and takes ove
   expect(toasters()[0]?.matches(':popover-open')).toBe(true)
   expect([...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Saved'])
 })
+
+test('Alt+T moves focus to the toasts and Escape dismisses the focused one', async () => {
+  mounted = await mountComponent('src/components/toasts.kay')
+  click(mounted.root.querySelector('#saved'))
+  click(mounted.root.querySelector('#refused'))
+  await settle()
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', altKey: true, bubbles: true, cancelable: true }))
+  await settle()
+
+  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast-message')?.textContent).toBe('Saved')
+
+  document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  await settle()
+
+  expect([...mounted.root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Refused'])
+})

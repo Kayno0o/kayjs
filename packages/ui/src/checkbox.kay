@@ -1,8 +1,7 @@
 ---
 import type { JSX } from 'kay'
-import { effect, signal, untrack } from 'kay'
-import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import { effect, untrack } from 'kay'
+import { controlledCheckbox } from './controlled-checkbox'
 
 const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.
@@ -19,62 +18,25 @@ const { checked = false, indeterminate = false, label, hint, onChange, class: cl
   class?: string | undefined
 }>()
 
-const on = signal(checked)
-const busy = signal(false)
 let box: HTMLInputElement | undefined
-// How often the parent's `checked` reached the box, so a change under way knows whether the parent answered it.
-let synced = 0
 
-effect(() => {
-  on.set(checked)
-  synced++
+const { on, busy, ref, change } = controlledCheckbox({
+  control: 'Checkbox',
+  checked: () => checked,
+  onChange: () => onChange,
+  start: (element) => {
+    box = element
+    element.indeterminate = untrack(() => indeterminate)
+  },
+  // The click cleared it, whatever the parent still says.
+  settled: input => input.indeterminate = indeterminate,
 })
-
-// The box starts once: its default is what it was first drawn with, not what the parent holds now.
-const ref = startRef<HTMLInputElement>((element) => {
-  box = element
-  element.defaultChecked = untrack(() => checked)
-  element.indeterminate = untrack(() => indeterminate)
-})
-
-// A reset puts the box back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
-const resetting = resetWhenIdle(busy, () => {
-  if (!box)
-    return
-
-  box.checked = box.defaultChecked
-
-  if (box.checked !== on())
-    void change(box)
-})
-
-onFormReset(() => box, resetting.reset)
 
 // A property only, which no attribute sets.
 effect(() => {
   if (box)
     box.indeterminate = indeterminate
 })
-
-async function change(input: HTMLInputElement) {
-  const next = input.checked
-  const before = on()
-  const syncedBefore = synced
-
-  on.set(next)
-
-  // Put back unless the parent set `checked` meanwhile, which has the last word.
-  const accepted = await changeAccepted('Checkbox', () => onChange?.(next), busy.set)
-
-  if (!accepted && synced === syncedBefore) {
-    on.set(before)
-    input.checked = before
-  }
-
-  // The click cleared it, whatever the parent still says.
-  input.indeterminate = indeterminate
-  resetting.idle()
-}
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
 label.kui-checkbox(class={className})

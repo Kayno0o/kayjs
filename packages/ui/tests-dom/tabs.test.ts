@@ -156,3 +156,19 @@ test('focusInvalid reaches a FormField group with an issue, showing its tab and 
 
   expect(marks()).toEqual([[null, null], [null, null]])
 })
+
+test('flips the arrows under a right-to-left direction', async () => {
+  const { root, shown } = await tabs()
+
+  root.querySelector<HTMLElement>('[role="tablist"]')!.style.direction = 'rtl'
+  root.querySelectorAll<HTMLElement>('[role="tab"]')[1]!.focus()
+  key('ArrowLeft')
+  await settle()
+
+  expect(shown()).toEqual(['Earth'])
+
+  key('ArrowRight')
+  await settle()
+
+  expect(shown()).toEqual(['Venus'])
+})

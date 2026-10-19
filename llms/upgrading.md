@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `publicEnv` refuses a secret-looking name
 
 - The server stops at boot, where it only warned, when `publicEnv` declares a name with `SECRET`, `PASSWORD`, `PASSWD`, `PRIVATE` or `TOKEN` in it, `API_KEY`, `APIKEY` or a name ending in `_API_KEY` or `_APIKEY`, or a database address such as `DATABASE_URL`. Move it to `defineEnv` and read it on the server, or rename a value that is public by design, such as a Mapbox `MAPBOX_ACCESS_TOKEN` to `MAPBOX_KEY` (`MAP_KEY` passes). The error names the variable at boot; no lint ships, as the names are those of a schema the server reads when it starts.
+### kayjs-ui Meter requires a label
+
+- `Meter` needs `label`, which names it for screen readers; `kay check` reports a Meter without one as a type error.
 
 ### kayjs-mail keeps a failed mail 7 days, without its body
 

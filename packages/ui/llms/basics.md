@@ -42,7 +42,7 @@ await attempt(() => publish({ id }), 'Could not publish', (data: { error: string
 
 `attempt(run, failure, refused?)`, or `attempt(run, { failure, success?, refused? })`, toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`.
 
-A toast stays for six seconds, an error for ten, or until its close button is pressed, named by `dismissLabel` on Toaster. Screen readers hear each one from a status region kept in the page, an error from an alert region. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
+A toast stays for six seconds, an error for ten, or until its close button is pressed, named by `dismissLabel` on Toaster. Screen readers hear each one from a status region kept in the page, an error from an alert region. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Alt and `t` (`hotkey` on Toaster, `null` for none) moves focus to the toasts on screen, where Escape dismisses the focused one. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
 
 ### Dialog, ConfirmDelete
 
@@ -55,7 +55,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
 ```
 
 - Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onOpenChange(false)` runs however it closed (`onClose(event)` is the deprecated name). Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.
-- Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it.
+- Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it. A Dialog with no footer still closes on Escape after typing, as it has no button to close it.
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
   - Once it resolves, the dialog closes. If it throws, the dialog stays open and `failure` is toasted, or a refusal of the whole call such as a limit, as `attempt` does.
@@ -92,7 +92,7 @@ Popover(placement="bottom-end")
 ### Stat, Meter, BarList, SiteFavicon, CopyButton, Rating
 
 - `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts.
-- `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
+- `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar named by the required `label`, holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `empty` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for `copiedFor` (a duration with its unit, `2s` by default). It takes Button's `variant`, `tone` and `size`. A copy the browser refuses toasts `failure`.

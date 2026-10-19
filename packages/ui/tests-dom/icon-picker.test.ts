@@ -37,12 +37,15 @@ function found(query: string, limit: number, offset: number): IconChoice[] {
   return SET.filter(entry => entry.name.includes(query)).slice(offset, offset + limit)
 }
 
-async function picker(options: { value?: string, hold?: (query: string) => boolean, ignoreOffset?: boolean } = {}) {
+async function picker(options: { value?: string, hold?: (query: string) => boolean, ignoreOffset?: boolean, fail?: (query: string) => boolean } = {}) {
   mounted = await mountComponent('src/components/icon-picker.kay', {
     value: options.value,
     onChange: (name: string) => changes.push(name),
     search: async (query: string, limit: number, offset: number) => {
       searches.push([query, limit, offset])
+
+      if (options.fail?.(query))
+        throw new Error('search down')
 
       if (options.hold?.(query))
         await new Promise<void>(release => held.push({ query, release }))
@@ -179,6 +182,30 @@ test('reads Searching… until the first search lands', async () => {
 
   expect(view.empty()).toBeUndefined()
   expect(view.names()).toHaveLength(50)
+})
+
+test('says the icons could not be loaded when a search is rejected, keeping the last grid', async () => {
+  const error = console.error
+
+  console.error = () => undefined
+
+  try {
+    const view = await picker({ fail: query => query === 'x' })
+
+    type(view.search, 'x')
+    await clock.elapse(TYPED_MS)
+
+    expect(view.root.querySelector('.kui-icon-grid-error')?.textContent).toBe('The icons could not be loaded.')
+    expect(view.names()).toHaveLength(50)
+
+    type(view.search, 'house')
+    await clock.elapse(TYPED_MS)
+
+    expect(view.root.querySelector('.kui-icon-grid-error')).toBeNull()
+  }
+  finally {
+    console.error = error
+  }
 })
 
 test('starts on the given icon, drawing it once a search finds it and after one no longer does', async () => {

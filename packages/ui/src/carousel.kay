@@ -2,6 +2,7 @@
 import type { Duration, JSX } from 'kay'
 import { durationMs, effect, listen, onCleanup, onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
+import { startRef } from './form-reset'
 import { stepIndex } from './cycle'
 import { wording } from 'kay/words'
 
@@ -28,20 +29,36 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
 }>()
 
 const shown = signal(index)
-// Whether the pointer or the focus is on the carousel, or the tab is hidden, which holds the autoplay.
+// Whether the pointer or the focus is on the carousel, or the tab is hidden or the carousel scrolled out of view, which holds the autoplay.
 const pointed = signal(false)
 const focused = signal(false)
 const hidden = signal(false)
+const offscreen = signal(false)
+const root = signal<HTMLElement>()
 // The visitor's own pause, which nothing but the button lifts.
 const paused = signal(false)
 
 onMount(() => hidden.set(document.hidden))
 listen(document, 'visibilitychange', () => hidden.set(document.hidden))
 
+const ref = startRef<HTMLElement>(element => root.set(element), rest.ref)
+
 effect(() => shown.set(index))
 
 effect(() => {
-  if (!autoplay || paused() || pointed() || focused() || hidden() || matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const element = root()
+
+  if (!autoplay || !element || typeof IntersectionObserver === 'undefined')
+    return
+
+  const observer = new IntersectionObserver(entries => offscreen.set(!entries.at(-1)!.isIntersecting))
+
+  observer.observe(element)
+  onCleanup(() => observer.disconnect())
+})
+
+effect(() => {
+  if (!autoplay || paused() || pointed() || focused() || hidden() || offscreen() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return
 
   const timer = setInterval(step, durationMs(autoplay), 1)
@@ -64,7 +81,7 @@ function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
 }
 ---
-section.kui-carousel({...rest} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+section.kui-carousel({...rest} ref={ref} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
   .kui-carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
       .kui-carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})

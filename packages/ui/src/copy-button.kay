@@ -1,7 +1,7 @@
 ---
 import type { DurationText, JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
-import { durationMs, signal } from 'kay'
+import { durationMs, onCleanup, signal } from 'kay'
 import { formOf, lookOf } from './button-props'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
@@ -25,6 +25,9 @@ const { text, label, html, variant = 'solid', tone, size = 'md', copiedFor = '2s
 }>()
 
 const copied = signal(false)
+let timer: ReturnType<typeof setTimeout> | undefined
+
+onCleanup(() => clearTimeout(timer))
 
 async function press() {
   if (!text)
@@ -36,7 +39,8 @@ async function press() {
     return
 
   copied.set(true)
-  setTimeout(() => copied.set(false), durationMs(copiedFor))
+  clearTimeout(timer)
+  timer = setTimeout(() => copied.set(false), durationMs(copiedFor))
 }
 ---
 button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(variant, tone, className)} data-variant={formOf(variant)} data-size={size} onClick={press}) {copied() ? copiedLabel : label}

@@ -57,7 +57,7 @@ slot
 
 ### Toaster and tooltips
 
-Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`.
+Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one.
 
 ```kay
 ---

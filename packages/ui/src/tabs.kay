@@ -14,6 +14,8 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
+const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }
+
 const { tabs, value, label, onChange, panel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   tabs: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
@@ -45,7 +47,9 @@ function show(next: Value) {
 
 // Moving with the keys shows the tab it lands on, and focus goes with it: only the shown tab is in the page's tab order.
 function keyDown(event: KeyboardEvent) {
-  const move = MOVES[event.key]
+  // Under a right-to-left direction the arrows point the other way along the list.
+  const key = list && getComputedStyle(list).direction === 'rtl' ? FLIPPED[event.key] ?? event.key : event.key
+  const move = MOVES[key]
 
   // A chord is the browser's, such as Alt with an arrow going back a page.
   if (!move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
@@ -56,7 +60,7 @@ function keyDown(event: KeyboardEvent) {
   let next = move(tabs.findIndex(tab => tab.value === shown()), tabs.length)
 
   // The arrows go on past a disabled tab, Home and End to the nearest one that is not, every tab being checked at most once.
-  const step = event.key === 'ArrowLeft' || event.key === 'End' ? -1 : 1
+  const step = key === 'ArrowLeft' || key === 'End' ? -1 : 1
 
   for (let tried = 0; tabs[next]?.disabled && tried < tabs.length; tried++)
     next = stepIndex(next, step, tabs.length)
