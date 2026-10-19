@@ -112,6 +112,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   prefetched.clear()
 
   let response: Answer
+  const delivery = { reached: false }
 
   try {
     const action = withoutBase(url.pathname)
@@ -119,13 +120,20 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     const work = document.querySelector(`[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(action, undefined, form, data) : undefined
     const body = multipart ? data : urlEncoded(data)
 
-    response = await post(url, body, form, work)
+    response = await post(url, body, form, work, delivery)
 
     // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
     if (response.work !== null)
-      response = await post(url, body, form, await (await import('./work.client')).spendWork(action, response.work))
+      response = await post(url, body, form, await (await import('./work.client')).spendWork(action, response.work), delivery)
   }
   catch {
+    // A post that reached the server has run its action, only the answer was lost: the page loads rather than the form posting again.
+    if (delivery.reached) {
+      leave(new URL(location.href), true)
+
+      return
+    }
+
     // The swap could not send it: the browser does, as it would have.
     submitNatively(form, submitter)
 
@@ -197,20 +205,33 @@ function urlEncoded(data: FormData): URLSearchParams {
 }
 
 // Through `./upload`'s XMLHttpRequest, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
-async function post(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement, work: string | undefined): Promise<Answer> {
+async function post(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement, work: string | undefined, delivery: { reached: boolean }): Promise<Answer> {
+  delivery.reached = false
+
   const headers: Record<string, string> = { [NAVIGATE_HEADER]: '1', [PAGE_HEADER]: location.pathname + location.search }
 
   if (work !== undefined)
     headers[WORK_HEADER] = work
 
-  const response = await uploaded('POST', url.href, headers, body, (done) => {
-    form.style.setProperty('--kay-progress', String(done))
+  let response: Response
 
-    for (const bar of form.querySelectorAll('progress')) {
-      bar.max = 1
-      bar.value = done
-    }
-  })
+  try {
+    response = await uploaded('POST', url.href, headers, body, (done) => {
+      form.style.setProperty('--kay-progress', String(done))
+
+      for (const bar of form.querySelectorAll('progress')) {
+        bar.max = 1
+        bar.value = done
+      }
+    })
+  }
+  catch (error) {
+    delivery.reached = Reflect.get(new Object(error), 'sent') === true
+
+    throw error
+  }
+
+  delivery.reached = true
 
   return { type: response.headers.get('content-type') ?? '', text: await response.text(), redirect: response.headers.get(REDIRECT_HEADER), refused: response.headers.has(FAILURE_HEADER), work: response.headers.get(WORK_HEADER) }
 }

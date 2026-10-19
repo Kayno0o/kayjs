@@ -217,7 +217,7 @@ In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from an
 
 `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
-While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`.
+While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`, and a second submit is ignored until the promise settles.
 
 Once a call goes through, the page's loads run again, so its list is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 

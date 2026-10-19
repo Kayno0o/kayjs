@@ -32,6 +32,67 @@ async function listeningPort(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): P
   return LISTENING.exec(output)![1]!
 }
 
+// Forwards to the fixture, the answer to the first action post cut off by closing the connection short of the body it promised once the server has run it.
+function lossyProxy(target: number) {
+  let cut = false
+
+  const listener = Bun.listen<{ upstream?: Bun.Socket, pending: Uint8Array[], drop: boolean }>({
+    hostname: '127.0.0.1',
+    port: 0,
+    socket: {
+      async open(client) {
+        client.data = { pending: [], drop: false }
+
+        const upstream = await Bun.connect({
+          hostname: '127.0.0.1',
+          port: target,
+          socket: {
+            data(_, chunk) {
+              if (client.data.drop) {
+                // The headers arrive, promising a body that never does.
+                client.write(new TextEncoder().encode(new TextDecoder().decode(chunk).replace(/content-length: \d+\r\n/i, '').replace('\r\n\r\n', '\r\ncontent-length: 50\r\n\r\n')))
+                setTimeout(() => client.end(), 20)
+              }
+              else {
+                client.write(chunk)
+              }
+            },
+            close() {
+              client.end()
+            },
+          },
+        })
+
+        client.data.upstream = upstream
+
+        for (const chunk of client.data.pending)
+          upstream.write(chunk)
+      },
+      data(client, chunk) {
+        if (!cut && new TextDecoder().decode(chunk.subarray(0, 24)).startsWith('POST /_kay/action')) {
+          cut = true
+          client.data.drop = true
+        }
+
+        if (client.data.upstream)
+          client.data.upstream.write(chunk)
+        else
+          client.data.pending.push(chunk)
+      },
+      close(client) {
+        client.data.upstream?.end()
+      },
+    },
+  })
+
+  return {
+    port: listener.port,
+    stop() {
+      listener.stop(true)
+    },
+  }
+}
+
 // Set on the window before a navigation: still there after it means the page was swapped, not loaded.
 async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
@@ -1064,6 +1125,28 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(sent.every(([progress, value]) => Number(progress) === value && value > 0 && value <= 1)).toBe(true)
     expect(seen.at(-1)![0]).toBe('')
     await fresh.close()
+  })
+
+  it('never posts a form again natively once the server had it, only the answer lost: the page loads and the action ran once', async () => {
+    const fresh = await browser.newPage()
+    const proxy = lossyProxy(Number(new URL(origin).port))
+
+    try {
+      await fresh.goto(`http://127.0.0.1:${proxy.port}/posted`)
+      await fresh.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
+      await fresh.click('form.count button')
+      await fresh.waitForFunction(() => (window as { kayAlive?: boolean }).kayAlive === undefined)
+      await fresh.locator('p.posts').waitFor()
+      await settled(fresh)
+
+      expect(await fresh.locator('p.posts').textContent()).toBe('1')
+    }
+    finally {
+      proxy.stop()
+      await fresh.close()
+    }
   })
 
   it('leaves a form to the browser when form posting cannot load', async () => {

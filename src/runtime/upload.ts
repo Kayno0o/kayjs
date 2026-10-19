@@ -1,11 +1,12 @@
 const NULL_BODY = new Set([204, 205, 304])
 const HEADER_LINE = /\r?\n/
 
-// Sends a form as fetch would, through an XMLHttpRequest, which tells how much of it went: rejecting as fetch does on a network error, and with the signal's reason once it aborts.
+// Sends a form as fetch would, through an XMLHttpRequest, which tells how much of it went: rejecting as fetch does on a network error (with `sent` true once the whole body had gone or an answer had begun), and with the signal's reason once it aborts.
 export async function uploaded(method: string, url: string, headers: Record<string, string>, body: FormData | URLSearchParams, onProgress: (sent: number) => void, signal?: AbortSignal): Promise<Response> {
   signal?.throwIfAborted()
 
   const request = new XMLHttpRequest()
+  let sent = false
   const abort = () => request.abort()
 
   request.open(method, url)
@@ -14,13 +15,14 @@ export async function uploaded(method: string, url: string, headers: Record<stri
   for (const [name, value] of Object.entries(headers))
     request.setRequestHeader(name, value)
 
+  request.upload.onload = () => sent = true
   request.upload.onprogress = event => event.lengthComputable && onProgress(event.loaded / event.total)
   signal?.addEventListener('abort', abort, { once: true })
 
   try {
     return await new Promise((resolve, reject) => {
       request.onload = () => resolve(new Response(NULL_BODY.has(request.status) ? null : request.response as Blob, { status: request.status, headers: responseHeaders(request.getAllResponseHeaders()) }))
-      request.onerror = () => reject(new TypeError('Failed to fetch'))
+      request.onerror = () => reject(Object.assign(new TypeError('Failed to fetch'), { sent: sent || request.readyState >= XMLHttpRequest.HEADERS_RECEIVED }))
       request.ontimeout = request.onerror
       request.onabort = () => reject(signal?.reason ?? new DOMException('The upload was aborted', 'AbortError'))
       request.send(body)

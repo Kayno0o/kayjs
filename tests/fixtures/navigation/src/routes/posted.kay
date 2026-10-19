@@ -1,10 +1,12 @@
 --- server
 import { t } from 'elysia'
 import { action } from 'kay'
+import { store } from '../state'
 
 export const away = action(t.Object({}), (_, ctx) => ctx.redirect('/plain'))
 export const crash = action(t.Object({}), (_, ctx) => ctx.fail(400, 'Refused'))
 export const upload = action(t.Object({ file: t.File() }), async ({ file }) => file.size, { bodyLimit: 8 * 1024 * 1024 })
+export const count = action(t.Object({}), () => ++store.posts)
 
 // A refusal this page cannot render, which the server's error page answers.
 if (ctx.failed(crash))
@@ -23,5 +25,8 @@ form.upload(action={upload})
   input(type="file" name="file")
   progress
   button Upload
+form.count(action={count})
+  button Count
+p.posts {store.posts}
 if sent as done
   p.sent Sent {done.data}
