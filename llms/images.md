@@ -187,7 +187,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - `images.webp: { quality: 75 }` sets the WebP quality over `images.quality`, which then keeps the share cards' JPEG alone.
 - `images.avif: { quality: 60 }` sets its quality, 50 by default, and `images.avif: false` serves WebP alone.
 - `kay build` writes both formats of every imported image's variants, the AVIF taking 25 ms to half a second each, on up to four threads, cached between builds as the WebP is.
-- A runtime or remote image's AVIF is encoded on its first request, on a worker thread the server starts then and stops after 30 seconds with nothing to encode, so a request for another page never waits on it. A task with no answer after two minutes has its worker stopped and fails that request, so a hung decode cannot hold the four drawing slots for good.
+- A runtime or remote image's AVIF is encoded on its first request, on a worker thread the server starts then and stops after 30 seconds with nothing to encode, so a request for another page never waits on it. A worker that answers nothing for two minutes while it holds tasks is stopped and fails their requests, so a hung decode cannot hold the four drawing slots for good.
 - Development and a static export serve WebP alone, and the share card stays a JPEG.
 - A CDN in front of the site must key its cache on `Accept`, or it could hand an AVIF to a browser that cannot read it.
 - An element with a spread is not checked for `alt`, so write it.

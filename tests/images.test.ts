@@ -470,10 +470,26 @@ describe('AVIF', () => {
       expect(hung.every(result => result.status === 'rejected' && String(result.reason).includes('the AVIF encoder stopped: no answer in 1 ms'))).toBe(true)
     }
     finally {
-      setAvifTaskTimeout(120_000)
+      setAvifTaskTimeout()
     }
 
     expect(isAvif(await drawing(async () => encodeAvif(new Bun.Image(png), 50)))).toBe(true)
+  })
+
+  it('does not count the wait in a long queue as a hang', async () => {
+    const png = encodePng(new Uint8Array(32 * 16 * 4).fill(200), 32, 16)
+
+    // Each task answers well inside the limit while the queue as a whole takes longer.
+    setAvifTaskTimeout(3000)
+
+    try {
+      const results = await Promise.all(Array.from({ length: 12 }, async () => encodeAvif(new Bun.Image(png), 50)))
+
+      expect(results.every(isAvif)).toBe(true)
+    }
+    finally {
+      setAvifTaskTimeout()
+    }
   })
 
   it('fails the task a trap in the encoder stopped, with its message, and encodes the next on a new instance', async () => {

@@ -186,7 +186,13 @@ export async function keepMaps(root: string, maps: string[]): Promise<void> {
     catch (error) {
       kayLog('warn', `the source map of ${basename(map)} could not be kept, so island errors from it report minified frames`, error)
       // Left behind, the map would be served and embedded with the island sources it holds.
-      await rm(map, { force: true })
+
+      try {
+        await rm(map, { force: true })
+      }
+      catch {
+        // The warning above already names the map; the rest are still tried.
+      }
     }
   }
 }

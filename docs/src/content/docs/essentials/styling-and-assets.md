@@ -158,7 +158,7 @@ Threads sharing memory need extra headers, which the reference lists.
 
 ## Responsive images
 
-An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it. It also gets its `width` and `height`. An AVIF that takes more than two minutes to encode or decode is given up on, so one stuck image cannot hold up the others.
+An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it. It also gets its `width` and `height`. An AVIF worker that stops answering for two minutes is stopped and its images fail, so one stuck image cannot hold up the others.
 
 Write `sizes` to say how large the image shows. The browser then loads the smallest variant that fits.
 
