@@ -65,6 +65,8 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   // Set on a token an OAuth client was given.
   oauth_client: t.text().nullable(),
   oauth_family: t.text().nullable(),
+  // The resource (RFC 8707) the token is bound to; null for none, and for tokens stored before this column.
+  oauth_resource: t.text().nullable(),
 })).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
 
 export const AuthSessions = defineTable('auth_session', t => ({
@@ -158,6 +160,8 @@ export const AuthOAuthCodes = defineTable('auth_oauth_code', t => ({
   challenge: t.text().notNull(),
   scopes: t.array(t.text()).nullable(),
   family: t.text().notNull(),
+  // The resource (RFC 8707) asked at authorize; null for none, and for codes stored before this column.
+  resource: t.text().nullable(),
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
@@ -169,6 +173,8 @@ export const AuthOAuthRefresh = defineTable('auth_oauth_refresh', t => ({
   client_id: t.text().notNull(),
   scopes: t.array(t.text()).nullable(),
   family: t.text().notNull(),
+  // The resource (RFC 8707) the family is bound to; null for none, and for tokens stored before this column.
+  resource: t.text().nullable(),
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
@@ -347,7 +353,7 @@ export function pgStore(db: Database): AuthStore {
     },
     bearerTokens: {
       async create(token) {
-        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt, oauth_client: token.oauth?.clientId ?? null, oauth_family: token.oauth?.family ?? null })
+        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt, oauth_client: token.oauth?.clientId ?? null, oauth_family: token.oauth?.family ?? null, oauth_resource: token.oauth?.resource ?? null })
       },
       findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
       async findByDigestWithUser(digest) {
@@ -392,7 +398,7 @@ export function pgStore(db: Database): AuthStore {
       },
       codes: {
         async create(code) {
-          await oauthCodes.write.insertOne({ digest: code.digest, user_id: code.userId, client_id: code.clientId, redirect_uri: code.redirectUri, challenge: code.challenge, scopes: code.scopes, family: code.family, created_at: code.createdAt, expires_at: code.expiresAt, used_at: code.usedAt })
+          await oauthCodes.write.insertOne({ digest: code.digest, user_id: code.userId, client_id: code.clientId, redirect_uri: code.redirectUri, challenge: code.challenge, scopes: code.scopes, family: code.family, resource: code.resource ?? null, created_at: code.createdAt, expires_at: code.expiresAt, used_at: code.usedAt })
         },
         async use(digest, at) {
           // One UPDATE on the unspent row, so of two requests spending the code only one finds it unspent.
@@ -408,7 +414,7 @@ export function pgStore(db: Database): AuthStore {
       },
       refresh: {
         async create(token) {
-          await oauthRefresh.write.insertOne({ digest: token.digest, user_id: token.userId, client_id: token.clientId, scopes: token.scopes, family: token.family, created_at: token.createdAt, expires_at: token.expiresAt, used_at: token.usedAt })
+          await oauthRefresh.write.insertOne({ digest: token.digest, user_id: token.userId, client_id: token.clientId, scopes: token.scopes, family: token.family, resource: token.resource ?? null, created_at: token.createdAt, expires_at: token.expiresAt, used_at: token.usedAt })
         },
         async use(digest, at) {
           const [spent] = await oauthRefresh.write.updateMany({ used_at: at }, e => e.and(e.eq('digest', digest), e.isNull('used_at')))
@@ -615,7 +621,7 @@ function toToken(row: InferEntity<typeof AuthTokens>): TokenRecord {
 }
 
 function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): BearerTokenRecord | undefined {
-  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at, ...row.oauth_client != null && row.oauth_family != null && { oauth: { clientId: row.oauth_client, family: row.oauth_family } } } : undefined
+  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at, ...row.oauth_client != null && row.oauth_family != null && { oauth: { clientId: row.oauth_client, family: row.oauth_family, resource: row.oauth_resource } } } : undefined
 }
 
 function toOAuthClient(row: InferEntity<typeof AuthOAuthClients> | null): OAuthClientRecord | undefined {
@@ -627,11 +633,11 @@ function toOAuthGrant(row: InferEntity<typeof AuthOAuthGrants> | null): OAuthGra
 }
 
 function toOAuthCode(row: InferEntity<typeof AuthOAuthCodes>): OAuthCodeRecord {
-  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, redirectUri: row.redirect_uri, challenge: row.challenge, scopes: row.scopes, family: row.family, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
+  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, redirectUri: row.redirect_uri, challenge: row.challenge, scopes: row.scopes, family: row.family, resource: row.resource, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
 }
 
 function toOAuthRefresh(row: InferEntity<typeof AuthOAuthRefresh>): OAuthRefreshRecord {
-  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, scopes: row.scopes, family: row.family, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
+  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, scopes: row.scopes, family: row.family, resource: row.resource, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
 }
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {

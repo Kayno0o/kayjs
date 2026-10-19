@@ -6,7 +6,7 @@ import { banned } from '../core'
 import { digest, randomToken } from '../keys'
 import { spend } from '../limits'
 import { refused } from './reply'
-import { covers, sameSite } from './request'
+import { covers, sameResource, sameSite } from './request'
 
 // Seconds an access token works for, a refresh token unused, and a whole family of them from its first token.
 export const ACCESS_LIFETIME = 60 * 60
@@ -23,7 +23,7 @@ function matches(verifier: string, challenge: string): boolean {
 }
 
 // A bearer token and a refresh token of one family for the grant, which is how `user()`, `via()` and `requireUser({ scope })` see the client; the family ends at `familyEnd` whatever its rotations.
-async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | null, family: string, familyEnd: Date | undefined): Promise<TokenReply> {
+async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | null, family: string, familyEnd: Date | undefined, resource: string | null): Promise<TokenReply> {
   const oauth = core.store.oauth!
   const now = new Date()
   const access = randomToken()
@@ -38,14 +38,27 @@ async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | nul
     createdAt: now,
     lastUsedAt: null,
     expiresAt: new Date(now.getTime() + ACCESS_LIFETIME * 1000),
-    oauth: { clientId: grant.clientId, family },
+    oauth: { clientId: grant.clientId, family, resource },
   })
-  await oauth.refresh.create({ digest: digest(refresh), userId: grant.userId, clientId: grant.clientId, scopes, family, createdAt: now, expiresAt: familyEnd ?? new Date(now.getTime() + FAMILY_LIFETIME * 1000), usedAt: null })
+  await oauth.refresh.create({ digest: digest(refresh), userId: grant.userId, clientId: grant.clientId, scopes, family, resource, createdAt: now, expiresAt: familyEnd ?? new Date(now.getTime() + FAMILY_LIFETIME * 1000), usedAt: null })
 
   return {
     status: 200,
     body: { access_token: access, token_type: 'Bearer', expires_in: ACCESS_LIFETIME, refresh_token: refresh, ...scopes !== null && scopes.length > 0 && { scope: scopes.join(' ') } },
   }
+}
+
+// The resource the tokens are bound to: the one the code asked for, which a request may name again or leave out but not change or add. A reply when the request names another.
+function boundResource(form: URLSearchParams, root: string, bound: string | null | undefined): { resource: string | null } | TokenReply {
+  const asked = form.getAll('resource')
+
+  if (asked.length === 0)
+    return { resource: bound ?? null }
+
+  if (asked.length > 1 || !sameSite(asked[0]!, root))
+    return refused('invalid_target', 'The resource is not one of this server')
+
+  return bound != null && sameResource(asked[0]!, bound) ? { resource: bound } : refused('invalid_target', 'The resource is not the one the tokens were asked for')
 }
 
 // The grant the tokens are issued under, while its user can sign in and has not revoked the client.
@@ -82,10 +95,10 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
   if (!VERIFIER.test(verifier) || !matches(verifier, issued.challenge))
     return refused('invalid_grant', 'The code_verifier does not match the code_challenge')
 
-  const resource = form.get('resource')
+  const bound = boundResource(form, root, issued.resource)
 
-  if (resource !== null && !sameSite(resource, root))
-    return refused('invalid_target', 'The resource is not one of this server')
+  if ('status' in bound)
+    return bound
 
   // A code issued with every scope before the app declared some does not give them all now.
   if (issued.scopes === null && core.scopes.size > 0)
@@ -93,10 +106,10 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
 
   const grant = await liveGrant(core, issued.userId, issued.clientId)
 
-  return grant ? issue(core, grant, issued.scopes, issued.family, undefined) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, issued.scopes, issued.family, undefined, bound.resource) : refused('invalid_grant', 'The client is not approved')
 }
 
-async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
+async function rotate(core: Core, form: URLSearchParams, root: string): Promise<TokenReply> {
   const presented = form.get('refresh_token')
   const clientId = form.get('client_id')
 
@@ -130,9 +143,14 @@ async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
   if (asked !== null && !covers(held.scopes, scopes))
     return refused('invalid_scope', 'A refresh cannot add scopes')
 
+  const bound = boundResource(form, root, held.resource)
+
+  if ('status' in bound)
+    return bound
+
   const grant = await liveGrant(core, held.userId, held.clientId)
 
-  return grant ? issue(core, grant, scopes, held.family, held.expiresAt) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, scopes, held.family, held.expiresAt, bound.resource) : refused('invalid_grant', 'The client is not approved')
 }
 
 // The token endpoint: the authorization code grant with PKCE, and refresh tokens that rotate, a token used twice ending its family.
@@ -145,5 +163,5 @@ export async function tokenEndpoint(core: Core, address: string, form: URLSearch
   if (type === 'authorization_code')
     return exchangeCode(core, form, root)
 
-  return type === 'refresh_token' ? rotate(core, form) : refused('unsupported_grant_type', 'Only authorization_code and refresh_token are supported')
+  return type === 'refresh_token' ? rotate(core, form, root) : refused('unsupported_grant_type', 'Only authorization_code and refresh_token are supported')
 }

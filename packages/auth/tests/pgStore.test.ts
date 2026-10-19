@@ -1,6 +1,7 @@
 import { Database } from '@kaynooo/pg-orm'
-import { afterAll, test } from 'bun:test'
+import { afterAll, expect, test } from 'bun:test'
 import { authTables, pgStore } from '../src/pg'
+import { userRecord } from './helpers/app'
 import { storeContract } from './helpers/storeContract'
 
 // The database `docker compose up -d` starts; another with KAYJS_AUTH_TEST_DATABASE_URL.
@@ -19,6 +20,22 @@ if (reachable) {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
     return pgStore(db)
+  })
+
+  // Rows written before the resource columns existed have them null, and read back as unbound.
+  test('pgStore reads rows stored before the resource columns as unbound', async () => {
+    await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
+
+    const store = pgStore(db)
+
+    await store.users.create(userRecord({ id: 'u1' }))
+    await db.raw(`INSERT INTO "auth_oauth_code" ("digest", "user_id", "client_id", "redirect_uri", "challenge", "family", "created_at", "expires_at") VALUES ('legacy-code', 'u1', 'c1', 'http://127.0.0.1/cb', 'x', 'f1', now(), now() + interval '1 hour')`, [])
+    await db.raw(`INSERT INTO "auth_oauth_refresh" ("digest", "user_id", "client_id", "family", "created_at", "expires_at") VALUES ('legacy-refresh', 'u1', 'c1', 'f1', now(), now() + interval '1 hour')`, [])
+    await db.raw(`INSERT INTO "auth_bearer_token" ("id", "user_id", "label", "digest", "created_at", "oauth_client", "oauth_family") VALUES ('b1', 'u1', 'Agent', 'legacy-bearer', now(), 'c1', 'f1')`, [])
+
+    expect((await store.oauth!.codes.use('legacy-code', new Date()))?.code.resource).toBeNull()
+    expect((await store.oauth!.refresh.use('legacy-refresh', new Date()))?.token.resource).toBeNull()
+    expect((await store.bearerTokens.findByDigest('legacy-bearer'))?.oauth).toEqual({ clientId: 'c1', family: 'f1', resource: null })
   })
 
   // An app whose migrations predate the OAuth server: its sign-in, magic-link and reset flows revoke bearer tokens and prune, and must not fail on the missing tables.

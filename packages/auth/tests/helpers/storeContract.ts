@@ -482,7 +482,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
     })
 
     describe('the OAuth server', () => {
-      const bearer = (id: string, oauth?: { clientId: string, family: string }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
+      const bearer = (id: string, oauth?: { clientId: string, family: string, resource?: string | null }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
       const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })
       const code = (digest: string, fields: Partial<OAuthCodeRecord> = {}): OAuthCodeRecord => ({ digest, userId: 'u1', clientId: 'c1', redirectUri: 'http://127.0.0.1/cb', challenge: 'challenge', scopes: null, family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })
 
@@ -517,6 +517,28 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         expect((await oauth.codes.use('code', new Date('2026-02-01T00:00:00Z')))?.code.scopes).toEqual([])
         expect((await oauth.refresh.use('rt', new Date('2026-02-01T00:00:00Z')))?.token.scopes).toEqual([])
         expect((await store.bearerTokens.findByDigest('d-t1'))?.scopes).toEqual([])
+      })
+
+      test('the resource a code, a refresh token and a bearer token were asked for is read back, null when none was', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.codes.create(code('bound', { resource: 'https://site.test/mcp' }))
+        await oauth.codes.create(code('open'))
+        await oauth.refresh.create(refresh('rt-bound', { resource: 'https://site.test/mcp' }))
+        await oauth.refresh.create(refresh('rt-open'))
+        await store.bearerTokens.create(bearer('t-bound', { clientId: 'c1', family: 'f1', resource: 'https://site.test/mcp' }))
+        await store.bearerTokens.create(bearer('t-open', { clientId: 'c1', family: 'f2' }))
+
+        const at = new Date('2026-02-01T00:00:00Z')
+
+        expect((await oauth.codes.use('bound', at))?.code.resource).toBe('https://site.test/mcp')
+        expect((await oauth.codes.use('open', at))?.code.resource ?? null).toBeNull()
+        expect((await oauth.refresh.use('rt-bound', at))?.token.resource).toBe('https://site.test/mcp')
+        expect((await oauth.refresh.use('rt-open', at))?.token.resource ?? null).toBeNull()
+        expect((await store.bearerTokens.findByDigest('d-t-bound'))?.oauth?.resource).toBe('https://site.test/mcp')
+        expect((await store.bearerTokens.findByDigest('d-t-open'))?.oauth?.resource ?? null).toBeNull()
+        expect((await store.bearerTokens.listByUser('u1')).map(token => token.oauth?.resource ?? null)).toEqual(['https://site.test/mcp', null])
       })
 
       test('a code and a refresh token are spent once, the second spend told from a token never issued', async () => {

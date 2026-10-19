@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { documentUrl, fetchPublicDocument, plainName, privateAddress } from '../src/authorize/clients'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
+import { digest } from '../src/keys'
 import { memoryStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
 import { testApp } from './helpers/app'
@@ -337,6 +338,110 @@ describe('the token endpoint and the resource', () => {
 
     expect(sized.status).toBe(400)
     expect(streamed.status).toBe(400)
+  })
+})
+
+describe('a token is bound to the resource it was asked for', () => {
+  const MCP = 'http://localhost/mcp'
+
+  async function approvedFor(app: Server, extra: Record<string, string> = {}) {
+    const { body } = await register(app)
+    const ada = await signedIn(app)
+    const answer = await ada.post('/call/oauthDecide', [params(body.client_id!, extra), true]) as { ok: true, redirect: string }
+
+    return { clientId: body.client_id!, code: new URL(answer.redirect).searchParams.get('code')! }
+  }
+
+  const exchangeWith = async (app: Server, clientId: string, code: string, extra: Record<string, string> = {}) => token(app, { grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: clientId, redirect_uri: REDIRECT, ...extra })
+  const refreshWith = async (app: Server, clientId: string, presented: string, extra: Record<string, string> = {}) => token(app, { grant_type: 'refresh_token', refresh_token: presented, client_id: clientId, ...extra })
+  const bearerOf = async (app: Server, reply: { body: Record<string, string | number> }) => app.store.bearerTokens.findByDigest(digest(reply.body.access_token as string))
+
+  test('keeps the resource asked at authorize on the bearer token and the refresh token', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const reply = await exchangeWith(app, clientId, code)
+    const refreshed = await app.store.oauth!.refresh.use(digest(reply.body.refresh_token as string), new Date())
+
+    expect(reply.status).toBe(200)
+    expect((await bearerOf(app, reply))?.oauth?.resource).toBe(MCP)
+    expect(refreshed?.token.resource).toBe(MCP)
+  })
+
+  test('accepts the same resource at the token endpoint, spelled differently too', async () => {
+    const app = server()
+    const same = await approvedFor(app, { resource: MCP })
+    const spelledApp = server()
+    const spelled = await approvedFor(spelledApp, { resource: 'http://LOCALHOST:80/mcp' })
+
+    expect((await exchangeWith(app, same.clientId, same.code, { resource: MCP })).status).toBe(200)
+    expect((await exchangeWith(spelledApp, spelled.clientId, spelled.code, { resource: MCP })).status).toBe(200)
+  })
+
+  test('refuses another resource of this site with invalid_target, issuing nothing', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const wrong = await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })
+
+    expect(wrong.status).toBe(400)
+    expect(wrong.body.error).toBe('invalid_target')
+    expect(wrong.body.access_token).toBeUndefined()
+  })
+
+  test('refuses a resource at the token endpoint that none was asked for at authorize', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app)
+
+    expect((await exchangeWith(app, clientId, code, { resource: MCP })).body.error).toBe('invalid_target')
+  })
+
+  test('issues unbound tokens when no resource was asked anywhere', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app)
+    const reply = await exchangeWith(app, clientId, code)
+
+    expect(reply.status).toBe(200)
+    expect((await bearerOf(app, reply))?.oauth?.resource ?? null).toBeNull()
+  })
+
+  test('a refresh keeps the resource, accepts it named again and refuses another one', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const named = await refreshWith(app, clientId, first.body.refresh_token as string, { resource: MCP })
+
+    expect(named.status).toBe(200)
+    expect((await bearerOf(app, named))?.oauth?.resource).toBe(MCP)
+
+    const bare = await refreshWith(app, clientId, named.body.refresh_token as string)
+
+    expect((await bearerOf(app, bare))?.oauth?.resource).toBe(MCP)
+    expect((await app.store.oauth!.refresh.use(digest(bare.body.refresh_token as string), new Date()))?.token.resource).toBe(MCP)
+  })
+
+  test('a refresh naming another resource of this site is invalid_target', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const other = await refreshWith(app, clientId, first.body.refresh_token as string, { resource: 'http://localhost/other' })
+
+    expect(other.body.error).toBe('invalid_target')
+    expect(other.body.access_token).toBeUndefined()
+  })
+
+  test('a refresh cannot add a resource to a token that had none', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app)
+    const first = await exchangeWith(app, clientId, code)
+
+    expect((await refreshWith(app, clientId, first.body.refresh_token as string, { resource: MCP })).body.error).toBe('invalid_target')
+  })
+
+  test('a refresh naming a resource of another site is invalid_target too', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+
+    expect((await refreshWith(app, clientId, first.body.refresh_token as string, { resource: 'https://other.example/mcp' })).body.error).toBe('invalid_target')
   })
 })
 

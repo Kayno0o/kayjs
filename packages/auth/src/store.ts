@@ -53,7 +53,7 @@ export interface BearerTokenRecord {
   // Null for a token that never expires.
   expiresAt: Date | null
   // Set on a token an OAuth client was given, which revoking the client takes back; left out otherwise.
-  oauth?: { clientId: string, family: string } | null | undefined
+  oauth?: { clientId: string, family: string, resource?: string | null | undefined } | null | undefined
 }
 
 // A client registered by itself with the app's OAuth server (dynamic client registration), always public: it holds no secret. A client named by a metadata document URL is read from that URL and not stored.
@@ -87,6 +87,8 @@ export interface OAuthCodeRecord {
   scopes: string[] | null
   // The tokens issued for it share this one, so spending the code twice takes them all back.
   family: string
+  // The resource (RFC 8707) asked at authorize, which its tokens are bound to; null or left out for a code that asked for none, and for a row stored before this field.
+  resource?: string | null | undefined
   createdAt: Date
   expiresAt: Date
   usedAt: Date | null
@@ -99,6 +101,8 @@ export interface OAuthRefreshRecord {
   clientId: string
   scopes: string[] | null
   family: string
+  // The resource the family is bound to, kept through each rotation; null or left out for none, and for a row stored before this field.
+  resource?: string | null | undefined
   // A token unused for 30 days from here is refused.
   createdAt: Date
   // Where the whole family ends, 90 days after its first token and the same for each rotation, so a spent token stays this long to catch a reuse.

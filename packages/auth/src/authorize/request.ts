@@ -43,6 +43,7 @@ interface Checked {
   redirectUri: string
   challenge: string
   scopes: string[] | null
+  resource: string | null
   params: AuthorizeParams
 }
 
@@ -122,7 +123,17 @@ async function check(state: RequestState, params: AuthorizeParams, root: string)
   if (resource !== undefined && !sameSite(resource, root))
     return failure(base, root, 'invalid_target', 'The resource is not one of this server')
 
-  return { client, redirectUri, challenge, scopes, params }
+  return { client, redirectUri, challenge, scopes, resource: resource ?? null, params }
+}
+
+// Whether two URLs are the same resource, however they are spelled.
+export function sameResource(a: string, b: string): boolean {
+  try {
+    return new URL(a).href === new URL(b).href
+  }
+  catch {
+    return false
+  }
 }
 
 // Whether `resource` is a URL of the site the OAuth server is of.
@@ -152,7 +163,7 @@ async function approve(state: RequestState, record: UserRecord, checked: Checked
   const grant: OAuthGrantRecord = { userId: record.id, clientId: checked.client.id, clientName: checked.client.name, scopes: granted, createdAt: held?.createdAt ?? now, lastUsedAt: held?.lastUsedAt ?? null }
 
   await oauth.grants.upsert(grant)
-  await oauth.codes.create({ digest: digest(code), userId: record.id, clientId: checked.client.id, redirectUri: checked.redirectUri, challenge: checked.challenge, scopes: checked.scopes, family: crypto.randomUUID(), createdAt: now, expiresAt: new Date(now.getTime() + CODE_LIFETIME * 1000), usedAt: null })
+  await oauth.codes.create({ digest: digest(code), userId: record.id, clientId: checked.client.id, redirectUri: checked.redirectUri, challenge: checked.challenge, scopes: checked.scopes, family: crypto.randomUUID(), resource: checked.resource, createdAt: now, expiresAt: new Date(now.getTime() + CODE_LIFETIME * 1000), usedAt: null })
 
   if (!held || !approves(held.scopes, checked.scopes))
     await report(state, record, 'oauth-client-approved', checked.client.name)
