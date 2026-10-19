@@ -95,6 +95,13 @@ describe('a websocket route with a body schema', () => {
     expect(await (await site.fetch('/api/rooms/errors')).json()).toBe(0)
   })
 
+  it('never hands the route a message with a key the schema does not name', async () => {
+    const received = await frames('/api/rooms/optional', '{"type":"a","nested":null,"extra":1}', '{"type":"a","nested":"x","__proto__":{"x":1}}', '{"type":"a","nested":{"n":1},"extra":1}', '{"type":"a","extra":1}')
+
+    for (const frame of received)
+      expect(Object.keys((JSON.parse(frame) as { body: object }).body).every(key => key === 'type' || key === 'nested')).toBe(true)
+  })
+
   it('logs a drop under kay dev only, naming the route and what the body refused', async () => {
     const warn = console.warn
     const logged: string[] = []
@@ -105,7 +112,9 @@ describe('a websocket route with a body schema', () => {
     try {
       await frames('/api/rooms', '{"type":"move","at":"x"}')
       expect(logged).toHaveLength(1)
-      expect(logged[0]).toContain('/api/rooms')
+      expect(logged[0]).toContain('"/api/rooms"')
+      await frames('/api/rooms', '{"type":"move","at":"x"}', '{"type":"move","at":"y"}')
+      expect(logged).toHaveLength(1)
       expect(logged[0]).toContain('dropped a message')
       delete process.env.KAY_DEV_CODE
       logged.length = 0

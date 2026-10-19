@@ -26,6 +26,12 @@ export default api()
       ws.send(JSON.stringify({ type: 'echo', body }))
     },
   })
+  .ws('/optional', {
+    body: s.Object({ type: s.Literal('a'), nested: s.Optional(s.Object({ n: s.Integer() })) }),
+    message(ws, body) {
+      ws.send(JSON.stringify({ type: 'echo', body, own: Object.keys(body) }))
+    },
+  })
   .get('/errors', () => errors)
   .ws('/plain', {
     message(ws, body) {

@@ -656,26 +656,34 @@ function decoded(app: Elysia, path: string, options: SocketOptions): SocketOptio
     return options
 
   const { message } = options
+  let loggedAt = 0
+
+  // Under `kay dev` only, and at most once a second per route: the sender is told nothing, so the developer is, in quotes as what a client sent may hold control codes.
+  const drop = (value: unknown): undefined => {
+    if (underKayDev() && performance.now() - loggedAt >= 1000) {
+      loggedAt = performance.now()
+      kayLog('warn', `the websocket route ${JSON.stringify(withoutSlash(apiRoutePath((app as { [API_MOUNT]?: string })[API_MOUNT] ?? '', path)))} dropped a message its body refused: ${JSON.stringify(firstRefusal(validator, value))}`)
+    }
+
+    return undefined
+  }
 
   return {
     ...options,
     body: undefined,
     message(ws, raw) {
-      let cleaned = raw
+      let cleaned: unknown
 
-      // As on the HTTP path, a structure the cleaner cannot walk is left as it came, for the check to refuse.
+      // A structure the cleaner cannot walk is refused as a failed check is, never passed on unstripped.
       try {
         cleaned = validator.Clean?.(raw) ?? raw
       }
-      catch {}
-
-      if (validator.Check(cleaned) === false) {
-        // Under `kay dev` only: the sender is told nothing, so the developer is.
-        if (underKayDev())
-          kayLog('warn', `the websocket route ${withoutSlash(apiRoutePath((app as { [API_MOUNT]?: string })[API_MOUNT] ?? '', path))} dropped a message its body refused: ${firstRefusal(validator, cleaned)}`)
-
-        return undefined
+      catch {
+        return drop(raw)
       }
+
+      if (validator.Check(cleaned) === false)
+        return drop(cleaned)
 
       let value = cleaned
 
