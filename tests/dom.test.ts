@@ -979,6 +979,8 @@ describe('blocks', () => {
   it('render an await block given an async iterable again with each part, the latest of those coming within a frame, and not again once it ends on a part shown', async () => {
     fresh()
 
+    // A still clock, so a first part slow to render on a loaded host does not use up the frame the others wait for.
+    const now = spyOn(performance, 'now').mockReturnValue(1_000)
     const { root, dispose } = await mount19b()
 
     try {
@@ -1000,6 +1002,7 @@ describe('blocks', () => {
       expect(first!.stopped).toBe(false)
     }
     finally {
+      now.mockRestore()
       await dispose()
     }
   })
