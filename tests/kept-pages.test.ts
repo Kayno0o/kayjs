@@ -380,7 +380,14 @@ describe('a kept page after a request that can write', () => {
 
   it('is not rechecked after kay\'s live values stream, whatever the slashes', async () => {
     const root = await guestbook()
-    const answers = await served(root, [noise('/_kay/live'), noise('/_kay/live/'), noise(`/_kay/live${'/'.repeat(20_000)}`), read('/about'), read('/calls.json')])
+    const answers = await served(root, [noise('/_kay/live'), noise('/_kay/live/'), noise(`/_kay/live${'/'.repeat(20_000)}`), noise(`/_kay${'/'.repeat(20_000)}x`), read('/about'), read('/calls.json')])
+
+    expect((JSON.parse(answers.at(-1)!.text) as Tally).stable).toBe(0)
+  }, 120_000)
+
+  it('is not rechecked after the MCP endpoint, whatever its path or slashes', async () => {
+    const root = await guestbook()
+    const answers = await served(root, [noise('/mcp'), noise('/mcp/'), noise('/tools/'), read('/about'), read('/calls.json')], ', mcp: { path: \'/tools\' }')
 
     expect((JSON.parse(answers.at(-1)!.text) as Tally).stable).toBe(0)
   }, 120_000)

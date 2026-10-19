@@ -30,7 +30,7 @@ function withoutTrailingSlashes(path: string): string {
 
 // A request that is not a GET, a HEAD or an OPTIONS can change what a page renders, an action as much as a route of the app, once a route answers it: one to no route, and kay's own routes in `own` (the MCP endpoint among them, whose tool calls reach the app's actions and count there), write nothing, so no visitor can force a page to render again by sending them.
 // Counted when its route is matched and again as its response is made, so a visit between the two is checked once more, and the visit that follows the response sees the finished write; a route matched is counted whatever its guards then answer.
-// The end count is a `mapResponse`, which every answer goes through and which leaves it as it is, as no `afterHandle` or `onError` of the pages app may change how an API module answers; called before any route is added, as a hook reaches only the routes added after it.
+// The end count is a `mapResponse` and an `afterResponse`, never an `afterHandle` or `onError`, which would change how an API module answers; called before any route is added, as a hook reaches only the routes added after it.
 export function countWrites(app: Elysia, own: string[] = []): Writes {
   const writes: Writes = { count: 0 }
   const kay = new Set([...KAY_ROUTES, ...own])
@@ -42,10 +42,14 @@ export function countWrites(app: Elysia, own: string[] = []): Writes {
       writes.count++
     }
   })
-  app.mapResponse({ as: 'global' }, ({ request }) => {
+  const ended = ({ request }: { request: Request }) => {
     if (started.delete(request))
       writes.count++
-  })
+  }
+
+  app.mapResponse({ as: 'global' }, ended)
+  // For an answer a `mapResponse` ahead of this one, or an error handler of the app, kept from reaching the one above.
+  app.onAfterResponse({ as: 'global' }, ended)
 
   return writes
 }
