@@ -210,8 +210,27 @@ describe('scanClassName and isClassToken', () => {
     for (const token of ['flex', 'md:w-[200px]', 'py-0.5', '[&>svg]:size-4', 'bg-(--brand)/50', '*:p-2', '2xl:block'])
       expect(isClassToken(token), token).toBe(true)
 
-    for (const token of ['', 'a b', 'a.b', 'w-[1px', 'a(b)', 'bg-(--x', '#a', 'a,b', 'a=b'])
+    for (const token of ['', 'a b', 'a.b', 'w-[1px', 'a(b)', 'bg-(--x', '#a', 'a,b', 'a=b', 'foo-', 'hover:', '5/6', '1.5'])
       expect(isClassToken(token), token).toBe(false)
+  })
+})
+
+describe('the edges of the grammar', () => {
+  it('reads a `(` after a `-` as a variable group, so a class ending in `-` takes no attribute list', () => {
+    const file = parseKay('div.btn-(id="x") y\n')
+
+    expect(file.diagnostics).toEqual([])
+    expect(classesOf('div.btn-(id="x") y\n')).toEqual(['btn-(id="x")'])
+    expect(parseKay('div.btn-(a="1" b="2") y\n').diagnostics.map(d => d.message)).toEqual(['Unclosed `(` in a class'])
+  })
+
+  it('ends a decimal at a letter, so `p-1.5em` is two classes', () => {
+    expect(classesOf('div.p-1.5em x\n')).toEqual(['p-1', '5em'])
+  })
+
+  it('keeps a bracket inside quotes in the group, and renders the quotes', async () => {
+    expect(classesOf('div.content-[\'[\'].content-["]"] x\n')).toEqual(['content-[\'[\']', 'content-["]"]'])
+    expect(await render('div.[&_svg:not([class*=\'size-\'])]:p-1.content-["a"] x\n')).toBe('<div class="[&amp;_svg:not([class*=\'size-\'])]:p-1 content-[&quot;a&quot;]">x</div>')
   })
 })
 
@@ -269,6 +288,12 @@ describe('kay fmt --from-html', () => {
 
   it('keeps a class the shorthand cannot hold in class="..."', () => {
     expect(htmlToKay('<div class="a w-[1px b(c) d">x</div>').code).toBe('.a.d(class="w-[1px b(c)") x\n')
+  })
+
+  it('keeps a class ending in a dash or a colon, or made of digits, out of the shorthand, whatever follows it', () => {
+    expect(htmlToKay('<div class="foo-" data-a="1" title="t">x</div>').code).toBe('div(class="foo-" data-a="1" title="t") x\n')
+    expect(htmlToKay('<div class="hover: y">x</div>').code).toBe('.y(class="hover:") x\n')
+    expect(htmlToKay('<div class="w-1 5/6">x</div>').code).toBe('.w-1(class="5/6") x\n')
   })
 
   it('renders the same HTML as the page it read', async () => {

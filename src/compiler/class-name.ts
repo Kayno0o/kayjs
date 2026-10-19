@@ -1,8 +1,10 @@
-// Characters a shorthand class holds outside a group: Tailwind's variants and utilities, `*:` and `**:` included.
-const PLAIN = /[\w\-:/@!*]/
+// What a shorthand class holds outside a group: Tailwind's variants and utilities, `*:` and `**:` included.
+const PLAIN_RUN = /[\w\-:/@!*]+/y
 // A decimal's digits, which must not run into a letter: `.2xl:flex` starts a class where `.5` ends one.
 const DECIMAL_DIGITS = /\d+\b/y
 const WHITESPACE = /\s/
+// A token made of digits that no letter follows, `5/6` or `1.5`, which only the middle of a class can hold.
+const NUMBER_START = /^\d+\b/
 const DIGIT = /\d/
 const CLOSERS: Record<string, string> = { '[': ']', '(': ')' }
 
@@ -19,12 +21,17 @@ export function scanClassName(src: string, from: number): ClassScan {
   let i = from
 
   while (i < src.length) {
+    PLAIN_RUN.lastIndex = i
+
+    if (PLAIN_RUN.test(src)) {
+      i = PLAIN_RUN.lastIndex
+
+      continue
+    }
+
     const char = src[i]!
 
-    if (PLAIN.test(char)) {
-      i++
-    }
-    else if (char === '.' && isDecimalDot(src, i)) {
+    if (char === '.' && isDecimalDot(src, i)) {
       i++
     }
     else if (char === '[' || (char === '(' && src[i - 1] === '-')) {
@@ -44,10 +51,11 @@ export function scanClassName(src: string, from: number): ClassScan {
 }
 
 // Whether the whole of `token` is one shorthand class, which a pasted class attribute may be folded into.
+// One ending in `-` or `:` would take the `(` or the space after it, and one made of digits would join the decimal before it.
 export function isClassToken(token: string): boolean {
   const scan = scanClassName(token, 0)
 
-  return token !== '' && scan.unclosed === undefined && scan.end === token.length
+  return token !== '' && scan.unclosed === undefined && scan.end === token.length && !token.endsWith('-') && !token.endsWith(':') && !NUMBER_START.test(token)
 }
 
 function isDecimalDot(src: string, at: number): boolean {
@@ -71,10 +79,31 @@ function groupEnd(src: string, open: number): number {
     if (WHITESPACE.test(char))
       return -1
 
+    // A bracket inside a quoted value, `content-['[']`, closes nothing.
+    if (char === '\'' || char === '"') {
+      const quoted = quotedEnd(src, i)
+
+      if (quoted !== -1) {
+        i = quoted
+
+        continue
+      }
+    }
+
     if (char === opener)
       depth++
     else if (char === closer && --depth === 0)
       return i + 1
+  }
+
+  return -1
+}
+
+// The position of the quote closing the one at `open`, or -1 when a space or the end of the source comes first.
+function quotedEnd(src: string, open: number): number {
+  for (let i = open + 1; i < src.length && !WHITESPACE.test(src[i]!); i++) {
+    if (src[i] === src[open])
+      return i
   }
 
   return -1

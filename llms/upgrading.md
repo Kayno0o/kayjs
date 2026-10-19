@@ -12,6 +12,10 @@ A template line that starts with `pending` and nothing else is the `pending` blo
 
 `FailureData<Output>` is `unknown`, not `never`, for an output naming no `Failure`, so `ctx.failed(action)?.data`, `action.refused(error)`'s `data`, a tracked call's refusal and `kay/test`'s `refusal` read `unknown` for such an action, and one is no longer assignable to a prop typed with a `Failure<...>` it never returns. Narrow the data where it is read, or type the prop with the success output alone, which a handler that can `ctx.fail` fits too. `kay check` cannot recognise the old form, so no lint ships with it.
 
+### A shorthand class ending in `-` takes no attribute list
+
+A `(` right after a `-` in the `.class` shorthand opens Tailwind's variable group, `.bg-(--brand)`, so `div.btn-(id="x")` reads one class where it read `btn-` and an attribute. Write the attributes after a class that does not end in `-`, or put the class in `class="..."`.
+
 ## 1.58.0
 
 ### kayjs-auth users carry `data` and `providers`

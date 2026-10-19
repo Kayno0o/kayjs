@@ -247,7 +247,7 @@ for product of products
 - Classes: `.class` takes Tailwind names, `:`, `/`, `@`, `!` and `*` included: `div.md:flex.w-1/2.hover:underline.*:p-2`.
 - A `.` between two digits stays in the class, `div.gap-1.5`, unless letters follow the digits: `div.col-2.2xl:flex` has `col-2` and `2xl:flex`.
 - A balanced `[...]` stays in the class, `div.w-[calc(100%-2rem)].[&>svg]:size-4`, and so does a `(...)` right after a `-`, Tailwind's variable form, `div.bg-(--brand)/50`.
-- Nothing inside such a group ends the class, a `#`, `.`, `(` or `,` included, but it must close before any space: write a space in a Tailwind value as `_`, or `kay check` reports the unclosed group.
+- Nothing inside such a group ends the class, a `#`, `.`, `(` or `,` included, but it must close before any space: write a space in a Tailwind value as `_`, or `kay check` reports the unclosed group. A quote in a group hides a bracket, `.content-['[']`.
 - A static `class="..."` may run over several lines: its words join with single spaces, and merge with the shorthand as one string.
 - `kay fmt` moves an element's shorthand into a `class` attribute inside the parentheses when its classes make the line, with its tag, id and attributes, longer than 120 characters: the attributes go one to a line, and the class value is filled into lines when it is too long for one. An element whose attributes alone pass 120, with a `class={...}`, with attributes already over lines or inside a text is left as written.
 - `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`.
