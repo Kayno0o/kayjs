@@ -23,7 +23,7 @@ const MIGRATION_LOCK = 'kay_jobs'
 const LOST_KEY_TRIES = 3
 const INSUFFICIENT_PRIVILEGE = '42501'
 
-// The tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` that keeps `db.sync()` and `pg-orm generate` from dropping them.
+// The names of the tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` of an app that creates them with `createJobTables`: one that lists the table definitions of `jobTables` from `kay/pg-orm` has no use for it.
 export const jobTables = ['kay_jobs', 'kay_locks'] as const
 
 function toJob(row: PgJobRow): StoredJob {
@@ -49,7 +49,7 @@ function connectionOf(source: PgJobsSource): SQL {
   return 'sql' in source ? source.sql : source
 }
 
-// Creates `kay_jobs` and `kay_locks` and their indexes unless they exist: run it as the database's owner, in a migration or a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
+// Creates `kay_jobs` and `kay_locks` and their indexes unless they exist, for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
 // Replicas running it together take turns, and tables already there are left alone.
 export async function createJobTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
@@ -70,7 +70,7 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
 }
 
 // Jobs kept in the app's Postgres, shared by every process of every replica opening it, each job running in one of them: a claim is one `UPDATE` over a `FOR UPDATE SKIP LOCKED` pick.
-// The tables `kay_jobs` and `kay_locks` are looked for first and created only when missing, which takes a role that may create tables: with one that may not, `createJobTables` run by the owner makes them. Either way they are outside pg-orm's table definitions, so list `jobTables` in its `ignoreTables`.
+// The tables `kay_jobs` and `kay_locks` are looked for first, and an app on pg-orm lists `jobTables` from `kay/pg-orm` in its `new Database({ tables })` so its own migrations create them. A store that finds them missing creates them, which takes a role that may create tables: with one that may not, `createJobTables` run by the owner makes them, and pg-orm's `ignoreTables` then needs the names in `jobTables` of `kay/server`.
 // A hold lasts from the database's clock, whichever replica claims: replicas' clocks need not agree. A job's `runAt` stays the clock of the process that enqueued or retried it, compared with the claiming process's.
 export function pgJobs(source: PgJobsSource): JobStore {
   let sql: SQL | undefined
@@ -105,7 +105,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
     }
     catch (error) {
       if ((error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE)
-        throw new Error('kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: run `await createJobTables(db)` from kay/server as the database\'s owner, in a migration or a boot script', { cause: error })
+        throw new Error('kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: list `jobTables` from kay/pg-orm in the Database\'s tables so a migration creates them, or run `await createJobTables(db)` from kay/server as the database\'s owner', { cause: error })
 
       throw error
     }

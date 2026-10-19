@@ -2,9 +2,11 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from '@kaynooo/pg-orm'
 import { SQL } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { createJobTables, pgJobs } from '../src/server'
+import { jobTables } from '../src/server/pg-orm'
 import { APP_ROLES_SCRIPT } from '../src/templates'
 
 // A Postgres whose user may create databases and roles, as the app template's tests take: CI sets it.
@@ -17,14 +19,18 @@ const DATABASE = 'kay_app_roles_test'
 // CI has psql, so a missing one fails there instead of skipping: the workflows set CI.
 const run = it.skipIf((url === undefined || Bun.which('psql') === null) && (process.env.CI ?? '') === '')
 
-function connect(user: string, password: string) {
+function targetOf(user: string, password: string): string {
   const target = new URL(url!.href)
 
   target.username = user
   target.password = password
   target.pathname = `/${DATABASE}`
 
-  return new SQL(target.href)
+  return target.href
+}
+
+function connect(user: string, password: string) {
+  return new SQL(targetOf(user, password))
 }
 
 async function permission(sql: SQL, statement: string): Promise<string> {
@@ -196,16 +202,49 @@ describe('the app template\'s db/roles.sh', () => {
 
       await jobs.add({ id: 'a', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })
       expect(await jobs.add({ id: 'b', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })).toBe('a')
-      expect((await jobs.claim('q', 10, 100))?.id).toBe('a')
-      await jobs.progress!('a', 100, '[1]')
+      const claimed = await jobs.claim('q', 10, 100)
+
+      expect(claimed?.id).toBe('a')
+      await jobs.progress!('a', claimed!.heldUntil!, '[1]')
       expect((await jobs.state!('q', { key: 'k' }, 50))?.progress).toBe('[1]')
       expect(await jobs.lock('digest', 1)).toBe(true)
-      await jobs.complete('a')
+      await jobs.complete('a', claimed!.heldUntil)
       expect(await permission(app, 'ALTER TABLE "kay_jobs" ADD COLUMN "x" int')).toBe('42501')
     }
     finally {
       await app.close()
       await owner.close()
+    }
+  }, 30_000)
+
+  run('lets pgJobs run as app_rw over the tables the owner\'s pg-orm migration created from kay/pg-orm', async () => {
+    await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+    await admin!.unsafe('DROP ROLE IF EXISTS app_rw')
+    await admin!.unsafe(`CREATE DATABASE ${DATABASE}`)
+    await runScript(PASSWORD)
+
+    const migrator = new Database({ url: targetOf(decodeURIComponent(url!.username), decodeURIComponent(url!.password)), tables: [...jobTables] })
+    const app = connect('app_rw', PASSWORD)
+
+    try {
+      await migrator.sync()
+
+      const jobs = pgJobs(app)
+
+      await jobs.add({ id: 'a', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })
+      expect(await jobs.add({ id: 'b', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })).toBe('a')
+
+      const claimed = await jobs.claim('q', 10, 100)
+
+      expect(claimed?.id).toBe('a')
+      expect(await jobs.lock('digest', 1)).toBe(true)
+      await jobs.complete('a', claimed!.heldUntil)
+      expect(await jobs.jobs!('q')).toEqual([])
+      expect(await permission(app, 'ALTER TABLE "kay_jobs" ADD COLUMN "x" int')).toBe('42501')
+    }
+    finally {
+      await app.close()
+      await migrator.close()
     }
   }, 30_000)
 

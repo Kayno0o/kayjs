@@ -90,6 +90,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/i18n` | `t`, `locale`, `locales`, `localeName`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime`, `formatList`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
 | `kay/words` | `wording`, `pageLocale`, `sizeText`: the lookup a library words its default texts through. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
+| `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
 | `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |

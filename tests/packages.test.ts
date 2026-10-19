@@ -42,6 +42,22 @@ describe('kay\'s libraries', () => {
     expect([...ranges].filter(([, named]) => named.size > 1).map(([name, named]) => [name, [...named]])).toEqual([])
   })
 
+  // `kay/pg-orm` is the one module reaching pg-orm, so an app without it installs, builds and runs; the app template only writes the import into the files of a new app.
+  it('asks for pg-orm as an optional peer, imported by kay/pg-orm alone', async () => {
+    expect(root.peerDependencies?.['@kaynooo/pg-orm']).toBeDefined()
+    expect((root as Manifest & { peerDependenciesMeta: Record<string, unknown> }).peerDependenciesMeta['@kaynooo/pg-orm']).toEqual({ optional: true })
+    expect(root.dependencies?.['@kaynooo/pg-orm']).toBeUndefined()
+
+    const importers: string[] = []
+
+    for (const file of await Array.fromAsync(new Glob('src/**/*.{ts,kay}').scan())) {
+      if (file !== 'src/new.ts' && file !== 'src/templates.ts' && (/(?:from|import)\s*(?:\(\s*)?['"]@kaynooo\/pg-orm['"]/).test(await Bun.file(file).text()))
+        importers.push(file)
+    }
+
+    expect(importers).toEqual(['src/server/pg-orm.ts'])
+  })
+
   it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
     expect(manifest.engines?.bun).toBe(root.engines!.bun)
   })

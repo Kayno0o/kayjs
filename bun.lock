@@ -40,10 +40,12 @@
       },
       "peerDependencies": {
         "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
+        "@kaynooo/pg-orm": "^7.0.0",
         "@types/bun": "^1.4.3",
       },
       "optionalPeers": [
         "@happy-dom/global-registrator",
+        "@kaynooo/pg-orm",
       ],
     },
     "docs": {

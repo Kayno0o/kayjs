@@ -1,9 +1,12 @@
+import type { SQL } from 'bun'
 import type { JobStore, StoredJob } from '../src/server'
 import { resolve } from 'node:path'
 import process from 'node:process'
+import { Database, generateMigration } from '@kaynooo/pg-orm'
 import { describe, expect, it } from 'bun:test'
 import { openSqlite } from '../src/runtime/sqlite.server'
-import { pgJobs, sqliteJobs } from '../src/server'
+import { createJobTables, pgJobs, sqliteJobs } from '../src/server'
+import { jobTables } from '../src/server/pg-orm'
 import { cleanUpAfterFile, freshPg, kinds, pgDescribe, pgIt, postgres, replicas, sqlitePath } from './job-stores'
 
 cleanUpAfterFile()
@@ -306,6 +309,50 @@ describe('a sqlite file made before keys and progress', () => {
 
     await sqliteJobs(path).add(job())
     expect(await sqliteJobs(path).add(job({ key: 'k' }))).toBeUndefined()
+  })
+})
+
+// Columns, indexes and constraints of the two tables, as the database reports them.
+async function shapeOf(sql: SQL) {
+  const columns = await sql`SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name IN ('kay_jobs', 'kay_locks') ORDER BY table_name, column_name`
+  const indexes = await sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename IN ('kay_jobs', 'kay_locks') ORDER BY indexname`
+  const constraints = await sql`SELECT conname, contype, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid IN ('kay_jobs'::regclass, 'kay_locks'::regclass) ORDER BY conname`
+
+  return { columns: [...columns], indexes: [...indexes], constraints: [...constraints] }
+}
+
+pgDescribe('the tables of kay/pg-orm', () => {
+  pgIt('are what createJobTables creates, made by db.sync() or a generated migration, and pgJobs runs over them', async () => {
+    const sql = await freshPg()
+
+    await createJobTables(sql)
+
+    const created = await shapeOf(sql)
+    const { url: target } = await postgres()
+    const db = new Database({ url: target, tables: [...jobTables] })
+
+    try {
+      // An app that created them with createJobTables sees no drift once it lists the definitions.
+      expect((await db.sync({ dryRun: true })).ops).toEqual([])
+      await sql.unsafe('DROP TABLE kay_jobs, kay_locks')
+
+      const migration = await generateMigration(db, db.getTablesRegistry())
+
+      expect(migration?.up).toContain('CREATE TABLE "kay_jobs"')
+      expect(migration?.up).toContain('CREATE UNIQUE INDEX "kay_jobs_key"')
+      await db.sync()
+      expect(await shapeOf(sql)).toEqual(created)
+
+      const store = pgJobs(db)
+      const added = job({ key: 'k' })
+
+      expect(await store.add(added)).toBeUndefined()
+      expect(await store.add(job({ key: 'k' }))).toBe(added.id)
+      expect((await claimFor(store))?.id).toBe(added.id)
+    }
+    finally {
+      await db.close()
+    }
   })
 })
 

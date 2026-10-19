@@ -165,17 +165,20 @@ Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less o
 
 ### Postgres
 
-`pgJobs` looks for its tables `kay_jobs` and `kay_locks`, and creates them when they are missing and its role may. The app template connects with `app_rw`, which may not create tables. There the owner creates them once, in a boot script or a migration, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once.
+`pgJobs(db)` keeps the jobs in Postgres. It takes a Bun `SQL`, a pg-orm `Database` or a connection URL.
 
-pg-orm does not know these tables, so its `db.sync()` and `pg-orm generate` would plan to drop them. Tell it to leave them alone.
+If your app uses pg-orm, list the queue's tables with your own. Then `db.sync()` or `pg-orm generate` creates them, and your migrations carry them to production like any other table.
 
 ```ts
-import { jobTables } from 'kay/server'
+import { Database } from '@kaynooo/pg-orm'
+import { jobTables } from 'kay/pg-orm'
 
-await db.sync({ ignoreTables: [...jobTables] })
+export const db = new Database({ url: env.DATABASE_URL, tables: [...tables, ...jobTables] })
 ```
 
-Use the same `ignoreTables` in `defineConfig`.
+kay lists pg-orm as an optional peer, so an app without it installs and builds as before. The app template connects with `app_rw`, which may not create tables. That is fine, because the migration, run by the owner, already created them.
+
+Without pg-orm migrations, `pgJobs` creates the tables when they are missing and its role may. If the role may not, the owner creates them once, in a boot script, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once. pg-orm does not know tables made that way, so tell it to leave them alone with `ignoreTables: [...jobTables]`, where `jobTables` comes from `kay/server` and lists their names.
 
 A claim and its hold use the database's clock, so replicas need not keep their clocks in agreement.
 

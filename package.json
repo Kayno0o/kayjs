@@ -131,6 +131,10 @@
       "types": "./types/server/index.d.ts",
       "default": "./src/server/index.ts"
     },
+    "./pg-orm": {
+      "types": "./types/server/pg-orm.d.ts",
+      "default": "./src/server/pg-orm.ts"
+    },
     "./internal": {
       "types": "./types/runtime/internal.d.ts",
       "default": "./src/runtime/internal.ts"
@@ -213,10 +217,14 @@
   },
   "peerDependencies": {
     "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
+    "@kaynooo/pg-orm": "^7.0.0",
     "@types/bun": "^1.4.3"
   },
   "peerDependenciesMeta": {
     "@happy-dom/global-registrator": {
+      "optional": true
+    },
+    "@kaynooo/pg-orm": {
       "optional": true
     }
   },

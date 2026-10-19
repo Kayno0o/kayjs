@@ -23,6 +23,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check --fix` declares the raw `process.env.X` reads `kay env` warns of in the app's `defineEnv` schema (or a new `src/env.ts`), keeping a `?? 'default'` as the default and rewriting the reads to `env.X` ([Check](check-and-tools.md)).
 - A queue's run writes about its job (`complete`, `retry`, `fail`) only while the hold it was claimed with is still the job's, so one that outlived its hold no longer completes or fails the job another process runs; a `JobStore` gets the hold as a last argument and may return the one it stored in `heldUntil` ([Queues](queues.md)).
 - `pgJobs` takes holds from the database's clock, so replicas' clocks need no longer agree ([Queues](queues.md)).
+- `kay/pg-orm` exports `jobTables`, the job queue's `kay_jobs` and `kay_locks` as pg-orm definitions: an app lists them in `new Database({ tables })` and its own migrations create them, instead of `ignoreTables` plus `createJobTables(db)`; pg-orm is an optional peer of kay ([Queues](queues.md)).
 
 ## 1.58.0
 
