@@ -6,8 +6,8 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
-import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated } from './analytics'
-import { ANALYTICS_SCRIPT } from './analytics-script'
+import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated, NOTICE_SCRIPT_PATH } from './analytics'
+import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 
@@ -181,6 +181,7 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
 
   const tracker = new Elysia({ name: 'kay-analytics' })
     .get(ANALYTICS_SCRIPT_PATH, () => new Response(ANALYTICS_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
+    .get(NOTICE_SCRIPT_PATH, () => new Response(NOTICE_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
 
   if (options.provider === 'custom')
     return tracker.use(customServer(options, gated))

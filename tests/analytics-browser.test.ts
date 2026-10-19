@@ -4,6 +4,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { analytics } from '../src/server/analytics'
+import { NOTICE_SCRIPT } from '../src/server/analytics-script'
 import { browserPath, testSite } from '../src/test'
 
 // Assigning undefined to an environment variable stores the text "undefined".
@@ -451,5 +452,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     await Bun.sleep(300)
 
     expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/admin', '/loud'])
+  })
+
+  it('puts the base before a policy path, and leaves an address alone', async () => {
+    const other = await own.open('/plain')
+    const hrefs = await other.evaluate((script) => {
+      const found: (string | null)[] = []
+
+      for (const [scope, policy] of [['/shop', '/privacy'], ['/', '/privacy'], ['/shop', 'https://example.com/policy']] as const) {
+        const root = window as unknown as { kayAnalytics: object }
+
+        root.kayAnalytics = { data: { texts: '{"en":{"text":"Hi","agree":"Yes","refuse":"No","policy":"Policy"}}', policy }, scope, decide: () => undefined, wanted: () => undefined }
+        document.querySelector('section[aria-labelledby]')?.remove()
+        // eslint-disable-next-line no-new-func, ts/no-unsafe-call
+        new Function(script)()
+        found.push(document.querySelector('#kay-analytics-notice a')?.getAttribute('href') ?? null)
+      }
+
+      return found
+    }, NOTICE_SCRIPT)
+
+    expect(hrefs).toEqual(['/shop/privacy', '/privacy', 'https://example.com/policy'])
   })
 })

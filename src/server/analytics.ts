@@ -1,7 +1,7 @@
 import type { KayExtension } from '../config'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
-import { ANALYTICS_SCRIPT } from './analytics-script'
+import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
@@ -133,6 +133,7 @@ export type VisitOptions = Exclude<AnalyticsOptions, FathomOptions | CloudflareO
 
 export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
+export const NOTICE_SCRIPT_PATH = `${ANALYTICS_PATH}/notice.js`
 export const CUSTOM_SCRIPT_PATH = `${ANALYTICS_PATH}/script.js`
 export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
 export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare', 'custom'])
@@ -198,7 +199,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   return {
     name: 'kay/analytics',
     // Fathom and Cloudflare only need the notice's script, which a static export writes itself.
-    ...asking && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT } },
+    ...asking && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT, [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
     ...options.provider === 'custom' && { needsServer: true },
     ...(options.provider === 'custom' || asking) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {

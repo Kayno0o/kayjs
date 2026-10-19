@@ -222,6 +222,7 @@ describe('kay build --static', () => {
 
       expect(home.includes('data-consent')).toBe(asks)
       expect(existsSync(join(elsewhere, '_kay/analytics.js'))).toBe(asks)
+      expect(existsSync(join(elsewhere, '_kay/analytics/notice.js'))).toBe(asks)
       expect(home.includes('src="https://cdn.usefathom.com/script.js"')).toBe(!asks && options.includes('fathom'))
     }
     finally {

@@ -12,12 +12,11 @@ export const ANALYTICS_SCRIPT = `(() => {
   const titles = data.titles !== undefined
   const maxAge = Number(data.maxAge) || 15552000
   const exclude = data.exclude ? JSON.parse(data.exclude).map(pattern => pattern.split('/').filter(Boolean)) : []
-  const texts = data.texts ? JSON.parse(data.texts) : {}
   const load = data.load ? JSON.parse(data.load) : undefined
   let loaded = false
   let last = document.referrer
-  let banner
-  let opener
+  let wanted
+  let asking
 
   function choice() {
     const found = document.cookie.split('; ').find(cookie => cookie.startsWith(name + '='))
@@ -82,11 +81,6 @@ export const ANALYTICS_SCRIPT = `(() => {
     const before = choice()
 
     document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : maxAge) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
-    const back = banner?.contains(document.activeElement) ? opener : undefined
-
-    banner?.remove()
-    banner = undefined
-    opener = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
     if (value === 'yes' && (gated ? before !== 'yes' : before === 'no'))
@@ -97,13 +91,57 @@ export const ANALYTICS_SCRIPT = `(() => {
       location.reload()
     else if (value === '')
       ask()
-
-    if (back?.isConnected)
-      back.focus()
   }
 
+  // The notice is a file of its own, fetched only when a visitor has to be asked.
   function ask(clicked) {
-    if (banner || silent || !(gated || informed))
+    if (silent || !(gated || informed))
+      return
+
+    if (api.show) {
+      api.show(clicked)
+
+      return
+    }
+
+    wanted = clicked
+
+    if (!asking) {
+      asking = Object.assign(document.createElement('script'), { src: path + '/notice.js', defer: true })
+      document.head.append(asking)
+    }
+  }
+
+  const api = window.kayAnalytics = { consent: choice, decide, ask, data, scope, wanted: () => wanted }
+
+  document.addEventListener('kay:navigate', event => {
+    if (!load)
+      void view(event.detail.url)
+  })
+
+  document.addEventListener('click', event => {
+    const opening = event.target instanceof Element && event.target.closest('[data-analytics-consent]')
+
+    if ((gated || informed) && opening)
+      ask(opening)
+  })
+
+  if ((gated || informed) && choice() === '')
+    ask()
+
+  start()
+})()
+`
+
+export const NOTICE_SCRIPT = `(() => {
+  const api = window.kayAnalytics
+  const { data, scope } = api
+  const texts = data.texts ? JSON.parse(data.texts) : {}
+  let banner
+  let opener
+
+  function show(clicked) {
+    if (banner)
       return
 
     const lang = document.documentElement.lang.split('-')[0]
@@ -114,7 +152,7 @@ export const ANALYTICS_SCRIPT = `(() => {
 
       element.type = 'button'
       element.style.cssText = 'font:inherit;padding:.4em .9em;cursor:pointer'
-      element.addEventListener('click', () => decide(value))
+      element.addEventListener('click', () => api.decide(value))
 
       return element
     }
@@ -143,26 +181,25 @@ export const ANALYTICS_SCRIPT = `(() => {
     }
   }
 
-  window.kayAnalytics = { consent: choice, decide, ask }
-  document.addEventListener('kay:navigate', event => {
-    // A page swap replaces the body, and the notice with it.
+  // An answer closes the notice and gives focus back to where it came from.
+  document.addEventListener('kay:consent', () => {
+    const back = banner?.contains(document.activeElement) ? opener : undefined
+
+    banner?.remove()
+    banner = undefined
+    opener = undefined
+
+    if (back?.isConnected)
+      back.focus()
+  })
+
+  // A page swap replaces the body, and the notice with it.
+  document.addEventListener('kay:navigate', () => {
     if (banner && !banner.isConnected)
       document.body.append(banner)
-
-    if (!load)
-      void view(event.detail.url)
   })
 
-  document.addEventListener('click', event => {
-    const opening = event.target instanceof Element && event.target.closest('[data-analytics-consent]')
-
-    if ((gated || informed) && opening)
-      ask(opening)
-  })
-
-  if ((gated || informed) && choice() === '')
-    ask()
-
-  start()
+  api.show = show
+  show(api.wanted())
 })()
 `

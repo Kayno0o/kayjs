@@ -108,7 +108,15 @@ describe('the script and the page', () => {
     const home = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(script.headers.get('content-type')).toContain('javascript')
-    expect(await script.text()).toContain('kay:navigate')
+    const tracker = await script.text()
+
+    expect(tracker).toContain('kay:navigate')
+    expect(tracker).not.toContain('aria-labelledby')
+
+    const notice = await app.handle(new Request('http://localhost/_kay/analytics/notice.js'))
+
+    expect(notice.headers.get('content-type')).toContain('javascript')
+    expect(await notice.text()).toContain('aria-labelledby')
     expect(home).toContain('src="/_kay/analytics.js"')
     expect(home).not.toContain('data-consent')
   })
