@@ -53,6 +53,9 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
       const size = STALE_PER_BATCH + kept.size
       const listed = await list(new Date(now - maxAge * 1000), size)
 
+      let deleted = 0
+      let failed = 0
+
       for (const account of listed) {
         if (kept.has(account.id))
           continue
@@ -60,19 +63,21 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
         try {
           if (await stillStale(core, account.id, kind)) {
             await eraseUser(core, account)
+            deleted++
 
             continue
           }
         }
         catch (error) {
           log.error(`deleting a stale ${kind} failed`, error)
+          failed++
         }
 
         kept.add(account.id)
       }
 
-      // A short list is the end of them.
-      if (listed.length < size)
+      // A short list is the end of them, and a batch whose erases all failed means a hook or store is down: the next run tries again.
+      if (listed.length < size || (deleted === 0 && failed > 0))
         return
     }
   }

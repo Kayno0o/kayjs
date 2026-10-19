@@ -266,3 +266,27 @@ describe('confirming an address with a password', () => {
     }
   })
 })
+
+describe('a replaced unverified account whose erase fails', () => {
+  test('stays listed as stale, so the sweep erases it later', async () => {
+    let failing = true
+    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onDelete: () => {
+      if (failing)
+        throw new Error('hook down')
+    } })
+
+    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    const old = (await app.store.users.findByEmail('ada@example.com'))!
+
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await Bun.sleep(50)
+    logged.mockRestore()
+    failing = false
+
+    expect(await app.store.users.get(old.id)).toBeDefined()
+    expect((await app.store.users.staleUnverified!(new Date(Date.now() + 1000), 10)).map(user => user.id)).toContain(old.id)
+  })
+})

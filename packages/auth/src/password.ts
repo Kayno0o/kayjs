@@ -223,7 +223,7 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   return { ok: true, user }
 }
 
-// Frees the address and the name at once and erases the account, `onDelete` included, off the response's path where registering signs no one in: a held address erases nothing, and the time the hook takes would tell it was unverified.
+// Frees the address and the name at once, under a placeholder address, and erases the account, `onDelete` included, off the response's path where registering signs no one in: a held address erases nothing, and the time the hook takes would tell it was unverified.
 async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promise<void> {
   if (!state.core.email?.requireVerified) {
     await eraseUser(state.core, holder)
@@ -231,7 +231,8 @@ async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promis
     return
   }
 
-  await state.core.store.users.update(holder.id, { email: null, username: null })
+  // The placeholder address keeps the account listed as unverified, so the stale sweep erases it should this erase fail or never run.
+  await state.core.store.users.update(holder.id, { email: `replaced+${holder.id}@invalid`, username: null })
   await afterResponse('erasing the account a registration replaced', async () => eraseUser(state.core, holder))
 }
 
