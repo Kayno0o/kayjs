@@ -389,23 +389,28 @@ export class HtmlTemplate extends TemplateWriter {
     const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
     const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     let ownDescribed: (() => void) | undefined
-    // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks.
-    const ownRequired = plan.attributes.some(attribute => 'name' in attribute && attribute.name === 'aria-required') || (type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()))
+    // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks; an expression for it is read a second time, as the type's is, and counts once it gives a value.
+    const required = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required')
+    const unrequirable = type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase())
     const fieldDescribed = (own: (() => void) | undefined) => {
+      const typed = type?.kind === 'value' ? () => b.add('(').addSource(type.expression).add(')') : undefined
+      const written = required?.kind === 'value' ? () => b.add('(').addSource(required.expression).add(')') : undefined
+      const args = [own, typed, written ?? (required || unrequirable ? () => b.add('true') : undefined)]
+
+      while (args.length > 0 && args.at(-1) === undefined)
+        args.pop()
+
       b.add(`${helperName('fieldDescribed')}(`)
 
-      if (own)
-        own()
-      else if (type?.kind === 'value' || ownRequired)
-        b.add('undefined')
+      for (const [index, arg] of args.entries()) {
+        if (index > 0)
+          b.add(', ')
 
-      if (type?.kind === 'value')
-        b.add(', (').addSource(type.expression).add(')')
-      else if (ownRequired)
-        b.add(', undefined')
-
-      if (ownRequired)
-        b.add(', true')
+        if (arg)
+          arg()
+        else
+          b.add('undefined')
+      }
 
       b.add(')')
     }

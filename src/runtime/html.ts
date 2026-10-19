@@ -156,12 +156,12 @@ function lastValue(sources: readonly object[], name: string): unknown {
 }
 
 // ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids, unless the `type` an expression gave it shows no text to describe.
-// `required` says the field wrote its own `aria-required`.
-export function fieldDescribed(own?: unknown, type?: unknown, required = false): string {
+// `ownRequired` is what the field's own `aria-required` gives, which keeps it once it gives a value.
+export function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown): string {
   if (UNDESCRIBED_TYPES.has(String(type ?? '').toLowerCase()))
     return attribute('aria-describedby', own)
 
-  return attribute('aria-describedby', fieldDescription(own)) + (fieldRequired() && !required && !UNREQUIRABLE_TYPES.has(String(type ?? '').toLowerCase()) ? ' aria-required="true"' : '')
+  return attribute('aria-describedby', fieldDescription(own)) + (fieldRequired() && ownRequired == null && !UNREQUIRABLE_TYPES.has(String(type ?? '').toLowerCase()) ? ' aria-required="true"' : '')
 }
 
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
@@ -229,7 +229,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
   if (field) {
     markup += attribute('aria-describedby', fieldDescription(described))
 
-    if (fieldRequired() && lastValue(sources, 'aria-required') === undefined && !UNREQUIRABLE_TYPES.has(String(lastValue(sources, 'type') ?? '').toLowerCase()))
+    if (fieldRequired() && lastValue(sources, 'aria-required') == null && !UNREQUIRABLE_TYPES.has(String(lastValue(sources, 'type') ?? '').toLowerCase()))
       markup += ' aria-required="true"'
   }
 

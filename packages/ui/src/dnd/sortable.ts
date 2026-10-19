@@ -29,13 +29,11 @@ export interface SortableOptions {
   onReorder: (from: number, to: number) => void | Promise<void>
 }
 
-const NATIVE_ROLES = new Set(['A', 'BUTTON', 'INPUT', 'SUMMARY'])
-
 function nameHandle(el: HTMLElement): void {
-  if (!el.hasAttribute('role') && !NATIVE_ROLES.has(el.tagName))
+  if (!el.matches('[role],a,button,input,summary'))
     el.setAttribute('role', 'button')
 
-  if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby') && !el.textContent?.trim())
+  if (!el.matches('[aria-label],[aria-labelledby]') && !el.textContent?.trim())
     el.setAttribute('aria-label', wording('ui.dnd.handleLabel', 'Reorder'))
 }
 

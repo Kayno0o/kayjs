@@ -290,3 +290,61 @@ inBrowser('a SaveForm passed an action by a page with a server fence', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a Select with submit on a served page', () => {
+  test('waits for Enter or blur after an arrow key on the closed list, and posts at once for a mouse pick', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/select-submit')
+    const posts = async () => page.evaluate(() => document.querySelector('#posts')!.textContent)
+    const value = async () => page.evaluate(() => document.querySelector<HTMLSelectElement>('#kind')!.value)
+
+    await page.evaluate(() => document.querySelector<HTMLSelectElement>('#kind')!.focus())
+    await page.press('ArrowDown')
+    await page.press('ArrowDown')
+
+    expect([await value(), await posts()]).toEqual(['c', '0'])
+
+    await page.press('Enter')
+
+    expect(await posts()).toBe('1')
+
+    // Enter may leave the native list open, which Escape closes without a pick.
+    await page.press('Escape')
+    await page.press('ArrowUp')
+
+    expect([await value(), await posts()]).toEqual(['b', '1'])
+
+    await page.click('#elsewhere')
+
+    expect(await posts()).toBe('2')
+
+    // A mouse pick posts at once: the native list is not drawn by headless Chromium, so the pick is the browser's own change from a pointer press and a value change.
+    await page.evaluate(() => {
+      const select = document.querySelector<HTMLSelectElement>('#kind')!
+
+      select.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      select.value = 'a'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    expect(await posts()).toBe('3')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('posts at once for a pick from the list a key opened', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/select-submit')
+    const posts = async () => page.evaluate(() => document.querySelector('#posts')!.textContent)
+
+    await page.evaluate(() => document.querySelector<HTMLSelectElement>('#kind')!.focus())
+    await page.press('Space')
+    await page.press('ArrowDown')
+    await page.press('Enter')
+    await page.waitUntil(() => document.querySelector('#posts')!.textContent !== '0')
+
+    expect(await posts()).toBe('1')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})

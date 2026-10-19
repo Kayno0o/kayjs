@@ -1,0 +1,6 @@
+---
+import SubmittingSelect from '../components/submitting-select.kay'
+---
+main
+  SubmittingSelect
+  button#elsewhere(type="button") Elsewhere

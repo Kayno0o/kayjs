@@ -103,3 +103,21 @@ test('a Select with submit still hands the page\'s own key, pointer and blur han
 
   expect(heard).toEqual(['keydown', 'pointerdown', 'blur'])
 })
+
+test('a Select without submit still hands the page\'s own handlers their events and never posts', async () => {
+  const heard: string[] = []
+
+  mounted = await mountComponent('src/components/submitting-select.kay', { heard, submit: false })
+
+  const select = mounted.root.querySelector<HTMLSelectElement>('#kind')!
+
+  select.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  select.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  select.value = 'b'
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+  select.dispatchEvent(new FocusEvent('blur'))
+  await settle()
+
+  expect(heard).toEqual(['keydown', 'pointerdown', 'blur'])
+  expect(mounted.root.querySelector('#posts')!.textContent).toBe('0')
+})

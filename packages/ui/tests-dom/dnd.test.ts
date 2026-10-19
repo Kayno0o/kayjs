@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { announce } from '../src/announce'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
 import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
@@ -135,6 +136,21 @@ describe('Sortable, from the keyboard', () => {
     await Bun.sleep(150)
 
     expect(dialog.querySelector(':scope > [data-kui-announce]')?.textContent).toBe('Moved to 2 of 2')
+  })
+
+  test('keeps the latest words when a second move is said before a fresh region has settled', async () => {
+    const dialog = document.createElement('dialog')
+
+    stage().append(dialog)
+
+    const handle = document.createElement('button')
+
+    dialog.append(handle)
+    announce('First', handle)
+    announce('Second', handle)
+    await Bun.sleep(150)
+
+    expect(dialog.querySelector('[data-kui-announce]')?.textContent).toBe('Second')
   })
 
   test('says nothing for a key that moves nothing', async () => {
