@@ -358,9 +358,12 @@ describe('the documents', () => {
       expect((await server({ url: null }).browser().fetch('/.well-known/oauth-authorization-server', { headers: { host: 'evil.example' } })).status).toBe(500)
       expect((await server().browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(200)
 
-      const unsaid = await server({ url: null }).browser().fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'host': 'evil.example' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
+      // What kay's MCP endpoint asks the auth library for its 401 pointer: no origin of its own, so it falls back to the request's.
+      const unsaid = server({ url: null })
 
-      expect(unsaid.status).not.toBe(500)
+      expect(await unsaid.browser().call('oauthOrigin')).toBeFalsy()
+      expect(await unsaid.browser().call('oauthResource', '/mcp', 'API')).toBeFalsy()
+      expect(await server().browser().call('oauthOrigin')).toBe('http://localhost')
     }
     finally {
       if (before === undefined)

@@ -473,6 +473,21 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         expect(await oauth.grants.get('u2', 'c1')).toBeUndefined()
       })
 
+      test('an empty scope list is kept as an empty list, apart from null, which is every scope', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c1', clientName: 'Agent', scopes: [], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null })
+        await oauth.codes.create(code('code', { scopes: [] }))
+        await oauth.refresh.create(refresh('rt', { scopes: [] }))
+        await store.bearerTokens.create({ ...bearer('t1', { clientId: 'c1', family: 'f1' }), scopes: [] })
+
+        expect((await oauth.grants.get('u1', 'c1'))?.scopes).toEqual([])
+        expect((await oauth.codes.use('code', new Date('2026-02-01T00:00:00Z')))?.code.scopes).toEqual([])
+        expect((await oauth.refresh.use('rt', new Date('2026-02-01T00:00:00Z')))?.token.scopes).toEqual([])
+        expect((await store.bearerTokens.findByDigest('d-t1'))?.scopes).toEqual([])
+      })
+
       test('a code and a refresh token are spent once, the second spend told from a token never issued', async () => {
         const oauth = store.oauth!
 

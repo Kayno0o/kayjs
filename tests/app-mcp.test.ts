@@ -389,6 +389,27 @@ describe('sign-in metadata of an app with no site set', () => {
   })
 })
 
+describe('an auth library that cannot name its origin', () => {
+  it('still answers 401 with a pointer built from the request, as kayjs-auth does in production with no site set', async () => {
+    const unnamed = await testSite({ routes, api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: { oauthResource: () => null, oauthOrigin: () => undefined, oauthFixed: () => false } }) })
+    const before = configuredSite()
+
+    try {
+      setSite(undefined)
+
+      const refused = await rpc(unnamed, 'tools/call', { name: 'wipe', arguments: { confirm: true } })
+
+      expect(refused.response.status).toBe(401)
+      expect(refused.response.headers.get('www-authenticate')).toBe('Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource"')
+      expect((await unnamed.fetch('/.well-known/oauth-protected-resource')).status).toBe(404)
+    }
+    finally {
+      setSite(before?.origin, before?.slashed === true ? 'always' : 'never')
+      await unnamed.close()
+    }
+  })
+})
+
 describe('sign-in metadata an app serves itself', () => {
   it('gives way to the app\'s own route at that path instead of stopping the boot', async () => {
     const own = await testSite({ routes, api, mcp: true, islands: false, redirects: { '/.well-known/oauth-protected-resource': '/elsewhere' } })
