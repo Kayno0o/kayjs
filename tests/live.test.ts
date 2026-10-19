@@ -1174,6 +1174,34 @@ describe('rooms', () => {
       expect(() => sqliteRooms(join(dir, 'bad.sqlite'), { poll: '0ms' })).toThrow('sqliteRooms` poll')
     })
 
+    it('reaches the other process as the file changes, well inside the interval it also reads at', async () => {
+      const file = join(dir, 'woken.sqlite')
+      const stores = [sqliteRooms(file), sqliteRooms(file)] as const
+      const [first, second] = [rooms<{ text: string }>({ store: stores[0] }), rooms<{ text: string }>({ store: stores[1] })]
+      const [ada, bob] = [connection(), connection()]
+
+      first.join(ada, 'hall')
+      second.join(bob, 'hall')
+      await Bun.sleep(300)
+
+      // The interval is 250 ms: every delivery under 100 ms came from the file changing.
+      const times: number[] = []
+
+      for (let message = 1; message <= 5; message++) {
+        const start = performance.now()
+
+        first.publish('hall', { text: String(message) })
+        await until(() => bob.received.length === message)
+        times.push(performance.now() - start)
+        await Bun.sleep(37)
+      }
+
+      expect(Math.max(...times)).toBeLessThan(100)
+
+      for (const store of stores)
+        store.close()
+    })
+
     it('lists the members of every process and reaches them, but the sender or to the member named', async () => {
       const { first, second, close } = processes('reach')
       const [ada, bob, host] = [connection(), connection(), connection()]

@@ -1,4 +1,7 @@
+import type { FSWatcher } from 'node:fs'
 import type { DurationText } from '../runtime/duration'
+import { watch } from 'node:fs'
+import { basename, dirname } from 'node:path'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -63,8 +66,9 @@ const NO_MEMBER = ''
 // How often a process says it is alive, and how long after its last word its members stop counting.
 const HEARTBEAT = 2_000
 const EXPIRY = 10_000
-// How often a process reads the messages others wrote, and how long they are kept.
-const POLL = '25ms'
+// How often a process reads the messages others wrote, and how long they are kept: a write by another process wakes the read at once, so this is only the net under it, and a file whose changes cannot be watched is read at the shorter interval.
+const POLL = '250ms'
+const UNWATCHED_POLL = '25ms'
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
@@ -198,10 +202,11 @@ export function memoryRooms(): RoomStore {
   }
 }
 
-// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll`, `'25ms'` by default; a bare number throws.
+// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched); a bare number throws.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
-export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText } = {}): RoomStore {
-  const pollMs = optionMs(poll, '`sqliteRooms` poll')
+export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}): RoomStore {
+  const askedMs = poll === undefined ? undefined : optionMs(poll, '`sqliteRooms` poll')
+  const [watched, unwatched] = [optionMs(POLL, ''), optionMs(UNWATCHED_POLL, '')]
   const db = openSqlite(path)
   const self = crypto.randomUUID()
 
@@ -226,6 +231,8 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText
   const own = new Map<string, { room: string, connection: string, member: string }>()
   let last = 0
   let reading: ReturnType<typeof setInterval> | undefined
+  let watcher: FSWatcher | undefined
+  let woken: ReturnType<typeof setTimeout> | undefined
   let closed = false
   let beating: ReturnType<typeof setInterval> | undefined
   let pruned = 0
@@ -264,6 +271,15 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText
     }
   }
 
+  const stopReading = () => {
+    clearInterval(reading)
+    clearTimeout(woken)
+    watcher?.close()
+    reading = undefined
+    woken = undefined
+    watcher = undefined
+  }
+
   // The process says it is alive, and reads what others publish, only while it holds a connection: one with none has no member to keep or to deliver to.
   const sync = () => {
     const held = own.size > 0 && !closed
@@ -281,12 +297,21 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText
     if (held && listeners.size > 0 && !reading) {
       // Read from now on: what others published before anyone here listened is for the members they had then.
       last = latest.get()?.id ?? 0
-      reading = setInterval(guarded('reading what other processes published to rooms', read), pollMs)
+
+      const reader = guarded('reading what other processes published to rooms', read)
+
+      watcher = watchStore(path, () => {
+        // Several writes of one transaction wake it once.
+        woken ??= setTimeout(() => {
+          woken = undefined
+          reader()
+        }, 0)
+      })
+      reading = setInterval(reader, askedMs ?? (watcher ? watched : unwatched))
       reading.unref()
     }
     else if (!(held && listeners.size > 0) && reading) {
-      clearInterval(reading)
-      reading = undefined
+      stopReading()
     }
   }
 
@@ -328,9 +353,8 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText
     close() {
       closed = true
       clearInterval(beating)
-      clearInterval(reading)
+      stopReading()
       beating = undefined
-      reading = undefined
       listeners.clear()
       db.close()
     },
@@ -340,4 +364,27 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText
   onReload(() => !closed && store.close())
 
   return store
+}
+
+// Calls `wake` when a process writes the SQLite file or the WAL beside it, or undefined where it cannot be watched: memory, or a folder the platform will not watch.
+function watchStore(path: string, wake: () => void): FSWatcher | undefined {
+  if (path === ':memory:' || path === '')
+    return undefined
+
+  const name = basename(path)
+
+  try {
+    const watcher = watch(dirname(path), { persistent: false }, (_, changed) => {
+      if (changed === null || changed.startsWith(name))
+        wake()
+    })
+
+    // A watcher that fails leaves the interval the only read.
+    watcher.on('error', () => watcher.close())
+
+    return watcher
+  }
+  catch {
+    return undefined
+  }
 }

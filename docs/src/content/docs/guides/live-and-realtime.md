@@ -273,7 +273,7 @@ export default api()
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
-A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`.
+A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`. A message reaches the other processes as soon as the file changes. The `poll` option, `'250ms'` by default, is how often a process also looks, in case the folder cannot be watched.
 
 ```ts
 import { rooms, sqliteRooms } from 'kay/server'
