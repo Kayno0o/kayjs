@@ -1,4 +1,4 @@
---- <Value extends string, Held extends Value | null = Value>
+--- <Value extends string | number, Held extends Value | null = Value>
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
@@ -23,10 +23,10 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   class?: string | undefined
 }>()
 
-// Held as a string: a signal cannot take a type parameter that might be a function.
+// Held as string or number: a signal cannot take a type parameter that might be a function.
 const group = name ?? uid()
-const picked = signal<string | null>(value)
-const answer = (next: string | null) => (onChange as ((value: string | null) => unknown) | undefined)?.(next)
+const picked = signal<string | number | null>(value)
+const answer = (next: string | number | null) => (onChange as ((value: string | number | null) => unknown) | undefined)?.(next)
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -41,19 +41,19 @@ const radios = () => [...root?.querySelectorAll<HTMLInputElement>('.kui-segmente
 
 // Checks the radio of `wanted` again, in this group only: the binding may never have seen the radio that took the check.
 // Focus follows the check, as it does for a radio moved by an arrow key: one left on a radio that snapped back would read as unchecked to a screen reader while the group holds another.
-function check(wanted: string | null) {
+function check(wanted: string | number | null) {
   const all = radios()
   const active = root?.ownerDocument.activeElement
   const focused = all.find(radio => radio === active)
 
   for (const radio of all)
-    radio.checked = radio.value === wanted
+    radio.checked = wanted !== null && radio.value === String(wanted)
 
   if (focused && !focused.checked)
     all.find(radio => radio.checked)?.focus()
 }
 
-async function pick(next: string) {
+async function pick(next: string | number) {
   // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back, on the start when a reset is waiting.
   if (busy()) {
     check(resetting.waiting() ? started() : picked())
@@ -64,7 +64,7 @@ async function pick(next: string) {
   await change(next)
 }
 
-async function change(next: string | null) {
+async function change(next: string | number | null) {
   const before = picked()
   const syncedBefore = synced
 
@@ -81,7 +81,12 @@ async function change(next: string | null) {
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
-const started = () => radios().find(radio => radio.defaultChecked)?.value ?? null
+// The radios hold text, so the option an input stands for is found again to hear its own type.
+const started = () => {
+  const text = radios().find(radio => radio.defaultChecked)?.value
+
+  return options.find(option => String(option.value) === text)?.value ?? null
+}
 
 // A reset puts the radios back on their defaults, which the app's `onChange` then hears of, `null` for a group that started with none picked.
 // One meeting a change under way waits for it.

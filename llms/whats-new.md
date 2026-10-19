@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `overrideEnv(env, values)` from `kay/test` gives a `defineEnv` value other variables for one test and puts them back, and `defineEnv`'s `source` argument is documented ([Testing](testing.md), [Server](server.md)).
 - kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when kay.config.ts `site` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
 - kayjs-ui's `attempt` and ConfirmDelete read the `ApiError` that `call()` throws as they do an action's refusal: the route's own words are toasted for a 4xx, `refused` reads its `answer`, and `failure` stands for status 0 or a 5xx ([kayjs-ui](../packages/ui/llms/basics.md)).
+- kayjs-ui `Segmented` takes number option values, and `onChange` hears the option's own type ([Tables, navigation and layout](../packages/ui/llms/tables-navigation-and-layout.md)).
 
 ## 1.57.1
 
