@@ -572,7 +572,7 @@ function track(source: Source): void {
   }
 
   // Read already in this run, out of order.
-  if (cursor > 0 && sources.lastIndexOf(source, cursor - 1) >= 0)
+  if (cursor > 0 && source.observers?.has(listener) && sources.lastIndexOf(source, cursor - 1) >= 0)
     return
 
   // The order changed: what the last run read from here on is read afresh, so what stays subscribed is what this run read.
