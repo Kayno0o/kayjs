@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
@@ -220,6 +220,12 @@ export class JsxTemplate {
     b.wrap(branch, () => {
       const hasRest = index + 1 < node.branches.length || node.fallback !== undefined
 
+      if (branch.alias && this.options.check) {
+        this.emitCheckedAlias(node, index, branch)
+
+        return
+      }
+
       if (branch.alias) {
         b.add(`<${helperName('Show')} when={`).addSource(branch.test).add('}')
 
@@ -243,6 +249,18 @@ export class JsxTemplate {
       b.add(' : ')
       this.emitIfRest(node, index + 1)
     })
+  }
+
+  // The type checker reads an aliased block as a ternary calling its block on the spot, which TypeScript runs inline, so a property path the condition or an enclosing block narrowed stays narrowed inside it, as a callback would drop.
+  private emitCheckedAlias(node: IfNode, index: number, branch: IfBranch) {
+    const { b } = this
+
+    b.add('(').addSource(branch.test).add(') ? ((')
+    this.sites.rows.add(b.code.length)
+    b.addSource(branch.alias!).add(') => ')
+    this.emitRoot(branch.children)
+    b.add(')(KayTruthy((').addSource(branch.test).add('))) : ')
+    this.emitIfRest(node, index + 1)
   }
 
   // What renders when the branches before `index` all fail: the next one, else the `else` block.
@@ -317,6 +335,12 @@ export class JsxTemplate {
   private emitFor(node: ForNode) {
     const { b } = this
 
+    if (this.options.check) {
+      this.emitCheckedFor(node)
+
+      return
+    }
+
     if (this.options.staticLoops) {
       this.emitStaticFor(node)
 
@@ -381,6 +405,87 @@ export class JsxTemplate {
       }
 
       b.add(`}</${tag}>`)
+    })
+  }
+
+  // The type checker reads the loop's list once, and its block as a call on the spot with a row of that list, which TypeScript runs inline, so a property path an enclosing block narrowed stays narrowed inside it, as a callback would drop.
+  private emitCheckedFor(node: ForNode) {
+    const { b } = this
+    const staticLoop = this.options.staticLoops === true
+
+    b.wrap(node, () => {
+      b.add('{(() => { const kayEach = (')
+
+      if (!staticLoop && this.options.identityKeys && !node.key)
+        b.add('KayIdentityKey((').addSource(node.each).add('))')
+      else
+        b.addSource(node.each)
+
+      b.add('); return ')
+
+      if (staticLoop) {
+        b.add(`${helperName('staticFor')}(kayEach, `)
+      }
+      else {
+        const positional = keyedByPosition(node, this.src)
+
+        b.add(`<KayLoopFor each={kayEach} keyed={`)
+
+        if (positional)
+          b.add('false')
+        else if (node.key)
+          b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
+        else
+          b.add('() => 0')
+
+        b.add('}')
+
+        if (node.fallback) {
+          b.add(' fallback={')
+          this.emitRoot(node.fallback)
+          b.add('}')
+        }
+
+        b.add('>{')
+      }
+
+      b.add('((')
+      this.sites.rows.add(b.code.length)
+      b.addSource(node.item)
+
+      if (node.index) {
+        b.add(', ')
+        this.sites.rows.add(b.code.length)
+        b.addSource(node.index)
+      }
+
+      b.add(') => ')
+
+      // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
+      if (!staticLoop && keyedByPosition(node, this.src)) {
+        b.add('(void (').addSource(node.key).add('), ')
+        this.emitRoot(node.children)
+        b.add(')')
+      }
+      else {
+        this.emitRoot(node.children)
+      }
+
+      b.add(node.index ? ')(KayRow(kayEach), 0)' : ')(KayRow(kayEach))')
+
+      if (staticLoop) {
+        if (node.fallback) {
+          b.add(', ')
+          this.emitRoot(node.fallback)
+        }
+
+        b.add(')')
+      }
+      else {
+        b.add('}</KayLoopFor>')
+      }
+
+      b.add(' })()}')
     })
   }
 

@@ -1025,6 +1025,49 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('keeps what an enclosing if narrows on a property path inside a nested for and an aliased if, in an island as in a static component', async () => {
+    const template = [
+      'if dossier.latest',
+      '  for entry of entries key={entry.id}',
+      '    p {dossier.latest.id}{entry.id}',
+      '  if entries[0] as first',
+      '    p {dossier.latest.id}{first.id}',
+      'if dossier.latest !== null',
+      '  for entry of entries key={entry.id}',
+      '    p {dossier.latest.id}{entry.id}',
+      '  if entries[0] as first',
+      '    p {dossier.latest.id}{first.id}',
+      'if dossier.latest',
+      '  for entry of entries key={entry.id}',
+      '    if entry.next',
+      '      for other of entries key={other.id}',
+      '        p {dossier.latest.id}{entry.next.id}{other.id}',
+      'for entry of entries key={entry.id}',
+      '  p {dossier.latest.id}',
+      'if entries[0] as first',
+      '  p {first.id}',
+      '',
+    ].join('\n')
+    const script = '---\ntype Stage = { id: string }\nconst { dossier, entries } = props<{ dossier: { latest: Stage | null }, entries: { id: string, next: Stage | null }[] }>()\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/routes/page.kay': `--- server\ntype Stage = { id: string }\nconst dossier: { latest: Stage | null } = { latest: null }\nconst entries: { id: string, next: Stage | null }[] = []\n---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      // Only the loop after the blocks reads a path nothing narrows.
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
+        ['island.kay', 25, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
+        ['page.kay', 22, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
+        ['static.kay', 21, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes raw on a head title only', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'head\n  title(raw) Whole\n  meta(raw name="x" content="y")\np Home\n' })
 

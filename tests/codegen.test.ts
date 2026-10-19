@@ -131,7 +131,7 @@ describe('control flow', () => {
     expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i}: {row}</li>, () => <li>none</li>)}')
     expect(server).not.toContain('KayLoopFor ')
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayLoopFor each={__props.rows}')
-    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayLoopFor each={__props.rows}')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayLoopFor each={kayEach}')
   })
 
   it('types a page\'s load with its query schema and keeps the schema out of a browser build\'s action stubs', () => {
