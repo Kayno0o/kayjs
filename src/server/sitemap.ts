@@ -32,7 +32,7 @@ export const SITEMAP_LIMITS = { urls: 50_000, bytes: 50 * 1024 * 1024 }
 let activeLimits = SITEMAP_LIMITS
 
 // For tests, which split a sitemap of a few dozen pages; not for apps. No argument restores the protocol's limits.
-export function setSitemapLimits(limits = activeLimits): void {
+export function setSitemapLimits(limits = SITEMAP_LIMITS): void {
   activeLimits = limits
 }
 // How many parts a sitemap served in several files may have, 5 million URLs.
