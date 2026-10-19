@@ -577,6 +577,8 @@ describe('pages left out', () => {
     try {
       await send(app, visit({ u: 'http://localhost/shop/account', s: '/shop' }))
       await send(app, visit({ u: 'http://localhost/shop/account', s: '"/evil' }))
+      // The root of a mounted app is no segment, so `/*` leaves it be.
+      await send(await site(plausible({ exclude: ['/*'] })), visit({ u: 'http://localhost/shop', s: '/shop' }))
 
       const post = async (u: string) => mounted.fetch('/_kay/analytics', { method: 'POST', body: JSON.stringify(visit({ u, s: '/shop' })), headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.30' } })
 
@@ -584,7 +586,7 @@ describe('pages left out', () => {
       await post('http://localhost/shop/pricing')
       await forwardsSettled()
 
-      expect(received.map(request => new URL((request.body as { url: string }).url).pathname)).toEqual(['/shop/account', '/shop/pricing'])
+      expect(received.map(request => new URL((request.body as { url: string }).url).pathname)).toEqual(['/shop/account', '/shop', '/shop/pricing'])
     }
     finally {
       await mounted.close()

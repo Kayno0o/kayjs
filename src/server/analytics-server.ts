@@ -8,7 +8,7 @@ import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated, NOTICE_SCRIPT_PATH } from './analytics'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
-import { BASE_PATH } from './base'
+import { BASE_PATH, routerPath } from './base'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 
@@ -244,7 +244,7 @@ function skippedPath(exclude: string[] | undefined, pathname: string, base: stri
   if (exclude === undefined || exclude.length === 0)
     return false
 
-  const parts = (pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname).split('/').filter(Boolean)
+  const parts = routerPath(pathname, base).split('/').filter(Boolean)
 
   return exclude.some(pattern => pattern.split('/').filter(Boolean).every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
 }

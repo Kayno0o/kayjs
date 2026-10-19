@@ -144,7 +144,9 @@ If the notice fails to load, say when the visitor is offline, it is fetched agai
 
 Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages.
 
-The server drops a visit to a listed path too, even from a browser holding an older tracker. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`, where `exclude` is a type error.
+The server drops a visit to a listed path too, even from a browser holding an older tracker, unless a proxy takes the base off the request and that tracker does not name it.
+
+The list works for the tools kay counts for, so not Fathom, Cloudflare or `custom`, where `exclude` is a type error.
 
 The page title is not sent unless you write `titles: true`, since a title can name a person. Like `exclude`, it is a type error for Fathom, Cloudflare and `custom`.
 
