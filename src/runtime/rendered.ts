@@ -1,4 +1,4 @@
-// A rendered value is `{ t: markup }` carrying a mark that data cannot hold, so a JSON value with a `t` string renders as text.
+// A rendered value is `{ t: markup }` carrying a mark that data cannot hold, so a JSON value with a `t` string renders nothing.
 // A global symbol, so a second copy of the runtime recognises the renders of the first.
 const RENDERED = Symbol.for('kay.rendered')
 
