@@ -29,12 +29,33 @@ export interface SortableOptions {
   onReorder: (from: number, to: number) => void | Promise<void>
 }
 
-function nameHandle(el: HTMLElement): void {
+// What the item holds, in a few words: its own label, else the alt of its first image, else its text.
+function itemName(item: HTMLElement | undefined): string {
+  if (!item)
+    return ''
+
+  const text = (item.getAttribute('aria-label') ?? item.querySelector('img[alt]')?.getAttribute('alt') ?? item.textContent ?? '').replaceAll(/\s+/g, ' ').trim()
+
+  return text.length > 40 ? `${text.slice(0, 39)}…` : text
+}
+
+// Handles named here rather than by the page, which are named again once their item registers.
+const named = new WeakSet<HTMLElement>()
+
+function nameHandle(el: HTMLElement, item?: HTMLElement): void {
   if (!el.matches('[role],a,button,input,summary'))
     el.setAttribute('role', 'button')
 
-  if (!el.matches('[aria-label],[aria-labelledby]') && !el.textContent?.trim())
-    el.setAttribute('aria-label', wording('ui.dnd.handleLabel', 'Reorder'))
+  const own = named.has(el)
+  const given = el.matches('[aria-label],[aria-labelledby]') && !own
+
+  if (given || el.textContent?.trim() || el.querySelector('img[alt]:not([alt=""])'))
+    return
+
+  const what = itemName(item)
+
+  el.setAttribute('aria-label', what === '' ? wording('ui.dnd.handleLabel', 'Reorder') : wording('ui.dnd.handleItemLabel', 'Reorder {item}', { item: what }))
+  named.add(el)
 }
 
 function clearSelection(): void {
@@ -58,13 +79,19 @@ export class Sortable {
   // An element a list no longer renders is left out wherever the items are read, rather than unregistered.
   item = (id: Id) => (el: HTMLElement): void => {
     this.#items.set(id, el)
+
+    const handle = this.#handles.get(id)
+
+    // The handle was registered first, so it was named without its item.
+    if (handle && named.has(handle))
+      nameHandle(handle, el)
   }
 
   handle = (id: Id) => (el: HTMLElement): void => {
     this.#handles.set(id, el)
     // Tells assistive technology what the keyboard can do with the handle, and gives one the page left bare a role and a name.
     el.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown')
-    nameHandle(el)
+    nameHandle(el, this.#items.get(id))
     on(el, 'pointerdown', event => this.#arm(id, event))
     on(el, 'keydown', event => this.#step(id, event))
   }

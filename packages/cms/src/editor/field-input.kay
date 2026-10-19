@@ -43,12 +43,12 @@ function set(next: unknown): void {
   drafts.set(entry, path, next)
 }
 
-// A move is said to a screen reader, whose focus follows the item but does not read where it landed.
+// A move is said to a screen reader, whose focus follows the item but does not read where it landed. A numbered item is named by the place it left, as its number at the new place would read as the one it now holds.
 function moveItem(from: number, to: number): void {
   set(reordered(items(), from, to))
 
   if (field.kind === 'list')
-    announceMove(itemAt(field, to).label, to, items().length)
+    announceMove(itemAt(field, from).label, to, items().length)
 }
 
 // Alt with an arrow in any control of an item moves it, as the buttons beside it do.

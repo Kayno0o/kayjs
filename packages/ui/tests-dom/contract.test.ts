@@ -8,6 +8,11 @@ const BROWSER_DRAWN: Record<string, string | undefined> = {
   'line-chart': '.kui-line-chart-plot',
 }
 
+// What an effect adds to the browser's render while the server's holds none, by component.
+const EFFECT_ADDED: Record<string, string | undefined> = {
+  'contact-form': '[aria-required]',
+}
+
 // The fixture app is no part of this package's type check, so its table is imported by a path no import is resolved for.
 const { CASES } = await import(join(process.env.KAY_ROOT!, 'src', 'contract.ts')) as { CASES: Record<string, unknown> }
 const mounted: { unmount: () => void }[] = []
@@ -32,7 +37,7 @@ function reflected(root: Element): string {
 }
 
 // The markup as a browser holds it: hydration markers and island wrappers gone, drawn ids numbered, attributes in a fixed order.
-function canonical(html: string, browserDrawn = ''): string {
+function canonical(html: string, browserDrawn = '', effectAdded = ''): string {
   const holder = document.createElement('div')
 
   holder.innerHTML = html
@@ -59,9 +64,11 @@ function canonical(html: string, browserDrawn = ''): string {
   for (const element of holder.querySelectorAll('[aria-keyshortcuts]'))
     element.removeAttribute('aria-keyshortcuts')
 
-  // A static page's server render writes `aria-required` itself, which the effect of the browser's render adds in its turn.
-  for (const element of holder.querySelectorAll('[aria-required]'))
-    element.removeAttribute('aria-required')
+  // Only the browser's side is stripped of it, so a server render that starts writing it too is seen.
+  if (effectAdded) {
+    for (const element of holder.querySelectorAll(effectAdded))
+      element.removeAttribute(effectAdded.slice(1, -1))
+  }
 
   for (const element of holder.querySelectorAll('[value=""]'))
     element.removeAttribute('value')
@@ -121,7 +128,7 @@ describe('component contract', () => {
       mounted.push(browser)
 
       // The server and the browser's first render draw the same page.
-      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name])).toBe(canonical(server, BROWSER_DRAWN[name]))
+      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name], EFFECT_ADDED[name])).toBe(canonical(server, BROWSER_DRAWN[name]))
 
       // No id repeats.
       const ids = [...browser.root.querySelectorAll('[id]')].map(element => element.id)

@@ -7,6 +7,7 @@ import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
+import { apiStubs, apiTrees } from '../server/api-modules'
 import { testRoot } from './root'
 
 export interface Mounted {
@@ -117,11 +118,12 @@ async function bundle(root: string, file: string): Promise<string> {
   try {
     await Bun.write(join(work, 'entry.ts'), entry(file))
 
-    const { settings } = await loadConfig(root)
+    const config = await loadConfig(root)
+    const trees = apiTrees(root, config)
     let output: Bun.BuildArtifact
 
     try {
-      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [kay({ root, settings }), sharedMarks] })).outputs[0]!
+      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [apiStubs(trees), kay({ root, settings: config.settings, api: trees }), sharedMarks] })).outputs[0]!
     }
     catch (error) {
       // Bun throws on a failed build, its messages in `errors`.

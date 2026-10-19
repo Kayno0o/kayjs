@@ -181,6 +181,26 @@ describe('Sortable, from the keyboard', () => {
     expect(['bare', 'button', 'named', 'roled'].map(read)).toEqual([['button', 'Reorder'], [null, null], ['button', 'Grip'], ['slider', null]])
   })
 
+  test('names a bare handle after its item, whichever of the two registers first, and leaves an image with alt to name its handle', () => {
+    const sortable = new Sortable({ onReorder: () => undefined })
+    const area = stage()
+
+    area.innerHTML = '<li id="a"><span id="grip-a" tabindex="0"></span>Milk</li><li id="b"><span id="grip-b" tabindex="0"></span><i></i></li><li id="c"><span id="grip-c" tabindex="0"><img alt="Cover"></span>Photo</li>'
+
+    const at = (id: string) => area.querySelector<HTMLElement>(`#${id}`)!
+
+    sortable.item(0)(at('a'))
+    sortable.handle(0)(at('grip-a'))
+    sortable.handle(1)(at('grip-b'))
+    sortable.item(1)(at('b'))
+    sortable.item(2)(at('c'))
+    sortable.handle(2)(at('grip-c'))
+
+    expect(at('grip-a').getAttribute('aria-label')).toBe('Reorder Milk')
+    expect(at('grip-b').getAttribute('aria-label')).toBe('Reorder')
+    expect(at('grip-c').hasAttribute('aria-label')).toBe(false)
+  })
+
   test('starts each move from where the rows stand now, and keeps focus on the handle a keyed list moved', async () => {
     mounted = await mountComponent('src/components/sortable-list.kay')
 

@@ -147,6 +147,6 @@ Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/ba
 
 Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more).
 
-Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui/dnd` and is in the full reference. A move by arrow key is said to screen readers: where the item landed, as `Moved to 2 of 3`.
+Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui/dnd` and is in the full reference. A move by arrow key is said to screen readers: where the item landed, as `Moved to 2 of 3`. A handle with no label or text of its own is named `Reorder` and the item's label or text, such as `Reorder Milk`; give it an `aria-label` to say more.
 
 <ReadMore href="/llms/kayjs-ui">Every component's props, forms with FormDialog, drag and drop, label translation and testing are in the full kayjs-ui reference.</ReadMore>

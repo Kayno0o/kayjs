@@ -21,7 +21,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.contactForm.*`: `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)
-- `ui.dnd.*`: `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)
+- `ui.dnd.*`: `handleItemLabel` (`Reorder {item}`), `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)
 - `ui.formDialog.*`: `cancelLabel` (`Cancel`), `savingLabel` (`Saving…`)
 - `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `errorLabel` (`The icons could not be loaded.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)
 - `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
