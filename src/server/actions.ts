@@ -625,6 +625,11 @@ export async function guardsFirst(guards: LoadedGuard[], context: { request: Req
 // Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set.
 export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = guardUrl(context.request.url)): Promise<Response | GuardedRequest> {
   const { request } = context
+
+  // A guard may read the Authorization header or any other, so every answer behind one is for that caller alone.
+  if (guards.length > 0)
+    readPersonally(request)
+
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
     request,

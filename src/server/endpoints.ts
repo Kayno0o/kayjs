@@ -77,7 +77,7 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
   const passed = await passGuards(endpoint.guards, context, params, options)
 
   if (passed instanceof Response)
-    return passed
+    return markedPrivate(passed, request)
 
   const { jar, headers } = passed
   const ctx: EndpointContext = {

@@ -86,7 +86,7 @@ A page that is the same for everyone is rendered once with `prerender: true` in 
 
 After a change, `invalidate('posts')` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. Use `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` for a page no data explains.
 
-A page rendered per request that read the session, a cookie or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`. A CDN caching HTML then never hands one visitor's page to another.
+A page rendered per request that read the session, a cookie or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`. So does every answer behind a guard, whatever the guard read, such as an `Authorization` header, and every endpoint or API route answer behind one or that read the session, refusals included. A route that sets its own `cache-control` keeps it. A CDN caching HTML then never hands one visitor's page to another.
 
 A prerendered page keeps its public caching. A `cache-control` the page sets through `ctx.headers` wins.
 

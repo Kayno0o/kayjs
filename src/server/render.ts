@@ -226,6 +226,10 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 // The response a guard refusing the request gives, if one does.
 async function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
   // The page keeps the URL as sent; its guards read it spelled one way.
+  // Behind a guard the answer is for whoever passed it, whatever the guard read of the request.
+  if (route.guards.length > 0)
+    readPersonally(rendering.ctx.request)
+
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
   if (options.dev) {
