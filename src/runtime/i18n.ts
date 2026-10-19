@@ -91,10 +91,6 @@ const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc'
 // Where a link's path ends and its query or fragment starts.
 const PATH_END = /[?#]/
 const OPTIONAL_MARK = /\?$/
-const LINK_MEMO = 2048
-const compiledSettings = new WeakMap<LocaleSettings, Compiled>()
-// What `encodeURIComponent` leaves as it is, a segment of which is spelled as a URL carries it already.
-const PLAIN_SEGMENT = /^[\w.!~*'()-]*$/
 // Each unit with its length in seconds, a relative time taking the largest one the span reaches.
 const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
 
@@ -291,6 +287,18 @@ function cached<Value>(cache: Map<string, Value>, key: string, make: () => Value
   return value
 }
 
+// What the server installs to match links against patterns it has split once; without it, as in the browser, they are matched as they come.
+export interface LinkMatcher {
+  link: (settings: LocaleSettings, href: string, locale: string, currentHost: string | undefined) => string
+  repath: (settings: LocaleSettings, href: string, locale: string, back: boolean) => string
+}
+
+let matcher: LinkMatcher | undefined
+
+export function matchLinksWith(next: LinkMatcher | undefined): void {
+  matcher = next
+}
+
 // A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.
 // A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written.
 export function localizedLink(settings: LocaleSettings, href: string, locale: string, currentHost?: string): string {
@@ -299,24 +307,9 @@ export function localizedLink(settings: LocaleSettings, href: string, locale: st
   if (unchanged || !href.startsWith('/') || href.startsWith('//'))
     return href
 
-  const key = `${locale}\n${currentHost ?? ''}\n${href}`
-  const known = compiled(settings).links
-  let link = known.get(key)
+  if (matcher)
+    return matcher.link(settings, href, locale, currentHost)
 
-  if (link === undefined) {
-    link = resolvedLink(settings, href, locale, currentHost)
-
-    // A link carrying a slug is seen once, so the memo stops growing at a size no site's own links reach.
-    if (known.size >= LINK_MEMO)
-      known.clear()
-
-    known.set(key, link)
-  }
-
-  return link
-}
-
-function resolvedLink(settings: LocaleSettings, href: string, locale: string, currentHost: string | undefined): string {
   const end = href.search(PATH_END)
   const path = end === -1 ? href : href.slice(0, end)
   const segments = segmentsOf(path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path)
@@ -325,20 +318,22 @@ function resolvedLink(settings: LocaleSettings, href: string, locale: string, cu
     return href
 
   if (settings.feeds?.includes(path) === true)
-    return prefixedPath(settings, href, locale, currentHost)
+    return localePath({ ...settings, paths: undefined }, href, locale, currentHost)
 
   const file = segments.at(-1)?.includes('.') === true
-  const named = bestMatch(compiled(settings).pages, segments, normalized(segments))?.named
+  const page = settings.pages?.some((pattern) => {
+    const named = matchSegments(segmentsOf(pattern), segments, {})
 
-  return named !== undefined && (!file || named === segments.length) ? localePath(settings, href, locale, currentHost) : href
+    return named !== undefined && (!file || named === segments.length)
+  })
+
+  return page === true ? localePath(settings, href, locale, currentHost) : href
 }
 
 // The path in that locale, translated where the locale names the page its own way: under its prefix, bare for an unprefixed default, or on its own host when locales go by domain.
 export function localePath(settings: LocaleSettings, path: string, locale: string, currentHost?: string): string {
-  return prefixedPath(settings, translatedPath(settings, path, locale), locale, currentHost)
-}
+  const translated = translatedPath(settings, path, locale)
 
-function prefixedPath(settings: LocaleSettings, translated: string, locale: string, currentHost?: string): string {
   if (settings.hosts) {
     const host = settings.hosts[locale]
 
@@ -367,19 +362,34 @@ function repath(settings: LocaleSettings, href: string, locale: string, back: bo
   if (settings.paths === undefined)
     return href
 
+  if (matcher)
+    return matcher.repath(settings, href, locale, back)
+
   const end = href.search(PATH_END)
   const path = end === -1 ? href : href.slice(0, end)
   const slash = path.length > 1 && path.endsWith('/')
   const segments = segmentsOf(slash ? path.slice(0, -1) : path)
-  const best = bestMatch(compiled(settings).translations(locale, back), segments, normalized(segments))
+  let best: { target: string, params: Record<string, string>, named: number } | undefined
+
+  for (const [pattern, translations] of Object.entries(settings.paths)) {
+    const translated = translations[locale]
+
+    if (translated === undefined)
+      continue
+
+    const [from, target] = back ? [translated, pattern] : [pattern, translated]
+    const params: Record<string, string> = {}
+    const named = matchSegments(segmentsOf(from), segments, params)
+
+    if (named !== undefined && (best === undefined || named > best.named))
+      best = { target, params, named }
+  }
 
   if (best === undefined)
     return href
 
-  const { params } = best
-  const { target } = best.candidate
-
-  const filled = target.flatMap((segment) => {
+  const { target, params } = best
+  const filled = segmentsOf(target).flatMap((segment) => {
     const param = segment.startsWith(':') ? segment.slice(1).replace(OPTIONAL_MARK, '') : undefined
     const name = segment === '*' ? '*' : param
     const value = name === undefined ? segment : params[name]
@@ -390,161 +400,50 @@ function repath(settings: LocaleSettings, href: string, locale: string, back: bo
   return `/${filled.join('/')}${slash && filled.length > 0 ? '/' : ''}${end === -1 ? '' : href.slice(end)}`
 }
 
-function segmentsOf(path: string): string[] {
+export function segmentsOf(path: string): string[] {
   return path === '/' || path === '' ? [] : path.split('/').slice(1)
 }
 
-// A pattern split once, its static segments spelled as a URL carries them, which no param name or `*` can be; the target is the path it translates to, as written.
-interface Candidate {
-  segments: string[]
-  target: string[]
-  order: number
-}
+// How many segments the pattern names outright when it takes the path, its params gathered; undefined when it does not take it.
+function matchSegments(pattern: string[], path: string[], params: Record<string, string>): number | undefined {
+  const [head, ...rest] = pattern
 
-// Candidates by the first segment they name outright; the rest, which any path may reach, apart.
-interface Indexed {
-  byFirst: Map<string, Candidate[]>
-  open: Candidate[]
-}
+  if (head === undefined)
+    return path.length === 0 ? 0 : undefined
 
-interface Compiled {
-  pages: Indexed
-  links: Map<string, string>
-  translations: (locale: string, back: boolean) => Indexed
-}
+  if (head === '*') {
+    params['*'] = path.join('/')
 
-// Everything a settings object's patterns need, split once, as a link meets them on every render; a settings object is read-only from its first link on.
-function compiled(settings: LocaleSettings): Compiled {
-  let known = compiledSettings.get(settings)
-
-  if (known === undefined) {
-    const translated = new Map<string, Indexed>()
-
-    known = {
-      pages: indexed((settings.pages ?? []).map((pattern, order) => compile(pattern, '/', order))),
-      links: new Map(),
-      translations(locale, back) {
-        const key = `${locale}${back ? '<' : '>'}`
-        let index = translated.get(key)
-
-        if (index === undefined) {
-          const candidates: Candidate[] = []
-
-          for (const [pattern, translations] of Object.entries(settings.paths ?? {})) {
-            const to = translations[locale]
-
-            if (to !== undefined)
-              candidates.push(back ? compile(to, pattern, candidates.length) : compile(pattern, to, candidates.length))
-          }
-
-          translated.set(key, index = indexed(candidates))
-        }
-
-        return index
-      },
-    }
-    compiledSettings.set(settings, known)
+    return 0
   }
 
-  return known
-}
+  if (head.startsWith(':') && head.endsWith('?')) {
+    const without = matchSegments(rest, path, params)
 
-function compile(pattern: string, target: string, order: number): Candidate {
-  return { segments: segmentsOf(pattern).map(segment => segment === '*' || segment.startsWith(':') ? segment : pathSegment(segment)), target: segmentsOf(target), order }
-}
-
-function indexed(candidates: Candidate[]): Indexed {
-  const byFirst = new Map<string, Candidate[]>()
-  const open: Candidate[] = []
-
-  for (const entry of candidates) {
-    const first = entry.segments[0]
-
-    if (first === undefined || first === '*' || first.startsWith(':')) {
-      open.push(entry)
-
-      continue
-    }
-
-    const group = byFirst.get(first)
-
-    if (group === undefined)
-      byFirst.set(first, [entry])
-    else
-      group.push(entry)
+    if (without !== undefined)
+      return without
   }
 
-  return { byFirst, open }
-}
+  const [segment, ...remaining] = path
 
-// The path's segments spelled as a URL carries them, which is how a pattern's static segments are compared.
-function normalized(segments: string[]): string[] {
-  return segments.map(segment => PLAIN_SEGMENT.test(segment) ? segment : pathSegment(segment))
-}
+  if (segment === undefined)
+    return undefined
 
-// The candidate naming most of the path outright, the earliest of equals, with its params gathered; undefined when none takes it.
-function bestMatch(index: Indexed, path: string[], spelled: string[]): { candidate: Candidate, named: number, params: Record<string, string> } | undefined {
-  let best: { candidate: Candidate, named: number, params: Record<string, string> } | undefined
+  if (head.startsWith(':')) {
+    const named = matchSegments(rest, remaining, params)
 
-  for (const group of [index.byFirst.get(spelled[0]!) ?? [], index.open]) {
-    for (const candidate of group) {
-      const params: Record<string, string> = {}
-      const named = matchSegments(candidate.segments, 0, path, spelled, 0, params)
+    if (named !== undefined)
+      params[head.slice(1).replace(OPTIONAL_MARK, '')] = segment
 
-      if (named !== undefined && (best === undefined || named > best.named || (named === best.named && candidate.order < best.candidate.order)))
-        best = { candidate, named, params }
-    }
+    return named
   }
 
-  return best
-}
+  if (pathSegment(head) !== pathSegment(segment))
+    return undefined
 
-// How many segments the pattern names outright when it takes the path from its segment `from` and the path's `at` on, its params gathered; undefined when it does not take it.
-function matchSegments(pattern: string[], from: number, path: string[], spelled: string[], at: number, params: Record<string, string>): number | undefined {
-  let named = 0
-  let place = at
+  const named = matchSegments(rest, remaining, params)
 
-  for (let index = from; index < pattern.length; index++) {
-    const head = pattern[index]!
-
-    if (head === '*') {
-      params['*'] = path.slice(place).join('/')
-
-      return named
-    }
-
-    if (head.startsWith(':') && head.endsWith('?')) {
-      // A failed attempt's params must not stay.
-      const attempt: Record<string, string> = {}
-      const without = matchSegments(pattern, index + 1, path, spelled, place, attempt)
-
-      if (without !== undefined) {
-        for (const name in attempt)
-          params[name] ??= attempt[name]!
-
-        return named + without
-      }
-    }
-
-    if (place >= path.length)
-      return undefined
-
-    if (!head.startsWith(':')) {
-      if (head !== spelled[place])
-        return undefined
-
-      named++
-    }
-    else {
-      const name = head.slice(1).replace(OPTIONAL_MARK, '')
-
-      params[name] ??= path[place]!
-    }
-
-    place++
-  }
-
-  return place === path.length ? named : undefined
+  return named === undefined ? undefined : named + 1
 }
 
 // A segment as a URL carries it, so `à-propos` written in the config and `%C3%A0-propos` sent by a browser are one.
@@ -568,6 +467,6 @@ export function splitLocale(settings: LocaleSettings, path: string): { locale: s
 }
 
 // A segment naming a locale whose pages go under its prefix.
-function prefixed(settings: LocaleSettings, segment: string): boolean {
+export function prefixed(settings: LocaleSettings, segment: string): boolean {
   return settings.locales.includes(segment) && (segment !== settings.defaultLocale || settings.prefixDefault)
 }

@@ -14,11 +14,12 @@ import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
-import { flattenMessages, localeName, localePath, localizedLink, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
+import { flattenMessages, localeName, localePath, localizedLink, matchLinksWith, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
+import { compiledLinks } from '../src/server/links'
 import { hookPrerendered } from '../src/server/page-hook'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
@@ -80,7 +81,11 @@ const PATH_EXPECTED: Record<string, string[]> = {
   'back/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
 }
 
-describe('links of a site with many routes', () => {
+// The browser matches links as they come and the server against patterns split once, so both must resolve every link alike.
+describe.each([['as they come', undefined], ['split once', compiledLinks]])('links of a site with many routes, patterns matched %s', (_, matcher) => {
+  beforeAll(() => matchLinksWith(matcher))
+  afterAll(() => matchLinksWith(compiledLinks))
+
   it('resolve to the href they always did, whatever the locale, host, prefix, param, file, query, encoding or feed', () => {
     for (const [name, expected] of Object.entries(LINK_EXPECTED)) {
       const [variant = '', locale = ''] = name.split('/')

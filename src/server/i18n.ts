@@ -7,15 +7,19 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
-import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
+import { flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
 import { importModule } from './bundle'
 import { requestCookies } from './cookies'
+import { compiledLinks } from './links'
 import { requestUrl } from './request-url'
 import { projectSource } from './source'
 import { INVALID_PARAMS } from './words'
+
+// Every link of every page is matched against the site's patterns, so the server splits them once.
+matchLinksWith(compiledLinks)
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay_locale'
