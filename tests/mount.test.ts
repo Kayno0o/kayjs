@@ -135,7 +135,7 @@ describe('mount', () => {
     process.env.KAY_ROOT = join(import.meta.dir, 'fixtures/mount-api')
 
     try {
-      const { root, unmount } = await mount('src/components/add-note.kay')
+      const { root, unmount } = await mountComponent('src/components/add-note.kay')
 
       root.querySelector('button')!.click()
 
