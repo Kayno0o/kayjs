@@ -80,7 +80,7 @@ function tick(): void {
       act()
   }
   finally {
-    // A step that throws leaves the others of the frame to the next one, as the frames of the elements after it would not be asked again.
+    // A step that throws drops the steps still due in its frame, but the loop goes on for the ones queued later.
     if (waiting.size > 0 || primed.size > 0)
       frame ||= requestAnimationFrame(tick)
   }
