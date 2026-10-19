@@ -1,6 +1,9 @@
 import { dirtyGuard, navigation } from './navigation'
 import { BUILD_HEADER, BUILD_META } from './swap'
 
+// Defined by `kay build --static`, whose host names no build in a header. Tested where it is read, so the bundler drops the code reading one.
+declare const KAY_STATIC_EXPORT: true | undefined
+
 const ENTRY_SCRIPT = 'script[type="module"][src*="/_kay/"]:not([src*="/_kay/dev/"])'
 const BUILD_TAG = `meta[name="${BUILD_META}"]`
 
@@ -40,18 +43,23 @@ async function headed(): Promise<string | undefined> {
 
 // The build the server answers now: the header every answer of a production server carries, else, for a static host, the build its page for this URL names.
 async function served(): Promise<string | undefined> {
-  const fromHead = await headed()
+  if (typeof KAY_STATIC_EXPORT === 'undefined') {
+    const fromHead = await headed()
 
-  if (fromHead !== undefined)
-    return fromHead
+    if (fromHead !== undefined)
+      return fromHead
+  }
 
   const response = await fetch(location.href, { cache: 'no-store', headers: { accept: 'text/html' } })
-  const named = response.headers.get(BUILD_HEADER)
 
-  if (named !== null) {
-    void response.body?.cancel()
+  if (typeof KAY_STATIC_EXPORT === 'undefined') {
+    const named = response.headers.get(BUILD_HEADER)
 
-    return named
+    if (named !== null) {
+      void response.body?.cancel()
+
+      return named
+    }
   }
 
   const page = new DOMParser().parseFromString(await response.text(), 'text/html')

@@ -357,7 +357,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' }, 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, direct, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
