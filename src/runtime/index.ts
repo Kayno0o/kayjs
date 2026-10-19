@@ -5,6 +5,7 @@ export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HandedSignal, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, RouteParams, SafeHtml, TemplateHelpers, Unmatched, UnresolvedParameter } from './checks'
 // The names `kay` exports. What this file defines itself is in `core.ts`, so a build imports the module holding a name rather than this one, which an entry importing it would take every name's module along with.
 export * from './core'
+export type { DescribeOptions } from './described'
 export { describeField } from './described'
 export type { Duration, DurationText } from './duration'
 export { durationMs } from './duration'

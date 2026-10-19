@@ -5,7 +5,7 @@ import type { Truthy } from './checks'
 import type { FieldSchema } from './form'
 import { isAction } from './action'
 import { NON_ROOT_TRAILING_SLASH } from './base'
-import { fieldDescription } from './described'
+import { fieldDescription, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
@@ -153,8 +153,12 @@ function lastValue(sources: readonly object[], name: string): unknown {
 }
 
 // ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids, unless the `type` an expression gave it shows no text to describe.
-export function fieldDescribed(own?: unknown, type?: unknown): string {
-  return attribute('aria-describedby', UNDESCRIBED_TYPES.has(String(type ?? '').toLowerCase()) ? own : fieldDescription(own))
+// `required` says the field wrote its own `aria-required`.
+export function fieldDescribed(own?: unknown, type?: unknown, required = false): string {
+  if (UNDESCRIBED_TYPES.has(String(type ?? '').toLowerCase()))
+    return attribute('aria-describedby', own)
+
+  return attribute('aria-describedby', fieldDescription(own)) + (fieldRequired() && !required ? ' aria-required="true"' : '')
 }
 
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
@@ -219,8 +223,12 @@ export function element(tag: string, sources: readonly object[], content?: () =>
     }
   }
 
-  if (field)
+  if (field) {
     markup += attribute('aria-describedby', fieldDescription(described))
+
+    if (fieldRequired() && lastValue(sources, 'aria-required') === undefined)
+      markup += ' aria-required="true"'
+  }
 
   if (isVoid)
     return { t: `${markup}>` }

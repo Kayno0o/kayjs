@@ -84,6 +84,8 @@ describe('images', () => {
 describe('describeField', () => {
   beforeAll(async () => {
     await Bun.write(join(scratch, 'describe-field.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (ids: string) => describeField(ids)\n')
+    await Bun.write(join(scratch, 'describe-required.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (ids: string, required: boolean | \'all\') => describeField(ids, { required })\n')
+    await Bun.write(join(scratch, 'described-required.kay'), '---\nimport { describe } from \'./describe-required\'\n\nconst { ids, required } = props<{ ids: string, required: boolean | \'all\' }>()\n\ndescribe(ids, required)\n---\nlabel\n  slot\n')
     await Bun.write(join(scratch, 'described.kay'), '---\nimport { describe } from \'./describe-field\'\n\nconst { ids } = props<{ ids: string }>()\n\ndescribe(ids)\n---\nlabel\n  slot\n')
   })
 
@@ -96,6 +98,12 @@ describe('describeField', () => {
     const html = await renderKay('---\nimport Described from \'./described.kay\'\n\nconst spread = { name: \'s\' }\n---\nDescribed(ids="hint")\n  input(type="hidden" name="x")\n  input(name="a" aria-describedby="own")\n  input(name="b")\nDescribed(ids="hint issues")\n  select({...spread})\nDescribed(ids="")\n  textarea(name="t")\ninput(name="outside")')
 
     expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="own hint"><input name="b"></label><label><select name="s" aria-describedby="hint issues"></select></label><label><textarea name="t"></textarea></label><input name="outside">')
+  })
+
+  it('gives the first described field aria-required, or each field with all, unless a hidden or button field or the field itself says otherwise', async () => {
+    const html = await renderKay('---\nimport Required from \'./described-required.kay\'\n\nconst spread = { name: \'s\' }\nconst text = \'text\'\n---\nRequired(ids="hint" required={true})\n  input(type="hidden" name="x")\n  input(name="a")\n  input(name="b")\nRequired(ids="" required="all")\n  input(type="checkbox" name="c")\n  button(type="button") Pick\n  input(type={text} name="d")\n  select({...spread})\n  input(name="e" aria-required="false")\nRequired(ids="hint" required={false})\n  input(name="f")\ninput(name="outside")')
+
+    expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="hint" aria-required="true"><input name="b"></label><label><input type="checkbox" name="c" aria-required="true"><button type="button">Pick</button><input type="text" name="d" aria-required="true"><select name="s" aria-required="true"></select><input name="e" aria-required="false"></label><label><input name="f" aria-describedby="hint"></label><input name="outside">')
   })
 
   // A signal makes the page an island, whose server render writes its fields through the same helpers.

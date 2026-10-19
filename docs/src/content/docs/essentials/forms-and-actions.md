@@ -111,6 +111,8 @@ small(id={hintId}) {hint}
 
 The first `input`, `select` or `textarea` the component renders gets `hintId` in its `aria-describedby`, after the ids kay adds for a refused field.
 
+Pass `{ required: true }` as a second argument and that field gets `aria-required="true"` too, since a star beside a label is not read by a screen reader. `{ required: 'all' }` marks every field the component renders, such as a group of checkboxes. A field that writes its own `aria-required` keeps it.
+
 A component that checks the field its own way marks it with `markInvalid(element, by, invalid)` from `kay`. `by` is any value naming the check, such as the component. The field stays `aria-invalid` while any source holds it, so the schema refusing it and your check do not undo each other.
 
 ```ts

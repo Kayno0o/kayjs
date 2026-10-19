@@ -59,6 +59,10 @@ function canonical(html: string, browserDrawn = ''): string {
   for (const element of holder.querySelectorAll('[aria-keyshortcuts]'))
     element.removeAttribute('aria-keyshortcuts')
 
+  // A static page's server render writes `aria-required` itself, which the effect of the browser's render adds in its turn.
+  for (const element of holder.querySelectorAll('[aria-required]'))
+    element.removeAttribute('aria-required')
+
   for (const element of holder.querySelectorAll('[value=""]'))
     element.removeAttribute('value')
 

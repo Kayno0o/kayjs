@@ -39,7 +39,7 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |
-| `describeField` | Adds ids to the `aria-describedby` of the first field a component renders, for a form field linking its parent's hint |
+| `describeField` | Adds ids to the `aria-describedby` of the first field a component renders, and with `required` its `aria-required`, for a form field linking its parent's hint |
 | `markInvalid` | Marks a field `aria-invalid` for one of several sources, and clears the mark once none holds it |
 | `previewing` | Whether the visitor is in preview mode |
 | `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |

@@ -24,6 +24,8 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 The control is described by the hint and, while one shows, by its messages. They sit beside the ids its own `aria-describedby` holds.
 
+A `required` field is announced as required: its control gets `aria-required="true"`, on a static page and in an island, since the `*` is hidden from a screen reader, and so does each field of a `group`. A control that sets its own `aria-required` keeps it.
+
 On a static page the server writes the link. Inside an island, as in a FormDialog, the browser keeps it as messages come and go, and marks the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it.
 
 Inside an island, a `group` with a message marks every input, select and textarea inside it the same way. So kay's `focusInvalid` shows the tab holding the group and focuses its first field.

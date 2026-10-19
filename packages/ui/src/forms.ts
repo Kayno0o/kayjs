@@ -29,7 +29,7 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
 
   // A static page renders the field outside any island, where nothing drops the effect as an island's server render does.
   if (typeof document === 'undefined') {
-    describeField(group ? '' : links.described().join(' '))
+    describeField(group ? '' : links.described().join(' '), { required: required && (group ? 'all' : true) })
 
     return links
   }

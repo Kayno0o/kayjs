@@ -62,7 +62,7 @@
 
 ## Forms
 
-FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
+FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. A `required` FormField gives its control, each field of a `group`, `aria-required="true"` unless it sets its own, as the `*` is hidden from screen readers. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
 
 ```kay
 --- server

@@ -243,6 +243,9 @@ describe('FormField', () => {
     expect(field.find('#field .kui-form-field-required').map(star => star.attributes['aria-hidden'])).toEqual(['true'])
     // Static on a page of its own, the server links the control to its hint; the message region takes an id once it holds one.
     expect(input!.attributes['aria-describedby']).toBe(hint!.attributes.id)
+    // The star is hidden from a screen reader, so the control says it is required itself.
+    expect(input!.attributes['aria-required']).toBe('true')
+    expect((await attributes('/form', '#compact select', ['aria-required']))).toEqual([{ 'aria-required': null }])
 
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })

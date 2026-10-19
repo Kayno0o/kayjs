@@ -389,12 +389,23 @@ export class HtmlTemplate extends TemplateWriter {
     const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
     const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     let ownDescribed: (() => void) | undefined
+    // A field written with its own `aria-required` keeps it whatever a component around it asks.
+    const ownRequired = plan.attributes.some(attribute => 'name' in attribute && attribute.name === 'aria-required')
     const fieldDescribed = (own: (() => void) | undefined) => {
       b.add(`${helperName('fieldDescribed')}(`)
-      own?.()
+
+      if (own)
+        own()
+      else if (type?.kind === 'value' || ownRequired)
+        b.add('undefined')
 
       if (type?.kind === 'value')
-        b.add(own ? ', (' : 'undefined, (').addSource(type.expression).add(')')
+        b.add(', (').addSource(type.expression).add(')')
+      else if (ownRequired)
+        b.add(', undefined')
+
+      if (ownRequired)
+        b.add(', true')
 
       b.add(')')
     }
