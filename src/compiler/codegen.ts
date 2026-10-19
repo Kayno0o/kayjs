@@ -304,8 +304,13 @@ class ModuleShell {
     if (this.kind === 'island' && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
-    if (facts.await && mode !== 'dom')
+    if (facts.await && runs && mode !== 'dom')
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
+
+    if (facts.await && !runs) {
+      declared.push(['KayAwait', 'Await'])
+      declared.push(['KayAwaited', 'awaited'])
+    }
 
     if (facts.try && !runs)
       declared.push(['KayTry', 'Try'])
@@ -855,7 +860,7 @@ type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 
 type Helper = TemplateHelper | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
-type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
+type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try' | 'Await' | 'awaited'
 
 // `T extends Record<string, U>, const U = number` names `T` and `U`: the first identifier of each parameter, split at the commas outside any brackets.
 function typeParameterNames(parameters: string): string[] {

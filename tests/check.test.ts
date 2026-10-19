@@ -961,6 +961,59 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('keeps what an enclosing if, match or for narrows inside the pending, then and catch blocks of an await, in an island as in a static component', async () => {
+    const template = [
+      'if dossier.latest',
+      '  await work',
+      '    p {dossier.latest.id}',
+      '  then done',
+      '    p {dossier.latest.id}{done}',
+      '  catch error',
+      '    p {dossier.latest.id}{String(error)}',
+      'if dossier.latest !== null',
+      '  await work then done',
+      '    p {dossier.latest.id}{done}',
+      'if name',
+      '  await work then done',
+      '    p {name.length}{done}',
+      'if dossier.latest && name',
+      '  if dossier.latest.id',
+      '    await work then done',
+      '      p {dossier.latest.id}{name.length}{done}',
+      'match dossier.latest?.id',
+      '  when \'a\'',
+      '    await work then done',
+      '      p {dossier.latest.id}{done}',
+      'for entry of entries key={entry.id}',
+      '  if entry.next',
+      '    await work then done',
+      '      p {entry.next.id}{done}',
+      'await work then done',
+      '  if dossier.latest',
+      '    await work then again',
+      '      p {dossier.latest.id}{done}{again}',
+      'await work then done',
+      '  p {dossier.latest.id}',
+      '',
+    ].join('\n')
+    const script = '---\ntype Stage = { id: string }\nconst { dossier, name, entries } = props<{ dossier: { latest: Stage | null }, name: string | null, entries: { id: string, next: Stage | null }[] }>()\nconst work = Promise.resolve(1)\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      // Only the last block reads a path nothing narrows.
+      expect((await check(root, { lints: { 'uncaught-await': 'allow' } })).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
+        ['island.kay', 40, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
+        ['static.kay', 36, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes raw on a head title only', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'head\n  title(raw) Whole\n  meta(raw name="x" content="y")\np Home\n' })
 

@@ -279,7 +279,9 @@ export interface TemplateHelpers {
   componentClass: (list: readonly unknown[]) => string | undefined
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
-  Try: (props: { block: () => JSX.Element, failed?: (error: unknown) => JSX.Element }) => JSX.Element
+  Try: (props: { block: JSX.Element, failed?: JSX.Element }) => JSX.Element
+  Await: <T>(props: { value: T, pending?: JSX.Element, ready?: JSX.Element, failed?: JSX.Element }) => JSX.Element
+  awaited: <T>(value: T) => Settled<T>
 }
 
 declare const SAFE_HTML: unique symbol

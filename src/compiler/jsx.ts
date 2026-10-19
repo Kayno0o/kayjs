@@ -253,29 +253,29 @@ export class JsxTemplate {
       this.b.add('null')
   }
 
-  // A component taking each block as a function, so the browser and the server each decide when to render which.
+  // The blocks are values rather than functions, the `then` and `catch` ones called at once, so `kay check` keeps what an enclosing `if` or `match` narrowed, as a callback would drop for a property path.
   private emitAwait(node: AwaitNode) {
     const { b } = this
 
     b.wrap(node, () => {
+      b.add('{(() => { const kayAwaited = (').addSource(node.value).add('); return <KayAwait ')
       // An error about the value lands on the value itself.
-      b.add('<KayAwait ')
       b.wrap(node.value, () => b.add('value'))
-      b.add('={').addSource(node.value).add('}')
+      b.add('={kayAwaited}')
 
       if (node.pending.length > 0) {
-        b.add(' pending={() => ')
+        b.add(' pending={')
         this.emitRoot(node.pending)
         b.add('}')
       }
 
       if (node.resolved)
-        this.emitAwaitBranch('ready', node.resolved)
+        this.emitAwaitBranch('ready', node.resolved, 'KayAwaited(kayAwaited)')
 
       if (node.rejected)
-        this.emitAwaitBranch('failed', node.rejected)
+        this.emitAwaitBranch('failed', node.rejected, '(void 0 as unknown)')
 
-      b.add(' />')
+      b.add(' /> })()}')
     })
   }
 
@@ -283,29 +283,30 @@ export class JsxTemplate {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add('<KayTry block={() => ')
+      b.add('<KayTry block={')
       this.emitRoot(node.children)
       b.add('}')
 
       if (node.rejected)
-        this.emitAwaitBranch('failed', node.rejected)
+        this.emitAwaitBranch('failed', node.rejected, '(void 0 as unknown)')
 
       b.add(' />')
     })
   }
 
-  private emitAwaitBranch(prop: 'ready' | 'failed', branch: AwaitBranch) {
+  // Called with the block's value on the spot, which TypeScript reads as running inline.
+  private emitAwaitBranch(prop: 'ready' | 'failed', branch: AwaitBranch, argument: string) {
     const { b } = this
 
     b.wrap(branch, () => {
-      b.add(` ${prop}={(`)
+      b.add(` ${prop}={((`)
 
       if (branch.alias)
         b.addSource(branch.alias)
 
       b.add(') => ')
       this.emitRoot(branch.children)
-      b.add('}')
+      b.add(`)(${argument})}`)
     })
   }
 

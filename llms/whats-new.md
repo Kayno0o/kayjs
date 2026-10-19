@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A shorthand class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` reads `gap-1.5` and `p-0.5` where it split each in two, and `kay migrate astro` and `kay fmt` write such classes as shorthand ([Templates](templates.md)).
 - A `kay/test` visit has `page.settled`, the page as the visitor ends up seeing it, each streamed `await` block's last part swapped in place ([Testing](testing.md#reading-a-page)).
 - `persistedCookie(name, value)` from `kay/test` sets a cookie-kept `persisted` value by name, for `site.as()` ([Testing](testing.md#requests-jobs-sockets-and-sessions)).
+- `kay check` keeps what an enclosing `if`, `match` or `for` narrows inside the blocks of an `await` and a `try`, a property path such as `dossier.latest` included ([Rendering](rendering.md#streaming)).
 
 ## 1.58.0
 
