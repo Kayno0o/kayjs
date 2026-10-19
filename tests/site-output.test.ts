@@ -180,7 +180,7 @@ describe('sitemap lastmod', () => {
     expect(xml).toContain('<url><loc>https://x.example/about</loc></url>')
   })
 
-  it('lists a URL with none for a null, and stops the sitemap for a value that is no date', async () => {
+  it('lists a URL with none for a null, and for a value that is no date, which is reported', async () => {
     // A page module is imported once per path, so each value gets a copy of its own.
     const xml = async (lastmod: string) => {
       const root = await fixtureCopy('site-output')
@@ -194,7 +194,7 @@ describe('sitemap lastmod', () => {
     expect(await xml('\'2026-05-06T10:00:00+02:00\'')).toContain('<lastmod>2026-05-06T08:00:00.000Z</lastmod>')
 
     for (const hostile of ['\'2026-02-31\'', '\'2026-13-01\'', '\'2026-00-10\'', '\'2026-5-6\'', '\'2026-05-06T10:00:00\'', 'true', '\'soon\'', '{}', 'Number.NaN'])
-      expect(await xml(hostile)).toBe('Internal Server Error')
+      expect(await xml(hostile)).toContain('<url><loc>https://x.example/posts/a</loc></url>')
   })
 
   it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {

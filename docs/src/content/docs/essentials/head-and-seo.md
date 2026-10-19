@@ -180,7 +180,9 @@ export const page = {
 ---
 ```
 
-A URL the function returns nothing or `null` for is listed without one. A value that is no date stops the sitemap with an error naming the page. Only a page's own `lastmod` counts, not a layout's.
+A URL the function returns nothing or `null` for is listed without one. A value that is no date, or a function that throws, lists that URL without one as well, and the error, which names the page, is logged and handed to `onError`, once for each page, so one bad date never takes the sitemap down. Only a page's own `lastmod` counts, not a layout's.
+
+A sitemap may hold 50,000 URLs and 50 MB. Past that, `/sitemap.xml` becomes an index and kay writes the URLs into `/sitemap-1.xml`, `/sitemap-2.xml` and so on, each within the limits. `robots.txt` still points at `/sitemap.xml`, and a static export writes every part. You change nothing.
 
 `noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `revalidate` the same way.
 

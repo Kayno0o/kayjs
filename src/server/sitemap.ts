@@ -7,8 +7,10 @@ import type { ListedParams } from './prerendered'
 import type { ServedPaths } from './served-paths'
 import { relative } from 'node:path'
 import process from 'node:process'
+import { NotFoundError } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { escape } from '../runtime/escape'
+import { kayLog } from '../runtime/log'
 import { importModule } from './bundle'
 import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
@@ -24,6 +26,12 @@ const DATE_TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\
 const ROBOTS_PATH = /^[/*][^\r\n]*$/
 // How many `lastmod` calls of a page run at once, as each may read a database.
 const LASTMOD_BATCH = 16
+
+// What one sitemap file may hold, by the protocol: 50,000 URLs and 50 MB uncompressed.
+export const SITEMAP_LIMITS = { urls: 50_000, bytes: 50 * 1024 * 1024 }
+// A part of a sitemap split in several, `/sitemap-1.xml`: a router path whose param is `1.xml`.
+const PART_PATH = '/sitemap-:part'
+const PART_NAME = /^(\d+)\.xml$/
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
 
@@ -40,31 +48,63 @@ export interface SitemapOptions {
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless something the app serves already takes that path.
 export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRoute[], origin: string, options: SitemapOptions = {}): void {
   // With locales by domain, each host lists its own pages: a sitemap may only name URLs of the host it is on.
-  const cached = new Map<string | undefined, { xml: Promise<string>, reply: (request: Request) => Promise<Response>, at: number }>()
+  // `files` holds the documents of the sitemap: the one `/sitemap.xml`, or its index followed by each part.
+  const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number }>()
   const settings = options.locales
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
+  const reading = (locale: string | undefined, report: (error: unknown) => void) => {
+    let sitemap = cached.get(locale)
+
+    if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS) {
+      const publicOrigin = settings?.hosts && locale !== undefined ? `https://${settings.hosts[locale]}${options.base ?? ''}` : origin
+
+      cached.set(locale, sitemap = { files: sitemapFiles(routes, origin, options.trailingSlash, settings, locale, report, publicOrigin), replies: new Map(), at: Date.now() })
+    }
+
+    return sitemap
+  }
+  const answer = async (request: Request, index: number) => {
+    const locale = hostOf(request)
+    const sitemap = reading(locale, error => reportServerError(error, request, options.onError))
+
+    try {
+      const files = await sitemap.files
+
+      if (files[index] === undefined)
+        throw new NotFoundError()
+
+      let reply = sitemap.replies.get(index)
+
+      if (!reply)
+        sitemap.replies.set(index, reply = fixedReply(files[index], { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${CACHE_MS / 1000}` }))
+
+      return await reply(request)
+    }
+    catch (error) {
+      if (error instanceof NotFoundError)
+        throw error
+
+      cached.delete(locale)
+      reportServerError(error, request, options.onError)
+
+      return new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    }
+  }
 
   if (served.offer({ path: SITEMAP, owner: 'the sitemap', kind: 'kay', exported: true })) {
-    app.get(SITEMAP, async ({ request }) => {
-      const locale = hostOf(request)
-      let sitemap = cached.get(locale)
+    app.get(SITEMAP, async ({ request }) => answer(request, 0))
 
-      if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS) {
-        const xml = sitemapXml(routes, origin, options.trailingSlash, settings, locale)
+    // The parts of a sitemap past its limits, which a static export writes once it knows how many there are.
+    if (served.offer({ path: PART_PATH, owner: 'the sitemap', kind: 'kay', exported: async () => (await reading(undefined, error => kayLog('warn', 'the sitemap leaves a lastmod out', error)).files).slice(1).map((_, index) => `/sitemap-${index + 1}.xml`) })) {
+      app.get(PART_PATH, async ({ request, params }) => {
+        const part = PART_NAME.exec((params as Record<string, string>).part ?? '')
 
-        cached.set(locale, sitemap = { xml, reply: fixedReply(xml, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${CACHE_MS / 1000}` }), at: Date.now() })
-      }
+        if (part === null || part[1]!.startsWith('0'))
+          throw new NotFoundError()
 
-      try {
-        return await sitemap.reply(request)
-      }
-      catch (error) {
-        cached.delete(locale)
-        reportServerError(error, request, options.onError)
-
-        return new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-      }
-    })
+        return answer(request, Number(part[1]))
+      })
+    }
   }
 
   if (options.robots !== false) {
@@ -147,21 +187,83 @@ async function lastmodOf(setting: unknown, params: ListedParams, file: string): 
   return `<lastmod>${date.toISOString()}</lastmod>`
 }
 
+// A `<urlset>` of `<url>` elements.
+function urlset(urls: string[], settings: LocaleSettings | undefined): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${settings ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''}>${urls.join('')}</urlset>\n`
+}
+
+// The `<url>` elements in groups that each fit a sitemap file, always at least one.
+export function sitemapParts(urls: string[], settings: LocaleSettings | undefined, limits = SITEMAP_LIMITS): string[][] {
+  const frame = Buffer.byteLength(urlset([], settings))
+  const parts: string[][] = []
+  let part: string[] = []
+  let size = frame
+
+  for (const url of urls) {
+    const bytes = Buffer.byteLength(url)
+
+    if (part.length > 0 && (part.length >= limits.urls || size + bytes > limits.bytes)) {
+      parts.push(part)
+      part = []
+      size = frame
+    }
+
+    part.push(url)
+    size += bytes
+  }
+
+  parts.push(part)
+
+  return parts
+}
+
+// The documents of the sitemap: its one file, or, past the protocol's limits, an index followed by its parts, which `prefix` (the public origin with the mount point) locates.
+export async function sitemapFiles(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void, prefix: string, limits = SITEMAP_LIMITS): Promise<string[]> {
+  const parts = sitemapParts(await sitemapUrls(routes, origin, trailingSlash, settings, only, report), settings, limits)
+
+  if (parts.length === 1)
+    return [urlset(parts[0]!, settings)]
+
+  const index = `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${parts.map((_, number) => `<sitemap><loc>${escape(`${prefix}/sitemap-${number + 1}.xml`)}</loc></sitemap>`).join('')}</sitemapindex>\n`
+
+  return [index, ...parts.map(part => urlset(part, settings))]
+}
+
+// The whole sitemap in one document, past its limits too, for what only reads the URLs it lists.
+export async function sitemapXml(routes: ServedRoute[], origin: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, only?: string): Promise<string> {
+  return urlset(await sitemapUrls(routes, origin, trailingSlash, settings, only), settings)
+}
+
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.
 // A page behind a guard is left out unless its `sitemap` export puts it in.
 // In a site of several locales, each copy of a page lists every other, `x-default` the default locale's; `only` keeps the copies of one locale, a domain's.
-export async function sitemapXml(routes: ServedRoute[], origin: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, only?: string): Promise<string> {
+async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void = () => undefined): Promise<string[]> {
   const lists = await Promise.all(routes.map(async (route) => {
     const file = relative(process.cwd(), route.file)
     const modules = await Promise.all(routeChain(route).files.map(async each => importModule<object>(each)))
     const module = modules.at(-1)!
     const sitemap = pageSetting(module, 'sitemap')
     const prerender = pageSetting(module, 'prerender')
+    let lastmodReported = false
+    // A lastmod that throws or is no date leaves that URL without one, and is reported once for the page.
+    const modifiedOf = async (value: ListedParams) => {
+      try {
+        return await lastmodOf(pageSetting(module, 'lastmod'), value, file)
+      }
+      catch (error) {
+        if (!lastmodReported) {
+          lastmodReported = true
+          report(error)
+        }
+
+        return ''
+      }
+    }
     const listed = async (params: ListedParams[]) => {
       const entries: { params: ListedParams, modified: string }[] = []
 
       for (let from = 0; from < params.length; from += LASTMOD_BATCH)
-        entries.push(...await Promise.all(params.slice(from, from + LASTMOD_BATCH).map(async value => ({ params: value, modified: await lastmodOf(pageSetting(module, 'lastmod'), value, file) }))))
+        entries.push(...await Promise.all(params.slice(from, from + LASTMOD_BATCH).map(async value => ({ params: value, modified: await modifiedOf(value) }))))
 
       return entries
     }
@@ -190,5 +292,5 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
     return copies.filter(copy => only === undefined || copy.locale === only).map(copy => `<url><loc>${absolute(copy)}</loc>${modified}${alternates}</url>`)
   }))
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${settings ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''}>${urls.join('')}</urlset>\n`
+  return urls
 }
