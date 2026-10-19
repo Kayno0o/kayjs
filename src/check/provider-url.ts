@@ -4,6 +4,7 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const AUTH_PACKAGE = '@kaynooo/kayjs-auth'
@@ -33,20 +34,7 @@ export async function providerUrls(root: string, options: CheckOptions): Promise
       continue
     }
 
-    const locals = new Set<string>()
-    const namespaces = new Set<string>()
-
-    for (const statement of ast.program.body) {
-      if (statement.type !== 'ImportDeclaration' || !statement.source.value.startsWith(AUTH_PACKAGE) || statement.importKind === 'type')
-        continue
-
-      for (const specifier of statement.specifiers) {
-        if (specifier.type === 'ImportNamespaceSpecifier')
-          namespaces.add(specifier.local.name)
-        else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'discordProvider')
-          locals.add(specifier.local.name)
-      }
-    }
+    const { locals, namespaces } = importsOf(ast, from => from.startsWith(AUTH_PACKAGE), 'discordProvider')
 
     if (locals.size === 0 && namespaces.size === 0)
       continue
@@ -87,18 +75,4 @@ export async function providerUrls(root: string, options: CheckOptions): Promise
   }
 
   return found
-}
-
-function walk(node: t.Node, visit: (node: t.Node) => void): void {
-  visit(node)
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === 'loc' || key.endsWith('Comments'))
-      continue
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-        walk(child as t.Node, visit)
-    }
-  }
 }

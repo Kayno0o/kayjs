@@ -4,6 +4,7 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const ANALYTICS_MODULE = 'kay/analytics'
@@ -34,23 +35,21 @@ export async function analyticsConsent(root: string, options: CheckOptions): Pro
       continue
     }
 
-    const locals = new Set<string>()
-    const namespaces = new Set<string>()
-
-    for (const statement of ast.program.body) {
-      if (statement.type !== 'ImportDeclaration' || statement.source.value !== ANALYTICS_MODULE || statement.importKind === 'type')
-        continue
-
-      for (const specifier of statement.specifiers) {
-        if (specifier.type === 'ImportNamespaceSpecifier')
-          namespaces.add(specifier.local.name)
-        else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'analytics')
-          locals.add(specifier.local.name)
-      }
-    }
+    const { locals, namespaces } = importsOf(ast, from => from === ANALYTICS_MODULE, 'analytics')
 
     if (locals.size === 0 && namespaces.size === 0)
       continue
+
+    // The objects of the file's declarations, for options written once and passed by name; a name declared twice points at none.
+    const objects = new Map<string, t.ObjectExpression | null>()
+    const reported = new Set<number>()
+
+    walk(ast, (node) => {
+      const init = node.type === 'VariableDeclarator' && node.id.type === 'Identifier' ? bare(node.init) : undefined
+
+      if (init?.type === 'ObjectExpression' && node.type === 'VariableDeclarator' && node.id.type === 'Identifier')
+        objects.set(node.id.name, objects.has(node.id.name) ? null : init)
+    })
 
     walk(ast, (node) => {
       if (node.type !== 'CallExpression')
@@ -60,22 +59,25 @@ export async function analyticsConsent(root: string, options: CheckOptions): Pro
       const named = callee.type === 'Identifier'
         ? locals.has(callee.name)
         : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === 'analytics'
-      const argument = node.arguments[0]
+      const given = bare(node.arguments[0])
+      const argument = given?.type === 'Identifier' ? objects.get(given.name) : given
 
       if (!named || argument?.type !== 'ObjectExpression' || argument.properties.some(property => property.type === 'SpreadElement'))
         return
 
       const keyed = (name: string) => argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && (property.key.type === 'Identifier' ? property.key.name === name : property.key.type === 'StringLiteral' && property.key.value === name))
       const provider = keyed('provider')
+      const name = textOf(provider?.value)
 
-      if (provider?.value.type !== 'StringLiteral' || !ASKING.has(provider.value.value) || argument.properties.some(property => property.type !== 'ObjectProperty' && property.type !== 'ObjectMethod') || keyed('consent') !== undefined)
+      if (provider === undefined || name === undefined || !ASKING.has(name) || argument.properties.some(property => property.type !== 'ObjectProperty' && property.type !== 'ObjectMethod') || keyed('consent') !== undefined || reported.has(provider.key.start!))
         return
 
+      reported.add(provider.key.start!)
       found.push({
         file,
         ...positionAt(source, provider.key.start!),
         end: provider.value.end!,
-        message: `\`analytics({ provider: '${provider.value.value}' })\` now asks for a yes before counting a visit, where it counted every one before`,
+        message: `\`analytics({ provider: '${name}' })\` now asks for a yes before counting a visit, where it counted every one before`,
         help: 'write `consent: true` to ask with kay\'s notice, or `consent: false` to count without asking',
         code: 'deprecated-analytics-consent',
         severity: level === 'warn' ? 'warning' : 'error',
@@ -87,16 +89,22 @@ export async function analyticsConsent(root: string, options: CheckOptions): Pro
   return found
 }
 
-function walk(node: t.Node, visit: (node: t.Node) => void): void {
-  visit(node)
+// The expression under `as`, `as const`, `satisfies`, `!` and parentheses.
+function bare(node: t.Node | null | undefined): t.Node | undefined {
+  let current = node
 
-  for (const [key, value] of Object.entries(node)) {
-    if (key === 'loc' || key.endsWith('Comments'))
-      continue
+  while (current && (current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion' || current.type === 'ParenthesizedExpression'))
+    current = current.expression
 
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-        walk(child as t.Node, visit)
-    }
-  }
+  return current ?? undefined
+}
+
+// The text of a string literal or of a template literal with nothing interpolated, under any cast.
+function textOf(node: t.Node | undefined): string | undefined {
+  const value = bare(node)
+
+  if (value?.type === 'StringLiteral')
+    return value.value
+
+  return value?.type === 'TemplateLiteral' && value.expressions.length === 0 ? value.quasis[0]?.value.cooked ?? undefined : undefined
 }

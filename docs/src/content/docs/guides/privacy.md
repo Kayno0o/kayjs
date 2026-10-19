@@ -148,7 +148,7 @@ The page title is not sent unless you write `titles: true`, since a title can na
 
 Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
 
-To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics.
+To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics. Wording for the information line (`info`) is refused where none is shown: for Fathom, Cloudflare and `custom`, and when `consent` asks.
 
 Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
 

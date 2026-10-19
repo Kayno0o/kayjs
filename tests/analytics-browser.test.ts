@@ -583,3 +583,40 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
     expect(await opened.evaluate(() => document.activeElement?.textContent)).toBe('Agree')
   })
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fathom and cloudflare with consent unset, in a browser', () => {
+  let before: string | undefined
+
+  beforeAll(() => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+  })
+
+  afterAll(() => {
+    restoreEnvironment(before)
+  })
+
+  it.each([
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' } as const, 'script[src^="https://cdn.usefathom.com"]'],
+    ['cloudflare', { provider: 'cloudflare', token: 'abc123' } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
+  ])('%s loads nothing before a yes, and its script after one', async (_name, options, selector) => {
+    const own = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, onError: () => undefined, extensions: [analytics(options)] })
+
+    try {
+      const opened = await own.open('/')
+
+      await opened.waitFor('section[aria-labelledby] button')
+      await Bun.sleep(200)
+
+      expect(await opened.count(selector)).toBe(0)
+
+      await opened.click('section[aria-labelledby] button:first-of-type')
+      await opened.waitFor(selector)
+
+      expect(await opened.count(selector)).toBe(1)
+    }
+    finally {
+      await own.close()
+    }
+  }, 60_000)
+})

@@ -6,6 +6,7 @@ import { millisecondsText } from '../compiler/duration-text'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
+import { importedName, walk } from './ast'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const CMS_PACKAGE = '@kaynooo/kayjs-cms'
@@ -69,7 +70,7 @@ export async function timeMilliseconds(root: string, options: CheckOptions): Pro
             namespaces.set(specifier.local.name, functions)
           }
           else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type') {
-            const imported = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+            const imported = importedName(specifier)
 
             if (functions[imported])
               locals.set(specifier.local.name, functions[imported])
@@ -134,18 +135,4 @@ export async function timeMilliseconds(root: string, options: CheckOptions): Pro
   }
 
   return found
-}
-
-function walk(node: t.Node, visit: (node: t.Node) => void): void {
-  visit(node)
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === 'loc' || key.endsWith('Comments'))
-      continue
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-        walk(child as t.Node, visit)
-    }
-  }
 }

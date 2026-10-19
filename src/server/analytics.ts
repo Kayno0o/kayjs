@@ -285,6 +285,14 @@ function checked(options: AnalyticsOptions): void {
   if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))
     refuse(`takes exclude and titles for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
 
+  if (typeof options.info === 'object') {
+    if (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom')
+      refuse(`takes no info for '${options.provider}', whose own script is loaded as it is and shows no line; use consent for a notice`)
+
+    if (isGated(options))
+      refuse('takes info for a counter that asks no one; with consent on, the notice is worded by consent, and consent: false shows the line')
+  }
+
   if ('host' in options && options.host !== undefined)
     address('host', options.host, true)
 

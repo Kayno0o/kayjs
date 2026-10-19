@@ -243,6 +243,19 @@ describe('the notice, its lifetime and what a visit carries', () => {
 
     expect(wrong).toHaveLength(3)
   })
+
+  it.each(['fathom', 'cloudflare', 'custom'] as const)('refuses an info object for %s, which shows no line', (name) => {
+    const options = NAMED.find(([provider]) => provider === name)![1] as AnalyticsOptions
+
+    expect(() => analytics({ ...options, consent: false, info: { text: 'Counting' } })).toThrow('info')
+    expect(() => analytics({ ...options, consent: false, info: false })).not.toThrow()
+  })
+
+  it('refuses an info object when consent asks, which shows the notice instead', () => {
+    expect(() => analytics(plausible({ consent: true, info: { text: 'Counting' } }))).toThrow('consent')
+    expect(() => analytics(plausible({ consent: true, info: false }))).not.toThrow()
+    expect(() => analytics(plausible({ info: { text: 'Counting' } }))).not.toThrow()
+  })
 })
 
 describe('what each provider is sent', () => {

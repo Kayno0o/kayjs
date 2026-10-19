@@ -4,6 +4,7 @@ import type { ServedProject } from './shadow-types'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { importsOf, walk } from './ast'
 
 const ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all'])
 const NODE_MODULES = /[\\/]node_modules[\\/]/
@@ -130,17 +131,10 @@ function isNamespaceApi(callee: t.MemberExpression, scope: ApiScope): boolean {
 function apiScope(ast: t.File): ApiScope {
   const scope: ApiScope = { imports: new Set(), namespaces: new Set(), names: new Set(), helpers: new Set() }
 
-  for (const statement of ast.program.body) {
-    if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay/server' || statement.importKind === 'type')
-      continue
+  const { locals, namespaces } = importsOf(ast, from => from === 'kay/server', 'api')
 
-    for (const specifier of statement.specifiers) {
-      if (specifier.type === 'ImportNamespaceSpecifier')
-        scope.namespaces.add(specifier.local.name)
-      else if (specifier.type === 'ImportSpecifier' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'api')
-        scope.imports.add(specifier.local.name)
-    }
-  }
+  scope.imports = locals
+  scope.namespaces = namespaces
 
   const add = (set: Set<string>, name: string) => {
     if (set.has(name))
@@ -213,18 +207,4 @@ function keyName(property: t.ObjectProperty): string | undefined {
     return property.key.name
 
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
-}
-
-function walk(node: t.Node, visit: (node: t.Node) => void): void {
-  visit(node)
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === 'loc' || key.endsWith('Comments'))
-      continue
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-        walk(child as t.Node, visit)
-    }
-  }
 }

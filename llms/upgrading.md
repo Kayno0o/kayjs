@@ -15,6 +15,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `analytics({ provider: 'fathom' | 'cloudflare' | 'custom', exclude, titles })` is a type error in `kay check` and the editor; the server already refused it at start, so no running app changes. Remove the option. No lint ships, as `kay check` reports the type error itself.
 
+### analytics refuses an `info` object where nothing shows it
+
+- `analytics()` throws at start for `info: { ... }` on Fathom, Cloudflare or `custom`, or when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` on Google Analytics to show the line; `info: false` stays valid. No lint ships, as the start-up error names the option.
+
 ## 1.55.0
 
 ### An empty route param is refused
