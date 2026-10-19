@@ -10,7 +10,7 @@ const BROWSER_DRAWN: Record<string, string | undefined> = {
 
 // What an effect adds to the browser's render while the server's holds none, by component.
 const EFFECT_ADDED: Record<string, string | undefined> = {
-  'contact-form': '[aria-required]',
+  'contact-form': 'aria-required',
 }
 
 // The fixture app is no part of this package's type check, so its table is imported by a path no import is resolved for.
@@ -66,8 +66,8 @@ function canonical(html: string, browserDrawn = '', effectAdded = ''): string {
 
   // Only the browser's side is stripped of it, so a server render that starts writing it too is seen.
   if (effectAdded) {
-    for (const element of holder.querySelectorAll(effectAdded))
-      element.removeAttribute(effectAdded.slice(1, -1))
+    for (const element of holder.querySelectorAll(`[${effectAdded}]`))
+      element.removeAttribute(effectAdded)
   }
 
   for (const element of holder.querySelectorAll('[value=""]'))

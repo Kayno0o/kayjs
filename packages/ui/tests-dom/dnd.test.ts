@@ -185,7 +185,7 @@ describe('Sortable, from the keyboard', () => {
     const sortable = new Sortable({ onReorder: () => undefined })
     const area = stage()
 
-    area.innerHTML = '<li id="a"><span id="grip-a" tabindex="0"></span>Milk</li><li id="b"><span id="grip-b" tabindex="0"></span><i></i></li><li id="c"><span id="grip-c" tabindex="0"><img alt="Cover"></span>Photo</li>'
+    area.innerHTML = '<li id="a"><span id="grip-a" tabindex="0"></span>Milk</li><li id="b"><span id="grip-b" tabindex="0"></span><i></i></li><li id="d"><span id="grip-d" tabindex="0"></span><img alt="">Bread</li><li id="c"><span id="grip-c" tabindex="0"><img alt="Cover"></span>Photo</li>'
 
     const at = (id: string) => area.querySelector<HTMLElement>(`#${id}`)!
 
@@ -194,10 +194,13 @@ describe('Sortable, from the keyboard', () => {
     sortable.handle(1)(at('grip-b'))
     sortable.item(1)(at('b'))
     sortable.item(2)(at('c'))
+    sortable.item(3)(at('d'))
+    sortable.handle(3)(at('grip-d'))
     sortable.handle(2)(at('grip-c'))
 
     expect(at('grip-a').getAttribute('aria-label')).toBe('Reorder Milk')
     expect(at('grip-b').getAttribute('aria-label')).toBe('Reorder')
+    expect(at('grip-d').getAttribute('aria-label')).toBe('Reorder Bread')
     expect(at('grip-c').hasAttribute('aria-label')).toBe(false)
   })
 

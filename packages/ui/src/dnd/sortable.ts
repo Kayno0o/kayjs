@@ -34,7 +34,7 @@ function itemName(item: HTMLElement | undefined): string {
   if (!item)
     return ''
 
-  const text = (item.getAttribute('aria-label') ?? item.querySelector('img[alt]')?.getAttribute('alt') ?? item.textContent ?? '').replaceAll(/\s+/g, ' ').trim()
+  const text = (item.getAttribute('aria-label') || item.querySelector('img[alt]:not([alt=""])')?.getAttribute('alt') || item.textContent || '').replaceAll(/\s+/g, ' ').trim()
 
   return text.length > 40 ? `${text.slice(0, 39)}…` : text
 }
