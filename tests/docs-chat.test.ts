@@ -108,8 +108,8 @@ describe('the tools', () => {
   })
 
   it('give a long page in parts, each under what the loop keeps of a result, that together hold all of it', async () => {
-    const page = (await readPage('/llms/actions'))!
-    const first = await site.call(readDocsPage, { path: '/llms/actions' })
+    const page = (await readPage('/llms/server'))!
+    const first = await site.call(readDocsPage, { path: '/llms/server' })
 
     expect(page.text.length).toBeGreaterThan(20_000)
     expect(first.parts).toBeGreaterThan(1)
@@ -117,7 +117,7 @@ describe('the tools', () => {
     let joined = ''
 
     for (let part = 1; part <= first.parts; part++) {
-      const read = await site.call(readDocsPage, { path: '/llms/actions', part })
+      const read = await site.call(readDocsPage, { path: '/llms/server', part })
 
       expect(JSON.stringify(read).length).toBeLessThan(20_000)
       joined += read.text
@@ -152,12 +152,12 @@ describe('the tools', () => {
   })
 
   it('answer a part past the last with an error that says how many parts the page has', async () => {
-    const { parts } = await site.call(readDocsPage, { path: '/llms/actions' })
+    const { parts } = await site.call(readDocsPage, { path: '/llms/server' })
 
-    await expect(site.call(readDocsPage, { path: '/llms/actions', part: parts + 1 })).rejects.toMatchObject({ status: 404 })
-    expect((await site.call(readDocsPage, { path: '/llms/actions', part: parts })).text).not.toBe('')
+    await expect(site.call(readDocsPage, { path: '/llms/server', part: parts + 1 })).rejects.toMatchObject({ status: 404 })
+    expect((await site.call(readDocsPage, { path: '/llms/server', part: parts })).text).not.toBe('')
 
-    fakeAi.reply({ calls: [{ name: 'read_page', input: { path: '/llms/actions', part: parts + 8 } }] })
+    fakeAi.reply({ calls: [{ name: 'read_page', input: { path: '/llms/server', part: parts + 8 } }] })
     fakeAi.reply('Done')
     await site.call(reply, question('read the ninth part of the islands page'))
 
