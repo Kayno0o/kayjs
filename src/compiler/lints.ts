@@ -326,15 +326,6 @@ export const LINTS = {
     wrong: '---\n// src/components/caller.kay\nconst { run } = props<{ run: (input: { name: string }) => Promise<string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
     right: '---\n// src/components/caller.kay\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
   },
-  'deprecated-provider-url': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.52',
-    site: true,
-    summary: '`discordProvider({ apiBase })` of kayjs-auth, which is `discordProvider({ url })` since 1.52, as every provider that a server can host names its base URL: `apiBase` still works for now and logs a warning. The fix renames the key, and is not offered for a shorthand `{ apiBase }` or a call that gives `url` too.',
-    wrong: 'discordProvider({ apiBase: \'https://proxy.example.com/discord\' })',
-    right: 'discordProvider({ url: \'https://proxy.example.com/discord\' })',
-  },
   'deprecated-analytics-consent': {
     level: 'warn',
     group: 'deprecated',

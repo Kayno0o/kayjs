@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.56.0
 
+### The forms deprecated in 1.52 are gone
+
+- An app still on them runs `kay upgrade` on 1.55 first, which rewrites what it can, then moves to 1.56. These now fail or are ignored, and `kay check` no longer reports them.
+- kayjs-auth: `discordProvider({ apiBase })` is `discordProvider({ url })`; `apiBase` is ignored.
+
 ### kayjs-auth passkeys carry `userVerified`
 
 - A passkey record has `userVerified: boolean`, and a passkey with `false` is no way in, as sign-in refuses it: `removePasskey` and `unlink` count only passkeys that proved it. With pg-orm, generate a migration for the new `auth_passkey.user_verified` column (default `false`, so every passkey stored before it, a working one too, counts as a way in only after its next sign-in or re-proof with user verification, and until then `unlink` refuses the last provider of a user whose other way in it was); a custom store keeps and returns `userVerified` (and accepts it in `passkeys.update`). `kay check` cannot recognise this, so there is no lint.

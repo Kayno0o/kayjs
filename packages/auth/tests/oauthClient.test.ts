@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from 'bun:test'
-import { log } from '../src/log'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { createOAuthClient, OAuthExchangeError } from '../src/oauth/client'
 import { appleProvider, discordProvider, githubProvider, gitlabProvider, oidcProvider } from '../src/oauth/providers'
 
@@ -321,27 +320,13 @@ describe('provider options', () => {
     expect(githubProvider({ url: 'https://example.com/github/' })).toMatchObject({ authorizeUrl: 'https://example.com/github/login/oauth/authorize', userUrl: 'https://example.com/github/api/v3/user' })
   })
 
-  test('the Discord and GitLab urls drop trailing slashes and keep paths; apiBase still works', () => {
+  test('the Discord and GitLab urls drop trailing slashes and keep paths', () => {
     expect(discordProvider({ url: 'https://proxy.test/discord/api/' })).toMatchObject({ tokenUrl: 'https://proxy.test/discord/api/oauth2/token', userUrl: 'https://proxy.test/discord/api/users/@me' })
-    expect(discordProvider({ apiBase: 'https://old.test/api/' })).toMatchObject({ tokenUrl: 'https://old.test/api/oauth2/token' })
-    expect(discordProvider({ url: 'https://new.test', apiBase: 'https://old.test' }).tokenUrl).toBe('https://new.test/oauth2/token')
     expect(discordProvider().tokenUrl).toBe('https://discord.com/api/v10/oauth2/token')
     expect(gitlabProvider({ url: 'https://lab.test/gitlab/' })).toMatchObject({ authorizeUrl: 'https://lab.test/gitlab/oauth/authorize', userUrl: 'https://lab.test/gitlab/oauth/userinfo' })
   })
 
-  test('apiBase warns that it is url, and an empty url is refused', () => {
-    const warn = spyOn(log, 'warn').mockImplementation(() => undefined)
-
-    try {
-      discordProvider({ apiBase: 'https://old.test' })
-      discordProvider({ url: 'https://new.test' })
-      expect(warn).toHaveBeenCalledTimes(1)
-      expect(String(warn.mock.calls[0]![0])).toContain('apiBase')
-    }
-    finally {
-      warn.mockRestore()
-    }
-
+  test('an empty url is refused', () => {
     expect(() => githubProvider({ url: '/' })).toThrow('empty')
     expect(() => discordProvider({ url: '' })).toThrow('empty')
   })
@@ -354,7 +339,6 @@ describe('provider options', () => {
     try {
       expect(() => githubProvider({ url: 'http://git.example.com' })).toThrow('not https')
       expect(() => discordProvider({ url: 'http://proxy.test' })).toThrow('not https')
-      expect(() => discordProvider({ apiBase: 'http://proxy.test' })).toThrow('not https')
     }
     finally {
       process.env.NODE_ENV = before

@@ -35,7 +35,6 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { mcpRoutes } from './mcp-routes'
-import { providerUrls } from './provider-url'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 import { storeVerbs } from './store-verbs'
 import { testMounts } from './test-mount'
@@ -112,7 +111,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
-  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await testMounts(root, options), ...await providerUrls(root, options), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options), ...await storeVerbs(root, options), ...await timeMilliseconds(root, options))
+  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await testMounts(root, options), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options), ...await storeVerbs(root, options), ...await timeMilliseconds(root, options))
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
   await tree.write('kay-icons.d.ts', iconTypes(root))

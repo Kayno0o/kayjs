@@ -486,7 +486,7 @@ A sign-in stores none of the provider's tokens unless the app asks. Set `keepTok
 
 Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
 
-Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one. Discord's earlier `apiBase` works as `url` and logs a warning.
+Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one.
 
 A site whose `url` is https refuses a provider on plain http in every environment, and the endpoints a provider's discovery document names too.
 

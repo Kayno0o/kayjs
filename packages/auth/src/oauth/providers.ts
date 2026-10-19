@@ -34,15 +34,8 @@ function discordImage(kind: 'avatars' | 'banners', userId: string, hash: string 
 }
 
 /** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. `url` is the API's base, `https://discord.com/api/v10` by default, and `params` extra authorize URL parameters. */
-export function discordProvider(opts: ProviderOptions & {
-  /** @deprecated Renamed `url`, as on every provider. */
-  apiBase?: string
-} = {}): OAuthProvider<DiscordRawUser> {
-  if (opts.apiBase !== undefined && opts.url === undefined) {
-    log.warn('discordProvider({ apiBase }) is renamed discordProvider({ url })')
-  }
-
-  const apiBase = providerUrl(opts.url ?? opts.apiBase, 'https://discord.com/api/v10', 'the Discord url')
+export function discordProvider(opts: ProviderOptions = {}): OAuthProvider<DiscordRawUser> {
+  const apiBase = providerUrl(opts.url, 'https://discord.com/api/v10', 'the Discord url')
 
   return {
     name: 'discord',

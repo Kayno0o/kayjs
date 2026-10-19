@@ -30,7 +30,7 @@ What each minor release before 1.53 broke, and what an app changed to move to it
 
 ### kayjs-auth: `discordProvider({ apiBase })` is `url`
 
-- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning, and production refuses an `http://` one as it does for `url`. `kay check` reports it as `deprecated-provider-url`, and `kay check --fix` (or `kay upgrade`) renames the key.
+- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; production refuses an `http://` one as it does for `url`. `apiBase` was removed in 1.56 with its lint `deprecated-provider-url`: run `kay upgrade` on 1.55 first.
 
 ### kayjs-auth: a custom store's `members.remove` is `delete`, `grants.put` is `upsert`
 
