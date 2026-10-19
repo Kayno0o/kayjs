@@ -29,9 +29,8 @@ const LASTMOD_BATCH = 16
 
 // What one sitemap file may hold, by the protocol: 50,000 URLs and 50 MB uncompressed.
 export const SITEMAP_LIMITS = { urls: 50_000, bytes: 50 * 1024 * 1024 }
-// A part of a sitemap split in several, `/sitemap-1.xml`: a router path whose param is `1.xml`.
-const PART_PATH = '/sitemap-:part'
-const PART_NAME = /^(\d+)\.xml$/
+// How many parts a sitemap served in several files may have, 5 million URLs.
+const MAX_PARTS = 100
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
 
@@ -94,16 +93,10 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   if (served.offer({ path: SITEMAP, owner: 'the sitemap', kind: 'kay', exported: true })) {
     app.get(SITEMAP, async ({ request }) => answer(request, 0))
 
-    // The parts of a sitemap past its limits, which a static export writes once it knows how many there are.
-    if (served.offer({ path: PART_PATH, owner: 'the sitemap', kind: 'kay', exported: async () => (await reading(undefined, error => kayLog('warn', 'the sitemap leaves a lastmod out', error)).files).slice(1).map((_, index) => `/sitemap-${index + 1}.xml`) })) {
-      app.get(PART_PATH, async ({ request, params }) => {
-        const part = PART_NAME.exec((params as Record<string, string>).part ?? '')
-
-        if (part === null || part[1]!.startsWith('0'))
-          throw new NotFoundError()
-
-        return answer(request, Number(part[1]))
-      })
+    // The parts of a sitemap past its limits, each a path of its own so no route of the app with a param is shadowed; a static export writes the ones that exist.
+    for (let part = 1; part <= MAX_PARTS; part++) {
+      served.offer({ path: `/sitemap-${part}.xml`, owner: 'the sitemap', kind: 'kay', exported: async () => (await reading(undefined, error => kayLog('warn', 'the sitemap leaves a lastmod out', error)).files)[part] === undefined ? [] : [`/sitemap-${part}.xml`] })
+      app.get(`/sitemap-${part}.xml`, async ({ request }) => answer(request, part))
     }
   }
 
@@ -220,6 +213,11 @@ export function sitemapParts(urls: string[], settings: LocaleSettings | undefine
 // The documents of the sitemap: its one file, or, past the protocol's limits, an index followed by its parts, which `prefix` (the public origin with the mount point) locates.
 export async function sitemapFiles(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void, prefix: string, limits = SITEMAP_LIMITS): Promise<string[]> {
   const parts = sitemapParts(await sitemapUrls(routes, origin, trailingSlash, settings, only, report), settings, limits)
+
+  if (parts.length > MAX_PARTS) {
+    report(new KayError('page-settings-invalid', `kay: the sitemap needs ${parts.length} files, and kay serves ${MAX_PARTS}; the URLs past them are left out`))
+    parts.length = MAX_PARTS
+  }
 
   if (parts.length === 1)
     return [urlset(parts[0]!, settings)]

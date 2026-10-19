@@ -15,7 +15,19 @@ const LOCS = /<sitemap><loc>([^<]+)<\/loc><\/sitemap>/g
 let root = ''
 const errors: unknown[][] = []
 
+const apps = new Map<string, ReturnType<typeof pages>>()
+
+// A site is built once per set of options, as each build lists 50,001 URLs.
 async function app(options: Parameters<typeof pages>[0] = {}) {
+  const key = JSON.stringify(options)
+
+  if (!apps.has(key))
+    apps.set(key, build(options))
+
+  return apps.get(key)!
+}
+
+async function build(options: Parameters<typeof pages>[0]) {
   return pages({ routes: join(root, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported), ...options })
 }
 
@@ -88,6 +100,16 @@ describe('a sitemap past 50,000 URLs', () => {
 
     for (const path of ['/sitemap-0.xml', '/sitemap-3.xml', '/sitemap-01.xml', '/sitemap-1', '/sitemap-1.xml.gz', '/sitemap-x.xml', '/sitemap-.xml'])
       expect((await read(served, path)).status).toBe(404)
+  })
+
+  it('leaves a page of the app with a param that starts with sitemap- to the app', async () => {
+    const copy = await fixtureCopy('site-output')
+
+    await Bun.write(join(copy, 'src/routes/[slug].kay'), '--- server\nexport const page = { prerender: false }\n---\nh1 Slug\n')
+
+    const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example' })
+
+    expect((await read(served, '/sitemap-guide')).text).toContain('Slug')
   })
 
   it('locates the parts under the base, with the trailing slash left to the URLs it lists', async () => {

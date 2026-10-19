@@ -385,11 +385,11 @@ async function forward(options: VisitOptions, visit: Visit): Promise<void> {
   try {
     const response = await fetch(url, { method, headers, ...body !== undefined && { body: JSON.stringify(body) }, redirect: 'manual', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
 
-    // The body is never read, so it is cancelled to free the connection.
-    await response.body?.cancel()
-
     if (!response.ok)
       warn(`provider-${options.provider}-${response.status}`, `analytics: the ${options.provider} provider answered ${response.status} to a visit, so the visits are lost until its settings are right (a wrong site id, domain or secret answers this way)`)
+
+    // The body is never read, so it is cancelled to free the connection.
+    await response.body?.cancel()
   }
   catch (error) {
     // Bun's error carries the request URL as `path`, which holds a GA4 secret or a Matomo token, so only its message is logged.
