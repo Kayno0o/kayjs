@@ -9,7 +9,7 @@ describe('a weighted hit', () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
       expect((await store.hit('key', 60_000, 5)).count).toBe(5)
       expect((await store.hit('key', 60_000)).count).toBe(6)
-      expect((await store.peek!('key'))!.count).toBe(6)
+      expect((await store.peek('key'))!.count).toBe(6)
     }
   })
 
