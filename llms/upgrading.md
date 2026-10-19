@@ -15,6 +15,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `kay/test` has no `mount`: it is `mountComponent`, which `kay/mount`'s `mount` never was.
 - kayjs-ui: `Dialog`, `SidePanel` and `FormDialog` take `onOpenChange(open)` alone, `Popover` too, so `onClose` and `onToggle` are never called and a `Dialog`, `SidePanel` or `FormDialog` without `onOpenChange` throws when it closes; `Button`, `CopyButton`, `IconButton`, `Menu` and `ConfirmDelete` take `variant` as `solid`, `ghost` or `inline` and the meaning as `tone` (`variant="danger"` is `tone="danger"`, `variant="accent"` `tone="accent"`, `variant="default"` is `variant="solid"`), and an unknown `variant` is drawn as it is; `Notice` has `tone="danger"`, not `error`; `BarList`, `MediaGallery` and `ScatterChart` take `emptyLabel`, not `empty`, and the catalog keys `ui.barList.empty`, `ui.mediaGallery.empty` and `ui.scatterChart.empty` are no longer read, they are `emptyLabel`.
 
+### The default image ladder stops at 2560 px
+
+- `images.widths` defaults to `[320, 640, 960, 1280, 1920, 2560]`, and an image is served at no width past the last one, its own size included, where it also had a 3840 px variant and one at its own size. A site whose photographs must stay sharp on 4K screens sets `images: { widths: [320, 640, 960, 1280, 1920, 2560, 3840] }`; a list of its own is cut at its last width the same way.
+
 ### kayjs-auth passkeys carry `userVerified`
 
 - A passkey record has `userVerified: boolean`, and a passkey with `false` is no way in, as sign-in refuses it: `removePasskey` and `unlink` count only passkeys that proved it. With pg-orm, generate a migration for the new `auth_passkey.user_verified` column (default `false`, so every passkey stored before it, a working one too, counts as a way in only after its next sign-in or re-proof with user verification, and until then `unlink` refuses the last provider of a user whose other way in it was); a custom store keeps and returns `userVerified` (and accepts it in `passkeys.update`). `kay check` cannot recognise this, so there is no lint.

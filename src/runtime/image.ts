@@ -1,6 +1,6 @@
 import { kayLog } from './log'
 // The widths an image is resized to unless `images.widths` says otherwise, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
-export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
+export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560] as const
 // The most widths `images.widths` may list, and the widest of them.
 export const MOST_WIDTHS = 16
 export const WIDEST = 16384
@@ -320,7 +320,7 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
   const fixed = FIXED_SIZE.exec(options.sizes ?? '')
-  const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : [...imageWidths().filter(width => width < size.width), size.width]
+  const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : ladderFor(size.width)
 
   return {
     src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect, wanted),
@@ -339,11 +339,19 @@ function fixedWidths(drawn: number, density: number, most: number): number[] {
   return [...new Set(densities.map(at => Math.min(most, routeWidth(drawn * at))))].sort((a, b) => a - b)
 }
 
-// The narrowest width the route makes at or above `width`, past the ladder the image's own.
+// The widths an image `width` wide gets: those of the ladder below it, then its own when the ladder reaches it. Nothing is wider than the ladder's last width, so a photograph larger than that gets no variant of its own size.
+export function ladderFor(width: number): number[] {
+  const steps = imageWidths()
+  const reach = steps.findIndex(step => step >= width)
+
+  return reach === -1 ? [...steps] : [...steps.slice(0, reach), width]
+}
+
+// The narrowest width the route makes at or above `width`, the ladder's last past it.
 function routeWidth(width: number): number {
   const steps = imageWidths()
 
-  return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? Infinity
+  return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? steps.at(-1)!
 }
 
 // Qualities come in steps, so a visitor asking the route for every one cannot fill the cache.

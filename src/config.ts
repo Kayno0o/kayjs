@@ -307,7 +307,7 @@ export interface ImagesConfig {
   quality?: number | undefined
   // WebP variants beside the AVIF ones: `{ quality: 75 }` over `quality`, for the variants alone.
   webp?: { quality?: number | undefined } | undefined
-  // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560, 3840]`. Each width is a file per image, so a short ladder builds fewer.
+  // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560]`, and no variant is wider than the last width. Each width is a file per image, so a short ladder builds fewer.
   widths?: number[] | undefined
   // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.
   avif?: false | { quality?: number } | undefined

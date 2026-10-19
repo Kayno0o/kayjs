@@ -8,7 +8,7 @@ import decodeAvif from '@jsquash/avif/decode.js'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
-import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setImageWidths, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, pages, processImage } from '../src/server'
 import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
@@ -103,6 +103,26 @@ describe('image()', () => {
     expect(image('/uploads/a.jpg', { width: 2000, height: 1000 }).src).toBe(imageUrl('/uploads/a.jpg', 1280))
     expect(image('/uploads/a.jpg')).toEqual({ src: '/uploads/a.jpg' })
     expect(image(registerImage('/_kay/assets/icon-1.svg', 24, 24))).toEqual({ src: '/_kay/assets/icon-1.svg', width: 24, height: 24 })
+  })
+
+  it('stops the ladder at 2560 whatever the image\'s size, and goes wider only where images.widths lists it', () => {
+    const widths = (width: number, sizes?: string) => image('/uploads/big.jpg', { width, height: 1000, ...sizes === undefined ? {} : { sizes } }).srcset!.split(', ').map(entry => Number(entry.slice(entry.indexOf(' ') + 1, -1)))
+
+    expect(widths(6000)).toEqual([320, 640, 960, 1280, 1920, 2560])
+    expect(widths(3000)).toEqual([320, 640, 960, 1280, 1920, 2560])
+    expect(widths(2560)).toEqual([320, 640, 960, 1280, 1920, 2560])
+    expect(widths(2500)).toEqual([320, 640, 960, 1280, 1920, 2500])
+    expect(widths(3000, '1500px')).toEqual([1920, 2560])
+    expect(image('/uploads/big.jpg', { width: 6000, height: 4000 })).toMatchObject({ width: 6000, height: 4000 })
+
+    try {
+      setImageWidths([480, 3840])
+      expect(widths(6000)).toEqual([480, 3840])
+      expect(widths(3000)).toEqual([480, 3000])
+    }
+    finally {
+      setImageWidths(undefined)
+    }
   })
 
   it('gives an image drawn at a fixed width one variant per density, at the narrowest width the route makes, none past its own', () => {
@@ -411,6 +431,16 @@ describe('build variants', () => {
     finally {
       await rm(client, { recursive: true, force: true })
     }
+  })
+
+  it('stops at the ladder\'s last width for an image wider than it, and gives one it reaches its own', async () => {
+    const client = await scratchDir('image-ladder-')
+
+    await Bun.write(join(client, 'assets', 'wide-abc.png'), encodePng(new Uint8Array(3000 * 2 * 4).fill(90), 3000, 2))
+    await Bun.write(join(client, 'assets', 'mid-abc.png'), encodePng(new Uint8Array(2000 * 2 * 4).fill(90), 2000, 2))
+
+    expect(await writeImageVariants(client)).toBe(12)
+    expect((await readdir(join(client, 'images'))).sort()).toEqual([...[320, 640, 960, 1280, 1920, 2560].map(width => variantName('wide-abc.png', width)), ...[320, 640, 960, 1280, 1920, 2000].map(width => variantName('mid-abc.png', width))].sort())
   })
 
   it('copies the variants an earlier build cached, encoding again only when the quality changes, and prunes what no build uses', async () => {

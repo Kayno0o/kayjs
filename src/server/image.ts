@@ -12,7 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
@@ -152,7 +152,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       return
 
     // A width below the ladder a page asked for may be the image's own, written already.
-    const variants = [...imageWidths().filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
+    const variants = [...ladderFor(width), ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
     // The share card stays a JPEG, which social sites read best.
     const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(variantLevel(variant, 'webp', quality, avif ?? DEFAULT_AVIF_QUALITY)) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${variantLevel(variant, 'avif', quality, avif)}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
