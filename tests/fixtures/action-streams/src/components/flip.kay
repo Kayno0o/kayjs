@@ -4,7 +4,7 @@ import { signal } from 'kay'
 import { quiet } from '../routes/index.kay'
 
 // Where the button that starts the stream sits: a block the call's own result removes, as an `if`, a `for` row, a `match` arm or an `await` block's `then`.
-const { mode } = props<{ mode: 'if' | 'for' | 'match' | 'await' }>()
+const { mode } = props<{ mode: 'if' | 'for' | 'match' | 'await' | 'nested' }>()
 const answer = signal<ActionStream<number> | undefined>(undefined)
 const waiting = new Promise<never>(() => undefined)
 const ready = signal<Promise<unknown>>(Promise.resolve(1))
@@ -19,6 +19,10 @@ if mode === 'if'
     button.begin(type="button" onClick={open}) Begin
   else
     p.shown shown
+else if mode === 'nested'
+  if answer() === undefined
+    if mode === 'nested'
+      button.begin(type="button" onClick={open}) Begin
 else if mode === 'for'
   for row of answer() === undefined ? [1] : []
     button.begin(type="button" onClick={open}) Begin

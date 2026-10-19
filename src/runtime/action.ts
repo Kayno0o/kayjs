@@ -735,9 +735,10 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the block or island that started it, or the nearest one around it still alive when its answer arrives, which a handler on a leaving row needs; a `persist` island's living on across pages. A block going within the task its answer arrived in is the call's own result removing it, which hands the stream to the block around it. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
+// A stream ends with the block or island that started it, or the nearest one around it still alive when its answer arrives (a persist island's living on across pages), and one whose block goes in that same task, the call's own result removing it, passes to the block around it. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown.
 function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller | undefined): void {
   let answering = true
+  let ended = false
   let owner: Owner | undefined
 
   setTimeout(() => {
@@ -749,29 +750,46 @@ function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller
 
     owner = undefined
 
-    if (answering && from)
-      keep(liveOwner(from.owner))
-    else
+    if (!answering || !from) {
       stream.close()
+
+      return
+    }
+
+    // After the pass that disposes the block, so the nearest one around it still alive then takes the stream.
+    queueMicrotask(() => {
+      const to = liveOwner(from.owner)
+
+      if (ended)
+        return
+
+      if (to)
+        attach(to)
+      else
+        stream.close()
+    })
   }
 
-  function keep(to: Owner | undefined) {
-    if (to) {
-      owner = to
-      onCleanupOf(to, release)
-    }
-    else if (caller && navigation.arrivals !== caller.arrivals) {
-      stream.close()
-    }
-    else if (caller) {
-      leaving.add(stream.close)
-    }
+  function attach(to: Owner) {
+    owner = to
+    onCleanupOf(to, release)
   }
 
-  keep(liveOwner(caller?.owner))
+  const first = liveOwner(caller?.owner)
+
+  if (first) {
+    attach(first)
+  }
+  else if (caller && navigation.arrivals !== caller.arrivals) {
+    stream.close()
+  }
+  else if (caller) {
+    leaving.add(stream.close)
+  }
 
   // One per call, so an island answering many clicks with a stream does not keep every one until it goes.
   stream[SETTLED](() => {
+    ended = true
     leaving.delete(stream.close)
 
     const at = owner?.cleanups?.indexOf(release) ?? -1

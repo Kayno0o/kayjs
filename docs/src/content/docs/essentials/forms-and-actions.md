@@ -304,7 +304,9 @@ Yield the whole text so far, not just the new piece. Then `last()` is all the is
 
 Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
 
-`close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up, from an event handler or from a `listen` callback closes with the enclosing block or component, so a `persist` island's stays open across pages. For a row playing its leave phase, or a block the call itself removes (a suggestion that sends and leaves), that is the nearest one still alive.
+`close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up, from an event handler or from a `listen` callback closes with the enclosing block or component, so a `persist` island's stays open across pages. For a row playing its leave phase, that is the nearest one still alive.
+
+A block the call's own result removes, such as a button that sends and leaves, hands its stream to the block around it. The block has to go as the call resolves, as in `reply = await ask()`: one removed later by something else closes the stream with it.
 
 A stream started after an `await`, from a timer, or from a handler whose whole owner chain is already gone has no block to close with, so it closes once the visitor goes to another path, not at once.
 

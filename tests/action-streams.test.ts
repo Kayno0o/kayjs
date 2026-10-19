@@ -453,9 +453,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   }
 
   // The call's own result removes the block its button sits in, which must not end the stream the call answered with.
-  const removed = { if: 'an `if`', for: 'a `for` row', match: 'a `match` arm', await: 'an `await` block\'s `then`' }
+  const removed = { if: 'an `if`', for: 'a `for` row', match: 'a `match` arm', nested: 'an `if` in an `if`', await: 'an `await` block\'s `then`' }
 
-  for (const mode of ['if', 'for', 'match', 'await'] as const) {
+  for (const mode of ['if', 'nested', 'for', 'match', 'await'] as const) {
     it(`keeps a stream open when its result removes the block holding ${removed[mode]} that called it, closing it with the page`, async () => {
       const page = await site.open(`/flip-${mode}`, { path })
       const before = seen.quietStopped
