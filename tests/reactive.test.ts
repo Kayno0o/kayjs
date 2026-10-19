@@ -410,7 +410,7 @@ describe('the dependency graph', () => {
   it('skips an effect disposed by one that ran before it in the same flush', () => {
     const count = signal(0)
     const log: string[] = []
-    let stop = () => {}
+    let stop: () => void = () => undefined
 
     const dispose = root((dispose) => {
       renderEffect(() => {
@@ -468,13 +468,15 @@ describe('the dependency graph', () => {
     const counts = [0, 0, 0, 0]
 
     const dispose = root((dispose) => {
-      counts.forEach((_, index) => renderEffect(() => {
-        if (index === 2 && !on())
-          return
+      for (const [index] of counts.entries()) {
+        renderEffect(() => {
+          if (index === 2 && !on())
+            return
 
-        shared()
-        counts[index]!++
-      }))
+          shared()
+          counts[index]!++
+        })
+      }
 
       return dispose
     })

@@ -65,7 +65,9 @@ export interface Owner {
 interface Computation extends Owner, Source {
   fn: () => unknown
   value: unknown
+  // In the order the last run read them; while it runs, the first `cursor` are the ones read so far, and -1 when it does not.
   sources: Source[]
+  cursor: number
   // Typed per memo where it is made; compared as unknown values here.
   equals: Equals<never>
   // Effects run when what they read changes; memos only when read.
@@ -548,7 +550,7 @@ export function renderOnServer<T>(fn: () => T): T {
 }
 
 function computation<T>(fn: () => T, kind: Computation['effect'], equals: Equals<T>): Computation {
-  const node: Computation = { fn, value: undefined, sources: [], observers: undefined, equals, effect: kind, owner, children: undefined, cleanups: undefined, state: CLEAN }
+  const node: Computation = { fn, value: undefined, sources: [], cursor: -1, observers: undefined, equals, effect: kind, owner, children: undefined, cleanups: undefined, state: CLEAN }
 
   if (owner)
     (owner.children ??= []).push(node)
@@ -560,21 +562,65 @@ function track(source: Source): void {
   if (!listener)
     return
 
-  // A source read again in the same run already has the listener among its observers, which every run starts afresh.
+  const { sources, cursor } = listener
+
+  // Read in the order of the last run: already subscribed.
+  if (sources[cursor] === source) {
+    listener.cursor++
+
+    return
+  }
+
+  // The order changed: what the last run read from here on is read afresh, so what stays subscribed is what this run read.
+  if (cursor < sources.length)
+    truncate(listener, cursor)
+
+  // Read again in this run: the sources up to here are all this run's.
   if (source.observers?.has(listener))
     return
 
-  listener.sources.push(source)
-  ;(source.observers ??= new Set()).add(listener)
+  source.observers ??= new Set()
+  source.observers.add(listener)
+  sources.push(source)
+  listener.cursor++
+}
+
+// Drops the sources from `from` on.
+function truncate(node: Computation, from: number): void {
+  for (let index = from; index < node.sources.length; index++)
+    node.sources[index]!.observers?.delete(node)
+
+  node.sources.length = from
+}
+
+// Whether `node` is not running, or has read `source` already in this run: a running one will read what it has not yet as it goes.
+function reads(node: Computation, source: Source): boolean {
+  if (node.cursor < 0)
+    return true
+
+  const index = node.sources.indexOf(source)
+
+  return index >= 0 && index < node.cursor
+}
+
+// Marks the observers of `source`, `direct` ones as dirty at once, the others as `stale` does.
+function mark(source: Source, state: typeof CHECK | typeof DIRTY, direct = false): void {
+  for (const observer of source.observers ?? []) {
+    if (!reads(observer, source))
+      continue
+
+    if (direct)
+      observer.state = DIRTY
+    else
+      stale(observer, state)
+  }
 }
 
 function notify(source: Source): void {
   if (!source.observers)
     return
 
-  for (const observer of source.observers)
-    stale(observer, DIRTY)
-
+  mark(source, DIRTY)
   schedule()
 }
 
@@ -587,10 +633,7 @@ function stale(node: Computation, state: typeof CHECK | typeof DIRTY): void {
 
   node.state = state
 
-  if (node.observers) {
-    for (const observer of node.observers)
-      stale(observer, CHECK)
-  }
+  mark(node, CHECK)
 }
 
 function enqueue(node: Computation): void {
@@ -658,7 +701,8 @@ function runEffect(node: Computation): void {
 }
 
 function run(node: Computation): void {
-  reset(node)
+  // What the last run created goes away; its sources stay subscribed while they are read in the same order.
+  disposeChildren(node)
 
   const previousOwner = owner
   const previousListener = listener
@@ -668,6 +712,7 @@ function run(node: Computation): void {
   listener = node
   // Clean before it runs, so a write to what it already read marks it to run again, and a run that throws still runs on the next change.
   node.state = CLEAN
+  node.cursor = 0
 
   try {
     node.value = node.fn()
@@ -675,23 +720,17 @@ function run(node: Computation): void {
   finally {
     owner = previousOwner
     listener = previousListener
+
+    // What this run did not read again is no longer a source.
+    if (node.cursor < node.sources.length)
+      truncate(node, node.cursor)
+
+    node.cursor = -1
   }
 
   // A memo whose value changed makes what read it run again.
-  if (!node.effect && node.observers && (node.equals === false || !(node.equals as (previous: unknown, next: unknown) => boolean)(previous, node.value))) {
-    for (const observer of node.observers)
-      observer.state = DIRTY
-  }
-}
-
-// Before running again: what the last run created goes away, and its sources are read afresh.
-function reset(node: Computation): void {
-  disposeChildren(node)
-
-  for (const source of node.sources)
-    source.observers?.delete(node)
-
-  node.sources = []
+  if (!node.effect && node.observers && (node.equals === false || !(node.equals as (previous: unknown, next: unknown) => boolean)(previous, node.value)))
+    mark(node, DIRTY, true)
 }
 
 function disposeChildren(node: Owner): void {
@@ -719,10 +758,7 @@ function dispose(node: Owner): void {
   disposeChildren(node)
 
   if ('sources' in node) {
-    for (const source of (node as Computation).sources)
-      source.observers?.delete(node as Computation)
-
-    ;(node as Computation).sources = []
+    truncate(node as Computation, 0)
   }
 
   node.state = DISPOSED
