@@ -462,6 +462,74 @@ describe('the dependency graph', () => {
     expect(computed).toBe(3)
   })
 
+  it('runs an effect again inside its own run when it writes what it read through batch or flush', () => {
+    const a = signal(0)
+    const b = signal(0)
+    const d = signal(0)
+    const viaBatch: string[] = []
+    const viaFlush: string[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        viaBatch.push(`run ${a()}`)
+
+        if (a() === 0)
+          batch(() => a.set(1))
+
+        b()
+      })
+      renderEffect(() => {
+        viaFlush.push(`run ${d()}`)
+
+        if (d() === 1) {
+          d.set(2)
+          flush()
+        }
+
+        b()
+      })
+
+      return dispose
+    })
+
+    expect(viaBatch).toEqual(['run 0', 'run 1'])
+    d.set(1)
+    flush()
+    expect(viaFlush).toEqual(['run 0', 'run 1', 'run 2'])
+    b.set(1)
+    flush()
+    expect(viaBatch).toHaveLength(3)
+    dispose()
+  })
+
+  it('keeps the sources after a source read again out of order', () => {
+    const a = signal(0)
+    const b = signal(0)
+    const c = signal(0)
+    let runs = 0
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        runs++
+        a()
+        b()
+        a()
+        c()
+      })
+
+      return dispose
+    })
+
+    a.set(1)
+    flush()
+    c.set(1)
+    flush()
+    b.set(1)
+    flush()
+    expect(runs).toBe(4)
+    dispose()
+  })
+
   it('lets a signal with many observers drop and regain them', () => {
     const shared = signal(0)
     const on = signal(true)

@@ -571,6 +571,10 @@ function track(source: Source): void {
     return
   }
 
+  // Read already in this run, out of order.
+  if (cursor > 0 && sources.lastIndexOf(source, cursor - 1) >= 0)
+    return
+
   // The order changed: what the last run read from here on is read afresh, so what stays subscribed is what this run read.
   if (cursor < sources.length)
     truncate(listener, cursor)
@@ -605,7 +609,10 @@ function reads(node: Computation, source: Source): boolean {
 
 // Marks the observers of `source`, `direct` ones as dirty at once, the others as `stale` does.
 function mark(source: Source, state: typeof CHECK | typeof DIRTY, direct = false): void {
-  for (const observer of source.observers ?? []) {
+  if (!source.observers)
+    return
+
+  for (const observer of source.observers) {
     if (!reads(observer, source))
       continue
 
@@ -712,6 +719,10 @@ function run(node: Computation): void {
   listener = node
   // Clean before it runs, so a write to what it already read marks it to run again, and a run that throws still runs on the next change.
   node.state = CLEAN
+
+  // Run again inside its own run, as an effect writing what it read does through `flush`: the outer run goes on after it, appending to what it read.
+  const outer = node.cursor
+
   node.cursor = 0
 
   try {
@@ -725,7 +736,7 @@ function run(node: Computation): void {
     if (node.cursor < node.sources.length)
       truncate(node, node.cursor)
 
-    node.cursor = -1
+    node.cursor = outer < 0 ? -1 : node.sources.length
   }
 
   // A memo whose value changed makes what read it run again.
@@ -757,9 +768,8 @@ function dispose(node: Owner): void {
 
   disposeChildren(node)
 
-  if ('sources' in node) {
+  if ('sources' in node)
     truncate(node as Computation, 0)
-  }
 
   node.state = DISPOSED
 }
