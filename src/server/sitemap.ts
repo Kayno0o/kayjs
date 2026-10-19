@@ -68,7 +68,8 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
       const built: typeof sitemap = { files: Promise.resolve([]), replies: new Map(), at: Date.now(), degraded: false }
 
       built.files = sitemapFiles(routes, origin, options.trailingSlash, settings, locale, (error) => {
-        built.degraded = true
+        // A lastmod that is no date or a limit passed stays so on the next build: only an error the app threw, such as a database down, is worth building again soon.
+        built.degraded ||= !(error instanceof KayError && error.code === 'page-settings-invalid')
         report(error)
       }, publicOrigin, options.base)
       cached.set(locale, sitemap = built)

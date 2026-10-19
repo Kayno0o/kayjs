@@ -219,6 +219,32 @@ describe('a sitemap built without a lastmod', () => {
   })
 })
 
+describe('a sitemap with a lastmod that is no date', () => {
+  it('keeps the one-hour cache, as the next build would find the same', async () => {
+    const copy = await fixtureCopy('site-output')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => \'2026-02-31\' }\n---\nh1 Post\n')
+    errors.length = 0
+
+    try {
+      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported) })
+      const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
+      const first = await fetched()
+
+      expect(first.headers.get('cache-control')).toBe('public, max-age=3600')
+      await first.text()
+      setSystemTime(Date.now() + 61_000)
+      await (await fetched()).text()
+      expect(errors).toHaveLength(1)
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+    }
+  })
+})
+
 describe('a static export', () => {
   it('writes the index and each part', async () => {
     const copy = await fixtureCopy('static')
