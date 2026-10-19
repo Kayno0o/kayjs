@@ -606,13 +606,24 @@ function pageOutcome(): Outcome | undefined {
   return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }
 
+// An `ownSignal` made when first read, as most actions are only called: what is written before holds as its value.
+function lazySignal<T>(value: T): [read: () => T, write: (next: T) => void, peek: () => T] {
+  let current = value
+  let signal: ReturnType<typeof ownSignal<T>> | undefined
+
+  return [() => (signal ??= ownSignal(current))[0](), (next) => {
+    current = next
+    signal?.[1](next)
+  }, () => current]
+}
+
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes, unless the visitor stays or already went elsewhere.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
-  const [inFlight, setInFlight] = ownSignal(0)
-  const [last, setLast] = ownSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
-  const [progress, setProgress] = ownSignal<number | undefined>(undefined)
-  const shift = (by: number) => setInFlight(untrack(inFlight) + by)
+  const [inFlight, setInFlight, flying] = lazySignal(0)
+  const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
+  const [progress, setProgress] = lazySignal<number | undefined>(undefined)
+  const shift = (by: number) => setInFlight(flying() + by)
   const called = (page: number, outcome: Outcome | null) => setLast({ page, outcome })
   const outcome = () => {
     let found = requestOutcome?.()

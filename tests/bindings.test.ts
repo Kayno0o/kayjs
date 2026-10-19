@@ -200,6 +200,35 @@ describe('branches', () => {
   })
 })
 
+describe('choose', () => {
+  it('builds a branch again only when another takes over, as a chain naming no value does', async () => {
+    const [count, setCount] = reactive.createSignal(1)
+    const [other, setOther] = reactive.createSignal(false)
+    const parent = document.createElement('div')
+    let built = 0
+
+    document.body.append(parent)
+    dom.choose(parent, null, null, [[count, () => {
+      built++
+
+      return document.createElement('p')
+    }], [other, () => document.createElement('b')], [null, () => document.createElement('i')]])
+    expect([parent.innerHTML, built]).toEqual(['<p></p>', 1])
+    setCount(5)
+    await settle()
+    expect([parent.innerHTML, built]).toEqual(['<p></p>', 1])
+    setCount(0)
+    await settle()
+    expect(parent.innerHTML).toBe('<i></i>')
+    setOther(true)
+    await settle()
+    expect(parent.innerHTML).toBe('<b></b>')
+    setCount(2)
+    await settle()
+    expect([parent.innerHTML, built]).toEqual(['<p></p>', 2])
+  })
+})
+
 describe('an action stub', () => {
   it('reads pending, succeeded and failed from the first read on, whenever that is', async () => {
     const answered = spyOn(globalThis, 'fetch').mockImplementation((async () => {

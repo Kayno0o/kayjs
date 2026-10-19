@@ -686,6 +686,25 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
   })
 }
 
+// The `if` chain of a template naming no value: one memo of the branch number, so a test changing within the same branch builds nothing.
+export function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void {
+  const block = blockIn(new Region(element, start, end))
+  const index = memo(() => {
+    for (const [at, [test]] of list.entries()) {
+      if (!test || Boolean(test()))
+        return at
+    }
+
+    return -1
+  })
+
+  renderEffect(() => {
+    const selected = index()
+
+    untrack(() => unrecorded(() => swap(block, () => selected < 0 ? null : list[selected]![1]())))
+  })
+}
+
 interface Row {
   key: unknown
   unit: Unit | null

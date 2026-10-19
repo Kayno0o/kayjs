@@ -10,7 +10,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` is in a module of its own, as the image runtime weighs on a page with no image.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -165,7 +165,8 @@ export class DomTemplate extends TemplateWriter {
   private if(node: IfNode, at: string): void {
     const { b } = this
 
-    b.add(`KayBranches(${at}, [`)
+    // A chain naming no value needs no memo of it.
+    b.add(`${node.branches.some(branch => branch.alias) ? 'KayBranches' : 'KayChoose'}(${at}, [`)
 
     for (const branch of node.branches) {
       b.wrap(branch, () => {
@@ -188,7 +189,7 @@ export class DomTemplate extends TemplateWriter {
   private match(node: MatchNode, at: string): void {
     const { b } = this
 
-    b.add(`{ const ${SUBJECT} = ${helperName('memo')}(() => (`).addSource(node.subject).add(`)); KayBranches(${at}, [`)
+    b.add(`{ const ${SUBJECT} = ${helperName('memo')}(() => (`).addSource(node.subject).add(`)); KayChoose(${at}, [`)
 
     for (const branch of node.cases) {
       b.wrap(branch, () => {

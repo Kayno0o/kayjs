@@ -87,7 +87,7 @@ export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> 
     const raw = values[index]
 
     if (raw === null || typeof raw !== 'object')
-      return keep(index, raw)
+      return raw
 
     if (!Array.isArray(raw)) {
       const object = keep(index, {})
