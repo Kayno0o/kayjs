@@ -37,6 +37,15 @@ describe('s from kay', () => {
     expect(s.Object({ title: s.String() }).type).toBe('object')
   })
 
+  it('lets an island read the type of a schema its shared module builds, with nothing of the module in the bundle', async () => {
+    await Bun.write(join(dir, 'shared.ts'), 'import type { Static } from \'kay\'\nimport { s } from \'kay\'\n\nexport const choice = s.Union([s.Literal(\'smash\'), s.Literal(\'pass\')])\nexport type Choice = Static<typeof choice>\n')
+
+    const bundle = await browserBundle('import type { Choice } from \'./shared\'\nimport type { choice } from \'./shared\'\n\nexport const pick = (value: Choice, from: typeof choice) => [value, from]\n')
+
+    expect(bundle).not.toContain('builds a schema')
+    expect(bundle).not.toContain('smash')
+  })
+
   it('leaves Elysia out of an island, and throws saying why when one calls it', async () => {
     const plain = await browserBundle('import { signal } from \'kay\'\n\nexport const count = signal(1)\n')
     const calling = await browserBundle('import { s } from \'kay\'\n\nexport const schema = () => s.String()\n')

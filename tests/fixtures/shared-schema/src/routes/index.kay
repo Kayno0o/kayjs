@@ -1,0 +1,9 @@
+--- server
+import { action, s } from 'kay'
+import { choice } from '../schemas'
+
+export const castVerdict = action(s.Object({ choice }), input => input.choice)
+--- script
+import Verdict from '../components/verdict.kay'
+---
+Verdict(initial="smash")

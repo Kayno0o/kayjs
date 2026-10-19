@@ -11,7 +11,7 @@
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Durations kay's config and server code take are seconds as a number, or a number with its unit as a string, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`): `cached`'s `ttl`, `revalidate`, a session's `maxAge`, `rateLimit`'s `window`, an action's `minTime` and `shutdownTimeout`. `every` and `debounced`'s delay, `rooms.coalesce({ wait })`, `sqliteRooms({ poll })`, kayjs-cms's `forgejo({ timeout })` and `createDrafts({ delay })` and kayjs-ui's `Carousel` `autoplay` take the string alone (type `DurationText`), and a bare number throws. Each must be positive, which `kay check` reports for a literal `cached` ttl and the server for the rest. In milliseconds, as `bun:test`'s own timeouts are, `kay/test`'s browser `timeout`; a store's `set(id, data, maxAge)` gets seconds.
+- Durations kay's config and server code take are seconds as a number, or a number with its unit as a string, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`): `cached`'s `ttl`, `revalidate`, a session's `maxAge`, `rateLimit`'s `window`, an action's `minTime` and `shutdownTimeout`. `every`, `debounced`, `rooms.coalesce`, `sqliteRooms` and the delays of kayjs-cms and kayjs-ui take the string alone (type `DurationText`), and a bare number throws. Each must be positive, which `kay check` reports for a literal `cached` ttl and the server for the rest. In milliseconds, as `bun:test`'s own timeouts are, `kay/test`'s browser `timeout`; a store's `set(id, data, maxAge)` gets seconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met, a compile error at its `.kay` line, a request that threw with its stack on `.kay` lines, or an island's error in the browser: read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
@@ -40,6 +40,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
 - [Actions](llms/actions.md): form posts that work without JavaScript, typed by a schema: validation errors, files, redirects
 - [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming answers, optimistic changes, actions as props
+- [Schemas](llms/schemas.md): one schema for the server, its type read by islands
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, guards on actions, rate limits, body limit
 - [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes images, signs private links, upload progress
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
@@ -55,7 +56,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt`, `kay lsp`, `kay mcp`, `kay/compiler`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` (a page's output, no server), `kay screenshot <path>`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html`), `kay lsp`, `kay mcp` (tools and guides for an agent), `kay/compiler`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
 - [Queues](llms/queues.md): jobs surviving a restart: stores, retries
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression

@@ -220,6 +220,9 @@ export type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output
 // What the handler passes to `ctx.fail`, read off its phantom for the same reason.
 export type FailuresOf<Target> = Target extends { readonly [FAILED]?: infer Data } ? Data : never
 
+// The input an action's schema describes, as a form posts it or a call takes it.
+export type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
+
 export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
 
 // What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.

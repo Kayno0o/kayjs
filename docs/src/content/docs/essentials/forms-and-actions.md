@@ -100,6 +100,25 @@ Its actions are served behind the `_guard.ts` files of its directory and above, 
 
 An action in it can read the params of every page below it.
 
+## One schema for the server and the browser
+
+A schema is built with `s`, which only the server has. An island cannot import one, but it can import the type read off it, which leaves the module out of its bundle. Write the schema once in a `.ts` module, with its type beside it.
+
+```ts
+// src/schemas.ts
+import type { Static } from 'kay'
+import { s } from 'kay'
+
+export const choice = s.Union([s.Literal('smash'), s.Literal('pass')])
+export type Choice = Static<typeof choice>
+```
+
+An action and an API route import `choice`. An island writes `import type { Choice } from '../schemas'`.
+
+`InputOf<typeof contact>` from `kay` is the input of an action, for a mail or a module the handler calls to type its argument without writing the fields again.
+
+<ReadMore href="/llms/schemas">Where a shared schema lives, and what an island may read of it.</ReadMore>
+
 ## Showing errors
 
 A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field. A bare `error` shows the form-wide one.

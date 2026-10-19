@@ -25,6 +25,7 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
+| `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
 | `ActionError`, `ActionRedirect` | What an action called from an island throws: its schema's messages, or the redirect it answered |
 | `focusInvalid`, `flush` | Focus the first invalid field once pending writes rendered; run pending effects now |

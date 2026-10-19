@@ -1,4 +1,5 @@
-import type { Action, Failure, FailureData, FailureOf, SuccessOf } from '../src/runtime/action'
+import type { Static } from '../src/runtime'
+import type { Action, Failure, FailureData, FailureOf, InputOf, SuccessOf } from '../src/runtime/action'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { action } from '../src/runtime/action'
@@ -13,6 +14,23 @@ const summarise = action(t.Object({ dossier: t.String() }), async function* (inp
 })
 
 const claim = action(t.Object({ id: t.String() }), (input, ctx) => (input.id ? 'ok' : ctx.fail(409, { reason: 'taken' })))
+
+const choice = t.Union([t.Literal('smash'), t.Literal('pass')])
+const verdict = action(t.Object({ choice }), input => input.choice)
+
+describe('the types a schema gives an island', () => {
+  it('reads a value shape off the schema, and an action\'s input off the action', () => {
+    const value: Static<typeof choice> = 'smash'
+    const input: InputOf<typeof verdict> = { choice: 'pass' }
+
+    // @ts-expect-error only the schema's literals
+    const wrong: Static<typeof choice> = 'maybe'
+    // @ts-expect-error the input holds the schema's field
+    const missing: InputOf<typeof verdict> = {}
+
+    expect([value, input, wrong, missing, verdict]).toHaveLength(5)
+  })
+})
 
 describe('an action prop typed with the success output', () => {
   it('takes an action whose handler can ctx.fail', () => {

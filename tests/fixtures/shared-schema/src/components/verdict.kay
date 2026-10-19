@@ -1,0 +1,8 @@
+---
+import type { Choice } from '../schemas'
+import { signal } from 'kay'
+
+const { initial } = props<{ initial: Choice }>()
+const picked = signal<Choice>(initial)
+---
+button.flip(type="button" onClick={() => picked.set(picked() === 'smash' ? 'pass' : 'smash')}) {picked()}
