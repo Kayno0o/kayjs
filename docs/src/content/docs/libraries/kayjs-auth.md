@@ -591,7 +591,7 @@ await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct ho
 
 The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'`.
 
-To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user. It mints `session`, which a request over http reads; in production with an https `url` it mints `__Host-session`, which a request over https reads alone, and `{ secure: true }` or `{ secure: false }` picks one by hand.
+To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user. It mints the cookie the app reads from a plain request: `__Host-session` in production when `site` in kay.config.ts is https, else `session`. A request over https reads `__Host-session` alone, so `{ secure: true }` asks for it, as for a site without `site` behind a proxy that says it was reached over https, and `{ secure: false }` asks for `session`.
 
 ```ts
 const cookie = await auth.sessionCookie(user.id)

@@ -5,7 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `overrideEnv(env, values)` from `kay/test` gives a `defineEnv` value other variables for one test and puts them back, and `defineEnv`'s `source` argument is documented ([Testing](testing.md), [Server](server.md)).
-- kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when the site's `url` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
+- kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when kay.config.ts `site` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
 
 ## 1.57.1
 
