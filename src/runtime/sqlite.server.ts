@@ -17,9 +17,28 @@ export function openSqlite(path: string): Database {
 
   // Set first, as switching to WAL needs a lock and fails at once on a file another process holds without it.
   db.run('PRAGMA busy_timeout = 5000')
-  db.run('PRAGMA journal_mode = WAL')
+  switchToWal(db)
   // A commit waits on no disk sync, only checkpoints do: under WAL a power cut may lose the last writes, never corrupt the file.
   db.run('PRAGMA synchronous = NORMAL')
 
   return db
+}
+
+// The switch can answer busy without waiting on the timeout, while another process opening the file at the same moment holds it, so it is tried again for as long.
+function switchToWal(db: Database): void {
+  const until = Date.now() + 5000
+
+  for (;;) {
+    try {
+      db.run('PRAGMA journal_mode = WAL')
+
+      return
+    }
+    catch (error) {
+      if ((error as { code?: string }).code !== 'SQLITE_BUSY' || Date.now() > until)
+        throw error
+
+      Bun.sleepSync(10)
+    }
+  }
 }
