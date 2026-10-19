@@ -332,7 +332,7 @@ onMount(() => drawMap(center))
 
 `debounced(source, delay)` gives the value once it has stopped changing for `delay`, a duration such as `'300ms'`. `watch(debounced(typed, '300ms'), lookUp)` looks a name up when the user pauses typing.
 
-`every(interval, run)` runs `run` on a timer while the island lives, `interval` being a duration such as `'1s'`. `every('1s', () => now = Date.now())` ticks a clock.
+`every(interval, run)` runs `run` on a timer while the island lives, `interval` being a duration such as `'1s'`. `every('1s', () => now = Date.now())` ticks a clock. The timer pauses while the tab is hidden and runs once as it shows again; pass `{ background: true }` to keep it running. An interval of zero, a negative one or one that is not a duration throws.
 
 `listen(window, 'keydown', event => ...)` listens to an event of `window` or `document`. It removes the listener when the island ends. Call it with an arrow function or read the target as `event.currentTarget`, as the callback has no `this`. An `effect()` or `onCleanup()` inside the callback belongs to the island and builds up with every event, as in an element's handler, so keep them out of it.
 

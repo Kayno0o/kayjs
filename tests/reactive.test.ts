@@ -1,5 +1,5 @@
 import type { Action, Failure, NoInputAction } from '../src/runtime'
-import { describe, expect, it, jest, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
 import { ActionError, ActionRedirect, actionStub } from '../src/runtime/action'
@@ -968,6 +968,8 @@ describe('a tracked action call', () => {
 })
 
 describe('every', () => {
+  withTab()
+
   it('runs every interval until its root goes, starting and stopping as its condition turns', async () => {
     // Once a test before waited on a real timer, fake timers no longer settle a tick's await before the next tick: each step lets it.
     const advance = async (ms: number) => {
@@ -1233,7 +1235,17 @@ describe('watch', () => {
   })
 })
 
+// The one document every() reads the tab's visibility from, which the runtime keeps listening to once it has met it.
+const tab = Object.assign(new EventTarget(), { hidden: false })
+
+function withTab(): void {
+  beforeAll(() => void Object.assign(globalThis, { document: tab }))
+  afterAll(() => void Reflect.deleteProperty(globalThis, 'document'))
+}
+
 describe('durations as delays', () => {
+  withTab()
+
   it('takes every and debounced delays as duration strings, a bare number staying milliseconds', async () => {
     jest.useFakeTimers()
 
@@ -1263,6 +1275,59 @@ describe('durations as delays', () => {
       dispose()
     }
     finally {
+      jest.useRealTimers()
+    }
+  })
+})
+
+describe('every, paused and checked', () => {
+  withTab()
+
+  it('throws for an interval that is not a positive duration', () => {
+    for (const interval of [0, -5, Number.NaN, '3 s', '', '0s', 'fast'] as never[])
+      expect(() => root(() => every(interval, () => undefined))).toThrow('every() takes a positive duration')
+  })
+
+  it('pauses while the tab is hidden and runs as it shows again, unless it is told to keep going', async () => {
+    jest.useFakeTimers()
+
+    const hide = (hidden: boolean) => {
+      tab.hidden = hidden
+      tab.dispatchEvent(new Event('visibilitychange'))
+      flush()
+    }
+
+    try {
+      let paused = 0
+      let kept = 0
+      const stop = root((dispose) => {
+        every('1s', () => paused++)
+        every('1s', () => kept++, { background: true })
+
+        return dispose
+      })
+
+      flush()
+      jest.advanceTimersByTime(1000)
+      await Promise.resolve()
+      hide(true)
+
+      for (let second = 0; second < 3; second++) {
+        jest.advanceTimersByTime(1000)
+        await Promise.resolve()
+      }
+
+      expect([paused, kept]).toEqual([1, 4])
+      hide(false)
+      await Promise.resolve()
+      expect(paused).toBe(2)
+      jest.advanceTimersByTime(1000)
+      await Promise.resolve()
+      expect(paused).toBe(3)
+      stop()
+    }
+    finally {
+      hide(false)
       jest.useRealTimers()
     }
   })

@@ -234,6 +234,7 @@ ul
 - `every(interval, run, { while })` from `kay` runs `run` every `interval`, a duration such as `'3s'` or `'250ms'`, while the island lives, and while `while`, read as an effect reads, holds: the timer starts and stops as it turns, never on the server.
 - `every` skips a tick while the promise the last run returned is pending.
 - `every(interval, run, { immediate: true })` runs it as the timer starts too, rather than one interval later.
+- `every` pauses while the tab is hidden and runs once as it shows again; `{ background: true }` keeps it running hidden. An interval that is zero, negative, not a number or not a duration string (`'3 s'`) throws.
 - `every('3s', refresh, { while: () => issuing })` polls the page, `every('1s', () => now = Date.now())` ticks a clock; a bare number is milliseconds still, which `deprecated-time-ms` rewrites.
 - `watch(source, (next, previous) => ...)` from `kay` runs on each change of `source`, a signal or a function reading some, not on its first read: no hand-kept previous value to compare against.
 - `watch` tracks only `source`, never what its callback reads; a read giving the same value runs nothing, and what the callback registers with `onCleanup` stays until its next run.

@@ -7,6 +7,7 @@ import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
 import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
+import { tabVisible } from './visibility'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -33,15 +34,30 @@ export interface EveryOptions {
   while?: (() => boolean) | undefined
   // Runs `run` as the timer starts too, rather than one interval later: a poll showing fresh data the moment it starts.
   immediate?: boolean | undefined
+  // Keeps running while the tab is hidden, which it pauses for otherwise and catches up with as the tab shows again.
+  background?: boolean | undefined
 }
 
 // Runs `run` every `interval` while the island lives, and while `options.while` holds: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
 // A bare number is milliseconds here for now, `deprecated-time-ms` rewrites it to a duration string.
-// Nothing runs while the server renders, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
+// Nothing runs while the server renders or the tab is hidden, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
+// An interval that is not a positive duration throws.
 export function every(interval: Duration, run: () => unknown, options?: EveryOptions): void {
+  const ms = durationMs(interval)
+  let paused = false
+
+  if (!(ms > 0 && Number.isFinite(ms)))
+    throw new Error(`kay: every() takes a positive duration such as '3s' or '250ms', not ${JSON.stringify(interval)}`)
+
   effect(() => {
     if (options?.while && !options.while())
       return
+
+    if (!options?.background && !tabVisible()) {
+      paused = true
+
+      return
+    }
 
     let busy = false
     const tick = async () => {
@@ -57,12 +73,14 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
         busy = false
       }
     }
-    const timer = setInterval(() => void tick(), durationMs(interval))
+    const timer = setInterval(() => void tick(), ms)
 
     onCleanup(() => clearInterval(timer))
 
-    if (options?.immediate)
+    if (options?.immediate || paused)
       void tick()
+
+    paused = false
   })
 }
 
