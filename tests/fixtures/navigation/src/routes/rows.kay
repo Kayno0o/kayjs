@@ -1,0 +1,14 @@
+--- server
+const lead = ctx.url.searchParams.has('lead')
+const rows = Array.from({ length: 1500 }, (_, index) => index)
+---
+head
+  title Rows
+h1 Rows
+a.rows(href="/rows") Rows
+a.lead(href="/rows?lead=1") Lead
+ol
+  if lead
+    li.row.new New
+  for row of rows
+    li.row {row}

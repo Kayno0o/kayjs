@@ -524,6 +524,33 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(measured.html).toBeLessThanOrEqual(measured.elements * 3)
   })
 
+  it('keeps the element a script changed in the head between two swaps, and each row of a long list a leading insert moves down', async () => {
+    await page.goto(`${origin}/rows`)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      document.querySelector('meta[name="theme-color"]')!.setAttribute('content', '#abcdef')
+      for (const [index, row] of document.querySelectorAll('li.row').entries())
+        (row as HTMLElement & { index?: number }).index = index
+    })
+    await page.click('a.lead')
+    await page.locator('li.new').waitFor()
+
+    const kept = await page.evaluate(() => ({
+      rows: [...document.querySelectorAll('li.row:not(.new)')].filter((row, index) => (row as HTMLElement & { index?: number }).index === index).length,
+      first: document.querySelector('ol')!.firstElementChild!.className,
+      theme: document.querySelector('meta[name="theme-color"]')!.getAttribute('content'),
+    }))
+
+    expect(kept).toEqual({ rows: 1500, first: 'row new', theme: '#abcdef' })
+    expect(await sameDocument()).toBe(true)
+
+    await page.evaluate(() => document.querySelector('meta[name="theme-color"]')!.setAttribute('content', '#fedcba'))
+    await page.click('a.rows')
+    await page.waitForFunction(() => document.querySelector('li.new') === null)
+    expect(await page.evaluate(() => document.querySelector('meta[name="theme-color"]')!.getAttribute('content'))).toBe('#fedcba')
+    expect(await sameDocument()).toBe(true)
+  })
+
   it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
