@@ -664,7 +664,7 @@ export type ResourceOf<Module, Path> = Resource<GetRoute<Module, Path> extends {
 
 // An answer as Elysia sends it: JSON for an object, text for anything else.
 // What a route answered: JSON, text, or the bytes of anything else, a file say. A refusal whose JSON does not parse reads as its text, and an answer cut off throws an ApiError with status 0, unless the call was aborted.
-async function readAnswer(response: Response, signal?: AbortSignal): Promise<unknown> {
+export async function readAnswer(response: Response, signal?: AbortSignal): Promise<unknown> {
   const type = response.headers.get('content-type') ?? ''
   let text: string
 
@@ -814,7 +814,9 @@ export type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Fou
 type MethodOption<Node, M> = 'get' extends RouteKey<Node> ? { method?: M } : { method: M }
 type CallBody<Route> = Route extends { body: infer Input } ? unknown extends Input ? { body?: unknown } : { body: Input | FormData } : { body?: unknown }
 
-export type ApiCallOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>> & {
+export type ApiRequest<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>
+
+export type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
   // Aborts the call, which rejects with the signal's reason.
   signal?: AbortSignal | undefined
   // Called as a body carrying files uploads, with how much of it went, from 0 to 1.
@@ -855,7 +857,7 @@ export async function call<Module, const Path extends CallPath<Module>, const M 
 }
 
 // A body carrying files goes as a form, its other fields as text, which Elysia reads against the route's schema; anything else goes as JSON.
-function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Record<string, string> } {
+export function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Record<string, string> } {
   if (body === undefined || body instanceof FormData)
     return { body }
 

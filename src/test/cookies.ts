@@ -12,6 +12,15 @@ function covers(scope: string, path: string): boolean {
   return scope === '/' || path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)
 }
 
+const cookieName = (piece: string): string => piece.slice(0, Math.max(piece.indexOf('='), 0)).trim()
+
+// A request's own `cookie` header with the jar's cookies it does not name itself.
+export function withKept(given: string | null, kept: string): string {
+  const named = new Set((given ?? '').split(';').map(cookieName))
+
+  return [...given === null || given === '' ? [] : [given], ...kept.split('; ').filter(piece => piece !== '' && !named.has(cookieName(piece)))].join('; ')
+}
+
 export function cookieJar(): CookieJar {
   const cookies = new Bun.CookieMap()
   const scopes = new Map<string, string>()
@@ -21,7 +30,7 @@ export function cookieJar(): CookieJar {
     cookies,
     header,
     send: async (handle, request, path = new URL(request.url).pathname) => {
-      const sent = header(path)
+      const sent = withKept(request.headers.get('cookie'), header(path))
 
       if (sent !== '')
         request.headers.set('cookie', sent)

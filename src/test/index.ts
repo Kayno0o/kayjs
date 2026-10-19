@@ -2,7 +2,7 @@ import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
 import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Settles, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
+import type { ApiAnswer, ApiRequest, CallMethod, CallPath, EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
@@ -19,7 +19,7 @@ import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { durationSeconds } from '../runtime/duration'
-import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
+import { callBody, openSocket, readAnswer, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
@@ -37,7 +37,7 @@ import { memoryFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
 import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
-import { cookieJar } from './cookies'
+import { cookieJar, withKept } from './cookies'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
@@ -55,6 +55,8 @@ export { scratchDir } from './scratch'
 export { solveWork }
 
 export interface TestOptions extends PagesOptions {
+  // Headers every request of the site sends unless the call gives one of the same name, such as an `authorization` bearer token; `site.as()` adds to them.
+  headers?: Record<string, string> | undefined
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
   use?: AnyElysia[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
@@ -84,6 +86,9 @@ export type FormValue = string | Blob
 // What a call gives back: every value of a handler returning an async iterable, else what it returned.
 type Tested<Output> = Success<Output> extends infer Value ? Value extends AsyncIterable<infer Item> ? Item[] : Value : never
 
+// What `site.api` resolves with: a refusal is data, so a test of one reads its status and body rather than catching.
+export type ApiResult<Answer> = { ok: true, status: number, headers: Headers, body: Answer } | { ok: false, status: number, headers: Headers, body: unknown }
+
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
 // A call to an action whose fields are all optional, or that takes none, may leave its input out.
 type CallArguments<Target> = object extends InputOf<Target> ? [input?: InputOf<Target> | FormData, init?: VisitInit & { from?: string }] : [input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }]
@@ -108,6 +113,12 @@ export interface TestSite {
   }
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
+  // A route of a module under `src/api`, called as `call()` calls it from an island, typed from the route: the path as the module writes it, `method` (GET unless named), `params`, `query` and `body`. Resolves with the status, headers and body, the body parsed as an island reads it, whatever the status.
+  api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiRequest<Module, Path, M> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
+  // The same site with these headers added to every request, a string being a `Cookie` header such as `auth.sessionCookie` returns; the site it was made from is unchanged and shares its cookies.
+  as: (who: string | Record<string, string>) => TestSite
+  // A websocket route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test.
+  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
   // A route of a module under `src/api` answering with `eventStream()`, read as an island reads it.
@@ -156,9 +167,21 @@ export type TestStream<Client> = Client & {
 }
 
 const ORIGIN = 'http://localhost'
+const UPGRADE = { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' }
 // The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
 const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const MAX_REDIRECTS = 10
+
+// The site's default headers, those a call gives winning by name in any case.
+function withDefaults(defaults: Record<string, string>, given: Record<string, string> | undefined): Headers {
+  const headers = new NativeHeaders(defaults)
+
+  for (const [name, value] of Object.entries(given ?? {}))
+    headers.set(name, value)
+
+  return headers
+}
+
 // Each test's client, counted across the run as rate limits are. A private address reads as a proxy's, so a test sending the header the app's `proxy` names still posts as the client it gives.
 let clients = 0
 
@@ -293,40 +316,6 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return joinBase(base, routerPath(url.pathname, base)) + url.search
   }
 
-  const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
-    const url = new NativeURL(path, ORIGIN)
-    const routed = routerPath(url.pathname, base)
-    const request = new NativeRequest(new NativeURL(routed + url.search, ORIGIN), { ...init, headers: new NativeHeaders(init.headers), redirect: 'manual' })
-
-    sendFrom(request, address)
-
-    return jar.send(handle, request, joinBase(base, routed))
-  }
-
-  const follow = async (response: Response, url: string, headers?: Record<string, string>): Promise<Visit> => {
-    let current = response
-    let path = shown(url)
-
-    for (let redirects = 0; current.status >= 300 && current.status < 400 && current.headers.has('location'); redirects++) {
-      if (redirects === MAX_REDIRECTS)
-        throw new Error(`kay: more than ${MAX_REDIRECTS} redirects from ${url}`)
-
-      const next = new URL(current.headers.get('location')!, new URL(path, ORIGIN))
-
-      // Another site is not this app's to answer, so the visit ends at the redirect.
-      if (next.origin !== ORIGIN)
-        break
-
-      path = next.pathname + next.search
-      current = await send(path, { headers })
-    }
-
-    // A page streamed after its shell renders on as it is read.
-    const html = await withNatives(async () => current.text())
-
-    return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
-  }
-
   // The URL the browser shows a page at that answered a post in place: the one posted to.
   const answeredAt = new WeakMap<Visit, string>()
   let server: Bun.Server<unknown> | undefined
@@ -343,174 +332,244 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return server
   }
 
-  const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
-    const { headers, body } = encodeCall(input)
+  const scoped = (defaults: Record<string, string>): TestSite => {
+    const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
+      const url = new NativeURL(path, ORIGIN)
+      const routed = routerPath(url.pathname, base)
+      const request = new NativeRequest(new NativeURL(routed + url.search, ORIGIN), { ...init, headers: withDefaults(defaults, init.headers), redirect: 'manual' })
 
-    const sent: Record<string, string> = { ...headers, origin: ORIGIN }
+      sendFrom(request, address)
 
-    if (init.from !== undefined)
-      sent[PAGE_HEADER] = shown(init.from)
+      return jar.send(handle, request, joinBase(base, routed))
+    }
 
-    const answer = await readActionResponse<unknown>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
+    // What a socket's upgrade carries: the site's headers, the cookies so far and the call's own.
+    const upgradeHeaders = (url: string, given: Record<string, string> | undefined): Record<string, string> => {
+      const headers = withDefaults(defaults, given)
 
-    return (isStream(answer) ? await streamedValues(answer, action.url) : answer) as Tested<ResultOf<typeof action>>
-  }
+      const cookie = withKept(headers.get('cookie'), jar.header(joinBase(base, url)))
 
-  interface RpcResult { tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
+      if (cookie !== '')
+        headers.set('cookie', cookie)
 
-  let rpcId = 0
+      return Object.fromEntries(headers)
+    }
 
-  const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
-    const response = await send(mcpPath(config.mcp) ?? MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
-    const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
+    const follow = async (response: Response, url: string, headers?: Record<string, string>): Promise<Visit> => {
+      let current = response
+      let path = shown(url)
 
-    if (reply.error)
-      throw new Error(`kay: ${method} was refused: ${reply.error.message}`)
+      for (let redirects = 0; current.status >= 300 && current.status < 400 && current.headers.has('location'); redirects++) {
+        if (redirects === MAX_REDIRECTS)
+          throw new Error(`kay: more than ${MAX_REDIRECTS} redirects from ${url}`)
 
-    return { status: response.status, result: reply.result! }
-  }
+        const next = new URL(current.headers.get('location')!, new URL(path, ORIGIN))
 
-  return {
-    cookies: jar.cookies,
-    handle,
-    mcp: {
-      tools: async init => (await rpc('tools/list', {}, init)).result.tools ?? [],
-      call: async (name, args = {}, init) => {
-        const { status, result } = await rpc('tools/call', { name, arguments: args }, init)
+        // Another site is not this app's to answer, so the visit ends at the redirect.
+        if (next.origin !== ORIGIN)
+          break
 
-        return { isError: result.isError === true, text: (result.content ?? []).map(part => part.text).join(''), data: result.structuredContent, status }
+        path = next.pathname + next.search
+        current = await send(path, { headers })
+      }
+
+      // A page streamed after its shell renders on as it is read.
+      const html = await withNatives(async () => current.text())
+
+      return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
+    }
+
+    const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
+      const { headers, body } = encodeCall(input)
+
+      const sent: Record<string, string> = { ...headers, origin: ORIGIN }
+
+      if (init.from !== undefined)
+        sent[PAGE_HEADER] = shown(init.from)
+
+      const answer = await readActionResponse<unknown>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
+
+      return (isStream(answer) ? await streamedValues(answer, action.url) : answer) as Tested<ResultOf<typeof action>>
+    }
+
+    interface RpcResult { tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
+
+    let rpcId = 0
+
+    const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
+      const response = await send(mcpPath(config.mcp) ?? MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
+      const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
+
+      if (reply.error)
+        throw new Error(`kay: ${method} was refused: ${reply.error.message}`)
+
+      return { status: response.status, result: reply.result! }
+    }
+
+    return {
+      cookies: jar.cookies,
+      handle,
+      mcp: {
+        tools: async init => (await rpc('tools/list', {}, init)).result.tools ?? [],
+        call: async (name, args = {}, init) => {
+          const { status, result } = await rpc('tools/call', { name, arguments: args }, init)
+
+          return { isError: result.isError === true, text: (result.content ?? []).map(part => part.text).join(''), data: result.structuredContent, status }
+        },
       },
-    },
-    runJobs: drainQueues,
-    sitemap: async (path = SITEMAP) => {
-      const response = await send(path, {})
+      runJobs: drainQueues,
+      sitemap: async (path = SITEMAP) => {
+        const response = await send(path, {})
 
-      if (response.status !== 200)
-        throw new Error(`kay: ${path} answered ${response.status}`)
+        if (response.status !== 200)
+          throw new Error(`kay: ${path} answered ${response.status}`)
 
-      return sitemapUrls(await withNatives(async () => response.text()))
-    },
-    fetch: async (path, init = {}) => send(path, init),
-    socket: (module, path, ...[options]) => {
-      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: { ...options?.headers, ...jar.cookies.size > 0 ? { cookie: jar.header(joinBase(base, url)) } : {} } }))
-      const tested = Object.assign(client, inbox(client))
+        return sitemapUrls(await withNatives(async () => response.text()))
+      },
+      fetch: async (path, init = {}) => send(path, init),
+      as: who => scoped(Object.fromEntries(withDefaults(defaults, typeof who === 'string' ? { cookie: who } : who))),
+      api: async (module, path, ...[options]) => withNatives(async () => {
+        const { method = 'get', body, headers } = (options ?? {}) as { method?: string, body?: unknown, headers?: Record<string, string> }
+        const sent = callBody(body)
+        const response = await send(routeUrl(module, path, options as Parameters<typeof routeUrl>[2]), { method: method.toUpperCase(), headers: { accept: 'application/json', ...sent.headers, ...headers }, body: sent.body ?? null })
 
-      connections.add(client)
-      client.start()
+        return { ok: response.ok, status: response.status, headers: response.headers, body: await readAnswer(response) } as ApiResult<never>
+      }),
+      socket: (module, path, ...[options]) => {
+        const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+        const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: upgradeHeaders(url, options?.headers) }))
+        const tested = Object.assign(client, inbox(client))
 
-      return tested as never
-    },
-    stream: (module, path, ...[options]) => {
-      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const init = streamRequest(options)
-      const reader = readEvents(async signal => send(url, { ...init, headers: { ...init.headers, ...options?.headers }, signal }), init.method === 'GET')
-      const tested = Object.assign(reader, inbox(reader))
-      const finished = new Promise<unknown[]>((resolve) => {
-        reactiveRoot(dispose => effect(() => {
-          const status = reader.status()
+        connections.add(client)
+        client.start()
 
-          if (status !== 'connecting' && status !== 'open') {
-            dispose()
-            resolve(tested.received)
-          }
-        }))
-      })
+        return tested as never
+      },
+      socketRefusal: async (module, path, ...[options]) => {
+        const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+        const response = await fetch(`http://localhost:${listening().port}${url}`, { headers: { ...UPGRADE, ...upgradeHeaders(url, options?.headers) }, redirect: 'manual' })
 
-      Object.assign(tested, { finished: async () => finished })
-      connections.add(reader)
-      reader.start()
+        if (response.status === 101) {
+          await response.body?.cancel()
 
-      return tested as never
-    },
-    open: async (path, browserOptions) => {
-      if (options.browser === undefined || options.browser === false)
-        throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
-
-      const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
-      const close = page.close
-
-      opened.add(page)
-      page.close = () => {
-        opened.delete(page)
-        close()
-      }
-
-      return page
-    },
-    close: async () => {
-      for (const page of opened)
-        page.close()
-
-      // The sockets and streams the test left open are closed with the site, and the stop is forced as nothing but the test is left to finish.
-      for (const connection of connections)
-        connection.close()
-
-      connections.clear()
-
-      if (server)
-        await shutdown(app, true)
-
-      server = undefined
-    },
-    visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
-    submit: async (action, fields, init = {}) => {
-      const page = typeof init.from === 'object' ? init.from : undefined
-      const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
-      const target = page?.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
-      const url = target === undefined ? undefined : new URL(target, ORIGIN)
-      const posted = url === undefined ? action.url : url.pathname + url.search
-      const form = new NativeFormData()
-
-      const rendered = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
-      const stamp = postedStamp(action, rendered, init.openedFor)
-
-      if (stamp !== undefined && !(STAMP_FIELD in fields))
-        form.set(STAMP_FIELD, stamp)
-
-      // Its `workChallenge` fields post their solution, as kay's script sends them.
-      for (const field of url === undefined ? [] : page?.find(`form[action^="${url.pathname}"] input[${WORK_SCRIPT}]`) ?? []) {
-        const { name, [WORK_SCRIPT]: challenge } = field.attributes
-
-        if (name !== undefined && challenge !== undefined && !(name in fields))
-          form.set(name, solveWork(challenge) ?? '')
-      }
-
-      for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
-        for (const item of Array.isArray(value) ? value : [value]) {
-          if (item !== undefined)
-            form.append(name, item)
+          throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
         }
-      }
 
-      const response = await send(posted, {
-        method: 'POST',
-        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? shown(from), ORIGIN).href, ...workHeaders(action), ...init.headers },
-        body: form,
-      })
-      const visit = await follow(response, from, init.headers)
+        return response
+      },
+      stream: (module, path, ...[options]) => {
+        const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+        const init = streamRequest(options)
+        const reader = readEvents(async signal => send(url, { ...init, headers: { ...init.headers, ...options?.headers }, signal }), init.method === 'GET')
+        const tested = Object.assign(reader, inbox(reader))
+        const finished = new Promise<unknown[]>((resolve) => {
+          reactiveRoot(dispose => effect(() => {
+            const status = reader.status()
 
-      if (!response.headers.has('location'))
-        answeredAt.set(visit, shown(posted))
+            if (status !== 'connecting' && status !== 'open') {
+              dispose()
+              resolve(tested.received)
+            }
+          }))
+        })
 
-      return visit
-    },
-    call,
-    refusal: async (action, input, init) => {
-      try {
-        await call(action, ...[input, init] as CallArguments<typeof action>)
-      }
-      catch (error) {
-        // `Target` only bounds the action, so its own `refused` types the data as unknown.
-        if (action.refused(error))
-          return error as ActionError<FailureData<ResultOf<typeof action>>>
+        Object.assign(tested, { finished: async () => finished })
+        connections.add(reader)
+        reader.start()
 
-        throw error
-      }
+        return tested as never
+      },
+      open: async (path, browserOptions) => {
+        if (options.browser === undefined || options.browser === false)
+          throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
 
-      throw new Error(`kay: the call to ${action.url} went through, where a refusal was expected`)
-    },
+        const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
+        const close = page.close
+
+        opened.add(page)
+        page.close = () => {
+          opened.delete(page)
+          close()
+        }
+
+        return page
+      },
+      close: async () => {
+        for (const page of opened)
+          page.close()
+
+        // The sockets and streams the test left open are closed with the site, and the stop is forced as nothing but the test is left to finish.
+        for (const connection of connections)
+          connection.close()
+
+        connections.clear()
+
+        if (server)
+          await shutdown(app, true)
+
+        server = undefined
+      },
+      visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
+      submit: async (action, fields, init = {}) => {
+        const page = typeof init.from === 'object' ? init.from : undefined
+        const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
+        const target = page?.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
+        const url = target === undefined ? undefined : new URL(target, ORIGIN)
+        const posted = url === undefined ? action.url : url.pathname + url.search
+        const form = new NativeFormData()
+
+        const rendered = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
+        const stamp = postedStamp(action, rendered, init.openedFor)
+
+        if (stamp !== undefined && !(STAMP_FIELD in fields))
+          form.set(STAMP_FIELD, stamp)
+
+        // Its `workChallenge` fields post their solution, as kay's script sends them.
+        for (const field of url === undefined ? [] : page?.find(`form[action^="${url.pathname}"] input[${WORK_SCRIPT}]`) ?? []) {
+          const { name, [WORK_SCRIPT]: challenge } = field.attributes
+
+          if (name !== undefined && challenge !== undefined && !(name in fields))
+            form.set(name, solveWork(challenge) ?? '')
+        }
+
+        for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
+          for (const item of Array.isArray(value) ? value : [value]) {
+            if (item !== undefined)
+              form.append(name, item)
+          }
+        }
+
+        const response = await send(posted, {
+          method: 'POST',
+          headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? shown(from), ORIGIN).href, ...workHeaders(action), ...init.headers },
+          body: form,
+        })
+        const visit = await follow(response, from, init.headers)
+
+        if (!response.headers.has('location'))
+          answeredAt.set(visit, shown(posted))
+
+        return visit
+      },
+      call,
+      refusal: async (action, input, init) => {
+        try {
+          await call(action, ...[input, init] as CallArguments<typeof action>)
+        }
+        catch (error) {
+          // `Target` only bounds the action, so its own `refused` types the data as unknown.
+          if (action.refused(error))
+            return error as ActionError<FailureData<ResultOf<typeof action>>>
+
+          throw error
+        }
+
+        throw new Error(`kay: the call to ${action.url} went through, where a refusal was expected`)
+      },
+    }
   }
+
+  return scoped(options.headers ?? {})
 }
 
 function isStream(value: unknown): value is EventReader<unknown> & Settles {

@@ -97,6 +97,14 @@ expect(answer.status()).toBe('done')
 
 Both take `headers` in their options, to call as a signed-in client.
 
+To test that a socket is refused, `site.socketRefusal` sends a real upgrade and resolves with the refusal. It fails when the route accepted the connection.
+
+```ts
+const refused = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
+
+expect(refused.status).toBe(403)
+```
+
 ## A site under a base
 
 A site with a `base` in kay.config.ts is tested under it with nothing more. `testSite({ base: '/blog' })` serves one that sets none.
@@ -116,6 +124,25 @@ const site = await testSite({ use: [sessions] })
 const admin = await testSite({
   locals: () => ({ user: { id: 1, admin: true } }),
 })
+```
+
+A site made with `headers` sends them with every request. `site.as()` gives the same site more of them, and a string is a `Cookie` header, such as `auth.sessionCookie` returns.
+
+```ts
+const asAdmin = site.as(await auth.sessionCookie(admin.id))
+
+expect((await asAdmin.visit('/admin')).status).toBe(200)
+```
+
+## Calling an API route
+
+`site.api(module, path, options)` calls a route of a module under `src/api` as an island's `call()` does. The method, params, query and body are typed from the route, so a wrong one fails to compile. It resolves with `ok`, `status`, `headers` and `body`, and a refusal is an answer, not a throw.
+
+```ts
+const created = await site.api(notes, '/', { method: 'post', body: { title: 'first' } })
+
+if (created.ok)
+  expect(created.body.title).toBe('first')
 ```
 
 ## One component

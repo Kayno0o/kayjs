@@ -58,6 +58,14 @@ const site = await testSite({
 })
 ```
 
+`headers` gives every request of the site a header, and `site.as(cookie | headers)` is the same site with more of them, a string being a `Cookie` header such as `await auth.sessionCookie(userId)` returns, so a test does not repeat `{ headers: { cookie } }` on each call:
+
+```ts
+const asAdmin = site.as(await auth.sessionCookie(admin.id))
+
+expect((await asAdmin.visit('/admin')).status).toBe(200)
+```
+
 ### Check a page's metadata
 
 A visit reads the title, meta tags, canonical link, JSON-LD and links without a regex:
@@ -79,6 +87,19 @@ expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')
 const response = await site.fetch('/api/health')
 
 expect(response.status).toBe(200)
+```
+
+`site.api(module, path, options)` calls a route of a module under `src/api` as `call()` does from an island, typed from the route (the method, `params`, `query` and `body`, a wrong one failing to compile), and resolves with `{ ok, status, headers, body }`, the refusal of a 4xx included, `body` typed once `ok` is checked:
+
+```ts
+import notes from '../src/api/notes'
+
+const created = await site.api(notes, '/', { method: 'post', body: { title: 'first' } })
+
+if (created.ok)
+  expect(created.body.title).toBe('first')
+
+expect(await site.api(notes, '/:id', { method: 'patch', params: { id: 9 }, body: { title: 'x' } })).toMatchObject({ ok: false, status: 404 })
 ```
 
 ### Run the jobs an action enqueued
@@ -104,6 +125,14 @@ room.send({ text: 'hello' })
 
 expect(await room.next()).toEqual({ room: 'general', from: 'anonymous', text: 'hello' })
 room.close()
+```
+
+`site.socketRefusal(module, path, options)` sends a real upgrade and resolves with the refusal, such as a guard's 401 or the 403 of a cross-site `origin`, and fails when the route accepted it:
+
+```ts
+const refused = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
+
+expect(refused.status).toBe(403)
 ```
 
 ### Test a component's handlers
@@ -186,6 +215,9 @@ it('shows why a todo was refused', async () => {
 
 ### Requests, jobs, sockets and sessions
 
+- `testSite({ headers })` and `site.as(cookie | headers)` set headers every method sends, a call's own header of the same name winning, and a `cookie` header goes with the cookies kept so far, the one it names itself winning; `as` shares the site's cookies and server, and leaves the site it came from as it is.
+- `site.api(module, path, options)` takes `method` (GET unless named), `params`, `query`, `body` and `headers`, a body with a file going as a form, and resolves with `{ ok, status, headers, body }` for any status, the body parsed as `call()` reads an answer; a param is encoded as one segment, and an empty one or a dot segment throws a `TypeError`.
+- `site.socketRefusal(module, path, options)` sends the upgrade to the site's server, which it starts as `socket` does, and resolves with the response of a refused one; an accepted upgrade is closed and fails the test naming the route. A socket the app closes after accepting is `socket()`'s `status()`.
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
 - `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did.
 - Queues keep their jobs in memory under `bun test` unless one names a store, and `files` its files, each `testSite` in a store of its own unless its options name one.

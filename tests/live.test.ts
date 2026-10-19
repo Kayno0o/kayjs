@@ -12,7 +12,7 @@ import { ApiError, call, dispatch, openSocket, readEvents, resource, routeUrl, s
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
 import { rooms, sqliteRooms } from '../src/server/rooms'
-import { testSite } from '../src/test'
+import { cookieJar, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
 // Written into a copy, for this file only: any other test building the repository's root as one project would bundle the island's server imports, missing the fixture's API directory.
@@ -1613,5 +1613,168 @@ describe('routeUrl', () => {
 
   it('rejects a call whose param is a dot segment before any fetch', async () => {
     await expect(call(users as never, '/:id' as never, { params: { id: '..' } } as never)).rejects.toThrow(TypeError)
+  })
+})
+
+describe('site.api, default headers and socketRefusal', () => {
+  it('calls a route typed from the module, answering status, headers and the body parsed as an island reads it', async () => {
+    const created = await site.api(notes, '/', { method: 'post', body: { title: 'first' } })
+
+    expect(created.ok).toBe(true)
+    expect(created.status).toBe(200)
+
+    if (created.ok) {
+      const title: string = created.body.title
+
+      expect(title).toBe('first')
+      expect(created.body.at).toBe('2026-01-01T00:00:00.000Z')
+    }
+
+    const listed = await site.api(notes, '/')
+
+    expect(listed.ok && listed.body.length).toBeGreaterThan(0)
+    expect((await site.api(notes, '/touch', { method: 'post' })).body).toBe('')
+    expect((await site.api(chat, '/count')).body).toBe('3')
+    expect((await site.api(notes, '/bytes')).body).toBeInstanceOf(Blob)
+  })
+
+  it('answers a refusal as data: its status and the text or JSON it carried', async () => {
+    const missing = await site.api(chat, '/rooms/:name', { params: { name: 'nowhere' } })
+
+    expect(missing).toMatchObject({ ok: false, status: 404, body: 'No such room' })
+
+    const invalid = await site.api(notes, '/', { method: 'post', body: { title: '' } })
+
+    expect(invalid.ok).toBe(false)
+    expect(invalid.status).toBe(422)
+    expect(typeof invalid.body === 'object' || typeof invalid.body === 'string').toBe(true)
+  })
+
+  it('encodes a param as one segment and refuses one reaching another route', async () => {
+    await expect(site.api(chat, '/rooms/:name', { params: { name: '..' } })).rejects.toThrow(TypeError)
+    await expect(site.api(chat, '/rooms/:name', { params: { name: '' } })).rejects.toThrow(TypeError)
+    expect((await site.api(chat, '/rooms/:name', { params: { name: 'a/b' } })).status).toBe(404)
+  })
+
+  it('sends a body with a file as a form', async () => {
+    const attached = await site.api(notes, '/attachments', { method: 'post', body: { file: new File(['abc'], 'a.txt'), caption: 'c' } })
+
+    expect(attached.body).toEqual({ name: 'a.txt', size: 3, caption: 'c' })
+  })
+
+  it('is typed by the route: method, path, params and body', () => {
+    const typed = async () => {
+      // @ts-expect-error: no such path
+      await site.api(notes, '/nowhere')
+      // @ts-expect-error: /attachments answers no GET
+      await site.api(notes, '/attachments')
+      // @ts-expect-error: the route takes a param
+      await site.api(notes, '/:id', { method: 'patch', body: { title: 'x' } })
+      // @ts-expect-error: the title is a string
+      await site.api(notes, '/', { method: 'post', body: { title: 1 } })
+      // @ts-expect-error: the body is required
+      await site.api(notes, '/', { method: 'post' })
+      // @ts-expect-error: a websocket route is opened with socket()
+      await site.api(chat, '/:room', { params: { room: 'x' } })
+
+      const answered = await site.api(chat, '/rooms/:name', { params: { name: 'general' } })
+
+      if (answered.ok) {
+        const members: number = answered.body.members
+
+        void members
+      }
+    }
+
+    void typed
+  })
+
+  it('sends default headers with every method, a call\'s own header winning in any case', async () => {
+    const named = await testSite({ routes: `${fixture}/src/routes`, api: `${fixture}/src/api`, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), headers: { 'x-user': 'ada' }, onError: error => void reported.push(error) })
+
+    try {
+      expect(await (await named.fetch('/api/private/me')).json()).toEqual({ user: 'ada' })
+      expect((await named.api(secret, '/me')).body).toEqual({ user: 'ada' })
+      expect((await named.api(secret, '/me', { headers: { 'X-User': 'grace' } })).body).toEqual({ user: 'grace' })
+      expect((await named.fetch('/api/private/me', { headers: { 'X-USER': 'linus' } })).status).toBe(200)
+      expect(await (await named.fetch('/api/private/me', { headers: { 'X-USER': 'linus' } })).json()).toEqual({ user: 'linus' })
+      expect((await named.visit('/', { headers: {} })).status).toBe(200)
+    }
+    finally {
+      await named.close()
+    }
+  })
+
+  it('as() stacks headers and a cookie header on a site sharing the cookies, leaving the site it came from alone', async () => {
+    const ada = site.as({ 'x-user': 'ada' })
+    const again = ada.as({ 'x-user': 'grace' }).as('session=abc')
+
+    expect((await ada.api(secret, '/me')).body).toEqual({ user: 'ada' })
+    expect((await again.api(secret, '/me')).body).toEqual({ user: 'grace' })
+    expect((await site.api(secret, '/me')).status).toBe(401)
+
+    site.cookies.set('seen', '1')
+
+    try {
+      const echoed = await again.fetch('/api/private/me')
+
+      expect(echoed.status).toBe(200)
+      expect(site.cookies.get('checked')).toBe('private')
+    }
+    finally {
+      site.cookies.delete('seen')
+      site.cookies.delete('checked')
+    }
+  })
+
+  it('merges a request\'s own cookie header with the cookies kept so far, the one it names itself winning', async () => {
+    const jar = cookieJar()
+    const seen: (string | null)[] = []
+
+    jar.cookies.set('a', 'jar')
+    jar.cookies.set('b', 'jar')
+
+    const echo = async (request: Request) => {
+      seen.push(request.headers.get('cookie'))
+
+      return new Response('')
+    }
+
+    await jar.send(echo, new Request('http://localhost/', { headers: { cookie: 'a=mine; c=3' } }))
+    await jar.send(echo, new Request('http://localhost/'))
+    expect(seen).toEqual(['a=mine; c=3; b=jar', 'a=jar; b=jar'])
+  })
+
+  it('sends a real upgrade for a refusal and returns it, whoever the refusal is from', async () => {
+    const guarded = await site.socketRefusal(secret, '/feed')
+
+    expect(guarded.status).toBe(401)
+    expect(await guarded.text()).toBe('Sign in first')
+
+    const crossSite = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.example' } })
+
+    expect(crossSite.status).toBe(403)
+  })
+
+  it('fails when the upgrade was accepted, naming the route', async () => {
+    await expect(site.socketRefusal(chat, '/:room', { params: { room: 'general' } })).rejects.toThrow('/api/chat/general was accepted')
+    await expect(site.as({ 'x-user': 'ada' }).socketRefusal(secret, '/feed')).rejects.toThrow('/api/private/feed was accepted')
+  })
+
+  it('gives a socket the site\'s headers', async () => {
+    const room = site.as({ 'x-user': 'ada' }).socket(chat, '/:room', { params: { room: 'general' } })
+
+    room.send({ text: 'hi' })
+    expect(await room.next()).toEqual({ room: 'general', from: 'ada', text: 'hi' })
+    room.close()
+  })
+
+  it('types socketRefusal on websocket routes only', () => {
+    const typed = async () => {
+      // @ts-expect-error: /ticks is no websocket route
+      await site.socketRefusal(chat, '/ticks')
+    }
+
+    void typed
   })
 })
