@@ -88,6 +88,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height` |
+| `large-public-image` | warn | performance | An `img` using a public image over 256 KiB |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

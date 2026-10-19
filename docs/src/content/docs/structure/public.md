@@ -9,6 +9,8 @@ A file in `public/` is served at its path as it is, so `public/robots.txt` is `/
 
 An image or a font a component uses is imported instead, which names its URL after its content.
 
+Kay does not resize a file in `public/`, so a large photo there is sent whole to every visitor. `kay check` warns when an `img` points at a public image over 256 KiB: import it from `src/` instead and kay serves it resized.
+
 <FileTree tree="
 public/
   robots.txt  /robots.txt

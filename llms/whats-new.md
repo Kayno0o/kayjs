@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `custom` analytics with `info: false` under a `base` names the base in its head tag too, so an app behind a proxy that takes the base off serves the tracker with the collect route under the base.
+- `kay check` warns (`large-public-image`) of an `img` using a public image over 256 KiB, which is sent unresized; import it from `src/` instead ([images](images.md)).
 
 ## 1.56.0
 

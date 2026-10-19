@@ -375,6 +375,14 @@ export const LINTS = {
     wrong: 'img(src="/team.png" alt="The team")',
     right: 'img(src="/team.png" width="1200" height="800" alt="The team")',
   },
+  'large-public-image': {
+    level: 'warn',
+    group: 'performance',
+    site: true,
+    summary: 'An `img` whose static `src` is a PNG, JPEG, GIF, WebP, AVIF or BMP in `public/` over 256 KiB: public files are sent as they are, so every visitor downloads it whole however small it is drawn. Import it from `src/` instead and kay serves it resized as WebP at the width the page shows it. An `img` with its own `srcset` and one whose `src` is an expression are left alone.',
+    wrong: 'img(src="/hero.jpg" width="1600" height="900" alt="The workshop")',
+    right: '---\nimport hero from \'./hero.jpg\'\n---\nimg(src={hero} alt="The workshop")',
+  },
   'missing-site': {
     level: 'warn',
     group: 'seo',
