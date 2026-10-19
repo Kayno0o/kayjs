@@ -764,10 +764,10 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
       if (typeof module === 'function')
         return void load(module as (signal: AbortSignal) => unknown)
 
-      const url = routeUrl(module, path ?? '', (typeof options === 'function' ? options() : options))
+      const given = typeof options === 'function' ? options() : options
 
       return void load(async (signal, fresh) => {
-        const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
+        const response = await fetch(withBase(routeUrl(module, path ?? '', given)), { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
         const answer = await readAnswer(response, signal)
 
         if (!response.ok && !signal.aborted)

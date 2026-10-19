@@ -702,6 +702,14 @@ describe('resource()', () => {
     expect(missing.error()?.status).toBe(404)
   })
 
+  it('fails with a refused param instead of throwing from the effect', async () => {
+    const refused = root(() => resource(chat, '/rooms/:name', { params: { name: '' } }))
+
+    await until(() => refused.status() !== 'loading')
+    expect(refused.status()).toBe('failed')
+    expect(refused.error()?.message).toContain('empty')
+  })
+
   it('fails with status 0 when no answer came', async () => {
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)
     const rooms = root(() => resource(chat, '/rooms'))

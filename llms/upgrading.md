@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.55.0
 
+### An empty route param is refused
+
+- `call()` and the test harness throw a `TypeError` for a param that is `''` (it built the collection route, `/api/users/` for `/:id`), `stream()` and `socket()` throw it at the call, and `resource()` fails; a `*` may stay empty. Pass a real value, or call the collection route by its own path.
+
 ### `publicEnv` refuses a secret-looking name
 
 - The server stops at boot, where it only warned, when `publicEnv` declares a name with `SECRET`, `PASSWORD`, `PASSWD`, `PRIVATE` or `TOKEN` in it, `API_KEY`, `APIKEY` or a name ending in `_API_KEY` or `_APIKEY`, or a database address such as `DATABASE_URL`. Move it to `defineEnv` and read it on the server, or rename a value that is public by design, such as a Mapbox `MAPBOX_ACCESS_TOKEN` to `MAPBOX_KEY` (`MAP_KEY` passes). The error names the variable at boot; no lint ships, as the names are those of a schema the server reads when it starts.
