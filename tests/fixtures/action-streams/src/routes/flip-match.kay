@@ -1,0 +1,5 @@
+---
+import Flip from '../components/flip.kay'
+---
+h1 Flip match
+Flip(mode="match")

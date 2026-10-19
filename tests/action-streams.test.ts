@@ -452,6 +452,30 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     })
   }
 
+  // The call's own result removes the block its button sits in, which must not end the stream the call answered with.
+  const removed = { if: 'an `if`', for: 'a `for` row', match: 'a `match` arm', await: 'an `await` block\'s `then`' }
+
+  for (const mode of ['if', 'for', 'match', 'await'] as const) {
+    it(`keeps a stream open when its result removes the block holding ${removed[mode]} that called it, closing it with the page`, async () => {
+      const page = await site.open(`/flip-${mode}`, { path })
+      const before = seen.quietStopped
+
+      await page.click('button.begin')
+      await page.waitFor('p.status', { text: 'open' })
+      await page.waitFor('button.begin', { gone: true })
+      await Bun.sleep(150)
+
+      expect(seen.quietStopped).toBe(before)
+      expect(await page.text('p.status')).toBe('open')
+
+      await page.click('a.away')
+      await page.waitFor('h1', { text: 'Elsewhere' })
+      await stoppedTimes(before + 1, 'quietStopped')
+
+      expect(page.errors).toEqual([])
+    })
+  }
+
   it('keeps a stream no island owns open when the swap that began is superseded, closing it once a page is shown', async () => {
     const page = await site.open('/kept/await', { path })
     const before = seen.quietStopped

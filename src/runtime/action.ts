@@ -735,28 +735,50 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the block or island that started it, or the nearest one around it still alive when its answer arrives, which a handler on a leaving row or in a block the call itself removes needs; a `persist` island's living on across pages. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
+// A stream ends with the block or island that started it, or the nearest one around it still alive when its answer arrives, which a handler on a leaving row needs; a `persist` island's living on across pages. A block going within the task its answer arrived in is the call's own result removing it, which hands the stream to the block around it. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
 function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller | undefined): void {
-  const owner = liveOwner(caller?.owner)
+  let answering = true
+  let owner: Owner | undefined
 
-  if (owner) {
-    onCleanupOf(owner, stream.close)
+  setTimeout(() => {
+    answering = false
+  }, 0)
 
-    // One per call, so an island answering many clicks with a stream does not keep every one until it goes.
-    stream[SETTLED](() => {
-      const at = owner.cleanups?.indexOf(stream.close) ?? -1
+  function release() {
+    const from = owner
 
-      if (at !== -1)
-        owner.cleanups!.splice(at, 1)
-    })
+    owner = undefined
+
+    if (answering && from)
+      keep(liveOwner(from.owner))
+    else
+      stream.close()
   }
-  else if (caller && navigation.arrivals !== caller.arrivals) {
-    stream.close()
+
+  function keep(to: Owner | undefined) {
+    if (to) {
+      owner = to
+      onCleanupOf(to, release)
+    }
+    else if (caller && navigation.arrivals !== caller.arrivals) {
+      stream.close()
+    }
+    else if (caller) {
+      leaving.add(stream.close)
+    }
   }
-  else if (caller) {
-    leaving.add(stream.close)
-    stream[SETTLED](() => leaving.delete(stream.close))
-  }
+
+  keep(liveOwner(caller?.owner))
+
+  // One per call, so an island answering many clicks with a stream does not keep every one until it goes.
+  stream[SETTLED](() => {
+    leaving.delete(stream.close)
+
+    const at = owner?.cleanups?.indexOf(release) ?? -1
+
+    if (at !== -1)
+      owner!.cleanups!.splice(at, 1)
+  })
 }
 
 // Hands `then` how a stream ended, once it ended, failed or was closed; false when `data` is no stream.
