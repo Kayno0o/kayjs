@@ -397,7 +397,7 @@ if (found.ok) {
 - `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
-- `deleteUser(id)` deletes the user as `deleteAccount` does, so it answers `last-owner` for the only owner of an organization with other members.
+- `deleteUser(id)` deletes the user as `deleteAccount` does. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
 - `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
 - `adminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
@@ -421,7 +421,7 @@ createAuth({
 })
 ```
 
-Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` and the admin's `deleteUser` answer `last-owner` until another member is made an owner. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
+Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` answers `last-owner` until another member is made an owner. An admin's `deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
 
 An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
 

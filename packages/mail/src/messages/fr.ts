@@ -157,6 +157,11 @@ export default defineMessages({
         lead: 'Votre compte {site} a été supprimé.',
         ending: 'Si ce n\'était pas vous, contactez le site sans attendre.',
       },
+      'organization-handed-over': {
+        subject: 'Vous dirigez une organisation sur {site}',
+        lead: 'Vous êtes désormais propriétaire de {detail} sur {site} : le compte de son seul propriétaire a été supprimé.',
+        ending: 'Si ce n\'était pas vous, contactez le site sans attendre.',
+      },
     },
   },
 })

@@ -1,7 +1,9 @@
 import type { User } from '../src/auth'
 import type { AuthEvent, AuthEventInfo, EventContext } from '../src/events'
 import type { Mail } from '../src/mail'
+import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { memoryStore } from '../src/memoryStore'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -51,7 +53,7 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
     return [event, user.email, fields, context.actor?.email]
   })
 
-  return { ...app, events, said, told, member, admin, ada }
+  return { ...app, events, heard, said, told, member, admin, ada }
 }
 
 describe('admin', () => {
@@ -208,29 +210,69 @@ describe('admin', () => {
     expect(await store.users.get(other.id)).toBeTruthy()
   })
 
-  test('an admin cannot delete the only owner of an organization with other members, and deletes one who is alone, organization included', async () => {
-    const { admin, ada, member, store } = await setup({
+  test('an admin deletes a sole owner whose organization has members, handing it to its longest-standing member who is told', async () => {
+    const mails: Mail[] = []
+    const { admin, ada, member, store, events, heard } = await setup({
+      audit: true,
       url: 'https://site.test',
       site: 'Site',
       organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
-      email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false },
+      email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false },
     })
     const grace = await member('grace@example.com')
 
     await store.users.update(ada.id, { emailVerifiedAt: new Date() })
+    await store.users.update(grace.id, { emailVerifiedAt: new Date() })
 
     const { membership } = await ada.browser.callOk('createOrganization', { name: 'Acme' })
     const org = membership.organization.id
 
     await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
-
-    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: false, error: 'last-owner' })
-    expect(await store.users.get(ada.id)).toBeTruthy()
-
-    await store.members!.delete(org, grace.id)
+    mails.length = 0
+    events.length = 0
 
     expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: true })
-    expect(await store.organizations!.get(org)).toBeUndefined()
+    expect(await store.users.get(ada.id)).toBeUndefined()
+    expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
+    expect(events.filter(entry => entry.event === 'organization-handed-over').map(entry => [entry.user.email, entry.detail, entry.context.actor])).toEqual([['grace@example.com', org, null]])
+    expect(heard.filter(info => info.event === 'organization-handed-over').map(info => 'organizationId' in info && info.organizationId)).toEqual([org])
+    expect(mails.map(mail => [mail.kind, mail.to, mail.detail])).toEqual([['account-deleted', 'ada@example.com', undefined], ['organization-handed-over', 'grace@example.com', 'Acme']])
+    expect(mails[1]!.text).toContain('Acme')
+    expect((await store.audit!.list({ userId: grace.id, limit: 20 })).map(entry => [entry.event, entry.detail, entry.ip])).toContainEqual(['organization-handed-over', org, ''])
+  })
+
+  test('an admin\'s deletion whose after-delete step throws still hands the organization over and strips the audit log', async () => {
+    const base = memoryStore()
+    const store: AuthStore = { ...base, invitations: { ...base.invitations!, listByEmail: async () => {
+      throw new Error('invitation store down')
+    } } }
+    const { admin, ada, member, events } = await setup({
+      store,
+      audit: true,
+      organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
+    })
+    const grace = await member('grace@example.com')
+    const { membership } = await ada.browser.callOk('createOrganization', { name: 'Acme' })
+    const org = membership.organization.id
+
+    await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
+    events.length = 0
+
+    expect(await admin.browser.call('deleteUser', ada.id)).not.toEqual({ ok: true })
+    expect(await store.users.get(ada.id)).toBeUndefined()
+    expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
+    expect(events.map(entry => entry.event)).toContain('organization-handed-over')
+    expect(await store.audit!.list({ userId: ada.id, limit: 20 })).toEqual([])
+  })
+
+  test('an admin deletes a sole owner who is alone in an organization, organization included', async () => {
+    const { admin, ada, store } = await setup({
+      organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
+    })
+    const { membership } = await ada.browser.callOk('createOrganization', { name: 'Acme' })
+
+    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: true })
+    expect(await store.organizations!.get(membership.organization.id)).toBeUndefined()
   })
 
   test('deleting a user removes them, tells the app, mails them and logs the admin as the actor', async () => {

@@ -461,6 +461,37 @@ describe('the prebuilt pages', () => {
     expect(await store.users.findByEmail('leaving@example.com')).toBeUndefined()
   })
 
+  test('the data page names the organizations the deletion removes or refuses, and refuses a sole owner with members', async () => {
+    const ada = await signedUp('owner@example.com')
+    const { id } = (await store.users.findByEmail('owner@example.com'))!
+    const now = new Date()
+
+    await store.organizations!.create({ id: 'solo', name: 'Solo Inc', slug: 'solo-inc', createdAt: now })
+    await store.members!.add({ organizationId: 'solo', userId: id, roles: ['owner'], createdAt: now })
+    await store.organizations!.create({ id: 'crowd', name: 'Crowd Ltd', slug: 'crowd-ltd', createdAt: now })
+    await store.members!.add({ organizationId: 'crowd', userId: id, roles: ['owner'], createdAt: now })
+    await store.members!.add({ organizationId: 'crowd', userId: 'someone', roles: ['member'], createdAt: now })
+
+    const notices = (page: Page) => page.find('p').map(p => p.text).filter(line => line.includes('Solo Inc') || line.includes('Crowd Ltd'))
+
+    expect(notices(await ada.visit('/auth/account/data'))).toEqual(['These organizations are deleted with it, as you are their only member: Solo Inc.', 'You are the only owner of Crowd Ltd: make another member an owner first.'])
+    expect(text(await ada.submit(remove, { password: PASSWORD }, { from: '/auth/account/data' }), '[role="alert"]')).toBe('You are the only owner of an organization with other members: make another member an owner first.')
+    expect(await store.users.get(id)).toBeDefined()
+
+    await store.users.update(id, { passwordHash: null })
+    setSystemTime(new Date(Date.now() + 11 * 60_000))
+
+    try {
+      const stale = await ada.visit('/auth/account/data')
+
+      expect(stale.find('p').map(p => p.text)).toContain('For your safety, sign in again before doing this.')
+      expect(notices(stale)).toHaveLength(2)
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
   test('an API module whose cors lets a site in reads the user its guard reads, and one it does not reads nobody', async () => {
     const ada = await signedUp('partner@example.com')
     const post = (origin: string) => ada.fetch('/api/partner', { method: 'POST', headers: { origin, 'sec-fetch-site': 'cross-site' } })

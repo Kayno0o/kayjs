@@ -19,6 +19,7 @@ const CARRIES: Partial<Record<AuthKind, Partial<AuthMail>>> = {
   'passkey-added': { detail: 'Laptop' },
   'passkey-removed': { detail: 'Laptop' },
   'token-created': { detail: 'Deploys' },
+  'organization-handed-over': { detail: 'Acme' },
 }
 
 // A mail of `kind` as kayjs-auth hands it, for the samples page, which renders it in the site's default language: its locale, subject, text and html go unread.

@@ -95,5 +95,6 @@ A change to what protects an account is mailed to its verified address, never an
 - `sign-in-locked`: too many wrong passwords or second-factor codes were tried on the account, mailed once per lockout (see Limits).
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
 - `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `keptThisOne` whether the session asking stayed signed in.
+- `organization-handed-over`, `organizationId`: mailed to the member an organization passes to when its only owner's account is deleted and no owner was named (an admin's `deleteUser`, a stale guest or unverified account pruned), naming the organization.
 - `email-changed`, mailed to the address left, `email` the new one.
 - `provider-linked` and `provider-unlinked`, `provider`; `passkey-added` and `passkey-removed`, `name`; `token-created`, `name` its label.

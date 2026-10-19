@@ -58,6 +58,7 @@ export interface EventFields {
   // `keptThisOne` is whether the session that asked stayed signed in.
   'signed-out-everywhere': { keptThisOne: boolean }
   'account-deleted': Record<never, never>
+  'organization-handed-over': { organizationId: string }
 }
 
 // An event as `onAuthEvent` hears it: the event, who it happened to, where from and its own fields, such as the `role` of a `role-granted`.
@@ -99,6 +100,7 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
       return text === undefined ? {} : { reason: text }
     case 'organization-created':
     case 'organization-deleted':
+    case 'organization-handed-over':
     case 'member-left':
     case 'member-removed':
       return { organizationId: text ?? '' }
@@ -146,12 +148,16 @@ export async function impersonatorOf(state: RequestState): Promise<string | unde
 // Hands `event` to the app's `onAuthEvent` and `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
 // While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
 export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
-  const { core } = state
   const impersonator = await impersonatorOf(state)
-  const actor = impersonator === undefined ? by : await core.store.users.get(impersonator) ?? by
+  const actor = impersonator === undefined ? by : await state.core.store.users.get(impersonator) ?? by
 
+  await reportFrom(state.core, state, record, event, detail, actor)
+}
+
+// `report` for what happens outside a request, as a hand-over when a prune deletes an account: `where` is empty, so the entry names no address or browser.
+export async function reportFrom(core: Core, where: { address: string, userAgent: string }, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
   const user = publicUser(record)
-  const context: EventContext = { ip: state.address, userAgent: state.userAgent, actor: actor ? publicUser(actor) : null }
+  const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? publicUser(actor) : null }
 
   try {
     await core.onAuthEvent?.({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)
@@ -171,7 +177,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
     return
 
   try {
-    await audit(core).add({ id: Bun.randomUUIDv7(), userId: record.id, event, detail: detail ?? null, ip: core.audit.ip === 'full' ? state.address : truncatedAddress(state.address), userAgent: state.userAgent, actorId: actor?.id ?? null, at: new Date() })
+    await audit(core).add({ id: Bun.randomUUIDv7(), userId: record.id, event, detail: detail ?? null, ip: core.audit.ip === 'full' ? where.address : truncatedAddress(where.address), userAgent: where.userAgent, actorId: actor?.id ?? null, at: new Date() })
     await prune(core)
   }
   catch (error) {

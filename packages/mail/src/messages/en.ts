@@ -158,6 +158,11 @@ export default defineMessages({
         lead: 'Your {site} account was deleted.',
         ending: 'If this was not you, contact the site at once.',
       },
+      'organization-handed-over': {
+        subject: 'You own an organization on {site}',
+        lead: 'You are now an owner of {detail} on {site}: its only owner\'s account was deleted.',
+        ending: 'If this was not you, contact the site at once.',
+      },
     },
   },
 })

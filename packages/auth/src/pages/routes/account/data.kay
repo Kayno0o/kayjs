@@ -66,6 +66,10 @@ else
     if stale
       form.flex.flex-col.items-start.gap-3(action={signInAgain})
         p {t('auth.account.data.deleteIntro')}
+        if impact.deleted.length > 0
+          p {t('auth.account.data.deleteOrganizations', { names: impact.deleted.join(', ') })}
+        if impact.blocked.length > 0
+          p {t('auth.account.data.deleteBlocked', { names: impact.blocked.join(', ') })}
         p {t('auth.proof.stale')}
         Button(type="submit" label={t('auth.proof.signInAgain')})
     else

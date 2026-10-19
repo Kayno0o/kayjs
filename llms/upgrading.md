@@ -78,9 +78,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ai limits a public chat by default
 
 - In production `ask` now counts each visitor against 20 asks per 10 minutes and 100,000 tokens a day when `ai({ limit, budget })` sets neither, also in an app that never calls `ai()`, and refuses messages past 50,000 characters with a `too-long` error. An app that wants more writes its own `limit` / `budget` / `maxInputChars`, and one that counts elsewhere writes `limit: false` / `budget: false`. No lint can see it, as the old code is still valid.
-### Deleting an account can answer `last-owner`
+### Deleting your account can answer `last-owner`
 
-- kayjs-auth's `deleteAccount` and `deleteUser` (`DeleteResult`) now answer `{ ok: false, error: 'last-owner' }` for the only owner of an organization with other members. An app that maps their errors exhaustively adds a case for it; the built-in pages already do. No lint can see it, as the result is a runtime value.
+- kayjs-auth's `deleteAccount` now answers `{ ok: false, error: 'last-owner' }` for the only owner of an organization with other members. An app that maps its errors exhaustively adds a case for it; the built-in pages already do. `deleteUser` never answers it: an admin's deletion hands such an organization to its longest-standing member. No lint can see it, as the result is a runtime value.
 ### Google Analytics, Fathom, Cloudflare and custom analytics ask first
 
 - `analytics({ provider: 'ga4' | 'fathom' | 'cloudflare' | 'custom' })` with no `consent` counted every production visit from the first page; it now behaves as `consent: true`, so kay's notice asks and nothing is sent or loaded before a yes. Keep it by writing `consent: true` (or your own wording / `notice: false`), or write `consent: false` to count without asking, which the app then answers for. `kay check` reports the call as `deprecated-analytics-consent` and `kay check --fix` (or `kay upgrade`) writes `consent: true`. A `kay build --static` site asks the same for Fathom and Cloudflare, kay writing the notice's script into the export; Google Analytics and `custom` need a server there, as before.

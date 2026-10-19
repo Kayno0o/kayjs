@@ -11,15 +11,20 @@ export async function notify(state: RequestState, record: UserRecord, event: Sec
 
   await report(state, record, event, detail, actor)
 
+  // A new sign-in links to where the user ends the sessions they do not know.
+  const url = event === 'new-sign-in' && core.sessionsPage !== undefined ? `${core.url}${core.sessionsPage}` : undefined
+
+  mailNotice(core, state.languages, record, event, detail, to, url)
+}
+
+// The mail half of `notify`, for a notice outside a request: `languages` are the ones to write in after the user's own.
+export function mailNotice(core: RequestState['core'], languages: readonly string[], record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email, url?: string): void {
   const mail = core.email
 
   if (!mail || to === null)
     return
 
-  // A new sign-in links to where the user ends the sessions they do not know.
-  const url = event === 'new-sign-in' && core.sessionsPage !== undefined ? `${core.url}${core.sessionsPage}` : undefined
-
-  const { locale, templates } = writing(mail, [record.locale, ...state.languages])
+  const { locale, templates } = writing(mail, [record.locale, ...languages])
 
   sendAside(mail, () => ({ to, kind: event, site: core.site, locale, ...url === undefined ? {} : { url }, ...detail === undefined ? {} : { detail }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) }), event)
 }

@@ -5,7 +5,7 @@ import { language, pickLocale } from './locale'
 import { log } from './log'
 
 // A change to what protects an account, mailed to its verified address and given to `onAuthEvent`.
-export type SecurityEvent = 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted'
+export type SecurityEvent = 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted' | 'organization-handed-over'
 
 // What a mail is about: a link to follow, news of a change to the account, an invitation to join an organization, or a registration for an address that has an account already.
 export type MailKind = LinkType | SecurityEvent | 'invitation' | 'account-exists'
@@ -165,6 +165,7 @@ export const defaultTemplates: Templates = {
   'token-created': data => noticeMail(en, data, 'New access token', `An access token named ${data.detail} was created for your ${data.site} account.`),
   'signed-out-everywhere': data => noticeMail(en, data, 'Signed out everywhere', `Your ${data.site} account was signed out everywhere: every session and access token it had has ended.`),
   'account-deleted': data => noticeMail(en, data, 'Account deleted', `Your ${data.site} account was deleted.`, en.contactSite),
+  'organization-handed-over': data => noticeMail(en, data, 'You own an organization', `You are now an owner of ${data.detail} on ${data.site}: its only owner's account was deleted.`, en.contactSite),
 }
 
 const fr = FRENCH
@@ -191,6 +192,7 @@ export const frenchTemplates: Templates = {
   'token-created': data => noticeMail(fr, data, 'Nouveau jeton d\'accès', `Un jeton d'accès nommé ${data.detail} a été créé pour votre compte ${data.site}.`),
   'signed-out-everywhere': data => noticeMail(fr, data, 'Déconnexion partout', `Votre compte ${data.site} a été déconnecté partout : toutes ses sessions et tous ses jetons d'accès ont pris fin.`),
   'account-deleted': data => noticeMail(fr, data, 'Compte supprimé', `Votre compte ${data.site} a été supprimé.`, fr.contactSite),
+  'organization-handed-over': data => noticeMail(fr, data, 'Vous dirigez une organisation', `Vous êtes désormais propriétaire de ${data.detail} sur ${data.site} : le compte de son seul propriétaire a été supprimé.`, fr.contactSite),
 }
 
 // kayjs-auth's own templates by language, English for any other.

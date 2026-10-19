@@ -31,7 +31,7 @@ export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: Ad
 
 export type UnbanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure }
 
-export type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'last-owner' }
+export type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' }
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -148,7 +148,7 @@ export async function changeRole(state: RequestState, userId: string, role: stri
   return { ok: true, user: managedUser(updated) }
 }
 
-// Bars the user from signing in, for good or `until` then, and signs them out everywhere, devices included. Another admin is refused: revoke their role first. So is the only owner of an organization with other members (`last-owner`): they hand it over first.
+// Bars the user from signing in, for good or `until` then, and signs them out everywhere, devices included. Another admin is refused: revoke their role first.
 export async function banUser(state: RequestState, userId: string, options: { reason?: string | undefined, until?: Date | undefined }): Promise<BanResult> {
   const acting = await changingAdmin(state)
 
@@ -206,7 +206,7 @@ export async function unbanUser(state: RequestState, userId: string): Promise<Un
   return { ok: true, user: managedUser(updated) }
 }
 
-// Deletes the user with everything kayjs-auth keeps for them, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first. So is the only owner of an organization with other members (`last-owner`): they hand it over first.
+// Deletes the user with everything kayjs-auth keeps for them, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first. An organization the user solely owns with other members passes to its longest-standing member, its new owner told, so an abandoned account is never a dead end.
 export async function deleteUser(state: RequestState, userId: string): Promise<DeleteResult> {
   const acting = await changingAdmin(state)
 
@@ -223,7 +223,7 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   if (record.id === actor.id)
     return { ok: false, error: 'self' }
 
-  return await isAdmin(state, record) ? { ok: false, error: 'admin' } : eraseLeavingUser(state, record, actor)
+  return await isAdmin(state, record) ? { ok: false, error: 'admin' } : eraseLeavingUser(state, record, { actor, handOver: true })
 }
 
 // Everyone's audit log, or one user's, newest first.

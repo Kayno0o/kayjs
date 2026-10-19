@@ -246,6 +246,7 @@ describe('onAuthEvent', () => {
       'token-created': [['CI', { name: 'CI' }]],
       'signed-out-everywhere': [['this-one-kept', { keptThisOne: true }], [undefined, { keptThisOne: false }]],
       'account-deleted': [[undefined, {}]],
+      'organization-handed-over': [['org1', { organizationId: 'org1' }]],
     }
 
     for (const [event, cases] of Object.entries(fields)) {

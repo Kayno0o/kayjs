@@ -1,4 +1,5 @@
 import type { User } from '../src/auth'
+import type { AuthEventInfo } from '../src/events'
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { memoryStore } from '../src/memoryStore'
@@ -15,10 +16,14 @@ afterEach(() => {
 async function setup(options: { store?: AuthStore, onDelete?: (user: User) => void | Promise<void> } = {}) {
   const store = options.store ?? memoryStore()
   const deleted: string[] = []
+  const heard: AuthEventInfo[] = []
   const app = testApp({
     store,
     guests: { maxAge: '1d' },
     organizations: { roles: { owner: [], member: [] }, owner: 'owner' },
+    onAuthEvent: (info) => {
+      heard.push(info)
+    },
     onDelete: async (user) => {
       deleted.push(user.id)
       await options.onDelete?.(user)
@@ -33,7 +38,7 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
     await new Promise(resolve => setTimeout(resolve, 30))
   }
 
-  return { ...app, deleted, start, prune }
+  return { ...app, deleted, heard, start, prune }
 }
 
 describe('pruning guests', () => {
@@ -56,7 +61,7 @@ describe('pruning guests', () => {
   })
 
   test('a stale guest who solely owned an organization with a member hands it to that member', async () => {
-    const { store, start, prune } = await setup()
+    const { store, heard, start, prune } = await setup()
 
     await store.users.create(userRecord({ id: 'stale', guest: true, createdAt: new Date(start - 1000) }))
     await store.users.create(userRecord({ id: 'grace', email: 'grace@example.com', createdAt: new Date(start - 1000) }))
@@ -67,6 +72,7 @@ describe('pruning guests', () => {
 
     expect(await store.users.get('stale')).toBeUndefined()
     expect((await store.members!.listByOrganization('org')).map(member => [member.userId, member.roles])).toEqual([['grace', ['member', 'owner']]])
+    expect(heard.filter(info => info.event === 'organization-handed-over')).toMatchObject([{ user: { id: 'grace' }, organizationId: 'org', context: { actor: null } }])
   })
 
   test('a guest exactly maxAge old stays, one a millisecond older goes', async () => {
