@@ -64,7 +64,7 @@ location.assign(withBase('/about'))
 
 On the server `withBase` leaves the path as it is, because kay adds the base itself. Island actions, their redirects and `localize()` already do this.
 
-<ReadMore href="/llms/routing#base-path">How an island puts the base on its attributes and what the base touches in styles.</ReadMore>
+<ReadMore href="/llms/routing-endpoints-and-base#base-path">How an island puts the base on its attributes and what the base touches in styles.</ReadMore>
 
 ## Trailing slashes
 

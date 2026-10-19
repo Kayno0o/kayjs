@@ -132,7 +132,7 @@ export const ERRORS = {
   'redirect-invalid': {
     group: 'build',
     summary: 'A redirect in `redirects` that does not start with `/`, holds something other than a `:param` or a final `*`, or goes to a path using a part its source lacks.',
-    fix: { file: 'llms/routing.md', heading: 'Redirects' },
+    fix: { file: 'llms/routing-endpoints-and-base.md', heading: 'Redirects' },
   },
   'locales-invalid': {
     group: 'build',

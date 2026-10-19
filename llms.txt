@@ -31,7 +31,8 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Islands](llms/islands.md): what runs in the browser: islands, props, hydration, shared and persisted state, transitions, error fallbacks, context, unique ids
 - [Browser-only code](llms/browser-only.md): components that render in the browser only, browser globals on the server, server globals in the browser
 - [Navigation and pages kay does not serve](llms/navigation.md): in-place page navigation, islands kept across pages, forms posting in place, going to a page from code, `.kay` components on a page kay does not serve
-- [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`, endpoint files (`llms.txt.ts` exporting `GET`), redirects, rewrites, base path
+- [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`
+- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `llms.txt.ts` exporting `GET`, `redirects`, `rewrite`, `base`
 - [Prerendering and static export](llms/prerendering.md): prerendered pages and their params, revalidation, server islands, exporting the site as static files
 - [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, entries as pages, pagination, feeds
 - [Loaded collections, preview mode and the CMS editor](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, the edit mode of kayjs-cms
