@@ -14,7 +14,7 @@
 - `ScatterChart(label="Games" points={games} x={{ label: 'Hours', scale: 'log', ticks }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved' }})`:
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
-  - `onSelect(point)` makes each dot a button, from an island; `emptyLabel` is what it reads with no points (`empty`, deprecated).
+  - `onSelect(point)` makes each dot a button, from an island; `emptyLabel` is what it reads with no points.
 - `ContributionGraph(days={days} color="var(--color-kui-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date, which screen readers read too, or how full the day was (`50% · 2026-09-01`) without one. The grid is a group named by `label`. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
 
 ### Drag and drop: Sortable, Board, DropTargets
@@ -58,7 +58,7 @@ ul
   - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src`, its WebVTT `captions` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
   - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js` in browsers without native HLS, fetched only once such a video shows: an optional peer, `bun add hls.js`. An app without it still builds, and a playlist it cannot play logs that hls.js is missing.
-  - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `emptyLabel` is what it reads with no items (`empty`, deprecated).
+  - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `emptyLabel` is what it reads with no items.
 - `Carousel(slides={[{ src: '/garden.jpg', alt: 'The garden' }]} autoplay="5s" ratio="4 / 3" label="Photos")`: one image at a time sliding in, for a marketing page.
   - The previous and next buttons wrap at either end, and a dot per slide jumps to it. A single slide draws no controls. `index` is the slide to start on, followed when the parent passes another, and `onIndexChange(index)` reports each turn.
   - Each slide is a `role="group"` named by `slideLabel`, where `{n}` and `{count}` stand for its number and how many there are; the hidden ones are `aria-hidden` and `inert`.

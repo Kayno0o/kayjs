@@ -7,52 +7,8 @@ import { RESIZABLE } from '../runtime/image'
 import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
-import { millisecondsText } from './duration-text'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
-
-const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
-
-interface UiRule {
-  prop: string
-  // Set when only one literal value is old.
-  value?: string
-  // The attribute, or for a value rule the whole attribute, that replaces it; left out when the change is not mechanical.
-  to?: string
-  // Set when the old form is a number literal of milliseconds in `{}`, and the new one the duration string it stands for.
-  milliseconds?: true
-  // Another attribute that makes the change unsafe to write for the app.
-  blockedBy?: string[]
-  note: string
-  help: string
-}
-
-const OPEN_CHANGE: UiRule = { prop: 'onToggle', to: 'onOpenChange', note: 'every disclosure takes `onOpenChange(open)`', help: 'Write `onOpenChange`' }
-const EMPTY: UiRule = { prop: 'empty', to: 'emptyLabel', note: '`emptyLabel` names the no-data text', help: 'Write `emptyLabel`' }
-const CLOSE: UiRule = { prop: 'onClose', note: '`onOpenChange(open)` is called with `false` on close', help: 'write `onOpenChange={open => ...}`, whose argument is the new state, instead of a handler for the close event' }
-const BUTTON: UiRule[] = [
-  { prop: 'variant', value: 'default', to: 'variant="solid"', note: '`default` is `solid`', help: 'Write `variant="solid"`' },
-  { prop: 'variant', value: 'accent', to: 'tone="accent"', blockedBy: ['tone'], note: '`variant` names the form and `tone` the meaning', help: 'Write `tone="accent"`' },
-  { prop: 'variant', value: 'danger', to: 'tone="danger"', blockedBy: ['tone'], note: '`variant` names the form and `tone` the meaning', help: 'Write `tone="danger"`' },
-]
-
-// By the component's file in kayjs-ui.
-const UI_RULES = new Map<string, UiRule[]>([
-  ['dialog', [CLOSE]],
-  ['side-panel', [CLOSE]],
-  ['form-dialog', [{ ...CLOSE, to: 'onOpenChange', note: '`onOpenChange(open)` replaces `onClose`' }]],
-  ['popover', [OPEN_CHANGE]],
-  ['button', BUTTON],
-  ['copy-button', BUTTON],
-  ['icon-button', [BUTTON[2]!]],
-  ['menu', [{ prop: 'variant', value: 'danger', to: 'variant="solid" tone="danger"', blockedBy: ['tone'], note: '`variant` names the form and `tone` the meaning', help: 'Write `variant="solid" tone="danger"`' }]],
-  ['confirm-delete', [{ prop: 'variant', value: 'danger', to: 'variant="solid"', blockedBy: ['tone'], note: '`variant` names the icon trigger\'s form and the `tone` of the confirmation its meaning', help: 'Write `variant="solid"`' }]],
-  ['notice', [{ prop: 'tone', value: 'error', to: 'tone="danger"', note: '`error` is `danger`', help: 'Write `tone="danger"`' }]],
-  ['bar-list', [EMPTY]],
-  ['media-gallery', [EMPTY]],
-  ['scatter-chart', [EMPTY]],
-  ['carousel', [{ prop: 'autoplay', milliseconds: true, note: 'a bare number is milliseconds for now, and `autoplay` takes a duration', help: 'Write the duration as a string' }]],
-])
 
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const TRANSITION_PART = 'transition:'
@@ -144,8 +100,6 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
-  // The names bound to a kayjs-ui component with an old form `deprecated-ui-prop` knows, by the component's file.
-  private uiComponents = new Map<string, string>()
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
@@ -153,15 +107,6 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
-    this.uiComponents = new Map()
-
-    for (const binding of [...script.imports, ...(server?.imports ?? [])]) {
-      const match = binding.imported === 'default' && !binding.typeOnly ? UI_SOURCE.exec(binding.source) : null
-
-      if (match && UI_RULES.has(match[1]!))
-        this.uiComponents.set(binding.local, match[1]!)
-    }
-
     this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
 
     if (server && this.options.includeServer !== false) {
@@ -307,9 +252,6 @@ class Validator {
   private elementIn(element: ElementNode, foreign: boolean): void {
     if (this.options.check && !element.component)
       this.accessibility(element)
-
-    if (this.options.check && element.component)
-      this.deprecatedUiProps(element)
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
       this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
@@ -476,54 +418,6 @@ class Validator {
     const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
 
     this.error(attribute.name, `\`${written}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }], safe: true }] })
-  }
-
-  // Past the quote or the brace that closes the attribute's value.
-  private attributeEnd(attribute: Exclude<Attribute, { kind: 'spread' }>): number {
-    if (attribute.kind === 'boolean')
-      return attribute.name.end
-
-    const tail = attribute.kind === 'static' ? attribute.value.end : attribute.expression.end
-    const closing = attribute.kind === 'static' ? '"\'' : '}'
-
-    return closing.includes(this.src[tail] ?? ' ') ? tail + 1 : tail
-  }
-
-  // Type checking only. A prop kayjs-ui renamed keeps working as an alias, so the old form is a warning with a fix when the new form takes the same value.
-  private deprecatedUiProps(element: ElementNode): void {
-    const rules = UI_RULES.get(this.uiComponents.get(element.name) ?? '')
-
-    if (!rules)
-      return
-
-    const written = (name: string) => element.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread')
-        continue
-
-      const name = this.text(attribute.name)
-      const whole = { start: attribute.name.start, end: this.attributeEnd(attribute) }
-      const milliseconds = attribute.kind === 'expression' ? millisecondsText(Number(this.text(attribute.expression))) : undefined
-      const rule = rules.find(candidate => candidate.prop === name && (candidate.milliseconds ? milliseconds !== undefined : candidate.value === undefined || (attribute.kind === 'static' && attribute.text === candidate.value)))
-
-      if (!rule)
-        continue
-
-      if (rule.milliseconds) {
-        const help = `Write ${name}="${milliseconds!}"`
-
-        this.lint(whole, 'deprecated-ui-prop', `\`${name}\` on \`${element.name}\` is the form kayjs-ui replaced in 1.52: ${rule.note}`, { help, fixes: [{ title: help, edits: [{ ...whole, text: `${name}="${milliseconds!}"` }], safe: true }] })
-
-        continue
-      }
-
-      const blocked = rule.blockedBy?.some(other => written(other)) ?? false
-      const edits = rule.to === undefined || blocked || (rule.value === undefined && written(rule.to)) ? undefined : [rule.value === undefined ? { ...attribute.name, text: rule.to } : { ...whole, text: rule.to }]
-      const shown = rule.value === undefined ? `\`${name}\`` : `\`${name}="${rule.value}"\``
-
-      this.lint(whole, 'deprecated-ui-prop', `${shown} on \`${element.name}\` is the form kayjs-ui replaced in 1.52: ${rule.note}`, { help: rule.help, fixes: edits ? [{ title: rule.help, edits, safe: true }] : undefined })
-    }
   }
 
   // Type checking only, so a page still runs while it is fixed. A spread may carry what is missing, so an element with one is left alone.

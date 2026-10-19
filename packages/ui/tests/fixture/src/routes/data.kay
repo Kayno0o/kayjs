@@ -14,24 +14,12 @@ main
     Meter(value={140} label="Disk" fillClass="bg-kui-error")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
-  article#no-bars
-    // kay-allow deprecated-ui-prop
-    BarList(rows={[]} empty="No planets")
   article#no-bars-label
     BarList(rows={[]} emptyLabel="No visits")
-  article#no-bars-both
-    // kay-allow deprecated-ui-prop
-    BarList(rows={[]} emptyLabel="No visits" empty="No planets")
   article#no-bars-default
     BarList(rows={[]})
   article#no-media
     MediaGallery(items={[]} emptyLabel="No photos")
-  article#no-media-old
-    // kay-allow deprecated-ui-prop
-    MediaGallery(items={[]} empty="No images")
-  article#no-media-both
-    // kay-allow deprecated-ui-prop
-    MediaGallery(items={[]} emptyLabel="No photos" empty="No images")
   article#no-media-default
     MediaGallery(items={[]})
   article#favicon

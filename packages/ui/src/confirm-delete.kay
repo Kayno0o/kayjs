@@ -33,8 +33,8 @@ const { message, onConfirm, failure, success, refused, tone = 'danger', trigger 
   cancelLabel?: string | undefined
   // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger takes the tone's look.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
-  // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral. `danger` is deprecated.
-  variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
+  // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral.
+  variant?: 'solid' | 'ghost' | 'inline' | undefined
   // Goes on the trigger.
   class?: string | undefined
 }>()

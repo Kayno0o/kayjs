@@ -11,7 +11,7 @@ export interface Editing<Row, Draft = void> {
   // Opens the dialog on a row, or on what a new row starts from; each takes the place of the one open.
   edit: (row: Row) => void
   create: (draft: Draft) => void
-  // Forgets the row or draft, for the dialog's `onClose`.
+  // Forgets the row or draft, for the dialog's `onOpenChange`.
   close: () => void
 }
 

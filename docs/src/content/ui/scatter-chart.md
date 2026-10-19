@@ -22,4 +22,4 @@ A point has a `key`, a `label`, `x` and `y`, and a `weight` its dot's area follo
 
 ## Empty
 
-`emptyLabel` is what the chart reads with no points, `No data yet.` by default. `empty` is its deprecated name.
+`emptyLabel` is what the chart reads with no points, `No data yet.` by default.

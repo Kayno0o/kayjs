@@ -6,7 +6,7 @@ description: A modal dialog driven by an open flag, with a title and a footer.
 
 ## Open and close
 
-`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onOpenChange`. `onOpenChange(false)` runs however the dialog closed, Escape and a click outside included. Every disclosure takes `open` and `onOpenChange`; `onClose(event)` is the deprecated name, and `kay check` reports it as `deprecated-ui-prop`.
+`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onOpenChange`. `onOpenChange(false)` runs however the dialog closed, Escape and a click outside included. Every disclosure takes `open` and `onOpenChange`.
 
 The `@footer` block holds the buttons. The content renders only while the dialog is open.
 

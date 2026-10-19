@@ -199,23 +199,3 @@ describe('FormDialog', () => {
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 })
-
-describe('FormDialog\'s onClose, deprecated for onOpenChange', () => {
-  async function cancel(both: boolean) {
-    const closes: string[] = []
-
-    mounted = await mountComponent('src/components/form-dialog-old.kay', { closes, both })
-    click(mounted.root.querySelector('.kui-form-dialog-actions button'))
-    await settle()
-
-    return closes
-  }
-
-  test('still hears the dialog close', async () => {
-    expect(await cancel(false)).toEqual(['onClose'])
-  })
-
-  test('is ignored once onOpenChange is given', async () => {
-    expect(await cancel(true)).toEqual(['onOpenChange false'])
-  })
-})

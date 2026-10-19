@@ -25,5 +25,5 @@ test('a Menu trigger takes a tone, the danger variant being the danger tone', as
     return [button.getAttribute('data-variant'), button.getAttribute('data-tone')]
   }
 
-  expect([trigger('by-tone'), trigger('by-variant'), trigger('plain')]).toEqual([['ghost', 'danger'], ['solid', 'danger'], ['ghost', 'neutral']])
+  expect([trigger('by-tone'), trigger('plain')]).toEqual([['ghost', 'danger'], ['ghost', 'neutral']])
 })

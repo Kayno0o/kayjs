@@ -2,7 +2,7 @@
 import type { DurationText, JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
 import { durationMs, onCleanup, signal } from 'kay'
-import { formOf, lookOf } from './button-props'
+import { lookOf } from './button-props'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
@@ -11,8 +11,8 @@ const { text, label, html, variant = 'solid', tone, size = 'md', copiedFor = '2s
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.
   html?: string | undefined
-  // As a Button's: `solid`, `ghost` or `inline`; `default`, `accent` and `danger` are deprecated, `tone` taking the last two.
-  variant?: 'solid' | 'ghost' | 'inline' | 'default' | 'accent' | 'danger' | undefined
+  // As a Button's: `solid`, `ghost` or `inline`.
+  variant?: 'solid' | 'ghost' | 'inline' | undefined
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // How long the button says `copiedLabel` once the copy went through.
@@ -43,6 +43,6 @@ async function press() {
   timer = setTimeout(() => copied.set(false), durationMs(copiedFor))
 }
 ---
-button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(variant, tone, className)} data-variant={formOf(variant)} data-size={size} onClick={press}) {copied() ? copiedLabel : label}
+button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(tone, className)} data-variant={variant} data-size={size} onClick={press}) {copied() ? copiedLabel : label}
 // A button's new text is not read out, so the copy is said here too.
 span.kui-copy-btn-live(role="status") {copied() ? copiedLabel : ''}

@@ -128,7 +128,6 @@ describe('ConfirmDelete', () => {
     expect(look('v-solid')).toEqual(['solid', 'danger'])
     expect(look('v-ghost')).toEqual(['ghost', 'danger'])
     expect(look('v-inline')).toEqual(['inline', 'danger'])
-    expect(look('v-danger')).toEqual(look('v-solid'))
     expect(look('n-plain')).toEqual(['solid', 'neutral'])
     expect(look('n-solid')).toEqual(['solid', 'neutral'])
     expect(look('n-ghost')).toEqual(['ghost', 'neutral'])
@@ -169,7 +168,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(16)
+    expect(root.querySelectorAll('dialog')).toHaveLength(15)
 
     click(trigger)
     await settle()

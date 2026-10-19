@@ -10,37 +10,17 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-async function disclosures(mode: 'new' | 'old' | 'both') {
+async function disclosures() {
   const calls: string[] = []
 
-  mounted = await mountComponent('src/components/open-change.kay', { mode, calls })
+  mounted = await mountComponent('src/components/open-change.kay', { calls })
 
   return { root: mounted.root, calls }
 }
 
 describe('Dialog and SidePanel', () => {
   test('tell onOpenChange(false) when they close', async () => {
-    const { root, calls } = await disclosures('new')
-
-    click(root.querySelector('#shut-dialog'))
-    click(root.querySelector('#shut-panel'))
-    await settle()
-
-    expect(calls).toEqual(['dialog onOpenChange false', 'panel onOpenChange false'])
-  })
-
-  test('still tell the deprecated onClose, with the close event', async () => {
-    const { root, calls } = await disclosures('old')
-
-    click(root.querySelector('#shut-dialog'))
-    click(root.querySelector('#shut-panel'))
-    await settle()
-
-    expect(calls).toEqual(['dialog onClose close', 'panel onClose close'])
-  })
-
-  test('hear onOpenChange alone when both are given', async () => {
-    const { root, calls } = await disclosures('both')
+    const { root, calls } = await disclosures()
 
     click(root.querySelector('#shut-dialog'))
     click(root.querySelector('#shut-panel'))
@@ -52,7 +32,7 @@ describe('Dialog and SidePanel', () => {
 
 describe('Popover', () => {
   test('tells onOpenChange(open) as it shows and hides', async () => {
-    const { root, calls } = await disclosures('new')
+    const { root, calls } = await disclosures()
 
     clock.start()
     click(root.querySelector('#show-popover'))
@@ -61,25 +41,5 @@ describe('Popover', () => {
     await clock.settle()
 
     expect(calls).toEqual(['popover onOpenChange true', 'popover onOpenChange false'])
-  })
-
-  test('still tells the deprecated onToggle', async () => {
-    const { root, calls } = await disclosures('old')
-
-    clock.start()
-    click(root.querySelector('#show-popover'))
-    await clock.settle()
-
-    expect(calls).toEqual(['popover onToggle true'])
-  })
-
-  test('hears onOpenChange alone when both are given', async () => {
-    const { root, calls } = await disclosures('both')
-
-    clock.start()
-    click(root.querySelector('#show-popover'))
-    await clock.settle()
-
-    expect(calls).toEqual(['popover onOpenChange true'])
   })
 })

@@ -7,7 +7,7 @@ import { callAction, formIssues } from './forms'
 import { wording } from 'kay/words'
 
 
-const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.savingLabel', 'Saving…'), cancelLabel = wording('ui.formDialog.cancelLabel', 'Cancel'), failure, refused, onSaved, onOpenChange, onClose, extra, id, class: className } = props<{
+const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.savingLabel', 'Saving…'), cancelLabel = wording('ui.formDialog.cancelLabel', 'Cancel'), failure, refused, onSaved, onOpenChange, extra, id, class: className } = props<{
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -28,26 +28,9 @@ const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.s
   // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
   id?: string | undefined
   class?: string | undefined
-} & (
-  | {
-    // Called with `false` however the dialog closes, saved or not.
-    onOpenChange: (open: boolean) => void
-    // Deprecated: use `onOpenChange`, which wins when both are given.
-    onClose?: (() => void) | undefined
-  }
-  | {
-    onOpenChange?: ((open: boolean) => void) | undefined
-    // Deprecated: use `onOpenChange`, which hears `false`.
-    onClose: () => void
-  }
-)>()
-
-function close() {
-  if (onOpenChange)
-    onOpenChange(false)
-  else
-    onClose?.()
-}
+  // Called with `false` however the dialog closes, saved or not.
+  onOpenChange: (open: boolean) => void
+}>()
 
 const formId = id ?? uid()
 const issues = signal<Record<string, string>>({})
@@ -74,7 +57,7 @@ async function submit(event: SubmitEvent) {
 
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
   onSaved?.(done.result)
-  close()
+  onOpenChange(false)
 }
 
 // Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter.
@@ -87,12 +70,12 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog(open={open} title={title} dirty={action.pending()} class={className} onOpenChange={shown => !shown && open && close()})
+Dialog(open={open} title={title} dirty={action.pending()} class={className} onOpenChange={shown => !shown && open && onOpenChange(false)})
   @footer
     .kui-form-dialog-footer
       | {extra}
       .kui-form-dialog-actions
-        Button(label={cancelLabel} disabled={action.pending()} onClick={close})
+        Button(label={cancelLabel} disabled={action.pending()} onClick={() => onOpenChange(false)})
         Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} tone="accent" busy={action.pending()} disabled={action.pending()})
   form.kui-form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
     slot

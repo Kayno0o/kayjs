@@ -2637,22 +2637,6 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports a kayjs-ui prop renamed in 1.52 and --fix writes the new form', async () => {
-    const head = '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\n---\n'
-    const root = await scratchProject({ 'src/a.kay': `${head}Button(variant="danger") Delete\nDialog(open onClose={() => {}})\n` })
-
-    try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-ui-prop/g)).toHaveLength(2)
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(`${head}Button(tone="danger") Delete\nDialog(open onClose={() => {}})\n`)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('applies the safe fixes in the paths named alone with --fix', async () => {
     const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
     const root = await scratchProject({ 'src/a.kay': button, 'src/b.kay': button })

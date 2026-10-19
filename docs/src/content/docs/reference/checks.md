@@ -84,7 +84,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `deprecated-analytics-consent` | warn | deprecated | `analytics()` of Google Analytics, Fathom, Cloudflare or `custom` with no `consent`, which now asks for a yes; the options may be held in a `const` and passed by name |
 | `deprecated-analytics-info` | warn | deprecated | `analytics()` with an `info` object while `consent` asks, where no information line is shown, which is refused at start since 1.56 |
-| `deprecated-ui-prop` | warn | deprecated | A kayjs-ui prop or value renamed in 1.52, such as `variant="danger"`, now `tone="danger"`, or a ConfirmDelete's, now `variant="solid"` |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |

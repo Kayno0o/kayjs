@@ -26,8 +26,8 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement 
   // The trigger's icon, such as a row of dots.
   icon: IconSlot | IconProps
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
-  // The trigger's form, as an IconButton's. `danger` is deprecated: use `tone="danger"`.
-  variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
+  // The trigger's form, as an IconButton's.
+  variant?: 'solid' | 'ghost' | 'inline' | undefined
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   placement?: PopoverPlacement | undefined
   // Classes for the trigger.

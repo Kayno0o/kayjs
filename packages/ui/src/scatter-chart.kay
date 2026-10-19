@@ -5,7 +5,7 @@ import { memo } from 'kay'
 import { axisExtent, axisPercent, dotSize } from './plot'
 import { wording } from 'kay/words'
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, empty, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -16,8 +16,6 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, empty, 
   onSelect?: ((point: Point) => void) | undefined
   // What the chart reads with no points.
   emptyLabel?: string | undefined
-  // Deprecated: use `emptyLabel`, which wins when both are given.
-  empty?: string | undefined
   // Describes the chart for screen readers.
   label: string
   class?: string | undefined
@@ -34,7 +32,7 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty(id={rest.id} class={className}) {emptyLabel ?? empty ?? wording('ui.scatterChart.emptyLabel', wording('ui.scatterChart.empty', 'No data yet.'))}
+  p.kui-scatter-chart-empty(id={rest.id} class={className}) {emptyLabel ?? wording('ui.scatterChart.emptyLabel', 'No data yet.')}
 else
   figure.kui-scatter-chart({...rest} aria-label={label} class={className})
     if y.label

@@ -332,15 +332,11 @@ describe('data', () => {
 
     expect([...bars.matchAll(/bar-list-value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
     expect(await find('/data', '#bars button')).toEqual([])
-    expect((await find('/data', '#no-bars p')).map(found => found.text)).toEqual(['No planets'])
     expect((await find('/data', '#no-bars-label p')).map(found => found.text)).toEqual(['No visits'])
-    expect((await find('/data', '#no-bars-both p')).map(found => found.text)).toEqual(['No visits'])
     expect((await find('/data', '#no-bars-default p')).map(found => found.text)).toEqual(['No data yet.'])
     expect((await find('/fr/data', '#no-bars-default p')).map(found => found.text)).toEqual(['Aucune donnée'])
     expect((await find('/fr/data', '#no-media-default p')).map(found => found.text)).toEqual(['Aucun média'])
     expect((await find('/data', '#no-media p')).map(found => found.text)).toEqual(['No photos'])
-    expect((await find('/data', '#no-media-old p')).map(found => found.text)).toEqual(['No images'])
-    expect((await find('/data', '#no-media-both p')).map(found => found.text)).toEqual(['No photos'])
   })
 
   test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
@@ -441,9 +437,7 @@ describe('charts', () => {
     ])
     expect(scatter).toContain('<span class="kui-scatter-chart-grid" data-axis="x" style="left: 50%"><span class="kui-scatter-chart-tick">20h</span></span><span class="kui-scatter-chart-guide" data-axis="y" style="bottom: 50%"></span><span class="kui-scatter-chart-guide" data-axis="x" style="left: 50%"></span><span class="kui-scatter-chart-corner" data-corner="topRight">Long and loved</span>')
     expect(scatter).not.toContain('<button')
-    expect(await page('no-scatter')).toBe('<p class="kui-scatter-chart-empty">No games</p>')
     expect(await page('no-scatter-label')).toBe('<p class="kui-scatter-chart-empty">No titles</p>')
-    expect(await page('no-scatter-both')).toBe('<p class="kui-scatter-chart-empty">No titles</p>')
   })
 
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
@@ -721,28 +715,17 @@ describe('variant names the form and tone the meaning', () => {
     expect(await shown('plain')).toEqual(['kui-btn', 'solid', 'md', null])
   })
 
-  test('Button still reads the variant values that became tones, a tone winning over them', async () => {
-    expect(await shown('old-default')).toEqual(['kui-btn', 'solid', 'md', null])
-    expect(await shown('old-accent')).toEqual(['kui-btn kui-btn-accent', 'solid', 'md', null])
-    expect(await shown('old-danger')).toEqual(['kui-btn kui-btn-danger', 'solid', 'md', null])
-    expect(await shown('new-wins')).toEqual(['kui-btn kui-btn-accent', 'solid', 'md', null])
-    expect(await shown('neutral-wins')).toEqual(['kui-btn', 'solid', 'md', null])
-  })
-
   test('CopyButton takes the same variant, tone and size', async () => {
-    expect(await shown('copy-old')).toEqual([expect.stringContaining('kui-btn-accent'), 'solid', 'md', null])
     expect(await shown('copy-new')).toEqual([expect.stringContaining('kui-btn-danger'), 'ghost', 'sm', null])
   })
 
-  test('IconButton reads a tone, the danger variant being the danger tone and a tone winning over it', async () => {
+  test('IconButton reads a tone', async () => {
     expect(await shown('icon-tone')).toEqual([expect.not.stringContaining('kui-shell'), 'ghost', 'md', 'danger'])
     expect(await shown('icon-accent')).toEqual([expect.stringContaining('kui-shell'), 'solid', 'md', 'accent'])
-    expect(await shown('icon-old-danger')).toEqual([expect.stringContaining('kui-shell-danger'), 'solid', 'md', 'danger'])
-    expect(await shown('icon-new-wins')).toEqual([expect.not.stringContaining('kui-shell-danger'), 'solid', 'md', 'neutral'])
     expect(await shown('delete')).toEqual([expect.stringContaining('kui-shell-danger'), 'solid', 'sm', 'danger'])
   })
 
-  test('Notice has a danger tone, an alert, and still reads the error tone as it', async () => {
+  test('Notice has a danger tone, an alert', async () => {
     const roles = async (id: string) => {
       const found = await one('/buttons', `#${id}`)
 
@@ -750,7 +733,6 @@ describe('variant names the form and tone the meaning', () => {
     }
 
     expect(await roles('notice-danger')).toEqual(['danger', 'alert'])
-    expect(await roles('notice-error')).toEqual(['danger', 'alert'])
     expect(await roles('notice-default')).toEqual(['info', 'status'])
   })
 })

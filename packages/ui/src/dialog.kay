@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, signal } from 'kay'
 
-const { open, title, level = 2, dirty = false, onOpenChange, onClose, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, level = 2, dirty = false, onOpenChange, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog as a modal; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -12,19 +12,9 @@ const { open, title, level = 2, dirty = false, onOpenChange, onClose, footer, cl
   dirty?: boolean | undefined
   footer?: JSX.Element
   class?: string | undefined
-} & (
-  | {
-    // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
-    onOpenChange: (open: boolean) => void
-    // Deprecated: use `onOpenChange`, which wins when both are given.
-    onClose?: ((event: Event) => void) | undefined
-  }
-  | {
-    onOpenChange?: ((open: boolean) => void) | undefined
-    // Deprecated: use `onOpenChange`, which hears `false` where this heard the close event.
-    onClose: (event: Event) => void
-  }
-)>()
+  // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
+  onOpenChange: (open: boolean) => void
+}>()
 
 // Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.
 const edited = signal(false)
@@ -53,12 +43,8 @@ function closeWatcher() {
   return footer ? 'none' : 'closerequest'
 }
 
-function closed(event: Event) {
-  if (onOpenChange)
-    onOpenChange(false)
-  else
-    onClose?.(event)
-
+function closed() {
+  onOpenChange(false)
   edited.set(false)
 }
 ---
