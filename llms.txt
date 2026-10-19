@@ -43,7 +43,8 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes stored images, signs links to private files, upload progress in islands
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, and the MCP endpoint
-- [Calling API routes from islands, event streams, live values and rooms](llms/api-from-islands.md): reading routes typed from islands, server-sent events, `live()` values every open page follows, websockets and rooms
+- [Calling API routes from islands, event streams, live values and websockets](llms/api-from-islands.md): reading routes typed from islands, server-sent events, `live()` values every open page follows, websockets
+- [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
 - [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files

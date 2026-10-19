@@ -27,6 +27,10 @@ export interface RoomStore {
   remove: (room: string, connection: string) => void
   // The members of a room, as JSON, in every process sharing the store.
   members: (room: string) => string[]
+  // The state of a room as JSON, in every process sharing the store; undefined while it holds none. A store without it cannot keep a room's state.
+  state?: (room: string) => string | undefined
+  // Replaces a room's state with what `change` makes of the current one, as JSON, one change at a time in every process sharing the store, and gives what it stored. A room's state goes with its last member.
+  update?: (room: string, change: (current: string | undefined) => string) => string
   // Hands a message to the listeners of every process sharing the store, this one's included.
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   // Called with each message published from then on; returns what stops it.
@@ -35,9 +39,13 @@ export interface RoomStore {
   close: () => void
 }
 
-export interface RoomsOptions {
+export interface RoomsOptions<Message = never, State = undefined> {
   // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default.
   store?: RoomStore | undefined
+  // What a room's state is before any `update`, called each time one is read or changed while the room has none. The state is kept as JSON, whole, so a `Date` in it comes back as text.
+  state?: (() => State) | undefined
+  // The message a connection is sent, alone, as it joins, from the room's state as it then stands: a late joiner starts where the others are.
+  snapshot?: ((state: State, room: string) => Message) | undefined
 }
 
 export interface CoalesceOptions {
@@ -45,7 +53,7 @@ export interface CoalesceOptions {
   wait?: DurationText | undefined
 }
 
-export interface Rooms<Message, Member = undefined> {
+export interface Rooms<Message, Member = undefined, State = undefined> {
   // Puts a connection in a room, with what the room lists it as; joining again changes its member.
   join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
   // Takes a connection out of a room, or out of every room it is in, as `close` does.
@@ -54,6 +62,10 @@ export interface Rooms<Message, Member = undefined> {
   roomsOf: (ws: RoomConnection) => string[]
   // The members of a room, in every process sharing the store; a room no one is in is gone, and lists none.
   members: (room: string) => Member[]
+  // The room's state, the `state` option's initial one while no `update` made another. A room's state is gone when its last member leaves.
+  state: (room: string) => State
+  // Replaces the room's state with what `change` returns for the one it has, one change at a time in every process sharing the store, and gives the new one. `change` runs inside the store's turn: it must be quick and read nothing but its argument. Nothing is sent: publish the change, or its snapshot, to the members.
+  update: (room: string, change: (state: State) => State) => State
   // Sends a message to everyone in a room, but `except` when given, such as the connection it came from, or only to the connections joined as the member `to` names, such as a game's host.
   publish: (room: string, message: Message, options?: { except?: RoomConnection, to?: Member }) => void
   // A function sending a room one snapshot, read when it goes, however many times it is called within `wait`: a burst of changes goes out as one message.
@@ -72,8 +84,18 @@ const UNWATCHED_POLL_MS = optionMs('25ms', '')
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
-export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): Rooms<Message, Member> {
+export function rooms<Message, Member = undefined, State = undefined>(...[options = {}]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State> {
   const store = options.store ?? memoryRooms()
+
+  if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
+    throw new Error('kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
+
+  const initial = (): State => options.state?.() as State
+  const readState = (room: string): State => {
+    const kept = store.state?.(room)
+
+    return kept === undefined ? initial() : JSON.parse(kept) as State
+  }
   // The connections of this process in each room, by their id, with their member as JSON, or empty without one.
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
@@ -122,6 +144,10 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
       local.set(room, (local.get(room) ?? new Map<string, { raw: RoomConnection['raw'], member: string }>()).set(id, { raw: ws.raw, member: written }))
       joined.set(ws.raw, (joined.get(ws.raw) ?? new Set()).add(room))
       store.add(room, id, written)
+
+      // The member is listed first, so a change made while it joins reaches it as the snapshot or as what is published after.
+      if (options.snapshot)
+        ws.raw.sendText(messageText(options.snapshot(readState(room), room)))
     },
     leave(ws, room) {
       for (const name of room === undefined ? [...joined.get(ws.raw) ?? []] : [room])
@@ -129,6 +155,15 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
     },
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
     members: room => store.members(room).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
+    state: readState,
+    update: (room, change) => JSON.parse(store.update!(room, (kept) => {
+      const next = JSON.stringify(change(kept === undefined ? initial() : JSON.parse(kept) as State))
+
+      if (next === undefined)
+        throw new TypeError('kay: a room\'s state must be JSON, and `update` returned a value with none')
+
+      return next
+    })) as State,
     publish(room, message, { except, to } = {}) {
       store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
@@ -172,6 +207,7 @@ function guarded(what: string, run: () => void): () => void {
 // Rooms in this process's memory, gone when it stops.
 export function memoryRooms(): RoomStore {
   const byRoom = new Map<string, Map<string, string>>()
+  const states = new Map<string, string>()
   const listeners = new Set<RoomListener>()
 
   return {
@@ -183,10 +219,20 @@ export function memoryRooms(): RoomStore {
 
       members?.delete(connection)
 
-      if (members?.size === 0)
+      if (members?.size === 0) {
         byRoom.delete(room)
+        states.delete(room)
+      }
     },
     members: room => [...byRoom.get(room)?.values() ?? []],
+    state: room => states.get(room),
+    update(room, change) {
+      const next = change(states.get(room))
+
+      states.set(room, next)
+
+      return next
+    },
     publish(room, text, recipients) {
       for (const listener of listeners)
         listener(room, text, recipients)
@@ -211,6 +257,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
 
   db.run('CREATE TABLE IF NOT EXISTS kay_room_members (room TEXT NOT NULL, connection TEXT NOT NULL, process TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY (room, connection))')
   db.run('CREATE TABLE IF NOT EXISTS kay_room_processes (process TEXT PRIMARY KEY, seen INTEGER NOT NULL)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_room_state (room TEXT PRIMARY KEY, state TEXT NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, recipient TEXT, at INTEGER NOT NULL)')
   // The beat deletes the dead processes' members and the old messages by these.
   db.run('CREATE INDEX IF NOT EXISTS kay_room_members_process ON kay_room_members (process)')
@@ -219,6 +266,10 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
   // An upsert, so a member joining again keeps its place in the list, as it does in memory.
   const add = db.query('INSERT INTO kay_room_members (room, connection, process, member) VALUES (?, ?, ?, ?) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member')
   const remove = db.query('DELETE FROM kay_room_members WHERE room = ? AND connection = ?')
+  const kept = db.query<{ state: string }, [string]>('SELECT state FROM kay_room_state WHERE room = ?')
+  const keep = db.query('INSERT OR REPLACE INTO kay_room_state (room, state) VALUES (?, ?)')
+  // A room's state goes once no live process has a member in it.
+  const drop = db.query('DELETE FROM kay_room_state WHERE room = ? AND NOT EXISTS (SELECT 1 FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ?)')
   const members = db.query<{ member: string }, [string, number]>('SELECT member FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ? ORDER BY kay_room_members.rowid')
   const insert = db.query('INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES (?, ?, ?, ?, ?, ?)')
   const since = db.query<{ id: number, room: string, text: string, skipped: string | null, recipient: string | null }, [number, string]>('SELECT id, room, text, skipped, recipient FROM kay_room_messages WHERE id > ? AND process != ? ORDER BY id')
@@ -239,8 +290,14 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
   // Drops the members of processes gone quiet and the messages past `KEPT`.
   // One transaction, so a process beating between two of the deletes never finds its row kept while its members went.
   const prune = db.transaction((now: number) => {
+    const emptied = db.query<{ room: string }, [number]>('SELECT DISTINCT room FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)').all(now - EXPIRY)
+
     db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
     db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
+
+    for (const { room } of emptied)
+      drop.run(room, room, now - EXPIRY)
+
     db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
   })
 
@@ -333,9 +390,21 @@ export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}
     },
     remove(room, connection) {
       own.delete(`${room}\n${connection}`)
-      remove.run(room, connection)
+      db.transaction(() => {
+        remove.run(room, connection)
+        drop.run(room, room, Date.now() - EXPIRY)
+      })()
       sync()
     },
+    state: room => kept.get(room)?.state,
+    // Immediate, so two processes changing one room's state wait for each other rather than both reading the old one.
+    update: (room, change) => db.transaction(() => {
+      const next = change(kept.get(room)?.state)
+
+      keep.run(room, next)
+
+      return next
+    }).immediate(),
     members: room => members.all(room, Date.now() - EXPIRY).map(row => row.member),
     publish(room, text, recipients) {
       const now = Date.now()

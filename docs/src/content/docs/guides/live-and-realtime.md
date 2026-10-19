@@ -292,9 +292,27 @@ To share rooms through Redis or another server, pass `store` a `RoomStore`, from
 | `add(room, connection, member)` | Records a connection of this process, with its member as JSON |
 | `remove(room, connection)` | Drops it |
 | `members(room)` | The members of a room as JSON, in every process sharing the store |
+| `state(room)`, `update(room, change)` | Optional: a room's state as JSON, and a change made to it one at a time. Without them `rooms({ state })` throws |
 | `publish(room, text, recipients)` | Hands a message to the listeners of every process, this one's included |
 | `subscribe(listener)` | Calls the listener with each message published from then on, and returns what stops it |
 | `close()` | Stops what the store runs in the background |
+
+### Remembering a state
+
+A room can keep a state, such as a game's board, so you do not keep one next to it. Give `rooms` a `state` for how a room starts, and a `snapshot`, the message each connection gets when it joins, from the state as it stands then.
+
+```ts
+const games = rooms<Sent, string, { cells: string[] }>({
+  state: () => ({ cells: [] }),
+  snapshot: ({ cells }) => ({ type: 'board', cells }),
+})
+
+games.update(room, ({ cells }) => ({ cells: [...cells, 'x'] }))
+```
+
+`update` replaces the state with what your function returns, one change at a time, and gives the new state. `games.state(room)` reads it. Nothing is sent to the room by an `update`: publish the change yourself, or use `coalesce`.
+
+The state is kept as JSON, so a `Date` comes back as text. It goes when the last member leaves, in every process that shares the rooms, so a late joiner always starts from the latest state while anyone is there.
 
 ### Sending a snapshot
 
@@ -319,4 +337,4 @@ dispatch(body, {
 
 It works on the server's `body` and on what an island's `socket` receives.
 
-<ReadMore href="/llms/api-from-islands#rooms">Sharing rooms between processes with SQLite, `to` targets, rejoining after a drop and reconnect timing are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/rooms">Sharing rooms between processes with SQLite, `to` targets, rejoining after a drop and reconnect timing are in the full API routes reference.</ReadMore>
