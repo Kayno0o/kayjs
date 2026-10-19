@@ -994,14 +994,15 @@ it('tells every visitor how many are online', async () => {
 })
 `
 
-// The project's AGENTS.md, naming the checks its scripts run. Claude Code expands the `@` line into kay's docs as installed, other agents read it as a path.
-export function agentsFile(scripts: Record<string, string>): string {
+// The project's AGENTS.md, naming the checks its scripts run. Claude Code expands the `@` line into kay's docs as installed, other agents read it as a path. With `seo`, it names the folder name every title ends with, which an agent otherwise leaves as it is.
+export function agentsFile(scripts: Record<string, string>, seo: boolean): string {
   const checks = ['check', 'fmt', 'lint', 'test'].filter(script => script in scripts).map(script => `\`bun run ${script}\``)
 
   return blocks(
     '# __NAME__',
     'Built with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:',
     '@node_modules/kay/llms.txt',
+    seo && 'Every page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.',
     `Before calling a change done, run ${new Intl.ListFormat('en').format(checks)}.`,
   )
 }

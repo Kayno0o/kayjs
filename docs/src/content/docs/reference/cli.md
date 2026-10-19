@@ -61,7 +61,7 @@ Without `--forge`, `kay new` reads the `origin` remote. A remote on github.com g
 
 The workflow can read the repository and nothing more, except a Pages workflow, which gets the permission it publishes with. Each action it uses is pinned to the commit of a release, with the version in a comment.
 
-Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version and names the checks the project's scripts run.
+Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version and names the checks the project's scripts run. It also tells them to set `seo.name` to the real name of the site: every page title ends with it, and `kay new` fills it in from the folder name.
 
 ### Features
 

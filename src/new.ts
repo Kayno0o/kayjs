@@ -190,7 +190,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
     ...templateFiles(features, settings, host, runner),
-    'AGENTS.md': agentsFile(scripts),
+    'AGENTS.md': agentsFile(scripts, settings.seo !== false),
     'package.json': `${JSON.stringify({
       name,
       type: 'module',

@@ -767,8 +767,8 @@ describe('kay new', () => {
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt' })
-      // An agent reads kay's docs as installed, and runs the checks this project's scripts hold.
-      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:\n\n@node_modules/kay/llms.txt\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
+      // An agent reads kay's docs as installed, renames the site every title ends with, and runs the checks this project's scripts hold.
+      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:\n\n@node_modules/kay/llms.txt\n\nEvery page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
       // Published, so the docs AGENTS.md imports are in node_modules/kay.
       expect(((await Bun.file(join(repo, 'package.json')).json()) as { files: string[] }).files).toEqual(expect.arrayContaining(['llms', 'llms.txt']))
       expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
