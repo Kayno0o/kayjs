@@ -178,6 +178,28 @@ describe('an onRequest hook that throws', () => {
     }
   })
 
+  it('draws the app\'s error page with the locals a derive added before the hook threw', async () => {
+    const own = await scratchDir('hook-errors-locals-')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Promise.all([
+        Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
+        Bun.write(join(own, 'routes/_error.kay'), '--- server\nconst who = (ctx.locals as { who?: string }).who ?? \'nobody\'\n---\nh1 Oops {who}\n'),
+      ])
+      const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
+      const app = new Elysia().derive({ as: 'global' }, () => ({ who: 'ann' })).onBeforeHandle({ as: 'global' }, hook).use(kay)
+      const page = await ask(app, TARGETS[0], 'error')
+
+      expect(page.status).toBe(500)
+      expect(page.body).toContain('<h1>Oops ann</h1>')
+    }
+    finally {
+      logged.mockRestore()
+      await rm(own, { recursive: true, force: true })
+    }
+  })
+
   it('falls back to plain text when the error page throws itself', async () => {
     const own = await scratchDir('hook-errors-broken-')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
