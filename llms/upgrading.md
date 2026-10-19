@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.59.0
 
+### `pending` is a reserved line start
+
+A template line that starts with `pending` and nothing else is the `pending` block of a form posting to an action, and `pending text` is an error ("takes nothing on its line"); before, both were an element named `pending`. Rename such an element (`pending-note`, `pending.note` and `Pending` still read as before).
+
 ### An action that cannot fail has `unknown` failure data
 
 `FailureData<Output>` is `unknown`, not `never`, for an output naming no `Failure`, so `ctx.failed(action)?.data`, `action.refused(error)`'s `data`, a tracked call's refusal and `kay/test`'s `refusal` read `unknown` for such an action, and one is no longer assignable to a prop typed with a `Failure<...>` it never returns. Narrow the data where it is read, or type the prop with the success output alone, which a handler that can `ctx.fail` fits too. `kay check` cannot recognise the old form, so no lint ships with it.
