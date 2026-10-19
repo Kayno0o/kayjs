@@ -167,6 +167,8 @@ describe('elements', () => {
     expect(classesOf('.-mt-0.5 x')).toEqual(['-mt-0.5'])
     expect(classesOf('.md:py-2.5.a(href="x")')).toEqual(['md:py-2.5', 'a'])
     expect(classesOf('div.gap-1.5: span')).toEqual(['gap-1.5'])
+    expect(classesOf('div.hidden.2xl:block x')).toEqual(['hidden', '2xl:block'])
+    expect(classesOf('.a.5')).toEqual(['a', '5'])
   })
 
   it('nests by indentation', () => {

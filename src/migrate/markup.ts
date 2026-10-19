@@ -24,7 +24,7 @@ const WHITESPACE = /\s+/
 const HTML_SPACE = /[ \t\n\r\f]+/g
 const HTML_EDGE_SPACE = /^[ \t\n\r\f]+|[ \t\n\r\f]+$/g
 
-const CLASS_TOKEN = /^(?:[\w\-:/@!]|\.(?=\d))+$/
+const CLASS_TOKEN = /^(?:[\w\-:/@!]|(?<=\d)\.(?=\d))+$/
 const ID_TOKEN = /^[\w-]+$/
 const UPPERCASE_START = /^[A-Z]/
 const COMMENT_END = /\*\//g

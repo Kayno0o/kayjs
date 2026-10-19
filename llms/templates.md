@@ -160,11 +160,11 @@ div(innerHTML={sanitizeHtml(comment)})
 HTML from Tailwind UI, Flowbite, a designer or an LLM becomes a template with `kay fmt --from-html page.html` (or stdin), which prints it formatted; paste the result in a `.kay` file and keep the dynamic parts to write by hand:
 
 ```sh
-echo '<div class="rounded-md px-3.5"><a href="/terms">Terms</a></div>' | kay fmt --from-html
+echo '<div class="rounded-md md:w-[200px]"><a href="/terms">Terms</a></div>' | kay fmt --from-html
 ```
 
 ```kay
-.rounded-md(class="px-3.5")
+.rounded-md(class="md:w-[200px]")
   a(href="/terms") Terms
 ```
 
@@ -243,8 +243,8 @@ for product of products
 
 ### Elements
 
-- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A `.` followed by a digit stays in the class, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
-- A class holding `.` or `[` goes in `class="..."`.
+- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A `.` between two digits stays in the class, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
+- A class holding `[`, or a `.` not between digits, goes in `class="..."`.
 - `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`.
 - A component gets what merges as one string, so its `class?: string` prop holds; an expression alone reaches it as written.
 - An element has one `class` attribute and one id.

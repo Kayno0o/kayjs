@@ -1073,6 +1073,10 @@ describe('shorthand classes with a decimal', () => {
 
   it('keeps a decimal class before an attribute list, text and a block expansion', () => {
     expect(compileKay('a.p-0.5(href="/x") go\n', 'x.kay').tsx).toContain('p-0.5')
-    expect(compileKay('ul.gap-1.5: li x\n', 'x.kay').diagnostics).toEqual([])
+    const nested = compileKay('ul.gap-1.5: li x\n', 'x.kay')
+
+    expect(nested.diagnostics).toEqual([])
+    expect(nested.tsx).toContain('gap-1.5')
+    expect(nested.tsx).toContain('<li')
   })
 })

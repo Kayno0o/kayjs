@@ -31,7 +31,7 @@ A line is `tag.class#id(attributes) text`, every part optional. A line starting 
   input(type="text" disabled)
 ```
 
-A class keeps a `.` followed by a digit, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
+A class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
 
 Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
 
