@@ -209,7 +209,7 @@ function ratesKeyFile(path: string): Buffer {
 
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
 // A key is stored pseudonymised: an HMAC keyed by the session's, the app's or the preview's secret once one is set, else by a random key kept in a file beside the store (`<path>.key`, the server's user alone), so the store's file alone cannot be checked against a guessed address.
-export function sqliteRates(path: string): RateStore {
+export function sqliteRates(path: string): SyncRates {
   let opened: OpenRates | undefined
 
   // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
@@ -217,12 +217,14 @@ export function sqliteRates(path: string): RateStore {
 
   // The file is opened by the first call, so loading a config that names it, to build or check, creates nothing.
   return {
-    hit: async (key, windowMs, weight) => (opened ??= openRates(path)).hit(key, windowMs, weight),
-    peek: async key => (opened ??= openRates(path)).peek(key),
+    hit: (key, windowMs, weight) => (opened ??= openRates(path)).hit(key, windowMs, weight),
+    peek: key => (opened ??= openRates(path)).peek(key),
   }
 }
 
-type OpenRates = RateStore & { peek: NonNullable<RateStore['peek']>, close: () => void }
+// Answered at once, as a store reading SQLite needs no promise.
+interface SyncRates { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
+type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
   const db = openSqlite(path)

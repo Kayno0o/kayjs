@@ -63,7 +63,7 @@ describe('a sqlite store given in a config', () => {
     // Used from another module than the one naming it: the stores only get their owner at construction.
     await useBoth(rates, rooms)
     await disposeOwned(new Set([import.meta.path]))
-    await expect(rates.hit('a', 1000)).rejects.toThrow()
+    expect(async () => rates.hit('a', 1000)).toThrow()
     expect(() => rooms.members('r')).toThrow()
   })
 })

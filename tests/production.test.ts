@@ -1345,8 +1345,9 @@ describe('SQLite stores', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-stores-'))
 
     try {
-      sqliteRates(join(dir, 'rates/rates.sqlite'))
-      sqliteStore(join(dir, 'sessions/sessions.sqlite'))
+      // The rates and session stores open their file on first use, so a config naming them creates nothing until then.
+      await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', 60_000)
+      await sqliteStore(join(dir, 'sessions/sessions.sqlite')).get('a')
       sqliteCache(join(dir, 'cache/cache.sqlite'))
       // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.
       await sqliteJobs(join(dir, 'jobs/jobs.sqlite')).lock('report', 0)
