@@ -1,6 +1,6 @@
 import type { JSX } from 'kay'
-import { html } from 'kay/html'
 import type { Palette, Settings } from './defaults'
+import { html } from 'kay/html'
 
 type Triple = [number, number, number]
 
