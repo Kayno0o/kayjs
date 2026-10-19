@@ -586,7 +586,7 @@ function ranAlready(element: Element): boolean {
   return element instanceof HTMLScriptElement && RUNNABLE_TYPES.has(element.type.toLowerCase())
 }
 
-// The markup a script was added with, which is what makes it the same script on the next page; kept on the copy, so a script is serialized once however many pages follow.
+// The markup a script was served or added with, which is what makes it the same script on the next page; kept on the element, so a script is serialized once however many pages follow, and a change made to it since does not make it another.
 const scriptMarkups = new WeakMap<HTMLScriptElement, string>()
 
 function scriptMarkup(script: HTMLScriptElement): string {
@@ -599,7 +599,7 @@ function scriptMarkup(script: HTMLScriptElement): string {
 }
 
 // A script a parser made never runs once moved into another document, so it is made again.
-function runnable(script: HTMLScriptElement, markup: string = script.outerHTML): HTMLScriptElement {
+function runnable(script: HTMLScriptElement, markup: string): HTMLScriptElement {
   const copy = document.createElement('script')
 
   scriptMarkups.set(copy, markup)

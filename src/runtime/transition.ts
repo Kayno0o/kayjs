@@ -72,14 +72,18 @@ function tick(): void {
   waiting = primed
   primed = new Set()
 
-  const reads = [...due].map(step => step())
-  const acts = reads.map(read => read())
+  try {
+    const reads = [...due].map(step => step())
+    const acts = reads.map(read => read())
 
-  for (const act of acts)
-    act()
-
-  if (waiting.size > 0 || primed.size > 0)
-    frame = requestAnimationFrame(tick)
+    for (const act of acts)
+      act()
+  }
+  finally {
+    // A step that throws leaves the others of the frame to the next one, as the frames of the elements after it would not be asked again.
+    if (waiting.size > 0 || primed.size > 0)
+      frame ||= requestAnimationFrame(tick)
+  }
 }
 
 function afterTwoFrames(step: Step): () => void {

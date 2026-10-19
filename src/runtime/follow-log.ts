@@ -14,7 +14,7 @@ interface Anchor {
 
 const DEFAULT_THRESHOLD = 32
 
-// The first item whose bottom is under `top`, by bisection as the items stack down the container, so a long log reads a few rects per scroll, not one per line.
+// The first item whose bottom is under `top`, by bisection, which takes the items to stack down the container in order (a hidden or sticky one shifts the anchor to a neighbour), so a long log reads a few rects per scroll, not one per line.
 function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined {
   let low = 0
   let high = items.length
