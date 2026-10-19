@@ -13,6 +13,7 @@ const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
 const ID_NAME = /[\w-]+/y
+const WHITESPACE_RUN = /\s+/g
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
@@ -1049,8 +1050,10 @@ class TemplateParser {
 
     if (quote === '"' || quote === '\'') {
       const end = this.src.indexOf(quote, this.pos + 1)
+      // A long list of classes may run over several lines, which render as single spaces.
+      const spansLines = this.src.slice(name.start, name.end) === 'class'
 
-      if (end === -1 || end > this.scan.lineEnd(this.pos)) {
+      if (end === -1 || (end > this.scan.lineEnd(this.pos) && !spansLines)) {
         this.error(this.pos, this.pos + 1, 'Unclosed string')
         this.pos = this.src.length
 
@@ -1058,10 +1061,11 @@ class TemplateParser {
       }
 
       const value = { start: this.pos + 1, end }
+      const text = this.src.slice(value.start, value.end)
 
       this.pos = end + 1
 
-      return { kind: 'static', name, value, text: this.src.slice(value.start, value.end) }
+      return { kind: 'static', name, value, text: spansLines && text.includes('\n') ? text.trim().replaceAll(WHITESPACE_RUN, ' ') : text }
     }
 
     if (quote === '{') {

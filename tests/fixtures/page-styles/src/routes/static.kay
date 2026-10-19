@@ -1,1 +1,5 @@
-div.rules(class="data-[state=open]:bg-red-500 [&>svg]:size-4 font-['Fira_Code'] has-[>img]:p-2 after:content-['x'] 2xl:p-4") Static classes whose names hold quotes, equals signs and angle brackets
+div(
+  class="
+    rules data-[state=open]:bg-red-500 [&>svg]:size-4 font-['Fira_Code'] has-[>img]:p-2 after:content-['x'] 2xl:p-4
+  "
+) Static classes whose names hold quotes, equals signs and angle brackets

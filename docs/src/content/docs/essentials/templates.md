@@ -37,6 +37,17 @@ A class takes Tailwind's names whole: `md:hover:underline`, `w-1/2`, `gap-1.5`, 
 .grid.grid-cols-[1fr_2fr].gap-1.5.[&>svg]:size-4.bg-(--brand).2xl:grid-cols-3
 ```
 
+A `class="..."` may run over several lines, and its words join with single spaces. `kay fmt` writes a long list that way:
+
+```kay
+div(
+  class="
+    flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3
+    shadow-sm hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500 md:px-6 md:py-4
+  "
+) Content
+```
+
 Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
 
 `tag: child` nests one element on the same line.

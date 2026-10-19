@@ -1,4 +1,4 @@
-import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
+import type { Attribute, Diagnostic, ElementNode, KayFile, Node, Span } from './ast'
 import { elementsIn, visitNodes } from './ast'
 import { parseKay } from './parser'
 
@@ -17,9 +17,14 @@ interface Line {
 interface AttributeEdit extends Span {
   text: string
   lines?: string[] | undefined
+  // What goes before the `(` of the lines, the id of an element whose classes moved into them.
+  head?: string | undefined
 }
 
 const INDENT = '  '
+// The width past which an element's tag, classes, id and attributes move their classes into a `class` attribute of their own.
+const MAX_WIDTH = 120
+const WHITESPACE_RUN = /\s+/
 const FENCE_OPEN = /^---(?:[ \t]+([a-z]+)(?:[ \t]+(<.*>))?|[ \t]*(<.*>))?[ \t]*$/
 const LEADING_SPACES = /^ */
 const CRLF = /\r\n/g
@@ -62,6 +67,7 @@ function formatTemplate(file: KayFile): string[] {
   // A span holding a template literal may carry significant whitespace across its lines, so they are kept byte for byte.
   const literals = spans.filter(span => file.source.slice(span.start, span.end).includes('`'))
   const edits = attributeEdits(file)
+  const wrappable = classWrapCandidates(file)
   const textEnds = trailingTextEnds(file.template)
   const levels: number[] = []
   const out: string[] = []
@@ -110,7 +116,7 @@ function formatTemplate(file: KayFile): string[] {
 
     blank = false
     const offset = line.start + indent
-    const spread = edits.find(edit => edit.lines && edit.start >= offset && edit.start < offset + content.length)
+    const spread = edits.find(edit => edit.lines && edit.start >= offset && edit.start < offset + content.length) ?? classWrapEdit(file, wrappable.get(line.start), offset, owner.to, edits)
 
     if (!spread?.lines) {
       out.push(' '.repeat(owner.to) + applyEdits(content, offset, edits))
@@ -120,7 +126,7 @@ function formatTemplate(file: KayFile): string[] {
 
     const closingLineEnd = lineEnd(file.source, spread.end)
 
-    out.push(`${' '.repeat(owner.to)}${applyEdits(content.slice(0, spread.start - offset), offset, edits)}(`)
+    out.push(`${' '.repeat(owner.to)}${applyEdits(content.slice(0, spread.start - offset), offset, edits)}${spread.head ?? ''}(`)
     out.push(...spread.lines.map(attribute => ' '.repeat(owner.to + INDENT.length) + attribute))
     out.push(`${' '.repeat(owner.to)})${applyEdits(textEnds.has(closingLineEnd) ? file.source.slice(spread.end, closingLineEnd) : file.source.slice(spread.end, closingLineEnd).trimEnd(), spread.end, edits)}`)
     skipUntil = closingLineEnd
@@ -214,6 +220,10 @@ function attributeText(source: string, attribute: Attribute): string {
 
   switch (attribute.kind) {
     case 'static': {
+      // A value running over lines, as a long `class` does, keeps the lines it was written on.
+      if (slice(attribute.value).includes('\n'))
+        return `${slice(attribute.name)}=${source[attribute.value.start - 1]}${slice(attribute.value)}${source[attribute.value.end]}`
+
       const quote = attribute.text.includes('"') ? '\'' : '"'
 
       return `${slice(attribute.name)}=${quote}${attribute.text}${quote}`
@@ -225,6 +235,101 @@ function attributeText(source: string, attribute: Attribute): string {
     case 'spread':
       return `{...${slice(attribute.expression)}}`
   }
+}
+
+// The elements of each line that write classes in the shorthand and stand where their attributes may spread over lines: not the ones inside a text, which `#[a.x text]` writes in the line.
+function classWrapCandidates(file: KayFile): Map<number, ElementNode[]> {
+  const inline = new Set<ElementNode>()
+  const lines = new Map<number, ElementNode[]>()
+
+  visitNodes(file.template, (node) => {
+    if (node.kind !== 'text')
+      return
+
+    for (const part of node.parts) {
+      if (part.kind === 'element') {
+        inline.add(part)
+
+        for (const inner of elementsIn(part.children))
+          inline.add(inner)
+      }
+    }
+  })
+
+  for (const element of elementsIn(file.template)) {
+    if (element.classes.length === 0 || element.outlet || inline.has(element))
+      continue
+
+    const start = file.source.lastIndexOf('\n', element.start - 1) + 1
+
+    lines.set(start, [...lines.get(start) ?? [], element])
+  }
+
+  return lines
+}
+
+// Where the classes of an element make its line longer than MAX_WIDTH, they move into a `class` attribute and its attributes go one to a line, the value running over lines when it is too long for one.
+// An element is left as written when it has a `class={...}`, attributes over several lines or a quote in its classes, or when it would be too long without its classes, and only the one with the most classes on a line moves.
+function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, offset: number, column: number, edits: AttributeEdit[]): AttributeEdit | undefined {
+  const { source } = file
+  const slice = (span: Span) => source.slice(span.start, span.end)
+  let best: { edit: AttributeEdit, classes: number } | undefined
+
+  for (const element of candidates ?? []) {
+    const parens = element.parens
+    const named = element.attributes.find(attribute => attribute.kind !== 'spread' && slice(attribute.name) === 'class')
+    const end = Math.max(parens?.end ?? 0, element.id?.end ?? 0, element.classes.at(-1)!.end)
+
+    if (named && named.kind !== 'static')
+      continue
+
+    const attributes = element.attributes.filter(attribute => attribute !== named).map(attribute => attributeText(source, attribute))
+    const words = [...element.classes.map(slice), ...named?.kind === 'static' ? named.text.split(WHITESPACE_RUN).filter(Boolean) : []]
+
+    if (attributes.some(attribute => attribute.includes('\n')) || (named?.kind === 'static' && slice(named.value).includes('\n')) || words.some(word => word.includes('"')) || source.slice(parens?.start ?? end, end).includes('\n'))
+      continue
+
+    const head = applyEdits(source.slice(element.start, end), element.start, edits)
+    const before = applyEdits(source.slice(offset, element.start), offset, edits)
+
+    const width = column + before.length + head.length
+    const shorthand = element.classes.reduce((sum, span) => sum + span.end - span.start + 1, 0)
+
+    if (width <= MAX_WIDTH || width - shorthand > MAX_WIDTH || (best && best.classes >= element.classes.length))
+      continue
+
+    const tag = element.tag.end > element.tag.start ? '' : element.name
+
+    best = {
+      classes: element.classes.length,
+      edit: { start: element.tag.end, end, text: '', head: `${tag}${element.id ? `#${slice(element.id)}` : ''}`, lines: [...classLines(words, column + INDENT.length), ...attributes] },
+    }
+  }
+
+  return best?.edit
+}
+
+// `class="a b"` when it fits the width, else the words filled into lines between `class="` and `"`.
+function classLines(words: string[], column: number): string[] {
+  const one = `class="${words.join(' ')}"`
+
+  if (column + one.length <= MAX_WIDTH)
+    return [one]
+
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    if (current !== '' && column + INDENT.length + current.length + 1 + word.length > MAX_WIDTH) {
+      lines.push(INDENT + current)
+      current = word
+    }
+    else {
+      current = current === '' ? word : `${current} ${word}`
+    }
+  }
+
+  return ['class="', ...lines, INDENT + current, '"']
 }
 
 function applyEdits(content: string, offset: number, edits: AttributeEdit[]): string {
