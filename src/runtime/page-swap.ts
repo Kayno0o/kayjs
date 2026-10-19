@@ -176,8 +176,8 @@ function policyOf(swap: Swap): Policy {
   return policy
 }
 
-// The fetch of the navigation under way, which a newer one cancels: its page would never be shown.
-let fetching: AbortController | undefined
+// The fetch of the navigation under way, which a newer one to another page cancels: its page would never be shown. One for the same page leaves it, as it always did.
+let fetching: { controller: AbortController, key: string } | undefined
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
@@ -188,8 +188,12 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
   const controller = new AbortController()
 
-  fetching?.abort()
-  fetching = controller
+  const key = pageKey(url)
+
+  if (fetching?.key !== key)
+    fetching?.controller.abort()
+
+  fetching = { controller, key }
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
   if (url.pathname !== location.pathname)
