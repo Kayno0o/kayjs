@@ -15,6 +15,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Sortable` names a handle after its item's text without its other controls (`Reorder Milk`, not `Reorder Milk Delete`) and renames it when that text changes ([Drag and drop](../packages/ui/llms/charts-drag-and-media.md)).
 - kayjs-ai `Chat` learns a lower `maxInputChars` of the action's `ask` from its 413, posting less and asking again, so the app states it once ([Chat](../packages/ai/llms/chat.md)).
 - `kay/server` exports `typeOfName` and `holdsType`, the file route's name-to-type rule and its image and PDF signature checks, which kayjs-cms now uses to judge an upload instead of its own copies ([Files](files.md#storing-and-linking)).
+- The code deferring an island to `hydrate="visible"` or `"idle"`, or a server island, is a chunk of its own that only a page with one loads: the entry is about 105 bytes gzip lighter on every other page.
 - An island that is not `persist` no longer pays for the code giving a kept island the next page's props: the entry is about 230 bytes gzip lighter on every page, and a `persist` island loads that code as a chunk of its own.
 - A static export's entry is 190 bytes gzip lighter: it no longer carries the code reading the build header, which a static host never sends ([Production](production.md)).
 

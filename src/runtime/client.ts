@@ -19,14 +19,7 @@ interface IslandElement extends HTMLElement {
   _$p?: ((props: object) => void) | undefined
 }
 
-// Starts loading a `visible` island this far before it scrolls into view.
-declare const KAY_VISIBLE_MARGIN: string | undefined
-declare const KAY_NEAR_MARGIN: string | undefined
-const VISIBLE_MARGIN = typeof KAY_VISIBLE_MARGIN === 'undefined' ? '200px' : KAY_VISIBLE_MARGIN
-// Fetches a deferred server island about a screen before it scrolls into view, so a visitor never meets the copy standing in for it.
-const NEAR_MARGIN = typeof KAY_NEAR_MARGIN === 'undefined' ? '100% 0px' : KAY_NEAR_MARGIN
 const SERVER_ISLAND = 'slot[data-kay-server]'
-const IDLE_FALLBACK_MS = 200
 const started = new WeakSet<HTMLElement>()
 // What disposes each hydrated island, so a page swap can end the ones it takes away: their effects, timers and connections.
 const disposers = new WeakMap<Node, () => void>()
@@ -122,8 +115,10 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     let fetched: Promise<void> | undefined
     const run = async () => fetched ??= fetchServerIsland(registry, element)
 
-    whenVisible(element, run, NEAR_MARGIN)
-    whenIdle(run)
+    void whenHydrating((when) => {
+      when.whenVisible(element, run, true)
+      when.whenIdle(run)
+    })
   }
 
   for (const element of root.querySelectorAll<HTMLElement>(ISLAND)) {
@@ -134,14 +129,27 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     const run = async () => hydrateIsland(registry, element)
 
     if (element.dataset.hydrate === 'visible')
-      whenVisible(element, run)
+      void whenHydrating(when => when.whenVisible(element, run))
     else if (element.dataset.hydrate === 'idle')
-      whenIdle(run)
+      void whenHydrating(when => when.whenIdle(run))
     else
       eager.push(run())
   }
 
   await Promise.all(eager)
+}
+
+// Its own chunk, which only a page with an island hydrating on `visible` or `idle`, or a deferred server island, loads. One that fails to load is a missing chunk like an island's.
+async function whenHydrating(start: (when: typeof import('./hydrate-when')) => void): Promise<void> {
+  try {
+    start(await import('./hydrate-when'))
+  }
+  catch (error) {
+    if (await skew())
+      return
+
+    throw error
+  }
 }
 
 // Its own chunk, which only a page deferring a server island loads.
@@ -388,33 +396,4 @@ function takeEvents(element: HTMLElement): Event[] {
   }
 
   return taken
-}
-
-function whenVisible(element: HTMLElement, run: () => Promise<void>, margin = VISIBLE_MARGIN) {
-  if (typeof IntersectionObserver === 'undefined') {
-    void run()
-
-    return
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    if (!entries.some(entry => entry.isIntersecting))
-      return
-
-    observer.disconnect()
-    void run()
-  }, { rootMargin: margin })
-
-  // The wrapper lays out as `display: contents`, so it has no box of its own to intersect.
-  const targets = element.children.length > 0 ? element.children : [element.parentElement ?? element]
-
-  for (const target of targets)
-    observer.observe(target)
-}
-
-function whenIdle(run: () => Promise<void>) {
-  if (typeof requestIdleCallback === 'function')
-    requestIdleCallback(() => void run())
-  else
-    setTimeout(() => void run(), IDLE_FALLBACK_MS)
 }
