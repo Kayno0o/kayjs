@@ -923,10 +923,10 @@ async function navigateApi(): Promise<typeof import('./navigate-api') | undefine
 
 // The page's loads again through the swap, unless the visitor or the app went elsewhere while its code loaded, as a refresh started before them would have given way to them.
 async function refreshed(): Promise<void> {
-  const [navigations, current] = [navigation.navigations, navigation.current]
+  const [navigations, visits] = [navigation.navigations, navigation.visits]
   const api = await navigateApi()
 
-  if (api && navigation.navigations === navigations && navigation.current === current)
+  if (api && navigation.navigations === navigations && navigation.visits === visits)
     await api.refresh()
 }
 
