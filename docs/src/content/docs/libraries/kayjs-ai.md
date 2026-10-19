@@ -236,7 +236,7 @@ To count users from a session of your own instead, pass `visitor`, a function fr
 
 The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model. Tokens the provider read from its prompt cache, or wrote to it, count like any other, so a cached chat cannot spend past its budget unseen, even though a cache read costs less.
 
-The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. A budget store must be able to `peek`, as both of kay's stores can.
+The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. The file is created on the first ask, not when the config loads, so `kay build` and `kay check` leave none behind. A budget store must be able to `peek`, as both of kay's stores can.
 
 Tokens are added when a reply ends, with the count the provider reports. A reply that goes over the budget while it streams is let finish, and all of it counts. The next question is refused.
 

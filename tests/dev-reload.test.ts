@@ -353,7 +353,7 @@ describe.concurrent('kay dev reloading', () => {
       const probes = ['previous.rooms.members(\'r\')', 'previous.store.get(\'x\')', 'await previous.pool`select 1`']
       const check = probes.map(probe => `try { ${probe}; state += 'open ' } catch { state += 'closed ' }`).join('\n')
 
-      await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteStore } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\n;(globalThis as any).kept = { rooms: sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))}), store: sqliteStore(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
+      await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteStore } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst used = <T extends { members?: (room: string) => unknown, peek?: (key: string) => unknown }>(store: T): T => { store.members?.('r'); store.peek?.('k'); return store }\n;(globalThis as any).kept = { rooms: used(sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))})), store: sqliteStore(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
         await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)
@@ -380,7 +380,7 @@ describe.concurrent('kay dev reloading', () => {
       // The job store opens lazily and reopens when used again, so what shows is the files this process holds open.
       const held = `readdirSync('/proc/self/fd').filter((fd) => { try { return readlinkSync('/proc/self/fd/' + fd).endsWith('jobs.sqlite') } catch { return false } }).length`
 
-      await entryWith(project, `import { readdirSync, readlinkSync } from 'node:fs'\nimport { sqliteCache } from 'kay/cache'\nimport { sqliteJobs, sqliteRates } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst store = sqliteJobs(${JSON.stringify(jobs)})\nstore.add({ id: crypto.randomUUID(), queue: 'q', payload: '1', attempts: 0, runAt: Date.now() })\n;(globalThis as any).kept = { cache: sqliteCache(${JSON.stringify(join(project.root, 'cache.sqlite'))}), rates: sqliteRates(${JSON.stringify(join(project.root, 'rates.sqlite'))}) }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + ' ' + ${held} + '\\n')\n`)
+      await entryWith(project, `import { readdirSync, readlinkSync } from 'node:fs'\nimport { sqliteCache } from 'kay/cache'\nimport { sqliteJobs, sqliteRates } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst used = <T extends { members?: (room: string) => unknown, peek?: (key: string) => unknown }>(store: T): T => { store.members?.('r'); store.peek?.('k'); return store }\nconst store = sqliteJobs(${JSON.stringify(jobs)})\nstore.add({ id: crypto.randomUUID(), queue: 'q', payload: '1', attempts: 0, runAt: Date.now() })\n;(globalThis as any).kept = { cache: sqliteCache(${JSON.stringify(join(project.root, 'cache.sqlite'))}), rates: used(sqliteRates(${JSON.stringify(join(project.root, 'rates.sqlite'))})) }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + ' ' + ${held} + '\\n')\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
         await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)
@@ -398,7 +398,7 @@ describe.concurrent('kay dev reloading', () => {
 
   it('closes what an API module opened when it is edited, and keeps what one that did not run again opened', async () => {
     const ticks = join(await scratchDir('dev-reload-ticks-'), '.ticks')
-    const api = (edit: number, name: string) => `import { appendFileSync } from 'node:fs'\nimport { api } from 'kay/server'\nimport { sqliteRooms } from 'kay/server'\n\nconst rooms = sqliteRooms(${JSON.stringify(`${ticks}-${name}.sqlite`)})\nconst previous = (globalThis as any).${name}\n;(globalThis as any).${name} = rooms\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, '${name}${edit}\\n'), 10)\n\nexport default api().get('/', () => {\n  try {\n    previous?.members('r')\n\n    return { previous: previous ? 'open' : 'none', edit: ${edit} }\n  }\n  catch {\n    return { previous: 'closed', edit: ${edit} }\n  }\n})\n`
+    const api = (edit: number, name: string) => `import { appendFileSync } from 'node:fs'\nimport { api } from 'kay/server'\nimport { sqliteRooms } from 'kay/server'\n\nconst rooms = sqliteRooms(${JSON.stringify(`${ticks}-${name}.sqlite`)})\n\nrooms.members('r')\nconst previous = (globalThis as any).${name}\n;(globalThis as any).${name} = rooms\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, '${name}${edit}\\n'), 10)\n\nexport default api().get('/', () => {\n  try {\n    previous?.members('r')\n\n    return { previous: previous ? 'open' : 'none', edit: ${edit} }\n  }\n  catch {\n    return { previous: 'closed', edit: ${edit} }\n  }\n})\n`
     const project = await served({ 'src/routes/index.kay': 'h1 Home\n', 'src/api/one.ts': api(0, 'one'), 'src/api/two.ts': api(0, 'two') })
 
     try {

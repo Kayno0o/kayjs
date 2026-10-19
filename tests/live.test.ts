@@ -1362,6 +1362,9 @@ describe('rooms', () => {
       const store = sqliteRooms(path, { poll: '5ms' })
       const room = rooms<{ text: string }, string>({ store })
       const ada = connection()
+
+      store.members('opened')
+
       const file = new Database(path)
       const processesNow = () => {
         const reader = new Database(path)
@@ -1414,6 +1417,9 @@ describe('rooms', () => {
     it('prunes old messages and silent processes when a process only publishes, at most once per heartbeat', () => {
       const path = join(dir, 'publish-only.sqlite')
       const store = sqliteRooms(path, { poll: '5ms' })
+
+      store.members('opened')
+
       const file = new Database(path)
       const count = (table: string) => file.query<{ n: number }, []>(`SELECT count(*) AS n FROM ${table}`).get()!.n
       const old = () => {

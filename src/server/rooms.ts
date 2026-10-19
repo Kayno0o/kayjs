@@ -256,8 +256,25 @@ export function memoryRooms(): RoomStore {
 
 // Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched); a bare number throws.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
+// The file is opened by the first call that needs it, so loading a config that names it, to build or check, creates nothing.
 export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}): RoomStore {
   const askedMs = poll === undefined ? undefined : optionMs(poll, '`sqliteRooms` poll')
+  let opened: RoomStore | undefined
+  const open = (): RoomStore => opened ??= openRooms(path, askedMs)
+
+  return {
+    add: (room, connection, member) => open().add(room, connection, member),
+    remove: (room, connection) => open().remove(room, connection),
+    members: room => open().members(room),
+    state: room => open().state!(room),
+    update: (room, change) => open().update!(room, change),
+    publish: (room, text, recipients) => open().publish(room, text, recipients),
+    subscribe: listener => open().subscribe(listener),
+    close: () => opened?.close(),
+  }
+}
+
+function openRooms(path: string, askedMs: number | undefined): RoomStore {
   const db = openSqlite(path)
   const self = crypto.randomUUID()
 

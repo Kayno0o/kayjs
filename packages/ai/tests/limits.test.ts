@@ -1,5 +1,5 @@
 import type { Piece, Provider } from '../src'
-import { rmSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
@@ -552,6 +552,21 @@ describe('when the store fails', () => {
 })
 
 describe('the store', () => {
+  it('creates no sqliteRates file until the first ask, so loading a config makes none', async () => {
+    const path = join(tmpdir(), `kayjs-ai-${crypto.randomUUID()}.sqlite`)
+
+    try {
+      ai({ budget: { tokens: 5, window: '1m', store: sqliteRates(path) } })
+      expect(existsSync(path)).toBe(false)
+      fakeAi.reply('a')
+      await ask('a', { visitor: 'v' })
+      expect(existsSync(path)).toBe(true)
+    }
+    finally {
+      rmSync(path, { force: true })
+    }
+  })
+
   it('can be sqliteRates, which keeps the count over a restart', async () => {
     const path = join(tmpdir(), `kayjs-ai-${crypto.randomUUID()}.sqlite`)
 

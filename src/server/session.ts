@@ -434,22 +434,27 @@ export function sqliteStore(path: string): SqliteSessionStore {
 
 // A store that keeps its object while the database under it changes, so a request holding it never meets a closed one; each call is synchronous, so none runs across a reopen.
 function fileStore(file: string): { store: SqliteSessionStore, reopen: () => void } {
-  let opened = openSqliteStore(file)
-  let stamp = fileId(file)
+  // Opened by the first call, so loading a config that names the file, to build or check, creates nothing.
+  let opened: ReturnType<typeof openSqliteStore> | undefined
+  let stamp: string | undefined
   let checked = Date.now()
   const reopen = () => {
     checked = Date.now()
 
-    if (fileId(file) === stamp)
+    if (!opened || fileId(file) === stamp)
       return
 
     opened.close()
-    opened = openSqliteStore(file)
-    stamp = fileId(file)
+    opened = undefined
   }
   const current = () => {
     if (Date.now() - checked >= FILE_CHECK_MS)
       reopen()
+
+    if (!opened) {
+      opened = openSqliteStore(file)
+      stamp = fileId(file)
+    }
 
     return opened.store
   }

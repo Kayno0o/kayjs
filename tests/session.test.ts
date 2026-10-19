@@ -539,7 +539,12 @@ describe('sessions', () => {
     try {
       const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
 
-      expect(sqliteStore(file)).toBe(sqliteStore(join(file, '..', 'sessions.sqlite')))
+      const store = sqliteStore(file)
+
+      expect(store).toBe(sqliteStore(join(file, '..', 'sessions.sqlite')))
+      expect(sweeps).toHaveLength(0)
+      await store.get('first')
+      await store.get('second')
       expect(sweeps).toHaveLength(1)
 
       const db = new Database(file)
@@ -559,7 +564,7 @@ describe('sessions', () => {
 
     old.run('CREATE TABLE kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
     old.close()
-    sqliteStore(file)
+    await sqliteStore(file).get('any')
 
     const db = new Database(file)
 

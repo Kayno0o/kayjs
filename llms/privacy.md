@@ -192,7 +192,7 @@ export async function archive(scan: File) {
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
 - The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
-- The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone.
+- The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteStore`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
 
 ### Stored files
 
