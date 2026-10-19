@@ -4,7 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { Proof, ProofFailure } from '../twoFactor'
 import type { OAuthTokens } from './types'
 import { localPath } from 'kay'
-import { homeOf, newUserRecord, publicUser, sameText } from '../core'
+import { homeOf, linkedProviders, newUserRecord, publicUser, sameText } from '../core'
 import { report } from '../events'
 import { randomToken } from '../keys'
 import { log } from '../log'
@@ -12,6 +12,7 @@ import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { chooseRemember } from '../sessions'
 import { reprove } from '../twoFactor'
+import { mergedData } from '../userData'
 import { OAuthExchangeError } from './client'
 import { challengeOf, createPkcePair } from './pkce'
 
@@ -198,7 +199,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)
 
     if (!guest)
-      await core.onSignUp?.(publicUser(record), profile)
+      await core.onSignUp?.(publicUser(record, await linkedProviders(core, record.id)), profile)
   }
 
   await heardProfile(core, record, profile)
@@ -224,9 +225,20 @@ function callbackParams(query: Record<string, string | undefined>): Record<strin
 }
 
 // A failure is logged, not thrown: refreshing what the app keeps from a profile must not fail a sign-in the provider vouched for.
+// What the callback returns is laid over the user's `data`, kept only when it fits the `user` schema.
 async function heardProfile(core: Core, record: UserRecord, profile: Profile): Promise<void> {
   try {
-    await core.onProviderProfile?.(publicUser(record), profile)
+    const given = await core.onProviderProfile?.(publicUser(record, await linkedProviders(core, record.id)), profile)
+
+    if (given === undefined || given === null)
+      return
+
+    const data = core.userData && mergedData(core.userData, record.data, given)
+
+    if (data === undefined)
+      log.error(`onProviderProfile for ${profile.provider} returned data the \`user\` schema does not accept, so it was not kept`)
+    else
+      await core.store.users.update(record.id, { data })
   }
   catch (error) {
     log.error(`onProviderProfile failed for ${profile.provider}`, error)

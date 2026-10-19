@@ -87,7 +87,7 @@ else
   a(href="/login") Sign in
 ```
 
-- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor, locale, guest }`, or `null`. Secrets never leave the store: no hash, no TOTP secret, no token.
+- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor, locale, guest, data, providers }`, or `null`: `data` is what the `user` schema keeps (see OAuth), `{}` without one, and `providers` the id of each linked provider (`providers.discord?.id`), read for `user()`, `requireUser()` and the OAuth callbacks, `{}` in events and admin lists. Secrets never leave the store: no hash, no TOTP secret, no token.
 - It reads the session first, then the request's `Authorization: Bearer` token. `via()` says which: `'session'`, `'bearer'` or `null`.
 - `requireUser()` is `user()` for a page or an action that needs one, with no guard above it: it answers the `User`, and for an anonymous request it stops as `auth.guard()` does, a visitor reading a page going to the sign-in page with `?redirect=` set to where they were, with `pages`, and any other request, an action's call included, refused with a 401. The user is read once per request however many of them ask.
 - `requireUser({ redirect, scope })` names the sign-in page of an app without `pages` (an empty `redirect`, as in `guard`, is none), and a scope a bearer token limited to scopes needs, which is otherwise refused with a 403 as `guard()` refuses it. `signInUrl(back?)` is that sign-in URL for a link of the app's own: `a(href={ctx.locals.auth.signInUrl()}) Sign in` leads back to the page it is on, `signInUrl('/pricing')` to another path. A `back` that is not a path of this site, `//evil.example` or `https://...`, leads home instead.

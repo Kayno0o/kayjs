@@ -14,6 +14,7 @@ import type { PasskeyChallenge, Relying } from './passkeys'
 import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
+import type { UserDataRules } from './userData'
 
 // A visit or a token use is recorded at most this often, so a busy browser or device does not write on every request.
 export const TOUCH_EVERY_MS = 5 * 60 * 1000
@@ -63,8 +64,8 @@ export interface Profile extends OAuthUser {
   provider: string
 }
 
-// A user as the app sees them, secrets left out.
-export interface User {
+// A user as the app sees them, secrets left out. `data` is what the app keeps through the `user` option, `{}` without one, and `providers` the id each linked provider gave them: read for `auth.user()` and for the callbacks of an OAuth sign-in, and `{}` in the other places a user is handed out, such as events and the admin's lists.
+export interface User<Data extends object = Record<string, unknown>> {
   id: string
   email: string | null
   emailVerified: boolean
@@ -74,6 +75,8 @@ export interface User {
   twoFactor: boolean
   locale: string | null
   guest: boolean
+  data: Data
+  providers: Record<string, { id: string }>
 }
 
 // What every request's `Auth` shares.
@@ -118,7 +121,9 @@ export interface Core {
   // Whether a user meets the `admin` option; nobody does without it.
   admin?: ((user: User) => Promise<boolean>) | undefined
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
-  onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
+  // The data to keep on the user, laid over what they hold; nothing keeps it as is.
+  onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined
+  userData?: UserDataRules | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
   // Seconds a guest is kept once their sessions are gone.
   guestMaxAge: number
@@ -139,7 +144,7 @@ export interface RefreshSubject {
   credential: StoredCredential
 }
 
-export function publicUser(record: UserRecord): User {
+export function publicUser(record: UserRecord, providers: User['providers'] = {}): User {
   return {
     id: record.id,
     email: record.email,
@@ -150,7 +155,17 @@ export function publicUser(record: UserRecord): User {
     twoFactor: record.totpEnabledAt !== null,
     locale: record.locale,
     guest: record.guest,
+    data: structuredClone(record.data ?? {}),
+    providers,
   }
+}
+
+// The provider accounts linked to a user, by provider; read only where the app set up OAuth, as no user has one otherwise.
+export async function linkedProviders(core: Pick<Core, 'oauth' | 'store'>, userId: string): Promise<User['providers']> {
+  if (core.oauth.size === 0)
+    return {}
+
+  return Object.fromEntries((await core.store.identities.listByUser(userId)).map(identity => [identity.provider, { id: identity.providerId }]))
 }
 
 export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
@@ -171,6 +186,7 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
     bannedAt: null,
     bannedUntil: null,
     banReason: null,
+    data: {},
     createdAt: new Date(),
     ...fields,
   }

@@ -27,6 +27,7 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
     bannedAt: null,
     bannedUntil: null,
     banReason: null,
+    data: {},
     createdAt: new Date(),
     ...fields,
   }

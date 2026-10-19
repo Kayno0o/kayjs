@@ -14,6 +14,8 @@ afterAll(async () => {
 })
 
 if (reachable) {
+  const store = () => pgStore(db)
+
   await db.sync({ allowDestructive: true })
 
   storeContract('pgStore', async () => {
@@ -39,6 +41,22 @@ if (reachable) {
     expect((await store.oauth!.refresh.get!('legacy-refresh'))?.usedAt).not.toBeNull()
     expect(await store.oauth!.refresh.get!('missing')).toBeUndefined()
     expect((await store.bearerTokens.findByDigest('legacy-bearer'))?.oauth).toEqual({ clientId: 'c1', family: 'f1', resource: null })
+  })
+
+  // A table made before users kept app data gains the column on sync, its rows reading as empty.
+  test('pgStore adds the data column to an older users table and reads its rows as empty', async () => {
+    await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
+    await store().users.create(userRecord({ id: 'u1' }))
+    await db.raw('ALTER TABLE "auth_user" DROP COLUMN "data"', [])
+
+    try {
+      await db.sync({ allowDestructive: true })
+
+      expect((await store().users.get('u1'))?.data).toEqual({})
+    }
+    finally {
+      await db.sync({ allowDestructive: true })
+    }
   })
 
   // An app whose migrations predate the OAuth server: its sign-in, magic-link and reset flows revoke bearer tokens and prune, and must not fail on the missing tables.

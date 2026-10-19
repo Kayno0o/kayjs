@@ -72,7 +72,7 @@ export function memoryStore(): AuthStore {
       findByUsername: username => copy(holder('username', username)),
       create(user) {
         claim(user)
-        users.set(user.id, { ...user, roles: [...user.roles] })
+        users.set(user.id, { ...user, roles: [...user.roles], data: structuredClone(user.data ?? {}) })
       },
       update(id, patch) {
         const user = users.get(id)
@@ -80,7 +80,7 @@ export function memoryStore(): AuthStore {
         if (!user)
           return undefined
 
-        const next = { ...user, ...patch }
+        const next = { ...user, ...patch, ...patch.data !== undefined && { data: structuredClone(patch.data) } }
 
         claim(next)
         users.set(id, next)
@@ -559,7 +559,7 @@ export function memoryStore(): AuthStore {
 
 // Callers get their own copy, as from a database, so changing one changes nothing stored.
 function copy(user: UserRecord | undefined): UserRecord | undefined {
-  return user && { ...user, roles: [...user.roles] }
+  return user && { ...user, roles: [...user.roles], data: structuredClone(user.data ?? {}) }
 }
 
 function copyToken(token: BearerTokenRecord | undefined): BearerTokenRecord | undefined {

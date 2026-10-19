@@ -1,5 +1,5 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
-import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase } from 'elysia'
+import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase, TSchema } from 'elysia'
 import type { Duration, Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
@@ -40,7 +40,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { banned, homeOf, newUserRecord, publicUser } from './core'
+import { banned, homeOf, linkedProviders, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
@@ -66,6 +66,7 @@ import { createRoleHierarchy } from './roles'
 import { PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
+import { userDataRules } from './userData'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
@@ -115,7 +116,7 @@ export interface SessionPlugin<Data extends AuthSessionData> {
   'deriveSecret'?: (purpose: string) => string | string[]
 }
 
-export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never> {
+export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> {
   sessions: SessionPlugin<Data>
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads. Left out, kayjs-auth derives its own from the session's secret, so one secret serves both.
   secret?: string | string[] | undefined
@@ -145,7 +146,10 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // Called once a new user exists, to create the app's own records for them.
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar.
-  onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
+  // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `onProviderProfile` fills it, and a store keeps it as JSON.
+  user?: (TSchema & { static: UserData }) | undefined
+  // Called on every provider sign-in, the first and a link included, with the user as the app has them and the provider's profile. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there.
+  onProviderProfile?: ((user: User<UserData>, profile: Profile) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((user: User) => void | Promise<void>) | undefined
   // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
@@ -191,11 +195,12 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string> {
+export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
   readonly [STATE]: RequestState
   private known?: { record: Promise<UserRecord | null>, at: number } | undefined
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
+  private linked = new WeakMap<UserRecord, Promise<User['providers']>>()
 
   private readonly session: Session<AuthSessionData>
 
@@ -249,15 +254,25 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read on first use, and again past 30 seconds on a websocket.
-  async user(): Promise<User | null> {
+  async user(): Promise<User<UserData> | null> {
     const record = await this.record()
 
-    return record && publicUser(record)
+    return record && publicUser(record, await this.providersOf(record)) as User<UserData>
+  }
+
+  // Read once per request for the record in hand, as the user is asked for several times.
+  private async providersOf(record: UserRecord): Promise<User['providers']> {
+    let held = this.linked.get(record)
+
+    if (!held)
+      this.linked.set(record, held = linkedProviders(this.core, record.id))
+
+    return held
   }
 
   // The signed-in user, who must be there: an anonymous visitor reading a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
   // The sign-in page is the prebuilt one with `pages`, else `redirect`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds.
-  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User> {
+  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User<UserData>> {
     const user = await this.user()
     const { redirect, deny } = stoppers(this.request)
 
@@ -292,7 +307,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!profile || !user || await this.via() !== 'session')
       return null
 
-    const held = await profile.load(user)
+    const held = await profile.load(user as User)
 
     return Object.entries(profile.fields).map(([name, field]) => ({ ...field, label: profileLabel(field.label, locale), name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: profileValue(name, Object.hasOwn(held, name) ? held[name] : undefined) }))
   }
@@ -328,7 +343,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (Object.keys(errors).length > 0)
       return { ok: false, errors }
 
-    const refused = await profile.save(user, clean)
+    const refused = await profile.save(user as User, clean)
 
     if (!refused)
       return { ok: true }
@@ -652,6 +667,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Unlinks a provider from the signed-in user, unless it is their last way in.
   async unlink(provider: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }> {
+    this.linked = new WeakMap()
+
     return unlink(this[STATE], provider, proof)
   }
 
@@ -1056,7 +1073,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 const DEV_PATH = '/_kay/auth'
 
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
-export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>) {
+export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
@@ -1076,7 +1093,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       pruneWhenDue(core, session.settings)
 
-      const auth = new Auth<Scope, Role, OrgRole>(session, core, ctx.request, core.keys.fingerprint(rateKey(address)), address)
+      const auth = new Auth<Scope, Role, OrgRole, UserData>(session, core, ctx.request, core.keys.fingerprint(rateKey(address)), address)
 
       // Lets other libraries, such as kayjs-ai counting a visitor, know the signed-in user without importing kayjs-auth; a guest costs nothing to mint, so it is not named and stays counted by address.
       nameUser(ctx.request, async () => {
@@ -1365,7 +1382,7 @@ function noSecret(): never {
   throw new Error('kayjs-auth: `secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
 }
 
-function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
+function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
 
@@ -1418,7 +1435,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
     onSignUp: options.onSignUp,
-    onProviderProfile: options.onProviderProfile,
+    onProviderProfile: options.onProviderProfile as Core['onProviderProfile'],
+    userData: options.user && userDataRules(options.user),
     onDelete: options.onDelete,
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),

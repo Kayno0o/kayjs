@@ -25,6 +25,8 @@ export interface UserRecord {
   bannedAt: Date | null
   bannedUntil: Date | null
   banReason: string | null
+  // What the app keeps on the user, as JSON checked against the `user` schema; `{}` when it has none, and a store that holds nothing here reads as `{}` too.
+  data?: Record<string, unknown> | undefined
   createdAt: Date
 }
 

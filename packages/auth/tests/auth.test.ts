@@ -10,7 +10,7 @@ import { browser, SECRET, testApp, userRecord } from './helpers/app'
 
 const POST = { method: 'POST' }
 
-type PluginAuth = Auth<string, 'admin' | 'editor', string>
+type PluginAuth = Auth<string, 'admin' | 'editor', string, Record<string, never>>
 
 async function seeded() {
   const setup = testApp()
@@ -127,7 +127,7 @@ describe('createAuth', () => {
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(await ada.json('/me')).toEqual({ id: 'u1', email: 'ada@example.com', emailVerified: false, username: null, roles: ['editor'], hasPassword: true, twoFactor: false, locale: null, guest: false })
+    expect(await ada.json('/me')).toEqual({ id: 'u1', email: 'ada@example.com', emailVerified: false, username: null, roles: ['editor'], hasPassword: true, twoFactor: false, locale: null, guest: false, data: {}, providers: {} })
   })
 
   test('reaches the app\'s routes from inside a plugin of the app\'s own, however deep', async () => {
@@ -278,7 +278,7 @@ describe('gate', () => {
     const app = new Elysia({ prefix: '/api' })
       .use(auth.gate())
       .get('/me', async ({ auth }) => {
-        expectTypeOf(auth).toEqualTypeOf<Auth<never, 'admin' | 'editor', never>>()
+        expectTypeOf(auth).toEqualTypeOf<Auth<never, 'admin' | 'editor', never, Record<string, never>>>()
 
         return (await auth.user())?.email ?? 'nobody'
       })

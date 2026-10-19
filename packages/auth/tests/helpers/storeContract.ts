@@ -32,6 +32,21 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.users.get('u1'))!.roles).toEqual(['admin'])
     })
 
+    test('a user\'s app data round-trips as JSON, is replaced by an update and handed out as a copy', async () => {
+      await store.users.create(userRecord({ id: 'u1', data: { avatar: 'a.png', nested: { list: [1, 2] } } }))
+
+      expect((await store.users.get('u1'))?.data).toEqual({ avatar: 'a.png', nested: { list: [1, 2] } })
+
+      const copy = await store.users.get('u1')
+
+      ;(copy!.data!.nested as { list: number[] }).list.push(3)
+      await store.users.update('u1', { email: 'ada@example.com' })
+
+      expect((await store.users.get('u1'))?.data).toEqual({ avatar: 'a.png', nested: { list: [1, 2] } })
+      expect((await store.users.update('u1', { data: { avatar: 'b.png' } }))?.data).toEqual({ avatar: 'b.png' })
+      expect((await store.users.get('u1'))?.data).toEqual({ avatar: 'b.png' })
+    })
+
     test('a taken email or username is refused, on create and on update', async () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', username: 'Ada' }))
       await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', username: 'Bob' }))

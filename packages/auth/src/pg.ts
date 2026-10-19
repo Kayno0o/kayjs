@@ -22,6 +22,8 @@ export const AuthUsers = defineTable('auth_user', t => ({
   banned_at: t.timestamptz().nullable(),
   banned_until: t.timestamptz().nullable(),
   ban_reason: t.text().nullable(),
+  // The app's own data on the user, from the `user` option.
+  data: t.jsonb<Record<string, unknown>>().notNull().default({}),
   created_at: t.timestamptz().notNull(),
 })).withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
 
@@ -547,7 +549,7 @@ function decoded(column: string, value: unknown): unknown {
   if (value === null || value === undefined)
     return value
 
-  if (column === 'roles' && typeof value === 'string') {
+  if ((column === 'roles' || column === 'data') && typeof value === 'string') {
     try {
       return JSON.parse(value)
     }
@@ -562,7 +564,7 @@ function decoded(column: string, value: unknown): unknown {
   return DATE_COLUMNS.has(column) && !(value instanceof Date) ? new Date(value as string | number) : value
 }
 
-// The user a joined row holds, its columns typed as a read of the user alone gives them: Postgres types them as it reads, SQLite hands a date as text, an array as JSON text and a boolean as 0 or 1.
+// The user a joined row holds, its columns typed as a read of the user alone gives them: Postgres types them as it reads, SQLite hands a date as text, an array or an object as JSON text and a boolean as 0 or 1.
 function userOf(row: Record<string, unknown>): UserRow {
   const user: Record<string, unknown> = {}
 
@@ -594,6 +596,7 @@ function toUser(row: UserRow | null): UserRecord | undefined {
       bannedAt: row.banned_at,
       bannedUntil: row.banned_until,
       banReason: row.ban_reason,
+      data: row.data ?? {},
       createdAt: row.created_at,
     }
     : undefined
@@ -618,6 +621,7 @@ function fromUser(user: Partial<UserRecord>) {
     banned_at: user.bannedAt,
     banned_until: user.bannedUntil,
     ban_reason: user.banReason,
+    data: user.data,
     created_at: user.createdAt,
   })
 }

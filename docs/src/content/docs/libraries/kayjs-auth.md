@@ -104,6 +104,24 @@ const user = await ctx.locals.auth.requireUser()
 p Hello {user.email}
 ```
 
+### Your own data on the user
+
+Give `createAuth` a `user` schema to keep your own fields on the user, such as a provider's avatar. `onProviderProfile` returns what to store on every provider sign-in, and `user().data` gives it back typed.
+
+```ts
+createAuth({
+  // ...
+  user: s.Object({ avatar: s.Optional(s.String()) }),
+  onProviderProfile: (user, profile) => ({ avatar: profile.avatar ?? undefined }),
+})
+```
+
+What the callback returns goes over the stored `data`. A field it leaves out, or sets to `undefined`, keeps its value. Fields the schema does not declare are dropped. A result that does not fit the schema, or takes more than 16 KB as JSON, is logged and not stored, and the sign-in goes on. The data is JSON, so a `Date` is stored as text. Nothing from the provider's tokens is in it.
+
+`user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`. It is read for `user()` and `requireUser()` and for the callbacks of an OAuth sign-in. In events and the admin's lists it is `{}`.
+
+`pgStore` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
+
 With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds.
 
 The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: same-origin`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.

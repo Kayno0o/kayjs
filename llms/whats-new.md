@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth keeps typed app data on the user: `createAuth({ user: s.Object({ ... }) })` with `onProviderProfile` returning what to store (an avatar, say), `auth.user().data` typed from the schema, and `User.providers` giving each linked provider's id; `pgStore` adds its `data` column on `db.sync()` ([kayjs-auth OAuth](../packages/auth/llms/oauth-passkeys-two-factor.md)).
 - kayjs-auth's `secret` is optional: left out, it derives its own key from the session's secret, so an app sets one secret, and `session()` exposes `deriveSecret(purpose)` for the same ([kayjs-auth setup](../packages/auth/llms/setup.md), [Server](server.md)).
 - `overrideEnv(env, values)` from `kay/test` gives a `defineEnv` value other variables for one test and puts them back, and `defineEnv`'s `source` argument is documented ([Testing](testing.md), [Server](server.md)).
 - kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when kay.config.ts `site` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
