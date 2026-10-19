@@ -54,8 +54,9 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html` turns HTML into a template), `kay lsp`, and `kay mcp`, serving kay's tools and these guides to an agent, and `kay/compiler`, compiling a `.kay` source from a tool
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html` turns HTML into a template), `kay lsp`, `kay mcp` (kay's tools and guides for an agent), `kay/compiler`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
+- [Queues](llms/queues.md): jobs surviving a restart: stores, retries
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.45

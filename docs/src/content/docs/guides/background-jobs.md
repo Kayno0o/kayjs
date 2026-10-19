@@ -134,4 +134,4 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })
 ```
 
-<ReadMore href="/llms/production#background-jobs">Concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
+<ReadMore href="/llms/queues">Concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
