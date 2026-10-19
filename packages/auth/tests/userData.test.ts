@@ -1,4 +1,4 @@
-import type { AuthSessionData, Profile } from '../src/auth'
+import type { AuthSessionData, Profile, User } from '../src/auth'
 import { afterEach, describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
@@ -200,6 +200,60 @@ describe('app data and provider ids on the user', () => {
     await me(ada)
 
     expect(listed).not.toHaveBeenCalled()
+  })
+
+  test('a gate and a guard make no identities query, as the user they check has no providers to read', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { app, auth, browserOn, store } = setup()
+    const wrapped = new Elysia().use(app).use(auth.gate()).get('/private', () => 'ok')
+    const ada = browserOn(wrapped)
+
+    await signInWith(ada, 'discord', '1')
+
+    const listed = spyOn(store.identities, 'listByUser')
+
+    expect((await ada.fetch('/private')).status).toBe(200)
+    expect(listed).not.toHaveBeenCalled()
+    await me(ada)
+    expect(listed).toHaveBeenCalledTimes(1)
+  })
+
+  test('the admin option sees the provider id of the user it judges', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup({ admin: async (user: User) => user.providers.discord?.id === '1' })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+
+    expect(await ada.call('listUsers')).toMatchObject({ ok: true })
+  })
+
+  test('the auth event hook sees the provider id', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const seen: unknown[] = []
+    const { browser } = setup({ onAuthEvent: (info: { user: User }) => void seen.push(info.user.providers) })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+
+    expect(seen.at(-1)).toEqual({ discord: { id: '1' } })
+  })
+
+  test('a result over the size cap is not stored and is logged', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { browser, store } = setup({ onProviderProfile: () => ({ avatar: 'é'.repeat(9000) }) })
+    const ada = browser()
+
+    try {
+      await signInWith(ada, 'discord', '1')
+
+      expect((await store.users.get((await me(ada)).id))?.data).toEqual({})
+      expect(error).toHaveBeenCalled()
+    }
+    finally {
+      error.mockRestore()
+    }
   })
 
   // Checked by `bun run check`: the schema types `data`.

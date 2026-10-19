@@ -8,7 +8,7 @@ import type { ApprovedClient } from './authorize/grants'
 import type { AuthorizeOutcome, AuthorizeParams } from './authorize/request'
 import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
-import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
+import type { AuthSessionData, BareUser, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { AuditCursorInput, AuditEntry, AuthEventInfo } from './events'
 import type { DataExport } from './export'
@@ -40,7 +40,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { banned, homeOf, linkedProviders, newUserRecord, publicUser } from './core'
+import { banned, homeOf, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
@@ -68,7 +68,7 @@ import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, 
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 import { userDataRules } from './userData'
 
-export type { AuthSessionData, OAuthApp, Profile, User } from './core'
+export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
 const STATE = Symbol('kayjs-auth.state')
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
@@ -87,7 +87,7 @@ const servedSockets = new WeakSet<object>()
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
-export type AuthRequirement<Role extends string> = Requirement<User, Role>
+export type AuthRequirement<Role extends string> = Requirement<BareUser, Role>
 
 // A session a browser's cross-site POST or websocket upgrade reads as signed out and cannot write, a write answered with a 403: a plain Elysia app has no Origin check of kay's own.
 function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, refusal: () => Response): Session<AuthSessionData> {
@@ -112,8 +112,8 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
 // The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> {
   '~Ephemeral': { derive: { readonly session: Session<Data> } }
-  // A key for one purpose from the session's secret, a list for a list of secrets.
-  'deriveSecret'?: (purpose: string) => string | string[]
+  // A key for one purpose from each of the session's secrets, in their order.
+  'deriveSecret'?: (purpose: string) => string[]
 }
 
 export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> {
@@ -191,7 +191,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryStore` and `pgStore` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
   oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly Scope[] | undefined } | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
-  authorize?: ((user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+  authorize?: ((user: BareUser | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
@@ -257,7 +257,14 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   async user(): Promise<User<UserData> | null> {
     const record = await this.record()
 
-    return record && publicUser(record, await this.providersOf(record)) as User<UserData>
+    return record && { ...publicUser(record), providers: await this.providersOf(record) } as User<UserData>
+  }
+
+  // The signed-in user as `user()` finds them but without `providers`, which costs a read: for a guard or a gate that does not look at it.
+  async bareUser(): Promise<BareUser<UserData> | null> {
+    const record = await this.record()
+
+    return record && publicUser(record) as BareUser<UserData>
   }
 
   // Read once per request for the record in hand, as the user is asked for several times.
@@ -302,12 +309,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
   async profile(locale?: string): Promise<ProfileFieldView[] | null> {
     const profile = this.core.pages?.profile
-    const user = profile && await this.user()
+    const user = profile && await this.bareUser()
 
     if (!profile || !user || await this.via() !== 'session')
       return null
 
-    const held = await profile.load(user as User)
+    const held = await profile.load(user as BareUser)
 
     return Object.entries(profile.fields).map(([name, field]) => ({ ...field, label: profileLabel(field.label, locale), name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: profileValue(name, Object.hasOwn(held, name) ? held[name] : undefined) }))
   }
@@ -319,7 +326,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!profile)
       throw new Error('kayjs-auth: saveProfile needs `pages.profile` in createAuth')
 
-    const user = await this.user()
+    const user = await this.bareUser()
 
     // A device's token cannot edit the profile of the account it was given for, as it cannot rename it.
     if (!user || await this.via() !== 'session')
@@ -343,7 +350,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (Object.keys(errors).length > 0)
       return { ok: false, errors }
 
-    const refused = await profile.save(user as User, clean)
+    const refused = await profile.save(user as BareUser, clean)
 
     if (!refused)
       return { ok: true }
@@ -429,7 +436,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted as registering is, and CAPTCHA-checked as `guest`.
-  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: User } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }> {
+  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }> {
     const current = await this.record()
 
     if (current)
@@ -446,7 +453,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const fresh = newUserRecord({ guest: true, roles: [...this.core.defaultRoles], locale: this[STATE].languages[0] ?? null })
     const record = (await this.core.store.users.create(fresh)) ?? fresh
 
-    await this.core.onSignUp?.(publicUser(record), undefined)
+    await this.core.onSignUp?.(unlinked(publicUser(record)), undefined)
     await this.establish(record, 'guest')
 
     return { ok: true, user: publicUser(record) }
@@ -887,7 +894,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const signedIn = await this.session.get('auth')
     const actor = signedIn?.impersonator && await this.core.store.users.get(signedIn.impersonator.user)
 
-    return actor ? publicUser(actor) : null
+    return actor ? linkedUser(this.core, actor) : null
   }
 
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `onExport`: for a download of their data.
@@ -1075,7 +1082,7 @@ const DEV_PATH = '/_kay/auth'
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
 export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
-  const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
+  const { hasRole, isGranted } = createRoleHierarchy<BareUser, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
   const failed = (error: OAuthFailure) => options.failurePage ?? withQuery(core.signInPage, `error=${error}`)
 
@@ -1097,7 +1104,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       // Lets other libraries, such as kayjs-ai counting a visitor, know the signed-in user without importing kayjs-auth; a guest costs nothing to mint, so it is not named and stays counted by address.
       nameUser(ctx.request, async () => {
-        const user = await auth.user()
+        const user = await auth.bareUser()
 
         return user && !user.guest ? user.id : undefined
       })
@@ -1172,7 +1179,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (underKayDev()) {
     (plugin as unknown as Elysia).get(DEV_PATH, async (ctx) => {
       const { auth } = ctx as unknown as { auth: Auth }
-      const [user, via] = await Promise.all([auth.user(), auth.via()])
+      const [user, via] = await Promise.all([auth.bareUser(), auth.via()])
 
       ctx.set.headers['cache-control'] = 'no-store'
 
@@ -1180,7 +1187,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
   }
 
-  const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
+  const evaluate = async (user: BareUser, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
     if (typeof grant === 'string')
       return isGranted(grant, user.roles)
 
@@ -1189,7 +1196,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   })
 
   const authorize = options.authorize ?? (async (user, requirement, _level, ctx) => user !== null && evaluate(user, requirement, ctx))
-  const signedIn: Predicate<User> = user => user !== null
+  const signedIn: Predicate<BareUser> = user => user !== null
   const admin = options.admin
 
   if (admin !== undefined)
@@ -1205,10 +1212,10 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
-    isGranted: (role: Role, user: User) => isGranted(role, user.roles),
+    isGranted: (role: Role, user: BareUser) => isGranted(role, user.roles),
 
     // A requirement met by a member of the organization the route's `param` names, by id or slug, holding `role` there when given: `auth: auth.memberOf('admin')`.
-    memberOf(role?: OrgRole, memberOptions: { param?: string } = {}): Predicate<User> {
+    memberOf(role?: OrgRole, memberOptions: { param?: string } = {}): Predicate<BareUser> {
       return async (user, ctx) => {
         const ref: unknown = ctx.params?.[memberOptions.param ?? core.organizations?.param ?? 'org']
 
@@ -1243,7 +1250,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     },
 
     // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`, and read again past 30 seconds: null for an anonymous one, or a socket opened on an app without the plugin. A socket whose user is gone since, signed out, revoked or banned, is closed.
-    async socketUser(ws: { data?: unknown, close?: ((code?: number, reason?: string) => void) | undefined }): Promise<User | null> {
+    async socketUser(ws: { data?: unknown, close?: ((code?: number, reason?: string) => void) | undefined }): Promise<BareUser | null> {
       const data = ws.data
       const state = typeof data === 'object' && data !== null && 'auth' in data ? data.auth : undefined
 
@@ -1256,7 +1263,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         return null
       }
 
-      const user = await state.user()
+      const user = await state.bareUser()
 
       if (user)
         servedSockets.add(state)
@@ -1280,13 +1287,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     async userFromToken(token: string): Promise<User | null> {
       const owner = await tokenUser(core, token)
 
-      return owner && !banned(owner.record) ? publicUser(owner.record) : null
+      return owner && !banned(owner.record) ? linkedUser(core, owner.record) : null
     },
 
     // Closes every route of the Elysia instance it is used on unless the user meets `require`, signed in by default. A route takes `auth: <requirement>` to ask for more and `auth: false` to stay open.
     gate(gateOptions: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}) {
-      const gate = createGate<User, Role, Scope>({
-        principal: async ctx => authOf(ctx).user(),
+      const gate = createGate<BareUser, Role, Scope>({
+        principal: async ctx => authOf(ctx).bareUser(),
         authorize,
         defaultRequirement: gateOptions.require ?? signedIn,
         scopes: async ctx => authOf(ctx).scopes(),
@@ -1302,7 +1309,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? core.pages && core.signInPage : guardOptions.redirect
 
       return async (ctx) => {
-        const user = await authOf(ctx.locals).user()
+        const user = await authOf(ctx.locals).bareUser()
         const reading = READ_METHODS.has(ctx.request.method)
 
         if (!user) {

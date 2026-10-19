@@ -1,7 +1,7 @@
 import type { AnyElysia } from 'elysia'
 import type { KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
-import type { Core, User } from '../core'
+import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
 import type { LinkType } from '../store'
 import { pickLocale } from '../locale'
@@ -44,9 +44,9 @@ export type ProfileProblem = 'required' | 'too-long' | { message: string }
 export interface ProfileOptions<Field extends string = string> {
   fields: Record<Field, ProfileField>
   // What each field holds now for this user, read when the form renders.
-  load: (user: User) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
+  load: (user: BareUser) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
   // Stores values already trimmed and checked against `required` and `maxLength`; returns `{ errors }` naming what it refused, by field.
-  save: (user: User, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>> } | Promise<void | { errors: Partial<Record<Field, string>> }>
+  save: (user: BareUser, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>> } | Promise<void | { errors: Partial<Record<Field, string>> }>
 }
 
 // What `createAuth`'s `pages` option takes: `authPages`' own options and the profile data of the app.

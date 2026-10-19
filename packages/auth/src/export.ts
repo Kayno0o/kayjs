@@ -8,7 +8,7 @@ import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import { approvedClients } from './authorize/grants'
 import { listTokens } from './bearer'
-import { publicUser } from './core'
+import { linkedUser } from './core'
 import { impersonatorOf } from './events'
 import { spend } from './limits'
 import { exportedInvitations, listMemberships } from './organizations'
@@ -59,7 +59,7 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
   if (await spend(core.store, `export:${record.id}`, core.limits.export))
     return { ok: false, error: 'limited' }
 
-  const user = publicUser(record)
+  const user = await linkedUser(core, record)
 
   return {
     ok: true,

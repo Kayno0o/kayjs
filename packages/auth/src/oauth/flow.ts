@@ -4,7 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { Proof, ProofFailure } from '../twoFactor'
 import type { OAuthTokens } from './types'
 import { localPath } from 'kay'
-import { homeOf, linkedProviders, newUserRecord, publicUser, sameText } from '../core'
+import { homeOf, linkedUser, newUserRecord, sameText } from '../core'
 import { report } from '../events'
 import { randomToken } from '../keys'
 import { log } from '../log'
@@ -199,7 +199,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)
 
     if (!guest)
-      await core.onSignUp?.(publicUser(record, await linkedProviders(core, record.id)), profile)
+      await core.onSignUp?.(await linkedUser(core, record), profile)
   }
 
   await heardProfile(core, record, profile)
@@ -228,12 +228,12 @@ function callbackParams(query: Record<string, string | undefined>): Record<strin
 // What the callback returns is laid over the user's `data`, kept only when it fits the `user` schema.
 async function heardProfile(core: Core, record: UserRecord, profile: Profile): Promise<void> {
   try {
-    const given = await core.onProviderProfile?.(publicUser(record, await linkedProviders(core, record.id)), profile)
+    const given = await core.onProviderProfile?.(await linkedUser(core, record), profile)
 
-    if (given === undefined || given === null)
+    if (given === undefined || given === null || !core.userData)
       return
 
-    const data = core.userData && mergedData(core.userData, record.data, given)
+    const data = mergedData(core.userData, record.data, given)
 
     if (data === undefined)
       log.error(`onProviderProfile for ${profile.provider} returned data the \`user\` schema does not accept, so it was not kept`)

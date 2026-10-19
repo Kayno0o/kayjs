@@ -64,8 +64,8 @@ export interface Profile extends OAuthUser {
   provider: string
 }
 
-// A user as the app sees them, secrets left out. `data` is what the app keeps through the `user` option, `{}` without one, and `providers` the id each linked provider gave them: read for `auth.user()` and for the callbacks of an OAuth sign-in, and `{}` in the other places a user is handed out, such as events and the admin's lists.
-export interface User<Data extends object = Record<string, unknown>> {
+// A user as the app sees them, secrets left out, without what costs a read: the user guards, gates, results and admin lists work with. `data` is what the app keeps through the `user` option, `{}` without one.
+export interface BareUser<Data extends object = Record<string, unknown>> {
   id: string
   email: string | null
   emailVerified: boolean
@@ -76,6 +76,10 @@ export interface User<Data extends object = Record<string, unknown>> {
   locale: string | null
   guest: boolean
   data: Data
+}
+
+// A user with the provider accounts linked to them, `providers` holding the id each gave: what `auth.user()`, `requireUser()` and the app's hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onAuthEvent`) receive.
+export interface User<Data extends object = Record<string, unknown>> extends BareUser<Data> {
   providers: Record<string, { id: string }>
 }
 
@@ -144,7 +148,7 @@ export interface RefreshSubject {
   credential: StoredCredential
 }
 
-export function publicUser(record: UserRecord, providers: User['providers'] = {}): User {
+export function publicUser(record: UserRecord): BareUser {
   return {
     id: record.id,
     email: record.email,
@@ -156,11 +160,20 @@ export function publicUser(record: UserRecord, providers: User['providers'] = {}
     locale: record.locale,
     guest: record.guest,
     data: structuredClone(record.data ?? {}),
-    providers,
   }
 }
 
 // The provider accounts linked to a user, by provider; read only where the app set up OAuth, as no user has one otherwise.
+// A user who has no provider linked yet, as a new account is.
+export function unlinked(user: BareUser): User {
+  return { ...user, providers: {} }
+}
+
+// The user with their linked providers read, for what hands one to the app's hooks.
+export async function linkedUser(core: Pick<Core, 'oauth' | 'store'>, record: UserRecord): Promise<User> {
+  return { ...publicUser(record), providers: await linkedProviders(core, record.id) }
+}
+
 export async function linkedProviders(core: Pick<Core, 'oauth' | 'store'>, userId: string): Promise<User['providers']> {
   if (core.oauth.size === 0)
     return {}

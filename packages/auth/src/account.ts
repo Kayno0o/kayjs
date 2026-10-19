@@ -1,4 +1,4 @@
-import type { User } from './core'
+import type { BareUser } from './core'
 import type { PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
@@ -38,7 +38,7 @@ export async function changePassword(state: RequestState, proof: Proof, password
   return { ok: true }
 }
 
-export type ChangeUsernameResult = { ok: true, user: User } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
+export type ChangeUsernameResult = { ok: true, user: BareUser } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
 
 // Names the signed-in user, or renames them, under the rules register checks. A name is no credential, so it takes no proof and sends no mail; a session is needed all the same, so a device's token cannot rename the account it was given for.
 export async function changeUsername(state: RequestState, username: string): Promise<ChangeUsernameResult> {

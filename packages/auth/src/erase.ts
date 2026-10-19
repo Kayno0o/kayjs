@@ -1,6 +1,6 @@
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
-import { publicUser } from './core'
+import { linkedUser } from './core'
 import { reportFrom } from './events'
 import { log } from './log'
 import { mailNotice, notify } from './notify'
@@ -84,7 +84,7 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
   const owners = await owning(core, record)
   const pseudonym = crypto.randomUUID()
 
-  await core.onDelete?.(publicUser(record))
+  await core.onDelete?.(await linkedUser(core, record))
   await Promise.all((await store.identities.listByUser(record.id)).map(async identity => revokeUpstream(core, identity)))
   // Before the account goes, so a store that cannot strip the audit log fails the erase with the account still there to delete again.
   await forget(core, record, pseudonym)

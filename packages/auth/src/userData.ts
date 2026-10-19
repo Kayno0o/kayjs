@@ -1,5 +1,6 @@
 import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
+import { Buffer } from 'node:buffer'
 import { TypeCompiler } from 'elysia/type-system'
 
 // What a user's app data is held to: the top-level fields the app's schema declares, and the schema's check.
@@ -8,7 +9,7 @@ export interface UserDataRules {
   check: TypeCheck<TSchema>
 }
 
-// The most JSON a user's app data may take, so a profile cannot fill a row.
+// The most bytes of JSON a user's app data may take, so a profile cannot fill a row.
 const MOST_DATA_LENGTH = 16_384
 
 export function userDataRules(schema: TSchema): UserDataRules {
@@ -36,7 +37,7 @@ export function mergedData(rules: UserDataRules, held: Record<string, unknown> |
 
   const text = JSON.stringify(next)
 
-  if (text.length > MOST_DATA_LENGTH)
+  if (Buffer.byteLength(text) > MOST_DATA_LENGTH)
     return undefined
 
   const json = JSON.parse(text) as Record<string, unknown>

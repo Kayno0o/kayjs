@@ -159,12 +159,8 @@ export function session<Data extends object = SessionData>(options: SessionOptio
       context.set.headers['set-cookie'] = [before ?? []].flat().concat(cookie)
     })
 
-  // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; text of 43 characters, a list in the same order for a list of secrets.
-  const deriveSecret = (purpose: string): string | string[] => {
-    const derived = secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
-
-    return Array.isArray(options.secret) ? derived : derived[0]!
-  }
+  // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; a list of 43-character texts in the order of the secrets, one for a single secret.
+  const deriveSecret = (purpose: string): string[] => secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
 
   return Object.assign(plugin, { deriveSecret })
 }

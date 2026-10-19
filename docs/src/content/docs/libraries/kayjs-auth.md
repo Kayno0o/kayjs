@@ -39,6 +39,8 @@ export const auth = createAuth({
 
 kayjs-auth takes its key from the session's secret, so one secret serves both. Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
 
+With the default, the TOTP secrets and stored provider tokens are sealed with a key derived from the session secret. When you rotate it, keep the old session secrets in the list for as long as that data exists, or set `secret` separately. To move an app from `AUTH_SECRET` to the default, pass `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
+
 Then declare it in `kay.config.ts`. The module loads only when the server starts, so the config never loads your database.
 
 ```ts
@@ -116,9 +118,15 @@ createAuth({
 })
 ```
 
-What the callback returns goes over the stored `data`. A field it leaves out, or sets to `undefined`, keeps its value. Fields the schema does not declare are dropped. A result that does not fit the schema, or takes more than 16 KB as JSON, is logged and not stored, and the sign-in goes on. The data is JSON, so a `Date` is stored as text. Nothing from the provider's tokens is in it.
+What the callback returns goes over the stored `data`. A field it leaves out, or sets to `undefined`, keeps its value. Fields the schema does not declare are dropped.
 
-`user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`. It is read for `user()` and `requireUser()` and for the callbacks of an OAuth sign-in. In events and the admin's lists it is `{}`.
+The patch is all or nothing: one field the schema refuses, or a result over 16 KB of JSON, drops the whole patch, which is logged, and the sign-in goes on. The update reads the stored data and writes it back, so two sign-ins at once can overwrite each other's fields. The data is JSON, so a `Date` is stored as text. Nothing from the provider's tokens is in it.
+
+`user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`.
+
+It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `register` give a `BareUser`, which has no `providers`, so they cost no query.
+
+`user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 
 `pgStore` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
 

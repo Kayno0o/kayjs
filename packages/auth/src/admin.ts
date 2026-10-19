@@ -1,9 +1,9 @@
-import type { User } from './core'
+import type { BareUser } from './core'
 import type { AuditCursorInput, AuditEntry } from './events'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
-import { banned, publicUser } from './core'
+import { banned, linkedUser, publicUser } from './core'
 import { eraseLeavingUser } from './erase'
 import { auditEntries, report } from './events'
 import { revokeBearerTokens } from './sessions'
@@ -13,7 +13,7 @@ const USER_PAGE_MAX = 200
 const BAN_REASON_MAX_LENGTH = 500
 
 // A user as an admin sees them.
-export interface ManagedUser extends User {
+export interface ManagedUser extends BareUser {
   createdAt: Date
   // Set while the user is barred from signing in, `until` null for good.
   ban: { at: Date, until: Date | null, reason: string | null } | null
@@ -62,7 +62,7 @@ export async function changingAdmin(state: RequestState): Promise<{ ok: true, ac
 }
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
-  return await state.core.admin?.(publicUser(record)) ?? false
+  return await state.core.admin?.(await linkedUser(state.core, record)) ?? false
 }
 
 // Whether `record` is the only user meeting the `admin` option, so losing them leaves the deployment with no admin.

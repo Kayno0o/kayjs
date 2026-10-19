@@ -1,4 +1,4 @@
-import type { User } from '../src/auth'
+import type { BareUser, User } from '../src/auth'
 import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { Mail } from '../src/mail'
 import type { AuthStore } from '../src/store'
@@ -110,7 +110,7 @@ describe('admin', () => {
     const all = await admin.browser.callOk('listUsers')
 
     expect(all.total).toBe(3)
-    expect(all.users.map((user: User) => user.email)).toContain('bob@example.com')
+    expect(all.users.map((user: BareUser) => user.email)).toContain('bob@example.com')
     expect(all.users[0]).toMatchObject({ email: 'bob@example.com', roles: [], ban: null, hasPassword: true })
     expect(await admin.browser.call('listUsers', { search: 'BOB', limit: 1 })).toMatchObject({ ok: true, users: [{ email: 'bob@example.com' }], total: 1 })
     expect((await admin.browser.callOk('listUsers', { offset: 2, limit: 5 })).users).toHaveLength(1)

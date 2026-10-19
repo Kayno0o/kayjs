@@ -4,7 +4,7 @@ import type { RequestState } from './state'
 import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { truncatedAddress } from './address'
-import { publicUser } from './core'
+import { linkedUser } from './core'
 import { log } from './log'
 import { PRUNE_EVERY_MS } from './prune'
 
@@ -156,8 +156,8 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
 
 // `report` for what happens outside a request, as a hand-over when a prune deletes an account: `where` is empty, so the entry names no address or browser.
 export async function reportFrom(core: Core, where: { address: string, userAgent: string }, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
-  const user = publicUser(record)
-  const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? publicUser(actor) : null }
+  const user = await linkedUser(core, record)
+  const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? await linkedUser(core, actor) : null }
 
   try {
     await core.onAuthEvent?.({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)

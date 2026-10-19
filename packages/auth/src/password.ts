@@ -1,4 +1,4 @@
-import type { Core, User } from './core'
+import type { BareUser, Core } from './core'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
@@ -7,7 +7,7 @@ import { hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
 import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
-import { homeOf, newUserRecord, publicUser } from './core'
+import { homeOf, newUserRecord, publicUser, unlinked } from './core'
 import { warnHolder, welcome } from './email'
 import { eraseUser } from './erase'
 import { afterResponse, report } from './events'
@@ -32,7 +32,7 @@ export interface RegisterErrors {
 }
 
 // `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `closed` with `signUp: false`.
-export type RegisterResult = { ok: true, user: User, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
+export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
 
 export interface CreateUserInput {
   // At least one of the two, the user signing in with either.
@@ -47,7 +47,7 @@ export interface CreateUserInput {
   locale?: string | undefined
 }
 
-export type CreateUserResult = { ok: true, user: User } | { ok: false, errors: RegisterErrors }
+export type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -137,9 +137,9 @@ export async function register(state: RequestState, input: RegisterInput, captch
     const { onSignUp } = state.core
 
     if (requireVerified)
-      await afterResponse('onSignUp', async () => onSignUp(user, undefined))
+      await afterResponse('onSignUp', async () => onSignUp(unlinked(user), undefined))
     else
-      await onSignUp(user, undefined)
+      await onSignUp(unlinked(user), undefined)
   }
 
   // This browser may verify the address without signing in, as with `requireVerified` it cannot.
@@ -209,7 +209,7 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
 
   const user = publicUser(record)
 
-  await core.onSignUp?.(user, undefined)
+  await core.onSignUp?.(unlinked(user), undefined)
 
   return { ok: true, user }
 }

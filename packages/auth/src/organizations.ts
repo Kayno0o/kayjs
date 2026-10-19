@@ -1,5 +1,5 @@
 import type { Duration } from 'kay'
-import type { Core, User } from './core'
+import type { BareUser, Core } from './core'
 import type { RequestState } from './state'
 import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import type { Requirement } from './types'
@@ -30,7 +30,7 @@ export interface OrganizationsOptions<OrgRole extends string, Role extends strin
   // What an invitation naming no roles gives, such as `['member']`; none by default, a plain membership.
   defaultRoles?: NoInfer<OrgRole>[] | undefined
   // Who may create an organization, a site role or a predicate; anyone signed in by default.
-  create?: Requirement<User, NoInfer<Role>> | undefined
+  create?: Requirement<BareUser, NoInfer<Role>> | undefined
   // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `invitation(id)` and accepts it. Inviting answers 'unavailable' without it.
   invitationPage?: string | undefined
   // How long an invitation lasts, seconds or a string such as '7d', a week by default.
@@ -51,12 +51,12 @@ export interface OrganizationsCore {
   invitationPage?: string | undefined
   invitationMaxAge: number
   // Whether a user may create an organization; anyone signed in without it.
-  create?: ((user: User) => Promise<boolean>) | undefined
+  create?: ((user: BareUser) => Promise<boolean>) | undefined
 }
 
 // `create` is wired once the app's `authorize` is known.
 export function organizationsCore<OrgRole extends string, Role extends string>(options: OrganizationsOptions<OrgRole, Role>): OrganizationsCore {
-  const { isGranted } = createRoleHierarchy<User, OrgRole>(options.roles, user => user.roles as OrgRole[])
+  const { isGranted } = createRoleHierarchy<BareUser, OrgRole>(options.roles, user => user.roles as OrgRole[])
 
   return {
     roles: new Set(Object.keys(options.roles)),
