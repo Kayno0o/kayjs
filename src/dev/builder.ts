@@ -1,15 +1,16 @@
 import type { ClientOptions, ClientSources } from '../build/client'
 import type { ImportGraph } from '../build/libraries'
+import type { ChunkInputs } from '../build/report'
 import type { StyleUses } from '../build/style-uses'
 import type { ClientManifest } from '../server/client'
 import type { ClassWords } from './tailwind'
 import { realpathSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { mkdir, rm } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { outputDir } from '../build/assets'
+import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource } from '../build/files'
+import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
@@ -60,6 +61,8 @@ interface Built {
   manifest: string
 }
 
+// A `.kay` module of a chunk, a static component's `?island` twin included.
+const KAY_INPUT = /\.kay(?:\?island)?$/
 const SCRIPT_OR_COMPONENT = /\.(?:kay|[cm]?[jt]sx?)$/
 // The files Tailwind reads classes from.
 const SCANNED_FILE = /\.(?:kay|[cm]?[jt]sx?|html|mdx?)$/
@@ -75,6 +78,9 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const graph: ImportGraph = new Map()
   // What a module's text signed as, so a stylesheet build parses only the inputs whose text changed since it last did.
   const signed = new Map<string, { hash: number | bigint, signature: string | undefined }>()
+  // What each chunk's map was pointed at `.kay` lines for, and the rewriting still going on after the build answered.
+  const mapKeys = new Map<string, string>()
+  let mapWork: { stop: boolean, done: Promise<void> } | undefined
   const classesOf = async (built: Built) => built.classes ??= tailwindClasses(built.styleInputs)
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
@@ -151,6 +157,15 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file))
     const stylesAgain = !previous || await stylesChanged(previous, sources, texts)
 
+    // A rewrite still going stops after the map it is on, so it never writes over the maps of the build that is starting.
+    if (islandsAgain && mapWork) {
+      mapWork.stop = true
+      await mapWork.done
+    }
+
+    if (!previous)
+      mapKeys.clear()
+
     if (previous)
       await rm(join(output, BUILD_FAILURE), { force: true })
     else
@@ -165,7 +180,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     await Bun.write(join(output, MANIFEST), text)
 
     if (scripts)
-      void pointMapsAtKay(scripts.maps)
+      mapWork = await pointMapsAtKay(root, scripts, mapKeys)
 
     const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
 
@@ -234,14 +249,70 @@ function describeLog(log: unknown): string {
   return position ? `${position.file}:${position.line}:${position.column}: ${String(log.message)}` : String(log.message)
 }
 
-// In the background, as a browser only reads a map once its devtools open; the server then sends it as it is.
-async function pointMapsAtKay(maps: string[]): Promise<void> {
-  for (const map of maps) {
-    try {
-      await mapBundleToKay(map)
+// A chunk with the name and `.kay` sources of the last build keeps its map as that one was pointed at `.kay` lines, put back from `DEV_MAPS_DIR` at once; the others are pointed in the background, as a browser only reads a map once its devtools open, and the server then sends them as they are.
+async function pointMapsAtKay(root: string, scripts: { maps: string[], inputs: ChunkInputs }, keys: Map<string, string>): Promise<{ stop: boolean, done: Promise<void> }> {
+  const base = clientDir(root)
+  const saved = join(outputDir(root), DEV_MAPS_DIR)
+  const work = { stop: false, done: Promise.resolve() }
+  const pending: { map: string, name: string, key: string }[] = []
+  const names = new Set<string>()
+
+  await Promise.all(scripts.maps.map(async (map) => {
+    const name = relative(base, map)
+    const key = kayKey(root, scripts.inputs[name.slice(0, -'.map'.length)])
+
+    if (key === undefined)
+      return
+
+    names.add(name)
+
+    if (keys.get(name) === key) {
+      try {
+        await writeAtomically(map, Bun.file(join(saved, name)))
+
+        return
+      }
+      catch {
+        keys.delete(name)
+      }
     }
-    catch {}
+
+    pending.push({ map, name, key })
+  }))
+
+  for (const name of keys.keys()) {
+    if (!names.has(name)) {
+      keys.delete(name)
+      void rm(join(saved, name), { force: true })
+    }
   }
+
+  work.done = (async () => {
+    for (const { map, name, key } of pending) {
+      if (work.stop)
+        return
+
+      try {
+        await mapBundleToKay(map)
+        await mkdir(dirname(join(saved, name)), { recursive: true })
+        await writeAtomically(join(saved, name), Bun.file(map))
+        keys.set(name, key)
+      }
+      catch {}
+    }
+  })()
+
+  return work
+}
+
+// What a chunk's map depends on besides the chunk's name, which holds its code's hash: the text of each `.kay` file in it. Undefined for a chunk with none, whose map has nothing to point.
+function kayKey(root: string, inputs: ChunkInputs[string] | undefined): string | undefined {
+  const files = Object.keys(inputs ?? {}).filter(input => KAY_INPUT.test(input)).sort()
+
+  if (files.length === 0)
+    return undefined
+
+  return Bun.hash(files.map(file => `${file}\0${readSourceText(resolve(root, file.replace(KAY_INPUT, '.kay'))) ?? ''}`).join('\0')).toString(36)
 }
 
 async function signatureOf(file: string, text: string, signed: Map<string, { hash: number | bigint, signature: string | undefined }>): Promise<string | undefined> {

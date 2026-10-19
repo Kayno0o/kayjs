@@ -11,6 +11,8 @@ export const ASSETS_DIR = 'assets'
 
 // Beside `clientDir`, never served: the browser build's source maps, pointed at `.kay` lines, for the server to map the stacks islands report.
 export const MAPS_DIR = 'maps'
+// Beside `clientDir`, `kay dev`'s builder keeps the maps it pointed at `.kay` lines here, to put back the ones of a chunk an edit left as it was.
+export const DEV_MAPS_DIR = 'dev-maps'
 
 // A server `kay dev` started, which it tells how many changes came before it.
 export function underKayDev(): boolean {

@@ -1,8 +1,9 @@
 import type { KayLibrary } from './libraries'
 import type { Node } from './supports'
+import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { kindOf, selectors } from './class-rules'
-import { CSS_FILE, findProjectFiles, readSource } from './files'
+import { CSS_FILE, fileStamp, findProjectFiles, readSource, settledBefore } from './files'
 import { exportsFile } from './libraries'
 import { parse } from './supports'
 
@@ -37,7 +38,8 @@ function addRuleClasses(nodes: Node[], into: Set<string>): void {
 }
 
 const sheetClasses = new WeakMap<object, string[]>()
-const fileTokens = new WeakMap<object, Set<string>>()
+// The tokens of a file that are in the class universe it was last asked about, so a file keeps a few words, not all of its text's: the text itself is not kept for it.
+const fileTokens = new Map<string, { stamp: string, universe: string, tokens: Set<string> }>()
 
 // A file removed since the walk found it, a dangling link or one the user cannot read holds nothing to prune by: left out, it can only keep more rules.
 function readable(file: string): ReturnType<typeof readSource> | undefined {
@@ -75,16 +77,27 @@ export function* classTokens(text: string): Generator<string, void, undefined> {
     yield match[0]
 }
 
-function tokensOf(file: string): ReadonlySet<string> {
-  const read = readable(file)
+function tokensOf(file: string, universe: ReadonlySet<string>, universeKey: string): ReadonlySet<string> {
+  const stamp = fileStamp(file)
 
-  if (read === undefined)
+  if (stamp === undefined)
     return new Set()
 
-  let tokens = fileTokens.get(read)
+  const known = fileTokens.get(file)
 
-  if (tokens === undefined)
-    fileTokens.set(read, tokens = new Set(classTokens(read.text)))
+  if (known?.stamp === stamp && known.universe === universeKey && settledBefore(file, Date.now()))
+    return known.tokens
+
+  let tokens: Set<string>
+
+  try {
+    tokens = new Set(classTokens(readFileSync(file, 'utf8')).filter(token => universe.has(token)))
+  }
+  catch {
+    return new Set()
+  }
+
+  fileTokens.set(file, { stamp, universe: universeKey, tokens })
 
   return tokens
 }
@@ -122,9 +135,20 @@ export async function unusedLibraryClasses(root: string, libraries: KayLibrary[]
   if (unused.size === 0)
     return unused
 
-  for (const file of await findProjectFiles(root, NAMING_FILE, { project: true, ownKayOnly: true })) {
-    for (const token of tokensOf(file))
+  const universe = new Set(unused)
+  const universeKey = Bun.hash([...universe].sort().join(' ')).toString(36)
+  const files = await findProjectFiles(root, NAMING_FILE, { project: true, ownKayOnly: true })
+
+  for (const file of files) {
+    for (const token of tokensOf(file, universe, universeKey))
       unused.delete(token)
+  }
+
+  const present = new Set(files)
+
+  for (const file of fileTokens.keys()) {
+    if (!present.has(file))
+      fileTokens.delete(file)
   }
 
   for (const word of named) {

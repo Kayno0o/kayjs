@@ -22,7 +22,7 @@ import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
-import { ASSET_PREFIX, clientDir, MAPS_DIR, outputDir } from './assets'
+import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
 import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
 import { fileWords } from './libraries'
@@ -298,7 +298,7 @@ export async function clearClientOutput(root: string): Promise<void> {
   const base = outputDir(root)
   const dir = clientDir(root)
 
-  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true }), rm(join(base, MAPS_DIR), { recursive: true, force: true })])
+  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true }), rm(join(base, MAPS_DIR), { recursive: true, force: true }), rm(join(base, DEV_MAPS_DIR), { recursive: true, force: true })])
   await mkdir(dir, { recursive: true })
 }
 

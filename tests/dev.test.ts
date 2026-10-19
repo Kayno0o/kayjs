@@ -2183,6 +2183,43 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
+  it.serial('lets the process building the client exit when idle, and builds everything right with the next edit in a new one', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builder-idle-'))
+    const real = realpathSync(root)
+    const island = (label: string) => `---\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) ${label} {count()}\n`
+    const chunks = () => readdirSync(join(root, '.kay/dev/dist')).filter(file => file.endsWith('.js')).map(file => readFileSync(join(root, '.kay/dev/dist', file), 'utf8')).join('\n')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/one.kay'), island('one'))
+    await Bun.write(join(root, 'src/two.kay'), island('two'))
+    await Bun.write(join(root, 'src/routes/index.kay'), '---\nimport One from \'../one.kay\'\nimport Two from \'../two.kay\'\n---\nOne\nTwo\n')
+    const builder = startClientBuilder(root, process.env, 'inherit', false, 300)
+
+    try {
+      expect(await builder.build(null)).toBeDefined()
+      expect(chunks()).toContain('two')
+
+      const [first] = childrenRunning(real, 'builder.ts')
+
+      await until(() => !childrenRunning(real, 'builder.ts').includes(first!))
+      await Bun.write(join(root, 'src/two.kay'), island('renamed'))
+
+      const outcome = await builder.build(['src/two.kay'])
+
+      expect(outcome?.failed).toBe(false)
+      expect(chunks()).toContain('renamed')
+      expect(chunks()).not.toContain('two {')
+      expect(childrenRunning(real, 'builder.ts')).not.toContain(first!)
+    }
+    finally {
+      await builder.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('starts no process building the client once stopping, for a server asking for it as it stops', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 

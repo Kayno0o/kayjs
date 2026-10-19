@@ -22,17 +22,20 @@ interface Builder {
   answered: boolean
   replacing: Promise<void> | undefined
   waiting: ((outcome: BuildOutcome | undefined) => void)[]
+  idle: ReturnType<typeof setTimeout> | undefined
   child: Subprocess
 }
 
 const BUILDER = join(import.meta.dir, 'builder.ts')
 // How much of a held error output is kept: the start of a stack is what says why.
 const HELD_LIMIT = 64 * 1024
+// How long the process waits for the next build before it exits, so a project left alone holds no memory for it: the next edit then builds everything, which on the docs takes about 0.4 s more than an edit the process answers.
+const IDLE_MS = 30_000
 
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
 // `stdout` is where what the build prints goes, `kay dev`'s own by default.
 // `quiet` holds the first process's error output back until `release`, as the types of a config that does not load say it already.
-export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit', quiet = false): ClientBuilder {
+export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit', quiet = false, idleMs = IDLE_MS): ClientBuilder {
   const realRoot = realpathSync(root)
   let modules = new Set<string>()
   let current = spawn(quiet)
@@ -60,6 +63,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       // Spawning the process taking its place once it died after answering, shared by the builds riding it.
       replacing: undefined,
       waiting: [],
+      idle: undefined,
       // Under `kay dev`, so it writes where its servers read.
       child: Bun.spawn([process.execPath, BUILDER], {
         cwd: root,
@@ -72,6 +76,11 @@ export function startClientBuilder(root: string, env: Record<string, string | un
           if (message.built) {
             state.answered = true
             state.waiting.shift()?.(message.built)
+
+            if (state.waiting.length === 0) {
+              state.idle = setTimeout(() => state.child.kill(), idleMs)
+              state.idle.unref()
+            }
           }
         },
       }),
@@ -94,6 +103,8 @@ export function startClientBuilder(root: string, env: Record<string, string | un
   const ask = async (state: Builder, changed: string[] | null) => {
     if (state.gone)
       return Promise.resolve(undefined)
+
+    clearTimeout(state.idle)
 
     const outcome = new Promise<BuildOutcome | undefined>(resolve => state.waiting.push(resolve))
 

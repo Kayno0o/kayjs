@@ -221,6 +221,28 @@ describe('a library\'s stylesheet in an app', () => {
     expect(unused).toContain('ui-unused-too')
   })
 
+  it('reads a file of the app again once it changed, or once the library classes did', async () => {
+    const root = await newProject(PLAIN_CSS)
+    const notes = join(root, 'src/notes.txt')
+    const sheet = join(root, 'node_modules/ui-lib/src/theme.css')
+    const unusedNow = async () => unusedLibraryClasses(root, await findKayLibraries(root), [])
+
+    expect(await unusedNow()).toContain('ui-unused')
+
+    // Past the grain of the file times, so the first read counts as settled.
+    await Bun.sleep(2100)
+    expect(await unusedNow()).toContain('ui-unused')
+    await Bun.write(notes, 'ui-unused\n')
+    expect(await unusedNow()).not.toContain('ui-unused')
+
+    // The library gains a class the file already names, which the stored words of the file must cover.
+    await Bun.write(sheet, `${await Bun.file(sheet).text()}.ui-fresh { padding: 1px; }\n`)
+    await Bun.write(notes, 'ui-unused ui-fresh\n')
+    expect(await unusedNow()).not.toContain('ui-fresh')
+    await Bun.write(notes, 'ui-unused\n')
+    expect(await unusedNow()).toContain('ui-fresh')
+  }, 30_000)
+
   it('prunes the stylesheets an exported one pulls in with a relative import, however deep, and leaves the unexported ones that nothing imports', async () => {
     const root = await newProject(PLAIN_CSS)
     const library = join(root, 'node_modules/ui-lib')
