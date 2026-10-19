@@ -33,15 +33,41 @@ describe('cms()', () => {
   test('boots a production server told where files go, and any server outside production', () => {
     process.env.NODE_ENV = 'production'
 
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const told = cms({ files: workingTree() }).server
 
     expect(typeof told === 'function' && told()).toBeTruthy()
+    warned.mockRestore()
 
     process.env.NODE_ENV = 'development'
 
     const dev = cms().server
 
     expect(typeof dev === 'function' && dev()).toBeTruthy()
+  })
+
+  test('warns a production server without a guard, naming cms({ guard }), and no other', () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const boot = (production: boolean, options: Parameters<typeof cms>[0]): string[] => {
+      process.env.NODE_ENV = production ? 'production' : 'development'
+      warned.mockClear()
+
+      const { server } = cms({ files: workingTree(), ...options })
+
+      if (typeof server === 'function')
+        void server()
+
+      return warned.mock.calls.map(call => String(call[0]))
+    }
+
+    try {
+      expect(boot(true, {})).toEqual([expect.stringContaining('no cms({ guard })')])
+      expect(boot(true, { guard: () => undefined })).toEqual([])
+      expect(boot(false, {})).toEqual([])
+    }
+    finally {
+      warned.mockRestore()
+    }
   })
 })
 

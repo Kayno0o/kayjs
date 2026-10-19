@@ -3,6 +3,7 @@ import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, Succe
 import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
+import type { EntryRef } from '../runtime/fields'
 import type { HeadOptions, RenderedHead } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
@@ -51,6 +52,7 @@ import { followsCaches, inLiveReads, liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
+import { noteEditedEntries } from './preview'
 import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
@@ -827,6 +829,13 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[]): () => u
   return view
 }
 
+// The entries the editor opens are the only ones its edit cookie may read through a CMS's API.
+function noted(request: Request, entries: EntryRef[]): EntryRef[] {
+  noteEditedEntries(request, entries)
+
+  return entries
+}
+
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | ReadableStream<Uint8Array> {
   const view = viewOf(modules, data)
   const chunks = islandChunks(client)
@@ -837,7 +846,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const file = marks === undefined ? undefined : options.editor
   const editor = file === undefined ? undefined : editors.get(file)
   // The editor renders once the page did, given each entry the page read, kept alive by the page swap, which hands it the next page's.
-  const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks.entries.values()], persist: true })) })
+  const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: noted(rendering.ctx.request, [...marks.entries.values()]), persist: true })) })
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))

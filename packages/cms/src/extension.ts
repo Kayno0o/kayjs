@@ -29,6 +29,9 @@ export function cms(options: CmsOptions = {}): KayExtension {
       if (options.files === undefined && process.env.NODE_ENV === 'production')
         throw new Error('kayjs-cms: a production server saves no edit to the working tree, which the next deploy replaces: set cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy')
 
+      if (options.guard === undefined && process.env.NODE_ENV === 'production')
+        log.warn('no cms({ guard }): in production an edit link or cookie reads only the entries of the page it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ guard }) to let editors write')
+
       const plugin = api()
 
       // Once the server listens, the content config is registered.

@@ -1,23 +1,27 @@
 import type { GuardContext } from 'kay'
-import { describe, expect, mock, test } from 'bun:test'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
 import { authors } from '../src/authors'
 import { configure, settings } from '../src/settings'
 
 class Refused extends Error {}
 
-// An edit-mode request carries this header here, standing in for kay's signed cookie.
-void mock.module('kay/server', () => ({ ...server, editRequested: (request: Request) => request.headers.has('x-edit') }))
+// An edit-mode request carries this header here, standing in for kay's signed cookie, and lists the collections its pages rendered, comma-separated.
+void mock.module('kay/server', () => ({
+  ...server,
+  editRequested: (request: Request) => request.headers.has('x-edit'),
+  editedCollections: (request: Request) => new Set((request.headers.get('x-edit') ?? '').split(',').filter(Boolean)),
+}))
 
 const { default: apiGuard } = await import('../src/api/_guard')
 const { default: screenGuard } = await import('../src/routes/_guard')
 const ada = { name: 'Ada', email: 'ada@example.com' }
 
-function context(method: string, path: string, edit: boolean): GuardContext {
+function context(method: string, path: string, edit: boolean | string): GuardContext {
   const url = new URL(`http://site.test/api/cms${path}`)
 
   return {
-    request: new Request(url, { method, headers: edit ? { 'x-edit': '1' } : {} }),
+    request: new Request(url, { method, headers: edit === false ? {} : { 'x-edit': edit === true ? 'posts' : edit } }),
     url,
     deny: (_code?: number, message?: string) => {
       throw new Refused(message)
@@ -39,12 +43,56 @@ async function admitted(ctx: GuardContext): Promise<boolean> {
   }
 }
 
+const environment = process.env.NODE_ENV
+
 describe('the API guard', () => {
-  test('without a guard of the app\'s, lets edit mode alone read and write', async () => {
+  afterEach(() => {
+    if (environment === undefined)
+      delete process.env.NODE_ENV
+    else
+      process.env.NODE_ENV = environment
+  })
+
+  test('without a guard of the app\'s, lets edit mode alone read the collections of its pages and, in development, write', async () => {
     configure({})
 
     expect(await admitted(context('POST', '/entries/posts/hello', true))).toBe(true)
+    expect(await admitted(context('POST', '/files/posts', true))).toBe(true)
+    expect(await admitted(context('GET', '/entries/posts/hello', true))).toBe(true)
     expect(await admitted(context('GET', '/entries/posts/hello', false))).toBe(false)
+  })
+
+  test('without one, a production server lets an edit link or cookie read its pages\' collections and leave, and write nothing', async () => {
+    configure({})
+    process.env.NODE_ENV = 'production'
+
+    expect(await admitted(context('GET', '/entries/posts/hello', true))).toBe(true)
+    expect(await admitted(context('GET', '/files/rules', true))).toBe(true)
+    expect(await admitted(context('POST', '/preview/exit', true))).toBe(true)
+
+    for (const [method, path] of [['POST', '/entries/posts/hello'], ['POST', '/entries/posts/hello/publish'], ['POST', '/entries/posts/hello/move'], ['DELETE', '/entries/posts/hello'], ['PUT', '/entries/posts/hello'], ['POST', '/files/posts'], ['POST', '/files/unused/delete'], ['POST', '/redirects'], ['POST', '/entries/preview/exit']] as const)
+      expect(await admitted(context(method, path, true))).toBe(false)
+  })
+
+  test('reads no collection the pages shown in edit mode did not read, with a guard or without one', async () => {
+    for (const guarded of [false, true]) {
+      configure(guarded ? { guard: ({ deny }) => deny(403, 'Editors only') } : {})
+
+      expect(await admitted(context('GET', '/entries/orders/42', 'posts'))).toBe(false)
+      expect(await admitted(context('HEAD', '/entries/orders/42', 'posts'))).toBe(false)
+      expect(await admitted(context('GET', '/entries/orders/42', ''))).toBe(false)
+      expect(await admitted(context('GET', '/entries/posts%2Forders/42', 'posts'))).toBe(false)
+      expect(await admitted(context('GET', '/entries/%E0%A4%A/42', 'posts'))).toBe(false)
+      expect(await admitted(context('GET', '/entries/posts/a/b', 'posts'))).toBe(false)
+      expect(await admitted(context('GET', '/entries/posts/hello/', 'posts'))).toBe(false)
+      expect(await admitted(context('GET', '/entries/orders/42', 'posts,orders'))).toBe(true)
+    }
+  })
+
+  test('lets a signed-in editor read any collection through the app\'s guard', async () => {
+    configure({ guard: () => undefined })
+
+    expect(await admitted(context('GET', '/entries/orders/42', 'posts'))).toBe(true)
   })
 
   test('with one, lets edit mode read and leave, and only whom it admits write', async () => {
