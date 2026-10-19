@@ -645,7 +645,7 @@ export class JsxTemplate {
     const { b } = this
 
     if (attribute.kind === 'expression' && attribute === actionOf(element, this.src)) {
-      b.addSource(attribute.name).add(`={${helperName('formAction')}((`).addSource(attribute.expression).add('))}')
+      this.attributeName(attribute).add(`={${helperName('formAction')}((`).addSource(attribute.expression).add('))}')
 
       return true
     }
@@ -708,7 +708,7 @@ export class JsxTemplate {
     if (attribute.kind === 'expression') {
       const [open, close] = element.component ? [`${helperName('componentClass')}([`, '])'] : ['[', ']']
 
-      b.addSource(attribute.name).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
+      this.attributeName(attribute).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
     }
   }
 
@@ -760,11 +760,11 @@ export class JsxTemplate {
 
         return
       case 'boolean':
-        b.addSource(attribute.name)
+        this.attributeName(attribute)
 
         return
       case 'static': {
-        b.addSource(attribute.name).add('=')
+        this.attributeName(attribute).add('=')
         const quoted = quoteAttribute(attribute.text)
 
         if (quoted === `"${attribute.text}"`)
@@ -785,12 +785,12 @@ export class JsxTemplate {
 
         // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
         if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
-          b.addSource(attribute.name).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
+          this.attributeName(attribute).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
 
           return
         }
 
-        b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
+        this.attributeName(attribute).add('={').addSource(attribute.expression).add('}')
       }
     }
   }
@@ -825,7 +825,7 @@ export class JsxTemplate {
     const name = this.text(attribute.name)
 
     if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.servedOtherwise(element)))) {
-      b.addSource(attribute.name).add('={KayHref(')
+      this.attributeName(attribute).add('={KayHref(')
 
       if (attribute.kind === 'static')
         b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
@@ -838,7 +838,7 @@ export class JsxTemplate {
     }
 
     if (!element.component && attribute.kind === 'expression' && MARKUP_ATTRIBUTES.has(name)) {
-      b.addSource(attribute.name).add('={KayHtml((').addSource(attribute.expression).add('))}')
+      this.attributeName(attribute).add('={KayHtml((').addSource(attribute.expression).add('))}')
 
       return true
     }
@@ -863,7 +863,7 @@ export class JsxTemplate {
       b.add(' ')
     }
 
-    b.addSource(attribute.name).add('={')
+    this.attributeName(attribute).add('={')
 
     for (const part of sent.parts) {
       b.addSource({ start: at, end: start + part.start }).add('KayProp(').addSource(element.tag).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
@@ -888,6 +888,14 @@ export class JsxTemplate {
   }
 
   // Reports a function passed to an island, `0` standing for the prop.
+  // The name of an attribute as written, which a bare `{name}` shares with its value, so the rewrites of that value leave it alone.
+  private attributeName(attribute: NamedAttribute): CodeBuilder {
+    if (attribute.kind === 'expression' && attribute.shorthand)
+      return this.b.wrap(attribute.name, () => this.b.add(this.text(attribute.name)))
+
+    return this.b.addSource(attribute.name)
+  }
+
   private emitFunctionPropCheck(element: ElementNode, name: Span) {
     this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }

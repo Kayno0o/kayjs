@@ -1,4 +1,4 @@
-import type { Diagnostic, Node, Span } from './ast'
+import type { Attribute, Diagnostic, Node, Span } from './ast'
 import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
@@ -6,7 +6,7 @@ import type { NameFindings } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { drawIcons, templateFacts, visitNodes } from './ast'
+import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, promotionCause, typesAction } from './codegen'
 import { cssImportsWithoutText, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
@@ -196,7 +196,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
-  const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).sort((a, b) => a.start - b.start)
+  const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
+  const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source)).sort((a, b) => a.start - b.start)
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island !== undefined) {
@@ -219,6 +220,31 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 }
 
 // A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
+type Shorthand = Extract<Attribute, { kind: 'expression' }> & { shorthand: Span }
+
+// A fix editing the name a bare `{title}` shares with its value writes the attribute out, `title={title()}`, as the braces would otherwise hold more than a name.
+function spelledOut(diagnostic: Diagnostic, shorthands: Shorthand[], source: string): Diagnostic {
+  if (shorthands.length === 0 || !diagnostic.fixes)
+    return diagnostic
+
+  const fixes = diagnostic.fixes.map(fix => ({
+    ...fix,
+    edits: fix.edits.map((edit) => {
+      const attribute = shorthands.find(candidate => edit.start >= candidate.name.start && edit.end <= candidate.name.end)
+
+      if (!attribute)
+        return edit
+
+      const { name, shorthand } = attribute
+      const written = source.slice(name.start, name.end)
+
+      return { ...shorthand, text: `${written}={${written.slice(0, edit.start - name.start)}${edit.text}${written.slice(edit.end - name.start)}}` }
+    }),
+  }))
+
+  return { ...diagnostic, fixes }
+}
+
 function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
   return diagnostics.map(diagnostic => diagnostic.code === undefined ? { ...diagnostic, code } : diagnostic)
 }

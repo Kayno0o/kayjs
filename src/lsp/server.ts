@@ -19,6 +19,7 @@ import { configCheckOptions, configProblems, contentChecks, generatedChecks, gen
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
 import { programShadows } from '../check/shadow-types'
+import { elementsIn } from '../compiler/ast'
 import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -868,10 +869,29 @@ export class KayLanguageServer {
       if (!edits)
         byFile.set(file.uri, edits = new Map<string, TextEdit>())
 
-      edits.set(rangeKey(range), { range, newText: params.newName })
+      edits.set(rangeKey(range), this.renamed(file, range, params.newName))
     }
 
     return { changes: Object.fromEntries([...byFile].map(([uri, edits]) => [uri, [...edits.values()]])) }
+  }
+
+  // The name a bare `{title}` attribute shares with its value is the variable's, so a rename keeps the attribute's own name: `title={heading}`.
+  private renamed(file: Target, range: Range, newName: string): TextEdit {
+    if (!file.shadow)
+      return { range, newText: newName }
+
+    const { source } = file.shadow
+    const start = toOffset(source, range.start)
+    const end = toOffset(source, range.end)
+
+    for (const element of elementsIn(parseKay(source).template)) {
+      for (const attribute of element.attributes) {
+        if (attribute.kind === 'expression' && attribute.shorthand && attribute.name.start === start && attribute.name.end === end)
+          return { range: { start: toPosition(source, attribute.shorthand.start), end: toPosition(source, attribute.shorthand.end) }, newText: `${source.slice(start, end)}={${newName}}` }
+      }
+    }
+
+    return { range, newText: newName }
   }
 
   // Generated code joins names TypeScript sees apart, such as a server value and the template's reads of it through `__props`: wherever an answer lands in generated code, the question is asked again from there.

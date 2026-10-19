@@ -1068,6 +1068,37 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types a bare {name} attribute as the written-out form, reporting an unknown name at its column, in an island as in a static component', async () => {
+    const template = [
+      'Card({title} {count})',
+      'img({src} alt="x" width="1" height="1")',
+      'Card({missing} {title})',
+      'Card(title={title} count={count})',
+      'Card(title={count} count={count})',
+      '',
+    ].join('\n')
+    const script = '---\nimport Card from \'./card.kay\'\n\nconst title = \'T\'\nconst count = 1\nconst src = \'/a.png\'\n'
+    const root = await scratchProject({
+      'src/card.kay': '---\nconst { title, count } = props<{ title: string, count: number }>()\n---\np {title}{count}\n',
+      'src/static.kay': `${script}---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, diagnostic.column, firstLine(diagnostic.message)])).toEqual([
+        ['island.kay', 14, 7, 'Type \'{ missing: any; title: string; }\' is not assignable to type \'{ title: string; count: number; }\'.'],
+        ['island.kay', 14, 7, 'Cannot find name \'missing\'.'],
+        ['island.kay', 16, 6, 'Type \'number\' is not assignable to type \'string\'.'],
+        ['static.kay', 10, 7, 'Type \'{ missing: any; title: string; }\' is not assignable to type \'{ title: string; count: number; }\'.'],
+        ['static.kay', 10, 7, 'Cannot find name \'missing\'.'],
+        ['static.kay', 12, 6, 'Type \'number\' is not assignable to type \'string\'.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes raw on a head title only', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'head\n  title(raw) Whole\n  meta(raw name="x" content="y")\np Home\n' })
 

@@ -232,7 +232,7 @@ function attributeText(source: string, attribute: Attribute): string {
       return `${slice(attribute.name)}=${quote}${attribute.text}${quote}`
     }
     case 'expression':
-      return `${slice(attribute.name)}={${slice(attribute.expression)}}`
+      return attribute.shorthand ? `{${slice(attribute.name)}}` : `${slice(attribute.name)}={${slice(attribute.expression)}}`
     case 'boolean':
       return slice(attribute.name)
     case 'spread':

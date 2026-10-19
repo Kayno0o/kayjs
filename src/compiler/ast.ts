@@ -42,7 +42,8 @@ export interface Fix {
 
 export type Attribute
   = | { kind: 'static', name: Span, value: Span, text: string }
-    | { kind: 'expression', name: Span, expression: Span }
+    // A bare `{title}` is `title={title}`: its name and its expression are the one span, and `shorthand` holds the braces around it.
+    | { kind: 'expression', name: Span, expression: Span, shorthand?: Span }
     | { kind: 'boolean', name: Span }
     | { kind: 'spread', expression: Span }
 

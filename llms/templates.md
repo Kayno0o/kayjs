@@ -256,6 +256,7 @@ for product of products
 - Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`.
 - A value is a quoted string or `{expression}`.
 - A name alone is a boolean attribute.
+- `{title}` alone in the list is `title={title}`, on elements and components, and keeps its place among spreads. Only a bare name fits: `{post.title}`, `{x()}`, `{aria-label}` and `{class}` (a reserved word) are errors naming the written-out form. `kay fmt` keeps it as written.
 - A boolean bound to an attribute, `disabled={busy}`, writes it or leaves it out, but an `aria-*` one renders `"true"` or `"false"`, as ARIA states read: `aria-expanded={open}`.
 - `null` and `undefined` leave any attribute out.
 - `{...obj}` spreads.

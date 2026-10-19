@@ -50,6 +50,17 @@ div(
 
 Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
 
+When a variable has the name of the attribute, write the name alone in braces: `{title}` is `title={title}`. It works on elements and on components, and it keeps its place among spreads, so a later one overrides it.
+
+```kay
+---
+const { title, href } = props<{ title: string, href: string }>()
+---
+a({title} {href}) Read more
+```
+
+Only a bare name fits the shorthand. A member such as `post.title`, a call, a name with a dash and a reserved word such as `class` are reported, with the written-out form to use.
+
 `tag: child` nests one element on the same line.
 
 ```kay

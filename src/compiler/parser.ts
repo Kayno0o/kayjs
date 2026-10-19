@@ -18,6 +18,10 @@ const WHITESPACE_RUN = /[ \t\r\n]+/g
 // A `class="` that ends its line, which opens a value over several lines.
 const LINE_BREAK_AFTER = /[ \t]*\r?\n/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
+// The name a bare `{name}` attribute takes from its variable, and the last member of `{post.title}`.
+const SHORTHAND_NAME = /^[\p{ID_Start}_$][\p{ID_Continue}$]*$/u
+const MEMBER_CHAIN = /^(?:[\p{ID_Start}_$][\p{ID_Continue}$]*\??\.)+([\p{ID_Start}_$][\p{ID_Continue}$]*)$/u
+const RESERVED_WORDS = new Set(['await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'])
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
@@ -1017,8 +1021,18 @@ class TemplateParser {
         const inner = this.src.slice(this.pos + 1, end - 1)
         const spreadAt = inner.indexOf('...')
 
-        if (spreadAt === -1 || inner.slice(0, spreadAt).trim() !== '')
-          this.error(this.pos, end, 'A braced attribute must be a spread', { help: '`{...props}`' })
+        if (spreadAt === -1 || inner.slice(0, spreadAt).trim() !== '') {
+          const shorthand = this.parseBareAttribute(this.pos, end)
+
+          if (shorthand)
+            element.attributes.push(shorthand)
+          else
+            element.attributes.push({ kind: 'spread', expression: { start: this.pos + 1, end: end - 1 } })
+
+          this.pos = end
+
+          continue
+        }
 
         element.attributes.push({ kind: 'spread', expression: { start: this.pos + 1 + spreadAt + 3, end: end - 1 } })
         this.pos = end
@@ -1041,6 +1055,29 @@ class TemplateParser {
       this.pos = name.end
       element.attributes.push(this.parseAttributeValue(name))
     }
+  }
+
+  // `{title}` for `title={title}`, from the brace at `open` to `end`. Anything else braced is reported, with the written-out form when the last name of a member chain can stand for the attribute.
+  private parseBareAttribute(open: number, end: number): Attribute | undefined {
+    const inner = this.src.slice(open + 1, end - 1)
+    const trimmed = inner.trim()
+    const start = open + 1 + inner.indexOf(trimmed)
+    const name = { start, end: start + trimmed.length }
+
+    if (SHORTHAND_NAME.test(trimmed) && !RESERVED_WORDS.has(trimmed))
+      return { kind: 'expression', name, expression: name, shorthand: { start: open, end } }
+
+    if (RESERVED_WORDS.has(trimmed)) {
+      this.error(open, end, `\`${trimmed}\` is a reserved word, so no variable has that name`, { help: `\`${trimmed}={value}\`` })
+
+      return undefined
+    }
+
+    const last = MEMBER_CHAIN.exec(trimmed)?.[1]
+
+    this.error(open, end, 'A braced attribute is the name of a variable, or a spread', { help: last === undefined ? '`name={expression}`, or `{...props}`' : `\`${last}={${trimmed}}\`` })
+
+    return undefined
   }
 
   private parseAttributeValue(name: Span): Attribute {

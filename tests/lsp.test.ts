@@ -1164,6 +1164,7 @@ describe('kay lsp on an app holding a nested project and listing an extension be
       Bun.write(join(dir, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
       Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
       Bun.write(join(dir, page), source),
+      Bun.write(join(dir, 'src/routes/bare.kay'), '--- server\nconst title = \'x\'\n---\na({title}) go\np {title}\n'),
       Bun.write(join(dir, 'src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
       Bun.write(join(dir, 'shared/data.ts'), 'export const label: string = \'Item \'\n'),
       Bun.write(join(dir, 'apps/web/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
@@ -1207,6 +1208,18 @@ describe('kay lsp on an app holding a nested project and listing an extension be
 
   it('renames a name in the .kay file', async () => {
     expect(spots((await editor.rename(page, 4, 3, 'value'))[page]!)).toEqual([[1, 6, 7], [2, 27, 28], [4, 3, 4]])
+  })
+
+  it('renames the variable a bare {name} attribute reads, keeping the attribute\'s own name', async () => {
+    const bare = 'src/routes/bare.kay'
+
+    await editor.open(bare)
+
+    const { changes = {} } = await editor.connection.request<WorkspaceEdit>('textDocument/rename', { textDocument: { uri: editor.uri(bare) }, position: { line: 4, character: 3 }, newName: 'heading' })
+    const edits = changes[editor.uri(bare)]!.toSorted((a, b) => a.range.start.line - b.range.start.line)
+
+    expect(spots(edits.map(edit => edit.range))).toEqual([[1, 6, 11], [3, 2, 9], [4, 3, 8]])
+    expect(edits.map(edit => edit.newText)).toEqual(['heading', 'title={heading}', 'heading'])
   })
 
   it('checks a nested project\'s .kay file against its own tsconfig, routes and kay environment', async () => {

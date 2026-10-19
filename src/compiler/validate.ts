@@ -424,7 +424,7 @@ class Validator {
 
     const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
 
-    this.error(attribute.name, `\`${written}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }], safe: true }] })
+    this.error(attribute.name, `\`${written}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [attribute.shorthand ? { ...attribute.shorthand, text: `${camel}={${written}}` } : { ...attribute.name, text: camel }], safe: true }] })
   }
 
   // Type checking only, so a page still runs while it is fixed. A spread may carry what is missing, so an element with one is left alone.
