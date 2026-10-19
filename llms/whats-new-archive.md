@@ -1,6 +1,20 @@
 # What's new, older releases
 
-What each release before 1.53.1 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.53.2 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.53.1
+
+- kayjs-ai asks the provider to cache the prompt by default, so a chat and each step of a tool loop stop paying full price for the system prompt, tools and history: Anthropic gets automatic `cache_control`, an OpenAI-compatible server a `prompt_cache_key` per conversation (dropped when it refuses it), `ask(..., { cache: false | '1h' })` changes it, `reply.usage` reports `cacheReadTokens` and `cacheWriteTokens`, and the token budget counts them ([prompt caching](../packages/ai/llms/asking.md#prompt-caching)).
+- kayjs-ai streams from Mistral with only `AI_BASE_URL`, `OPENAI_API_KEY` and `AI_MODEL` set: a server refusing `stream_options` is asked again without it, array content keeps its text, and a stream ending on `error` fails the reply ([asking](../packages/ai/llms/asking.md)).
+- `analytics({ provider: 'ga4', measurementId, apiSecret })` sends Google Analytics 4 page views from the server through its Measurement Protocol, with a visitor id made on the server and no cookie ([Privacy](privacy.md#count-visits-through-your-own-origin)).
+- `consent` from `kay/analytics` reads and sets the visitor's analytics answer from an island or a server render, and `consent: { notice: false }` leaves the asking to the app's own banner ([Privacy](privacy.md#ask-for-analytics-consent-in-your-own-ui)).
+- A `live: true` cached key refreshes its pages even when the replicas sharing a `CacheStore` run on machines whose clocks differ by a few seconds, once they have heard each other (half a second with `sqliteCache`), the store's `publish` relaying a clock reading ([cache stores](rendering.md#caching)).
+- A page importing an `~icons/<set>/<name>` icon, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
+- A page importing an `~icons/<set>/<name>` icon of an installed set, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
+- The dev tool's Head, Images, Env and Not found tabs show their warning counts from the page load and after each page swap, without opening the tab ([dev tool](dev-tool.md)).
+- A tab left open on a stopped `kay dev` server, or behind a proxy answering 502 for it, retries its events stream every five seconds after ten seconds down instead of four times a second, still meets a restart within a quarter second, and a hidden tab waits until it is shown ([kay dev](dev-server.md)).
+
+Releases before 1.53.1 are in [What's new, older releases](whats-new-archive.md).
 
 ## 1.53.0
 
@@ -98,27 +112,4 @@ What each release before 1.53.1 added, newest first, each feature with where it 
 
 - Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
 
-## 1.52.2
-
-- A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
-- `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
-- `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).
-- `kay screenshot` and an MCP `screenshot` tool shoot a page of `kay dev`, with a diff, and `--cookie` shoots one behind a session ([tools](check-and-tools.md#screenshot-a-page)).
-- `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing-endpoints-and-base.md#redirects)).
-- `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
-- A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
-- A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
-
-## 1.52.1
-
-- `collection(..., { order: 'position' })` orders a collection by a number field, and kayjs-cms moves its entries up or down by writing it ([Content](content.md)).
-- `collection(..., { title })` names a collection on the kayjs-cms screens ([Content](content.md)).
-- kayjs-cms: every image preview has the same square box, and a list item carries no required asterisk. kayjs-ui: a grouped `FormField`'s legend keeps its layout under an app's own `legend` styles ([kayjs-cms](../packages/cms/llms.txt)).
-- kayjs-cms: an image or file field keeps its path behind a collapsed Path control, the preview and the upload button alone showing ([kayjs-cms](../packages/cms/llms.txt)).
-- kayjs-cms: the items of a list field move up and down, with buttons or Alt and an arrow key ([kayjs-cms](../packages/cms/llms.txt)).
-- kayjs-cms: `s.Integer()`, `s.Numeric()`, `s.BooleanString()` and `s.Date()` fields get a number, toggle or date input, not a JSON box ([kayjs-cms](../packages/cms/llms.txt)).
-- kayjs-cms: a literal's `title` labels its option in a select, the value staying what is stored ([kayjs-cms](../packages/cms/llms.txt)).
-- kayjs-ai `Chat`: a wide table scrolls inside its bubble, a message refused with 422 returns to the field on a retry too, the history posted never opens on an assistant message, and an action that can `ctx.fail` is accepted as `action` ([kayjs-ai](../packages/ai/llms/chat.md)).
-- A stream an action answers with to an event handler closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
-
-Releases before 1.52.1 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.52.3 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

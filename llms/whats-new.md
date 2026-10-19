@@ -70,18 +70,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page importing `image`, `shareImage` or `shareCard` from `kay/image`, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
 - A page importing an exported object or array literal of strings, numbers and booleans, such as `export const CONTACT = { email: '...' }`, is prerendered when no file of the project writes to it or hands it on, instead of treating it as module state ([Prerendering](prerendering.md#prerendering)).
 
-## 1.53.1
-
-- kayjs-ai asks the provider to cache the prompt by default, so a chat and each step of a tool loop stop paying full price for the system prompt, tools and history: Anthropic gets automatic `cache_control`, an OpenAI-compatible server a `prompt_cache_key` per conversation (dropped when it refuses it), `ask(..., { cache: false | '1h' })` changes it, `reply.usage` reports `cacheReadTokens` and `cacheWriteTokens`, and the token budget counts them ([prompt caching](../packages/ai/llms/asking.md#prompt-caching)).
-- kayjs-ai streams from Mistral with only `AI_BASE_URL`, `OPENAI_API_KEY` and `AI_MODEL` set: a server refusing `stream_options` is asked again without it, array content keeps its text, and a stream ending on `error` fails the reply ([asking](../packages/ai/llms/asking.md)).
-- `analytics({ provider: 'ga4', measurementId, apiSecret })` sends Google Analytics 4 page views from the server through its Measurement Protocol, with a visitor id made on the server and no cookie ([Privacy](privacy.md#count-visits-through-your-own-origin)).
-- `consent` from `kay/analytics` reads and sets the visitor's analytics answer from an island or a server render, and `consent: { notice: false }` leaves the asking to the app's own banner ([Privacy](privacy.md#ask-for-analytics-consent-in-your-own-ui)).
-- A `live: true` cached key refreshes its pages even when the replicas sharing a `CacheStore` run on machines whose clocks differ by a few seconds, once they have heard each other (half a second with `sqliteCache`), the store's `publish` relaying a clock reading ([cache stores](rendering.md#caching)).
-- A page importing an `~icons/<set>/<name>` icon, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
-- A page importing an `~icons/<set>/<name>` icon of an installed set, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
-- The dev tool's Head, Images, Env and Not found tabs show their warning counts from the page load and after each page swap, without opening the tab ([dev tool](dev-tool.md)).
-- A tab left open on a stopped `kay dev` server, or behind a proxy answering 502 for it, retries its events stream every five seconds after ten seconds down instead of four times a second, still meets a restart within a quarter second, and a hidden tab waits until it is shown ([kay dev](dev-server.md)).
-
-Releases before 1.53.1 are in [What's new, older releases](whats-new-archive.md).
-
-Releases before 1.53.1 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.53.2 are in [What's new, older releases](whats-new-archive.md).

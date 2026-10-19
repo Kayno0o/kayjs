@@ -1,6 +1,95 @@
 # Upgrading, older releases
 
-What each minor release before 1.51 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.53 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.52.0
+
+### 404 bodies read `Not Found`
+
+- The plain-text 404 body of the image route, the card route, stored files and a page without a 404 page was `Not found` and is now `Not Found`, as endpoints and actions already answered. A test or monitor matching the old text changes it; no lint can see it, as it reads a response.
+
+### A search hit's `href` carries the words searched for
+
+- `hit.href` from `searchSite` and `searchResults` is now `/path?kay_q=words#anchor`, so a page opened from a hit marks them. An app comparing `hit.href` to a path, or splitting it at `#` only, reads the path from `new URL(hit.href, location.origin).pathname`. A page with a strict `query` schema is not affected, as `kay_q` is left out of `ctx.query`. No `deprecated` lint is possible, as no code `kay check` reads is wrong.
+### Time options take a duration, and `bodyLimit` a size
+
+- `every(ms, run)`, `debounced(source, ms)`, `rooms.coalesce(read, { wait })`, `sqliteRooms(path, { poll })`, kayjs-cms's `forgejo({ timeout })` and `createDrafts({ delay })` and kayjs-ui's `Carousel` `autoplay` take a `Duration` (`'3s'`, `'250ms'`, with the new `ms` unit valid wherever a duration is) instead of milliseconds. A bare number still works for now and still means milliseconds, so nothing changes until the form goes; a string is read as a duration and a bad one throws naming the option.
+- `kay check` reports a number literal at those calls as `deprecated-time-ms`, and `kay check --fix` writes the string (`3000` is `'3s'`, `300` is `'300ms'`), also in the script and server fences of a `.kay` file. It does not read a number held in a variable, a call through a name not imported from `kay`, `kay/server` or `@kaynooo/kayjs-cms`, so those are rewritten by hand. A `Carousel`'s `autoplay={5000}` in a template is reported as `deprecated-ui-prop` and `kay check --fix` writes `autoplay="5s"`.
+- `bodyLimit` in `kay.config.ts`, an action and `api()`, and in a route's `detail`, takes a size beside bytes, `'20mb'`, `'512kb'`, `'800b'`, as `budget` does. Bytes keep working, so no lint is added.
+
+### kayjs-cms no longer words sizes under `cms.size.*`
+
+- The `cms.size.bytes`, `cms.size.kb` and `cms.size.mb` messages are gone: an upload refusal writes its sizes through `sizeText` from `kay/words`, in the page's locale through Intl (`100 ko`, `1,5 Mo`, `200 octets` in French; `100 KB` in English), so a locale needs no wording for them.
+- An app that translated them deletes the `size` block under `cms` in its `src/messages/<locale>.ts`; it is read by nothing now.
+- `kay check` does not report the unused keys and no lint is possible: it compares a library key only with the English the library words, and a key the library no longer has is skipped as one built at run time or one of a newer library version, so it cannot tell a removed key from those.
+
+### `kay new --host` is `--forge`, and `kay/test`'s `mount` is `mountComponent`
+
+- `kay new --host forgejo|github` is now `--forge`, as `kay dev --host` is an address; `--host` still works for now and warns. A script calling `kay new` renames the flag. No `deprecated` lint is possible, as a command line is no code `kay check` reads.
+- `mount(file, props)` from `kay/test` is now `mountComponent`, so it no longer shares its name with `kay/mount`'s `mount`; the old name still works for now. `kay check` reports it as `deprecated-test-mount`, and `kay check --fix` (or `kay upgrade`) renames the import.
+
+### kayjs-auth: `discordProvider({ apiBase })` is `url`
+
+- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning, and production refuses an `http://` one as it does for `url`. `kay check` reports it as `deprecated-provider-url`, and `kay check --fix` (or `kay upgrade`) renames the key.
+
+### kayjs-auth: a custom store's `members.remove` is `delete`, `grants.put` is `upsert`
+
+- A custom `AuthStore` names `members.remove` as `members.delete` and `oauth.grants.put` as `oauth.grants.upsert`, so one verb does one thing in every group (`delete` removes a row, `upsert` creates or replaces it). A store with only the old names still works for now through a copy, and kayjs-auth logs a warning once per name. `kay check` reports an object literal with the old key as `deprecated-store-verb`, and `kay check --fix` (or `kay upgrade`) renames it, except a shorthand, a store giving both names, a computed key or a spread, which are renamed by hand. `memoryStore()` and `pgStore()` already follow. `tokens.consume` and `recoveryCodes.consume` (delete the row and answer it, or whether it had it) and `oauth.codes.use` and `oauth.refresh.use` (mark it spent and keep it, to tell a reuse) stay as they are, being different operations, and `delete` keeps answering whether there was a row, except a user's or an identity's, which cascades and answers nothing. `oauth.grants.revoke` and `oauth.refresh.revokeFamily` keep their names, deleting a grant's or a family's tokens together. The lint reads a literal given as `store`, held in a variable named `store` or typed `AuthStore['members']`, not a store assembled elsewhere.
+
+### kayjs-ui names the same prop the same way
+
+- Every disclosure (`Dialog`, `SidePanel`, `FormDialog`, `CommandPalette`, `Popover`) takes `open` and `onOpenChange(open)`. `onClose` on `Dialog`, `SidePanel` and `FormDialog` and `onToggle` on `Popover` still work for now, marked `@deprecated`, and `onOpenChange` wins when both are given. Rename the prop; a `Dialog` or `SidePanel` handler that read the close event now hears `false`.
+- `Button`, `IconButton`, `Menu` and `CopyButton`: `variant` names the form (`solid`, `ghost`, `inline`) and the new `tone` the meaning (`neutral`, `accent`, `danger`). `variant="default"` is `solid`, `variant="accent"` is `tone="accent"`, `variant="danger"` is `tone="danger"` (`IconButton`'s and `Menu`'s `danger` variant too), and a menu entry's `danger: true` is `tone: 'danger'`; the old values still work, deprecated, and a `tone` wins over them. `Notice`'s `tone="error"` is `tone="danger"` and is read as it.
+- `Button` and `CopyButton` take `size` (`xs`, `sm`, `md`, `lg`), as `IconButton` does.
+- A toast carries a `tone` (`danger`, `success`, `info`) beside its `type`, which stays for now as its deprecated name, with `data-tone` beside `data-type` on the markup; the info toast is drawn in `--color-kui-info`, not the accent colour. A skin with a non-zero `--radius-kui-card` now rounds buttons, cards and overlays too, not only text fields: set it per class to keep them square.
+- A `ConfirmDelete` given a `variant` hands its `tone` to the icon trigger, so `variant="solid"`, `"ghost"` or `"inline"` is now danger-coloured, neutral under `tone="neutral"`; without a `variant` the icon stays neutral. `kay check --fix` writes `variant="danger"` as `variant="solid"`, the same look as before. An existing `variant="solid"` or `"ghost"` on a ConfirmDelete turns danger-coloured: add `tone="neutral"` only where the confirmation is not a deletion, or drop the `variant` for the neutral icon. No lint recognises a menu action's `danger: true` (now `tone: 'danger'`) or a toast's `type`: rename them by hand, the old forms still work for now.
+- `BarList`, `MediaGallery` and `ScatterChart` name the string they read with nothing to show `emptyLabel`, as `CommandPalette` and `MultiSelect` do; `empty` still works, deprecated, and so does a catalog's `ui.barList.empty`, `ui.mediaGallery.empty` or `ui.scatterChart.empty` key (the new `emptyLabel` key is read first). `Table` and `Widget` keep `empty`, which is content rather than a string.
+
+### kayjs-auth: sign-in methods take one trailing options object
+
+- `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })` take what they used to find in the input (`redirect`, `remember`, `captcha`) or as a positional `redirect` in one object after the credentials. The old forms still work for now and log a warning; when both are given, the options object wins. `kay check` reports them as `deprecated-sign-in-options`, and `kay check --fix` (or `kay upgrade`) moves them, except in a call with a spread or a computed key, which it leaves to you.
+
+### kayjs-auth: `pgStore` indexes guests by creation
+
+- `auth_user` gets an index on `(guest, created_at)`, which the hourly prune of `guests.maxAge` reads through. An app on `db.sync()` gets it at startup; an app on pg-orm migrations runs `bunx pg-orm generate` and applies the migration. Without it, the prune still works, reading through the `created_at` index. A custom `AuthStore` needs nothing. `kay check` cannot see a database schema, so no `deprecated` lint can catch this.
+
+### kayjs-auth: `onEvent` is `onAuthEvent`, with one object
+
+- `createAuth({ onEvent: (event, user, detail, context) => ... })` is now `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the `detail` string is gone for fields typed per event (`method` and `provider` of a `signed-in`, `role`, `reason`, `organizationId` and `roles`, `client`, `provider`, `name`, `email`, `keptThisOne`). `onEvent` still works for now and logs a warning, and when both are given each hears every event. `kay check` reports it as `deprecated-auth-event`; no fix is offered, as the handler's parameters change with the name, so rewrite it by hand. The audit log is unchanged, its entries keep their `detail`.
+
+### kayjs-auth: `authPages` reads `prefix` and `home` from `createAuth`
+
+- `authPages({ auth, prefix, home })` now hands its `prefix` and `home` to `createAuth({ pages: true })`, so they are given once; a `createAuth({ pages: { prefix } })` naming another prefix than `authPages` stops the server at start instead of redirecting to pages that are not there. Nothing to change for an app giving both the same. No `deprecated` lint is possible: both are plain config values `kay check` does not read.
+
+### `kay dev` does not move a port it was asked for
+
+- A busy port given with `--port`, or by `PORT` in the environment or `.env`, used to move the server to the next free one; the server now fails to start naming the port. Free it, or drop the `PORT` to get the old behaviour. A port the entry names in code still moves. No deprecated lint is possible, as the port is an environment value.
+
+### A `slug` field in an entry is the entry's slug
+
+- A Markdown or data entry whose frontmatter or content has a `slug` is now served under that slug instead of its path's, and a `slug` that is empty or holds a `..` part, a backslash, `?` or `#` fails the collection. An app that kept a `slug` field for another purpose renames the field.
+- No `deprecated` lint is added: the field is data in the entries' files, which no template lint reads.
+
+### kayjs-auth follows the `session()` plugin's lifetimes
+
+- `sessionMaxAge`, `sessionAbsoluteMaxAge` and `browserSessionMaxAge` are removed from `createAuth`: a sign-in used to override the app's `session({ maxAge })` with auth's own 30 days, and the list of sessions used auth's 90-day absolute lifetime while the cookie used kay's. Both now use the `session()` plugin's `maxAge`, `absoluteMaxAge` and `browserMaxAge`, so delete the three options and set the lifetime on `session()`. `rememberMaxAge` stays.
+- `kay check` reports a leftover option as a type error (an unknown property of `createAuth`'s options), and no `deprecated` lint is added: the options live in the app's TypeScript call, which no template lint reads.
+
+### Unchecked "keep me signed in" is a browser session on every way of signing in
+
+- On the prebuilt pages, a magic link, a passkey or a provider sign-in with the box unchecked gave a 30-day session; it now gives the one-day browser session a password does. An app wanting the long session on all of them sets `pages: { remember: 'always' }`, and one wanting the box gone `'always'` or `'never'`. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
+- `pages.home` is now where the mailed links, codes, registering, a passkey and a provider land when nothing asked for another page, where they landed on `/`.
+
+### An action's `ActionRedirect.location` carries the `base` under `testSite`
+
+- Under `testSite({ base: '/app' })`, `site.call` rejects with an `ActionRedirect` whose `location` is `/app/dashboard`, where it was `/dashboard`, as the browser now lands under the base too. An assertion on `location` writes the path with the base, or the site is tested without one. No `deprecated` lint is possible, as a test's expected value is no code `kay check` reads.
+
+## 1.51.0
+
+### An API route is an MCP tool only when it sets `detail.tool`
+
+- With `mcp: true`, every API route not hidden was a tool; it is now one only when its `detail` says `tool: true`, a description, or `{ name, description }`, as an action's `tool` does. A route that does not opt in stays in the OpenAPI document and is absent from `tools/list`; a call naming it is refused as an unknown tool.
+- `kay upgrade` of an app from before 1.51 lists the routes still relying on the old default with `deprecated-api-tool` (a plain `kay check`, or an app turning `mcp` on after 1.51, reports none, as those routes were never tools); `tool: false` silences it for a route no agent should call; its fix adds `detail: { tool: true }` and is not applied by `--fix`, since it would offer every route, the ones an agent should not call included. It reads routes written with an inline handler and an object literal of options.
 
 ## 1.50.0
 
@@ -62,105 +151,4 @@ What each minor release before 1.51 broke, and what an app changed to move to it
 
 - `kay` no longer exports the schema builder as `t`, gone with its `deprecated-schema-name` lint: the schema builder is `s`, `import { s } from 'kay'` or no import in a server fence, and `s.Object(...)` in place of `t.Object(...)`. `kay check --fix` of 1.45 renames it, or rename it by hand, or import Elysia's own `t` from `elysia`.
 
-## 1.45.0
-
-### An idle queue looks at its store every 10 seconds at most
-
-- A `queue` backs off while idle, looking from one worker 1 second after a job, then twice as long after each empty look up to `idlePoll`, 10 seconds by default, where it looked every second. A job enqueued in the same process, still runs at once and a retry is picked up when due; one enqueued by another process, a script or a second server, waits 10 seconds at worst. An app relying on a pickup within a second from another process sets `idlePoll: '1s'`.
-- A custom `JobStore` may add `purge(queue, before)`, removing the expired failed jobs in one call; without it they are removed one by one as before.
-
-### The app preset's database runs the app as a role that cannot change the schema
-
-A new app now connects as `app_rw`, which reads and writes rows but cannot drop, alter or create anything, and only the migrations run as the owner. An app scaffolded earlier keeps working as it is; to adopt the split:
-
-1. Copy `db/roles.sh` from a new app, and set `APP_DB_PASSWORD` in `.env.example`, in the production environment and in `compose.prod.yaml`'s `db` service. Use a secret other than `POSTGRES_PASSWORD`, letters and digits only as it goes into the URL as it is. In `compose.dev.yaml`'s `db` service set `APP_DB_PASSWORD: app_rw`, the script refusing to run without it.
-2. Mount it in `db`, in `compose.prod.yaml` and `compose.dev.yaml`: `./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro`. The image runs it only when it creates a database, so a new one gets `app_rw` for free.
-3. Recreate the database container (`docker compose up -d db`, the data volume stays), then run the script once on the existing database. It is idempotent, so running it again only resets the password, regrants and makes the history table read-only to `app_rw`: `docker compose exec -T db sh /docker-entrypoint-initdb.d/roles.sh`.
-4. In `compose.prod.yaml`, give `migrate` `MIGRATE_DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app` and `app` `DATABASE_URL: postgres://app_rw:${APP_DB_PASSWORD}@db:5432/app`. In `pg-orm.config.ts`, read `process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL`. In `.env`, point `DATABASE_URL` at `postgres://app_rw:app_rw@127.0.0.1:5433/<database>` and add `MIGRATE_DATABASE_URL` for the owner.
-
-Tables in a schema other than `public` that exist already are not granted: run `GRANT USAGE ON SCHEMA <name> TO app_rw`, then `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA <name> TO app_rw` and `GRANT USAGE ON ALL SEQUENCES IN SCHEMA <name> TO app_rw`. Those the owner creates later are covered. A table created by a role other than the owner is not granted either.
-
-The script also revokes `CREATE` on `public` from `PUBLIC` (already the default from Postgres 15), and `app_rw` is a role of the cluster: two apps sharing one cluster share it, so give the second another name. pg-orm's migration history table, `_pgorm_migrations`, is the one table `app_rw` only reads: an event trigger the script creates takes its writes back as the owner creates it, and the script revokes them from one that exists already, in any schema. Creating the trigger takes a superuser, which the database image's user is; on a managed Postgres whose owner is not one, the script prints a notice and finishes without the trigger, so revoke `INSERT`, `UPDATE` and `DELETE` on `_pgorm_migrations` from `app_rw` after the first migrate.
-
-### kayjs-auth's two-factor setup no longer carries a server-drawn QR code
-
-- `setUpTwoFactor` answers `setup: { secret, uri }`: `qr`, an SVG data URI drawn on the server, is gone. Draw `uri` with kayjs-ui's `QrCode`, as kayjs-auth's own security page does.
-
-### IconPicker's `search` takes an offset
-
-- `search(query, limit)` becomes `search(query, limit, offset)`: it returns the `limit` icons from the `offset`th on, where it returned the first `offset + limit`. `Show more` used to ask again for everything shown; it now asks for the next page and adds it. Add `offset` to the action's input and slice from it, `.slice(offset, offset + limit)`; an app that leaves it out shows its first page, and `Show more` adds nothing and goes away.
-
-### Segmented's `onChange` hears `null` when `value` is typed nullable
-
-- A Segmented started with none picked now tells `onChange` `null` when a reset clears it, so `onChange` is typed `(value: Value | null)` when `value` is typed to allow `null`, and `(value: Value)` otherwise. An app passing a nullable `value` with a handler that does not take `null` widens the handler, or narrows `value`.
-
-### A `for` over objects with no `id` reuses its rows
-
-- Rows of plain objects with no `id`, no `key` and no identity left in the new list are now matched, between the rows that did match, to the unmatched rows in their place, where each used to be a new row. A list of fresh objects (results fetched again) reuses its rows by position: row-local state and enter transitions carry over. Give such items an `id` or a `key` when each must start afresh.
-
-### CommandPalette's hotkey follows the platform
-
-- `CommandPalette` opens on Cmd+`hotkey` on macOS and Ctrl+`hotkey` elsewhere, where it took either on every platform: an app telling its users Ctrl+K on a Mac, or Cmd+K on Windows, tells them the platform's key instead.
-
-### `localPath` falls back for more values
-
-- `localPath` (and kayjs-auth's `safeRedirect`, now the same function) returns the fallback for a value with a backslash, a control character or a malformed `%` escape in its path, or one that leaves the site once decoded (`/%2F/evil.example`, `/%09/evil.example`), and resolves a value with leading spaces where it fell back. An app passing such paths on purpose encodes them first.
-
-### A library's stylesheet keeps only the classes the app writes
-
-The rules of kayjs-ui's theme, and of any kay library's exported stylesheet, whose classes no file of the app's folder or library component it reaches writes whole are left out. A class put together at runtime (`` `kui-btn-${tone}` ``), written only in content kept outside the project (a CMS body in the database), or only in files outside the app's folder (a Tailwind `@source` elsewhere, a workspace package that is not a kay library) loses its rules: write each such class whole in a file of the app, for instance in a comment in `app.css` ([Using a component library](component-libraries.md#using-a-component-library)).
-
-### Pages that read nothing are kept by the build
-
-- `kay build` keeps a page that reads nothing from its request ([Prerendering](prerendering.md#prerendering)) and serves it from memory, without `prerender`. A page showing a value a function builds, such as `export const messages = seed()` read by a page and changed by an action, no longer shows later changes on its own: the first visit after a request that can write renders it live, and a page that differs is rendered per request from then on, with one warning naming it. A value changed with no request, by a timer or a job, is not seen.
-- To skip the check and the warning, or for such a value, add `export const page = { prerender: false }` to the page.
-
-## 1.44.0
-
-### kayjs-auth asks for a proof of work by default
-
-- `captcha` in `createAuth` defaults to `proofOfWork()`: registering, password resets and magic links ask for one, and a password sign-in from the third attempt. The prebuilt pages carry its field; `captcha: false` keeps the old behaviour.
-- An app's own register, reset or magic-link form carries the field, `input(type="hidden" name="captcha" data-kay-work={challenge})` with `const challenge = await ctx.locals.auth.captchaChallenge('register')` (`'reset'`, `'magic-link'`, `'sign-in'`) in its server fence, and its action passes `captcha` on, else the request answers `{ ok: false, error: 'captcha' }`. The full form is in kayjs-auth's llms.txt under "Bots and breached passwords".
-- A test posting such a form submits from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which solves the field.
-- `signInAsGuest` is CAPTCHA-checked as `'guest'`, with its own `captcha.on.guest`, where it was `'register'` before: a custom `captcha.verify(token, action)` matching on `action` handles it.
-- `auth.features().captcha` is `'proof-of-work'` by default, besides a `CaptchaWidget` or `null`: an app's own page reading `.script`, `.class` or `.siteKey` off it checks `captcha === 'proof-of-work'` first and renders the field above. `CaptchaOptions` is a union of `CaptchaCheck` and `ProofOfWorkCaptcha`, so code reading its `verify` or `widget` narrows it first.
-- The prebuilt pages' actions also refuse a post sent without kay's script or under 2 seconds (`honeypot`, `minTime`): a test posting to one goes through `site.submit(..., { from })` as above.
-
-### kayjs-auth asks for a recent proof before sensitive reads and changes
-
-- `exportData()` answers `{ ok: false, error: 'stale' }` unless the session signed in or `reprove()`d within ten minutes, and `GET <prefix>/export` a 403. An app's own data page calls `auth.reprove(proof)` before linking the download, `auth.provedLately()` telling whether it must; an exhaustive `switch` over `exportData`'s errors handles `'stale'`.
-- `changeEmail` on an account with two-factor on takes its code or a passkey, `{ code }`, no longer the password alone, else `{ ok: false, error: 'proof' }`: an app's own change-email form asks for the code when `user.twoFactorEnabledAt` is set.
-
-### kayjs-auth checks OpenID Connect providers harder
-
-- ID tokens are verified against asymmetric algorithms only (RS, PS, ES and EdDSA): an identity provider signing them with an `HS*` secret switches to a key pair. `oidcProvider`, `googleProvider`, `microsoftProvider` and `gitlabProvider` take `algorithms` to narrow the list further.
-- In production, an `http:` issuer or GitLab `url` throws at startup, and an `http:` endpoint in the discovery document on the first sign-in: use the `https:` address. `http:` still works in development and tests.
-- Discovery no longer follows a redirect: point `issuer` at the address whose `/.well-known/openid-configuration` answers directly.
-
-### kayjs-auth stores
-
-- A custom `AuthStore`'s `audit.list` takes `before` as a `Date` or an `{ at, id }` cursor, orders by `at` then `id`, both descending, and with a cursor returns only the entries before it in that order (`at < before.at`, or the same `at` and `id < before.id`).
-- Expired links, codes, invitations, attempt windows and old sessions are deleted by the store's optional `prune(limits)`, run hourly, no longer as a side effect of reading them: a custom store implements `prune` or deletes them otherwise. `memoryStore` and `pgStore` implement it.
-- `pgStore`'s `auth_attempts` table gains an index on `reset_at`: `db.sync()` creates it, an app writing its own migrations adds it.
-- The rate-limit counters keyed by a typed email reset once.
-
-### Rendering and tests
-
-- `xlink:href` is rebased under `base` and URL-checked like `href`: drop a `base` prefix written into it by hand.
-- `mount()` from `kay/mount` leaves two empty comments around what it renders, and disposing it removes only those nodes rather than emptying the element: an app relying on the element being emptied empties it, and `innerHTML` snapshots change.
-- `page.a11y()` and the dev tool report text the colour of its background under `color-contrast`, where axe-core left it unreported: fix the colours, or clip text meant for screen readers only.
-- An extension typed as a bare `KayExtension` no longer turns `ctx.locals` into `any`: type it `KayExtension<typeof plugin>`, or fix what only compiled through the `any`.
-- kayjs-cms problem ids spell a `-` in a collection or key as `_2d_`.
-
-### kayjs-auth refuses cross-site requests on a plain Elysia app
-
-- On a plain Elysia app mounting `auth.plugin`, a browser's cross-site POST or websocket upgrade reads the session as signed out, and its sign-in, sign-out or any other session write answers a 403. A kay app's actions and API refused these already, and an `api({ cors })` module still lets in the origins it names.
-- Behind a proxy that does not pass the browser's `Host` on, set `url` in `createAuth` to the site's public address, whose host then counts as the request's own; without it, every form post touching the session answers a 403.
-- Only an `Authorization: Bearer` header skips the check: a request with Basic credentials, which a browser sends on its own, is checked like any other.
-
-### kayjs-ui
-
-- `TextInput(type="number")` hands `onInput` and `onChange` a `number | null`, no longer a string: `onInput={value => count.set(Number(value))}` becomes `onInput={count.set}` over a `signal<number | null>`, and `value` takes that number as well as a string.
-- `Select` takes the type of its options' values: a number option hands `onChange` a number, no longer its string, and `value` holds that number, `value={String(id)}` becoming `value={id}`. With `emptyOption`, `onChange` is typed `Value | ''`, so a parent holding the options' union alone widens it to `Kind | ''`.
-
-Releases before 1.44 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.46 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
