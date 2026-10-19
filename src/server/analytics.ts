@@ -105,8 +105,8 @@ export interface Ga4Options extends Counted {
 
 // Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
 export interface FathomOptions extends Common {
-  exclude?: never
-  titles?: never
+  exclude?: undefined
+  titles?: undefined
   provider: 'fathom'
   // The site's id in Fathom, such as `ABCDEFGH`.
   siteId: string
@@ -116,8 +116,8 @@ export interface FathomOptions extends Common {
 
 // Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
 export interface CloudflareOptions extends Common {
-  exclude?: never
-  titles?: never
+  exclude?: undefined
+  titles?: undefined
   provider: 'cloudflare'
   // The token of the site in Cloudflare Web Analytics.
   token: string
@@ -125,8 +125,8 @@ export interface CloudflareOptions extends Common {
 
 // Any other tracker that is a script posting to an endpoint: kay serves the script from the app with the endpoint's address in it pointed at the app, and forwards what the script posts.
 export interface CustomOptions extends Common {
-  exclude?: never
-  titles?: never
+  exclude?: undefined
+  titles?: undefined
   provider: 'custom'
   // The tracker's script, `https://tracker.example/script.js`.
   script: string

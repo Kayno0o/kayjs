@@ -84,6 +84,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `deprecated-provider-url` | warn | deprecated | `discordProvider({ apiBase })` of kayjs-auth, now `discordProvider({ url })` |
 | `deprecated-analytics-consent` | warn | deprecated | `analytics()` of Google Analytics, Fathom, Cloudflare or `custom` with no `consent`, which now asks for a yes; the options may be held in a `const` and passed by name |
+| `deprecated-analytics-info` | warn | deprecated | `analytics()` with an `info` object where no information line is shown, which is refused at start since 1.56 |
 | `deprecated-store-verb` | warn | deprecated | A kayjs-auth store's `members.remove` or `oauth.grants.put`, now `delete` and `upsert` |
 | `deprecated-sign-in-options` | warn | deprecated | `redirect`, `remember` or `captcha` in the input of kayjs-auth's `signInWithPassword` or `register`, or a positional `redirect` of `requestMagicLink` or `signInWithPasskey`: now one trailing options object |
 | `deprecated-auth-event` | warn | deprecated | `createAuth({ onEvent })` of kayjs-auth, now `onAuthEvent`, which gets one object instead of four arguments |

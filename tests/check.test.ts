@@ -2598,6 +2598,43 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports an analytics info object where no line is shown, and --fix removes it', async () => {
+    const root = await scratchProject({
+      'src/a.ts': [
+        'import { analytics } from \'kay/analytics\'',
+        '',
+        'const held = { provider: \'cloudflare\', token: \'tok\', consent: false, info: { text: \'Counting\' } }',
+        '',
+        'export const a = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })',
+        'export const b = analytics({ provider: \'plausible\', consent: true, info: { text: \'Counting\' }, policyUrl: \'/p\' })',
+        'export const c = analytics({ info: { text: \'Counting\' } as const, provider: \'ga4\', consent: false })',
+        'export const d = analytics({ provider: \'plausible\', info: { text: \'Counting\' } })',
+        'export const e = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: false })',
+        'export const f = analytics(held)',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-analytics-info/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+
+      const fixed = await Bun.file(join(root, 'src/a.ts')).text()
+
+      expect(fixed).toContain('consent: false })')
+      expect(fixed).toContain('analytics({ provider: \'plausible\', consent: true, policyUrl: \'/p\' })')
+      expect(fixed).toContain('info: { text: \'Counting\' } as const, provider: \'ga4\'')
+      expect(fixed).toContain('const held = { provider: \'cloudflare\', token: \'tok\', consent: false }')
+      expect(fixed).toContain('analytics({ provider: \'plausible\', info: { text: \'Counting\' } })')
+      expect((await runCheck(root)).output).not.toContain('deprecated-analytics-info')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports discordProvider\'s apiBase as url, and --fix renames the key unless it is a shorthand or url is given too', async () => {
     const root = await scratchProject({
       'src/a.ts': 'import { discordProvider } from \'@kaynooo/kayjs-auth\'\n\nexport const a = discordProvider({ apiBase: \'https://proxy.test\' })\n',

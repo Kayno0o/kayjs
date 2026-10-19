@@ -344,6 +344,15 @@ export const LINTS = {
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\' })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: true })',
   },
+  'deprecated-analytics-info': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.56',
+    site: true,
+    summary: '`analytics({ info: { ... } })` where no information line is shown: for `fathom`, `cloudflare` and `custom`, which load their own script as it is, and while `consent` asks (`ga4`, `fathom`, `cloudflare` and `custom` ask unless `consent: false`), where the notice is worded by `consent`. It did nothing and `analytics()` refuses it at start since 1.56: the fix removes it. Found in the project\'s `.ts` files importing `kay/analytics`, for a call with an object literal and no spread.',
+    wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
+    right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false })',
+  },
   'deprecated-store-verb': {
     level: 'warn',
     group: 'deprecated',

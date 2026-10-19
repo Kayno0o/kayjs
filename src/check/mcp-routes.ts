@@ -129,12 +129,8 @@ function isNamespaceApi(callee: t.MemberExpression, scope: ApiScope): boolean {
 
 // What the file holds of `api()`: its import names, then, until nothing new turns up, the names declared or assigned one and the functions returning one.
 function apiScope(ast: t.File): ApiScope {
-  const scope: ApiScope = { imports: new Set(), namespaces: new Set(), names: new Set(), helpers: new Set() }
-
   const { locals, namespaces } = importsOf(ast, from => from === 'kay/server', 'api')
-
-  scope.imports = locals
-  scope.namespaces = namespaces
+  const scope: ApiScope = { imports: locals, namespaces, names: new Set(), helpers: new Set() }
 
   const add = (set: Set<string>, name: string) => {
     if (set.has(name))

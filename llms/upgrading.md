@@ -17,7 +17,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### analytics refuses an `info` object where nothing shows it
 
-- `analytics()` throws at start for `info: { ... }` on Fathom, Cloudflare or `custom`, or when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` on Google Analytics to show the line; `info: false` stays valid. No lint ships, as the start-up error names the option.
+- `analytics()` throws at start for `info: { ... }` on Fathom, Cloudflare or `custom`, or when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` on Google Analytics to show the line; `info: false` stays valid. `deprecated-analytics-info` finds it and `kay upgrade` removes it.
 
 ## 1.55.0
 
