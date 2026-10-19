@@ -171,8 +171,6 @@ form(action={signIn})
 
 Every way of signing in takes what is not a credential in one trailing options object: `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
 
-Before 1.52 the fields sat in the input, or a `redirect` came as an argument of its own: that still works for now and `kay check --fix` moves them.
-
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
 To keep the time the same too, your `onSignUp` hook, and the `onDelete` of an unverified account that a new registration replaces, run after the response is sent. `register` may return before they have finished.

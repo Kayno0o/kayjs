@@ -1,7 +1,6 @@
 import type { CaptchaOptions } from '../src/captcha'
 import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mergeInput, mergePositional } from '../src/signInOptions'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
@@ -44,7 +43,7 @@ async function cookieOf(browser: Browser, method: string, ...args: unknown[]): P
   return response.headers.getSetCookie().find(line => line.startsWith('session='))
 }
 
-// What `auth[method](...args)` answers, the forms of before 1.52 included, which the typed `call` refuses.
+// What `auth[method](...args)` answers, arguments the typed `call` refuses included.
 async function answer(browser: Browser, method: string, ...args: unknown[]): Promise<unknown> {
   return (await browser.fetch(`/call/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args) })).json()
 }
@@ -53,51 +52,42 @@ async function answer(browser: Browser, method: string, ...args: unknown[]): Pro
 const credentials = { identifier: 'ada@example.com', password: PASSWORD }
 
 describe('signInWithPassword', () => {
-  test('takes redirect, remember and captcha as a trailing options object, and the old input fields still work', async () => {
+  test('takes redirect, remember and captcha as a trailing options object', async () => {
     const { browser } = await setup()
 
     expect(await browser().call('signInWithPassword', credentials, { redirect: '/account', captcha: 'human' })).toEqual({ ok: true, redirect: '/account' })
-    expect(await browser().call('signInWithPassword', { ...credentials, redirect: '/old', captcha: 'human' })).toEqual({ ok: true, redirect: '/old' })
     expect(await browser().call('signInWithPassword', credentials, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await browser().call('signInWithPassword', { ...credentials, captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(asked).toEqual(['sign-in:human', 'sign-in:human', 'sign-in:bot', 'sign-in:bot'])
+    expect(asked).toEqual(['sign-in:human', 'sign-in:bot'])
     expect(await cookieOf(browser(), 'signInWithPassword', credentials, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await cookieOf(browser(), 'signInWithPassword', { ...credentials, remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
     expect(await cookieOf(browser(), 'signInWithPassword', credentials, { remember: false, captcha: 'human' })).not.toContain('Max-Age')
   })
 
-  test('the options object wins over the same field in the input, and a field only in the input stays', async () => {
+  test('a redirect, remember or captcha in the input is ignored', async () => {
     const { browser } = await setup()
 
-    expect(await browser().call('signInWithPassword', { ...credentials, redirect: '/old', captcha: 'human' }, { redirect: '/new' })).toEqual({ ok: true, redirect: '/new' })
-    expect(await browser().call('signInWithPassword', { ...credentials, redirect: '/old', captcha: 'bot' }, { captcha: 'human' })).toEqual({ ok: true, redirect: '/old' })
-    expect(await cookieOf(browser(), 'signInWithPassword', { ...credentials, remember: false, captcha: 'human' }, { remember: true })).toContain(`Max-Age=${90 * DAY}`)
+    expect(await answer(browser(), 'signInWithPassword', { ...credentials, redirect: '/old', captcha: 'bot' }, { captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
+    expect(await cookieOf(browser(), 'signInWithPassword', { ...credentials, remember: true }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
   })
 
-  test.each(HOSTILE)('a redirect of %s leads home, given either way', async (redirect) => {
+  test.each(HOSTILE)('a redirect of %s leads home', async (redirect) => {
     const { browser } = await setup()
 
     expect(await browser().call('signInWithPassword', credentials, { redirect, captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
-    expect(await browser().call('signInWithPassword', { ...credentials, redirect, captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
-    expect(await browser().call('signInWithPassword', { ...credentials, redirect: '/old', captcha: 'human' }, { redirect })).toEqual({ ok: true, redirect: '/' })
   })
 })
 
 describe('register', () => {
-  test('takes remember and captcha as a trailing options object, and the old input fields still work', async () => {
+  test('takes remember and captcha as a trailing options object', async () => {
     const { browser } = await setup()
 
     expect(await cookieOf(browser(), 'register', { email: 'bob@example.com', password: PASSWORD }, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await cookieOf(browser(), 'register', { email: 'cy@example.com', password: PASSWORD, remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
     expect(await browser().call('register', { email: 'di@example.com', password: PASSWORD }, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await browser().call('register', { email: 'di@example.com', password: PASSWORD, captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
   })
 
-  test('the options object wins over the same field in the input', async () => {
+  test('a remember or captcha in the input is ignored', async () => {
     const { browser } = await setup()
 
-    expect(await cookieOf(browser(), 'register', { email: 'bob@example.com', password: PASSWORD, remember: false, captcha: 'bot' }, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await browser().call('register', { email: 'cy@example.com', password: PASSWORD, captcha: 'human' }, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await cookieOf(browser(), 'register', { email: 'bob@example.com', password: PASSWORD, remember: true, captcha: 'bot' }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
   })
 })
 
@@ -110,14 +100,11 @@ describe('requestMagicLink', () => {
     return (await browser.call('signInWithMagicLink', app.tokenOf('magic-link')) as { redirect: string }).redirect
   }
 
-  test('takes redirect, remember and captcha as an options object, and the positional redirect still works', async () => {
+  test('takes redirect, remember and captcha as an options object', async () => {
     const app = await setup()
 
     expect(await redirectOf(app, { redirect: '/account', captcha: 'human' })).toBe('/account')
-    expect(await redirectOf(app, '/old', { captcha: 'human' })).toBe('/old')
-    expect(await redirectOf(app, undefined, { captcha: 'human' })).toBe('/')
     expect(await app.browser().call('requestMagicLink', 'ada@example.com', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await answer(app.browser(), 'requestMagicLink', 'ada@example.com', '/old', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
 
     const ada = app.browser()
 
@@ -126,18 +113,16 @@ describe('requestMagicLink', () => {
     expect(await cookieOf(ada, 'signInWithMagicLink', app.tokenOf('magic-link'))).toContain(`Max-Age=${90 * DAY}`)
   })
 
-  test('the options object\'s redirect wins over the positional one', async () => {
+  test('a positional redirect is no redirect', async () => {
     const app = await setup()
 
-    expect(await redirectOf(app, '/old', { redirect: '/new', captcha: 'human' })).toBe('/new')
+    expect(await answer(app.browser(), 'requestMagicLink', 'ada@example.com', '/old', { captcha: 'human' })).toEqual({ ok: false, error: 'captcha' })
   })
 
-  test.each(HOSTILE)('a redirect of %s leads home, given either way', async (hostile) => {
+  test.each(HOSTILE)('a redirect of %s leads home', async (hostile) => {
     const app = await setup()
 
     expect(await redirectOf(app, { redirect: hostile, captcha: 'human' })).toBe('/')
-    expect(await redirectOf(app, hostile, { captcha: 'human' })).toBe('/')
-    expect(await redirectOf(app, '/old', { redirect: hostile, captcha: 'human' })).toBe('/')
   })
 })
 
@@ -169,52 +154,23 @@ describe('signInWithPasskey', () => {
     return { signIn, cookie }
   }
 
-  test('takes redirect and remember as an options object, and the positional redirect still works', async () => {
+  test('takes redirect and remember as an options object', async () => {
     const { signIn, cookie } = await passkeySetup()
 
     expect((await signIn({ redirect: '/account' })).result).toEqual({ ok: true, redirect: '/account' })
-    expect((await signIn('/old')).result).toEqual({ ok: true, redirect: '/old' })
-    expect((await signIn('/old', { remember: false })).result).toEqual({ ok: true, redirect: '/old' })
-    expect((await signIn(undefined, { remember: true })).result).toEqual({ ok: true, redirect: '/' })
     expect(await cookie({ remember: true })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await cookie('/old', { remember: true })).toContain(`Max-Age=${90 * DAY}`)
     expect(await cookie({ remember: false })).not.toContain('Max-Age')
   })
 
-  test('the options object\'s redirect wins over the positional one', async () => {
+  test('a positional redirect is no redirect', async () => {
     const { signIn } = await passkeySetup()
 
-    expect((await signIn('/old', { redirect: '/new' })).result).toEqual({ ok: true, redirect: '/new' })
+    expect((await signIn('/old')).result).toEqual({ ok: true, redirect: '/' })
   })
 
-  test.each(HOSTILE)('a redirect of %s leads home, given either way', async (hostile) => {
+  test.each(HOSTILE)('a redirect of %s leads home', async (hostile) => {
     const { signIn } = await passkeySetup()
 
     expect((await signIn({ redirect: hostile })).result).toEqual({ ok: true, redirect: '/' })
-    expect((await signIn(hostile)).result).toEqual({ ok: true, redirect: '/' })
-    expect((await signIn('/old', { redirect: hostile })).result).toEqual({ ok: true, redirect: '/' })
-  })
-})
-
-describe('the deprecation warning', () => {
-  test('is logged once per process for each old form, not once per call', () => {
-    const lines: string[] = []
-    const original = console.warn
-
-    console.warn = (...args: unknown[]) => {
-      lines.push(args.join(' '))
-    }
-
-    try {
-      for (let call = 0; call < 3; call++) {
-        mergeInput('onceTest', { remember: true }, undefined)
-        mergePositional('onceTest', '/old', undefined)
-      }
-    }
-    finally {
-      console.warn = original
-    }
-
-    expect(lines.filter(line => line.includes('onceTest'))).toHaveLength(2)
   })
 })

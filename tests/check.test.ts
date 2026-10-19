@@ -2637,23 +2637,6 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports the old options of kayjs-auth\'s sign-in methods in .ts and .kay files, and --fix moves them into the trailing options object', async () => {
-    const root = await scratchProject({
-      'src/a.ts': 'export function a(auth: { signInWithPassword: (input: object, options?: object) => void }, identifier: string, password: string, redirect: string): void {\n  auth.signInWithPassword({ identifier, password, redirect })\n}\n',
-      'src/routes/page.kay': '--- server\nimport { action } from \'kay\'\n\nexport const go = action(async (ctx) => {\n  await ctx.locals.auth.requestMagicLink(\'a@b.c\', \'/home\', { remember: true })\n})\n---\np x\n',
-    })
-
-    try {
-      expect((await runCheck(root)).output.match(/deprecated-sign-in-options/g)).toHaveLength(2)
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('auth.signInWithPassword({ identifier, password }, { redirect })')
-      expect(await Bun.file(join(root, 'src/routes/page.kay')).text()).toContain('requestMagicLink(\'a@b.c\', { redirect: \'/home\', remember: true })')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('reports kay/test\'s mount through a dynamic import or a re-export too, and --fix renames it', async () => {
     const root = await scratchProject({
       'src/a.test.ts': 'export {}\nconst { mount, settle } = await import(\'kay/test\')\n\nawait mount(\'a.kay\')\nawait settle()\n',

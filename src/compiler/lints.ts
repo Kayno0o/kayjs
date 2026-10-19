@@ -344,14 +344,6 @@ export const LINTS = {
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' } })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
   },
-  'deprecated-sign-in-options': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.52',
-    summary: 'A call of kayjs-auth\'s `signInWithPassword`, `register`, `requestMagicLink` or `signInWithPasskey` with `redirect`, `remember` or `captcha` in the old place: in the input of `signInWithPassword` and `register`, or a positional `redirect` after the first argument of `requestMagicLink` and `signInWithPasskey`. They are one trailing options object since 1.52, and the old forms still work for now and log a warning. The calls are found by method name, in `.kay` fences and `.ts` modules; `register` only on a receiver named `auth`. The fix moves them, and `--fix` applies it unless the call has a spread or a computed key.',
-    wrong: '--- server\nimport { action } from \'kay\'\n\nexport const signIn = action(async ctx => ctx.locals.auth.signInWithPassword({ identifier: \'ada\', password: \'secret\', redirect: \'/account\' }))\n---\np Signing in',
-    right: '--- server\nimport { action } from \'kay\'\n\nexport const signIn = action(async ctx => ctx.locals.auth.signInWithPassword({ identifier: \'ada\', password: \'secret\' }, { redirect: \'/account\' }))\n---\np Signing in',
-  },
   'deprecated-auth-event': {
     level: 'warn',
     group: 'deprecated',

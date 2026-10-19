@@ -145,60 +145,6 @@ describe('css-import-without-text', () => {
   })
 })
 
-describe('deprecated-sign-in-options', () => {
-  const page = (call: string) => `--- server\nimport { action } from 'kay'\n\nexport const go = action(async ctx => ${call})\n---\np x`
-  const codes = (source: string) => lints(source).map(d => d.code)
-  const fixes = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.flatMap(d => (d.fixes ?? []).map(fix => ({ safe: fix.safe, text: [...fix.edits].sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source) })))
-
-  it('moves redirect, remember and captcha out of the input of signInWithPassword and register, leaving the other fields and their text', () => {
-    expect(fixes(page('ctx.locals.auth.signInWithPassword({ identifier, password, redirect: next, remember })'))).toEqual([{ safe: true, text: page('ctx.locals.auth.signInWithPassword({ identifier, password }, { redirect: next, remember })') }])
-    expect(fixes(page('ctx.locals.auth.signInWithPassword({ redirect, identifier, captcha: token, password })'))).toEqual([{ safe: true, text: page('ctx.locals.auth.signInWithPassword({ identifier, password }, { redirect, captcha: token })') }])
-    expect(fixes(page('auth.register({ email, password, remember: true, locale })'))).toEqual([{ safe: true, text: page('auth.register({ email, password, locale }, { remember: true })') }])
-    expect(fixes(page('auth.signInWithPassword({\n  identifier,\n  password,\n  redirect,\n})'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({\n  identifier,\n  password,\n}, { redirect })') }])
-  })
-
-  it('merges the old fields into an options argument already there, whose own fields win, and leaves no gap in an emptied input', () => {
-    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, { captcha })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({ identifier, password }, { redirect, captcha })') }])
-    expect(fixes(page('auth.register({ email, password, remember: true }, { remember: false })'))).toEqual([{ safe: true, text: page('auth.register({ email, password }, { remember: false })') }])
-    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, options)'))).toEqual([{ safe: false, text: page('auth.signInWithPassword({ identifier, password }, { redirect, ...options })') }])
-    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, { ...rest })'))).toEqual([{ safe: false, text: page('auth.signInWithPassword({ identifier, password }, { redirect, ...rest })') }])
-    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, undefined)'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({ identifier, password }, { redirect })') }])
-    expect(fixes(page('auth.signInWithPassword({ redirect })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({}, { redirect })') }])
-    expect(fixes(page('auth.signInWithPassword({ redirect, remember }, { captcha })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({}, { redirect, remember, captcha })') }])
-    expect(codes(page('auth.signInWithPassword({ identifier, password }, { redirect }, extra)'))).toEqual([])
-  })
-
-  it('leaves a call already in the new form, a register of another receiver and a call with no old field', () => {
-    expect(codes(page('ctx.locals.auth.signInWithPassword({ identifier, password }, { redirect })'))).toEqual([])
-    expect(codes(page('ctx.locals.auth.signInWithPassword(input)'))).toEqual([])
-    expect(codes(page('registry.register({ remember: true })'))).toEqual([])
-    expect(codes(page('auth.register({ email, password }, { remember: true })'))).toEqual([])
-    expect(codes(page('auth.requestMagicLink(email, { redirect })'))).toEqual([])
-    expect(codes(page('auth.requestMagicLink(email)'))).toEqual([])
-    expect(codes(page('auth.signInWithPasskey(response, { redirect })'))).toEqual([])
-  })
-
-  it('offers a fix that is not safe when a spread may hold one of the fields', () => {
-    expect(fixes(page('auth.signInWithPassword({ ...input, redirect })'))).toEqual([{ safe: false, text: page('auth.signInWithPassword({ ...input }, { redirect })') }])
-    expect(fixes(page('auth.requestMagicLink(email, redirect, { ...rest })'))).toEqual([{ safe: false, text: page('auth.requestMagicLink(email, { redirect, ...rest })') }])
-  })
-
-  it('moves the positional redirect of requestMagicLink and signInWithPasskey into the options', () => {
-    expect(fixes(page('auth.requestMagicLink(email, input.redirect, { captcha, remember })'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { redirect: input.redirect, captcha, remember })') }])
-    expect(fixes(page('auth.requestMagicLink(email, \'/x\')'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { redirect: \'/x\' })') }])
-    expect(fixes(page('auth.requestMagicLink(email, options)'))).toEqual([])
-    expect(fixes(page('auth.requestMagicLink(email, undefined, { captcha })'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { captcha })') }])
-    expect(fixes(page('auth.requestMagicLink(email, undefined)'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email)') }])
-    expect(fixes(page('auth.signInWithPasskey(response, \'/account\', { remember })'))).toEqual([{ safe: true, text: page('auth.signInWithPasskey(response, { redirect: \'/account\', remember })') }])
-  })
-
-  it('reads a module, the `.ts` files of an app, and is allowed by a comment', () => {
-    expect(moduleChecks('export const a = (auth: Auth) => auth.requestMagicLink(email, \'/x\')\n').map(d => d.code)).toEqual(['deprecated-sign-in-options'])
-    expect(moduleChecks('export const a = 1\n')).toEqual([])
-    expect(codes(page('auth.signInWithPasskey(response, \'/x\')').replace('export', '// kay-allow deprecated-sign-in-options\nexport'))).toEqual([])
-  })
-})
-
 describe('deprecated-auth-event', () => {
   const page = (options: string) => `--- server\nimport { createAuth } from '@kaynooo/kayjs-auth'\n\nexport const auth = createAuth(${options})\n---\np x`
 

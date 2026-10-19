@@ -65,7 +65,6 @@ import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
 import { PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
-import { mergeInput, mergePositional } from './signInOptions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
@@ -438,20 +437,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
   async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha'>): Promise<RegisterResult> {
-    const merged = mergeInput('register', input, options)
+    await chooseRemember(this[STATE], options?.remember)
 
-    await chooseRemember(this[STATE], merged.remember)
-
-    return register(this[STATE], merged)
+    return register(this[STATE], input, options?.captcha)
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
   async signInWithPassword(input: PasswordSignInInput, options?: SignInOptions): Promise<PasswordSignInResult> {
-    const merged = mergeInput('signInWithPassword', input, options)
+    await chooseRemember(this[STATE], options?.remember)
 
-    await chooseRemember(this[STATE], merged.remember)
-
-    return signInWithPassword(this[STATE], merged)
+    return signInWithPassword(this[STATE], input, options ?? {})
   }
 
   // Mails a new link verifying the address to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of with an 'unverified' answer.
@@ -475,12 +470,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
-  /** @deprecated The redirect goes in the options: `requestMagicLink(email, { redirect, remember, captcha })`. */
-  async requestMagicLink(email: string, redirect?: string, options?: SignInOptions): Promise<MailRequestResult>
-  async requestMagicLink(email: string, options?: SignInOptions): Promise<MailRequestResult>
-  async requestMagicLink(email: string, second?: string | SignInOptions, third?: SignInOptions): Promise<MailRequestResult> {
-    const options = mergePositional('requestMagicLink', second, third)
-
+  async requestMagicLink(email: string, options: SignInOptions = {}): Promise<MailRequestResult> {
     await chooseRemember(this[STATE], options.remember)
 
     return requestMagicLink(this[STATE], email, options.redirect, options.captcha)
@@ -743,12 +733,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
-  /** @deprecated The redirect goes in the options: `signInWithPasskey(response, { redirect, remember })`. */
-  async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string, options?: Pick<SignInOptions, 'redirect' | 'remember'>): Promise<PasskeySignInResult>
-  async signInWithPasskey(response: AuthenticationResponseJSON, options?: Pick<SignInOptions, 'redirect' | 'remember'>): Promise<PasskeySignInResult>
-  async signInWithPasskey(response: AuthenticationResponseJSON, second?: string | Pick<SignInOptions, 'redirect' | 'remember'>, third?: Pick<SignInOptions, 'redirect' | 'remember'>): Promise<PasskeySignInResult> {
-    const options = mergePositional('signInWithPasskey', second, third)
-
+  async signInWithPasskey(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<PasskeySignInResult> {
     await chooseRemember(this[STATE], options.remember)
 
     return signInWithPasskey(this[STATE], response, options.redirect, async (record, method) => this.establish(record, method))

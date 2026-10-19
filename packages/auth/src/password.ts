@@ -1,5 +1,6 @@
 import type { Core, User } from './core'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
+import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
@@ -18,12 +19,8 @@ export interface RegisterInput {
   email: string
   password: string
   username?: string
-  /** @deprecated Given in the options after the input: `register(input, { captcha })`. */
-  captcha?: string | undefined
   // The language the user reads, for their mails; the browser's by default.
   locale?: string | undefined
-  /** @deprecated Given in the options after the input: `register(input, { remember })`. */
-  remember?: boolean | undefined
 }
 
 // Why a field was refused, by field, as codes a form turns into messages in its own words and language.
@@ -56,12 +53,6 @@ export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
   identifier: string
   password: string
-  /** @deprecated Given in the options after the input: `signInWithPassword(input, { redirect })`. */
-  redirect?: string | undefined
-  /** @deprecated Given in the options after the input: `signInWithPassword(input, { captcha })`. */
-  captcha?: string | undefined
-  /** @deprecated Given in the options after the input: `signInWithPassword(input, { remember })`. */
-  remember?: boolean | undefined
 }
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
@@ -69,13 +60,13 @@ export interface PasswordSignInInput {
 export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
 
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
-export async function register(state: RequestState, input: RegisterInput): Promise<RegisterResult> {
+export async function register(state: RequestState, input: RegisterInput, captcha?: string): Promise<RegisterResult> {
   const { store } = state.core
 
   if (!state.core.signUp)
     return { ok: false, error: 'closed' }
 
-  const refused = await admit(state, 'register', input.captcha)
+  const refused = await admit(state, 'register', captcha)
 
   if (refused)
     return { ok: false, error: refused }
@@ -248,12 +239,12 @@ async function answerHeld(state: RequestState, holder: UserRecord, password: str
   return { ok: true, signedIn: false }
 }
 
-export async function signInWithPassword(state: RequestState, input: PasswordSignInInput): Promise<PasswordSignInResult> {
+export async function signInWithPassword(state: RequestState, input: PasswordSignInInput, options: Pick<SignInOptions, 'redirect' | 'captcha'>): Promise<PasswordSignInResult> {
   const { store } = state.core
   const byEmail = input.identifier.includes('@')
   const identifier = byEmail ? normalizeEmail(input.identifier) : normalizeUsername(input.identifier)
 
-  const refused = await admit(state, 'sign-in', input.captcha)
+  const refused = await admit(state, 'sign-in', options.captcha)
 
   if (refused)
     return { ok: false, error: refused }
@@ -290,7 +281,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (passwordNeedsRehash(record!.passwordHash!))
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
-  return state.complete(record!, localPath(input.redirect, homeOf(state.core)), 'password')
+  return state.complete(record!, localPath(options.redirect, homeOf(state.core)), 'password')
 }
 
 function withoutUndefined(errors: RegisterErrors): RegisterErrors {

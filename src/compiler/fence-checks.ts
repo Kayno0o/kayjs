@@ -287,14 +287,9 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
-const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|createAuth)\b|\bauth\.register\b/
-// What a way of signing in of kayjs-auth took in its input before 1.52, which is its trailing options object now.
-const INPUT_OPTIONS: Record<string, string[]> = { signInWithPassword: ['redirect', 'remember', 'captcha'], register: ['remember', 'captcha'] }
-// The ones whose redirect was a positional argument after the first.
-const POSITIONAL_REDIRECT = new Set(['requestMagicLink', 'signInWithPasskey'])
+const SIGN_IN_CALL = /\bcreateAuth\b/
 
-// A call of kayjs-auth's `signInWithPassword`, `register`, `requestMagicLink` or `signInWithPasskey` in the form of before 1.52: the redirect, remember and captcha in the input or as a positional redirect, where they are the trailing options object now.
-// Read by name, as the `auth` of `ctx.locals.auth` is typed by the app; `register` only on a receiver named `auth`, as it is a common name.
+// A `createAuth({ onEvent })`, which is `onAuthEvent` since 1.52.
 export function staleAuthCalls(fence: ParsedFence): Diagnostic[] {
   if (!SIGN_IN_CALL.test(fence.code))
     return []
@@ -313,31 +308,6 @@ export function staleAuthCalls(fence: ParsedFence): Diagnostic[] {
         checkOnly: true,
       })
     }
-
-    if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || node.arguments.some(argument => argument.type === 'SpreadElement'))
-      return
-
-    const { callee } = node
-    const name = (callee.property as t.Identifier).name
-
-    const keys = INPUT_OPTIONS[name]
-
-    if (name === 'register' && receiverName(callee.object) !== 'auth')
-      return
-
-    const edit = keys ? inputOptionsEdit(fence.code, node.arguments, keys) : positionalRedirectEdit(fence.code, name, node.arguments)
-
-    if (!edit)
-      return
-
-    diagnostics.push({
-      ...fence.shift(callee.property),
-      code: 'deprecated-sign-in-options',
-      message: keys ? `\`${name}\` takes ${keys.map(key => `\`${key}\``).join(', ')} in an options object after the input since 1.52, not in the input` : `\`${name}\` takes its redirect in the options object since 1.52, not as an argument of its own`,
-      help: 'move them into one trailing options object: `{ redirect, remember, captcha }`',
-      fixes: [{ title: 'Use the options object', edits: [{ start: fence.offset + edit.start, end: fence.offset + edit.end, text: edit.text }], safe: edit.safe }],
-      checkOnly: true,
-    })
   })
 
   return diagnostics
@@ -355,107 +325,6 @@ function staleEventHook(call: t.CallExpression): t.Node | undefined {
   const found = options.properties.find((property): property is t.ObjectProperty | t.ObjectMethod => property.type !== 'SpreadElement' && propertyKey(property) === 'onEvent')
 
   return found?.key
-}
-
-// The name the receiver of a call ends on: `auth` in `auth.x()` and in `ctx.locals.auth.x()`.
-function receiverName(object: t.Node): string | undefined {
-  if (object.type === 'Identifier')
-    return object.name
-
-  return object.type === 'MemberExpression' && !object.computed && object.property.type === 'Identifier' ? object.property.name : undefined
-}
-
-interface CallEdit {
-  start: number
-  end: number
-  text: string
-  safe: boolean
-}
-
-function source(code: string, node: t.Node): string {
-  return code.slice(node.start!, node.end!)
-}
-
-// `f({ a, redirect })` as `f({ a }, { redirect })`: the moved properties leave the input, the others keep the text around them, and an options argument already there takes them in front of its own properties, which win as they do at run time. Safe unless the input or the options have a spread or a computed key, or the options are not an object literal: a spread may hold one of the moved names the property no longer overrides. A moved field the options also set is dropped, as the options win.
-function inputOptionsEdit(code: string, args: t.CallExpression['arguments'], keys: string[]): CallEdit | undefined {
-  const input = args[0]
-
-  const second = args[1]
-  const given = second?.type === 'Identifier' && second.name === 'undefined' ? undefined : second
-
-  if (args.length > 2 || input?.type !== 'ObjectExpression')
-    return undefined
-
-  const { properties } = input
-  const moved = properties.filter(property => property.type === 'ObjectProperty' && !property.computed && keys.includes(propertyKey(property) ?? ''))
-
-  if (moved.length === 0)
-    return undefined
-
-  // What opened the object, then each kept property after the text that stood between it and the property before it.
-  let rebuilt = code.slice(input.start!, properties[0]!.start!)
-  let first = true
-
-  for (const [index, property] of properties.entries()) {
-    if (moved.includes(property))
-      continue
-
-    rebuilt += `${first ? '' : code.slice(properties[index - 1]!.end!, property.start!)}${source(code, property)}`
-    first = false
-  }
-
-  const movedText = moved.map(property => source(code, property)).join(', ')
-  const safeInput = properties.every(property => property.type === 'ObjectProperty' && !property.computed)
-
-  // What closed the object, from the end of its last property: its trailing comma and line break stay. An emptied input is `{}`.
-  const inputText = moved.length === properties.length ? '{}' : `${rebuilt}${code.slice(properties.at(-1)!.end!, input.end!)}`
-
-  if (!given)
-    return { start: input.start!, end: (second ?? input).end!, text: `${inputText}, { ${movedText} }`, safe: safeInput }
-
-  if (given.type === 'ObjectExpression') {
-    const own = given.properties.map(property => source(code, property))
-    const overridden = new Set(given.properties.map(property => property.type === 'ObjectProperty' && !property.computed ? propertyKey(property) : undefined))
-    const carried = moved.filter(property => !overridden.has(propertyKey(property as t.ObjectProperty))).map(property => source(code, property))
-    const safeOptions = given.properties.every(property => property.type === 'ObjectProperty' && !property.computed)
-
-    return { start: input.start!, end: given.end!, text: `${inputText}, { ${[...carried, ...own].join(', ')} }`, safe: safeInput && safeOptions }
-  }
-
-  // A variable may hold `undefined` for a field, which would override the moved one.
-  return { start: input.start!, end: given.end!, text: `${inputText}, { ${movedText}, ...${source(code, given)} }`, safe: false }
-}
-
-// `f(email, redirect, { remember })` as `f(email, { redirect, remember })`.
-function positionalRedirectEdit(code: string, name: string, args: t.CallExpression['arguments']): CallEdit | undefined {
-  const [first, redirect, options] = args
-
-  if (!POSITIONAL_REDIRECT.has(name) || !first || !redirect || args.length > 3 || redirect.type === 'ObjectExpression')
-    return undefined
-
-  // A second argument that is a variable or a call may already be the options object, so only a string, a template or `undefined` is read as the old redirect.
-  const literal = redirect.type === 'StringLiteral' || redirect.type === 'TemplateLiteral' || (redirect.type === 'Identifier' && redirect.name === 'undefined')
-
-  if (args.length === 2 && !literal)
-    return undefined
-
-  const parts: string[] = []
-
-  if (!(redirect.type === 'Identifier' && redirect.name === 'undefined'))
-    parts.push(redirect.type === 'Identifier' && redirect.name === 'redirect' ? 'redirect' : `redirect: ${source(code, redirect)}`)
-
-  let safe = true
-
-  if (options?.type === 'ObjectExpression') {
-    parts.push(...options.properties.map(property => source(code, property)))
-    safe = options.properties.every(property => property.type === 'ObjectProperty' && !property.computed)
-  }
-  else if (options) {
-    parts.push(`...${source(code, options)}`)
-    safe = false
-  }
-
-  return { start: first.end!, end: args.at(-1)!.end!, text: parts.length === 0 ? '' : `, { ${parts.join(', ')} }`, safe }
 }
 
 // The checks a plain module takes, parsed only when one of them may find something.

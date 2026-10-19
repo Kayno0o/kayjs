@@ -80,7 +80,7 @@ describe('where a flow lands when nothing asked for another page', () => {
     await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
     await take({ kind: 'magic-link' })
     expect(await ada.call('signInWithMagicLink', tokenOf('magic-link'))).toEqual({ ok: true, redirect: '/account' })
-    expect(await browser().call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD, redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
+    expect(await browser().call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD }, { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
   })
 
   test('a passkey sign-in and an OAuth sign-in land on home', async () => {

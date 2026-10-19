@@ -16,7 +16,7 @@ describe('time options take a Duration', () => {
       const { browser, store } = testApp({ rememberMaxAge })
       const ada = browser()
 
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD, remember: true })
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
       expect((await store.sessions.listByUser((await ada.json('/me') as { id: string }).id))[0]!.maxAge).toBe(45 * 24 * 60 * 60)
     }
 

@@ -1,4 +1,5 @@
 import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
+import type { SignInOptions } from '../../src/signInOptions'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
 import { userOf } from 'kay/library'
@@ -66,8 +67,17 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
 
       return 'ok'
     })
-    .post('/register', async ({ auth, body }) => auth.register(body as Parameters<typeof auth.register>[0]))
-    .post('/password', async ({ auth, body }) => auth.signInWithPassword(body as Parameters<typeof auth.signInWithPassword>[0]))
+    // `captcha`, `redirect` and `remember` in the posted body are the call's options.
+    .post('/register', async ({ auth, body }) => {
+      const { captcha, remember, ...input } = body as Parameters<typeof auth.register>[0] & SignInOptions
+
+      return auth.register(input, { captcha, remember })
+    })
+    .post('/password', async ({ auth, body }) => {
+      const { captcha, redirect, remember, ...input } = body as Parameters<typeof auth.signInWithPassword>[0] & SignInOptions
+
+      return auth.signInWithPassword(input, { captcha, redirect, remember })
+    })
     // Calls any method of `auth` with the posted arguments, so a test drives what an action would.
     .post('/call/:method', async ({ auth, params, body }) => {
       const method = (auth as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>)[params.method]!
