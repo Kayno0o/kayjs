@@ -893,6 +893,20 @@ describe('a custom provider', () => {
     }
   })
 
+  it('leaves the base off an app\'s own head script that shares the custom tracker\'s path', async () => {
+    const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', head: [{ tag: 'script', props: { src: '/_kay/analytics/script.js', defer: true } }] })
+
+    try {
+      const home = await (await mounted.fetch('/')).text()
+
+      expect(home).toContain('src="/shop/_kay/analytics/script.js"')
+      expect(home).not.toContain('base=')
+    }
+    finally {
+      await mounted.close()
+    }
+  })
+
   it('passes what the script posts to the endpoint, the visitor\'s agent with it and no address', async () => {
     const response = await collect(await site(custom()), '{"e":"view"}', { cookie: 'session=abc' })
 

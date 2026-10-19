@@ -11,7 +11,7 @@ import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from
 import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
-import { CUSTOM_SCRIPT_PATH } from './analytics'
+import { CUSTOM_SCRIPT_PATH, TRACKER_TAGS } from './analytics'
 import { basePath } from './base'
 import { faviconTags, isOwnManifest, manifestPath } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
@@ -55,7 +55,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
 
   for (const given of config.head ?? []) {
     // A custom tracker's tag in the head names the base, as a proxy that takes it off hides it from the route serving the script.
-    const tag = mount !== '' && given.tag === 'script' && given.props.src === CUSTOM_SCRIPT_PATH ? { ...given, props: { ...given.props, src: `${CUSTOM_SCRIPT_PATH}?base=${encodeURIComponent(mount)}` } } : given
+    const tag = mount !== '' && TRACKER_TAGS.has(given) && given.props.src === CUSTOM_SCRIPT_PATH ? { ...given, props: { ...given.props, src: `${CUSTOM_SCRIPT_PATH}?base=${encodeURIComponent(mount)}` } } : given
     const inline = inlineText(tag)
 
     extra.push(tag)

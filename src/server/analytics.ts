@@ -1,4 +1,5 @@
 import type { KayExtension } from '../config'
+import type { HeadTag } from '../runtime/head'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
@@ -145,6 +146,9 @@ export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
 export const NOTICE_SCRIPT_PATH = `${ANALYTICS_PATH}/notice.js`
 export const CUSTOM_SCRIPT_PATH = `${ANALYTICS_PATH}/script.js`
+
+// The head tags kay put there for a custom tracker, which an app's own tag of the same `src` is not one of.
+export const TRACKER_TAGS = new WeakSet<HeadTag>()
 export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
 export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare', 'custom'])
 const SITE_ID = /^[A-Z\d]{1,32}$/i
@@ -205,6 +209,10 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   // With `info: false` the provider's script goes in the head as it is; behind the notice or the information line, kay's script loads it, once the visitor said yes or until they opted out.
   const loads = asking || informs
   const tag = loads ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
+  const head: HeadTag = { tag: 'script', props: tag }
+
+  if (options.provider === 'custom')
+    TRACKER_TAGS.add(head)
 
   // The provider's own script needs no route of ours, except the one that shows the notice and loads it.
   return {
@@ -214,7 +222,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     ...options.provider === 'custom' && { needsServer: true },
     ...(options.provider === 'custom' || loads) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {
-      head: [{ tag: 'script', props: tag }],
+      head: [head],
       ...options.provider !== 'custom' && { security: { csp: cspOf(options) } },
     },
   }
