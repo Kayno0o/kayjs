@@ -33,9 +33,11 @@ export default guard(({ request, deny }) => {
 
 let dir = ''
 const reported: string[] = []
+// The first line of an error message, the rest being its details.
+const FIRST_LINE = /^.*/
 
 async function app(options: { dev?: boolean, base?: string, trailingSlash?: 'always' | 'never' } = {}) {
-  return pages({ routes: ROUTES, api: join(dir, 'api'), prebuilt: true, ...options, onError: (error, request) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message.split('\n')[0]}`) })
+  return pages({ routes: ROUTES, api: join(dir, 'api'), prebuilt: true, ...options, onError: (error, request) => void reported.push(`${new URL(request!.url).pathname}: ${FIRST_LINE.exec((error as Error).message)![0]}`) })
 }
 
 beforeAll(async () => {
