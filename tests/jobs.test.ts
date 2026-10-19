@@ -697,6 +697,45 @@ describe('schedule every so long', () => {
     }
   })
 
+  it('gives a job ignoring its signal the stop grace even when the stop came while its lock was pending', async () => {
+    const cron = fakeCron()
+    const store = memoryJobs()
+    const lock = store.lock.bind(store)
+    let grant: (() => void) | undefined
+    let stopped = false
+
+    store.lock = async (name, slot) => {
+      await new Promise<void>(resolve => void (grant = resolve))
+
+      return lock(name, slot)
+    }
+
+    const app = new Elysia().use(schedule('@hourly', async () => new Promise<void>(() => undefined), { lock: 'late', store })).listen(0)
+
+    try {
+      const fired = cron.fired.map(async entry => entry.handler())
+      const stopping = (async () => {
+        await shutdown(app)
+        stopped = true
+      })()
+
+      // Real time for the server to stop and abort the run, then fake time for the grace after the lock.
+      await Bun.sleep(50)
+      jest.useFakeTimers()
+      grant?.()
+      await settle()
+      jest.advanceTimersByTime(5000)
+      jest.useRealTimers()
+      await Promise.race([stopping, Bun.sleep(1000)])
+      expect(stopped).toBe(true)
+      await Promise.all(fired)
+    }
+    finally {
+      jest.useRealTimers()
+      cron.restore()
+    }
+  })
+
   it('waits out another process holding the job store while it opens, rather than failing', async () => {
     const path = await jobsPath()
 

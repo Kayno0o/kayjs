@@ -236,10 +236,16 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
         }
 
         // A stop waits for the run to wind down, but not past the grace, so a job ignoring its signal never holds a shutdown.
-        controller.signal.addEventListener('abort', () => {
+        const arm = () => {
           if (controller.signal.reason === STOPPED)
             grace = setTimeout(reject, Math.min(STOP_GRACE_MS, timeout ?? STOP_GRACE_MS), STOPPED)
-        })
+        }
+
+        controller.signal.addEventListener('abort', arm)
+
+        // A stop that came while the lock was pending already aborted the signal, which no listener saw.
+        if (controller.signal.aborted)
+          arm()
       })
 
       await Promise.race([job(controller.signal), limit])
