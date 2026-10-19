@@ -11,7 +11,7 @@ import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
 import { endOtherSessions } from './sessions'
-import { reprove } from './twoFactor'
+import { reprove, secondFactorLimited } from './twoFactor'
 import { hasWayIn, putBack } from './wayIn'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
@@ -250,7 +250,7 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
   if (!pending || !record || record.sessionVersion !== pending.version)
     return { ok: false, error: 'expired' }
 
-  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor) || await spend(store, `two-factor:${record.id}`, limits.twoFactorAccount))
+  if (await secondFactorLimited(state, record))
     return { ok: false, error: 'limited' }
 
   const challenge = await take(state, 'second-factor', record.id)

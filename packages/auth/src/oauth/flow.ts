@@ -43,7 +43,7 @@ export async function startOAuth(state: RequestState, provider: string, options:
   const live = await liveFlow(state)
 
   // A provider link in flight is the signed-in user's own, proved by `linkProvider`: a GET, which any page can make the browser send, never replaces it.
-  if (live && live.link !== null && live.link !== '')
+  if (live && live.link !== null && live.link !== '' && live.link === (await state.current())?.id)
     return { error: 'oauth' }
 
   // The same sign-in asked for again, by a double click, a prefetch or a page loading the link, goes on with the one in flight rather than breaking it.

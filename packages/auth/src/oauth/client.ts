@@ -32,7 +32,7 @@ export class OAuthExchangeError extends Error {
 
 // A site served over https sends codes and tokens to https endpoints only, whatever NODE_ENV says.
 function requireSecureEndpoints(endpoints: OAuthEndpoints, provider: string): void {
-  const urls = { authorizeUrl: endpoints.authorizeUrl, tokenUrl: endpoints.tokenUrl, userUrl: endpoints.userUrl, jwksUrl: endpoints.openId?.jwksUrl }
+  const urls = { authorizeUrl: endpoints.authorizeUrl, tokenUrl: endpoints.tokenUrl, userUrl: endpoints.userUrl, jwksUrl: endpoints.openId?.jwksUrl, discoveryBase: endpoints.discoveryBase }
 
   for (const [name, url] of Object.entries(urls)) {
     if (url !== undefined && new URL(url).protocol !== 'https:')

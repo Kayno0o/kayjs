@@ -2,7 +2,7 @@ import type { Limits } from '../src/limits'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { hcaptcha, turnstile } from '../src/captcha'
 import { createOAuthClient } from '../src/oauth/client'
-import { discordProvider, githubProvider } from '../src/oauth/providers'
+import { discordProvider, githubProvider, oidcProvider } from '../src/oauth/providers'
 import { base32Encode } from '../src/totp'
 import { sealTotpSecret } from '../src/twoFactor'
 import { SECRET, testApp, userRecord } from './helpers/app'
@@ -148,6 +148,11 @@ describe('OAuth', () => {
     const callback = await ada.fetch(`/auth/discord/callback?error=access_denied&state=${linkState}`)
 
     expect(callback.headers.get('location')).toBe('/login?error=cancelled')
+
+    // Signed out, an abandoned link no longer blocks signing in with a provider.
+    await ada.callOk('linkProvider', 'discord', { password: PASSWORD })
+    await ada.call('signOut')
+    expect((await ada.fetch('/auth/github')).headers.get('location')).toContain('github.com')
   })
 
   test('a failed token exchange is logged', async () => {
@@ -174,6 +179,12 @@ describe('OAuth', () => {
 
     expect(() => testApp({ url: 'https://site.test', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
     expect(() => testApp({ url: 'http://localhost:3000', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).not.toThrow()
+  })
+
+  test('an http OpenID Connect issuer is refused at an https site outside production too', () => {
+    process.env.NODE_ENV = 'development'
+
+    expect(() => testApp({ url: 'https://site.test', oauth: { idp: { provider: oidcProvider({ issuer: 'http://idp.test' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
   })
 
   test('a discovered endpoint on plain http is refused for an https site', async () => {

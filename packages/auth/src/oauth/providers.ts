@@ -183,6 +183,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
 
   return {
     name: opts.name ?? new URL(issuer).host,
+    discoveryBase: issuer,
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     discover: async () => {

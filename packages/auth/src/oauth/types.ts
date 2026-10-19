@@ -35,6 +35,8 @@ export interface OAuthEndpoints {
   tokenUrl?: string | undefined
   userUrl?: string | undefined
   openId?: OpenIdCheck | undefined
+  /** The URL the endpoints are discovered from, such as an OpenID Connect issuer, checked like an endpoint. */
+  discoveryBase?: string | undefined
 }
 
 /** A provider's OAuth endpoints plus how to parse its token/user responses. */

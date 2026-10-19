@@ -77,6 +77,25 @@ export async function challenged(state: RequestState): Promise<boolean> {
   return challenge !== undefined && challenge.expires > Date.now()
 }
 
+// Counts one sign-in guess at the second factor, per client and per account, and says whether it is past the cap.
+// Once per lockout, as for passwords: only the first guess past the account's cap mails the holder.
+export async function secondFactorLimited(state: RequestState, record: UserRecord): Promise<boolean> {
+  const { store, limits } = state.core
+
+  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
+    return true
+
+  const guesses = await store.attempts.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)
+
+  if (guesses <= limits.twoFactorAccount.max)
+    return false
+
+  if (guesses === limits.twoFactorAccount.max + 1)
+    await afterResponse('reporting a second factor lockout', async () => notify(state, record, 'sign-in-locked'))
+
+  return true
+}
+
 export async function verifyTwoFactor(state: RequestState, code: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
   const { store, limits } = state.core
   const challenge = await state.session.get('authChallenge')
@@ -86,18 +105,8 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
     return { ok: false, error: 'expired' }
 
   // Six digits with three live at a time make about one guess in 333,000: the attempt budget is what makes the factor strong.
-  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
+  if (await secondFactorLimited(state, record))
     return { ok: false, error: 'limited' }
-
-  const guesses = await store.attempts.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)
-
-  if (guesses > limits.twoFactorAccount.max) {
-    // Once per lockout, as for passwords: only the first guess past the cap mails the holder.
-    if (guesses === limits.twoFactorAccount.max + 1)
-      await afterResponse('reporting a second factor lockout', async () => notify(state, record, 'sign-in-locked'))
-
-    return { ok: false, error: 'limited' }
-  }
 
   if (!(await spendSecondFactor(state, record, code))) {
     await report(state, record, 'sign-in-failed', 'two-factor')
