@@ -10,7 +10,7 @@ export type { Consent } from '../runtime/consent'
 export type AnalyticsText = string | Record<string, string>
 
 export interface AnalyticsConsent {
-  // The question the notice asks.
+  // The question the notice asks; `{provider}` in it becomes the provider's name, as in the default wording.
   text?: AnalyticsText | undefined
   agree?: AnalyticsText | undefined
   refuse?: AnalyticsText | undefined
@@ -40,7 +40,7 @@ interface Common {
   consent?: boolean | AnalyticsConsent | undefined
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
   info?: false | AnalyticsInfo | undefined
-  // The app's privacy policy, a path (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
+  // The app's privacy policy, a path written without the `base` (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
   policyUrl?: string | undefined
   // Pages that are never counted, as paths: `/account` leaves out the page and all under it, `*` stands for one segment (`/*/admin` for an app with locale prefixes).
   // A page with `noindex` is left out too. Only the providers kay forwards visits for take it, not `fathom`, `cloudflare` or `custom`, whose script counts alone.
@@ -141,7 +141,7 @@ const TOKEN = /^[\w-]{1,128}$/
 const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 
 const PROVIDER_NAMES: Record<string, string> = { plausible: 'Plausible', umami: 'Umami', simpleanalytics: 'Simple Analytics', matomo: 'Matomo', ga4: 'Google Analytics', fathom: 'Fathom', cloudflare: 'Cloudflare Web Analytics' }
-const LOCAL_PATH = /^\/(?!\/)/
+const LOCAL_PATH = /^\/(?![/\\])/
 const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
 // The providers that wait for a yes unless the app wrote `consent: false`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
@@ -163,12 +163,14 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   const info = typeof options.info === 'object' ? options.info : {}
   const name = options.provider === 'custom' ? URL.parse(options.endpoint)?.hostname ?? 'a statistics tool' : PROVIDER_NAMES[options.provider]!
   const words = asking
-    ? noticeOf(given, { text: `We count visits to improve this site with ${name}, without cookies that follow you. Do you agree?`, agree: 'Agree', refuse: 'Refuse', policy: 'Privacy policy' })
-    : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, { text: `We count visits to improve this site with ${name}, without cookies that follow you. You can opt out.`, agree: 'OK', refuse: 'Opt out', policy: 'Privacy policy' })
+    ? noticeOf(given, { text: `We count visits to improve this site with {provider}, without cookies that follow you. Do you agree?`, agree: 'Agree', refuse: 'Refuse', policy: 'Privacy policy' })
+    : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, { text: `We count visits to improve this site with {provider}, without cookies that follow you. You can opt out.`, agree: 'OK', refuse: 'Opt out', policy: 'Privacy policy' })
+
+  const named = Object.fromEntries(Object.entries(words).map(([language, entry]) => [language, { ...entry, text: entry.text.replaceAll('{provider}', name) }]))
 
   const gate = (asking || informs) && {
     ...asking ? { 'data-consent': '', ...given.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
-    'data-texts': JSON.stringify(words),
+    'data-texts': JSON.stringify(named),
     'data-max-age': String(given.maxAge ?? CONSENT_MAX_AGE),
     ...options.policyUrl !== undefined && { 'data-policy': options.policyUrl },
   }

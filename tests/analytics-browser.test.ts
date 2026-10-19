@@ -359,7 +359,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
       routes: 'tests/fixtures/navigation/src/routes',
       browser: { path },
       onError: () => undefined,
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true, policyUrl: '/privacy', exclude: ['/second'] })],
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true, policyUrl: '/privacy', exclude: ['/second', '/*/admin'] })],
     })
     opened = await own.open('/')
   }, 60_000)
@@ -431,5 +431,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
 
     expect(urls).toEqual(['/', '/later'])
     expect(opened.errors).toEqual([])
+  })
+
+  it('leaves out a path matching a wildcard pattern and a page that says noindex, however the meta is written', async () => {
+    const before = received.length
+    const swap = async (path: string) => opened.evaluate((to) => {
+      document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: location.origin + to } }))
+    }, path)
+
+    await swap('/fr/admin/users')
+    await swap('/fr/admin')
+    await swap('/admin')
+    await visits(before + 1)
+    await opened.evaluate(() => document.head.append(Object.assign(document.createElement('meta'), { name: 'robots', content: 'NoIndex, nofollow' })))
+    await swap('/quiet')
+    await opened.evaluate(() => document.querySelector('meta[name=robots]')!.remove())
+    await swap('/loud')
+    await visits(before + 2)
+    await Bun.sleep(300)
+
+    expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/admin', '/loud'])
   })
 })

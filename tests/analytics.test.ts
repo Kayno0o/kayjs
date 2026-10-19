@@ -157,6 +157,14 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(await page(plausible({ consent: true }))).toContain('with Plausible, without cookies that follow you. Do you agree?')
   })
 
+  it('puts the provider into wording the app wrote, where it writes {provider}', async () => {
+    const html = await page(plausible({ consent: { text: { en: 'Count with {provider}?', fr: 'Compter avec {provider} ?' } } }))
+
+    expect(html).toContain('Count with Plausible?')
+    expect(html).toContain('Compter avec Plausible ?')
+    expect(html).not.toContain('{provider}')
+  })
+
   it('links the policy the app names, in the notice and in the information line', async () => {
     expect(await page(plausible({ policyUrl: '/privacy' }))).toContain('data-policy="/privacy"')
     expect(await page(plausible({ consent: true, policyUrl: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
@@ -164,7 +172,7 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(await page(plausible({ policyUrl: '/privacy', info: { policy: { en: 'Policy', fr: 'Politique' } } }))).toContain('Politique')
   })
 
-  it.each(['javascript:alert(1)', '//evil.example', 'privacy', ''])('refuses the policy address %p', (policyUrl) => {
+  it.each(['javascript:alert(1)', '//evil.example', '/\\evil.example', 'privacy', ''])('refuses the policy address %p', (policyUrl) => {
     expect(() => analytics({ ...plausible(), policyUrl })).toThrow('policyUrl')
   })
 

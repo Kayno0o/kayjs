@@ -11,7 +11,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const silent = data.silent !== undefined
   const titles = data.titles !== undefined
   const maxAge = Number(data.maxAge) || 15552000
-  const exclude = data.exclude ? JSON.parse(data.exclude) : []
+  const exclude = data.exclude ? JSON.parse(data.exclude).map(pattern => pattern.split('/').filter(Boolean)) : []
   const texts = data.texts ? JSON.parse(data.texts) : {}
   const load = data.load ? JSON.parse(data.load) : undefined
   let loaded = false
@@ -34,11 +34,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   function skipped(url) {
     const parts = new URL(url).pathname.slice(scope === '/' ? 0 : scope.length).split('/').filter(Boolean)
 
-    return !!document.querySelector('meta[name=robots][content*=noindex]') || exclude.some(pattern => {
-      const wanted = pattern.split('/').filter(Boolean)
-
-      return wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at])
-    })
+    return !!document.querySelector('meta[name=robots][content*=noindex i]') || exclude.some(wanted => wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
   }
 
   async function view(url) {
@@ -133,7 +129,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     if (words.policy && data.policy) {
       const link = make('a', words.policy)
 
-      link.href = data.policy
+      link.href = data.policy[0] === '/' && scope !== '/' ? scope + data.policy : data.policy
       banner.firstChild.append(' ', link)
     }
 

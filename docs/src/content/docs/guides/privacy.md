@@ -125,7 +125,7 @@ analytics({
 })
 ```
 
-The notice names the tool from your config, for example "with Plausible", so you write no wording for it. Add `policyUrl: '/privacy'` (a path or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
+The notice names the tool from your config, for example "with Plausible", so you write no wording for it. If you word the text yourself, write `{provider}` where the name goes. Add `policyUrl: '/privacy'` (a path written without your `base`, or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
 
 The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
 
@@ -135,7 +135,7 @@ Give any element a `data-analytics-consent` attribute and a click on it shows th
 
 ### Leaving pages out
 
-Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`.
+Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`.
 
 The page title is not sent unless you write `titles: true`, since a title can name a person.
 
