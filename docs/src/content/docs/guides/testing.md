@@ -136,6 +136,8 @@ const asAdmin = site.as(await auth.sessionCookie(admin.id))
 expect((await asAdmin.visit('/admin')).status).toBe(200)
 ```
 
+A `persisted` signal kept in a cookie stores its value in kay's own encoding, so `scheme=light` reads as the default. `persistedCookie(name, value)` gives the right cookie: `site.as(persistedCookie('scheme', 'light'))` renders the first page with `light`.
+
 ## Calling an API route
 
 `site.api(module, path, options)` calls a route of a module under `src/api` as an island's `call()` does. The method, params, query and body are typed from the route, so a wrong one fails to compile. It resolves with `ok`, `status`, `headers` and `body`, and a refusal is an answer, not a throw.

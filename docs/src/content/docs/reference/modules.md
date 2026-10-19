@@ -93,7 +93,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
-| `kay/test` | `testSite`, `mountComponent`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `cookieJar`, `overrideEnv`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |
+| `kay/test` | `testSite`, `mountComponent`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `persistedCookie`, `cookieJar`, `overrideEnv`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |
 | `kay/test/preload` | The preload a project's `bunfig.toml` lists for `bun test`, before any other registering a DOM |
 | `kay/test/dom` | The preload registering happy-dom's DOM, popover API included, for `mountComponent`. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |

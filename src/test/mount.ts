@@ -35,6 +35,11 @@ export function writePersisted(key: string, value: unknown): void {
   localStorage.setItem(key, sendValue(value))
 }
 
+// A `Cookie` header value setting the cookie a `persisted(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
+export function persistedCookie(name: string, value: unknown): string {
+  return `${name}=${encodeURIComponent(sendValue(value))}`
+}
+
 // The value a `persisted(key, initial, { storage: 'local' })` signal kept in localStorage, decoded, or undefined when it kept none.
 export function readPersisted(key: string): unknown {
   const text = localStorage.getItem(key)

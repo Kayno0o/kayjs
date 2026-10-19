@@ -212,6 +212,7 @@ it('shows why a todo was refused', async () => {
 - `page.settled` is the page as a visitor ends up seeing it, for one whose `await` blocks stream: each block's last part put in place of its pending markup and the swap script left out, read with the same `title`, `find` and `text`, and an `html` without the streamed templates; `page.text()` and `page.html` keep the pending markup and the templates, `expect(page.settled.text('.score')).toBe('42')`, no browser needed.
 - Assert on text through `text` or `find`, never on `page.html`: an island's markup holds hydration markers between the parts of an interpolated text, so `p Thanks, {name}!` renders `Thanks, <!--[-->Ada<!--]-->!`, and `expect(page.text('.success')).toBe('Thanks, Ada!')` is what passes.
 - Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`.
+- `persistedCookie(name, value)` from `kay/test` is the `Cookie` value a `persisted(name, initial)` signal kept in a cookie holds, so a test sets one by name without knowing how kay encodes it: `site.as(persistedCookie('scheme', 'light')).visit('/')` renders with `light` on the first render, where `scheme=light` reads as the default.
 - `site.sitemap()` resolves with the URLs `/sitemap.xml` lists, or the sitemap at another path, failing when it does not answer 200.
 
 ### Requests, jobs, sockets and sessions

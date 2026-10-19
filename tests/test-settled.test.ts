@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { testSite } from '../src/test'
+import { persistedCookie, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/settled/src/routes', islands: false })
 
@@ -33,5 +33,24 @@ describe('the settled view of a streamed page', () => {
     const page = await site.visit('/plain')
 
     expect(page.settled.html).toBe(page.html)
+  })
+})
+
+describe('persistedCookie', () => {
+  it('sets a persisted value the first render reads', async () => {
+    const light = await site.as(persistedCookie('scheme', 'light')).visit('/theme')
+
+    expect(light.find('main')[0]?.attributes['data-theme']).toBe('light')
+    expect((await site.visit('/theme')).find('main')[0]?.attributes['data-theme']).toBe('system')
+  })
+
+  it('stacks with other cookies by name', async () => {
+    const both = site.as('a=1').as(persistedCookie('scheme', 'dark'))
+
+    expect((await both.visit('/theme')).find('p.scheme')[0]?.text).toBe('dark')
+  })
+
+  it('encodes values that are not strings', () => {
+    expect(persistedCookie('n', 5)).toBe(`n=${encodeURIComponent('[5]')}`)
   })
 })
