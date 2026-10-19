@@ -190,8 +190,7 @@ it('shows why a todo was refused', async () => {
 - A page older than `maxAge` is still refused as expired.
 - A post or a call to an action with `proofOfWork` carries a solved challenge, unless `headers` gives its own `x-kay-work`, `''` for none.
 - A test of the minimum itself says how long the form was open: `site.submit(contact, fields, { from: '/', openedFor: 0 })` posts as soon as the page loaded and `openedFor: '2d'` two days after.
-- A `kay_since` among the fields, such as a forged one, wins over all of it, the clock left alone.
-- `openedFor` signs a stamp of its own, so a test checking that the refused page keeps the stamp its form rendered with posts that stamp as `kay_since`, read off the visit with `page.find('input[name="kay_since"]')`.
+- `visit.stamp(action)` reads the stamp the visit's form for `action` rendered with, and `{ from: visit, stamp }` posts it as it is, so a test checking that the refused page keeps the stamp its form rendered with compares `refused.stamp(contact)` to `page.stamp(contact)`; a `stamp` such as `'forged'` is posted as given, and wins over `openedFor` and the clock.
 - Both `visit` and `submit` resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below).
 - `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, left out for an action with no input or only optional fields: `site.call(signOut)`.
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.

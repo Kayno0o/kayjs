@@ -67,6 +67,8 @@ With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees. `site.mcp.ca
 
 An action with `minTime` takes the post as if its form had been open long enough, so a test of something else needs no waiting. To test the minimum itself, say how long the form was open: `{ from: '/', openedFor: 0 }` posts as soon as the page loaded.
 
+The form carries a stamp of when it rendered. `page.stamp(contact)` reads it off a visit, and `{ from: page, stamp }` posts it back as it is, so a test can check that a refused page keeps the stamp its form first had. Any other text, such as `stamp: 'forged'`, is posted as given.
+
 An action with `proofOfWork` gets a solved challenge with each post and call. Send your own `x-kay-work` header to override it, `''` for none.
 
 A site made at the top of the file posts as a new client in each test, so a rate limit counts the posts of one test only.

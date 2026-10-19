@@ -76,6 +76,8 @@ export interface Visit extends PageReading {
   html: string
   // The page as the visitor ends up seeing it: each streamed `await` block replaced by its last part, read as the page is, and its `html` without the templates and the swap script.
   settled: PageReading & { html: string }
+  // The stamp the form posting to `action` rendered with, which `submit` takes as its `stamp`; `undefined` for a page with no such form or a form with no stamp.
+  stamp: (action: Pick<Action<never, unknown>, 'url'>) => string | undefined
 }
 
 export interface VisitInit {
@@ -99,8 +101,8 @@ export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
-  // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened.
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
+  // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened, and `stamp` posts the stamp it is given as it is, such as the one `visit.stamp(action)` read or a forged one.
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0, stamp?: string | undefined }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects. `from` names the page it is made on, whose params the action reads.
   // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
@@ -193,6 +195,18 @@ function nextClient(): string {
   clients++
 
   return `10.${clients >> 16 & 255}.${clients >> 8 & 255}.${clients & 255}`
+}
+
+// The URL the form posting to `action` carries on a page, which the browser posts to.
+function formUrl(page: PageReading, action: Pick<Action<never, unknown>, 'url'>): URL | undefined {
+  const target = page.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
+
+  return target === undefined ? undefined : new URL(target, ORIGIN)
+}
+
+// The stamp the form posting to `url` rendered with.
+function renderedStamp(page: PageReading, url: URL): string | undefined {
+  return page.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
 }
 
 // The stamp `minTime` reads, as the browser sends the form it was rendered in: dated `openedFor` ago when given, else the page's own made no younger than the action asks, so a test about something else is not refused as too fast.
@@ -381,13 +395,19 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const html = await withNatives(async () => current.text())
 
       let settled: Visit['settled'] | undefined
+      const reading = readPage(html)
 
       return {
         url: path,
         status: current.status,
         headers: current.headers,
         html,
-        ...readPage(html),
+        ...reading,
+        stamp: (action) => {
+          const url = formUrl(reading, action)
+
+          return url && renderedStamp(reading, url)
+        },
         get settled() {
           const text = settledHtml(html)
 
@@ -558,13 +578,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       submit: async (action, fields, init = {}) => {
         const page = typeof init.from === 'object' ? init.from : undefined
         const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
-        const target = page?.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
-        const url = target === undefined ? undefined : new URL(target, ORIGIN)
+        const url = page && formUrl(page, action)
         const posted = url === undefined ? action.url : url.pathname + url.search
         const form = new NativeFormData()
 
-        const rendered = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
-        const stamp = postedStamp(action, rendered, init.openedFor)
+        const rendered = page && url && renderedStamp(page, url)
+        const stamp = init.stamp ?? postedStamp(action, rendered, init.openedFor)
 
         if (stamp !== undefined && !(STAMP_FIELD in fields))
           form.set(STAMP_FIELD, stamp)

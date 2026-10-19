@@ -34,6 +34,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay fmt` moves the shorthand classes of an element into a `class="..."` inside the parentheses when they make its line longer than 120 characters, the value over several lines when it is long, and a static `class="..."` may run over lines, its words joined by single spaces ([Templates](templates.md)).
 - An `_actions.kay` is a `--- server` fence alone, with no closing `---` line, and `kay fmt` leaves a fence running to the end of the file as it is ([Actions](actions.md#declaring-an-action)).
 - `s.UnionKeys(record)` is an enum schema over a record's keys, typed as their union where `s.UnionEnum(Object.keys(record) as [...])` needed a cast ([Actions](actions.md#forms)).
+- A `kay/test` visit has `stamp(action)`, the stamp its form for `action` rendered with, and `site.submit` takes it back as `{ stamp }`, so a test of a refused form needs no `kay_since` field ([Testing](testing.md#test-site)).
 
 ## 1.58.0
 
