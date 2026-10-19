@@ -428,12 +428,30 @@ describe('a token is bound to the resource it was asked for', () => {
     expect(other.body.access_token).toBeUndefined()
   })
 
-  test('a refresh cannot add a resource to a token that had none', async () => {
+  test('a refresh naming a resource of this site keeps a token that had none unbound', async () => {
     const app = server()
     const { clientId, code } = await approvedFor(app)
     const first = await exchangeWith(app, clientId, code)
 
-    expect((await refreshWith(app, clientId, first.body.refresh_token as string, { resource: MCP })).body.error).toBe('invalid_target')
+    const named = await refreshWith(app, clientId, first.body.refresh_token as string, { resource: MCP })
+
+    expect(named.status).toBe(200)
+    expect((await bearerOf(app, named))?.oauth?.resource ?? null).toBeNull()
+  })
+
+  test('more than one resource is invalid_target', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const twice = await exchangeWith(app, clientId, code, {})
+    const first = await refreshWith(app, clientId, twice.body.refresh_token as string)
+    const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: first.body.refresh_token as string, client_id: clientId })
+
+    body.append('resource', MCP)
+    body.append('resource', MCP)
+
+    const response = await app.browser().fetch('/auth/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+
+    expect((await response.json() as { error: string }).error).toBe('invalid_target')
   })
 
   test('a refresh naming a resource of another site is invalid_target too', async () => {

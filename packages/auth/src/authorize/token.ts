@@ -49,7 +49,7 @@ async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | nul
 }
 
 // The resource the tokens are bound to: the one the code asked for, which a request may name again or leave out but not change or add. A reply when the request names another.
-function boundResource(form: URLSearchParams, root: string, bound: string | null | undefined): { resource: string | null } | TokenReply {
+function boundResource(form: URLSearchParams, root: string, bound: string | null | undefined, legacy = false): { resource: string | null } | TokenReply {
   const asked = form.getAll('resource')
 
   if (asked.length === 0)
@@ -57,6 +57,10 @@ function boundResource(form: URLSearchParams, root: string, bound: string | null
 
   if (asked.length > 1 || !sameSite(asked[0]!, root))
     return refused('invalid_target', 'The resource is not one of this server')
+
+  // A refresh token stored before the column has no resource to compare, and a client names its resource on every refresh: it stays unbound.
+  if (legacy && bound == null)
+    return { resource: null }
 
   return bound != null && sameResource(asked[0]!, bound) ? { resource: bound } : refused('invalid_target', 'The resource is not the one the tokens were asked for')
 }
@@ -143,7 +147,7 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   if (asked !== null && !covers(held.scopes, scopes))
     return refused('invalid_scope', 'A refresh cannot add scopes')
 
-  const bound = boundResource(form, root, held.resource)
+  const bound = boundResource(form, root, held.resource, true)
 
   if ('status' in bound)
     return bound
