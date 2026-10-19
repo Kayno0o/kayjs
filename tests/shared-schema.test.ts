@@ -10,19 +10,12 @@ const site = await testSite({ routes: 'tests/fixtures/shared-schema/src/routes' 
 afterAll(async () => site.close())
 
 describe('a schema shared by a server module and an island', () => {
-  it('builds an island reading only the schema\'s type, shipping none of the schema', async () => {
+  // The production client build the site makes refuses to finish when an island bundles `s`, so a page with its island is the proof.
+  it('builds an island reading only the schema\'s type', async () => {
     const response = await site.fetch('/')
-    const html = await response.text()
-    const chunks = [...html.matchAll(/(?:href|src)="(\/_kay\/[^"]+\.js)"/g)].map(match => match[1]!)
 
     expect(response.status).toBe(200)
-    expect(html).toContain('class="flip"')
-
-    for (const chunk of chunks) {
-      const code = await (await site.fetch(chunk)).text()
-
-      expect(code).not.toContain('builds a schema')
-    }
+    expect(await response.text()).toContain('class="flip"')
   })
 
   it('answers the action built from the same schema', async () => {

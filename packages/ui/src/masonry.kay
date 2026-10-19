@@ -38,10 +38,7 @@ onMount(() => {
     const next = new Map(heights())
 
     for (const entry of entries) {
-      const id = keys.get(entry.target)
-
-      if (id !== undefined)
-        next.set(id, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
+      next.set(keys.get(entry.target)!, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
     }
 
     heights.set(next)

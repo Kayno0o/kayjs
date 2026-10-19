@@ -275,6 +275,7 @@ const column = elementSize()
 - `elementSize()` from `kay`, called in an island's script, returns `{ ref, width, height }`: pass `ref` to the element as `ref={column.ref}`, and `column.width()` and `column.height()` read its content box in pixels, following every resize.
 - Both are 0 on the server and until the browser has measured the element, so the first paint of a size-dependent drawing is empty.
 - An element rendered later, as inside an `if`, is observed from then on, the one it replaces dropped; the observer goes with the island.
+- Give `ref` to one element: two elements sharing it follow the last, and one removed by an `if` with no `else` stays observed until the island goes.
 - To keep the element too, a `ref` calls both: `ref={element => { box = element; size.ref(element) }}`.
 
 ### Context
