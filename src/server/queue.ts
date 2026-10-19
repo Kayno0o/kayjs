@@ -575,10 +575,10 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
 
       await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay })
-      await tidy()
 
       // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
       wakePoller()
+      await tidy()
 
       return id
     },

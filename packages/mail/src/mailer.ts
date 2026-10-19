@@ -410,9 +410,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
   const jobs = queue<Mail>(name, deliver, {
-    keepFailed: FAILED_KEPT,
-    redact: withoutBody,
     ...queueOptions,
+    keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
+    redact: queueOptions.redact ?? withoutBody,
     onFailed: async (mail, error) => {
       log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
       await onFailed?.(mail, error)

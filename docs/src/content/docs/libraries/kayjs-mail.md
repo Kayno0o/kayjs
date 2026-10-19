@@ -151,7 +151,11 @@ Each address holds one mailbox. A visitor's `a@x.com,b@y.com` is refused, and se
 
 To list the queued mails given up on, call `mail.failed()`.
 
-A mail given up is kept 7 days, and its body, links, headers and attachments are dropped at once, so a reset link does not stay in the job store. Its recipients, subject and the server's error stay. Set `queue: { keepFailed: '30d' }` to keep it longer, or `redact` to keep something else. `onFailed` still gets the whole mail. To erase a person, call `mail.remove({ recipient: 'ada@example.com' })`, which deletes every queued or failed mail to that address.
+A mail given up is kept 7 days, and its body, links, headers and attachments are dropped at once, so a reset link does not stay in the job store.
+
+Its recipients, subject and the server's error stay, the error as it came: a refusal may quote a URL. Set `queue: { keepFailed: '30d' }` to keep it longer, or `redact` to keep something else. `onFailed` still gets the whole mail.
+
+To erase a person, call `mail.remove({ recipient: 'ada@example.com' })`, which deletes every queued or failed mail to that address.
 
 ### Unsubscribe links
 

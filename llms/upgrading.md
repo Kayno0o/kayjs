@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.55.0
 
+### kayjs-mail keeps a failed mail 7 days, without its body
+
+- A mail given up is kept 7 days instead of 30, with its `html`, `text`, `headers` and `attachments` emptied: `mail.failed()` still lists recipients, subject and error. Code re-enqueuing a payload from `failed()` would send an empty mail; enqueue again from the app's own data, or keep the old behaviour with `queue: { keepFailed: '30d', redact: mail => mail }`. `kay check` cannot recognise this, so there is no lint.
+- A queue's `JobStore.fail(id, error, payload?)` takes the redacted payload as a third argument; a custom store ignoring it keeps the job whole.
+
 ### kayjs-auth tokens expire by default and adopted ones need 32 characters
 
 - `createToken` and `issueToken` now expire a token after 90 days when `expiresIn` is left out; pass `expiresIn: null` for one that never does. Existing tokens keep the expiry they were made with. The account page's "Never" choice passes `null` itself. `kay check` cannot recognise the old form, so there is no lint.
