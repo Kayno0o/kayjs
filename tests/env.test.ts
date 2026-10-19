@@ -149,9 +149,18 @@ describe('a compiled server', () => {
   }, 90_000)
 })
 
+function readerEnv() {
+  const env = defineEnv(t.Object({
+    MEDIA_DIR: t.String({ default: 'media' }),
+    DEBUG: t.Optional(t.Boolean()),
+  }), { DEBUG: 'true' })
+
+  return { env, mediaDir: (): string => env.MEDIA_DIR }
+}
+
 describe('overrideEnv', () => {
-  it('gives a variable of an env already read at import another value for one test, and puts it back', async () => {
-    const { env, mediaDir } = await import('./fixtures/env-reader')
+  it('gives a variable of an env already read another value for one test, and puts it back', async () => {
+    const { env, mediaDir } = readerEnv()
 
     const override = overrideEnv(env, { MEDIA_DIR: '/tmp/a' })
 
@@ -163,7 +172,7 @@ describe('overrideEnv', () => {
   })
 
   it('restores at the end of a using block, a failing one included', async () => {
-    const { env, mediaDir } = await import('./fixtures/env-reader')
+    const { env, mediaDir } = readerEnv()
 
     expect(() => {
       using override = overrideEnv(env, { MEDIA_DIR: '/tmp/b' })
@@ -177,7 +186,7 @@ describe('overrideEnv', () => {
   })
 
   it('nests, each restore putting back what its override replaced', async () => {
-    const { env, mediaDir } = await import('./fixtures/env-reader')
+    const { env, mediaDir } = readerEnv()
     const outer = overrideEnv(env, { MEDIA_DIR: '/outer' })
     const inner = overrideEnv(env, { MEDIA_DIR: '/inner' })
 
@@ -189,7 +198,7 @@ describe('overrideEnv', () => {
   })
 
   it('unsets an optional variable with undefined and brings it back', async () => {
-    const { env } = await import('./fixtures/env-reader')
+    const { env } = readerEnv()
     const override = overrideEnv(env, { DEBUG: undefined })
 
     expect('DEBUG' in env).toBe(false)
@@ -198,7 +207,7 @@ describe('overrideEnv', () => {
   })
 
   it('sets a variable the env did not hold and removes it after', async () => {
-    const { env } = await import('./fixtures/env-reader')
+    const { env } = readerEnv()
     const other: { EXTRA?: string } = {}
     const override = overrideEnv(other, { EXTRA: 'x' })
 
@@ -218,7 +227,7 @@ describe('overrideEnv', () => {
   })
 
   it('leaves process.env alone', async () => {
-    const { env } = await import('./fixtures/env-reader')
+    const { env } = readerEnv()
     const before = process.env.MEDIA_DIR
 
     using override = overrideEnv(env, { MEDIA_DIR: '/tmp/c' })

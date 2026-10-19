@@ -1,8 +1,9 @@
 import type { Guard, GuardContext, LocalsOf } from 'kay'
 import type { AuthSessionData } from '../src/auth'
-import { describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
+import { afterEach, describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
+import { setSite } from '../../../src/runtime/site'
 import { Auth, createAuth } from '../src/auth'
 import { memoryStore } from '../src/memoryStore'
 import { browser, SECRET, testApp, userRecord } from './helpers/app'
@@ -31,49 +32,85 @@ describe('createAuth', () => {
     await expect(auth.sessionCookie('nobody')).rejects.toThrow('no user nobody')
   })
 
-  test('sessionCookie mints the cookie an https request reads, from `secure` or a production site whose url is https', async () => {
-    const { auth, app, store } = testApp({ url: 'https://example.com' })
-    const read = async (cookie: string, headers: Record<string, string>) => (await app.handle(new Request('http://localhost/me', { headers: { cookie, ...headers } }))).text()
+  describe('sessionCookie against the server\'s scheme rule', () => {
+    const previous = process.env.NODE_ENV
     const proto = { 'x-forwarded-proto': 'https' }
-    const previous = process.env.NODE_ENV ?? 'test'
 
-    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    afterEach(() => {
+      if (previous === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = previous
 
-    try {
-      const http = await auth.sessionCookie('u1')
+      setSite(undefined)
+    })
+
+    async function seed(options: Parameters<typeof testApp>[0] = {}) {
+      const setup = testApp(options)
+
+      await setup.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+
+      return { ...setup, read: async (cookie: string, headers: Record<string, string> = {}) => (await setup.app.handle(new Request('http://localhost/me', { headers: { cookie, ...headers } }))).text() }
+    }
+
+    test('mints the http cookie outside production, whatever the url', async () => {
+      const { auth, read } = await seed({ url: 'https://example.com' })
+      const cookie = await auth.sessionCookie('u1')
+
+      expect(cookie).toStartWith('session=')
+      expect(await read(cookie)).toContain('u1')
+      expect(await read(cookie, proto)).toBe('anonymous')
+    })
+
+    test('`secure: true` mints the cookie an https request reads, `secure: false` the plain one', async () => {
+      const { auth, read } = await seed()
       const https = await auth.sessionCookie('u1', { secure: true })
 
-      expect(http).toStartWith('session=')
       expect(https).toStartWith('__Host-session=')
       expect(await read(https, proto)).toContain('u1')
-      expect(await read(http, proto)).toBe('anonymous')
-      expect(await read(https, {})).toBe('anonymous')
+      expect(await read(https)).toBe('anonymous')
       expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
+    })
+
+    test('in production with an https site and no header, follows the server and mints __Host-session', async () => {
+      const { auth, read } = await seed()
 
       process.env.NODE_ENV = 'production'
-      expect(await auth.sessionCookie('u1')).toStartWith('__Host-session=')
+      setSite('https://example.com')
+
+      const cookie = await auth.sessionCookie('u1')
+
+      expect(cookie).toStartWith('__Host-session=')
+      expect(await read(cookie)).toContain('u1')
       expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
-      expect(await read(await auth.sessionCookie('u1'), proto)).toContain('u1')
-      await expect(auth.sessionCookie('nobody', { secure: true })).rejects.toThrow('no user nobody')
-    }
-    finally {
-      process.env.NODE_ENV = previous
-    }
-  })
+    })
 
-  test('sessionCookie stays http in production when the site has no https url', async () => {
-    const { auth, store } = testApp({ url: 'http://example.com' })
-    const previous = process.env.NODE_ENV ?? 'test'
+    test('in production with an https auth url but no site, mints what the server reads: session', async () => {
+      const { auth, read } = await seed({ url: 'https://example.com' })
 
-    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
-    process.env.NODE_ENV = 'production'
+      process.env.NODE_ENV = 'production'
 
-    try {
+      const cookie = await auth.sessionCookie('u1')
+
+      expect(cookie).toStartWith('session=')
+      expect(await read(cookie)).toContain('u1')
+    })
+
+    test('in production with no url and no site, mints session; `secure: true` serves a proxy sending the header', async () => {
+      const { auth, read } = await seed()
+
+      process.env.NODE_ENV = 'production'
       expect(await auth.sessionCookie('u1')).toStartWith('session=')
-    }
-    finally {
-      process.env.NODE_ENV = previous
-    }
+      expect(await read(await auth.sessionCookie('u1', { secure: true }), proto)).toContain('u1')
+    })
+
+    test('a missing or banned user throws on the https path', async () => {
+      const { auth, store } = await seed()
+
+      await expect(auth.sessionCookie('nobody', { secure: true })).rejects.toThrow('no user nobody')
+      await store.users.update('u1', { bannedAt: new Date() })
+      await expect(auth.sessionCookie('u1', { secure: true })).rejects.toThrow()
+    })
   })
 
   test('a visitor who never signed in reads as anonymous and gets no cookie', async () => {

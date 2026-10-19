@@ -153,6 +153,8 @@ export const env = defineEnv(s.Object({
 
 Import `env` from server code. An island never sees it.
 
+A module that builds its own environment passes the variables as a second argument, `defineEnv(schema, source)`, which is read instead of `process.env`.
+
 To read other values in a test, use `overrideEnv` from `kay/test` ([Testing](/guides/testing)).
 
 Give a secret that development and tests can do without, and production must have, `requiredInProduction: true`.

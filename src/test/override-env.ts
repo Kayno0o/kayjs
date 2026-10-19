@@ -7,7 +7,8 @@ export interface EnvRestore {
 }
 
 // Gives variables of a `defineEnv` value another value, which every module reading that `env` sees at once, `restore()` (or the end of a `using`) putting back what it held.
-// Values are not read against the schema again, and overrides undone in the order they were made.
+// Values are not read against the schema again, so a string given to a number field stays a string.
+// Restores must run in reverse order, as `using` does: one run out of order leaves the outer override's value in place.
 export function overrideEnv<Env extends object>(env: Env, values: EnvOverride<Env>): EnvRestore {
   const before = new Map<string, PropertyDescriptor | undefined>()
   let restored = false

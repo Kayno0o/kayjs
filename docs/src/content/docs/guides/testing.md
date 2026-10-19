@@ -187,7 +187,11 @@ You can also run each folder's tests on their own with `KAY_ROOT=<folder> bun te
 
 A test that drives an Elysia app of its own, rather than `testSite`, keeps a browser's cookies with `cookieJar()`. `jar.send(handle, request)` sends the cookies kept so far and keeps the ones the response sets.
 
-A test gives a variable of `env` another value with `overrideEnv(env, { MEDIA_DIR: dir })`, and `restore()` puts it back. Write `using restore = overrideEnv(...)` to have it put back when the test ends, even when it fails. Every module reading that `env` sees the new value, and tests running at the same time share one `env`.
+A test gives a variable of `env` another value with `overrideEnv(env, { MEDIA_DIR: dir })`, and `restore()` puts it back. Write `using override = overrideEnv(...)` to have it put back when the test ends, even when it fails.
+
+A module reading `env.MEDIA_DIR` when it runs sees the new value, but one that copied or destructured it at import keeps the old one.
+
+The value is not checked against the schema, so a string given to a number field stays a string. Undo overrides in reverse order, as `using` does. Tests running at the same time share one `env`, and `publicEnv` is read apart, so an override never reaches it.
 
 `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under `.kay/scratch`, which no build or check reads.
 
