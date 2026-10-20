@@ -3700,7 +3700,7 @@ function follow(event: PointerEvent, element: HTMLElement, move: (dx: number, dy
 }
 
 const FOCUSABLE = 'a[href], area[href], button, input:not([type=hidden]), select, textarea, details > summary:first-of-type, iframe, audio[controls], video[controls], [contenteditable]:not([contenteditable=false]), [tabindex]'
-// Re-reading the page waits for the mutations to settle, and the focus check, which moves focus, for the list of stops to change.
+// Re-reading the page waits for the mutations to settle, and the focus check, which moves focus, for the list of stops or a class or style to change.
 const TAB_ORDER_WAIT = 150
 const TAB_ORDER_MAX_REPORTED = 5
 const FOCUS_ANCESTORS = 4
@@ -3960,7 +3960,7 @@ function startTabOrder(doc: Document, root: ShadowRoot, make: DevTool['make']): 
   const move = () => repaint()
   const resize = () => {
     stale = true
-    repaint()
+    schedule()
   }
   const sameStops = (stops: HTMLElement[]) => stops.length === checked.length && stops.every((stop, index) => stop === checked[index])
 
