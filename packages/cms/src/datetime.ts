@@ -114,13 +114,6 @@ export function goesLive(time: number, now = Date.now(), zone?: string): string 
   return `${inputValue(new Date(time).toISOString(), at).replace('T', ' ')} ${zoneLabel(time, at)}`
 }
 
-// Says when an entry whose `publishAt` date is ahead goes live, or nothing for an entry that has none or whose date has passed.
-export function scheduledFor(collection: Pick<CollectionInfo, 'publishField'>, data: Record<string, unknown> | undefined, now = Date.now(), zone?: string): string | undefined {
-  const time = publishTime(collection, data)
-
-  return time === undefined ? undefined : goesLive(time, now, zone)
-}
-
 // Says when the date `at` returns goes live, in the editor's zone (UTC until the browser says it), and nothing once it has passed or while `at` has none, with no reload: a timer wakes it as the date passes. Called in a component's script.
 export function useGoesLive(at: () => number | undefined): () => string | undefined {
   const zone = useEditorZone()

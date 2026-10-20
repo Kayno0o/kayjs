@@ -1,7 +1,7 @@
 import type { CollectionInfo } from '../src/kay/contract'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { inputValue, scheduledFor, storedValue } from '../src/datetime'
+import { goesLive, inputValue, publishTime, storedValue } from '../src/datetime'
 import { rowsOf } from '../src/listing'
 
 const NOW = Date.parse('2026-10-19T12:00:00Z')
@@ -13,6 +13,13 @@ const talks: CollectionInfo = {
   publishField: 'at',
   draftField: 'draft',
   schema: { properties: { title: { type: 'string' }, at: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } },
+}
+
+// Says when an entry whose `publishAt` date is ahead goes live, or nothing for an entry that has none or whose date has passed.
+function scheduledFor(collection: CollectionInfo, data: Record<string, unknown> | undefined, now: number, zone?: string): string | undefined {
+  const time = publishTime(collection, data)
+
+  return time === undefined ? undefined : goesLive(time, now, zone)
 }
 
 describe('scheduledFor', () => {
