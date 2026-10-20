@@ -1,4 +1,5 @@
 import type { ClassSorter } from '../compiler/format'
+import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles } from '../build/files'
 import { stylesheetPath, TAILWIND_IMPORT } from '../dev/tailwind'
@@ -57,9 +58,24 @@ async function importsTailwind(file: string): Promise<boolean> {
   }
 }
 
+// Bun resolves a package missing from a tree with no node_modules by installing it from npm, and a formatter reaches no network: no sorting before the app is installed.
+export function installed(name: string, from: string): boolean {
+  for (let dir = from; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'node_modules', name)))
+      return true
+
+    if (dirname(dir) === dir)
+      return false
+  }
+}
+
 async function designSorter(entry: string): Promise<ClassSorter | undefined> {
   try {
     const base = dirname(entry)
+
+    if (!installed('tailwindcss', base))
+      return undefined
+
     const tailwind = await import(Bun.resolveSync('tailwindcss', base)) as { __unstable__loadDesignSystem?: LoadDesign }
     const design = await tailwind.__unstable__loadDesignSystem?.(await Bun.file(entry).text(), {
       base,

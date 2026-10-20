@@ -1,8 +1,9 @@
-import { rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { formatFiles, formatKay } from '../src/format'
-import { tailwindSorter } from '../src/format/tailwind'
+import { installed, tailwindSorter } from '../src/format/tailwind'
 import { scratchDir } from './scratch'
 
 const dirs: string[] = []
@@ -88,5 +89,16 @@ describe('Tailwind\'s order', () => {
     const root = await project({ 'src/app.css': `${entry}@import './missing-plugin.css';\n@plugin './missing.js';\n`, 'src/routes/index.kay': page })
 
     expect(await tailwindSorter(root)).toBeUndefined()
+  })
+
+  it('reaches no network for an app that is not installed: no node_modules above it, no sorting', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-fmt-tailwind-'))
+
+    dirs.push(root)
+    await Bun.write(join(root, 'src/app.css'), entry)
+
+    expect(installed('tailwindcss', root)).toBe(false)
+    expect(await tailwindSorter(root)).toBeUndefined()
+    expect(installed('tailwindcss', await project({}))).toBe(true)
   })
 })
