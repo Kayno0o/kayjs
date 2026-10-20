@@ -68,6 +68,7 @@ import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
+import { withSavedData } from './save-data'
 import { securityHeaders, setSecurityHeaders } from './security'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
@@ -181,6 +182,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
     quality: webpQuality(options.images),
     avif: mode.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
+    saveData: options.saveData,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
@@ -493,7 +495,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
   await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
 
-  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
+  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), renderOptions), securityOptions, security)
 
   const fallback = source.fallback(paths.routes, mounts)
 

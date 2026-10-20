@@ -327,7 +327,7 @@ describe('image route', () => {
     const decoded = (await decodeAvif((await avif.bytes()).buffer))!
 
     expect(avif.headers.get('content-type')).toBe('image/avif')
-    expect(avif.headers.get('vary')).toBe('accept')
+    expect(avif.headers.get('vary')).toBe('accept, save-data')
     expect(avif.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect([decoded.width, decoded.height]).toEqual([640, 384])
     expect(meanDifference(decoded.data, decodePng(await new Bun.Image(HERO).resize(640).png().bytes()).pixels)).toBeLessThan(4)
@@ -341,7 +341,7 @@ describe('image route', () => {
     const webp = await get(heroAt(640), { accept })
 
     expect(webp.headers.get('content-type')).toBe('image/webp')
-    expect(webp.headers.get('vary')).toBe('accept')
+    expect(webp.headers.get('vary')).toBe('accept, save-data')
   })
 
   it('encodes a runtime image\'s AVIF on request, under an ETag of its own', async () => {
@@ -355,12 +355,12 @@ describe('image route', () => {
     expect(avif.headers.get('content-type')).toBe('image/avif')
     expect(isAvif(await avif.bytes())).toBe(true)
     expect(webp.headers.get('content-type')).toBe('image/webp')
-    expect([avif.headers.get('vary'), webp.headers.get('vary')]).toEqual(['accept', 'accept'])
+    expect([avif.headers.get('vary'), webp.headers.get('vary')]).toEqual(['accept, save-data', 'accept, save-data'])
     expect(webp.headers.get('etag')).not.toBe(etag)
     const unchanged = await get(path, { 'accept': 'image/avif', 'if-none-match': etag })
 
     expect(unchanged.status).toBe(304)
-    expect(unchanged.headers.get('vary')).toBe('accept')
+    expect(unchanged.headers.get('vary')).toBe('accept, save-data')
   })
 
   it('answers an imported image\'s URL again in the format each request\'s Accept names', async () => {
@@ -379,7 +379,7 @@ describe('image route', () => {
       expect((await get(long, { accept: 'image/webp' })).status).toBe(200)
   })
 
-  it('serves WebP alone, varying on nothing, with images.avif off', async () => {
+  it('serves WebP alone, varying on Save-Data only, with images.avif off', async () => {
     const cache = await mkdtemp(join(tmpdir(), 'kay-webp-only-'))
 
     try {
@@ -390,7 +390,7 @@ describe('image route', () => {
       const response = await plain.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/avif' } }))
 
       expect(response.headers.get('content-type')).toBe('image/webp')
-      expect(response.headers.get('vary')).toBeNull()
+      expect(response.headers.get('vary')).toBe('save-data')
       expect([avifQuality(undefined), avifQuality({}), avifQuality({ avif: { quality: 70 } }), avifQuality({ avif: false })]).toEqual([50, 50, 70, undefined])
     }
     finally {

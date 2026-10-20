@@ -61,6 +61,7 @@ import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { guardUrl, routeChain } from './routes'
+import { savesLess } from './save-data'
 import { inServerScope, markPrivate, readPersonally, wasReadPersonally, withOutcome } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
@@ -157,6 +158,10 @@ export interface RenderOptions {
   lateStyles?: boolean | undefined
   // `false` leaves a French page's spaces as they were typed.
   typography?: boolean | undefined
+  // `false` serves every visitor the same page, as the `saveData` config key says; else a visitor asking for less data gets one without font preloads and speculation rules.
+  saveData?: boolean | undefined
+  // The stylesheet declaring the fonts, which a visitor asking for less data gets with each face shown only when cached.
+  fontCss?: string | undefined
   // A page rendered without its guards, as a prerender does, still being one a guard covers.
   guarded?: boolean | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
@@ -544,10 +549,14 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
   }
 
   const { names: encodings, available } = storedEncodings(page.encoded)
-  const asksDictionary = page.dcz !== undefined && client.dictionary !== undefined && dictionaryAsked(context.request, client.dictionary)
-  const encoding = asksDictionary ? 'dcz' : preferredEncoding(context.request.headers.get('accept-encoding'), available)
+  // A visitor saving data gets the page plain, its head changed on the way out, so none of the encoded copies fits.
+  const lighter = savesLess(context.request, options)
+  const asksDictionary = !lighter && page.dcz !== undefined && client.dictionary !== undefined && dictionaryAsked(context.request, client.dictionary)
+  const accepted = asksDictionary ? 'dcz' : preferredEncoding(context.request.headers.get('accept-encoding'), available)
+  const encoding = lighter ? undefined : accepted
   // Each encoding is a representation of its own, with its own tag.
-  const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag
+  const variant = lighter ? 'sd' : encoding
+  const etag = variant ? `${page.etag.slice(0, -1)}-${variant}"` : page.etag
 
   headers.set('etag', etag)
 
@@ -1002,7 +1011,7 @@ function headStart(head: RenderedHead): string {
 
 // What the islands read off the page: the mount point, and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const base = options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''
+  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '')
 
   if (!hasIslands)
     return base

@@ -1254,7 +1254,7 @@ describe('prerendering', () => {
       const etag = page.headers.get('etag')!
 
       expect(page.headers.get('content-encoding')).toBe('br')
-      expect(page.headers.get('vary')).toBe('accept-encoding')
+      expect(page.headers.get('vary')).toBe('accept-encoding, Save-Data')
       expect(etag).toEndWith('-br"')
       expect(brotliDecompressSync(await page.bytes()).toString()).toBe(file)
       expect((await fetch('/docs/guide/intro', { 'accept-encoding': 'br', 'if-none-match': etag })).status).toBe(304)
@@ -1266,7 +1266,7 @@ describe('prerendering', () => {
       const report = await signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': 'ada', 'accept-encoding': 'br' } }))
 
       expect(report.headers.get('content-encoding')).toBe('br')
-      expect(report.headers.get('vary')).toBe('x-user, accept-encoding')
+      expect(report.headers.get('vary')).toBe('x-user, accept-encoding, Save-Data')
     }
     finally {
       for (const dir of [client.dir, prerenderedDir]) {

@@ -1068,7 +1068,7 @@ describe('kay build --compile', () => {
       // Encoded on request, on the worker thread the executable carries.
       const upload = await fetch(`${origin}/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
 
-      expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept'])
+      expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept, save-data'])
       expect(upload.headers.get('content-type')).toBe('image/avif')
       expect(new TextDecoder().decode((await upload.bytes()).subarray(4, 12))).toBe('ftypavif')
       expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')

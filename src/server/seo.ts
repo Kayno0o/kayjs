@@ -19,6 +19,7 @@ import { localeCopies } from './i18n'
 import { imageHeader } from './image-format'
 import { publicFiles } from './public'
 import { slashedPath } from './routes'
+import { lightFontCss } from './save-data'
 
 // The file a prerendered page's `shareCard()` links, where a page served per request links the card route.
 const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
@@ -41,8 +42,14 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     if (!fonts)
       throw new KayError('executable-incomplete', 'kay: this executable holds no fonts; build it again with kay build --compile')
 
-    extra.push(...fontTags(fonts))
+    const saving = config.saveData !== false
+
+    extra.push(...fontTags(fonts, saving))
     styles.push(fonts.css)
+
+    // The copy a visitor saving data gets, which the policy lets through by its hash too.
+    if (saving)
+      styles.push(lightFontCss(fonts.css))
   }
 
   if (config.favicon !== false)

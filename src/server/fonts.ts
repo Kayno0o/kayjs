@@ -223,9 +223,10 @@ export async function builtFonts(dir: string): Promise<FontAssets | undefined> {
 
 // The rules sit in the head, a few hundred bytes that a stylesheet of their own would have the first paint wait a request for (30 to 45 ms on a throttled phone).
 // The faces with `preload: true` are fetched before the rules ask for them, so their text renders in its font on the first paint more often; `crossorigin` is what lets the browser reuse a font preload.
-export function fontTags(assets: FontAssets): HeadTag[] {
+// A browser asking for reduced data, where the header does not reach (a prerendered page, one a cache holds), skips the preloads by their `media`.
+export function fontTags(assets: FontAssets, reducedData = true): HeadTag[] {
   return [
-    ...assets.preload.map(({ href, type }) => ({ tag: 'link', props: { rel: 'preload', href, as: 'font', type, crossorigin: '' } })),
+    ...assets.preload.map(({ href, type }) => ({ tag: 'link', props: { rel: 'preload', href, as: 'font', type, crossorigin: '', ...reducedData && { media: '(prefers-reduced-data: no-preference)' } } })),
     { tag: 'style', props: { children: assets.css } },
   ]
 }

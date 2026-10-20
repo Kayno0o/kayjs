@@ -241,7 +241,7 @@ describe('a page against the dictionary', () => {
     expect(text).toBe(plain)
     expect(text).toContain('About paragraph 29')
     expect(reply.body.length).toBeLessThan(brotli.body.length / 2)
-    expect(reply.headers.get('vary')).toBe('accept-encoding, available-dictionary')
+    expect(reply.headers.get('vary')).toBe('accept-encoding, available-dictionary, Save-Data')
     expect(reply.headers.get('etag')).toEndWith('-dcz"')
     expect(brotli.headers.get('etag')).toEndWith('-br"')
   })

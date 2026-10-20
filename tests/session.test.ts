@@ -730,7 +730,7 @@ describe('a page read by who sent it', () => {
 
     expect(own.get('cache-control')).toBe('public, max-age=60')
     expect(varied.get('cache-control')).toBe('private, no-cache')
-    expect(varied.get('vary')).toBe('Accept-Language, Cookie')
+    expect(varied.get('vary')).toBe('Accept-Language, Cookie, Save-Data')
     expect(away.get('location')).toBe('/own')
     expect(away.get('cache-control')).toBe('private, no-cache')
     expect(prerendered.status).toBe(200)

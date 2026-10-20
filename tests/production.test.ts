@@ -1957,7 +1957,7 @@ describe('compression', () => {
     expect(report.headers.get('content-encoding')).toBe('gzip')
     expect(report.headers.get('set-cookie')).toBe('seen=1')
     expect(JSON.parse(new TextDecoder().decode(Bun.gunzipSync(await report.bytes())))).toMatchObject({ rows: expect.any(Array) })
-    expect(plain.headers.get('vary')).toBe('cookie, accept-encoding')
+    expect(plain.headers.get('vary')).toBe('cookie, Save-Data, accept-encoding')
 
     // Left alone, each keeps its body.
     for (const [path, body] of [['/api/tiny', '{}'], ['/api/raw', 'x'.repeat(1000)], ['/api/photo', '\0'.repeat(1000)], ['/api/encoded', 'already']] as const) {

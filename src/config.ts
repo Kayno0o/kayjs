@@ -121,6 +121,8 @@ export interface KayConfig {
   hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch | undefined
+  // Whether a visitor asking for less data (`Save-Data: on`, or `prefers-reduced-data` in the browser) gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no prefetch or speculation rules. On by default, `false` serves everyone alike.
+  saveData?: boolean | undefined
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.

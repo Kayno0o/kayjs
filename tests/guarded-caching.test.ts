@@ -58,8 +58,8 @@ describe('a guarded route is private', () => {
     const authorized = { headers: { authorization: 'Bearer token' } }
 
     it('marks a page whose guard read a header', async () => {
-      expect(await answer(name, `${base}/private`, authorized)).toEqual([200, 'private, no-cache', 'cookie'])
-      expect(await answer(name, `${base}/private`)).toEqual([200, 'private, no-cache', 'cookie'])
+      expect(await answer(name, `${base}/private`, authorized)).toEqual([200, 'private, no-cache', 'cookie, Save-Data'])
+      expect(await answer(name, `${base}/private`)).toEqual([200, 'private, no-cache', 'cookie, Save-Data'])
     })
 
     it('marks the answers of a guard that refuses a page', async () => {
@@ -68,7 +68,7 @@ describe('a guarded route is private', () => {
     })
 
     it('marks a HEAD answer of a guarded page', async () => {
-      expect(await answer(name, `${base}/private`, { method: 'HEAD', ...authorized })).toEqual([200, 'private, no-cache', 'cookie'])
+      expect(await answer(name, `${base}/private`, { method: 'HEAD', ...authorized })).toEqual([200, 'private, no-cache', 'cookie, Save-Data'])
     })
 
     it('keeps the caching a guarded page sets itself', async () => {
@@ -97,7 +97,7 @@ describe('a guarded route is private', () => {
     })
 
     it('leaves a route no guard covers alone', async () => {
-      expect(await answer(name, `${base}/`, authorized)).toEqual([200, null, null])
+      expect(await answer(name, `${base}/`, authorized)).toEqual([200, null, 'Save-Data'])
       expect(await answer(name, `${base}/open.txt`, authorized)).toEqual([200, null, null])
       expect(await answer(name, `${base}/api/open`, authorized)).toEqual([200, null, null])
     })

@@ -9,9 +9,9 @@ let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
 const handlers: Record<string, (event: Event) => void> = {}
 
-// Prefetches the links the way the server's speculation rules say, which the swap follows.
+// Prefetches the links the way the server's speculation rules say, which the swap follows; none for a visitor asking for less data, whom a page the server or a cache gave in full reaches here too.
 export function startPrefetch(rules: string | null): void {
-  eagerness = eagernessOf(rules)
+  eagerness = savesData() ? false : eagernessOf(rules)
 
   if (eagerness === 'conservative')
     handlers.pointerdown = onPrefetchHint
@@ -25,6 +25,11 @@ export function startPrefetch(rules: string | null): void {
 // Handles an event heard before the listeners were there.
 export function replay(event: Event): void {
   handlers[event.type]?.(event)
+}
+
+// `Save-Data` as the browser reports it, or `prefers-reduced-data`, unless the config turned the behavior off.
+function savesData(): boolean {
+  return !document.querySelector('meta[name="kay-save-data"]') && ((navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true || matchMedia('(prefers-reduced-data: reduce)').matches)
 }
 
 function eagernessOf(rules: string | null): Eagerness {

@@ -7,6 +7,7 @@ import { SERVER_ISLAND } from '../runtime/html'
 import { ISLAND_HEADER, ISLAND_PARAM } from '../runtime/server-islands'
 import { gzipParts, preferredEncoding, splicePartAsync, splicePartText } from './compress'
 import { renderServerIslands, servePrerendered } from './render'
+import { savesLess } from './save-data'
 import { freshStamp, STAMP_HOLE } from './stamp'
 import { freshWork } from './work'
 import { freshFieldWork } from './work-scope'
@@ -95,7 +96,7 @@ async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
 }
 
 // The page with its holes filled for this request, gzipped when the browser takes it.
-async function splice(page: ServedPage, all: boolean, islands: string[], request: Request): Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }> {
+async function splice(page: ServedPage, all: boolean, islands: string[], request: Request, options: RenderOptions): Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }> {
   const { parts, holes } = await cutOf(page, all)
   const between = holes.map((hole) => {
     if ('action' in hole)
@@ -107,7 +108,8 @@ async function splice(page: ServedPage, all: boolean, islands: string[], request
     return 'field' in hole ? freshFieldWork(hole.field) : islands[hole.island] ?? ''
   })
 
-  if (!preferredEncoding(request.headers.get('accept-encoding'), GZIP))
+  // A visitor saving data gets the page plain, its head changed after.
+  if (savesLess(request, options) || !preferredEncoding(request.headers.get('accept-encoding'), GZIP))
     return { body: parts.map((part, index) => splicePartText(part) + (between[index] ?? '')).join(''), gzip: false }
 
   return { body: await gzipParts(parts, between), gzip: true }
@@ -127,7 +129,7 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
 
   // A page with no island to render now still has its stamps signed.
   if (page.islands === undefined || (asked === null && !page.islands.includes('inline')))
-    return page.stamps ? servePrerendered(route, page, params, context, client, options, async () => splice(page, false, [], context.request)) : undefined
+    return page.stamps ? servePrerendered(route, page, params, context, client, options, async () => splice(page, false, [], context.request, options)) : undefined
 
   if (fetched && page.islands?.[Number(asked)] !== 'defer')
     return new Response(null, { status: 404 })
@@ -161,7 +163,7 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
   if (all)
     rendered.headers.set('x-robots-tag', 'noindex')
 
-  const { body, gzip } = await splice(page, all, rendered.html, context.request)
+  const { body, gzip } = await splice(page, all, rendered.html, context.request, options)
 
   if (gzip)
     rendered.headers.set('content-encoding', 'gzip')

@@ -26,6 +26,7 @@ import { revalidated } from './public'
 import { remoteAllowed, remotePatterns, remoteVariants } from './remote'
 import { requestUrl } from './request-url'
 import { decodePath } from './routes'
+import { savesData } from './save-data'
 import { headerCopies, ownHeaders } from './security'
 import { storedImage } from './storage'
 
@@ -43,6 +44,8 @@ export interface ImageRouteOptions {
   aspects?: readonly string[] | undefined
   // Downloads an image from a host `images.remote` lists.
   remote?: RemoteImages | undefined
+  // `false` answers a visitor saving data the width asked for, as any other, instead of the next one down.
+  saveData?: boolean | undefined
   // The security headers, which the route's answers carry themselves.
   security?: Record<string, string> | undefined
   // `images.resolve`, giving an absolute path, run after `images.guard` in the request's locale, as `actions` set it.
@@ -225,10 +228,12 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
   const text = headerCopies(TEXT, options.security)
-  const immutable = headerCopies({ 'cache-control': IMMUTABLE }, options.security)
-  const negotiatedImmutable = headerCopies({ 'cache-control': IMMUTABLE, 'vary': 'accept' }, options.security)
-  const revalidatedAs = headerCopies({}, options.security)
-  const negotiatedRevalidated = headerCopies({ vary: 'accept' }, options.security)
+  const lightens = options.saveData !== false
+  // By what the answer varies on: whether the format is negotiated, and whether the width is for a visitor saving data.
+  const immutables = varyingCopies({ 'cache-control': IMMUTABLE }, lightens, options.security)
+  const revalidatedCopies = varyingCopies({}, lightens, options.security)
+  const immutable = immutables(false, false)
+  const revalidatedAs = revalidatedCopies(false, false)
 
   let pruning: ReturnType<typeof setInterval> | undefined
 
@@ -254,7 +259,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
   app.get(IMAGE_ROUTE, async (context) => {
     const { request, server, set } = context
-    const key = options.avif === undefined ? request.url : `${request.url}\n${acceptsAvif(request.headers.get('accept'))}`
+    const saving = lightens && savesData(request)
+    const key = `${request.url}${options.avif === undefined ? '' : `\n${acceptsAvif(request.headers.get('accept'))}`}${saving ? '\nsave-data' : ''}`
     const known = answered.get(key)
 
     if (known)
@@ -330,10 +336,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (runtimeKey !== undefined && source.private !== true && !src.startsWith(FILES_ROUTE))
       void learnColor(src, runtimeKey, path, own)
 
-    const variant = requestedVariant(url, own, allowed)
+    const requested = requestedVariant(url, own, allowed)
 
-    if (typeof variant === 'string' && variant !== 'card')
-      return fail(variant, 400)
+    if (typeof requested === 'string' && requested !== 'card')
+      return fail(requested, 400)
 
     // Its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
     const answer = (response: Response) => {
@@ -344,7 +350,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     }
 
     // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
-    if (own.animated && variant !== 'card') {
+    if (own.animated && requested !== 'card') {
       const original = Bun.file(path, { type: 'image/gif' })
 
       if (source.immutable)
@@ -353,10 +359,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return answer(revalidated(request, `W/"${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}"`, () => original, ownHeaders(set, revalidatedAs)))
     }
 
+    // A visitor saving data gets the next width down of the same image.
+    const variant = saving && typeof requested === 'object' ? { ...requested, width: narrowerWidth(requested.width) } : requested
     // Both formats answer the same URL, so a cache keeps one per `Accept`.
     const negotiated = options.avif !== undefined && variant !== 'card'
     const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
-    const headers = negotiated ? negotiatedImmutable : immutable
+    const varied = lightens && variant !== 'card'
+    const headers = immutables(negotiated, varied)
     // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after the prefix of a remote or stored one, whose variants go when its original does.
     const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
@@ -422,7 +431,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return remembered(key, variantFile, headers, set)
     }
 
-    return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs)))
+    return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, revalidatedCopies(negotiated, varied))))
   })
 
   // The color of a runtime image shown until it loads, read once per version of the file in the background and kept by the `src` pages give `image()`. A private image, a stored one and an AVIF, which is costly to decode, get none.
@@ -460,6 +469,32 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
     return new Response(file, { headers: ownHeaders(set, headers) })
   }
+}
+
+// The headers of an answer that varies on `Accept`, or on `Save-Data`, or on both, by which of them it does.
+function varyingCopies(headers: Record<string, string>, lightens: boolean, security: Record<string, string> | undefined): (negotiated: boolean, varied: boolean) => HeaderCopies {
+  const copies = new Map<string, HeaderCopies>()
+
+  return (negotiated, varied) => {
+    const vary = [...negotiated ? ['accept'] : [], ...lightens && varied ? ['save-data'] : []].join(', ')
+    let found = copies.get(vary)
+
+    if (!found)
+      copies.set(vary, found = headerCopies(vary === '' ? headers : { ...headers, vary }, security))
+
+    return found
+  }
+}
+
+// The width a visitor saving data gets for the one asked: the ladder's step below it, a third less below the ladder, the ladder's first step as it is.
+function narrowerWidth(width: number): number {
+  const steps = imageWidths()
+  const below = steps.findLast(step => step < width)
+
+  if (below !== undefined)
+    return below
+
+  return width >= steps[0]! ? width : Math.min(width, Math.max(SMALL_STEP, Math.floor(width * 2 / 3 / SMALL_STEP) * SMALL_STEP))
 }
 
 // Whether a cached variant exists, marking it as used when its time is over a day old so the prune leaves it; a cache that cannot be written still answers from what it holds.

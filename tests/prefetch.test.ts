@@ -33,4 +33,67 @@ describe('pages fetched ahead of a click', () => {
       setSystemTime()
     }
   })
+
+  describe('for a visitor asking for less data', () => {
+    let runs = 0
+    const RULES = JSON.stringify({ prefetch: [{ source: 'document', eagerness: 'moderate' }] })
+
+    const listening = async (setup: () => (() => void) | undefined) => {
+      const restore = setup()
+      const added = spyOn(document, 'addEventListener')
+
+      try {
+        // A fresh module each time, as the listeners it keeps are the page's, started once.
+        const { startPrefetch } = await import(`../src/runtime/prefetch.ts?run=${++runs}`) as typeof import('../src/runtime/prefetch')
+
+        startPrefetch(RULES)
+
+        return added.mock.calls.map(call => call[0])
+      }
+      finally {
+        added.mockRestore()
+        restore?.()
+      }
+    }
+
+    const withConnection = (saveData: boolean) => () => {
+      Object.defineProperty(navigator, 'connection', { value: { saveData }, configurable: true })
+
+      return () => Reflect.deleteProperty(navigator, 'connection')
+    }
+
+    it('listens to hover and focus for anyone else', async () => {
+      expect(await listening(withConnection(false))).toEqual(['pointerover', 'focusin'])
+    })
+
+    it('listens to nothing when the browser reports Save-Data', async () => {
+      expect(await listening(withConnection(true))).toEqual([])
+    })
+
+    it('listens to nothing under prefers-reduced-data, where no header is sent', async () => {
+      const matches = spyOn(window, 'matchMedia').mockImplementation(((query: string) => ({ matches: query === '(prefers-reduced-data: reduce)' })) as unknown as typeof matchMedia)
+
+      try {
+        expect(await listening(() => undefined)).toEqual([])
+      }
+      finally {
+        matches.mockRestore()
+      }
+    })
+
+    it('listens as usual when the config turned the behavior off, the visitor asking or not', async () => {
+      const meta = document.createElement('meta')
+
+      meta.name = 'kay-save-data'
+      meta.content = 'off'
+      document.head.append(meta)
+
+      try {
+        expect(await listening(withConnection(true))).toEqual(['pointerover', 'focusin'])
+      }
+      finally {
+        meta.remove()
+      }
+    })
+  })
 })
