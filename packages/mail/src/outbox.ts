@@ -1,6 +1,10 @@
 import type { Duration } from 'kay'
-import type { Address, Delivery, Mail, Transport } from './types'
+import type { Address, Attachment, Delivery, Mail, Transport } from './types'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { durationSeconds } from 'kay/library'
+import { devFile, devServer } from './delivery'
+import { log } from './log'
 import { linksOf } from './text'
 
 // Where `kay dev` lists the outbox and serves the mail samples.
@@ -44,6 +48,8 @@ export interface Outbox extends Transport {
 
 // Enough for a day of development without the process growing for ever.
 const KEPT = 500
+// Where `kay dev` keeps the outbox, so the server restarting for an edit keeps the mails.
+const OUTBOX_FILE = 'mail-outbox.json'
 
 // On the global object, so the copy of the library a test imports and the one the app's server runs keep one list.
 const OUTBOX = Symbol.for('kayjs-mail.outbox')
@@ -63,8 +69,62 @@ function sentTo(mail: Mail, wanted: string): boolean {
   return [...mail.to, ...mail.cc, ...mail.bcc].some(to => addressOf(to).toLowerCase() === wanted)
 }
 
-function createOutbox(): Outbox {
-  const mails: SentMail[] = []
+// A mail as the file holds it: its date as text and an attachment's bytes as base64.
+interface StoredMail extends Omit<SentMail, 'sentAt' | 'attachments'> {
+  sentAt: string
+  attachments: (Omit<Attachment, 'content'> & { content: string, base64?: true })[]
+}
+
+function stored(mail: SentMail): StoredMail {
+  return { ...mail, sentAt: mail.sentAt.toISOString(), attachments: mail.attachments.map(({ content, ...rest }) => typeof content === 'string' ? { ...rest, content } : { ...rest, content: Buffer.from(content).toString('base64'), base64: true }) }
+}
+
+function restored({ sentAt, attachments, ...rest }: StoredMail): SentMail {
+  return { ...rest, sentAt: new Date(sentAt), attachments: attachments.map(({ content, base64, ...attachment }) => base64 === true ? { ...attachment, content: Buffer.from(content, 'base64') } : { ...attachment, content }) }
+}
+
+// The mails the file holds, none when it is missing or edited into something else; an entry that is no mail is left out.
+function readFile(file: string): SentMail[] {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
+
+    if (!Array.isArray(parsed))
+      return []
+
+    return (parsed as Partial<StoredMail>[]).filter(entry => typeof entry?.id === 'string' && typeof entry.subject === 'string' && typeof entry.text === 'string' && Array.isArray(entry.to) && Array.isArray(entry.attachments) && !Number.isNaN(Date.parse(entry.sentAt ?? ''))).slice(-KEPT).map(entry => restored(entry as StoredMail))
+  }
+  catch {
+    return []
+  }
+}
+
+// A file written aside and renamed over the old one, so a crash in the middle of a write never leaves half a file.
+function writeFile(file: string, mails: readonly SentMail[]): void {
+  const aside = `${file}.tmp`
+
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(aside, JSON.stringify(mails.map(stored)))
+  renameSync(aside, file)
+}
+
+// Under `kay dev` alone the outbox is read from `file` as it starts and written to it after each change; given none, it lives in memory.
+export function createOutbox(file?: string): Outbox {
+  const mails: SentMail[] = file === undefined ? [] : readFile(file)
+  let failedOnce = false
+  const keep = () => {
+    if (file === undefined)
+      return
+
+    try {
+      writeFile(file, mails)
+    }
+    catch (error) {
+      if (!failedOnce)
+        log.warn(`the outbox could not be kept in ${file}, so a restart of the server empties it: ${error instanceof Error ? error.message : String(error)}`)
+
+      failedOnce = true
+    }
+  }
   const watchers = new Set<(mail: SentMail) => void>()
   const watch = (listener: (mail: SentMail) => void) => {
     watchers.add(listener)
@@ -83,11 +143,13 @@ function createOutbox(): Outbox {
 
       mails.push(sent)
 
-      for (const watcher of watchers)
-        watcher(sent)
-
       if (mails.length > KEPT)
         mails.splice(0, mails.length - KEPT)
+
+      keep()
+
+      for (const watcher of watchers)
+        watcher(sent)
 
       return { messageId: `<${id}@outbox>`, accepted: [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf), rejected: [], response: 'kept in the outbox' }
     },
@@ -100,6 +162,7 @@ function createOutbox(): Outbox {
     find: id => mails.find(mail => mail.id === id),
     clear: () => {
       mails.length = 0
+      keep()
     },
     links: mail => mail.html === undefined ? [...new Set(mail.text.match(TEXT_URL))] : linksOf(mail.html),
     waitFor: async (address, options = {}) => {
@@ -130,4 +193,4 @@ function createOutbox(): Outbox {
 }
 
 // Where mails go in development and under `bun test` instead of leaving the machine: `kay dev` lists them at `/_kay/mail`, and a test reads them here.
-export const outbox: Outbox = ((globalThis as { [OUTBOX]?: Outbox })[OUTBOX] ??= createOutbox())
+export const outbox: Outbox = ((globalThis as { [OUTBOX]?: Outbox })[OUTBOX] ??= createOutbox(devServer() ? devFile(OUTBOX_FILE) : undefined))

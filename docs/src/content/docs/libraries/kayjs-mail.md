@@ -359,4 +359,6 @@ export const auth = createAuth({
 
 Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists the mails sent to the outbox, newest first. A click on one previews it in place, and Open shows its page.
 
+The mails are kept in `.kay` for your checkout, the last 500, so they are still there after you refresh the page and after `kay dev` restarts the server for an edit. Clear in the tab empties the list and the file. Under `bun test` and in production the outbox stays in memory, so each test run starts empty.
+
 <ReadMore href="/llms/kayjs-mail-writing-and-sending">Every message field, the queue's retry options, the settings and the full contact form are in the kayjs-mail reference.</ReadMore>

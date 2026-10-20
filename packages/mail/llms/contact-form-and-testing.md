@@ -49,7 +49,7 @@ it('welcomes a new account', async () => {
 
 ## Development
 
-Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its size, its html in a sandboxed frame and its text. The list reloads as mails arrive and can be cleared, a mail's html shows at desktop or phone width (`?view=phone`), its size warns past the 102 KB of html Gmail clips at, and it downloads as the `.eml` SMTP would send. The outbox lives in the server's process: a restart empties it.
+Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its size, its html in a sandboxed frame and its text. The list reloads as mails arrive and can be cleared, a mail's html shows at desktop or phone width (`?view=phone`), its size warns past the 102 KB of html Gmail clips at, and it downloads as the `.eml` SMTP would send. Under `kay dev` the outbox is kept in `.kay/mail-outbox.json` for the checkout (written aside and renamed, so a crash never leaves half a file), the last 500, so the mails survive a page refresh and `kay dev` restarting the server for an edit; the Mail tab's Clear button, `/_kay/mail/clear` and `outbox.clear()` empty the file too. Only the server `kay dev` runs reads or writes it: under `bun test`, in production and in a server merely started with `NODE_ENV=development` the outbox stays in memory, so each test run starts empty.
 
 `/_kay/mail/samples` shows the app's mails without sending any: every `.kay` file under `src/mails`, each rendered as the mailer renders it, html at desktop or phone width and text, with the props its `<name>.preview.ts` beside it default-exports, or none without one; a mail that throws shows why. The page reloads when `kay dev` restarts the server for a changed file.
 
@@ -125,4 +125,4 @@ AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
 
 ## Dev tool
 
-- `mailExtension` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent. It reads `/_kay/mail.json`.
+- `mailExtension` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent, with a Clear button. It reads `/_kay/mail.json`.

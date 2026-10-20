@@ -243,6 +243,49 @@ describe('the libraries\' dev tool tabs', () => {
     fetching.mockRestore()
   })
 
+  it('clears the outbox from a Clear button, the list and the count going, and says why when it is refused', async () => {
+    let mails: object[] = [{ id: 'a', sentAt: '2026-10-16T10:00:00Z', to: ['ada@example.com'], subject: 'Welcome', text: 'Hi' }]
+    let refuse = true
+    const posted: string[] = []
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/_kay/mail/clear') {
+        posted.push(init.method)
+
+        if (refuse)
+          return new Response('Refused: the outbox is cleared from its own page', { status: 403 })
+
+        mails = []
+
+        return new Response(null, { status: 204 })
+      }
+
+      return url === '/_kay/mail.json' ? Response.json(mails) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+    const clear = () => [...panel('mail').querySelectorAll('button')].find(button => button.textContent === 'Clear')!
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+    expect(panel('mail').querySelectorAll('.row')).toHaveLength(1)
+
+    clear().click()
+    await Bun.sleep(5)
+    expect(panel('mail').textContent).toContain('the outbox is cleared from its own page')
+    expect(panel('mail').querySelectorAll('.row')).toHaveLength(1)
+    expect(clear().disabled).toBe(false)
+
+    refuse = false
+    clear().click()
+    await Bun.sleep(5)
+    expect(posted).toEqual(['POST', 'POST'])
+    expect(panel('mail').querySelectorAll('.row')).toHaveLength(0)
+    expect(panel('mail').textContent).toContain('No mail has been sent')
+    expect([...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')]).toHaveLength(0)
+    fetching.mockRestore()
+  })
+
   it('holds the mail event stream open only while the tab is shown', async () => {
     const fetching = answering({ 'GET /_kay/mail.json': () => Response.json([]) })
     const streams = () => Stream.open

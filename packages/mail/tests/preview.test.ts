@@ -171,6 +171,16 @@ describe('the development outbox page', () => {
     expect(cleared.status).toBe(303)
     expect(cleared.headers.get('location')).toBe('/_kay/mail')
     expect(outbox.mails).toEqual([])
+
+    // The Mail tab's own post, a script's fetch with no page to go back to, and still refused from another site.
+    await mail.send({ to: 'ada@example.com', subject: 'Two', text: 'Hi' })
+    expect((await get(mail, '/_kay/mail/clear', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'empty' } })).status).toBe(403)
+    expect(outbox.mails).toHaveLength(1)
+
+    const fetched = await get(mail, '/_kay/mail/clear', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'empty' } })
+
+    expect(fetched.status).toBe(204)
+    expect(outbox.mails).toEqual([])
   })
 
   it('downloads a mail as the .eml SMTP would send', async () => {

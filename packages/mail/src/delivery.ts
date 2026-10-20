@@ -8,19 +8,22 @@ import { KAY_DIR, underKayDev } from 'kay/library'
 // One address, as the send form takes: a comma or a name would add a recipient.
 export const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
 
-// Where `kay dev` keeps the "Send for real" switch for this checkout, beside what it generates and out of git, so the server restarting keeps it.
+// The "Send for real" switch, kept so the server restarting keeps it.
 const SWITCH_FILE = 'mail-delivery.json'
 
-const switchPath = (): string => join(process.cwd(), KAY_DIR, SWITCH_FILE)
+// Where `kay dev` keeps what a restart of its server must not lose, for this checkout, beside what it generates and out of git.
+export const devFile = (name: string): string => join(process.cwd(), KAY_DIR, name)
 
-// The server `kay dev` runs, which alone reads the switch: one started with NODE_ENV=development outside it, or under test or in production, never does.
-export function switchRead(): boolean {
+const switchPath = (): string => devFile(SWITCH_FILE)
+
+// The server `kay dev` runs, which alone reads or writes those files: one started with NODE_ENV=development outside it, or under test or in production, never does.
+export function devServer(): boolean {
   return process.env.NODE_ENV === 'development' && underKayDev()
 }
 
 // The address every mail is delivered to while the switch is on, none when it is off, missing or edited into something that is no address.
 export async function deliveryAddress(): Promise<string | undefined> {
-  if (!switchRead())
+  if (!devServer())
     return undefined
 
   try {

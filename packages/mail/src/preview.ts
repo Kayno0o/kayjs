@@ -7,7 +7,7 @@ import { Elysia } from 'elysia'
 import { escapeHtml as escape, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
-import { attempt, deliveryAddress, messageOf, ONE_ADDRESS, setDeliveryAddress, switchRead } from './delivery'
+import { attempt, deliveryAddress, devServer, messageOf, ONE_ADDRESS, setDeliveryAddress } from './delivery'
 import { outbox, PREVIEW_PATH } from './outbox'
 import { nodemailerMessage } from './smtp'
 
@@ -298,7 +298,7 @@ function mailHtml(html: string): Response {
 async function deliveryState(relay: Relay): Promise<Response> {
   const state = { on: false, to: undefined as string | undefined, server: undefined as string | undefined, offered: undefined as string | undefined, missing: [] as string[], error: undefined as string | undefined }
 
-  if (!switchRead())
+  if (!devServer())
     return Response.json({ ...state, error: 'The switch works under kay dev with NODE_ENV=development alone.' })
 
   try {
@@ -343,7 +343,7 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
       if (refused)
         return refused
 
-      if (!switchRead())
+      if (!devServer())
         return new Response('Refused: the switch works under kay dev with NODE_ENV=development alone', { status: 409 })
 
       const typed = typeof body === 'object' && body !== null && 'to' in body && typeof body.to === 'string' ? body.to.trim() : undefined
@@ -411,7 +411,8 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
 
       outbox.clear()
 
-      return Response.redirect(PREVIEW_PATH, 303)
+      // The Mail tab posts it from a script, which has no page to go back to; the outbox page's form is a navigation.
+      return request.headers.get('sec-fetch-dest') === 'empty' ? new Response(null, { status: 204 }) : Response.redirect(PREVIEW_PATH, 303)
     })
     .get(`${PREVIEW_PATH}.json`, ({ query }) => jsonList(query.to))
     .get(`${PREVIEW_PATH}/:id`, ({ params, query }) => {

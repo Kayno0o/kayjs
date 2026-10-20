@@ -5,6 +5,7 @@ const PAGE = '/_kay/mail'
 const LIST_URL = `${PAGE}.json`
 const EVENTS_URL = `${PAGE}/events`
 const DELIVERY_URL = `${PAGE}/delivery`
+const CLEAR_URL = `${PAGE}/clear`
 const TEMPLATES_URL = `${PAGE}/samples.json`
 const TEMPLATE_PAGE = `${PAGE}/samples`
 const REFUSED = /^Refused: /
@@ -177,7 +178,35 @@ export default function mailDevTool(tool: DevTool): void {
       return
     }
 
-    list.replaceChildren(heading('Mails'), ...mails.toReversed().map(row))
+    const clear = tool.make('button', 'tool', 'Clear')
+    const bar = tool.make('div', 'actions')
+
+    clear.type = 'button'
+    clear.addEventListener('click', () => void empty(clear, bar))
+    bar.append(clear)
+    list.replaceChildren(heading('Mails'), bar, ...mails.toReversed().map(row))
+  }
+
+  async function empty(button: HTMLButtonElement, bar: HTMLElement): Promise<void> {
+    button.disabled = true
+
+    try {
+      const response = await fetch(CLEAR_URL, { method: 'POST' })
+
+      if (response.ok) {
+        previewed.clear()
+        await refresh()
+
+        return
+      }
+
+      bar.append(tool.make('div', 'error', (await response.text()).replace(REFUSED, '')))
+    }
+    catch (error) {
+      bar.append(tool.make('div', 'error', error instanceof Error ? error.message : String(error)))
+    }
+
+    button.disabled = false
   }
 
   async function post(to: string, button: HTMLButtonElement): Promise<void> {
