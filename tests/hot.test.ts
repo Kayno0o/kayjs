@@ -1,15 +1,16 @@
-import type { Browser, Page } from 'playwright-core'
+import type { TestPage } from '../src/test'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { dev } from '../src/dev'
+import { browse, browserPath } from '../src/test'
 
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
-const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
-const browserInstalled = existsSync(executablePath)
+const browserInstalled = browserPath() !== undefined
+// Edits reach the page after a rebuild, which takes longer than a page's usual wait.
+const SLOW = 30_000
 // Inside the repository, so the project resolves `kay` to it.
 const scratch = join(import.meta.dir, '../node_modules/.cache')
 const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(list => list.slice(1))}) ${label}\nul.todos\n  for item of items() key={item}\n    li {item}\n`
@@ -25,8 +26,16 @@ const home = (text: string, withExtra = false) => `---\nimport '../app.css'\nimp
 
 let root: string
 let stop: () => Promise<void>
-let browser: Browser
-let page: Page
+let page: TestPage
+
+// Picks the second option as a user does, firing what a pick fires.
+function chooseB() {
+  const select = document.querySelector<HTMLSelectElement>('select.pick')!
+
+  select.value = 'b'
+  select.dispatchEvent(new Event('input', { bubbles: true }))
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+}
 
 async function until(condition: () => boolean | Promise<boolean>, timeout = 30_000) {
   for (const start = Date.now(); !await condition(); await Bun.sleep(50)) {
@@ -40,6 +49,15 @@ async function written(path: string): Promise<string> {
   await until(async () => existsSync(path) && await Bun.file(path).text() !== '')
 
   return Bun.file(path).text()
+}
+
+// The dev tool's islands list, in the dev tool's shadow root, which the page's selectors do not reach.
+async function islandsText(): Promise<string> {
+  return page.evaluate(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('#kay-dev-islands')?.textContent ?? '')
+}
+
+async function islands(pattern: RegExp): Promise<void> {
+  await page.waitUntil((source: string) => new RegExp(source).test(document.querySelector('kay-dev')?.shadowRoot?.querySelector('#kay-dev-islands')?.textContent ?? ''), {}, pattern.source)
 }
 
 // Set on the window: still there after an edit means the page was not reloaded.
@@ -83,9 +101,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await chmod(join(root, 'bin/code'), 0o755)
     process.env.KAY_EDITOR = join(root, 'bin/code')
     stop = await dev(root)
-    browser = await chromium.launch({ headless: true, executablePath })
-    page = await browser.newPage()
-    await page.addInitScript(() => {
+    page = await browse(await origin(), { timeout: SLOW })
+    await page.initScript(() => {
       (window as unknown as { builtSays: string[] }).builtSays = []
       addEventListener('kay-dev-built', (event) => {
         const build = JSON.parse((event as CustomEvent<string>).detail) as { changed: string, reloaded?: boolean, styles?: boolean, ms: number }
@@ -99,7 +116,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
   afterAll(async () => {
     delete process.env.KAY_EDITOR
-    await browser?.close()
+    page?.close()
     await stop?.()
     await rm(root, { recursive: true, force: true })
   })
@@ -115,72 +132,71 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.click('.panel button.count')
     await page.click('button.open')
     await page.fill('.solo input.note', 'kept')
-    await page.locator('.solo button.count', { hasText: 'Clicked 2' }).waitFor()
+    await page.waitFor('.solo button.count', { text: 'Clicked 2' })
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
     })
 
     await Bun.write(join(root, 'src/components/counter.kay'), counter('Pressed'))
-    await page.locator('.solo button.count', { hasText: 'Pressed 2' }).waitFor({ timeout: 30_000 })
-    await page.locator('.panel button.count', { hasText: 'Pressed 1' }).waitFor()
+    await page.waitFor('.solo button.count', { text: 'Pressed 2' })
+    await page.waitFor('.panel button.count', { text: 'Pressed 1' })
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.inputValue('.solo input.note')).toBe('kept')
-    expect(await page.textContent('button.open')).toBe('Opened 1')
+    expect(await page.value('.solo input.note')).toBe('kept')
+    expect(await page.text('button.open')).toBe('Opened 1')
 
     await page.click('.solo button.count')
-    await page.locator('.solo button.count', { hasText: 'Pressed 3' }).waitFor()
+    await page.waitFor('.solo button.count', { text: 'Pressed 3' })
   }, 60_000)
 
   it('swaps again on the next edit, a list keeping its items rather than its rows\' order', async () => {
     await page.click('button.drop')
-    await page.locator('ul.todos li', { hasText: 'a' }).waitFor({ state: 'detached' })
+    await page.waitFor('ul.todos li', { text: 'a', gone: true })
 
     await Bun.write(join(root, 'src/components/todos.kay'), todos('Remove'))
-    await page.locator('button.drop', { hasText: 'Remove' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('button.drop', { text: 'Remove' })
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.locator('ul.todos li').allTextContents()).toEqual(['b', 'c'])
-    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+    expect(await page.evaluate(() => [...document.querySelectorAll('ul.todos li')].map(item => item.textContent))).toEqual(['b', 'c'])
+    expect(await page.text('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
   it('refreshes the page through the swap for a page edit, the islands, their state and the scroll kept', async () => {
     await page.evaluate(() => window.scrollTo(0, 400))
     await Bun.write(join(root, 'src/routes/index.kay'), home('Edited'))
-    await page.locator('p.static', { hasText: 'Edited' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('p.static', { text: 'Edited' })
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
-    expect(await page.inputValue('.solo input.note')).toBe('kept')
+    expect(await page.text('.solo button.count')).toBe('Pressed 3')
+    expect(await page.value('.solo input.note')).toBe('kept')
     expect(await page.evaluate(() => window.scrollY)).toBe(400)
   }, 60_000)
 
   it('refreshes it the same for a change to a server module, the server reloaded', async () => {
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Hello\'\n')
     await Bun.write(join(root, 'src/routes/index.kay'), `--- server\nimport { greeting } from '../greeting'\n---\n${home('{greeting}')}`)
-    await page.locator('p.static', { hasText: 'Hello' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('p.static', { text: 'Hello' })
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Welcome\'\n')
-    await page.locator('p.static', { hasText: 'Welcome' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('p.static', { text: 'Welcome' })
     // The live reload script announces what reloaded the server.
-    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/greeting\.ts: reloaded in \d+ ms$/).test(text)))
+    await page.waitUntil(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/greeting\.ts: reloaded in \d+ ms$/).test(text)))
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+    expect(await page.text('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
   it('keeps what was typed into a field the edit leaves in the page, for a template and for a server code edit, and drops it from one the edit removed or renamed', async () => {
-    const typed = await browser.newPage()
+    const typed = await browse(`${await origin()}/form`, { timeout: SLOW })
 
     try {
-      await typed.goto(`${await origin()}/form`)
-      await typed.locator('button.tap').click()
-      await typed.locator('button.tap', { hasText: 'Taps 1' }).waitFor()
+      await typed.click('button.tap')
+      await typed.waitFor('button.tap', { text: 'Taps 1' })
       await typed.fill('input.who', 'Ada')
       await typed.fill('input.old', 'stale')
       await typed.fill('input.gone', 'stale')
       await typed.fill('textarea.bio', 'Hello')
-      await typed.check('input.agree')
-      await typed.selectOption('select.pick', 'b')
+      await typed.click('input.agree')
+      await typed.evaluate(chooseB)
       await typed.fill('input.inner', 'in an island')
       await typed.evaluate(() => {
         (window as { kayAlive?: boolean }).kayAlive = true
@@ -199,28 +215,28 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
       // A template edit: `gone` leaves the page and `old` is renamed in place.
       await Bun.write(join(root, 'src/routes/form.kay'), form('two', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('name="pick"', 'name="picked"'))))
-      await typed.locator('h1.title', { hasText: 'two' }).waitFor({ timeout: 30_000 })
+      await typed.waitFor('h1.title', { text: 'two' })
 
       expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'a', inner: 'in an island' })
-      expect(await typed.textContent('button.tap')).toBe('Taps 1')
+      expect(await typed.text('button.tap')).toBe('Taps 1')
 
       // The select was renamed, so it shows the page's choice; typed into again, it is kept from here on.
-      await typed.selectOption('select.pick', 'b')
+      await typed.evaluate(chooseB)
 
       // A server code edit, which restarts the server.
       await Bun.write(join(root, 'src/form-title.ts'), 'export const formTitle = \'Changed\'\n')
-      await typed.locator('h1.title', { hasText: 'Changed' }).waitFor({ timeout: 30_000 })
+      await typed.waitFor('h1.title', { text: 'Changed' })
 
       expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'b', inner: 'in an island' })
 
       // A field whose rendered value the edit changes shows the new one, as a page loaded afresh does.
       await Bun.write(join(root, 'src/routes/form.kay'), form('three', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('name="pick"', 'name="picked"').replace('input.who(name="who")', 'input.who(name="who" value="Grace")'))))
-      await typed.locator('h1.title', { hasText: 'three' }).waitFor({ timeout: 30_000 })
+      await typed.waitFor('h1.title', { text: 'three' })
 
       expect((await values()).who).toBe('Grace')
     }
     finally {
-      await typed.close()
+      typed.close()
     }
   }, 90_000)
 
@@ -233,11 +249,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await rm(join(root, '.port'))
     await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 0, 255) }\n')
     await until(async () => await color() === 'rgb(0, 0, 255)')
-    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/app\.css: stylesheets swapped in \d+ ms$/).test(text)))
+    await page.waitUntil(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/app\.css: stylesheets swapped in \d+ ms$/).test(text)))
 
     expect(await sameDocument()).toBe(true)
     expect(existsSync(join(root, '.port'))).toBe(false)
-    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+    expect(await page.text('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
   it('tries again when the page cannot reach the server as an edit lands, rather than reloading', async () => {
@@ -245,11 +261,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     let refused = 0
 
     // The first two fetches of the page itself fail to connect, as a server announcing itself but not yet answering does.
-    await page.route(url => url.pathname === '/', async (route) => {
-      if (route.request().resourceType() === 'fetch' && refused++ < 2)
-        return route.abort('connectionrefused')
-
-      return route.fallback()
+    await page.route(url => url.pathname === '/', async (request) => {
+      if (request.type === 'fetch' && refused++ < 2)
+        await request.abort('connectionrefused')
     })
 
     try {
@@ -260,7 +274,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       expect(await sameDocument()).toBe(true)
     }
     finally {
-      await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await page.unroute()
     }
   }, 60_000)
 
@@ -282,34 +296,38 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     const refused: string[] = []
 
-    page.on('console', (message) => {
-      if (message.text().includes('Content Security Policy'))
-        refused.push(message.text())
+    // A policy's refusal is logged by the browser rather than the page, which the page's errors do not hold.
+    await page.cdp('Log.enable')
+    page.view.addEventListener('Log.entryAdded', (event) => {
+      const { text } = (event as MessageEvent<{ entry: { text: string } }>).data.entry
+
+      if (text.includes('Content Security Policy'))
+        refused.push(text)
     })
 
     for (let edit = 1; edit <= 8; edit++) {
       await Bun.write(join(root, 'src/greeting.ts'), `export const greeting = 'Edit ${edit}'\n`)
-      await page.locator('p.static', { hasText: `Edit ${edit}` }).waitFor({ timeout: 30_000 })
+      await page.waitFor('p.static', { text: `Edit ${edit}` })
     }
 
     expect(await sameDocument()).toBe(true)
     // A reload in the running server keeps the connection the page opened, so it opens none again; at most one stays open when a server restarts.
     expect(await page.evaluate(() => (window as { kaySources?: EventSource[] }).kaySources!.filter(source => source.readyState !== EventSource.CLOSED).length)).toBeLessThanOrEqual(1)
     expect(await page.evaluate(() => [...document.scripts].filter(script => script.textContent.includes('/_kay/dev/events')).length)).toBe(1)
-    expect(await page.locator('meta[name=kay-boot]').count()).toBe(1)
+    expect(await page.count('meta[name=kay-boot]')).toBe(1)
     expect(refused).toEqual([])
   }, 180_000)
 
   it('loads the page fully when the swap cannot apply the edit, as when a new island makes a new browser build', async () => {
     await Bun.write(join(root, 'src/components/extra.kay'), extra)
     await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))
-    await page.locator('button.extra').waitFor({ timeout: 30_000 })
+    await page.waitFor('button.extra')
 
     expect(await sameDocument()).toBe(false)
-    expect(await page.textContent('p.static')).toBe('Grown')
+    expect(await page.text('p.static')).toBe('Grown')
 
     await page.click('button.extra')
-    await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
+    await page.waitFor('button.extra', { text: 'Extra on' })
   }, 60_000)
 
   it('drops the stylesheets of the page left once an edited one swapped in, as the server served them', async () => {
@@ -320,10 +338,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
         link.href = to
         link.textContent = to
-        document.body.append(link)
+        document.body.prepend(link)
       }, href)
       await page.click(`a[href="${href}"]`)
-      await page.locator('h1', { hasText: heading }).waitFor()
+      await page.waitFor('h1', { text: heading })
       expect(await sameDocument()).toBe(true)
     }
 
@@ -340,12 +358,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await color()).toBe('rgb(0, 128, 0)')
     // Back on as the inspector's test expects it.
     await page.click('button.extra')
-    await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
+    await page.waitFor('button.extra', { text: 'Extra on' })
   }, 60_000)
 
   it('outlines the element under a resting pointer on Alt, over its exact box', async () => {
     await page.hover('h1')
-    await page.keyboard.down('Alt')
+    await page.cdp('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Alt', code: 'AltLeft', windowsVirtualKeyCode: 18, modifiers: 1 })
 
     try {
       const [outlined, heading] = await page.evaluate(() => {
@@ -357,7 +375,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       expect(outlined).toBe(heading)
     }
     finally {
-      await page.keyboard.up('Alt')
+      await page.cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Alt', code: 'AltLeft', windowsVirtualKeyCode: 18 })
     }
   })
 
@@ -365,22 +383,27 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.click('h1', { modifiers: ['Alt'] })
     expect(JSON.parse(await written(join(root, '.opened')))).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
-    await page.locator('kay-dev .bar > button', { hasText: /islands?$/ }).click()
-    await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1true/ }).waitFor()
-    await page.click('button.extra')
-    await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1false/ }).waitFor()
-    expect(await page.textContent('#kay-dev-islands')).toMatch(/counter\.kay.*#10number#2""string/)
-    expect(await page.textContent('#kay-dev-islands')).toMatch(/counter\.kay(?:props \d+ B)?hydrated in \d+(?:\.\d)? ms#1/)
+    await page.evaluate(() => {
+      const bar = [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll<HTMLButtonElement>('.bar > button')]
+
+      bar.find(button => (/islands?$/).test(button.textContent))!.click()
+    })
+    await islands(/extra\.kay.*#1true/)
+    // The open panel covers the button, which a click at its place would reach instead.
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('button.extra')!.click())
+    await islands(/extra\.kay.*#1false/)
+    expect(await islandsText()).toMatch(/counter\.kay.*#10number#2""string/)
+    expect(await islandsText()).toMatch(/counter\.kay(?:props \d+ B)?hydrated in \d+(?:\.\d)? ms#1/)
   }, 60_000)
 
   it('reloads the open page into the error page when an edit does not compile, and back once it does', async () => {
     await Bun.write(join(root, 'src/routes/index.kay'), `${home('Grown', true)}else\n  p no\n`)
-    await page.locator('h1', { hasText: '1 compile error' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('h1', { text: '1 compile error' })
 
-    expect(await page.textContent('pre')).toContain('src/routes/index.kay:')
+    expect(await page.text('pre')).toContain('src/routes/index.kay:')
 
     await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))
-    await page.locator('p.static', { hasText: 'Grown' }).waitFor({ timeout: 30_000 })
+    await page.waitFor('p.static', { text: 'Grown' })
   }, 60_000)
 
   it('keeps a live value, and the page following it, across an edit of its module', async () => {
@@ -388,19 +411,19 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     const bump = async () => ((await (await fetch(`${await origin()}/api/bump`, { method: 'POST' })).json()) as { visitors: number }).visitors
 
     await page.goto(`${await origin()}/live`)
-    await page.locator('p.online', { hasText: '0 online' }).waitFor()
+    await page.waitFor('p.online', { text: '0 online' })
     await bump()
-    await page.locator('p.online', { hasText: '1 online' }).waitFor({ timeout: 10_000 })
+    await page.waitFor('p.online', { text: '1 online', timeout: 10_000 })
 
     await Bun.write(join(root, 'src/live.ts'), 'import { live } from \'kay\'\n\nexport const visitors = live(0)\nexport const rooms = live((id: string) => id)\n')
 
     // The live reload script announces when the edit reached the server; the value it held is kept, so the next write counts on from it.
-    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/live\.ts: reloaded in \d+ ms$/).test(text)), undefined, { timeout: 30_000 })
+    await page.waitUntil(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/live\.ts: reloaded in \d+ ms$/).test(text)))
 
     expect(await bump()).toBe(2)
-    await page.locator('p.online', { hasText: '2 online' }).waitFor({ timeout: 10_000 })
+    await page.waitFor('p.online', { text: '2 online', timeout: 10_000 })
     // The page reloaded with the server module, and follows again on its own.
     expect(await bump()).toBe(3)
-    await page.locator('p.online', { hasText: '3 online' }).waitFor({ timeout: 10_000 })
+    await page.waitFor('p.online', { text: '3 online', timeout: 10_000 })
   }, 90_000)
 })

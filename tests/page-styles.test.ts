@@ -1,14 +1,12 @@
-import type { Browser, Page } from 'playwright-core'
 import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import type { Route } from '../src/server/routes'
-import { existsSync } from 'node:fs'
+import type { TestPage } from '../src/test'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
 import { styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
@@ -20,6 +18,7 @@ import { servePages } from '../src/server/app'
 import { INLINE_LIMIT, readClient, readInlineStyles } from '../src/server/client'
 import { sourceHash } from '../src/server/csp'
 import { prerenderPages } from '../src/server/prerender'
+import { browse, browserPath } from '../src/test'
 import { fixtureCopy } from './scratch'
 
 // Many arbitrary values, each its own rule, so the app's one stylesheet passes what a head may inline.
@@ -32,8 +31,7 @@ const HALF = bulk(9000).split(' ').slice(0, 900).join(' ')
 const LISTENING = /port (\d+)/
 const STYLE = /<style>([\s\S]*?)<\/style>/g
 const ROUTE_COPY = /\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/
-const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
-const browserInstalled = existsSync(executablePath)
+const browserInstalled = browserPath() !== undefined
 
 // A page rendered at build time that shows a class built from data.
 const TONE = '--- server\nexport const page = { prerender: true }\nconst tone = [\'ring\', 4].join(\'-\')\n---\nh1 Tone\np(class={tone}) built\n'
@@ -651,102 +649,89 @@ async function startFixture(env: Record<string, string> = {}): Promise<{ dir: st
 
 describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page swap, in Chromium', () => {
   let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
-  let browser: Browser
   let origin: string
   let appDir = ''
 
   beforeAll(async () => {
     ;({ dir: appDir, server, origin } = await startFixture())
-    browser = await chromium.launch({ headless: true, executablePath })
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
     server?.kill()
     await server?.exited
     await rm(appDir, { recursive: true, force: true })
   })
 
-  const style = async (page: Page, selector: string, property: 'textDecorationLine' | 'boxShadow' | 'backgroundColor') => page.evaluate(([selector, property]) => getComputedStyle(document.querySelector(selector!)!)[property as 'boxShadow'], [selector, property])
-  const inlined = async (page: Page) => page.evaluate(() => [...document.head.querySelectorAll('style')].map(element => element.textContent).join('\n'))
+  const style = async (page: TestPage, selector: string, property: 'textDecorationLine' | 'boxShadow' | 'backgroundColor') => page.evaluate((selector: string, property: 'textDecorationLine' | 'boxShadow' | 'backgroundColor') => getComputedStyle(document.querySelector(selector)!)[property], selector, property)
+  const inlined = async (page: TestPage) => page.evaluate(() => [...document.head.querySelectorAll('style')].map(element => element.textContent).join('\n'))
 
   it('applies the rules of classes an island sets after load, in the order of the whole stylesheet, with no stylesheet to load', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/late`)
 
-    await page.goto(`${origin}/late`)
     expect(await page.evaluate(() => document.head.querySelectorAll('link[rel="stylesheet"]').length)).toBe(0)
     expect(await style(page, '.late', 'backgroundColor')).toBe('rgba(0, 0, 0, 0)')
     await page.click('.late')
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.late')!).backgroundColor !== 'rgba(0, 0, 0, 0)')
+    await page.waitUntil(() => getComputedStyle(document.querySelector('.late')!).backgroundColor !== 'rgba(0, 0, 0, 0)')
     // `text-xl` follows `text-sm` in the whole stylesheet, so it wins whichever the island added last.
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.late')!).fontSize)).toBe('20px')
     await page.close()
   })
 
   it('brings the rules the next page needs with the swap, from a page to one using a component the first does not', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/`)
 
-    await page.goto(`${origin}/`)
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
     })
     expect(await inlined(page)).not.toContain('.decoration-wavy')
     await page.click('a.about')
-    await page.locator('h1', { hasText: 'About' }).waitFor()
+    await page.waitFor('h1', { text: 'About' })
     expect(await inlined(page)).toContain('.decoration-wavy')
     expect(await style(page, '.fancy', 'textDecorationLine')).toBe('underline')
     expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
     await page.click('a.widgets')
-    await page.locator('h1', { hasText: 'Widgets' }).waitFor()
+    await page.waitFor('h1', { text: 'Widgets' })
     expect(await inlined(page)).toContain('.bg-lime-300')
     expect(await inlined(page)).not.toContain('.decoration-wavy')
     expect(await style(page, '.counter', 'backgroundColor')).not.toBe('rgba(0, 0, 0, 0)')
     expect(await page.evaluate(() => document.head.querySelectorAll('link[rel="stylesheet"]').length)).toBe(0)
-    await page.goBack()
-    await page.locator('h1', { hasText: 'About' }).waitFor()
+    await page.back()
+    await page.waitFor('h1', { text: 'About' })
     expect(await style(page, '.fancy', 'textDecorationLine')).toBe('underline')
     await page.close()
   })
 
   it('keeps a noscript whose markup holds an ampersand through a swap, as the server serves it', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/`)
 
     // Both pages carry the same noscript, as a layout's would.
-    await page.route(`${origin}/**`, async (route) => {
-      try {
-        const response = await route.fetch()
-        const html = (response.headers()['content-type'] ?? '').includes('text/html')
+    await page.route(`${origin}/*`, async (request) => {
+      const response = await request.fetch()
+      const html = (response.headers['content-type'] ?? '').includes('text/html')
 
-        await route.fulfill(html ? { response, body: (await response.text()).replace('</head>', '<noscript><link rel="stylesheet" href="/amp.css?a=1&b=2"></noscript></head>') } : { response })
-      }
-      catch {
-        // The page closed with this request on its way.
-      }
+      await request.fulfill(html ? { ...response, body: response.text().replace('</head>', '<noscript><link rel="stylesheet" href="/amp.css?a=1&b=2"></noscript></head>') } : response)
     })
-    await page.goto(`${origin}/`)
+    await page.goto('/')
     await page.evaluate(() => {
       (window as { kept?: HTMLElement | undefined }).kept = [...document.head.querySelectorAll('noscript')].find(element => element.textContent?.includes('a=1&b=2'))
     })
     expect(await page.evaluate(() => (window as { kept?: HTMLElement | undefined }).kept !== undefined)).toBe(true)
     await page.click('a.about')
-    await page.locator('h1', { hasText: 'About' }).waitFor()
+    await page.waitFor('h1', { text: 'About' })
     expect(await page.evaluate(() => [...document.head.querySelectorAll('noscript')].includes((window as { kept?: HTMLElement | undefined }).kept!))).toBe(true)
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.unroute()
     await page.close()
   })
 
   it('leaves the head of the page it reaches as a direct load of it writes it, the rules of the layout it left gone', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/ga/pa`)
 
-    await page.goto(`${origin}/ga/pa`)
     await page.click('a.to-b')
-    await page.locator('h1', { hasText: 'Page B' }).waitFor()
+    await page.waitFor('h1', { text: 'Page B' })
 
-    const direct = await browser.newPage()
+    const direct = await browse(`${origin}/gb/pb`)
 
-    await direct.goto(`${origin}/gb/pb`)
-
-    const rules = async (from: Page) => from.evaluate(() => [...document.head.children].filter(element => element.tagName === 'STYLE' || element.matches('link[rel="stylesheet"]')).map(element => element.outerHTML).toSorted())
+    const rules = async (from: TestPage) => from.evaluate(() => [...document.head.children].filter(element => element.tagName === 'STYLE' || element.matches('link[rel="stylesheet"]')).map(element => element.outerHTML).toSorted())
 
     expect(await rules(page)).toEqual(await rules(direct))
     expect(await inlined(page)).toContain('.gb-mark')
@@ -756,9 +741,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
   })
 
   it('swaps the copy of the route it leaves for the one of the route it reaches before it paints, and the rules apply', async () => {
-    const page = await browser.newPage()
-
-    await page.goto(`${origin}/bulk`)
+    const page = await browse(`${origin}/bulk`)
 
     const links = async () => page.evaluate(() => [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => link.getAttribute('href')))
     const first = await links()
@@ -769,7 +752,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
       (window as { kayAlive?: boolean }).kayAlive = true
     })
     await page.click('a.to-other')
-    await page.locator('h1', { hasText: 'Other' }).waitFor()
+    await page.waitFor('h1', { text: 'Other' })
 
     const second = await links()
 
@@ -778,8 +761,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
     expect(second[0]).not.toBe(first[0])
     expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('p')!).paddingTop)).toBe('6802px')
-    await page.goBack()
-    await page.locator('h1', { hasText: 'Bulk' }).waitFor()
+    await page.back()
+    await page.waitFor('h1', { text: 'Bulk' })
     expect(await links()).toEqual(first)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('p')!).paddingTop)).toBe('1802px')
     await page.close()
@@ -788,38 +771,33 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
 
 describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('lateStyles, in Chromium', () => {
   let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
-  let browser: Browser
   let origin: string
   let appDir = ''
 
   beforeAll(async () => {
     ;({ dir: appDir, server, origin } = await startFixture({ LATE_STYLES: 'true' }))
-    browser = await chromium.launch({ headless: true, executablePath })
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
     server?.kill()
     await server?.exited
     await rm(appDir, { recursive: true, force: true })
   })
 
   it('applies the whole stylesheet once the page is up, and the rules only it holds', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/data`)
 
-    await page.goto(`${origin}/data`)
-    await page.waitForFunction(() => document.querySelector<HTMLLinkElement>('link[data-kay-rest]')?.media === 'all')
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.tone')!).boxShadow !== 'none')
+    await page.waitUntil(() => document.querySelector<HTMLLinkElement>('link[data-kay-rest]')?.media === 'all')
+    await page.waitUntil(() => getComputedStyle(document.querySelector('.tone')!).boxShadow !== 'none')
     await page.close()
   })
 
   it('swaps pages with the whole stylesheet linked once', async () => {
-    const page = await browser.newPage()
+    const page = await browse(`${origin}/`)
 
-    await page.goto(`${origin}/`)
-    await page.waitForFunction(() => document.querySelector<HTMLLinkElement>('link[data-kay-rest]')?.media === 'all')
+    await page.waitUntil(() => document.querySelector<HTMLLinkElement>('link[data-kay-rest]')?.media === 'all')
     await page.click('a.about')
-    await page.locator('h1', { hasText: 'About' }).waitFor()
+    await page.waitFor('h1', { text: 'About' })
     expect(await page.evaluate(() => [...document.head.querySelectorAll<HTMLLinkElement>('link[data-kay-rest]')].map(link => link.media))).toEqual(['all'])
     // The shared stylesheet keeps its place after the page's own rules.
     expect(await page.evaluate(() => {

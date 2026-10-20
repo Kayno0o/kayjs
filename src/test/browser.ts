@@ -1,4 +1,5 @@
 import type { AxeResults } from '../runtime/dev-a11y'
+import type { Network, PageResponse } from './network'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
 import { ISLAND } from '../runtime/markers'
+import { createNetwork } from './network'
 
 export interface BrowserOptions {
   // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else the first one found on the PATH or where it usually installs.
@@ -47,6 +49,11 @@ export interface WaitOptions {
   timeout?: number | undefined
 }
 
+export interface ClickOptions extends WaitOptions {
+  // Keys held down during the click, such as `['Alt']`.
+  modifiers?: Bun.WebView.Modifier[] | undefined
+}
+
 export interface WaitForOptions extends WaitOptions {
   // Only an element whose text contains this.
   text?: string | undefined
@@ -66,9 +73,13 @@ export interface A11yViolation {
   nodes: { target: string, html: string }[]
 }
 
+export type { FetchedResponse, FulfillOptions, PageRequest, PageResponse, RouteHandler, RouteMatch } from './network'
+
 export interface TestPage {
   // The `Bun.WebView` behind the page, for what the helpers leave out, such as `screenshot()` or `cdp()`.
   view: Bun.WebView
+  // A DevTools command of the page, queued with the page's own: the view runs one at a time, so a raw `view.cdp()` made while a page call or a route runs fails as already pending.
+  cdp: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
   // The console errors and uncaught exceptions of the page so far.
   errors: string[]
   // Loads a path of the site, or any URL, resolving once the page loaded and its eager islands hydrated.
@@ -76,12 +87,14 @@ export interface TestPage {
   // The current path and query, a swapped page's included.
   path: () => Promise<string>
   // Scrolls the element to the middle of the view and waits for it to be visible, still and not covered, then clicks it as a user does.
-  click: (selector: string, options?: WaitOptions) => Promise<void>
+  click: (selector: string, options?: ClickOptions) => Promise<void>
   // Replaces a field's text with `text`, as typing it does, firing `input`.
   fill: (selector: string, text: string) => Promise<void>
   // Types into the focused element.
   type: (text: string) => Promise<void>
   press: (key: Parameters<Bun.WebView['press']>[0], options?: Parameters<Bun.WebView['press']>[1]) => Promise<void>
+  // Moves the pointer onto the middle of the element, scrolled into view, and leaves it there.
+  hover: (selector: string, options?: WaitOptions) => Promise<void>
   // The first match's text, or null when nothing matches.
   text: (selector: string) => Promise<string | null>
   // The first match's form value, or null when nothing matches.
@@ -94,6 +107,19 @@ export interface TestPage {
   a11y: (selector?: string) => Promise<A11yViolation[]>
   // Waits for a function run in the page, as `evaluate` runs it, to return something truthy.
   waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitOptions, ...args: Args) => Promise<void>
+  // Every response the page received so far, redirects included, with its status and its request and response headers as the wire carried them, lowercased. A test empties the list with `responses.length = 0`.
+  responses: PageResponse[]
+  // Resolves with the first response whose URL matches, already received or not, once its body arrived (`complete: false` resolves on its headers, for one that never ends): a string with `*` for any characters, matched against the path on the page's site when it starts with `/`, else against the whole URL, a RegExp on the URL, or a function of the `URL`.
+  waitForResponse: Network['waitForResponse']
+  // Answers the requests matching, any the page makes from now on: the handler calls `fulfill`, `abort` or `continue` on the request, `fetch()` to get the server's answer first, and a request it answers none of goes on. The latest route matching a request answers it.
+  route: Network['route']
+  // Stops answering the requests a route given the same `match` matched, or every route without one.
+  unroute: Network['unroute']
+  // Cuts the page off the network, every request failing as with no connection, `navigator.onLine` false; `online()` restores it.
+  offline: () => Promise<void>
+  online: () => Promise<void>
+  // Runs a function in every document the page loads from now on, before the document's own scripts, in each frame; its arguments cross as for `evaluate`.
+  initScript: <Args extends unknown[]>(run: (...args: Args) => unknown, ...args: Args) => Promise<void>
   // Back and forward go through history, swapped pages included, resolving as `goto` does.
   back: () => Promise<void>
   forward: () => Promise<void>
@@ -119,6 +145,9 @@ const CRASHED = Symbol('crashed')
 // The files the page failed to load, such as the scripts that would hydrate its islands: refused, or a script answered as another type, which the browser does not run.
 const FAILED_FILES = `performance.getEntriesByType('resource').flatMap(entry => { const path = new URL(entry.name).pathname; return entry.responseStatus >= 400 ? [path + ' answered ' + entry.responseStatus] : (path.endsWith('.js') || path.endsWith('.mjs')) && entry.contentType && !entry.contentType.includes('javascript') ? [path + ' answered as ' + entry.contentType] : [] })`
 const FAILED_WAIT_MS = 1000
+// How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
+const CLICK_WAIT_MS = 1000
+const ACTIONABLE = /to be actionable$/
 // What the message of a wait that ran out of time starts with.
 const UNSETTLED = 'kay: timed out after'
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
@@ -240,6 +269,25 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     return answer
   }
+  // A view runs one DevTools command at a time, so the page's own and a route's queue behind each other.
+  let commands: Promise<void> = Promise.resolve()
+  const cdp = async <T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> => {
+    const previous = commands
+    const { promise, resolve } = Promise.withResolvers<void>()
+
+    commands = promise
+
+    return live(async () => {
+      await previous
+
+      try {
+        return await view.cdp<T>(method, params)
+      }
+      finally {
+        resolve()
+      }
+    })
+  }
   // A view runs one `inView()` at a time, so the page's calls queue rather than fail when a test runs two at once.
   let queue = Promise.resolve()
   // The view's last `inView()`, which a wait that timed out leaves running: the next waits for it, up to the page's timeout, rather than fail as already pending.
@@ -351,9 +399,40 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${SETTLED}`, 'the page to settle')
   }
 
+  const network = createNetwork({ view, cdp, origin: () => origin, errors, timeout })
   const page: TestPage = {
     view,
+    cdp,
     errors,
+    responses: network.responses,
+    waitForResponse: network.waitForResponse,
+    route: network.route,
+    unroute: network.unroute,
+    offline: async () => serial(async () => network.offline(true)),
+    online: async () => serial(async () => network.offline(false)),
+    initScript: async (run, ...args) => serial(async () => {
+      await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(run, args) })
+    }),
+    hover: async (selector, wait = {}) => serial(async () => {
+      await poll(script((target: string) => {
+        const element = document.querySelector(target)
+
+        element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
+
+        return element !== null && element.getClientRects().length > 0
+      }, [selector]), selector, wait.timeout)
+
+      // Two frames on, once a scroll or a transition settled.
+      const [x, y] = await inView<[number, number]>(script(async (target: string) => {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+        const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
+
+        return [left + width / 2, top + height / 2]
+      }, [selector]))
+
+      await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+    }),
     goto: async path => serial(async () => {
       const target = new URL(path, origin)
 
@@ -371,19 +450,30 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
-    click: async (selector, wait = {}) => serial(async () => {
+    click: async (selector, { modifiers, ...wait } = {}) => serial(async () => {
       const budget = wait.timeout ?? timeout
       const until = Date.now() + budget
 
-      // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. An island not hydrated yet replays the click once it is.
-      await poll(script((target: string) => {
-        const element = document.querySelector(target)
+      // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. Scrolled again between short waits, as a page restoring its scroll once loaded moves it away. An island not hydrated yet replays the click once it is.
+      for (;;) {
+        await poll(script((target: string) => {
+          const element = document.querySelector(target)
 
-        element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
+          element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
 
-        return element !== null
-      }, [selector]), selector, budget)
-      await live(async () => view.click(selector, { timeout: Math.max(until - Date.now(), 1) }))
+          return element !== null
+        }, [selector]), selector, Math.max(until - Date.now(), 1))
+
+        try {
+          await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
+
+          return
+        }
+        catch (error) {
+          if (gone || !(error instanceof Error) || !ACTIONABLE.test(error.message) || Date.now() >= until)
+            throw error
+        }
+      }
     }),
     fill: async (selector, text) => serial(async () => {
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
@@ -410,7 +500,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await inView<boolean>('!!window.axe')) {
-        const { exceptionDetails } = await live(async () => view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() }))
+        const { exceptionDetails } = await cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() })
 
         if (exceptionDetails)
           throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
@@ -445,6 +535,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await settle(SETTLED, 'the page to reload and hydrate its islands')
     }),
     close: () => {
+      network.close()
       attempt(() => view.close())
 
       if (!closed)
@@ -464,11 +555,12 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     if (first)
       await noteBunProfile(view, dir)
 
-    await live(async () => view.cdp('Runtime.enable'))
-    await live(async () => view.cdp('Inspector.enable'))
+    await cdp('Runtime.enable')
+    await cdp('Inspector.enable')
+    await cdp('Network.enable')
 
     if (options.colorScheme !== undefined)
-      await live(async () => view.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: options.colorScheme }] }))
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: options.colorScheme }] })
 
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
@@ -476,10 +568,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
     })
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
-    await live(async () => view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
+    await cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES })
 
     for (const { name, value } of cookiePairs(options.cookies))
-      await live(async () => view.cdp('Network.setCookie', { name, value, url: origin, path: '/' }))
+      await cdp('Network.setCookie', { name, value, url: origin, path: '/' })
 
     try {
       await page.goto(url)

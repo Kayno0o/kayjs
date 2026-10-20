@@ -6,16 +6,15 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
 import { pages } from '../src/server'
-import { browserPath } from '../src/test'
+import { browse, browserPath } from '../src/test'
 
 const CLI = resolve('src/cli.ts')
 const MAGIC = Buffer.from([0x5E, 0x2A, 0x4D, 0x18, 0x20, 0, 0, 0])
 const LISTENING = /localhost:(\d+)/
 const ACCEPT = 'gzip, deflate, br, zstd, dcb, dcz'
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 const tsconfig = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
@@ -406,45 +405,44 @@ describe('a server with no dictionary to use', () => {
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a browser', () => {
   it.each([0, 3])('fetches the dictionary once idle and gets its next pages as dcz, a navigation and a fetch alike, under kay\'s policy and under an app\'s connect-src (site %#)', async (index) => {
     const root = sites[index]!
-    const browser = await chromium.launch({ executablePath: path!, args: ['--no-sandbox'] })
+    const page = await browse(`${root.origin}/`)
 
     try {
-      const page = await browser.newPage()
-      const seen: { pathname: string, encoding: string | undefined, dictionary: string | undefined }[] = []
-
-      page.on('response', async (response) => {
-        const headers = await response.request().allHeaders()
-
-        seen.push({ pathname: new URL(response.url()).pathname, encoding: response.headers()['content-encoding'], dictionary: headers['available-dictionary'] })
-      })
-
-      const errors: string[] = []
-
-      page.on('pageerror', error => errors.push(error.message))
-      page.on('console', message => message.type() === 'error' && errors.push(message.text()))
-      await page.goto(`${root.origin}/`, { waitUntil: 'networkidle' })
-
       const { dictionary } = await manifestOf(root)
+      const fetched = `/_kay/${dictionary!.file}`
+      // What the browser sent and was answered, as the wire carried it.
+      const seen = (pathname: string) => {
+        const response = page.responses.find(({ url }) => new URL(url).pathname === pathname)
+
+        return response && { encoding: response.responseHeaders['content-encoding'], dictionary: response.requestHeaders['available-dictionary'] }
+      }
 
       // Fetched when the page is idle, at low priority.
-      for (let tries = 0; tries < 50 && !seen.some(({ pathname }) => pathname === `/_kay/${dictionary!.file}`); tries++)
-        await page.waitForTimeout(100)
+      await page.waitForResponse(fetched)
 
-      expect(seen.find(({ pathname }) => pathname === '/')!.encoding).not.toBe('dcz')
-      expect(seen.some(({ pathname }) => pathname === `/_kay/${dictionary!.file}`)).toBe(true)
+      expect(seen('/')!.encoding).not.toBe('dcz')
 
-      await page.goto(`${root.origin}/about`, { waitUntil: 'networkidle' })
-      expect(seen.find(({ pathname }) => pathname === '/about')).toMatchObject({ encoding: 'dcz', dictionary: expect.stringContaining(dictionary!.hash.slice(0, 10)) })
-      expect(await page.textContent('h1')).toBe('About')
+      // Chrome writes the dictionary to its store a moment after the last byte, with nothing to wait on, so a navigation going out before it is stored goes without.
+      for (let tries = 0; tries < 20 && seen('/about')?.encoding !== 'dcz'; tries++) {
+        page.responses.length = 0
 
-      const fetched = await page.evaluate(async () => (await fetch('/live?topic=fetched')).text())
+        await page.goto('/about')
+        await page.waitForResponse('/about')
+      }
 
-      expect(seen.find(({ pathname }) => pathname === '/live')).toMatchObject({ encoding: 'dcz' })
-      expect(fetched).toContain('fetched')
-      expect(errors).toEqual([])
+      expect(seen('/about')).toMatchObject({ encoding: 'dcz', dictionary: expect.stringContaining(dictionary!.hash.slice(0, 10)) })
+      expect(await page.text('h1')).toBe('About')
+
+      const text = await page.evaluate(async () => (await fetch('/live?topic=fetched')).text())
+
+      await page.waitForResponse('/live')
+
+      expect(seen('/live')).toMatchObject({ encoding: 'dcz' })
+      expect(text).toContain('fetched')
+      expect(page.errors).toEqual([])
     }
     finally {
-      await browser.close()
+      page.close()
     }
   }, 60_000)
 })

@@ -263,7 +263,8 @@ The page clicks and types as a user does.
 
 | Call | Does |
 | --- | --- |
-| `click(selector)` | Scrolls to the element, waits until it is visible, still and not covered, and clicks |
+| `click(selector, { modifiers })` | Scrolls to the element, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']` |
+| `hover(selector)` | Scrolls to the element and moves the pointer onto its middle, where it stays |
 | `fill(selector, text)` | Replaces a field's text, as typing does |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
 | `text(selector)`, `value(selector)`, `count(selector)` | Read the page at once |
@@ -288,6 +289,46 @@ const page = await site.open('/account', { cookies: await auth.sessionCookie(use
 ```
 
 `browse(url)` from `kay/test` opens the same page for a server that is already running, such as one the test started itself.
+
+### The network
+
+`page.responses` lists every response the page received so far: its `url`, `method`, `status` and `type`, and its `requestHeaders` and `responseHeaders` as the wire carried them, lowercased. The request headers include the ones the browser adds itself, such as `accept-encoding` or `cookie`. `page.waitForResponse(match)` resolves with the first response whose URL matches, once its body arrived.
+
+```ts
+await page.click('button.save')
+
+const saved = await page.waitForResponse('/api/save')
+
+expect(saved.status).toBe(200)
+expect(saved.requestHeaders['content-type']).toBe('application/json')
+```
+
+A `match` is a string with `*` for any characters, a `RegExp` on the whole URL or a function of the `URL`. A string starting with `/` is a path on the site the page is on, whatever it is mounted under.
+
+`page.route(match, handler)` answers the requests the page makes from then on. The handler calls `fulfill`, `abort` or `continue` on the request. A request the handler answers none of goes on to the server. The latest route that matches a request answers it, and `page.unroute(match?)` stops one route, or every route without an argument.
+
+```ts
+await page.route('/api/*', request => request.fulfill({ status: 503, json: { error: 'down' } }))
+await page.route('/avatar.png', request => request.abort('connectionrefused'))
+await page.route('/', async (request) => {
+  const answer = await request.fetch()
+
+  await request.fulfill({ ...answer, body: answer.text().replace('Hello', 'Bonjour') })
+})
+```
+
+`request.fetch()` lets the request reach the server and resolves with its decoded answer, `status`, `headers`, `body` and `text()`, for the handler to pass on changed. A handler that throws is reported in `page.errors` and its request fails.
+
+`page.offline()` cuts the page off the network, so every request fails and `navigator.onLine` is false, and `page.online()` brings it back. `page.initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, to set up a stub or a flag the page reads as it starts.
+
+```ts
+await page.offline()
+await page.click('button.sync')
+await page.waitFor('.banner', { text: 'You are offline' })
+await page.online()
+```
+
+The view runs one DevTools command at a time, so use `page.cdp(method, params)` where `page.view.cdp()` would be called: it queues behind the page's own commands and a route's.
 
 ### Checking accessibility
 
