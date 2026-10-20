@@ -117,7 +117,32 @@ const ENCODING = new Set(['content-encoding', 'content-length'])
 const ANNOUNCE_WAIT_MS = 500
 // How long a finished response waits for the extra info that carries its wire headers.
 const EXTRA_GRACE_MS = 200
+// What DevTools says of a request that was cancelled while paused, a navigation away or a closed stream.
+const GONE = /Invalid InterceptionId|No such|not found/i
+const GLOBAL_STICKY = /[gy]/g
 const KEBAB = /-([a-z])/g
+
+const TIMED_OUT = Symbol('timed out')
+
+// What a handler waiting on the server's answer fails with once its route is removed, which is no failure of the test.
+class RouteRemoved extends Error {
+  constructor() {
+    super('kay: the route was removed before the server answered')
+  }
+}
+
+// Resolves as `promise` does, or with TIMED_OUT after `ms`.
+async function within<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  const { promise: timedOut, resolve } = Promise.withResolvers<typeof TIMED_OUT>()
+  const timer = setTimeout(resolve, ms, TIMED_OUT)
+
+  try {
+    return await Promise.race([promise, timedOut])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
 
 export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOptions): Network {
   const responses: PageResponse[] = []
@@ -131,6 +156,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   const sightings = new Map<string, () => void>()
   let closed = false
   let fetching = false
+  let enabling: Promise<void> | undefined
 
   const event = <T>(name: string, listener: (data: T) => void) => view.addEventListener(name, (message) => {
     if (!closed)
@@ -183,7 +209,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
 
     // A redirect is a response of its own, answered before the next request is sent, and the next hop starts afresh.
     if (redirectResponse !== undefined && previous !== undefined) {
-      publish(previous, redirectResponse.status, lowercase(redirectResponse.headers), lowercase(redirectResponse.requestHeaders ?? previous.headers), true)
+      publish(previous, redirectResponse.status, previous.answer?.status === redirectResponse.status ? previous.answer.headers : lowercase(redirectResponse.headers), previous.wire ?? lowercase(redirectResponse.requestHeaders ?? previous.headers), true)
       inflight.delete(requestId)
     }
 
@@ -273,7 +299,20 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
       sightings.delete(id)
     }
 
-    return inflight.get(id)?.type ?? fallback
+    const known = inflight.get(id)?.type
+
+    return known === undefined || known === '' ? fallback : known
+  }
+
+  // A call on a request that may have been cancelled since it paused, which fails then and is no failure of the test.
+  const quiet = async (method: string, params: Record<string, unknown>) => {
+    try {
+      await send(method, params)
+    }
+    catch (error) {
+      if (!GONE.test(error instanceof Error ? error.message : String(error)))
+        errors.push(`kay: ${method} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   const request = (paused: Paused, type: string): { routed: PageRequest, answered: () => boolean } => {
@@ -283,7 +322,14 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         throw new Error('kay: the request was already answered')
 
       settled = true
-      await run()
+
+      try {
+        await run()
+      }
+      catch (error) {
+        if (!GONE.test(error instanceof Error ? error.message : String(error)))
+          throw error
+      }
     }
     const requestId = paused.requestId
 
@@ -307,12 +353,23 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         if (answer.responseErrorReason !== undefined)
           throw new Error(`kay: the request to ${paused.request.url} failed: ${answer.responseErrorReason}`)
 
-        const { body, base64Encoded } = await cdp<{ body: string, base64Encoded: boolean }>('Fetch.getResponseBody', { requestId })
+        const type = (answer.responseHeaders ?? []).find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? ''
+
+        // The body of a response that never ends never comes, and DevTools commands run one at a time.
+        if (type.startsWith('text/event-stream'))
+          throw new Error(`kay: fetch() cannot read the event stream ${paused.request.url}; continue the request instead`)
+
+        const read = await within(cdp<{ body: string, base64Encoded: boolean }>('Fetch.getResponseBody', { requestId }), timeout)
+
+        if (read === TIMED_OUT)
+          throw new Error(`kay: the body of ${paused.request.url} did not arrive within ${timeout}ms`)
+
+        const { body, base64Encoded } = read
         const bytes = base64Encoded ? Uint8Array.fromBase64(body) : new TextEncoder().encode(body)
 
         return {
           status: answer.responseStatusCode ?? 0,
-          headers: Object.fromEntries((answer.responseHeaders ?? []).map(({ name, value }) => [name.toLowerCase(), value]).filter(([name]) => !ENCODING.has(name!))),
+          headers: joined((answer.responseHeaders ?? []).filter(({ name }) => !ENCODING.has(name.toLowerCase()))),
           body: bytes,
           text: () => new TextDecoder().decode(bytes),
         }
@@ -333,7 +390,11 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
           ...bytes === undefined ? {} : { body: bytes.toBase64() },
         })
       }),
-      abort: async reason => once(async () => send('Fetch.failRequest', { requestId, errorReason: errorReason(reason) })),
+      abort: async (reason) => {
+        const name = errorReason(reason)
+
+        await once(async () => send('Fetch.failRequest', { requestId, errorReason: name }))
+      },
       continue: async (options = {}) => once(async () => send('Fetch.continueRequest', {
         requestId,
         ...options.headers === undefined ? {} : { headers: Object.entries(options.headers).map(([name, value]) => ({ name, value })) },
@@ -349,7 +410,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     // The response of a request a handler fetched; any other response pauses only because both stages are watched.
     if (paused.responseStatusCode !== undefined || paused.responseErrorReason !== undefined) {
       if (waiting === undefined)
-        return send('Fetch.continueRequest', { requestId: paused.requestId })
+        return quiet('Fetch.continueRequest', { requestId: paused.requestId })
 
       awaited.delete(paused.requestId)
       waiting.resolve(paused)
@@ -361,7 +422,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     const rule = rules.findLast(({ test }) => test(url))
 
     if (rule === undefined)
-      return send('Fetch.continueRequest', { requestId: paused.requestId })
+      return quiet('Fetch.continueRequest', { requestId: paused.requestId })
 
     const { routed, answered } = request(paused, await typeOf(paused))
 
@@ -373,7 +434,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         await routed.continue()
     }
     catch (error) {
-      if (closed)
+      if (closed || error instanceof RouteRemoved)
         return
 
       errors.push(`kay: a route handler for ${paused.request.url} failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -392,19 +453,32 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   })
 
   const enable = async () => {
-    if (fetching)
-      return
+    if (enabling === undefined) {
+      enabling = send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
+      fetching = true
+    }
 
-    fetching = true
-    await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
+    try {
+      await enabling
+    }
+    catch (error) {
+      enabling = undefined
+      fetching = false
+
+      throw error
+    }
   }
 
   const matches = (match: RouteMatch): ((url: URL) => boolean) => {
     if (typeof match === 'function')
       return match
 
-    if (match instanceof RegExp)
-      return url => match.test(url.href)
+    if (match instanceof RegExp) {
+      // A global or sticky RegExp remembers where it matched last.
+      const stateless = new RegExp(match.source, match.flags.replace(GLOBAL_STICKY, ''))
+
+      return url => stateless.test(url.href)
+    }
 
     const pattern = new RegExp(`^${match.replace(GLOB_SPECIAL, '\\$&').replace(STAR, '.*')}$`)
 
@@ -429,6 +503,13 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
 
       if (rules.length === 0 && fetching) {
         fetching = false
+        enabling = undefined
+
+        // Requests a handler waits the answer of get none once interception stops.
+        for (const waiting of awaited.values())
+          waiting.reject(new RouteRemoved())
+
+        awaited.clear()
         await send('Fetch.disable')
       }
     },
@@ -476,6 +557,19 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   }
 }
 
+// Repeated headers joined with a newline, as `Headers` does for `set-cookie` when read as one value.
+function joined(list: { name: string, value: string }[]): Record<string, string> {
+  const headers: Record<string, string> = {}
+
+  for (const { name, value } of list) {
+    const key = name.toLowerCase()
+
+    headers[key] = headers[key] === undefined ? value : `${headers[key]}\n${value}`
+  }
+
+  return headers
+}
+
 function lowercase(headers: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]))
 }
@@ -485,5 +579,10 @@ function errorReason(reason = 'failed'): string {
   const known = ['Failed', 'Aborted', 'TimedOut', 'AccessDenied', 'ConnectionClosed', 'ConnectionReset', 'ConnectionRefused', 'ConnectionAborted', 'ConnectionFailed', 'NameNotResolved', 'InternetDisconnected', 'AddressUnreachable', 'BlockedByClient', 'BlockedByResponse']
   const plain = reason.replace(KEBAB, '$1').toLowerCase()
 
-  return known.find(name => name.toLowerCase() === plain) ?? 'Failed'
+  const found = known.find(name => name.toLowerCase() === plain)
+
+  if (found === undefined)
+    throw new Error(`kay: no network error named ${reason}; use one of ${known.join(', ')}`)
+
+  return found
 }

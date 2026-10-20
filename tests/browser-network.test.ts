@@ -23,6 +23,15 @@ const server = Bun.serve({
     if (url.pathname === '/stream')
       return new Response(new ReadableStream({ start: (controller) => { controller.enqueue('data: 1\n\n') } }), { headers: { 'content-type': 'text/event-stream' } })
 
+    if (url.pathname === '/cookies') {
+      const headers = new Headers()
+
+      headers.append('x-multi', 'a=1')
+      headers.append('x-multi', 'b=2')
+
+      return new Response('x', { headers })
+    }
+
     if (url.pathname === '/old')
       return new Response(null, { status: 302, headers: { location: '/api/hello' } })
 
@@ -259,6 +268,78 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(await page.evaluate(() => (window as { entered?: number }).entered)).toBe(1)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.box')!).backgroundColor)).toBe('rgb(204, 0, 0)')
     await expect(page.hover('.nothing', { timeout: 100 })).rejects.toThrow('timed out after 100ms waiting for .nothing')
+  })
+
+  it('lets a request go that the page cancels while it is paused, and reports nothing', async () => {
+    await page.route('/api/hello', async (request) => {
+      await Bun.sleep(200)
+      await request.fulfill({ body: 'late' })
+    })
+    await page.route('/api/missing', async () => {
+      await Bun.sleep(200)
+    })
+
+    const cancelled = page.evaluate(() => {
+      const swallow = async (promise: Promise<unknown>) => {
+        try {
+          await promise
+        }
+        catch {}
+      }
+
+      void swallow(fetch('/api/hello'))
+      void swallow(fetch('/api/missing'))
+    })
+
+    await cancelled
+    await page.goto('/?away')
+    await Bun.sleep(400)
+
+    expect(page.errors).toEqual([])
+    await page.unroute()
+  })
+
+  it('refuses to read an event stream', async () => {
+    await page.route('/stream', async (request) => {
+      await request.fetch()
+    })
+    await page.evaluate(() => {
+      const swallow = async (promise: Promise<unknown>) => {
+        try {
+          await promise
+        }
+        catch {}
+      }
+
+      void swallow(fetch('/stream'))
+    })
+    await Bun.sleep(300)
+
+    expect(page.errors.at(-1)).toContain('cannot read the event stream')
+    page.errors.length = 0
+    await page.unroute()
+  })
+
+  it('refuses an unknown error name', async () => {
+    await page.route('/api/hello', async (request) => {
+      await request.abort('typo')
+    })
+    await call(page, '/api/hello')
+
+    expect(page.errors.at(-1)).toContain('no network error named typo')
+    page.errors.length = 0
+    await page.unroute()
+  })
+
+  it('joins repeated headers', async () => {
+    await page.route('/cookies', async (request) => {
+      const answer = await request.fetch()
+
+      await request.fulfill({ body: answer.headers['x-multi'] ?? 'none' })
+    })
+
+    expect(await call(page, '/cookies')).toMatch(/^200 a=1(, |\n)b=2$/)
+    await page.unroute()
   })
 
   it('does not hold its request when the page closes with it paused', async () => {

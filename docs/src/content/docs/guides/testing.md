@@ -292,7 +292,9 @@ const page = await site.open('/account', { cookies: await auth.sessionCookie(use
 
 ### The network
 
-`page.responses` lists every response the page received so far: its `url`, `method`, `status` and `type`, and its `requestHeaders` and `responseHeaders` as the wire carried them, lowercased. The request headers include the ones the browser adds itself, such as `accept-encoding` or `cookie`. `page.waitForResponse(match)` resolves with the first response whose URL matches, once its body arrived.
+`page.responses` lists every response the page received so far: its `url`, `method`, `status` and `type`, and its `requestHeaders` and `responseHeaders` as the wire carried them, lowercased. The request headers include the ones the browser adds itself, such as `accept-encoding` or `cookie`.
+
+`page.waitForResponse(match)` resolves with the first response whose URL matches, once its body arrived, or on its headers with `{ complete: false }` for one that never ends, such as an event stream. `page.responses.length = 0` empties the list.
 
 ```ts
 await page.click('button.save')
@@ -303,7 +305,7 @@ expect(saved.status).toBe(200)
 expect(saved.requestHeaders['content-type']).toBe('application/json')
 ```
 
-A `match` is a string with `*` for any characters, a `RegExp` on the whole URL or a function of the `URL`. A string starting with `/` is a path on the site the page is on, whatever it is mounted under.
+A `match` is a string with `*` for any characters, a `RegExp` on the whole URL or a function of the `URL`. A string starting with `/` matches the path on the site the page is on, a mount point included: `/docs/api/*` for an app under `/docs`.
 
 `page.route(match, handler)` answers the requests the page makes from then on. The handler calls `fulfill`, `abort` or `continue` on the request. A request the handler answers none of goes on to the server. The latest route that matches a request answers it, and `page.unroute(match?)` stops one route, or every route without an argument.
 
@@ -317,7 +319,9 @@ await page.route('/', async (request) => {
 })
 ```
 
-`request.fetch()` lets the request reach the server and resolves with its decoded answer, `status`, `headers`, `body` and `text()`, for the handler to pass on changed. A handler that throws is reported in `page.errors` and its request fails.
+`request.fetch()` lets the request reach the server and resolves with its decoded answer, `status`, `headers`, `body` and `text()`, for the handler to pass on changed.
+
+It cannot read an event stream, whose body never ends, so a route that fetches should not match one. A handler that throws is reported in `page.errors` and its request fails.
 
 `page.offline()` cuts the page off the network, so every request fails and `navigator.onLine` is false, and `page.online()` brings it back. `page.initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, to set up a stub or a flag the page reads as it starts.
 

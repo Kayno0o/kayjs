@@ -464,13 +464,15 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
           return element !== null
         }, [selector]), selector, Math.max(until - Date.now(), 1))
 
+        const tried = Date.now()
+
         try {
           await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
 
           return
         }
         catch (error) {
-          if (gone || !(error instanceof Error) || !ACTIONABLE.test(error.message) || Date.now() >= until)
+          if (gone || !(error instanceof Error) || !(ACTIONABLE.test(error.message) || Date.now() - tried >= CLICK_WAIT_MS - POLL_MS) || Date.now() >= until)
             throw error
         }
       }
