@@ -433,7 +433,7 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-export type TemplateHelper = 'For' | 'Show' | 'componentClass'
+export type TemplateHelper = 'For' | 'componentClass'
 
 // What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
 export interface TemplateFacts {
@@ -570,9 +570,6 @@ export function templateFacts(file: KayFile): TemplateFacts {
     }
     else if (node.kind === 'for') {
       facts.helpers.add('For')
-    }
-    else if (node.kind === 'if' && node.branches.some(branch => branch.alias)) {
-      facts.helpers.add('Show')
     }
     else if (node.kind === 'await') {
       const value = text(node.value).trim()

@@ -267,13 +267,12 @@ export interface AwaitProps<T> {
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>
 
-// What the template's control flow and dynamic tags read as in the code the type checker reads: `for` and an aliased `if` hand their block values, which TypeScript narrows, where the browser build hands accessors.
+// What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
   For: {
     <T>(props: { each: readonly T[] | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
     <T>(props: { each: readonly T[] | null | undefined | false, keyed: false, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
   }
-  Show: <T>(props: { when: T, fallback?: JSX.Element, children: (value: Truthy<T>) => JSX.Element }) => JSX.Element
   staticFor: <T>(each: readonly T[] | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   componentClass: (list: readonly unknown[]) => string | undefined

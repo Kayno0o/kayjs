@@ -291,10 +291,10 @@ class ModuleShell {
     if (mode === 'dom' && this.kind === 'island' && titled)
       b.add(`import { pageTitle as ${helperName('pageTitle')} } from 'kay/internal/title'\n`)
 
-    // Code that only gets read, by the type checker and the analysis pass, declares the helpers of its control flow rather than import a runtime of them.
-    const declared: [name: string, helper: DeclaredHelper][] = runs ? [] : used.filter(helper => helper !== 'For' && !(this.options.check && helper === 'Show')).map(helper => [helperName(helper), helper])
+    // Code that only gets read declares the helpers of its control flow rather than import a runtime of them; the analysis pass only parses its loops and aliased `if`s, so it declares none of them.
+    const declared: [name: string, helper: DeclaredHelper][] = runs ? [] : used.filter(helper => helper !== 'For').map(helper => [helperName(helper), helper])
 
-    if (used.includes('For') && !runs)
+    if (used.includes('For') && mode === 'check')
       declared.push(this.staticLoops ? ['KayStaticFor', 'staticFor'] : ['KayLoopFor', 'For'])
 
     if (this.kind === 'island')
