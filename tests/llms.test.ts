@@ -1,6 +1,7 @@
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { ARCHIVES } from '../scripts/whats-new'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
 import { nativeExe } from '../src/compiler/native-typescript'
@@ -20,6 +21,7 @@ const NAMED = /`(\w+)(?:<[^`>]*>)?(?:\([^`]*\))?`/g
 const MENTION = /((?:`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`(?:, | and | or ))*`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`),? (?:(?:imported |comes? )?from|in) `(kay(?:\/[\w/-]+)?)`/g
 // The entry points an app imports from, without what compiled files import (llms/project.md).
 const PUBLIC_ENTRIES = ['kay', 'kay/bun', 'kay/cache', 'kay/compiler', 'kay/content', 'kay/dev-tool', 'kay/edit', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/markdown', 'kay/mount', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
+const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
 
@@ -52,6 +54,18 @@ describe('llms.txt and its docs', () => {
 
     expect(files.length).toBeGreaterThan(30)
     expect(files.filter(file => Bun.file(join(root, file)).size >= MAX_DOC_BYTES).map(file => `${file}: ${Bun.file(join(root, file)).size}`)).toEqual([])
+  })
+
+  it('says in llms.txt the release each archive starts before, as the archive itself does', async () => {
+    const index = await Bun.file(join(root, 'llms.txt')).text()
+    const before = (text: string) => BEFORE.exec(text)?.[0]
+
+    for (const [, archive] of ARCHIVES) {
+      const line = index.split('\n').find(line => line.includes(`(${archive})`))
+
+      expect(before(line ?? '')).toBeDefined()
+      expect(before(line ?? '')).toBe(before(await Bun.file(join(root, archive)).text()))
+    }
   })
 
   it('lists every lint at its default level', () => {

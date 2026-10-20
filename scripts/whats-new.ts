@@ -1,5 +1,7 @@
 // The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
 export const WHATS_NEW = ['llms/whats-new.md']
+// The index whose lines list each archive and the release it starts before.
+export const INDEX = 'llms.txt'
 // Each long page with the archive its oldest releases move to, so an agent still reads either with one command.
 export const ARCHIVES = [['llms/whats-new.md', 'llms/whats-new-archive.md'], ['llms/upgrading.md', 'llms/upgrading-archive.md']] as const
 // The size a page is kept under by moving its oldest releases away, below the 25,000 bytes tests/llms.test.ts allows.
@@ -74,9 +76,17 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
   return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)}\n`
 }
 
-// The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive and each archive trimmed. Pure, so a release can check the result before it writes any of it.
+// Rewrites the "before" version of the line listing an archive to the one its opening paragraph names, so the index says what the archive holds.
+export function indexArchive(index: string, path: string, archive: string): string {
+  const boundary = BEFORE.exec(archive.split(SECTION)[0]!)?.[0]
+
+  return boundary === undefined ? index : index.split('\n').map(line => line.includes(`(${path})`) ? line.replace(BEFORE, boundary) : line).join('\n')
+}
+
+// The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive, each archive trimmed and the index's line for it moved to the release it now starts before. Pure, so a release can check the result before it writes any of it.
 export function releasePages(read: (path: string) => string, version: string): Map<string, string> {
   const pages = new Map<string, string>()
+  let index = read(INDEX)
 
   for (const path of WHATS_NEW)
     pages.set(path, stampUnreleased(read(path), version))
@@ -86,7 +96,10 @@ export function releasePages(read: (path: string) => string, version: string): M
 
     pages.set(page, moved.page)
     pages.set(archive, trimArchive(moved.archive))
+    index = indexArchive(index, archive, moved.archive)
   }
+
+  pages.set(INDEX, index)
 
   return pages
 }

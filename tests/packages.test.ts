@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, indexArchive, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -94,6 +94,14 @@ describe('what\'s new', () => {
     expect(moved.archive).toBe('# Old\n\nWhat each release before 1.51.2 added.\n\n## 1.51.1\n\n- bb\n\n## 1.51.0\n\n- aaaaaaaaaa\n\n## 1.50.0\n\n- z\n')
     // The patch boundary reads back: a second run moves nothing.
     expect(archiveOldest(moved.page, moved.archive, 10)).toEqual(moved)
+  })
+
+  it('moves the index\'s line for an archive to the release it now starts before, and leaves the other lines alone', () => {
+    const archive = '# Old\n\nWhat each release before 1.46 added.\n\n## 1.45.0\n\n- z\n'
+    const index = '# Docs\n\n- [New](new.md): what each recent release adds, before 1.1\n- [Old](old.md): the same for the releases before 1.45\n'
+
+    expect(indexArchive(index, 'old.md', archive)).toBe(index.replace('before 1.45', 'before 1.46'))
+    expect(indexArchive(index, 'other.md', archive)).toBe(index)
   })
 
   it('drops the oldest releases of an archive over its limit, keeping its newest, and ends on where they are read', () => {

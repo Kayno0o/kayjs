@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { brokenLinks } from '../scripts/links'
-import { ARCHIVES, releasePages, trimArchive } from '../scripts/whats-new'
+import { ARCHIVES, INDEX, releasePages, trimArchive } from '../scripts/whats-new'
 import { renderMarkdown } from '../src/content/markdown'
 
 const read = async (path: string) => Bun.file(path).text()
@@ -48,9 +48,22 @@ describe('the release\'s link check', () => {
   })
 
   it('finds no broken link in the pages the next release writes', async () => {
-    const paths = ARCHIVES.flat()
+    const paths = [INDEX, ...ARCHIVES.flat()]
     const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
 
     expect(await brokenLinks(releasePages(path => texts.get(path)!, '9.9.9'))).toEqual([])
+  })
+
+  it('writes llms.txt with the release each archive now starts before', async () => {
+    const paths = [INDEX, ...ARCHIVES.flat()]
+    const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
+    const whatsNew = texts.get('llms/whats-new.md')!.replace('\n## ', `\n## Unreleased\n\n- ${'a'.repeat(15_000)}\n\n## `)
+    const pages = releasePages(path => path === 'llms/whats-new.md' ? whatsNew : texts.get(path)!, '9.9.9')
+    const before = (text: string) => (/before \d+\.\d+(?:\.\d+)?/).exec(text)![0]
+    const line = (text: string, archive: string) => text.split('\n').find(line => line.includes(`(${archive})`))!
+
+    expect(before(pages.get('llms/whats-new-archive.md')!)).not.toBe(before(texts.get('llms/whats-new-archive.md')!))
+    expect(before(line(pages.get(INDEX)!, 'llms/whats-new-archive.md'))).toBe(before(pages.get('llms/whats-new-archive.md')!))
+    expect(line(pages.get(INDEX)!, 'llms/upgrading-archive.md')).toBe(line(texts.get(INDEX)!, 'llms/upgrading-archive.md'))
   })
 })
