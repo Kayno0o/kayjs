@@ -10,7 +10,9 @@ import { BODY } from '../markers'
 import { drafts } from './drafts'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
+import EntrySaveState from '../components/entry-save-state.kay'
 import { saveDraft } from './save'
+import { saveShortcut } from './shortcut'
 
 const { entry, focus } = props<{ entry: EntryRef, focus?: FieldPath | undefined }>()
 
@@ -19,6 +21,7 @@ const source = resource(entriesApi, '/:collection/:slug', {
   query: entry.locale === undefined ? {} : { locale: entry.locale },
 })
 const saving = signal(false)
+const lastSave = signal<{ at: number, rebuilding: boolean }>()
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
   const answer = source.value()
@@ -50,30 +53,36 @@ effect(() => {
 })
 
 async function save(): Promise<void> {
+  if (!drafts.changed(entry) || saving())
+    return
+
   saving = true
 
   try {
-    await saveDraft(drafts, entry)
+    await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => lastSave.set({ at: Date.now(), rebuilding }) })
   }
   finally {
     saving = false
   }
 }
+
+saveShortcut(() => void save())
 ---
-section.kcms-entry(ref={element => box = element})
+section.kcms-entry(aria-busy={saving()} ref={element => box = element})
   header.kcms-entry-head
     hgroup
       h3.kcms-entry-title {collectionTitle({ name: entry.collection, title: source.value()?.collection.title })}
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
-    if drafts.changed(entry)
-      .kcms-entry-actions
-        Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving()} onClick={() => drafts.reset(entry)})
-        Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} onClick={save})
+    .kcms-entry-actions
+      EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()})
+      Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving() || !drafts.changed(entry)} onClick={() => drafts.reset(entry)})
+      Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !drafts.changed(entry)} onClick={save})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
   else if source.value() as answer
     if answer.entry.problem as problem
       p.kcms-entry-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
-    EntryFields(form={scope()!})
+    fieldset.kcms-entry-fields(disabled={saving()})
+      EntryFields(form={scope()!})
   else
     p.kcms-entry-loading {wording('cms.entry.loading', 'Loading…')}

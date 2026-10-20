@@ -10,7 +10,8 @@ import { entryKey } from '../markers'
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
 // `told` is the toast a save this one waited for ended on, which a refusal worded the same does not repeat.
-interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean, told?: string | undefined }
+// `onSaved` hears each save that went through, and whether the site shows it only once it has rebuilt.
+interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean, told?: string | undefined, onSaved?: ((saved: { rebuilding: boolean }) => void) | undefined }
 
 // The save of each entry on its way, and whether another was asked for meanwhile.
 const saving = new WeakMap<Drafts, Map<string, Flight>>()
@@ -63,7 +64,7 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
   return flight.done
 }
 
-async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false, told }: SaveOptions, flight: Flight): Promise<boolean> {
+async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false, told, onSaved }: SaveOptions, flight: Flight): Promise<boolean> {
   const entry = drafts.entry(ref)
 
   if (!entry)
@@ -102,6 +103,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
 
   drafts.markSaved(ref, entry, 'version' in outcome ? outcome.version : undefined)
   drafts.report([])
+  onSaved?.({ rebuilding: 'commit' in outcome && outcome.commit !== undefined })
 
   return true
 }
@@ -169,6 +171,11 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
   }), wording('cms.save.publishFailure', 'Could not publish'))
 
   return settled(outcome, wording('cms.save.published', 'Published'), wording('cms.save.notPublished', 'Not published'))
+}
+
+// Tells the editor a publish, an unpublish or a schedule change waits for the edits typed so far to be saved, which they would otherwise carry along.
+export function refuseUnsaved(): void {
+  toast.error(wording('cms.save.saveFirst', 'You have unsaved changes. Save or cancel them first, so this does not save them too.'))
 }
 
 // Moves an entry one place up or down in its collection's order and says how it went; true once moved.

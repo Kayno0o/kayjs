@@ -1,3 +1,21 @@
+/* The form's fields, locked while a save is on its way. */
+.kcms-entry-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.kcms-entry-fields:disabled {
+  opacity: 0.6;
+}
+
+.kcms-save-state {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-kui-subtext);
+}
+
 .kcms-list-item {
   display: flex;
   align-items: start;

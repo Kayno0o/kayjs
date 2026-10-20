@@ -5,7 +5,8 @@ import { guardLeave, navigate, signal } from 'kay'
 import { wording } from 'kay/words'
 import { publishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
-import { deleteSaved, saveDraft } from './editor/save'
+import { deleteSaved, refuseUnsaved, saveDraft } from './editor/save'
+import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
 import { collectionPath, entryPath, entryTitle } from './listing'
 
@@ -35,12 +36,22 @@ export interface EntryForm extends FormScope {
   slug: Signal<string>
   newLocale: Signal<string>
   saving: Signal<boolean>
+  // Whether the entry has edits not saved yet.
+  dirty: () => boolean
+  // Whether Save has something to do: edits to save, or a new entry to create, and no save on its way.
+  canSave: () => boolean
+  // The last save that went through, when it was (`Date.now()`) and whether the site shows it only once it has rebuilt; undefined before the first.
+  savedAt: () => { at: number, rebuilding: boolean } | undefined
   stored: StoredEntry | undefined
   isDraft: () => boolean
   // When a published entry whose `publishAt` date is ahead goes live, in the editor's time zone (UTC until the browser says it), as the form holds it now; gone once the date passes, with no reload.
   scheduled: () => string | undefined
   save: () => Promise<void>
+  // Publish, Unpublish, Publish now and Clear schedule change the entry alone: with edits not saved yet they refuse, saving nothing, and a refused save leaves the form as it was.
   publish: () => Promise<void>
+  unpublish: () => Promise<void>
+  publishNow: () => Promise<void>
+  unschedule: () => Promise<void>
   remove: () => Promise<void>
   reset: () => void
 }
@@ -115,26 +126,60 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
 
   const goesLiveAt = () => !isDraft() && collection.publishField !== undefined ? publishTime(collection, { [collection.publishField]: drafts.value(ref, collection.publishField) }) : undefined
   const scheduled = useGoesLive(goesLiveAt)
+  const canSave = () => !saving() && (first === undefined || drafts.changed(ref))
 
-  async function save(): Promise<void> {
+  const lastSave = signal<{ at: number, rebuilding: boolean }>()
+  const onSaved = ({ rebuilding }: { rebuilding: boolean }) => lastSave.set({ at: Date.now(), rebuilding })
+
+  async function saveNow(): Promise<boolean> {
+    // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
+    if (first && !drafts.changed(ref))
+      return true
+
     saving.set(true)
 
     try {
-      if (first) {
-        await saveDraft(drafts, ref)
-
-        return
-      }
+      if (first)
+        return await saveDraft(drafts, ref, { onSaved })
 
       const created = { collection: collection.name, slug: slug().trim(), locale: collection.localized ? newLocale() : undefined }
 
-      if (await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true }))
-        await navigate(entryPath(prefix, created), { replace: true })
+      if (!await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true, onSaved }))
+        return false
+
+      await navigate(entryPath(prefix, created), { replace: true })
+
+      return true
     }
     finally {
       saving.set(false)
     }
   }
+
+  async function save(): Promise<void> {
+    await saveNow()
+  }
+
+  // Saves one field's new value alone, and puts the field back when the save is refused, so the form never shows what is not stored.
+  async function change(field: string | undefined, value: unknown): Promise<void> {
+    if (!first || field === undefined || saving())
+      return
+
+    if (drafts.changed(ref))
+      return refuseUnsaved()
+
+    const before = drafts.value(ref, field)
+
+    drafts.set(ref, field, value)
+
+    if (!await saveNow())
+      drafts.set(ref, field, before)
+  }
+
+  saveShortcut(() => {
+    if (canSave())
+      void save()
+  })
 
   return {
     ...formScope(drafts, ref, collection),
@@ -151,19 +196,19 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     slug,
     newLocale,
     saving,
+    dirty: () => drafts.changed(ref),
+    canSave,
+    savedAt: () => lastSave(),
     get stored() {
       return stored()
     },
     isDraft,
     scheduled,
     save,
-    async publish() {
-      if (collection.draftField === undefined)
-        return
-
-      drafts.set(ref, collection.draftField, false)
-      await save()
-    },
+    publish: async () => change(collection.draftField, false),
+    unpublish: async () => change(collection.draftField, true),
+    publishNow: async () => change(collection.publishField, new Date().toISOString()),
+    unschedule: async () => change(collection.publishField, undefined),
     async remove() {
       if (await deleteSaved(ref, drafts.version(ref)))
         await navigate(collectionPath(prefix, collection.name), { replace: true })

@@ -14,10 +14,12 @@ const { prefix, collection, entry, locale, presence } = props<{ prefix: string, 
 
 const form = createEntryForm({ prefix, collection, entry, locale })
 ---
-form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
+form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => { event.preventDefault(); void form.save() }})
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
     EntryActions(form={form})
   if presence
     EntryPresence(room={presence.room} member={presence.member})
-  EntryIdentity(form={form})
-  EntryFields(form={form})
+  // Locked while a save is on its way, so what is typed meanwhile is not left out of it.
+  fieldset.kcms-entry-fields(disabled={form.saving()})
+    EntryIdentity(form={form})
+    EntryFields(form={form})

@@ -253,6 +253,10 @@ The editor, the sidebar and the screens change entries through one API under `/a
 
 ## Saves and conflicts
 
+Save is disabled until something changed, and Ctrl or Cmd+S saves from anywhere on the screen or in the editor on the page. While a save is on its way the fields are locked. Next to the buttons, a line says where the entry stands: `Saving…`, `Unsaved changes`, or `Saved at 14:32`. When the site shows a save only after it has rebuilt, the line says `Not live yet` and links to the page.
+
+Publish, Unpublish, Publish now and Clear schedule each change one field and save it. With unsaved edits they refuse and ask you to save or cancel them first, so they never save half-typed text. If the save is refused, the form goes back to how it was. Delete names the entry, and for one that has a page it warns that the page stops answering.
+
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
 
 A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, and its Keep my edits button lets the next save write your edits over that save.
@@ -289,6 +293,8 @@ The editor on the page follows the form's layout too. A name twice, or an action
 A collection with `publishAt: 'publishAt'` (see [Scheduling an entry](/guides/content#scheduling-an-entry)) shows that date field in the entry form like any other. The editor sets, changes or clears it and saves. The cms only edits the field: kay shows the entry at that time, with no job in your app.
 
 In the list, a published entry whose date is ahead has a `Scheduled for` badge in the Status column, and the entry screen shows the same badge. Both name the time in the editor's own time zone, such as `Scheduled for 2026-10-20 10:00 GMT+2`, once the browser says it, and in UTC before. The badge goes by itself when the date passes, back to `Published` in the list. A draft stays a draft, so Publish on a draft with a date confirms the schedule.
+
+Beside the badge, Publish now dates the entry now and Clear schedule removes its date, each saving at once.
 
 The date and time input shows the time of the editor's own time zone, whatever the server's, and names the zone under the field. What the editor types is stored as the exact moment it names, so an editor in Paris and one in New York see the same entry at their own hours. A time the clocks of the zone skip, on the night they go forward, is stored an hour on. A date field you clear stores nothing.
 

@@ -1,4 +1,5 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
+import { wording } from 'kay/words'
 import { publishTime } from './datetime'
 import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
@@ -177,4 +178,11 @@ export function newEntryPath(prefix: string, collection: string): string {
 // Opens the page in edit mode, through the screens' guard.
 export function onPagePath(prefix: string, url: string): string {
   return screenPath(prefix, `/page?path=${encodeURIComponent(url)}`)
+}
+
+// What a delete confirmation asks: the entry by its title, and, for one with a page, that the page goes and links to it break.
+export function deleteMessage(title: string, url?: string | undefined): string {
+  const asked = wording('cms.entry.deleteNamed', 'Delete {title}? This cannot be undone.', { title })
+
+  return url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
 }
