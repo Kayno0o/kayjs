@@ -1659,7 +1659,7 @@ describe('the dev tool', () => {
       expect(facts).toContain(`${expected.co2.toFixed(expected.co2 < 0.1 ? 3 : 2)} gCO2e per view`)
       expect(facts).toContain(`DOM elements${counted.get('dom')}`)
       expect(facts).toContain('Requests11')
-      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('1 request of another site, of unknown weight, not counted. EcoIndex 5.10.0, Sustainable Web Design v4.')
+      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('1 request of unknown weight, not counted. EcoIndex 5.10.0, Sustainable Web Design v4.')
 
       // The last build's sizes for the route, with their age, the estimate marked.
       const built = shadow().querySelector('#kay-dev-performance .build')!.textContent

@@ -315,7 +315,7 @@ export function formatFootprintTable(footprints: RouteFootprint[], { width = Inf
 
       return [line, note(`${breakdown}${pages > 1 ? `; heaviest of ${pages} pages, ${path}` : ''}${unweighed > 0 ? `; ${unweighed} request${unweighed === 1 ? '' : 's'} of unknown weight, not counted` : ''}`)]
     }),
-    ...hidden > 0 ? [`  and ${hidden} more route${hidden === 1 ? '' : 's'}, lighter than these`] : [],
+    ...hidden > 0 ? [`  and ${hidden} more route${hidden === 1 ? '' : 's'}, lighter than these or not measured`] : [],
   ].join('\n')
 }
 

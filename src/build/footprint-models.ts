@@ -58,13 +58,13 @@ export const SWD_VERSION = 4
 const OPERATIONAL_KWH_PER_GB = 0.055 + 0.059 + 0.08
 const EMBODIED_KWH_PER_GB = 0.012 + 0.013 + 0.081
 
-// Ember's global average carbon intensity of electricity, in gCO2e per kWh, for the operational and the embodied energy alike.
-export const GRID_GCO2E_PER_KWH = 494
-// The model's visitor mix, as Website Carbon applies it: three in four views load everything, the rest a cache holds 98% of.
-export const FIRST_VISIT_SHARE = 0.75
-export const RETURN_VISIT_SHARE = 0.25
-export const RETURN_VISIT_RELOAD = 0.02
 // Green hosting is not assumed.
+// Ember's global average carbon intensity of electricity, in gCO2e per kWh, for the operational and the embodied energy alike.
+const GRID_GCO2E_PER_KWH = 494
+// The model's visitor mix, as Website Carbon applies it: three in four views load everything, the rest a cache holds 98% of.
+const FIRST_VISIT_SHARE = 0.75
+const RETURN_VISIT_SHARE = 0.25
+const RETURN_VISIT_RELOAD = 0.02
 const GIGABYTE = 1e9
 
 // The grams of CO2e one view of a page moving `bytes` costs, a visit mix of new and returning visitors averaged.

@@ -176,6 +176,8 @@ route   weight  requests  DOM  EcoIndex  gCO2e
 
 The build reads each page's HTML as it wrote it, so a page hook's changes count, and starts no browser. Images are read for a 1280 px window, and a font counts when the page preloads it. A request to another site counts as a request, with a note that its weight is unknown.
 
+Some things are not counted: CSS background images, video, audio, iframes and the favicon. A font face declared without a `unicode-range` counts even if the page never uses it.
+
 A route with params is measured on the pages its `prerender` list made. A route none of whose pages was prerendered is shown as not measured.
 
 The dev tool's Performance tab shows the same figures for the page you have open, measured in the browser. Its sizes are the development ones, so they are larger than the build's.

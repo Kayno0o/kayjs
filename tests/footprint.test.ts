@@ -183,6 +183,44 @@ describe('measurePage', () => {
     expect((await measurePage('<html><body><picture><source srcset="/c.jpg" type="image/vnd.future"><img src="/b.jpg"></picture></body></html>', '/', weighing(find, false))).parts.images).toBe(900)
   })
 
+  it('reads the media of a source as a browser does: media types, comma lists, ranges and not', async () => {
+    const { find } = await site({ 'a.avif': bytes(700), 'b.jpg': bytes(900) })
+    const weightWith = async (media: string) => (await measurePage(`<html><body><picture><source srcset="/a.avif" type="image/avif" media="${media}"><img src="/b.jpg"></picture></body></html>`, '/', weighing(find, false))).parts.images
+
+    for (const media of ['screen', 'all', 'only screen and (min-width: 600px)', '(min-width: 600px), (max-width: 100px)', '(width >= 600px)', '(width>=600px)', 'print, (min-width: 600px)', '(min-width: 600px) and (max-width: 1280px)'])
+      expect(await weightWith(media)).toBe(700)
+
+    for (const media of ['print', 'screen and (max-width: 600px)', '(width < 600px)', 'not all', '(max-width: 100px), (min-width: 2000px)', 'tv'])
+      expect(await weightWith(media)).toBe(900)
+  })
+
+  it('does not fail on a URL or an expression that is odd, hostile or enormous, and weighs what it can', async () => {
+    const { find } = await site({ 'b.jpg': bytes(900) })
+    const deep = `calc(${'('.repeat(200_000)}1px`
+    const html = `<html><head><link rel="preload" href="https://[" as="font"><style>@font-face{src:url(http://a:99999/x)}</style></head><body><img src="/b.jpg" srcset="/b.jpg 100w" sizes="${deep}"><picture><source srcset="/b.jpg" media="${'('.repeat(200_000)}"><img src="/b.jpg"></picture><img src="http://[x"></body></html>`
+    const page = await measurePage(html, '/', weighing(find, false))
+
+    // The one file, named three times, is fetched once.
+    expect(page.parts.images).toBe(900)
+  })
+
+  it('leaves a style inside a noscript or a template out of the fonts', async () => {
+    const { find } = await site({ 'a.woff2': bytes(300) })
+    const page = await measurePage('<html><body><noscript><style>@font-face{src:url("/a.woff2")}</style></noscript><template><style>@font-face{src:url("/a.woff2")}</style></template></body></html>', '/', weighing(find, false))
+
+    expect(page.parts.fonts).toBe(0)
+  })
+
+  it('serves a text file without a copy as it is when the build would keep none: small, or compressing little', async () => {
+    const small = 'a{color:red}'
+    const noise = Array.from({ length: 400 }, () => Math.random().toString(36)).join('')
+    const { find } = await site({ 'small.css': small, 'noise.js': noise, 'big.css': 'a { color: red }\n'.repeat(200) })
+    const page = await measurePage('<html><head><link rel="stylesheet" href="/small.css"><script src="/noise.js"></script><link rel="stylesheet" href="/big.css"></head></html>', '/', weighing(find, false))
+
+    expect(page.parts.css).toBe(small.length + gzipSize(new TextEncoder().encode('a { color: red }\n'.repeat(200))))
+    expect(page.parts.js).toBe(Math.min(noise.length, gzipSize(new TextEncoder().encode(noise)) < noise.length * 0.9 ? gzipSize(new TextEncoder().encode(noise)) : noise.length))
+  })
+
   it('counts the fonts a page preloads or declares without a range, and those of a linked stylesheet, not a subset it does not preload', async () => {
     const sheet = '@font-face{font-family:B;src:url("/b.woff2")}@font-face{font-family:C;src:url("/c.woff2");unicode-range:U+0400-04FF}'
     const { find } = await site({ 'a.woff2': bytes(100), 'b.woff2': bytes(200), 'c.woff2': bytes(400), 'd.woff2': bytes(800), 'e.woff2': bytes(1600), 's.css': sheet })

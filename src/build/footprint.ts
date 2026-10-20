@@ -3,6 +3,7 @@ import type { RenderedPage } from '../server/page-hook'
 import type { Route } from '../server/routes'
 import type { Figures } from './footprint-models'
 import { extname, join } from 'node:path'
+import { MIN_SIZE } from '../server/compress'
 import { limiter } from '../server/limit'
 import { figuresOf, VIEWPORT_WIDTH } from './footprint-models'
 import { gzipSize } from './report'
@@ -14,6 +15,7 @@ const TEXT_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.xml',
 const FONT_FACE = /@font-face\s*\{([^}]*)\}/g
 const FACE_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^"')\s]+))\s*\)/
 const WHITESPACE = /\s+/
+const EVERY_WHITESPACE = /\s+/g
 const SRCSET_SEPARATOR = /(?<=\s\d+(?:\.\d+)?[wx])\s*,\s*|,\s+/
 const EXTERNAL = /^(?:[a-z][\w+.-]*:|\/\/)/i
 const NOT_FETCHED = /^(?:data|blob|javascript|about|mailto|tel):/i
@@ -21,6 +23,9 @@ const LENGTH = /^(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em|vw|dppx|dpi|x)?$/i
 const LENGTH_START = /^[\d.+-]/
 // What a `preload` link's `as` loads.
 const PRELOAD_KINDS: Record<string, 'css' | 'js' | 'images' | 'fonts'> = { font: 'fonts', script: 'js', style: 'css', image: 'images' }
+// The longest `calc()` or media condition read: a deeper one would only be hostile, and nests as deep as it is long.
+const MAX_EXPRESSION = 1000
+const RANGE = /^(width|resolution)([<>]=?|=)([^<>=]+)$/
 const FEATURE_NAME = /^[\w-]+$/
 
 // What a page weighs, in the bytes a host serves: text gzipped, an image or a font as the file is.
@@ -44,7 +49,7 @@ export interface RouteFootprint {
 }
 
 // The file a root-relative URL names, as the build wrote it.
-export type FileFinder = RenderedPage['file']
+type FileFinder = RenderedPage['file']
 
 interface ImageRef {
   src?: string | undefined
@@ -81,6 +86,7 @@ async function read(html: string): Promise<Found> {
   let inert = 0
   let picture: PictureSource[] | undefined
   let style = ''
+  let collecting = false
 
   const inertElement = (element: HTMLRewriterTypes.Element) => {
     inert++
@@ -130,10 +136,12 @@ async function read(html: string): Promise<Found> {
     .on('style', {
       element: (element) => {
         style = ''
-        element.onEndTag(() => void found.inlineStyles.push(style))
+        collecting = inert === 0
+        element.onEndTag(() => void (collecting && found.inlineStyles.push(style)))
       },
       text: (chunk) => {
-        style += chunk.text
+        if (collecting)
+          style += chunk.text
       },
     })
     .transform(new Response(html))
@@ -197,6 +205,9 @@ function dimension(text: string, width: number): number | undefined {
 
 // `calc()` over lengths with + - * / and parentheses; undefined for anything else.
 function calc(text: string, width: number): number | undefined {
+  if (text.length > MAX_EXPRESSION)
+    return undefined
+
   const tokens = text.match(/[\d.]+[a-z%]*|[()+\-*/]/gi) ?? []
   let position = 0
   let sum: () => number | undefined = () => undefined
@@ -281,6 +292,9 @@ function combine(left: boolean, operator: string, right: boolean): boolean {
 
 // A media condition for a window `width` wide at one device pixel per CSS pixel: width and resolution features, `and`, `or`, `not` and parentheses; any other feature does not match.
 function matches(condition: string, width: number): boolean {
+  if (condition.length > MAX_EXPRESSION)
+    return false
+
   const parts = splitTop(condition.trim(), ' ')
   let negated = false
   let result: boolean | undefined
@@ -289,18 +303,17 @@ function matches(condition: string, width: number): boolean {
   for (const part of parts) {
     const word = part.toLowerCase()
 
-    if (word === 'not') {
+    if (word === 'only') {
+      continue
+    }
+    else if (word === 'not') {
       negated = true
     }
     else if (word === 'and' || word === 'or') {
       operator = word
     }
     else {
-      const inner = part.startsWith('(') && part.endsWith(')') ? part.slice(1, -1).trim() : undefined
-      const single = propertyOf(part)
-      const nested = inner !== undefined && matches(inner, width)
-      const value = single === undefined ? nested : feature(single[0].toLowerCase(), single[1], width)
-      const next = negated ? !value : value
+      const next = negated ? !conditionHolds(part, width) : conditionHolds(part, width)
 
       negated = false
       result = result === undefined ? next : combine(result, operator, next)
@@ -308,6 +321,51 @@ function matches(condition: string, width: number): boolean {
   }
 
   return result ?? true
+}
+
+// A media type word, a `(feature: value)`, a range such as `(width >= 600px)` or a parenthesized condition.
+function conditionHolds(part: string, width: number): boolean {
+  const word = part.toLowerCase()
+
+  if (word === 'all' || word === 'screen')
+    return true
+
+  const single = propertyOf(part)
+
+  if (single !== undefined)
+    return feature(single[0].toLowerCase(), single[1], width)
+
+  if (!part.startsWith('(') || !part.endsWith(')'))
+    return false
+
+  const inner = part.slice(1, -1).trim()
+  const range = RANGE.exec(inner.toLowerCase().replaceAll(EVERY_WHITESPACE, ''))
+
+  return range === null ? matches(inner, width) : compare(range[1]!, range[2]!, range[3]!, width)
+}
+
+function compare(name: string, operator: string, value: string, width: number): boolean {
+  const limit = name === 'width' ? lengthOf(value, width) : dimension(value, width)
+
+  if (limit === undefined)
+    return false
+
+  const actual = name === 'width' ? width : 1
+
+  switch (operator) {
+    case '>=': return actual >= limit
+    case '>': return actual > limit
+    case '<=': return actual <= limit
+    case '<': return actual < limit
+    default: return actual === limit
+  }
+}
+
+// A `media` attribute: queries separated by commas, any of which may hold; none at all holds.
+function mediaHolds(media: string, width: number): boolean {
+  const queries = splitTop(media, ',')
+
+  return queries.length === 0 || queries.some(query => matches(query, width))
 }
 
 function feature(name: string, value: string, width: number): boolean {
@@ -369,7 +427,7 @@ export function pickImage({ src, srcset, sizes }: ImageRef, width = VIEWPORT_WID
 // The URL a browser loads for an `img`: a `picture`'s first `source` it can use, else the `img` itself.
 function imageUrl(image: Found['images'][number], width: number): string | undefined {
   for (const source of image.sources) {
-    if (source.srcset !== undefined && (source.type === undefined || IMAGE_TYPES.has(source.type.toLowerCase())) && (source.media === undefined || matches(source.media, width)))
+    if (source.srcset !== undefined && (source.type === undefined || IMAGE_TYPES.has(source.type.toLowerCase())) && (source.media === undefined || mediaHolds(source.media, width)))
       return pickImage(source, width)
   }
 
@@ -380,11 +438,17 @@ function unescaped(url: string): string {
   return url.trim().replaceAll('&amp;', '&')
 }
 
-// The gzip copy `kay build` wrote beside a text file is what a host serves, so its size is read rather than compressing again; a file with no copy, too small or saving little, or whose copy is older than it, is compressed here.
+// The gzip copy `kay build` wrote beside a text file is what a host serves, so its size is read rather than compressing again; a file with no copy, or whose copy is older than it, is compressed here, and served as it is when the build would have kept no copy: under the least size, or saving less than a tenth.
 async function gzippedSize(file: string, bytes: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>): Promise<number> {
   const copy = Bun.file(`${file}.gz`)
 
-  return await copy.exists() && copy.lastModified >= Bun.file(file).lastModified ? copy.size : gzipSize(await bytes())
+  if (await copy.exists() && copy.lastModified >= Bun.file(file).lastModified)
+    return copy.size
+
+  const content = await bytes()
+  const gzipped = gzipSize(content)
+
+  return content.length >= MIN_SIZE && gzipped < content.length * 0.9 ? gzipped : content.length
 }
 
 async function measured(file: string): Promise<number> {
@@ -456,7 +520,11 @@ export async function measurePage(html: string, path: string, weighing: Weighing
       return undefined
     }
 
-    const resolved = new URL(text, here)
+    const resolved = URL.parse(text, here)
+
+    if (resolved === null)
+      return undefined
+
     const url = `${resolved.pathname}${resolved.search}`
 
     if (fetched.has(url))
@@ -482,7 +550,7 @@ export async function measurePage(html: string, path: string, weighing: Weighing
 
   for (const preload of found.preloads) {
     if (preload.as === 'font')
-      preloadedFonts.add(new URL(unescaped(preload.url), here).pathname)
+      preloadedFonts.add(URL.parse(unescaped(preload.url), here)?.pathname ?? '')
   }
 
   for (const url of found.scripts)
@@ -518,7 +586,7 @@ export async function measurePage(html: string, path: string, weighing: Weighing
   }
 
   for (const face of faces) {
-    if (!face.ranged || preloadedFonts.has(new URL(unescaped(face.url), here).pathname))
+    if (!face.ranged || preloadedFonts.has(URL.parse(unescaped(face.url), here)?.pathname ?? ''))
       await fetchOf(face.url, 'fonts')
   }
 
@@ -550,11 +618,17 @@ export async function routeFootprints(dir: string, pages: Map<string, Prerendere
 
   return Promise.all(patterns.map(async (route) => {
     const own = byRoute.get(route) ?? []
-    const measured = await Promise.all(own.map(async ([path, page]) => reading(async () => {
+    const measured = (await Promise.all(own.map(async ([path, page]) => reading(async () => {
       const file = join(dir, page.file)
 
-      return { path, footprint: await measurePage(await Bun.file(file).text(), path, context, file) }
-    })))
+      try {
+        return { path, footprint: await measurePage(await Bun.file(file).text(), path, context, file) }
+      }
+      catch {
+        // A page that cannot be read is left out, as a report must not fail the build.
+        return undefined
+      }
+    })))).filter(each => each !== undefined)
     const heaviest = measured.reduce<(typeof measured)[number] | undefined>((most, each) => most === undefined || each.footprint.weight > most.footprint.weight ? each : most, undefined)
 
     return { route, pages: own.length, path: heaviest?.path, footprint: heaviest?.footprint }

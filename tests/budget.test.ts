@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { budgetLints } from '../src/build/budget'
+import { budgetLints, checkBudget } from '../src/build/budget'
 import { byteSize } from '../src/runtime/byte-size'
 import { scratchDir } from './scratch'
 
@@ -63,6 +63,17 @@ describe('byteSize', () => {
 describe('budgetLints', () => {
   const sizes = [{ route: '/', js: 30_000, css: 12_000, islands: ['a.kay'], pages: 1, kept: 0, estimated: false }, { route: '/b', js: 1000, css: 100, islands: [], pages: 0, kept: 0, estimated: true }]
   const routes = [{ pattern: '/', file: 'src/routes/index.kay', layouts: [] }, { pattern: '/b', file: 'src/routes/b.kay', layouts: [] }] as never
+
+  it('refuses a weight that is no positive size and a grade that is no letter from A to G, where kay check reads them', () => {
+    expect(() => checkBudget({ weight: '500kb', grade: 'C' })).not.toThrow()
+    expect(() => checkBudget(undefined)).not.toThrow()
+
+    for (const weight of ['0', '-1kb', '1e3kb', '20 kb', '', 'heavy'])
+      expect(() => checkBudget({ weight: weight as never })).toThrow('`budget.weight`')
+
+    for (const grade of ['H', 'a', '', 'AA'])
+      expect(() => checkBudget({ grade: grade as never })).toThrow('`budget.grade`')
+  })
 
   it('reports each route and kind over its limit at the route\'s file, and nothing without a budget', () => {
     expect(budgetLints(undefined, undefined, sizes, routes, undefined)).toEqual([])

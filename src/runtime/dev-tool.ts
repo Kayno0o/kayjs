@@ -2881,7 +2881,7 @@ interface Weight {
   // The page's elements and the requests it made, the document's own included, for the EcoIndex.
   dom: number
   requests: number
-  // Requests whose size the browser does not tell, another site's, counted as requests only.
+  // Requests whose size the browser does not tell, another site's or one it kept in memory, counted as requests only.
   unweighed: number
 }
 
@@ -2921,7 +2921,7 @@ async function pageWeight(doc: Document): Promise<Weight> {
 
       const bytes = [fetched.encodedBodySize, fetched.transferSize].find(size => size > 0) ?? 0
 
-      media.set(url.href, { url: own ? `${url.pathname}${url.search}` : url.href, bytes, kind: MEDIA_KINDS[kind] ?? 'files', known: own || bytes > 0 })
+      media.set(url.href, { url: own ? `${url.pathname}${url.search}` : url.href, bytes, kind: MEDIA_KINDS[kind] ?? 'files', known: bytes > 0 })
 
       continue
     }
@@ -3130,7 +3130,10 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     if (ask !== asked)
       return
 
-    if (footprint !== undefined) {
+    if (footprint === undefined) {
+      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), tool.make('div', 'note', 'The server did not answer with the EcoIndex and the carbon of the page.'))
+    }
+    else {
       const facts = tool.make('dl', 'facts')
       const fact = (term: string, ...values: (Node | string)[]) => {
         const value = tool.make('dd')
@@ -3143,7 +3146,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
       fact('Carbon', `${footprint.co2.toFixed(footprint.co2 < 0.1 ? 3 : 2)} gCO2e per view`)
       fact('DOM elements', String(weight.dom))
       fact('Requests', String(weight.requests))
-      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), facts, tool.make('div', 'note', `Measured in this browser, with the dev sizes above, so \`kay build\` reports a lighter page.${weight.unweighed === 0 ? '' : ` ${weight.unweighed} ${weight.unweighed === 1 ? 'request' : 'requests'} of another site, of unknown weight, not counted.`} EcoIndex ${footprint.ecoindex}, Sustainable Web Design v${footprint.swd}.`))
+      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), facts, tool.make('div', 'note', `Measured in this browser, with the dev sizes above, so \`kay build\` reports a lighter page.${weight.unweighed === 0 ? '' : ` ${weight.unweighed} ${weight.unweighed === 1 ? 'request' : 'requests'} of unknown weight, not counted.`} EcoIndex ${footprint.ecoindex}, Sustainable Web Design v${footprint.swd}.`))
     }
 
     if (built === undefined)

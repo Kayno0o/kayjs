@@ -28,8 +28,9 @@ const HTML_TYPE = /^text\/html/i
 // Text the build writes, and the fonts with no compression of their own; images, woff fonts and media come compressed already.
 const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm|ttf|otf)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
+
 // Below this a response fits in a packet or two anyway.
-const MIN_SIZE = 256
+export const MIN_SIZE = 256
 const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
 // The `Accept-Encoding` headers kept parsed: a few browsers' worth, so headers made up to fill it cost nothing more than parsing.
 const KEPT_ACCEPTS = 64
