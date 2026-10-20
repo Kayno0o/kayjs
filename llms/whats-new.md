@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.60.0
 
 - The `deprecated-analytics-info` lint is gone, three minors after 1.56 made `analytics()` refuse an `info` object while `consent` asks, which it still does at start ([Privacy](privacy.md), [Lints](lints.md)).
 - A runtime redirect (`kay not-found --redirect /old --runtime`) answers a missing page whatever the 404 page weighs for a client taking gzip, brotli or zstd ([Routing](routing-endpoints-and-base.md)).
