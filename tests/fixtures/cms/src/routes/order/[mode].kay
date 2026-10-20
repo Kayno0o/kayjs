@@ -9,4 +9,4 @@ if fresh
 h1 {launch?.data.title}
 p.about {about?.data.title}
 if home
-  p.home {home.data.title}
+  img.home(src={home.data.title} alt="Home")

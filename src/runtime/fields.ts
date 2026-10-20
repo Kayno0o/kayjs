@@ -377,28 +377,35 @@ function rawTextTracker(html: string): (index: number) => boolean {
   }
 }
 
-// The entries read, in the order the markup shows each one's first marked field, so the editor lists them as the page does whatever the order the reads resolved in; an entry with nothing marked in the markup comes after, by name.
+const ATTRIBUTE_MARK = /data-kay-field-[\w-]+="([^"]+)"/g
+
+// The entries read, in the order the markup shows each one's first marked field (a fenced text, body or list, or an attribute), so the editor lists them as the page does whatever the order the reads resolved in; an entry with nothing marked in the markup, a field emptied say, comes after, by name.
 export function entriesInPageOrder(marks: FieldMarks, markup: string): EntryRef[] {
-  const seen = new Set<string>()
-  const checked = new Set<number>()
+  const names = [...marks.entries.keys()]
+  const nameOf = new Map<string, string | undefined>()
+  const first = new Map<string, number>()
 
-  for (const match of markup.matchAll(marks.fence)) {
-    const index = Number(match[2])
+  const note = (ref: string, at: number) => {
+    if (!nameOf.has(ref))
+      nameOf.set(ref, names.find(key => ref === key || ref.startsWith(`${key}:`)))
 
-    // A closing fence has no index.
-    if (match[2] === undefined || checked.has(index))
-      continue
+    const name = nameOf.get(ref)
 
-    checked.add(index)
-
-    const ref = marks.refs[index]!
-    const name = [...marks.entries.keys()].find(key => ref === key || ref.startsWith(`${key}:`))
-
-    if (name !== undefined)
-      seen.add(name)
+    if (name !== undefined && !first.has(name))
+      first.set(name, at)
   }
 
-  const rest = [...marks.entries.keys()].filter(name => !seen.has(name)).sort()
+  for (const match of markup.matchAll(marks.fence)) {
+    // A closing fence has no index.
+    if (match[2] !== undefined)
+      note(marks.refs[Number(match[2])]!, match.index)
+  }
 
-  return [...seen, ...rest].map(name => marks.entries.get(name)!)
+  for (const match of markup.matchAll(ATTRIBUTE_MARK))
+    note(match[1]!, match.index)
+
+  const shown = [...first].sort((a, b) => a[1] - b[1]).map(([name]) => name)
+  const rest = names.filter(name => !first.has(name)).sort()
+
+  return [...shown, ...rest].map(name => marks.entries.get(name)!)
 }

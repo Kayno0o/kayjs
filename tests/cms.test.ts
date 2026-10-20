@@ -1008,6 +1008,8 @@ describe('preview mode', () => {
     // A draft of the slowest entry to decode keeps every form in place, as does one typed again.
     expect(await post('/order/all', [launch])).toEqual(page)
     expect(await post('/order/all', [{ ...launch, data: { ...launch.data, title: 'Draft titles' } }])).toEqual(page)
+    // Home is marked through an attribute alone, and a title emptied leaves launch nothing to show: it comes last.
+    expect(await post('/order/all', [{ ...launch, data: { ...launch.data, title: '' } }])).toEqual(['pages:about', 'pages:home', 'pages:contact', 'news:launch'])
     // A new entry shows where the page shows it, and one the page no longer reads is gone from the list.
     expect(await post('/order/all', [launch, { collection: 'news', slug: 'fresh', data: { title: 'Fresh', published: true, tags: [] } }])).toEqual(['news:fresh', ...page])
     expect(listed((await get('/order/less', edit)).html)).toEqual(['news:launch', 'pages:about', 'pages:contact'])
