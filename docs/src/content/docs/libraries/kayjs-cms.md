@@ -288,9 +288,9 @@ The editor on the page follows the form's layout too. A name twice, or an action
 
 A collection with `publishAt: 'publishAt'` (see [Scheduling an entry](/guides/content#scheduling-an-entry)) shows that date field in the entry form like any other. The editor sets, changes or clears it and saves. The cms only edits the field: kay shows the entry at that time, with no job in your app.
 
-In the list, a published entry whose date is ahead has `Scheduled for 2026-10-20 08:00 UTC` in the Status column, and the entry screen shows the same badge. A draft stays a draft, so Publish on a draft with a date confirms the schedule.
+In the list, a published entry whose date is ahead has `Scheduled for 2026-10-20 08:00 UTC` in the Status column. The entry screen shows the same badge in the editor's own time zone, such as `Scheduled for 2026-10-20 10:00 GMT+2`, and it goes by itself when the date passes. A draft stays a draft, so Publish on a draft with a date confirms the schedule.
 
-The date and time input shows and stores UTC, and says so under the field. A date field you clear stores nothing.
+The date and time input shows the time of the editor's own time zone, whatever the server's, and names the zone under the field. What the editor types is stored as the exact moment it names, so an editor in Paris and one in New York see the same entry at their own hours. A time the clocks of the zone skip, on the night they go forward, is stored an hour on. A date field you clear stores nothing.
 
 ## Replacing a screen
 

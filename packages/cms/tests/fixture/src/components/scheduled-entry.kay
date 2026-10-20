@@ -1,0 +1,13 @@
+--- client
+import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
+import EntryActions from '@kaynooo/kayjs-cms/entry-actions.kay'
+import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
+import { createEntryForm } from '@kaynooo/kayjs-cms/form'
+
+// The date field and the badge of an entry screen, mounted with `mountComponent`.
+const { collection, entry } = props<{ collection: ScreenCollection, entry: StoredEntry }>()
+
+const form = createEntryForm({ prefix: '/admin', collection, entry })
+---
+EntryActions(form={form})
+EntryField(form={form} name="at")
