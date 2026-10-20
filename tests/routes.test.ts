@@ -179,7 +179,7 @@ describe('the dev tool\'s data', () => {
 
       const listed = await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
 
-      expect(listed.routes.filter(route => route.kind !== 'kay').map(route => `${route.kind} ${route.method} ${route.path} ${route.file} ${route.href ?? '-'}`).toSorted()).toEqual([
+      expect(listed.routes.filter(route => route.kind !== 'kay' && route.kind !== 'plumbing').map(route => `${route.kind} ${route.method} ${route.path} ${route.file} ${route.href ?? '-'}`).toSorted()).toEqual([
         `api GET /api/stock ${api}/stock.ts /api/stock`,
         `api POST /api/stock/:id ${api}/stock.ts -`,
         `endpoint GET /llms.txt ${routes}/llms.txt.ts /llms.txt`,

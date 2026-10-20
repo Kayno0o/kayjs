@@ -366,6 +366,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options)])
+  // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
+  const hasActions = actionLimits.size > 0
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
 
@@ -387,7 +389,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
     app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
     app.get(DEV_ROUTES, () => {
-      const own = { actions: actionLimits.size > 0, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: mountedByExtensions }
+      const own = { actions: hasActions, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: mountedByExtensions }
 
       return Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, plumbing: plumbing(own, (path, method) => served.heldByApp(path, method)), notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] }))
     })
