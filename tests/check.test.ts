@@ -1068,6 +1068,19 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('type-checks the key of a page\'s loop, which its static loop does not use', async () => {
+    const root = await scratchProject({ 'src/routes/page.kay': '--- server\nconst entries: { id: string }[] = []\n---\nfor entry of entries key={entry.idd}\n  p {entry.id}\n' })
+
+    try {
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
+        ['page.kay', 4, expect.stringContaining('\'idd\' does not exist')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types a bare {name} attribute as the written-out form, reporting an unknown name at its column, in an island as in a static component', async () => {
     const template = [
       'Card({title} {count})',

@@ -131,7 +131,8 @@ describe('control flow', () => {
     expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i}: {row}</li>, () => <li>none</li>)}')
     expect(server).not.toContain('KayLoopFor ')
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayLoopFor each={__props.rows}')
-    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayLoopFor each={kayEach}')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('KayStaticFor(kayEach, ((row, i) => (void (row), <li>{i}: {row}</li>))(KayRow(kayEach), 0), <li>none</li>)')
+    expect(compileKay('---\nconst { rows } = props<{ rows: number[] }>()\n---\nfor row of rows key={row}\n  p {row}', 'src/comp.kay', { check: true }).tsx).toContain('<KayLoopFor each={kayEach}')
   })
 
   it('types a page\'s load with its query schema and keeps the schema out of a browser build\'s action stubs', () => {
@@ -183,6 +184,20 @@ describe('control flow', () => {
 
   it('rejects writes to loop items', () => {
     expect(errors('for t of list key={t}\n  button(onClick={() => { t = 1 }}) x')).toEqual([expect.stringContaining('read-only')])
+  })
+
+  it('reports a write to a row or an index in the check build where the build does, a page\'s rows and a positional index being plain values', () => {
+    const loop = (key: string) => `for row, i of rows key={${key}}\n  p {row = 3} {i = 4}\n`
+    const page = (key: string) => `--- server\nconst rows = [1, 2]\n---\n${loop(key)}`
+    const component = (key: string) => `---\nconst { rows } = props<{ rows: number[] }>()\n---\n${loop(key)}`
+    const writes = (source: string, file: string, check: boolean) => compileKay(source, file, { check }).diagnostics.map(d => d.message)
+
+    for (const check of [false, true]) {
+      expect(writes(page('row'), 'src/routes/index.kay', check)).toEqual([])
+      expect(writes(page('i'), 'src/routes/index.kay', check)).toEqual([])
+      expect(writes(component('row'), 'src/comp.kay', check)).toEqual(['`row` is read-only here', '`i` is read-only here'])
+      expect(writes(component('i'), 'src/comp.kay', check)).toEqual(['`row` is read-only here'])
+    }
   })
 })
 

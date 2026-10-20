@@ -413,6 +413,7 @@ export class JsxTemplate {
   private emitCheckedFor(node: ForNode) {
     const { b } = this
     const staticLoop = this.options.staticLoops === true
+    const positional = keyedByPosition(node, this.src)
 
     b.wrap(node, () => {
       b.add('{(() => { const kayEach = (')
@@ -428,8 +429,6 @@ export class JsxTemplate {
         b.add(`${helperName('staticFor')}(kayEach, `)
       }
       else {
-        const positional = keyedByPosition(node, this.src)
-
         b.add(`<KayLoopFor each={kayEach} keyed={`)
 
         if (positional)
@@ -451,19 +450,25 @@ export class JsxTemplate {
       }
 
       b.add('((')
-      this.sites.rows.add(b.code.length)
+
+      if (!staticLoop)
+        this.sites.rows.add(b.code.length)
+
       b.addSource(node.item)
 
       if (node.index) {
         b.add(', ')
-        this.sites.rows.add(b.code.length)
+
+        if (!staticLoop && !positional)
+          this.sites.rows.add(b.code.length)
+
         b.addSource(node.index)
       }
 
       b.add(') => ')
 
-      // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
-      if (!staticLoop && keyedByPosition(node, this.src)) {
+      // A key the loop does not match rows by is still read, so the type check sees it, and hover and rename reach the key's name.
+      if (node.key && (staticLoop || positional)) {
         b.add('(void (').addSource(node.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')

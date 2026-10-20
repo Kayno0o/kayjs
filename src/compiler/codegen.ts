@@ -412,9 +412,9 @@ class ModuleShell {
     return this.mode === 'html' || this.mode === 'dom'
   }
 
-  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it.
+  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it; the type check knows it of a file with a server fence, not of a component an island may render.
   private get staticLoops(): boolean {
-    if (this.mode === 'check' || this.kind === 'island')
+    if (this.kind === 'island')
       return false
 
     return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined
