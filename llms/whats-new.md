@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay check` no longer fails inside kayjs-mail's contact mail in an app whose `t` is typed from another library's catalog, kayjs-ui's for one: kayjs-mail declares its `mail.*` catalog in its package.json, so an app installing it reads those texts with no line in `kay.config.ts`, `mailExtension` or not ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md), [Component libraries](component-libraries.md)).
+
 ## 1.60.0
 
 - The `deprecated-analytics-info` lint is gone, three minors after 1.56 made `analytics()` refuse an `info` object while `consent` asks, which it still does at start ([Privacy](privacy.md), [Lints](lints.md)).

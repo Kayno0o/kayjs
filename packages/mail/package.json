@@ -17,7 +17,8 @@
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
   },
   "kay": {
-    "settings": "./src/settings.ts"
+    "settings": "./src/settings.ts",
+    "messages": "./src/messages"
   },
   "exports": {
     "./*.kay": "./src/*.kay",

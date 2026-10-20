@@ -31,7 +31,7 @@ Put the texts your components show in one folder of catalogs, one file per langu
 }
 ```
 
-Every app that installs your library reads those texts with no line in `kay.config.ts`. The app's own `src/messages` wins key by key. A page in `fr-CA` reads your `fr.ts` when you have no `fr-CA.ts`.
+Every app that installs your library reads those texts with no line in `kay.config.ts`. The app's own `src/messages` wins key by key. A page in `fr-CA` reads your `fr.ts` when you have no `fr-CA.ts`. Declare it as soon as a component calls `t` with a key of your own: once any library ships a catalog, `kay check` types `t` from the catalogs and refuses a key none of them holds.
 
 ## Settings the app can replace
 

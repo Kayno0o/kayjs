@@ -26,7 +26,7 @@ const WORDS = /[-_]+/g
 const RESERVED = ['name', 'email', 'message', 'website']
 const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
 
-// The refusal of each field in the page's language, or the English text when kayjs-mail's messages are not brought in (`mailExtension`) or the language has none.
+// The refusal of each field in the page's language, or the English text when the language has none or the app is no kay app, which reads kayjs-mail's messages from its package.json.
 const ERROR_WORDS = {
   name: () => wording('mail.contact.errors.name', DEFAULT_ERRORS.name),
   email: () => wording('mail.contact.errors.email', DEFAULT_ERRORS.email),

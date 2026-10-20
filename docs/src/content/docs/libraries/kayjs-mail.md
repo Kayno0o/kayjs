@@ -269,9 +269,9 @@ A message with more than `maxLinks` links (3 by default) is refused. `rateLimit`
 
 A mailer that is `optional` and not set up answers 503. A mail that fails to send answers 502. Each comes with a refusal the form shows, and `reach` adds how else to reach the site, such as `hello@example.com` or a phone number.
 
-The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with `mailExtension`, so a mailer used with `.use(mail)` alone has none. The mail itself is written in the page's language, not the recipient's.
+The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with the package, so an app that installs kayjs-mail reads them with or without `mailExtension`. The mail itself is written in the page's language, not the recipient's.
 
-The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message }` to replace the field messages with a text or a function. ContactForm's label props replace its labels. Without `mailExtension`, both read English.
+The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message }` to replace the field messages with a text or a function. ContactForm's label props replace its labels.
 
 ## Previewing
 
