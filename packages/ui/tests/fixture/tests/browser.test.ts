@@ -220,6 +220,31 @@ inBrowser('FormField in an island', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('SiteNav shows the close icon while its menu is open, and closes it as a followed link swaps the next page in, the layout holding it kept', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/swap-a', { width: 600 })
+    const state = async () => page.evaluate(() => ({
+      open: document.querySelector('#swap-links')!.matches(':popover-open'),
+      icons: ['menu', 'close'].map(name => getComputedStyle(document.querySelector(`.kui-site-nav-toggle-${name}`)!).display !== 'none'),
+      kept: document.querySelector('#swap-header') === (window as { header?: Element }).header,
+      current: [...document.querySelectorAll('#swap-links a')].map(link => link.getAttribute('aria-current')),
+    }))
+
+    await page.evaluate(() => {
+      (window as { header?: Element | null }).header = document.querySelector('#swap-header')
+    })
+    await page.click('#swap-header button')
+    expect(await state()).toEqual({ open: true, icons: [false, true], kept: true, current: ['page', null] })
+
+    await page.click('#swap-links a[href="/swap-b"]')
+    await page.waitUntil(() => document.querySelector('#title')!.textContent === 'Page b')
+
+    expect(await state()).toEqual({ open: false, icons: [true, false], kept: true, current: [null, 'page'] })
+    expect(await page.path()).toBe('/swap-b')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('SiteNav keeps its links hidden below lg whatever display an app gives its lists, and a row from lg', async () => {
     const site = await shared()
     const display = async (width: number) => {

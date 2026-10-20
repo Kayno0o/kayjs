@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+h1#title Page b
+// An island, so the page ships kay's script and a link to the other one swaps in place.
+button#count(type="button" onClick={() => count.set(count() + 1)}) {count()}

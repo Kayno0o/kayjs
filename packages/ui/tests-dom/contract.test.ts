@@ -60,6 +60,10 @@ function canonical(html: string, browserDrawn = '', effectAdded = ''): string {
       element.replaceChildren()
   }
 
+  // The server render here reads the library's own icons and the browser build the fixture's settings, which replace the close icon, so an icon's drawing is left out of both.
+  for (const path of holder.querySelectorAll('.kui-icon path'))
+    path.removeAttribute('d')
+
   // An empty value is none, and an effect adds the shortcut a form answers to.
   for (const element of holder.querySelectorAll('[aria-keyshortcuts]'))
     element.removeAttribute('aria-keyshortcuts')

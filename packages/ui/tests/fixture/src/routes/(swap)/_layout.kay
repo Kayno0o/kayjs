@@ -1,0 +1,11 @@
+--- server
+const current = ctx.url.pathname
+--- script
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import '../../app.css'
+---
+// The layout holds the nav, so a swap between its pages keeps the element and has to close its popover.
+header#swap-header
+  SiteNav(id="swap-links" links={[{ href: '/swap-a', label: 'A' }, { href: '/swap-b', label: 'B' }]} current={current} label="Swap" menuLabel="Open")
+main
+  slot

@@ -1659,6 +1659,18 @@
     @apply lg:hidden;
   }
 
+  .kui-site-nav-toggle-close {
+    @apply hidden;
+  }
+
+  :where(.kui-site-nav:has(.kui-site-nav-list:popover-open)) .kui-site-nav-toggle-menu {
+    @apply hidden;
+  }
+
+  :where(.kui-site-nav:has(.kui-site-nav-list:popover-open)) .kui-site-nav-toggle-close {
+    @apply inline-block;
+  }
+
   @supports not selector(:popover-open) {
     .kui-site-nav-toggle {
       @apply hidden;
