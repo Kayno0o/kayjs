@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
+import { parsedApiModules } from '../src/check/api-modules'
 import { scratchDir } from './scratch'
 
 async function problems(source: string, lints?: object): Promise<string[]> {
@@ -40,5 +41,19 @@ describe('the untyped-socket lint', () => {
 
     expect(await problems(route, { 'untyped-socket': 'allow' })).toEqual([])
     expect(await problems(route, { 'untyped-socket': 'deny' })).toEqual(['/a'])
+  })
+
+  it('shares one parse of an API module between the checks reading its routes', async () => {
+    const dir = await scratchDir('untyped-socket-')
+
+    await mkdir(join(dir, 'src', 'api'), { recursive: true })
+    await writeFile(join(dir, 'src', 'api', 'chat.ts'), `${head}export default api().ws('/a', { body: s.String() })`)
+    await writeFile(join(dir, 'src', 'api', 'broken.ts'), 'export default (((')
+
+    const modules = [join(dir, 'src', 'api', 'chat.ts'), join(dir, 'src', 'api', 'broken.ts'), join(dir, 'node_modules', 'lib', 'api.ts')].map(file => ({ file, mount: '/', guards: [] }))
+    const first = await parsedApiModules(modules)
+
+    expect(await parsedApiModules(modules as never)).toBe(first)
+    expect(first.map(module => module.file)).toEqual([join(dir, 'src', 'api', 'chat.ts')])
   })
 })

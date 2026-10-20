@@ -1,14 +1,14 @@
 import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { ParsedApi } from './api-modules'
 import type { ServedProject } from './shadow-types'
-import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
-import { apiScope, fromApi, keyName } from './api-scope'
+import { parsedApiModules } from './api-modules'
+import { fromApi, keyName } from './api-scope'
 import { walk } from './ast'
 
 const ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all'])
-const NODE_MODULES = /[\\/]node_modules[\\/]/
 
 // With `mcp`, the routes of the API modules whose `detail` sets both `tool` and `hide`.
 // Only a route written with an inline handler and an object literal of options is read: `app.get('/x', () => ..., { detail: ... })`; a handler or options held in a variable are left out.
@@ -20,13 +20,10 @@ export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedPro
 
   const found: CheckDiagnostic[] = []
 
-  for (const module of apiModules) {
-    if (NODE_MODULES.test(module.file))
-      continue
+  for (const module of await parsedApiModules(apiModules)) {
+    const { source } = module
 
-    const source = await Bun.file(module.file).text()
-
-    for (const route of routesOf(source)) {
+    for (const route of routesOf(module)) {
       const label = `${route.method.toUpperCase()} ${route.path}`
 
       if (route.hidden && route.tool)
@@ -46,19 +43,8 @@ interface ReadRoute {
   tool: boolean
 }
 
-function routesOf(source: string): ReadRoute[] {
-  let ast: t.File
-
-  try {
-    ast = parse(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-  }
-  catch {
-    return []
-  }
-
+function routesOf({ source, ast, scope }: ParsedApi): ReadRoute[] {
   const routes: ReadRoute[] = []
-
-  const scope = apiScope(ast)
 
   walk(ast, (node) => {
     if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || !ROUTE_METHODS.has(node.callee.property.name))
