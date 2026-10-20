@@ -1,4 +1,4 @@
-import { rm, utimes, writeFile } from 'node:fs/promises'
+import { chmod, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
@@ -139,6 +139,7 @@ describe('compressing a public text file', () => {
       expect(response.status, accept).toBe(304)
       expect(response.headers.get('etag'), accept).toBe(etag)
       expect(response.headers.get('cache-control'), accept).toBe('public, max-age=0, must-revalidate')
+      expect(response.headers.get('content-type'), accept).toBeNull()
       expect(await response.text(), accept).toBe('')
     }
   })
@@ -193,23 +194,57 @@ describe('compressing a public text file', () => {
     expect(await request()).toBe(same)
   })
 
-  it('reads a file once rather than on every request', async () => {
+  it('serves a file that grew past the cap and shrank back', async () => {
+    const path = join(dir, 'public/grows.json')
+
+    await writeFile(path, MEDIUM)
+
     const app = await serve()
+    const request = async () => get(app, '/grows.json', { 'accept-encoding': 'gzip' })
 
-    await get(app, '/data.json', { 'accept-encoding': 'zstd' })
+    expect(await decoded(await request())).toBe(MEDIUM)
+    await writeFile(path, LARGE)
+    expect(await decoded(await request())).toBe(LARGE)
+    await writeFile(path, MEDIUM)
+    expect(await decoded(await request())).toBe(MEDIUM)
+  })
 
+  it('answers a Range request on a file the client takes compressed as it always did', async () => {
+    const server = new Elysia().use(await serve()).listen({ port: 0, hostname: '127.0.0.1' })
+
+    try {
+      const part = await fetch(`http://127.0.0.1:${server.server!.port}/data.json`, { headers: { 'range': 'bytes=0-9', 'accept-encoding': 'gzip' }, decompress: false } as RequestInit)
+
+      expect(part.status).toBe(200)
+      expect(part.headers.get('content-encoding')).toBe('gzip')
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+
+  it.skipIf(process.getuid?.() === 0)('answers from memory once asked for: the file is not opened again', async () => {
+    const path = join(dir, 'public/memory.json')
+
+    await writeFile(path, MEDIUM)
+
+    const app = await serve()
     const file = spyOn(Bun, 'file')
+
+    expect(await decoded(await get(app, '/memory.json', { 'accept-encoding': 'zstd' }))).toBe(MEDIUM)
+    await chmod(path, 0)
 
     try {
       for (let request = 0; request < 5; request++) {
         for (const accept of ['zstd', 'gzip', 'identity'])
-          expect(await decoded(await get(app, '/data.json', { 'accept-encoding': accept }))).toBe(MEDIUM)
+          expect(await decoded(await get(app, '/memory.json', { 'accept-encoding': accept }))).toBe(MEDIUM)
       }
 
       expect(file).not.toHaveBeenCalled()
     }
     finally {
       file.mockRestore()
+      await chmod(path, 0o644)
     }
   })
 })

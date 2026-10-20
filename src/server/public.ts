@@ -27,7 +27,7 @@ const FONT = /\.(?:woff2?|ttf|otf|eot)$/i
 const IMAGE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i
 const FONT_CONTROL = `public, max-age=${30 * 86_400}`
 const IMAGE_CONTROL = 'public, max-age=86400'
-// The text files kept in memory so compressing one reads nothing again: none above the first, and no more than the second altogether.
+// The text files kept in memory so compressing one reads nothing again: files up to 256 KB, 8 MB in all.
 const KEPT_FILE_BYTES = 256 * 1024
 const KEPT_TOTAL_BYTES = 8 * 1024 * 1024
 
@@ -152,29 +152,35 @@ function defaultControl(url: string): string {
   return IMAGE.test(url) ? IMAGE_CONTROL : REVALIDATE
 }
 
-// The bytes of a file as they stand, read again only when its size or date changed; undefined for a file too large to keep, or one that would pass the total.
-// What `held` counts is shared by every file of the server, which pass it in.
+// The bytes of a file as they stand, read again only when its size or date changed; undefined when it is gone, grew past the cap or would pass the total.
 function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBuffer> | undefined {
   let kept: { size: number, mtimeMs: number, bytes: Uint8Array<ArrayBuffer> } | undefined
 
-  return () => {
-    const stat = statSync(path, { throwIfNoEntry: false })
-
-    if (!stat?.isFile())
-      return undefined
-
-    if (kept?.size === stat.size && kept.mtimeMs === stat.mtimeMs)
-      return kept.bytes
-
+  const forget = () => {
     held.bytes -= kept?.bytes.length ?? 0
     kept = undefined
+  }
 
-    if (stat.size > KEPT_FILE_BYTES || held.bytes + stat.size > KEPT_TOTAL_BYTES)
+  return () => {
+    const current = statSync(path, { throwIfNoEntry: false })
+
+    if (!current?.isFile()) {
+      forget()
+
+      return undefined
+    }
+
+    if (kept?.size === current.size && kept.mtimeMs === current.mtimeMs)
+      return kept.bytes
+
+    forget()
+
+    if (current.size > KEPT_FILE_BYTES || held.bytes + current.size > KEPT_TOTAL_BYTES)
       return undefined
 
     const bytes = new Uint8Array(readFileSync(path))
 
-    kept = { size: stat.size, mtimeMs: stat.mtimeMs, bytes }
+    kept = { size: current.size, mtimeMs: current.mtimeMs, bytes }
     held.bytes += bytes.length
 
     return bytes
@@ -182,9 +188,11 @@ function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBu
 }
 
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
-// With `compressing`, a text file small enough is answered from its bytes kept in memory, which compression takes as they are; a range request, which Bun answers from the file, and the rest stream the file.
+// With `compressing`, a text file of up to 256 KB at boot is answered from its bytes kept in memory, 8 MB in all, which compression takes as they are; a range request, a conditional one and the rest stream the file.
 export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false): Promise<void> {
   const held = { bytes: 0 }
+  // The URLs an HTML file is also served at share its bytes.
+  const keepers = new Map<string, ReturnType<typeof keeper>>()
 
   for (const { path, url } of files.filter(file => served.holds(file.claim))) {
     const { size, mtimeMs } = await stat(path)
@@ -192,17 +200,16 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
 
     const cache = cacheFor(url)
     const { type } = Bun.file(path)
-    const read = compressing && COMPRESSIBLE_TYPE.test(type) ? keeper(path, held) : undefined
+    const keeps = compressing && size <= KEPT_FILE_BYTES && COMPRESSIBLE_TYPE.test(type)
+    const read = keeps ? keepers.get(path) ?? keepers.set(path, keeper(path, held)).get(path) : undefined
 
     app.get(url, ({ request }) => {
-      const bytes = request.headers.has('range') ? undefined : read?.()
+      const bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.()
 
       if (!bytes)
         return revalidated(request, etag, () => Bun.file(path), {}, cache)
 
-      const response = revalidated(request, etag, () => bytes, { 'content-type': type }, cache)
-
-      return response.status === 200 ? readResponse(response, bytes) : response
+      return readResponse(revalidated(request, etag, () => bytes, { 'content-type': type }, cache), bytes)
     })
   }
 }
