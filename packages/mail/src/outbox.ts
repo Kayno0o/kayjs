@@ -91,7 +91,7 @@ function readFile(file: string): SentMail[] {
     if (!Array.isArray(parsed))
       return []
 
-    return (parsed as Partial<StoredMail>[]).filter(entry => typeof entry?.id === 'string' && typeof entry.subject === 'string' && typeof entry.text === 'string' && Array.isArray(entry.to) && Array.isArray(entry.attachments) && !Number.isNaN(Date.parse(entry.sentAt ?? ''))).slice(-KEPT).map(entry => restored(entry as StoredMail))
+    return (parsed as Partial<StoredMail>[]).filter(entry => typeof entry?.id === 'string' && typeof entry.subject === 'string' && typeof entry.text === 'string' && Array.isArray(entry.to) && Array.isArray(entry.cc) && Array.isArray(entry.bcc) && Array.isArray(entry.attachments) && typeof entry.headers === 'object' && entry.headers !== null && !Number.isNaN(Date.parse(entry.sentAt ?? ''))).slice(-KEPT).map(entry => restored(entry as StoredMail))
   }
   catch {
     return []

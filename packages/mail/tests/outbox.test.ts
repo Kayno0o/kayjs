@@ -64,18 +64,23 @@ describe('the outbox kept in a file', () => {
       expect(createOutbox(path).mails).toEqual([])
     }
 
-    await Bun.write(path, JSON.stringify([null, 3, { id: 'x' }, { id: 'y', subject: 'Real', text: 'Hi', to: [], attachments: [], sentAt: 'yesterday' }, { id: 'z', subject: 'Real', text: 'Hi', to: ['a@example.com'], cc: [], bcc: [], attachments: [], sentAt: '2026-01-02T03:04:05.000Z' }]))
+    await Bun.write(path, JSON.stringify([null, 3, { id: 'x' }, { id: 'y', subject: 'Real', text: 'Hi', to: [], cc: [], bcc: [], headers: {}, attachments: [], sentAt: 'yesterday' }, { id: 'w', subject: 'No cc', text: 'Hi', to: ['a@example.com'], headers: {}, attachments: [], sentAt: '2026-01-02T03:04:05.000Z' }, { id: 'z', subject: 'Real', text: 'Hi', to: ['a@example.com'], cc: [], bcc: [], headers: {}, attachments: [], sentAt: '2026-01-02T03:04:05.000Z' }]))
 
     expect(createOutbox(path).mails.map(each => each.id)).toEqual(['z'])
   })
 
-  it('still tells its watchers and waitFor of each mail, and sends when the file cannot be written', async () => {
+  it('still tells its watchers and waitFor of each mail', async () => {
     const path = await file()
     const first = createOutbox(path)
+    const watched: string[] = []
+    const unwatch = first.watch(each => watched.push(each.subject))
     const waiting = first.waitFor('late@example.com')
 
     await first.send(mail('Late', { to: ['late@example.com'] }))
+    unwatch()
+    await first.send(mail('Unwatched'))
     expect((await waiting).subject).toBe('Late')
+    expect(watched).toEqual(['Late'])
   })
 
   it('says once that a restart will empty it when the file cannot be written, and sends all the same', async () => {

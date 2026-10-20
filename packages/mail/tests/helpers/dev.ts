@@ -64,8 +64,11 @@ export async function devApp(): Promise<{ root: string, url: string, restart: ()
   const restarts = () => lines.join('').match(RESTARTED)?.length ?? 0
 
   for (const start = Date.now(); !lines.join('').includes('ready in'); await Bun.sleep(25)) {
-    if (Date.now() - start > 30_000)
+    if (Date.now() - start > 30_000) {
+      child.kill('SIGKILL')
+
       throw new Error(`kay dev did not become ready:\n${lines.join('')}`)
+    }
   }
 
   return {
@@ -78,8 +81,11 @@ export async function devApp(): Promise<{ root: string, url: string, restart: ()
       await Bun.write(join(root, 'src/mail.ts'), `${await Bun.file(join(root, 'src/mail.ts')).text()}\n// edit ${before}\n`)
 
       for (const start = Date.now(); restarts() === before || !await answers(`http://localhost:${port}/_kay/mail.json`); await Bun.sleep(50)) {
-        if (Date.now() - start > 30_000)
+        if (Date.now() - start > 30_000) {
+          child.kill('SIGKILL')
+
           throw new Error(`kay dev did not restart:\n${lines.join('')}`)
+        }
       }
     },
     stop: async () => {

@@ -305,7 +305,7 @@ To get every mail that way, turn on Send for real in the Mail tab and type an ad
 
 The switch is kept in `.kay` for your checkout, so it stays on when `kay dev` restarts the server. It works under `kay dev` only, never in production or in tests. Without `SMTP_HOST` and a sender, the tab names what is missing and the switch stays off.
 
-While the switch is on, a relay that is slow or cannot be reached holds up `send()` for up to the SMTP `timeout`, 10 seconds by default. The mail is handed to the relay before `send()` returns.
+While the switch is on, a relay that is slow or cannot be reached holds up `send()` for up to the SMTP `timeout`, 10 seconds by default, at each step of the connection. The mail is handed to the relay before `send()` returns.
 
 ```ts
 // src/mails/welcome.preview.ts
@@ -361,6 +361,6 @@ export const auth = createAuth({
 
 Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists the mails sent to the outbox, newest first. A click on one previews it in place, and Open shows its page.
 
-The mails are kept in `.kay` for your checkout, the last 500, so they are still there after you refresh the page and after `kay dev` restarts the server for an edit. Clear in the tab empties the list and the file. Under `bun test` and in production the outbox stays in memory, so each test run starts empty.
+The mails are kept in `.kay` for your checkout, the last 500, so they are still there after you refresh the page and after `kay dev` restarts the server for an edit. Clear in the tab empties the list and the file. Under `bun test` and in production the outbox stays in memory, so each test run starts empty. The file holds each mail in full, reset links included, so keep `.kay` out of git.
 
 <ReadMore href="/llms/kayjs-mail-writing-and-sending">Every message field, the queue's retry options, the settings and the full contact form are in the kayjs-mail reference.</ReadMore>
