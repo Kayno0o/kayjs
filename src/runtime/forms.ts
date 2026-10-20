@@ -1,5 +1,6 @@
 import { withoutBase } from './base'
 import { busyForms, checkedForms, leave, navigation, prefetched, submitNatively, swappable } from './navigation'
+import { pendingBlocks } from './pending'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
 
@@ -44,7 +45,15 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
   if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
-    await send(form, submitter, url, swapper, navigated)
+    // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included.
+    pendingBlocks(form, 'post', true)
+
+    try {
+      await send(form, submitter, url, swapper, navigated)
+    }
+    finally {
+      pendingBlocks(form, 'post', false)
+    }
 
     return
   }

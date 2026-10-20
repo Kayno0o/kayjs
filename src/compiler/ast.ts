@@ -62,8 +62,10 @@ export interface ElementNode extends Span {
   // A `markdown` block: its lines, from the end of the `markdown` line to the end of the last one, which only `expandMarkdown` reads; it has no children.
   markdown?: Span | undefined
   children: Node[]
-  // Attributes the compiler writes itself, as HTML starting with a space: the elements a `pending` block stands for.
+  // Attributes the compiler writes itself, as HTML starting with a space: the element a `pending` block stands for.
   fixed?: string | undefined
+  // The `pending` block this element stands for, whose form's action an island follows.
+  pendingOf?: PendingNode | undefined
 }
 
 export interface TextChunk extends Span {

@@ -29,18 +29,15 @@ export function isDynamic(item: Item): item is DynamicItem {
 
 const pendingElements = new WeakMap<PendingNode, ElementNode>()
 
-// What a `pending` block renders: a status region always in the page, holding the block hidden until the form around it is `aria-busy`, which the runtime sets while it posts; the rule is `!important` to win over a reset such as Tailwind's `[hidden]`. An announcement is made of what shows in a region that was there already, and a blocked stylesheet leaves the block hidden.
+// What a `pending` block renders: a `slot` laying out as its contents do, hidden until the runtime shows it while the form around it posts or its action has a call in flight. No style rule is involved, so a strict `style-src` leaves it working, and the runtime announces its text from outside the form, whose `aria-busy` may hold back a region inside it.
 function pendingElement(node: PendingNode): ElementNode {
   let found = pendingElements.get(node)
 
   if (!found) {
     const at = { start: node.start, end: node.end }
     const tag = { start: node.start, end: node.start + 'pending'.length }
-    const element = (name: string, children: Node[], fixed?: string): ElementNode => ({ kind: 'element', ...at, tag, name, component: false, classes: [], attributes: [], children, fixed })
-    const css = 'form[aria-busy=true] [data-kay-pending]{display:block!important}'
-    const style = element('style', [{ kind: 'text', ...at, parts: [{ kind: 'chunk', ...at, text: css }] }])
 
-    found = element('div', [element('div', node.children, ' data-kay-pending hidden'), style], ' role="status"')
+    found = { kind: 'element', ...at, tag, name: 'slot', component: false, classes: [], attributes: [], children: node.children, fixed: ' data-kay-pending hidden', pendingOf: node }
     pendingElements.set(node, found)
   }
 

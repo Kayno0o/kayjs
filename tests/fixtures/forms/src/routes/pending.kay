@@ -1,6 +1,7 @@
 --- server
 import { t } from 'elysia'
 import { action } from 'kay'
+import Calling from '../components/calling.kay'
 import Saving from '../components/saving.kay'
 
 export const slow = action(t.Object({}), async () => {
@@ -17,6 +18,11 @@ export const leaves = action(t.Object({}), async (_input, ctx) => {
   await Bun.sleep(500)
   ctx.redirect('/other')
 })
+
+export const leavesLate = action(t.Object({}), async (_input, ctx) => {
+  await Bun.sleep(200)
+  ctx.redirect('/late')
+})
 ---
 h1 Pending
 form.slow(action={slow})
@@ -32,3 +38,8 @@ form.leaves(action={leaves})
   pending
     p.saving Saving leaves
 Saving
+form.late(action={leavesLate})
+  button Late
+  pending
+    p.saving Saving late
+Calling

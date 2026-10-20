@@ -224,7 +224,10 @@ form(action={add})
 - A quoted name such as `error "first-name"` takes any field, and the name is typed from the schema.
 - A bare `error` shows the form's own message, `add.error()`, its `form` described by it.
 - One inside a `for` renders without an id and describes nothing.
-- A `pending` block inside the form shows its lines only while that form posts, with no JavaScript of your own and none added to the page: the runtime already sets `aria-busy` on a posting form, and the block is shown by CSS on it. It is hidden in the render, after the answer, after a refused post and with JavaScript off, and sits in an always-present `role="status"` region so its text is announced once shown. A style-src without `'unsafe-inline'` leaves it hidden.
+- A `pending` block inside the form shows its lines only while that form posts, with no JavaScript of your own and none added to the page: the runtime that posts the form in place unhides it, and hides it again once the page the answer leads to (a redirect's included) is in. It is hidden in the render, after the answer, after a refused post and with JavaScript off.
+- In an island the block shows as well while a call of the form's action is in flight, from `onSubmit`, an `onClick` or anywhere else (`add.pending()`), and while an `onSubmit` returns a promise.
+- The block is a `slot` laid out as its contents, so it takes no place of its own in a flex or grid form and needs no class. No style rule is involved, so a strict `style-src` leaves it working.
+- Its text is announced through a live region the runtime writes outside the form, as the form's `aria-busy` may hold back a region inside it.
 - Without an `error` line, the field is described by the element an `if add.error('title')` block shows first, or one holding `{add.error('title')}`, written outside a `for` in the file holding a form that posts to `add`, which keeps its own `id` or gets one such as `add-title-error`.
 - The form likewise is described by the element showing `add.error()`.
 - A static `aria-describedby` the template writes, such as a hint, is kept and the error's id added after it; a bound one is left as it is.

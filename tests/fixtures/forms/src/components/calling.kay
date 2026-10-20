@@ -1,0 +1,16 @@
+---
+import { slow } from '../routes/pending.kay'
+
+function fire(event: SubmitEvent) {
+  event.preventDefault()
+  void slow({}, { refresh: false })
+}
+---
+form.fire(action={slow} onSubmit={fire})
+  button Fire
+  pending
+    p.saving Saving fire
+form.click(action={slow})
+  button(type="button" onClick={() => void slow({}, { refresh: false })}) Click
+  pending
+    p.saving Saving click

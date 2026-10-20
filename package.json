@@ -104,6 +104,10 @@
       "types": "./types/runtime/dom.d.ts",
       "default": "./src/runtime/dom.ts"
     },
+    "./pending": {
+      "types": "./types/runtime/pending.d.ts",
+      "default": "./src/runtime/pending.ts"
+    },
     "./dom-image": {
       "types": "./types/runtime/dom-image.d.ts",
       "default": "./src/runtime/dom-image.ts"

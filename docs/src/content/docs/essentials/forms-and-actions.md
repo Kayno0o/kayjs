@@ -147,7 +147,11 @@ form(action={add})
     p Saving...
 ```
 
-The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It sits in a status region, so a screen reader reads it once it shows. In an island, the form shows it while its `onSubmit` waits for a call. Outside a form that posts to an action, `pending` is an error.
+The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in. A screen reader reads its text once it shows.
+
+In an island, the form shows it as well while a call of its action is in flight, however the handler or a button made it, and while its `onSubmit` waits for a promise.
+
+The block adds no element of its own to the layout: what it holds sits in the form as if written there. No style is involved, so a strict `style-src` leaves it working. Outside a form that posts to an action, `pending` is an error.
 
 ### A component that holds the field
 

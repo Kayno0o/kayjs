@@ -111,8 +111,8 @@ p {column()}
 - `add.refused(error)` tells a refusal of a call to `add` from any other error, a redirect's included, and types its `data` as the handler passes it to `ctx.fail`, with no cast: `if (add.refused(error)) shown = error.data?.message`.
 - `data` is undefined for a call refused before the handler ran, by the schema or a limit.
 - Its input, its result and that `data` cross as island props do, Dates, Maps, Sets and bigints included; a result holding a function or a class instance answers 500, logging where it sits.
-- When the handler or a guard redirects, the browser goes there, swapping the page in as a link would, and the call never resolves.
-- A leave guard keeping the visitor on the page settles the call instead, throwing `ActionRedirect`, so `pending()` clears; a call made on a page the visitor has left since throws it too, taking them nowhere.
+- When the handler or a guard redirects, the browser goes there, swapping the page in as a link would, and the call never resolves: `pending()` stays true and `settled()` waits as the page goes away, so nothing awaiting either runs on that page.
+- A leave guard keeping the visitor on the page settles the call instead, throwing `ActionRedirect`, so `pending()` clears and `settled()` resolves; a call made on a page the visitor has left since throws it too, taking them nowhere.
 - Outside a browser, as in a test, a redirect throws `ActionRedirect` from `kay` with `location`.
 - Under a `base`, a redirect to a path of the site goes under it however the action was posted or called, so `ctx.redirect('/dashboard')` lands on `/app/dashboard`, and `location` is the path under the base.
 

@@ -186,11 +186,13 @@ describe('the messages a refused form is described by', () => {
     expect(tsx).toContain('<span id=\\"add-tag-error\\">')
   })
 
-  it('writes a pending block as the same status region in the island\'s template as on the server, its contents still bound', () => {
+  it('writes a pending block as the same hidden slot in the island\'s template as on the server, its contents still bound and its form\'s action followed', () => {
     const source = '---\nimport { add } from \'./page.kay\'\nconst { label } = props<{ label: string }>()\n---\nform(action={add})\n  button Add\n  pending\n    p {label}\n'
     const { tsx } = compileKay(source, 'page.kay', { output: 'dom' })
 
-    expect(tsx).toContain('<div role=\\"status\\"><div data-kay-pending hidden><p></p></div><style>form[aria-busy=true] [data-kay-pending]{display:block!important}</style></div>')
+    expect(tsx).toContain('<slot data-kay-pending hidden><p></p></slot>')
+    expect(tsx).toContain('KayPendingCall(')
+    expect(tsx).not.toContain('<style>')
   })
 
   it('describes the fields and the form of an island alike', () => {
@@ -400,13 +402,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(page.errors).toEqual([])
   })
 
-  // Whether the `pending` block of each form is shown, by the form's class.
-  const shown = async (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('form')].map(form => [form.className, form.querySelector<HTMLElement>('[data-kay-pending]')?.checkVisibility() ?? null])))
+  // Whether the `pending` block of each named form is shown, by the form's class; the slot lays out as its contents, so what it holds is what is looked at.
+  const shown = async (page: Awaited<ReturnType<typeof site.open>>, ...names: string[]) => page.evaluate(names => Object.fromEntries(names.map(name => [name, document.querySelector(`form.${name} [data-kay-pending] > *`)?.checkVisibility() ?? null])), names)
+  const FORMS = ['slow', 'refused', 'leaves', 'island']
+  const none = { slow: false, refused: false, leaves: false, island: false }
 
-  it('renders a pending block hidden, in a status region that is always there', async () => {
+  it('renders a pending block hidden, with no style of its own and no wrapper taking a place in the layout', async () => {
     const { html } = await site.visit('/pending')
 
-    expect(html.match(/<div role="status"><div data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island)<\/p><\/div><style>form\[aria-busy=true\] \[data-kay-pending\]\{display:block!important\}<\/style><\/div>/g)).toHaveLength(4)
+    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click)<\/p><\/slot>/g)).toHaveLength(7)
+    expect(html).not.toContain('role="status"')
+    expect(html).not.toContain('display:block')
   })
 
   it('shows a form\'s pending block while that form posts, and no other\'s, hiding it with the answer', async () => {
@@ -417,16 +423,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       document.head.insertAdjacentHTML('beforeend', '<style>[hidden]:where(:not([hidden=until-found])){display:none!important}</style>')
     })
 
-    expect(await shown(page)).toEqual({ slow: false, refused: false, leaves: false, island: false })
+    expect(await shown(page, ...FORMS)).toEqual(none)
 
     await page.click('form.slow button')
     await page.waitFor('form.slow[aria-busy]')
 
-    expect(await shown(page)).toEqual({ slow: true, refused: false, leaves: false, island: false })
+    expect(await shown(page, ...FORMS)).toEqual({ ...none, slow: true })
 
-    await page.waitFor('form.slow[aria-busy]', { gone: true })
+    await page.waitUntil(() => document.querySelector('form.slow [data-kay-pending] > *')?.checkVisibility() === false)
 
-    expect(await shown(page)).toEqual({ slow: false, refused: false, leaves: false, island: false })
+    expect(await shown(page, ...FORMS)).toEqual(none)
     expect(page.errors).toEqual([])
   })
 
@@ -436,11 +442,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.click('form.refused button')
     await page.waitFor('form.refused[aria-busy]')
 
-    expect((await shown(page))?.refused).toBe(true)
+    expect((await shown(page, 'refused')).refused).toBe(true)
 
-    await page.waitFor('form.refused[aria-busy]', { gone: true })
+    await page.waitUntil(() => document.querySelector('form.refused [data-kay-pending] > *')?.checkVisibility() === false)
 
-    expect(await shown(page)).toEqual({ slow: false, refused: false, leaves: false, island: false })
+    expect(await shown(page, ...FORMS)).toEqual(none)
     expect(page.errors).toEqual([])
   })
 
@@ -450,7 +456,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.click('form.leaves button')
     await page.waitFor('form.leaves[aria-busy]')
 
-    expect((await shown(page))?.leaves).toBe(true)
+    expect((await shown(page, 'leaves')).leaves).toBe(true)
 
     await page.waitFor('h1', { text: 'Other' })
     expect(page.errors).toEqual([])
@@ -462,11 +468,52 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.click('form.island button')
     await page.waitFor('form.island[aria-busy]')
 
-    expect(await shown(page)).toEqual({ slow: false, refused: false, leaves: false, island: true })
+    expect(await shown(page, ...FORMS)).toEqual({ ...none, island: true })
 
-    await page.waitFor('form.island[aria-busy]', { gone: true })
+    await page.waitUntil(() => document.querySelector('form.island [data-kay-pending] > *')?.checkVisibility() === false)
 
-    expect((await shown(page))?.island).toBe(false)
+    expect((await shown(page, 'island')).island).toBe(false)
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps it shown until the page a redirect leads to is in, not only while the post is in flight', async () => {
+    const page = await site.open('/pending', { path })
+
+    await page.click('form.late button')
+    await page.waitFor('form.late[aria-busy]')
+    await page.waitFor('form.late[aria-busy]', { gone: true })
+
+    // The post is answered; the page it redirects to takes a while to load.
+    expect((await shown(page, 'late')).late).toBe(true)
+
+    await page.waitFor('h1', { text: 'Late' })
+    expect(page.errors).toEqual([])
+  })
+
+  it('shows an island form\'s block while its action has a call in flight, whichever way the handler or a button made it', async () => {
+    const page = await site.open('/pending', { path })
+
+    for (const name of ['fire', 'click']) {
+      expect((await shown(page, name))[name]).toBe(false)
+      await page.click(`form.${name} button`)
+      await page.waitUntil(name => document.querySelector(`form.${name} [data-kay-pending] > *`)?.checkVisibility() === true, {}, name)
+
+      expect((await shown(page, name))[name]).toBe(true)
+
+      await page.waitUntil(() => [...document.querySelectorAll('[data-kay-pending] > *')].every(block => !block.checkVisibility()))
+
+      expect((await shown(page, name))[name]).toBe(false)
+    }
+
+    expect(page.errors).toEqual([])
+  })
+
+  it('announces a shown block from a region outside the form', async () => {
+    const page = await site.open('/pending', { path })
+
+    await page.click('form.slow button')
+    await page.waitUntil(() => [...document.querySelectorAll('body > [aria-live=polite]')].some(region => region.textContent === 'Saving slow'))
+    expect(await page.evaluate(() => document.querySelector('form.slow')!.querySelector('[aria-live], [role=status]'))).toBeNull()
     expect(page.errors).toEqual([])
   })
 

@@ -38,9 +38,16 @@ function setBusy(form: HTMLFormElement, busy: boolean): void {
   }
 }
 
+// Loaded only for a form with a `pending` block, so the entry carries none of it; calls made in a row run in a row.
+async function showPending(form: HTMLFormElement, on: boolean): Promise<void> {
+  if (form.querySelector('[data-kay-pending]'))
+    (await import('./pending')).pendingBlocks(form, 'hold', on)
+}
+
 async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promise<void> {
   holds.add(form)
   setBusy(form, true)
+  void showPending(form, true)
 
   // A rejection is rethrown once the hold is released, so it is reported as it would be without one; a handler that catches its own promise's rejection still has it reported.
   try {
@@ -49,6 +56,7 @@ async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promis
   finally {
     holds.delete(form)
     setBusy(form, false)
+    void showPending(form, false)
   }
 }
 

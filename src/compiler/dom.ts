@@ -9,12 +9,12 @@ import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, 
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
-// The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` is in a module of its own, as the image runtime weighs on a page with no image.
+// The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
-  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\nimport { image as ${helperName('image')} } from 'kay/dom-image'\n`
+  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\nimport { image as ${helperName('image')} } from 'kay/dom-image'\nimport { pendingCall as ${helperName('pendingCall')} } from 'kay/pending'\n`
 }
 
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.
@@ -384,6 +384,11 @@ export class DomTemplate extends TemplateWriter {
     else {
       const plan = this.plan(element, this.errors)
       const { target, field, action, described } = plan
+      const followed = element.pendingOf && this.facts.forms.get(element.pendingOf)
+
+      // An island's block shows while a call of its form's action is in flight, however the handler made it.
+      if (followed)
+        own.push(variable => b.add(`KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, (`).addSource(followed).add(')));'))
 
       if (plan.id !== undefined)
         html += ` id="${escapeStaticAttribute(plan.id)}"`
