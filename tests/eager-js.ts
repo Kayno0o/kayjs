@@ -4,6 +4,10 @@ const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)=
 const DYNAMIC_IMPORT = /import\("\.\/([\w.-]+?)-[a-z0-9]{8}\.js"\)/g
 const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
+// The bytes an eager JS budget allows above the size it was set from: the same build measures up to about a dozen bytes apart between a lane, a landing and CI, as the hashed chunk names in the import statements gzip differently and the count moves with the checkout's path.
+// Every budget is the size measured plus nothing, this margin is added once here, and a new import into the entry costs more than it.
+export const EAGER_JS_SLACK = 24
+
 // The gzipped size of each file a page loads up front, before anything is clicked: the URLs given and what those import statically, a dynamic `import()` waiting for a visitor to need it.
 // `read` returns the code served at a URL path.
 export async function eagerJs(urls: string[], read: (url: string) => Promise<string>): Promise<Map<string, { size: number, code: string }>> {
@@ -23,12 +27,12 @@ export async function eagerJs(urls: string[], read: (url: string) => Promise<str
   return loaded
 }
 
-// Asserts that the gzipped JS a page loads up front stays within `budget`, and returns the code of each file.
+// Asserts that the gzipped JS a page loads up front stays within `budget` plus `EAGER_JS_SLACK`, and returns the code of each file.
 export async function expectEagerJsWithin(budget: number, html: string, read: (url: string) => Promise<string>): Promise<string[]> {
   const loaded = await eagerJs([...html.matchAll(SCRIPT_URL)].map(match => match[1]!), read)
   const total = loaded.values().reduce((sum, { size }) => sum + size, 0)
 
-  expect(total, `${total} bytes of gzipped JS load up front, over the ${budget} budget: ${[...loaded].map(([url, { size }]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(budget)
+  expect(total, `${total} bytes of gzipped JS load up front, over the ${budget} budget (and ${EAGER_JS_SLACK} of slack): ${[...loaded].map(([url, { size }]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(budget + EAGER_JS_SLACK)
 
   return [...loaded.values()].map(({ code }) => code)
 }

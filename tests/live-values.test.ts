@@ -10,6 +10,7 @@ import { compileKay } from '../src/compiler'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { MAX_CONNECTIONS } from '../src/server/config-limits'
 import { browserPath, testSite } from '../src/test'
+import { EAGER_JS_SLACK } from './eager-js'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy } from './scratch'
 
@@ -19,9 +20,9 @@ const idOf = (name: string) => liveId('/app/src/live.ts', '/app', name)
 const VISITORS = idOf('visitors')
 const ROOM = idOf('room')
 const SECRET = idOf('secret')
-// The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures (12,762), as the budget in tests/static.test.ts is.
+// The gzipped JS the fixture's home page, with islands reading live values, loads up front: as measured, with `EAGER_JS_SLACK` of margin on top, as the budget in tests/static.test.ts is.
 // The live runtime is a chunk of the islands reading it, not of every page: the home page pays for that chunk, about 180 bytes, where the pages reading no live value save its whole runtime; the hooks letting `presence()` keep a hidden tab's connection open and name the tab cost 46 bytes of it.
-const LIVE_EAGER_JS_BUDGET = 12_771
+const LIVE_EAGER_JS_BUDGET = 12_762
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')
@@ -842,7 +843,7 @@ describe('live values in a production build', () => {
 
     expect(answer).toMatchObject({ home: true, module: true, about: false, aboutModule: false, status: 200 })
     expect(Number(answer.eager)).toBeGreaterThan(0)
-    expect(Number(answer.eager), `${String(answer.eager)} bytes of gzipped JS load up front`).toBeLessThanOrEqual(LIVE_EAGER_JS_BUDGET)
+    expect(Number(answer.eager), `${String(answer.eager)} bytes of gzipped JS load up front`).toBeLessThanOrEqual(LIVE_EAGER_JS_BUDGET + EAGER_JS_SLACK)
     expect(String(answer.type)).toContain('text/event-stream')
     expect(String(answer.first)).toContain(VISITORS)
   }, 120_000)
