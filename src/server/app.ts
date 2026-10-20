@@ -7,6 +7,7 @@ import type { ClientBuild } from './client'
 import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
+import type { Unmatched } from './page-routes'
 import type { ServedPage } from './render'
 import type { Claim } from './served-paths'
 import type { PageSetup } from './setup'
@@ -432,7 +433,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Read in development too, so a duration that is none stops it there rather than in production.
   const publicCache = publicCacheRules(options.publicCache)
 
-  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev)
+  // The page for a path none serves is built after the public routes, which a file deleted since boot answers with.
+  const pageFor: { unmatched?: Unmatched | undefined } = {}
+
+  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
   serveRedirects(app, redirects, mode.dev)
 
   // Before the page routes, which a hook registered after them does not reach.
@@ -446,7 +450,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const fallback = source.fallback(paths.routes, mounts)
 
-  const uncaught = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback, respond })
+  const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback, respond })
+
+  pageFor.unmatched = unmatched
 
   answerUncaught(app, { dev: mode.dev, onError: options.onError, page: uncaught })
   agreeOnWildcards(app)

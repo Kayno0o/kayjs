@@ -1,10 +1,13 @@
 import type { Elysia } from 'elysia'
+import type { Stats } from 'node:fs'
 import type { Duration } from '../runtime/duration'
+import type { Unmatched } from './page-routes'
 import type { Claim, ServedPaths } from './served-paths'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
+import { NotFoundError } from 'elysia'
 import { wholeSeconds } from '../runtime/duration'
 import { COMPRESSIBLE_TYPE, readResponse } from './compress'
 
@@ -152,8 +155,13 @@ function defaultControl(url: string): string {
   return IMAGE.test(url) ? IMAGE_CONTROL : REVALIDATE
 }
 
-// The bytes of a file as they stand, read again only when its size or date changed; undefined when it is gone, grew past the cap or would pass the total.
-function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBuffer> | undefined {
+// The weak tag of a file as it stands, so a file replaced under a running server is not revalidated against its old tag.
+function etagOf({ size, mtimeMs }: Stats): string {
+  return `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
+}
+
+// The bytes of a file as it stands, read again only when its size or date changed; undefined when it is gone, grew past the cap or would pass the total.
+function keeper(path: string, held: { bytes: number }): (current: Stats | undefined) => Uint8Array<ArrayBuffer> | undefined {
   let kept: { size: number, mtimeMs: number, bytes: Uint8Array<ArrayBuffer> } | undefined
 
   const forget = () => {
@@ -161,10 +169,8 @@ function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBu
     kept = undefined
   }
 
-  return () => {
-    const current = statSync(path, { throwIfNoEntry: false })
-
-    if (!current?.isFile()) {
+  return (current) => {
+    if (!current) {
       forget()
 
       return undefined
@@ -189,15 +195,14 @@ function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBu
 
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
 // With `compressing`, a text file of up to 256 KB at boot is answered from its bytes kept in memory, 8 MB in all, which compression takes as they are; a range request, a conditional one and the rest stream the file.
-export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false): Promise<void> {
+// A file deleted since boot is answered by `pageFor.unmatched`, set once the page routes exist, else by Elysia's 404.
+export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false, pageFor: { unmatched?: Unmatched | undefined } = {}): Promise<void> {
   const held = { bytes: 0 }
   // The URLs an HTML file is also served at share its bytes.
   const keepers = new Map<string, ReturnType<typeof keeper>>()
 
   for (const { path, url } of files.filter(file => served.holds(file.claim))) {
-    const { size, mtimeMs } = await stat(path)
-    const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
-
+    const { size } = await stat(path)
     const cache = cacheFor(url)
     const { type } = Bun.file(path)
     const keeps = compressing && size <= KEPT_FILE_BYTES && COMPRESSIBLE_TYPE.test(type)
@@ -208,9 +213,26 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
       keepers.set(path, read)
     }
 
-    app.get(url, ({ request }) => {
+    app.get(url, async (given) => {
+      const { request } = given
+      // Looked at on every request: a file deleted or replaced under the running server is answered as it now stands.
+      const current = statSync(path, { throwIfNoEntry: false })
+
+      if (!current?.isFile()) {
+        read?.(undefined)
+
+        const page = pageFor.unmatched?.({ ...given })
+
+        // An app with no page for a path nothing serves answers Elysia's own 404.
+        if (!page)
+          throw new NotFoundError()
+
+        return page
+      }
+
+      const etag = etagOf(current)
       // A range or a matching tag is answered from the file itself, so the kept bytes only ever back a 200.
-      const bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.()
+      const bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.(current)
 
       if (!bytes)
         return revalidated(request, etag, () => Bun.file(path), {}, cache)

@@ -14,7 +14,7 @@ const LARGE = 'lorem ipsum dolor sit amet\n'.repeat(40_000)
 
 let dir: string
 
-async function serve(options: { base?: string } = {}) {
+async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (error: unknown) => void } = {}) {
   return pages({ routes: 'tests/fixtures/site/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, ...options })
 }
 
@@ -245,6 +245,175 @@ describe('compressing a public text file', () => {
     finally {
       file.mockRestore()
       await chmod(path, 0o644)
+    }
+  })
+})
+
+describe('a public file changed under a running server', () => {
+  const ACCEPTS = ['br', 'identity', 'zstd, br, gzip']
+
+  // Each file is served once first, the way a visitor met it before the deploy changed it.
+  const SERVED = { 'gone.svg': SMALL.repeat(8), 'gone.json': MEDIUM, 'gone.png': new Uint8Array(2000).fill(7), 'gone.txt': LARGE } as const
+
+  async function deleted() {
+    const errors: unknown[] = []
+
+    for (const [name, content] of Object.entries(SERVED))
+      await writeFile(join(dir, 'public', name), content)
+
+    const fresh = await serve({ onError: error => errors.push(error) })
+
+    for (const name of Object.keys(SERVED)) {
+      for (const accept of ACCEPTS)
+        expect((await get(fresh, `/${name}`, { 'accept-encoding': accept })).status, name).toBe(200)
+    }
+
+    await Promise.all(Object.keys(SERVED).map(async name => rm(join(dir, 'public', name))))
+
+    return { app: fresh, errors }
+  }
+
+  it('answers 404 for a deleted file, whatever it was served as and the client accepts', async () => {
+    const { app, errors } = await deleted()
+
+    for (const name of Object.keys(SERVED)) {
+      for (const accept of ACCEPTS) {
+        const response = await get(app, `/${name}`, { 'accept-encoding': accept })
+
+        expect(response.status, `${name} ${accept}`).toBe(404)
+        await response.arrayBuffer()
+      }
+
+      expect((await get(app, `/${name}`)).status, name).toBe(404)
+      expect((await get(app, `/${name}`, { 'accept-encoding': 'gzip' }, 'HEAD')).status, `${name} HEAD`).toBe(404)
+      expect((await get(app, `/${name}`, { 'range': 'bytes=0-9', 'accept-encoding': 'identity' })).status, `${name} range`).toBe(404)
+    }
+
+    expect(errors).toEqual([])
+  })
+
+  it('answers a deleted file with the 404 an unknown path gets', async () => {
+    const { app } = await deleted()
+    const unknown = await get(app, '/never-there.json', { accept: 'text/html' })
+    const response = await get(app, '/gone.json', { accept: 'text/html' })
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('content-type')).toBe(unknown.headers.get('content-type'))
+  })
+
+  it('answers 404 over a real connection, with no error reported', async () => {
+    const { app, errors } = await deleted()
+    const server = new Elysia().use(app).listen({ port: 0, hostname: '127.0.0.1' })
+
+    try {
+      for (const name of Object.keys(SERVED)) {
+        for (const accept of ACCEPTS) {
+          const response = await fetch(`http://127.0.0.1:${server.server!.port}/${name}`, { headers: { 'accept-encoding': accept } })
+
+          expect(response.status, `${name} ${accept}`).toBe(404)
+          await response.arrayBuffer()
+        }
+      }
+    }
+    finally {
+      await server.stop(true)
+    }
+
+    expect(errors).toEqual([])
+  })
+
+  it('answers 404 for a deleted file under a base, in development and with trailing slashes', async () => {
+    for (const options of [{ base: '/docs' }, { dev: true }, { trailingSlash: 'always' }] as const) {
+      const path = join(dir, 'public/options.json')
+
+      await writeFile(path, MEDIUM)
+
+      const app = await serve(options)
+
+      expect((await get(app, '/options.json', { 'accept-encoding': 'gzip' })).status, JSON.stringify(options)).toBe(200)
+      await rm(path)
+
+      const response = await get(app, '/options.json', { 'accept-encoding': 'gzip' })
+
+      expect(response.status, JSON.stringify(options)).toBe(404)
+      expect(await decoded(response), JSON.stringify(options)).toContain('Nothing here')
+    }
+  })
+
+  it('answers Elysia\'s own 404 for a deleted file when the app has no page for an unknown path', async () => {
+    const path = join(dir, 'public/bare.json')
+
+    await writeFile(path, MEDIUM)
+
+    const app = await pages({ routes: 'tests/fixtures/bare/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, prebuilt: true })
+    const unknown = await get(app, '/never-there.json')
+
+    expect((await get(app, '/bare.json')).status).toBe(200)
+    await rm(path)
+
+    const response = await get(app, '/bare.json', { 'accept-encoding': 'gzip' })
+
+    expect(response.status).toBe(404)
+    expect(await response.text()).toBe(await unknown.text())
+  })
+
+  it('serves a deleted file again once it is back', async () => {
+    const path = join(dir, 'public/back.json')
+
+    await writeFile(path, MEDIUM)
+
+    const app = await serve()
+    const request = async () => get(app, '/back.json', { 'accept-encoding': 'gzip' })
+
+    expect(await decoded(await request())).toBe(MEDIUM)
+    await rm(path)
+    expect((await request()).status).toBe(404)
+    await writeFile(path, LARGE)
+    expect(await decoded(await request())).toBe(LARGE)
+  })
+
+  it('revalidates a replaced file against its new tag', async () => {
+    for (const [name, first, second] of [['tag.json', MEDIUM, `${MEDIUM}${' '.repeat(40)}`], ['tag.png', new Uint8Array(2000).fill(7), new Uint8Array(2400).fill(9)]] as const) {
+      const path = join(dir, 'public', name)
+
+      await writeFile(path, first)
+
+      const app = await serve()
+      const before = await get(app, `/${name}`, { 'accept-encoding': 'identity' })
+      const held = before.headers.get('etag')!
+
+      expect((await get(app, `/${name}`, { 'if-none-match': held })).status, name).toBe(304)
+      await writeFile(path, second)
+
+      const after = await get(app, `/${name}`, { 'if-none-match': held, 'accept-encoding': 'identity' })
+
+      expect(after.status, name).toBe(200)
+      expect(after.headers.get('etag'), name).not.toBe(held)
+      expect(new Uint8Array(await after.arrayBuffer()), name).toEqual(typeof second === 'string' ? new TextEncoder().encode(second) : second)
+      expect((await get(app, `/${name}`, { 'if-none-match': after.headers.get('etag')! })).status, name).toBe(304)
+    }
+  })
+
+  it('tags a file replaced by one of the same size by its new date', async () => {
+    const path = join(dir, 'public/same.json')
+
+    await writeFile(path, MEDIUM)
+
+    const app = await serve()
+    const held = (await get(app, '/same.json')).headers.get('etag')!
+
+    await writeFile(path, MEDIUM.replace('row 1"', 'row X"'))
+    await utimes(path, new Date(Date.now() + 5000), new Date(Date.now() + 5000))
+    expect((await get(app, '/same.json', { 'if-none-match': held })).status).toBe(200)
+  })
+
+  it('keeps answering a 304 for an unchanged file', async () => {
+    const app = await serve()
+
+    for (const name of ['data.json', 'logo.png']) {
+      const etag = (await get(app, `/${name}`)).headers.get('etag')!
+
+      expect((await get(app, `/${name}`, { 'if-none-match': etag })).status, name).toBe(304)
     }
   })
 })

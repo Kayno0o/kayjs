@@ -1,4 +1,4 @@
-import type { Elysia } from 'elysia'
+import type { Context, Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ClientBuild } from './client'
@@ -180,9 +180,12 @@ export interface PageRoutes {
   respond: PageResponder
 }
 
+// How a request nothing serves is answered, as the routes directory's `_404.kay` draws it.
+export type Unmatched = (given: RequestContext & { set: Context['set'] }) => Promise<Response>
+
 // A route per path the router serves, then one answering what none of them does, each in the locale its prefix or its host names.
-// Returns how an error thrown before any page was chosen is answered, in the locale the request names.
-export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): (error: unknown, context: RequestContext) => Promise<Response> {
+// Returns how an error thrown before any page was chosen is answered, in the locale the request names, and how a path none serves is, when the routes directory has a page for either.
+export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): { uncaught: (error: unknown, context: RequestContext) => Promise<Response>, unmatched: Unmatched | undefined } {
   const settings = i18n?.settings
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
@@ -292,15 +295,16 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
   // Every route above wins over this one, so it only answers what no page serves.
   if (!(fallback.notFound ?? fallback.error))
-    return uncaught
+    return { uncaught, unmatched: undefined }
 
   const unmatched = async (context: RequestContext) => inFallbackLocale(context, async () => renderUnmatched(fallback, context, client, renderOptions))
+  const answerUnmatched: Unmatched = async given => carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given }))))
 
   app.get('/*', async (given) => {
     pageRequested(given.request)
 
-    return carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given }))))
+    return answerUnmatched({ ...given })
   })
 
-  return uncaught
+  return { uncaught, unmatched: answerUnmatched }
 }

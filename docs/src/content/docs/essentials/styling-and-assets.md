@@ -108,6 +108,8 @@ Dotfiles, `.env` files and editor backups are neither served nor exported. `.wel
 
 A public file keeps its name when its content changes, so the browser cannot know when to fetch it again. Kay lets it keep a font for 30 days and an image for a day without asking, so a logo replaced in place shows within a day of the deploy. Everything else, such as `robots.txt`, a manifest or a script, is checked on every visit and answered with a 304 while it is unchanged. `kay dev` always checks, so an edit shows at once.
 
+A running server looks at the file on every request. A file you delete answers the same 404 as a path that never existed, and one you replace is sent with a tag for its new content.
+
 To choose other times, set `publicCache` in `kay.config.ts`:
 
 ```ts
