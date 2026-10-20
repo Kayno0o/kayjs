@@ -2,6 +2,7 @@ import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { gzipSize } from '../src/build/report'
 import { scratchDir } from './scratch'
 
@@ -79,7 +80,7 @@ const sizeOf = async (path: string) => Bun.file(path).size
 const footprintOf = (result: Result, route: string) => result.document.built!.footprints.find(each => each.route === route)
 
 async function variant(root: string, width: number, extension: 'avif' | 'webp'): Promise<string> {
-  const dir = join(root, '.kay/client/dist/images')
+  const dir = join(outputDir(root), 'dist/images')
   const name = (await readdir(dir)).find(file => file.startsWith('hero-') && file.endsWith(`-${width}.${extension}`))
 
   return join(dir, name!)
@@ -94,9 +95,9 @@ describe('kay build footprints', () => {
     const root = await project('')
     const result = await built(root)
     const home = footprintOf(result, '/')!.footprint!
-    const html = await Bun.file(join(root, '.kay/client/pages/index.html')).bytes()
+    const html = await Bun.file(join(outputDir(root), 'pages/index.html')).bytes()
     const tags = new TextDecoder().decode(html).match(/<[a-z][^\s>/]*/gi)!
-    const font = (await readdir(join(root, '.kay/client/dist/assets'))).find(file => file.endsWith('.woff2'))!
+    const font = (await readdir(join(outputDir(root), 'dist/assets'))).find(file => file.endsWith('.woff2'))!
 
     expect(result.document.problems).toEqual([])
     expect(home.parts).toEqual({
@@ -105,7 +106,7 @@ describe('kay build footprints', () => {
       js: 0,
       // 50vw of 1280 is 640; the lazy one takes the whole window, which only the 1000 wide variant fills.
       images: await sizeOf(await variant(root, 640, 'avif')) + await sizeOf(await variant(root, 1000, 'avif')),
-      fonts: await sizeOf(join(root, '.kay/client/dist/assets', font)),
+      fonts: await sizeOf(join(outputDir(root), 'dist/assets', font)),
     })
     // The document, the two images and the font.
     expect(home.requests).toBe(4)
@@ -124,7 +125,7 @@ describe('kay build footprints', () => {
     const result = await built(root)
     const counter = footprintOf(result, '/counter')!.footprint!
     const route = (result.document.built as unknown as { routes: { route: string, js: number, css: number }[] }).routes.find(each => each.route === '/counter')!
-    const page = await Bun.file(join(root, '.kay/client/pages/counter.html')).text()
+    const page = await Bun.file(join(outputDir(root), 'pages/counter.html')).text()
 
     expect(counter.parts.js).toBe(route.js)
     expect(counter.parts.js).toBeGreaterThan(5000)

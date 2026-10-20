@@ -668,7 +668,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       const names = [...panel.querySelectorAll('.weight > span:not(.bars):not(.v):not(.files):not(.rule)')]
       const html = names.find(name => name.textContent === 'HTML')!
 
-      return [html.nextElementSibling!.nextElementSibling!.textContent, [...panel.querySelectorAll('.weight .files')].flatMap(note => note.textContent.split(', ').map(file => file.split(' ')))] as const
+      return [html.nextElementSibling!.nextElementSibling!.textContent, [...panel.querySelectorAll('.weight .files')].flatMap(note => note.textContent.split(', ').map(file => file.split(' '))).filter(([url]) => (/\.(?:js|css)(?:\?|$)/).test(url!))] as const
     })
     const bytes = (text: string) => {
       const [value, unit] = text.split(' ')
