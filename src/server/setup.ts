@@ -1,6 +1,5 @@
 import type { Collection } from '../content'
 import type { Project } from '../project'
-import type { ApiModule } from './api-modules'
 import type { Cards } from './card'
 import type { ClientBuild } from './client'
 import type { I18n } from './i18n'
@@ -18,7 +17,6 @@ import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
 import { setupStore } from './app-store'
 import { basePath } from './base'
-import { importModule } from './bundle'
 import { setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
@@ -37,16 +35,6 @@ import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
-
-// Imports every page, layout and API module beside the client build, so their compiling is done when the first request renders them; a failing import is raised again where the server imports them itself.
-async function warmModules(routes: Route[], api: Promise<ApiModule[]>): Promise<void> {
-  const files = new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))
-
-  for (const module of await api)
-    files.add(module.file)
-
-  await Promise.allSettled([...files].map(async file => importModule(file)))
-}
 
 export interface PageSetup {
   source: ProjectSource
@@ -79,6 +67,20 @@ export interface PageSetup {
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
 // It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode and the locales, with the preview secret, the tracer and the file store when serving, as a build traces nothing, previews nothing and an export links its files itself.
 export async function setupPages(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false): Promise<PageSetup> {
+  let loading: Promise<ClientBuild> | undefined
+
+  try {
+    return await setupWith(project, async () => loading ??= Promise.resolve(loadClient()), prerendering)
+  }
+  catch (error) {
+    // A build still running would go on writing the output while the caller deals with the failure.
+    await Promise.allSettled([loading])
+
+    throw error
+  }
+}
+
+async function setupWith(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean): Promise<PageSetup> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
   const source = projectSource()
@@ -131,7 +133,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
-  void Promise.allSettled([extensions, api, !prerendering && mode.dev ? warmModules(routes, api) : undefined])
+  void Promise.allSettled([extensions, api])
 
   const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const ownManifest = appServesManifest(files, endpoints, routes)

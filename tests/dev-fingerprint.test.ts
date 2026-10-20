@@ -158,7 +158,7 @@ describe('the build an earlier kay dev left', () => {
 
     expect(await buildsAgain()).toBe(false)
 
-    const [chunk] = readdirSync(clientDir(project)).filter(file => file.endsWith('.js'))
+    const [chunk] = readdirSync(clientDir(project), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name)
 
     await Bun.write(join(clientDir(project), chunk!), 'console.log(1)')
     expect(await buildsAgain()).toBe(true)
@@ -240,7 +240,7 @@ describe('the build an earlier kay dev left', () => {
     await Bun.sleep(100)
 
     const started = devBuilder(project, OPTIONS)
-    const bundle = () => readdirSync(clientDir(project)).filter(file => file.endsWith('.js')).map(file => readFileSync(join(clientDir(project), file), 'utf8')).join('\n')
+    const bundle = () => readdirSync(clientDir(project), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).map(file => readFileSync(join(clientDir(project), file), 'utf8')).join('\n')
 
     expect((await started(null)).failed).toBe(false)
     expect(bundle()).toContain('one')

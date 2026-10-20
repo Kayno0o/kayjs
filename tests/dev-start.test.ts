@@ -80,7 +80,7 @@ it('leaves the server alone for an edit of package.json that resolves nothing, a
   const real = realpathSync(root)
   const lines: string[] = []
   const children: Subprocess[] = []
-  const bundle = () => readdirSync(join(dist(root), 'dist')).filter(file => file.endsWith('.js')).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
+  const bundle = () => readdirSync(join(dist(root), 'dist'), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
   const restarts = () => lines.filter(line => line.includes('package.json: restarted'))
   const pkg = async (changes: Record<string, unknown>) => Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'package-edits', version: '1.0.0', scripts: { dev: 'kay dev' }, imports: { '#label': './src/label-a.ts' }, ...changes }))
   const stop = await dev(root, { port: await freePort(), log: line => lines.push(line), onRestart: child => children.push(child) })
@@ -192,7 +192,7 @@ it('leaves the client build of an earlier run as it is when nothing the build re
       await until(() => manifestTime(root) !== built)
     })
     await until(() => existsSync(join(dist(root), FINGERPRINT)))
-    expect(readdirSync(join(dist(root), 'dist')).some(file => readFileSync(join(dist(root), 'dist', file), 'utf8').includes('two'))).toBe(true)
+    expect(readdirSync(join(dist(root), 'dist'), { withFileTypes: true }).some(entry => entry.isFile() && readFileSync(join(dist(root), 'dist', entry.name), 'utf8').includes('two'))).toBe(true)
     expect(childrenRunning(realpathSync(root), 'builder.ts')).toHaveLength(0)
   }
   finally {
@@ -305,7 +305,7 @@ it('reloads a module that imports package.json when only its version changed, an
   })
   const lines: string[] = []
   const port = await freePort()
-  const bundle = () => readdirSync(join(dist(root), 'dist')).filter(file => file.endsWith('.js')).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
+  const bundle = () => readdirSync(join(dist(root), 'dist'), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
   const stop = await dev(root, { port, log: line => lines.push(line) })
 
   try {
