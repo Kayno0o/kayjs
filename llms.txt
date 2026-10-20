@@ -18,7 +18,7 @@
 
 ## Docs
 
-To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form, enough to write them. The topic files below are references for what it leaves out: open one when a task needs something the walkthrough does not show. Each opens with its common tasks, one sentence and one complete example apiece, which answer most tasks; the exact rules follow under Reference, one per bullet, to search for an edge case rather than read whole.
+To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form. The topic files below cover what it leaves out: open one when a task needs more. Each opens with its common tasks, one sentence and one example apiece, which answer most tasks; the exact rules follow under Reference, one per bullet, to search for an edge case.
 
 - [Build a site](llms/site.md): one walkthrough of a small site: config and page titles, the layout and its nav, a Markdown collection and its pages, the 404 page, islands and shared state, a form checked on the server and in the browser
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`
@@ -64,4 +64,5 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.56
 - [What's new](llms/whats-new.md): what each recent release adds, newest first
 - [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.59
-- [Privacy and personal data](llms/privacy.md): the cookies and data kay keeps and for how long, erasing a person, analytics through your origin, photo metadata
+- [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person, analytics through your origin
+- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets, checks or leaves to the app
