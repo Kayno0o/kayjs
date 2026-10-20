@@ -1,10 +1,13 @@
+import type { ClientBuild } from './client'
 import type { PageResponder } from './page-routes'
 import type { RenderOptions } from './render'
+import { joinBase } from '../runtime/base'
 import { speculationRules } from './speculation'
 
 const SAVING = /^\s*on\s*$/i
 const FONT_PRELOAD = /<link\s[^>]*?\brel="preload"[^>]*?\bas="font"[^>]*>/g
 const VARY_ALL = new Set(['save-data', '*'])
+const MODULE_PRELOAD = /<link rel="modulepreload" href="([^"]*)">/g
 const FONT_DISPLAY = /font-display:[a-z-]+/g
 const HEAD_END = Buffer.from('</head>')
 
@@ -14,13 +17,20 @@ export function savesData(request: Request): boolean {
 }
 
 // Whether this request gets the lighter page: it asks for less data, and the pages vary on it.
-export function savesLess(request: Request, options: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss'>): boolean {
+export function savesLess(request: Request, options: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandChunks'>): boolean {
   return pagesVary(options) && savesData(request)
 }
 
 // Whether pages differ for a visitor saving data: they carry something to leave out, and the `saveData` config key leaves the behavior on.
-export function pagesVary({ saveData, prefetch, fontCss }: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss'>): boolean {
-  return saveData !== false && (prefetch !== false || fontCss !== undefined)
+export function pagesVary({ saveData, prefetch, fontCss, islandChunks }: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandChunks'>): boolean {
+  return saveData !== false && (prefetch !== false || fontCss !== undefined || (islandChunks?.drop.size ?? 0) > 0)
+}
+
+// The chunks a page preloads for its eager islands and for nothing else: not the entry's, nor the code waiting for the viewport.
+export function islandOnlyChunks({ islands, entryImports, hydrateWhen }: Pick<ClientBuild, 'islands' | 'entryImports' | 'hydrateWhen'>): NonNullable<RenderOptions['islandChunks']> {
+  const kept = new Set([...entryImports, ...hydrateWhen ?? []])
+
+  return { drop: new Set(Object.values(islands).flat().filter(chunk => !kept.has(chunk))), wait: hydrateWhen ?? [] }
 }
 
 // The fonts shown only if the browser has them in time, the system face standing in until then: a face not cached yet is no longer fetched ahead nor waited for.
@@ -35,8 +45,11 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
 
   const rules = speculationRules(options.prefetch, options.base)
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
+  // The chunks as the page names them, under the mount point.
+  const base = options.base ?? ''
+  const chunks = options.islandChunks && { drop: new Set([...options.islandChunks.drop].map(chunk => joinBase(base, chunk))), wait: options.islandChunks.wait.map(chunk => joinBase(base, chunk)) }
   const lighter = (head: string) => {
-    let lightened = head.replace(FONT_PRELOAD, '')
+    let lightened = withoutIslandPreloads(head.replace(FONT_PRELOAD, ''), chunks)
 
     if (rules !== '')
       lightened = lightened.replace(rules, () => '')
@@ -62,6 +75,26 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
 
     return lightened
   }
+}
+
+// The head without the preloads of the chunks only islands need, the code waiting for the viewport preloaded in the first one's place when the page did not already.
+function withoutIslandPreloads(head: string, chunks: RenderOptions['islandChunks']): string {
+  if (chunks === undefined || chunks.drop.size === 0)
+    return head
+
+  let dropped = false
+
+  return head.replace(MODULE_PRELOAD, (link, href: string) => {
+    if (!chunks.drop.has(href))
+      return link
+
+    if (dropped)
+      return ''
+
+    dropped = true
+
+    return chunks.wait.filter(chunk => !head.includes(`href="${chunk}"`)).map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')
+  })
 }
 
 function varyOnSaveData(headers: Headers): void {

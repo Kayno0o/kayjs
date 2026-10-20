@@ -27,6 +27,7 @@ import { dropOpenCache, privateDir } from './private-dir'
 import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
 import { routeMounts, styleChains } from './routes'
+import { islandOnlyChunks } from './save-data'
 import { allowsStyleAttributes } from './security'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
@@ -124,5 +125,5 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandChunks: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
 }

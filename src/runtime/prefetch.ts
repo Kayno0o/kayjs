@@ -1,4 +1,5 @@
 import { followable, linkOf, loadSwap } from './navigate'
+import { savesData } from './save-data'
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
@@ -25,11 +26,6 @@ export function startPrefetch(rules: string | null): void {
 // Handles an event heard before the listeners were there.
 export function replay(event: Event): void {
   handlers[event.type]?.(event)
-}
-
-// `Save-Data` as the browser reports it, or `prefers-reduced-data`, unless the config turned the behavior off.
-function savesData(): boolean {
-  return !document.querySelector('meta[name="kay-save-data"]') && ((navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true || matchMedia('(prefers-reduced-data: reduce)').matches)
 }
 
 function eagernessOf(rules: string | null): Eagerness {

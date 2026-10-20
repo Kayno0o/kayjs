@@ -205,20 +205,6 @@ describe.each([
       await remove()
     }
   })
-
-  it('leaves a page with no fonts and no speculation rules unvaried', async () => {
-    const { app, remove } = await served({ fonts: undefined, prefetch: false })
-
-    try {
-      const saving = await app.handle(request('/about', ON))
-
-      expect(varies(saving)).not.toContain('save-data')
-      expect(await saving.text()).toContain('<h1')
-    }
-    finally {
-      await remove()
-    }
-  })
 })
 
 describe('a prerendered page', () => {
@@ -351,6 +337,8 @@ describe('the page wrapper', () => {
     expect(withSavedData(respond, { prefetch: false })).toBe(respond)
     expect(withSavedData(respond, { saveData: false })).toBe(respond)
     expect(withSavedData(respond, { prefetch: false, fontCss: '@font-face{}' })).not.toBe(respond)
+    expect(withSavedData(respond, { prefetch: false, islandChunks: { drop: new Set(), wait: [] } })).toBe(respond)
+    expect(withSavedData(respond, { prefetch: false, islandChunks: { drop: new Set(['/_kay/a.js']), wait: [] } })).not.toBe(respond)
   })
 })
 

@@ -121,7 +121,7 @@ export interface KayConfig {
   hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch | undefined
-  // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch. On by default, `false` serves everyone alike.
+  // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
   saveData?: boolean | undefined
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined

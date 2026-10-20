@@ -210,6 +210,7 @@ const column = elementSize()
 - A click, input or change on an island still loading is replayed once it hydrated and its effects ran, an island that never hydrates holding its last 50 events at most, one whose chunk fails to load dropping them, and a field's consecutive inputs or changes counting as one.
 - `hydration: { visible: '640px', serverIslands: '200% 0px' }` in `kay.config.ts` sets how far ahead of the viewport a `visible` island and a deferred server island start loading, as CSS root margins; `'200px'` and `'100% 0px'`, a screen ahead, by default.
 - Only an island takes `hydrate`, and only from a static parent.
+- For a visitor asking for less data (`Save-Data: on`, `prefers-reduced-data`, `saveData: false` turning it off), an island with no `hydrate` hydrates as `visible` does: at once in view, else once it scrolls near, a click meanwhile replayed. `hydrate="load"`, `idle`, `visible` and `client` go as written, so `hydrate="load"` keeps an island that must work at once. A deferred server island is fetched only once it nears the viewport, not when the browser is idle, and the `Save-Data` page preloads no island chunk, only the entry's and the code waiting for the viewport.
 
 ### Shared and persisted state
 

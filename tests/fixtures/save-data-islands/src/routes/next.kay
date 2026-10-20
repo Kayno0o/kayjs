@@ -1,0 +1,11 @@
+---
+import Count from '../components/count.kay'
+---
+head
+  title Next
+h1 Next
+Count(name="top")
+div(style="height: 3000px")
+Count(name="below")
+div(style="height: 3000px")
+Count(name="load" hydrate="load")

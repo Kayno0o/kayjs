@@ -4,6 +4,7 @@ import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
 import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { savesData } from './save-data'
 import { freshPrefix, withIds } from './uid'
 import { decodeServerValue } from './wire'
 
@@ -86,8 +87,11 @@ async function followCaches(): Promise<void> {
 
 // Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
 // Running it again over the same root leaves the islands it already took alone.
+// For a visitor asking to save data, an island with no `hydrate` of its own waits until it scrolls near, as `visible` does, and a deferred server island is fetched only then; a `hydrate` written out, `load` included, and a client-only island go as they say.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
+  let saving: boolean | undefined
+  const asksLess = () => saving ??= savesData()
 
   if (following || document.querySelector(CACHE_SCRIPT))
     void followCaches()
@@ -103,7 +107,9 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
 
     void whenHydrating((when) => {
       when.whenVisible(element, run, true)
-      when.whenIdle(run)
+
+      if (!asksLess())
+        when.whenIdle(run)
     }, run)
   }
 
@@ -113,6 +119,10 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
 
     started.add(element)
     const run = async () => hydrateIsland(registry, element)
+
+    // Written on the island, as the server writes `visible` on one that asked for it.
+    if (element.dataset.client === undefined && asksLess())
+      element.dataset.hydrate ??= 'visible'
 
     if (element.dataset.hydrate === 'visible')
       void whenHydrating(when => when.whenVisible(element, run), run)

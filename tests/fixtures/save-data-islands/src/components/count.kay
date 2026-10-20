@@ -1,0 +1,10 @@
+---
+import { onMount, signal } from 'kay'
+
+const { name } = props<{ name: string }>()
+// Set as the island hydrates, which the server's markup never has.
+const ready = signal('no')
+
+onMount(() => ready.set('yes'))
+---
+button.count(data-name={name} data-ready={ready()} onClick={() => ready.set('clicked')}) {name}

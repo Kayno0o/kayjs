@@ -149,9 +149,10 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
-      const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
+      // `load` is written out too, so a visitor asking to save data, whose islands wait by default, sees the one that asked to go at once.
+      const marked = when === 'idle' || when === 'visible' || when === 'load' ? ` data-hydrate="${when}"` : ''
       const chunk = rendered?.chunks?.[id]
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }
