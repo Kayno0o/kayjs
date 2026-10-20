@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
@@ -15,7 +15,7 @@ import { refuseClashes } from '../server/route-table'
 import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
 import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
 import { kay } from './plugin'
-import { runtimeConfig, withoutPlugins } from './runtime-config'
+import { withoutPlugins, withProjectPaths } from './runtime-config'
 import { withoutStyles } from './styles'
 
 export interface CompileOptions {
@@ -166,7 +166,10 @@ export async function compileServer(project: Project, options: CompileOptions): 
   if (runtime === undefined && (config.plugins?.length ?? 0) > 0)
     console.warn(`kay: the plugins in ${CONFIG_FILE} cannot be told apart from the rest of the config, which they can as a property of the object it exports by default with no spread beside them, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
 
-  const configPlugins = configSource === undefined ? [] : [runtimeConfig(configFile, runtime ?? configSource)]
+  // Bun loads a module by its real path, a symlinked project's included.
+  const realConfig = configSource === undefined ? undefined : realpathSync(configFile)
+  // The config as the executable loads it: without its build plugins, which cannot load there, and with `import.meta.dir` naming the project's folder, as inside the executable it would name `/$bunfs/root`.
+  const rewrite = (file: string, source: string) => file === realConfig ? withProjectPaths(runtime ?? source, file) : source
   const since = raisedMark()
   const build = await Bun.build({
     // The AVIF encoder's worker too, which the executable starts from `/$bunfs/root/avif-worker.js`.
@@ -182,7 +185,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings, embedMaps: true }), ...config.plugins ?? []],
+    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings, embedMaps: true, rewrite }), ...config.plugins ?? []],
   })
 
   if (!build.success)

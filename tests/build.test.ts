@@ -19,10 +19,11 @@ import { buildClient, islandManifest, keepMaps, readClientSources } from '../src
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
+import { kay } from '../src/build/plugin'
 import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
 import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
-import { runtimeConfig, withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
+import { withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
 import { analyzeKayCached, compilerFingerprint, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
@@ -843,7 +844,8 @@ describe('kay.config.ts', () => {
 
     try {
       const file = join(link, 'kay.config.ts')
-      const build = await Bun.build({ entrypoints: [join(link, 'entry.ts')], target: 'bun', plugins: [runtimeConfig(file, withoutPlugins(await Bun.file(file).text())!)] })
+      const realFile = await realpath(file)
+      const build = await Bun.build({ entrypoints: [join(link, 'entry.ts')], target: 'bun', plugins: [kay({ root: link, rewrite: (path, source) => path === realFile ? withProjectPaths(withoutPlugins(source)!, path) : source })] })
       const code = await build.outputs[0]!.text()
 
       expect(code).not.toContain('STAMP')
@@ -2301,7 +2303,10 @@ describe('a config reading files beside it', () => {
     const source = [
       'const topics = readdirSync(join(import.meta.dir, \'../llms\'))',
       'const same = import.meta.dirname + import.meta.path + import.meta.filename + import.meta.file',
-      'const other = import.meta.url + import.meta.env + import.meta[\'dir\']',
+      'const forms = import.meta?.dir + import.meta[\'file\'] + `${import.meta.dir}/x`',
+      'const here = dirname(fileURLToPath(import.meta.url))',
+      'const shipped = new URL(\'./font.woff2\', import.meta.url)',
+      'const other = import.meta.env + import.meta[name]',
       '// import.meta.dir',
       'const text = \'import.meta.dir\'',
     ].join('\n')
@@ -2309,20 +2314,30 @@ describe('a config reading files beside it', () => {
     expect(withProjectPaths(source, '/app/docs/kay.config.ts')).toBe([
       'const topics = readdirSync(join("/app/docs", \'../llms\'))',
       'const same = "/app/docs" + "/app/docs/kay.config.ts" + "/app/docs/kay.config.ts" + "kay.config.ts"',
-      'const other = import.meta.url + import.meta.env + import.meta[\'dir\']',
+      'const forms = "/app/docs" + "kay.config.ts" + `${"/app/docs"}/x`',
+      'const here = dirname(fileURLToPath("file:///app/docs/kay.config.ts"))',
+      'const shipped = new URL(\'./font.woff2\', import.meta.url)',
+      'const other = import.meta.env + import.meta[name]',
       '// import.meta.dir',
       'const text = \'import.meta.dir\'',
     ].join('\n'))
     expect(withProjectPaths('export default { (', '/app/kay.config.ts')).toBe('export default { (')
   })
 
-  it('boots in a compiled executable, with its plugins left out or kept, wherever it starts', async () => {
-    for (const config of ['export default { redirects: redirects() }', 'export default { plugins: [], redirects: redirects(), ...{} }', 'export default { plugins: [], redirects: redirects() }']) {
+  const IMPORTS = 'import { readdirSync } from \'node:fs\'\nimport { dirname, join } from \'node:path\'\nimport { fileURLToPath } from \'node:url\'\n\n'
+  const configs: Record<string, string> = {
+    'import.meta.dir': `${IMPORTS}export default { redirects: Object.fromEntries(readdirSync(join(import.meta.dir, 'topics')).map(topic => [\`/\${topic.replace('.ts', '')}\`, '/'])) }\n`,
+    'import.meta.url, with a plugins array left out': `${IMPORTS}const redirects = Object.fromEntries(readdirSync(join(dirname(fileURLToPath(import.meta.url)), 'topics')).map(topic => [\`/\${topic.replace('.ts', '')}\`, '/']))\n\nexport default { plugins: [], redirects }\n`,
+    'import.meta.dir, with a plugins array that stays': `${IMPORTS}const redirects = Object.fromEntries(readdirSync(join(import.meta.dir, 'topics')).map(topic => [\`/\${topic.replace('.ts', '')}\`, '/']))\n\nexport default { plugins: [], ...{ redirects } }\n`,
+  }
+
+  for (const [name, config] of Object.entries(configs)) {
+    it(`boots in a compiled executable, wherever it starts, reading ${name}`, async () => {
       const project = await scratchProject({
         'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { elysia: '*' } }),
         'tsconfig.json': tsconfig,
-        'kay.config.ts': `import { readdirSync } from 'node:fs'\nimport { join } from 'node:path'\n\nfunction redirects() {\n  return Object.fromEntries(readdirSync(join(import.meta.dir, 'topics')).map(topic => [\`/\${topic}\`, '/']))\n}\n\n${config}\n`,
-        'topics/alpha': '',
+        'kay.config.ts': config,
+        'topics/alpha.ts': 'export default 1\n',
         'src/routes/index.kay': 'p Home\n',
         'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst moved = await app.handle(new Request(\'http://localhost/alpha\'))\n\nconsole.log(JSON.stringify({ status: moved.status, location: moved.headers.get(\'location\') }))\nprocess.exit(0)\n',
       })
@@ -2336,8 +2351,8 @@ describe('a config reading files beside it', () => {
 
       expect(errors).not.toContain('ENOENT')
       expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 308, location: '/' })
-    }
-  }, 120_000)
+    }, 60_000)
+  }
 })
 
 describe('a compiled server\'s images', () => {

@@ -1,8 +1,7 @@
 import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { BunPlugin } from 'bun'
-import { realpathSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
 import { loadTraverse } from '../compiler/rewrite'
 
@@ -17,19 +16,6 @@ interface Token extends Range {
 
 const COMMENTS = new Set(['CommentBlock', 'CommentLine'])
 const TS_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
-
-// `kay.config.ts` as the compiled server loads it: a build plugin and what only it imports never reach the executable, where a native addon such as Tailwind's cannot load, and `import.meta.dir` names the project's folder, as inside the executable it would name `/$bunfs/root`.
-export function runtimeConfig(file: string, contents: string): BunPlugin {
-  // Bun loads a module by its real path, a symlinked project's included.
-  const real = realpathSync(file)
-
-  return {
-    name: 'kay-runtime-config',
-    setup(build) {
-      build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}$`) }, () => ({ contents: withProjectPaths(contents, real), loader: 'ts' }))
-    },
-  }
-}
 
 // The config's source without the `plugins` of the object it exports by default, nor the imports and top-level declarations only they referenced; undefined when they cannot be told apart from the rest.
 // A declaration referencing itself, or one a type mentions, stays: what is left must run as it did.
@@ -94,22 +80,26 @@ export function withoutPlugins(source: string): string | undefined {
 }
 
 // The source with the `import.meta` paths of the module written out as the file's, so a config reading a file beside it at load, as `readdirSync(join(import.meta.dir, '../llms'))`, finds it where the build did instead of in the executable's own file system.
+// `new URL('./file', import.meta.url)` stays: it names a file the build ships.
 export function withProjectPaths(source: string, file: string): string {
   const ast = parseModule(source, false)
-  const paths: Record<string, string> = { dir: dirname(file), dirname: dirname(file), path: file, filename: file, file: basename(file) }
+  const paths: Record<string, string> = { dir: dirname(file), dirname: dirname(file), path: file, filename: file, file: basename(file), url: pathToFileURL(file).href }
   const found: (Range & { value: string })[] = []
 
   if (!ast)
     return source
 
-  loadTraverse()(ast, {
-    MemberExpression(path) {
-      const { object, property, computed } = path.node
+  const visit = (path: NodePath<t.MemberExpression | t.OptionalMemberExpression>) => {
+    const { object, property, computed } = path.node
+    const name = memberName(property, computed)
 
-      if (!computed && object.type === 'MetaProperty' && object.meta.name === 'import' && property.type === 'Identifier' && Object.hasOwn(paths, property.name))
-        found.push({ start: path.node.start!, end: path.node.end!, value: paths[property.name]! })
-    },
-  })
+    if (object.type !== 'MetaProperty' || object.meta.name !== 'import' || name === undefined || !Object.hasOwn(paths, name) || (name === 'url' && namesShippedFile(path)))
+      return
+
+    found.push({ start: path.node.start!, end: path.node.end!, value: paths[name]! })
+  }
+
+  loadTraverse()(ast, { MemberExpression: visit, OptionalMemberExpression: visit })
 
   let pinned = source
 
@@ -117,6 +107,21 @@ export function withProjectPaths(source: string, file: string): string {
     pinned = pinned.slice(0, start) + JSON.stringify(value) + pinned.slice(end)
 
   return pinned
+}
+
+// `.dir` or `['dir']`.
+function memberName(property: t.Node, computed: boolean): string | undefined {
+  if (property.type === 'Identifier' && !computed)
+    return property.name
+
+  return property.type === 'StringLiteral' ? property.value : undefined
+}
+
+// `import.meta.url` as the base of `new URL('./file', ...)`.
+function namesShippedFile(path: NodePath): boolean {
+  const call = path.parent
+
+  return call.type === 'NewExpression' && call.callee.type === 'Identifier' && call.callee.name === 'URL' && call.arguments[1] === path.node && call.arguments[0]?.type === 'StringLiteral'
 }
 
 // Undefined for what Babel does not read, though Bun might: the config then goes in as it is.

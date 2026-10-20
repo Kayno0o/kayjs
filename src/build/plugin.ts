@@ -42,6 +42,8 @@ export interface KayPluginOptions {
   direct?: boolean | undefined
   // An executable's modules carry their own source map, for it to map the stacks of the errors it meets to `.kay` lines with no compiler: they register it under the path Bun shows for the file, relative to the working directory.
   embedMaps?: boolean | undefined
+  // Rewrites a project module's source before the rest of the plugin reads it: the executable's `kay.config.ts` without its build plugins.
+  rewrite?: ((file: string, source: string) => string) | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -258,11 +260,12 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
       // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.
       build.onLoad({ filter: projectScript }, async ({ path }) => {
-        const source = await Bun.file(path).text()
+        const original = await Bun.file(path).text()
+        const source = options.rewrite?.(path, original) ?? original
         const loader = scriptLoader(path)
         const contents = anchoring(path, await pointed(await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader), loader))
 
-        return contents === source && build.config !== undefined ? undefined : { contents, loader }
+        return contents === original && build.config !== undefined ? undefined : { contents, loader }
       })
 
       // A package's modules, read only for the files they point at; the project's own were read above.
