@@ -2,7 +2,7 @@ import type { Action } from '../src/runtime'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
@@ -718,6 +718,97 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.waitUntil(() => document.querySelector('form.described input[name="first"]')?.getAttribute('aria-invalid') === 'true')
 
     expect(await described()).toEqual([['choose-hint choose-first-error', 'true'], ['last-note last-hint choose-last-error', 'true']])
+    expect(page.errors).toEqual([])
+  })
+})
+
+const isBusy = (node: AxNode | undefined) => node?.properties?.some(property => property.name === 'busy' && Boolean(property.value.value)) ?? false
+
+interface AxNode {
+  nodeId: string
+  parentId?: string
+  ignored?: boolean
+  role?: { value: string }
+  name?: { value: string }
+  properties?: { name: string, value: { value: unknown } }[]
+}
+
+describe('a pending block under a strict style-src', () => {
+  let strict: Awaited<ReturnType<typeof testSite>>
+
+  beforeAll(async () => {
+    strict = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true, security: { csp: { 'style-src': ['\'self\''] } } })
+  }, 60_000)
+
+  afterAll(async () => strict?.close())
+
+  it('shows, announces and hides it with no policy violation, the policy holding', async () => {
+    const page = await strict.open('/pending', { path })
+
+    // The policy holds: a style attribute the page adds is refused.
+    const refused = await page.evaluate(async () => {
+      const blocked = new Promise<string>(resolve => document.addEventListener('securitypolicyviolation', event => resolve(event.violatedDirective), { once: true }))
+      const marked = document.createElement('div')
+
+      marked.setAttribute('style', 'color: red')
+      document.body.append(marked)
+
+      return blocked
+    })
+
+    expect(refused).toStartWith('style-src')
+    await page.evaluate(() => {
+      (window as unknown as { violations: string[] }).violations = []
+      document.addEventListener('securitypolicyviolation', event => (window as unknown as { violations: string[] }).violations.push(`${event.violatedDirective} ${event.blockedURI}`))
+    })
+    await page.click('form.slow button')
+    await page.waitUntil(() => document.querySelector('form.slow [data-kay-pending] > *')?.checkVisibility() === true)
+    await page.waitUntil(() => [...document.querySelectorAll('body > [aria-live=polite]')].some(region => region.textContent === 'Saving slow'))
+    await page.waitUntil(() => document.querySelector('form.slow [data-kay-pending] > *')?.checkVisibility() === false)
+
+    expect(await page.evaluate(() => (window as unknown as { violations: string[] }).violations)).toEqual([])
+    expect(page.errors).toEqual([])
+  })
+
+  it('exposes the announcement to assistive technology as a polite live region outside the busy form', async () => {
+    const page = await strict.open('/pending', { path })
+
+    await page.view.cdp('Accessibility.enable')
+    await page.click('form.slow button')
+    await page.waitFor('form.slow[aria-busy]')
+
+    // The region lives a second once written: read the tree Chromium builds for assistive technology until it holds the text.
+    let tree: AxNode[] = []
+    let region: AxNode | undefined
+    const until = Date.now() + 5000
+
+    while (region === undefined && Date.now() < until) {
+      tree = (await page.view.cdp<{ nodes: AxNode[] }>('Accessibility.getFullAXTree')).nodes
+
+      const text = tree.find(node => node.role?.value === 'StaticText' && node.name?.value === 'Saving slow')
+      const parent = tree.find(node => node.nodeId === text?.parentId)
+
+      if (parent?.properties?.some(property => property.name === 'live' && property.value.value === 'polite'))
+        region = parent
+      else
+        await Bun.sleep(25)
+    }
+
+    expect(region).toBeDefined()
+    expect(region!.ignored).toBeFalsy()
+
+    // Nothing from the region up to the document is busy, which would hold its change back.
+    const busy: string[] = []
+
+    for (let node: AxNode | undefined = region; node; node = tree.find(candidate => candidate.nodeId === node?.parentId)) {
+      if (isBusy(node))
+        busy.push(node.role?.value ?? '')
+    }
+
+    expect(busy).toEqual([])
+
+    // The form itself is the busy one, so the text could not have been announced from inside it.
+    expect(tree.filter(isBusy).map(node => node.role?.value)).toEqual(['form'])
     expect(page.errors).toEqual([])
   })
 })
