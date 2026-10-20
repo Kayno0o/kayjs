@@ -351,7 +351,7 @@ await page.waitFor('.banner', { text: 'You are offline' })
 await page.online()
 ```
 
-While a route exists the browser's cache is off, as a response it served from its cache would never reach the route. That also means no cache hit or 304 happens while a route exists. The cache is on again after the last `unroute`.
+While a route exists the browser's cache is off, as a response it served from its cache would never reach the route. The page's cache is turned off with its first route and stays off, so no cache hit or 304 happens after it.
 
 The view runs one DevTools command at a time, so use `page.cdp(method, params)` where `page.view.cdp()` would be called: it queues behind the page's own commands and a route's.
 
