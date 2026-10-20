@@ -7,6 +7,8 @@ import { MAX_TIMER_MS } from './config-limits'
 
 // How long after a failed read of the dates the next try comes.
 const RETRY_MS = 60_000
+// The longest the server's start waits for the first read, so a slow loader delays it by no more; the read goes on after, and the pages it finds outdated are rendered again as it ends.
+const FIRST_READ_MS = 1000
 
 const listeners = new Set<() => void>()
 
@@ -34,7 +36,7 @@ export interface Publishing {
 export const NOT_PUBLISHING: Publishing = { passed: () => false, stop: () => undefined, start: () => undefined }
 
 // Refreshes the pages that read a collection with a `publishAt` when one of its dates passes, in this process alone: every replica has its clock and its pages, so none needs a lock, a store or a message from another.
-// A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept.
+// A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept, once a read of the dates ends, which the server's start waits for a second at most; a failed one is tried again.
 export async function watchPublishing(collections: Collection<unknown>[]): Promise<Publishing> {
   const watched = collections.filter(collection => collection.options.publishAt !== undefined)
 
@@ -49,6 +51,8 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
   let next: number | undefined
   // A fired run superseded before it refreshed leaves its refresh to the run that took over.
   let owed = false
+  // Whether a read of the dates ended yet, the first of which catches up what passed while no server ran.
+  let caughtUp = false
 
   const report = (error: unknown) => kayLog('error', 'the publication dates of a collection could not be read', error)
   const read = async (): Promise<Map<Collection<unknown>, number[]>> => {
@@ -88,6 +92,17 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
     if (stopped || mine !== generation)
       return
 
+    if (!caughtUp) {
+      caughtUp = true
+
+      for (const [collection, dates] of times) {
+        const passed = dates.findLast(at => at <= Date.now())
+
+        if (passed !== undefined)
+          latest.set(contentKey(collection.name), passed)
+      }
+    }
+
     if (owed) {
       const now = Date.now()
 
@@ -118,18 +133,6 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
     }
   }
 
-  try {
-    for (const [collection, times] of await read()) {
-      const passed = times.findLast(at => at <= Date.now())
-
-      if (passed !== undefined)
-        latest.set(contentKey(collection.name), passed)
-    }
-  }
-  catch (error) {
-    report(error)
-  }
-
   const listen = () => onKeysInvalidated((matches) => {
     if (watched.some(collection => matches(contentKey(collection.name))))
       void run(false)
@@ -138,7 +141,12 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
   })
   let stopListening = listen()
 
-  await run(false)
+  let giveUp: ReturnType<typeof setTimeout> | undefined
+
+  await Promise.race([run(false), new Promise<void>((resolve) => {
+    giveUp = setTimeout(resolve, FIRST_READ_MS)
+  })])
+  clearTimeout(giveUp)
 
   return {
     passed: page => (page.reads ?? []).some(read => read === ALL_READS ? Math.max(...latest.values(), 0) > page.renderedAt : (latest.get(read) ?? 0) > page.renderedAt),

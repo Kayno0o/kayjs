@@ -79,7 +79,7 @@ An entry whose date is still ahead is held back as a draft is: it is left out of
 
 The date is read in UTC, never in the server's time zone. `2026-10-20` means midnight UTC. To say an hour in your own zone, write the offset: `2026-10-20T08:00:00+02:00`. A date with an hour needs the `Z` or an offset, a time with neither is refused.
 
-Your app writes no cron, job or webhook. Each server process watches the dates of its own collections. When one passes, it builds again the pages that read the collection, and the sitemap. A server that was down at that time does it as it starts. Several replicas each do it for themselves. A cache in front of the feed, which is kept for an hour, may show the old one a while longer.
+Your app writes no cron, job or webhook. Each server process watches the dates of its own collections. When one passes, it builds again the pages that read the collection, and the sitemap. A server that was down at that time does it as it starts. If your data source fails then, the server starts anyway, logs the error once and reads the dates again every minute until it works. Several replicas each do it for themselves. A cache in front of the feed, which is kept for an hour, may show the old one a while longer.
 
 The page of the new entry itself was not listed when the site was built, so it is rendered on each visit until the next build.
 
