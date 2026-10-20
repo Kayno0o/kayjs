@@ -67,6 +67,8 @@ export interface ClientOptions {
   search?: boolean | undefined
   // The app has locales: the links its islands write go to the page's locale's copy, as the server writes them.
   i18n?: boolean | undefined
+  // The app has French pages (a `lang` or a locale of `fr` or `fr-...`) and `typography` is not off: its islands write their text with the same non-breaking spaces as the server's markup. An app without them is built without that code.
+  french?: boolean | undefined
   // Development: an edited island swaps into the open pages rather than reloading them.
   hot?: boolean | undefined
   // Development under `kay dev`: every element carries its source position, for its inspector.
@@ -357,7 +359,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, direct, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
