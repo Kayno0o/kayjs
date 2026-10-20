@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.61.0
 
+### Images carry their average color as a `style`
+
+An `img` kay resizes now carries `style="background-color:#c86432"` until it loads, so a test or snapshot reading the markup of an image, a selector on `img[style]`, or a content security policy set outside kay (a proxy's header) that refuses inline styles meets it. Set `images: { placeholder: false }` in `kay.config.ts` to keep the markup as it was, or `no-placeholder` on one `img`; a `security.csp` or `security.reportOnly` set in kay that lacks `'unsafe-inline'` for styles already leaves the color out. No lint can see it, as it is a rendering change ([Responsive images](images.md#responsive-images)).
+
 ### kayjs-ui's SiteNav menu is a popover
 
 `SiteNav` and `AppHeader` render their menu toggle as a `popovertarget` button over a `popover` list, with no island. The nav no longer carries `data-open`, and the toggle no longer carries `aria-expanded` and `aria-controls` as attributes (the browser exposes the state), so CSS or a test reading them changes: style the open list with `:popover-open` and read `matches(':popover-open')`; `kay check` cannot flag a CSS selector, so no lint warns of the old form. A link to a `#section` of the page leaves the menu open until a press outside or Escape. A browser without the Popover API (before Chrome and Edge 114, Firefox 125, Safari 17) shows the links as a plain list and hides the toggle.

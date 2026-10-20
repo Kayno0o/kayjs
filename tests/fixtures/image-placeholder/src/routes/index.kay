@@ -5,6 +5,8 @@ import jpeg from '../photo.jpg'
 import photo from '../photo.png'
 import motion from '../motion.gif'
 import icon from '../icon.svg'
+
+const mine = 'margin: 0'
 ---
 img.photo(src={photo} alt="Photo")
 img.spread({...image(photo)} alt="Spread")
@@ -18,5 +20,7 @@ img.off(src={photo} no-placeholder alt="Off")
 img.styled(src={photo} style="border: 0" alt="Styled")
 img.optout({...image(photo, { placeholder: false })} alt="Optout")
 img.styledspread({...image(photo)} style="border: 0" alt="Styled spread")
+img.stylefirst(style="border: 0" {...image(photo)} alt="Style first")
+img.dynamicfirst(style={mine} {...image(photo)} alt="Dynamic first")
 img.sized(src={photo} width="20" alt="Sized")
 img.upload({...image('/uploads/photo.png', { width: 64, height: 48 })} alt="Upload")

@@ -11,7 +11,7 @@ import { sizedImages } from '../src/content/images'
 import { contentPlace, loadEntries, markdownOf, setContentMode, setContentPlace, setMarkdownDefaults } from '../src/content/load'
 import { compileMarkdown } from '../src/content/markdown'
 import { image, imageUrl, parseWidths, setImageWidths, setPlaceholders } from '../src/runtime/image'
-import { placeholderColour } from '../src/runtime/placeholder'
+import { placeholderColor } from '../src/runtime/placeholder'
 import { pages } from '../src/server'
 import { encodePng } from '../src/server/png'
 import { fixtureCopy } from './scratch'
@@ -588,7 +588,7 @@ describe('Markdown images placeholder', () => {
     const { restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png) ![b](./ghost.png) <img src="./cat.png" style="border: 0" alt="c"> <img src="./cat.png" width="20" alt="d"> <img src="./cat.png" data-kay-placeholder="ff0000" alt="e">\n', 'posts/cat.png': opaque(200, 100, 50), 'posts/ghost.png': Bun.file(HERO) })
 
     try {
-      setPlaceholders(placeholderColour)
+      setPlaceholders(placeholderColor)
 
       const [entry] = await loadEntries('posts', { live: true })
       const html = (entry!.segments as string[]).join('')
@@ -618,12 +618,12 @@ describe('Markdown images placeholder', () => {
     const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': opaque(200, 100, 50) })
 
     try {
-      const colourOf = async () => (/data-kay-placeholder="(\w+)"/).exec(((await loadEntries('posts', { live: true }))[0]!.segments as string[]).join(''))?.[1]
+      const colorOf = async () => (/data-kay-placeholder="(\w+)"/).exec(((await loadEntries('posts', { live: true }))[0]!.segments as string[]).join(''))?.[1]
 
-      expect(await colourOf()).toBe('c86432')
-      expect(await colourOf()).toBe('c86432')
+      expect(await colorOf()).toBe('c86432')
+      expect(await colorOf()).toBe('c86432')
       await Bun.write(join(root, 'posts/cat.png'), opaque(10, 20, 30))
-      expect(await colourOf()).toBe('0a141e')
+      expect(await colorOf()).toBe('0a141e')
     }
     finally {
       await restore()

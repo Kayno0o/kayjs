@@ -14,11 +14,11 @@ import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setPlaceholders, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
-import { learnedVersion, learnPlaceholder, placeholderColour } from '../runtime/placeholder'
+import { learnedVersion, learnPlaceholder, placeholderColor } from '../runtime/placeholder'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
-import { dominantColour } from './image-colour'
+import { dominantColor } from './image-color'
 import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
@@ -221,7 +221,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
   // The color of a runtime image, by the version of its file.
-  const colours = new Map<string, Promise<string | undefined>>()
+  const colors = new Map<string, Promise<string | undefined>>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
   const text = headerCopies(TEXT, options.security)
@@ -328,7 +328,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     }
 
     if (runtimeKey !== undefined && source.private !== true && !src.startsWith(FILES_ROUTE))
-      void learnColour(src, runtimeKey, path, own)
+      void learnColor(src, runtimeKey, path, own)
 
     const variant = requestedVariant(url, own, allowed)
 
@@ -426,22 +426,22 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   })
 
   // The color of a runtime image shown until it loads, read once per version of the file in the background and kept by the `src` pages give `image()`. A private image, a stored one and an AVIF, which is costly to decode, get none.
-  async function learnColour(src: string, version: string, path: string, own: { animated: boolean, format: string }): Promise<void> {
+  async function learnColor(src: string, version: string, path: string, own: { animated: boolean, format: string }): Promise<void> {
     if (own.animated || own.format === 'avif' || learnedVersion(src) === version)
       return
 
-    let colour = colours.get(version)
+    let color = colors.get(version)
 
-    if (!colour) {
-      colour = drawing(async () => dominantColour(Bun.file(path), MAX_UPLOAD_PIXELS))
-      keep(colours, version, colour)
+    if (!color) {
+      color = drawing(async () => dominantColor(Bun.file(path), MAX_UPLOAD_PIXELS))
+      keep(colors, version, color)
     }
 
     try {
-      learnPlaceholder(src, version, await colour)
+      learnPlaceholder(src, version, await color)
     }
     catch {
-      colours.delete(version)
+      colors.delete(version)
     }
   }
 
@@ -660,7 +660,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, widt
   setRemoteImages(src => remoteAllowed(src, patterns))
   setResolvedImages(images?.resolve !== undefined)
   // A color is a `style` attribute, which a policy refusing inline styles would drop.
-  setPlaceholders(images?.placeholder === false || !inlineStyles ? undefined : placeholderColour)
+  setPlaceholders(images?.placeholder === false || !inlineStyles ? undefined : placeholderColor)
   recordVariants()
 
   return maxDensity

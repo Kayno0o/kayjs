@@ -16,9 +16,9 @@ const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
 // The attributes naming URLs of the site, which a path from its root in goes under its base.
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
-// A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
 // The attribute of an `img` that leaves out the color it shows until it loads.
 const NO_PLACEHOLDER = 'no-placeholder'
+// A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
 const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 // Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
@@ -345,6 +345,22 @@ export abstract class TemplateWriter {
       }
     }
 
+    const namedEntry = (attribute: NamedAttribute, name: string) => {
+      if (attribute.kind === 'boolean')
+        entry(name, () => b.add('true'), false)
+      else if (attribute.kind === 'static')
+        entry(name, () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
+      else if (!element.component && attribute === actionOf(element, this.src))
+        entry(name, () => b.add('KayFormAction((').addSource(attribute.expression).add('))'), true)
+      else if (!element.component && name.startsWith('on') && !isFunctionAt(this.src, attribute.expression, this.facts.functions))
+        entry(name, () => b.add('(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)'), false)
+      else
+        entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)
+    }
+
+    const lastSpread = element.attributes.findLastIndex(attribute => attribute.kind === 'spread')
+    const ownStyle = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'style')
+
     if (element.id)
       entry('id', () => b.add(JSON.stringify(this.source(element.id!))), false)
 
@@ -372,17 +388,12 @@ export abstract class TemplateWriter {
       if (this.skips(element, name))
         continue
 
-      if (attribute.kind === 'boolean')
-        entry(name, () => b.add('true'), false)
-      else if (attribute.kind === 'static')
-        entry(name, () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
-      else if (!element.component && attribute === actionOf(element, this.src))
-        entry(name, () => b.add('KayFormAction((').addSource(attribute.expression).add('))'), true)
-      else if (!element.component && name.startsWith('on') && !isFunctionAt(this.src, attribute.expression, this.facts.functions))
-        entry(name, () => b.add('(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)'), false)
-      else
-        entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)
+      namedEntry(attribute, name)
     }
+
+    // A spread after an `img`'s own `style` would replace it with the color `image()` brings, so the `style` is written again after the last one.
+    if (element.name === 'img' && ownStyle !== undefined && element.attributes.lastIndexOf(ownStyle) < lastSpread)
+      namedEntry(ownStyle, 'style')
 
     if (mergedClass)
       entry('class', () => this.mergedClass(element, classAttribute, spreads), true)

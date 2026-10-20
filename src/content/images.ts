@@ -5,10 +5,11 @@ import { realpathSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { writeAsset } from '../build/assets'
+import { projectPaths } from '../project'
 import { escapeAttribute } from '../runtime/escape'
 import { image, RESIZABLE } from '../runtime/image'
 import { registerPlaceholder } from '../runtime/placeholder'
-import { dominantColour } from '../server/image-colour'
+import { dominantColorOf } from '../server/image-color'
 import { imageHeader } from '../server/image-format'
 
 // An image a body links, as the entry's cache keeps it: the file, relative to the project root, and the URL it was built to, which a changed file renames.
@@ -33,7 +34,7 @@ const SIZES_ATTRIBUTE = /\ssizes\s*=/i
 const OWN_SIZES = /\ssizes="([^"]*)"/i
 const MARKER = / data-kay-image="(\d+)x(\d+)"/
 // The mean color of an image without transparency, read when it was linked.
-const COLOUR_MARKER = / data-kay-placeholder="([\da-f]{6})"/
+const COLOR_MARKER = / data-kay-placeholder="([\da-f]{6})"/
 const ANY_MARKER = / data-kay-(?:image|placeholder)(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi
 const STYLE_ATTRIBUTE = /\sstyle\s*=/i
 const BUILT = /^\/_kay\/assets\//
@@ -57,7 +58,7 @@ function insideOf(dir: string, path: string): boolean {
 }
 
 // The built asset a relative `src` names, or undefined for a URL, an absolute path, a file outside the collection's folder, a missing one or one kay does not resize.
-async function linkedImage(src: string, entryDir: string, folder: string, root: string, unlinked: Unlinked): Promise<{ file: string, url: string, stamp: string, width: number, height: number, animated: boolean, colour: string | undefined } | undefined> {
+async function linkedImage(src: string, entryDir: string, folder: string, root: string, unlinked: Unlinked): Promise<{ file: string, url: string, stamp: string, width: number, height: number, animated: boolean, color: string | undefined } | undefined> {
   const decoded = src.replace(ENTITY, entity => ENTITIES[entity]!)
 
   if (decoded === '' || SCHEME.test(decoded) || decoded.includes('\0') || decoded.includes('\\'))
@@ -88,7 +89,7 @@ async function linkedImage(src: string, entryDir: string, folder: string, root: 
     const { width, height, animated } = await imageHeader(Bun.file(file))
     const { mtimeMs, size } = await stat(file)
 
-    return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated, colour: animated ? undefined : await dominantColour(Bun.file(file)) }
+    return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated, color: animated ? undefined : await dominantColorOf(file, projectPaths(root).cache) }
   }
   catch {
     // A file not there yet, or half copied, is linked once it is, which the entry's cache looks for.
@@ -143,8 +144,8 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
       images.set(linked.file, { file: linked.file, url: linked.url, stamp: linked.stamp })
 
       const marked = linked.animated || SIZED.test(tag) || (SIZES_ATTRIBUTE.test(tag) && !OWN_SIZES.test(tag)) ? '' : ` data-kay-image="${linked.width}x${linked.height}"`
-      const colour = marked !== '' && linked.colour !== undefined ? ` data-kay-placeholder="${linked.colour}"` : ''
-      const rewritten = tag.replace(SRC, (_, start: string, __, end: string) => `${start}${escapeAttribute(linked.url)}${end}${marked}${colour}`)
+      const color = marked !== '' && linked.color !== undefined ? ` data-kay-placeholder="${linked.color}"` : ''
+      const rewritten = tag.replace(SRC, (_, start: string, __, end: string) => `${start}${escapeAttribute(linked.url)}${end}${marked}${color}`)
 
       out += html.slice(last, match.index) + rewritten
       last = match.index + match[0].length
@@ -181,13 +182,13 @@ export function sizedImages(html: string, sizes = '100vw'): string {
 
     const own = OWN_SIZES.exec(tag)
     const built = src[2]!.replace(ENTITY, entity => ENTITIES[entity]!)
-    const colour = COLOUR_MARKER.exec(tag)?.[1]
+    const color = COLOR_MARKER.exec(tag)?.[1]
 
-    if (colour !== undefined)
-      registerPlaceholder(built, colour)
+    if (color !== undefined)
+      registerPlaceholder(built, color)
 
     const props = image(built, { width: Number(size[1]), height: Number(size[2]), sizes: own ? own[1]!.replace(ENTITY, entity => ENTITIES[entity]!) : sizes })
-    const bare = tag.replace(MARKER, '').replace(COLOUR_MARKER, '')
+    const bare = tag.replace(MARKER, '').replace(COLOR_MARKER, '')
 
     if (props.srcset === undefined)
       return bare

@@ -8,7 +8,7 @@ import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { KayError } from '../compiler/errors'
 import { RESIZABLE } from '../runtime/image'
-import { dominantColour } from '../server/image-colour'
+import { dominantColorOf } from '../server/image-color'
 import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
 import { directImports } from './direct-imports'
@@ -72,22 +72,8 @@ function stampOf(files: string[]): string {
   }).join(',')
 }
 
-// The mean color of each imported image, by its URL, which names its content: read once per process, for a server bundle to carry.
-const colours = new Map<string, Promise<string | undefined>>()
-
-async function assetColour(path: string, url: string): Promise<string | undefined> {
-  let found = colours.get(url)
-
-  if (!found) {
-    found = dominantColour(Bun.file(path))
-    colours.set(url, found)
-  }
-
-  return found
-}
-
-// `withColour` is on for the server's bundle alone: an island has the server's markup, so the color would only weigh on what it downloads.
-async function assetModule(path: string, url: string, withColour: boolean): Promise<string> {
+// `withColor` is on for the server's bundle alone: an island has the server's markup, so the color would only weigh on what it downloads.
+async function assetModule(path: string, url: string, withColor: boolean, cacheDir: string | undefined): Promise<string> {
   if (!RESIZABLE.test(path))
     return `export default ${JSON.stringify(url)}`
 
@@ -104,12 +90,12 @@ async function assetModule(path: string, url: string, withColour: boolean): Prom
   if (size.animated)
     return `export default ${JSON.stringify(url)}`
 
-  const colour = withColour ? await assetColour(path, url) : undefined
+  const color = withColor ? await dominantColorOf(path, cacheDir) : undefined
 
-  if (colour === undefined)
+  if (color === undefined)
     return `import { registerImage } from 'kay/internal'\nexport default registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height})`
 
-  return `import { registerImage, registerPlaceholder } from 'kay/internal'\nexport default registerPlaceholder(registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height}), ${JSON.stringify(colour)})`
+  return `import { registerImage, registerPlaceholder } from 'kay/internal'\nexport default registerPlaceholder(registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height}), ${JSON.stringify(color)})`
 }
 
 export function kay(options: KayPluginOptions = {}): BunPlugin {
@@ -275,7 +261,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         if (fileImports.has(path))
           return build.config === undefined ? { exports: { default: path }, loader: 'object' } : { contents: await Bun.file(path).bytes(), loader: 'file' }
 
-        return { contents: await assetModule(path, await writeAsset(path, root, dist), target === 'ssr'), loader: 'js' }
+        return { contents: await assetModule(path, await writeAsset(path, root, dist), target === 'ssr', options.cacheDir), loader: 'js' }
       })
 
       // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.

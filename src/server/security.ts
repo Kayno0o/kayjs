@@ -251,13 +251,15 @@ function takeOwnHeaders(set: Context['set']): Record<string, string> | undefined
 
 const HASH_OR_NONCE = /^'(?:nonce-|sha(?:256|384|512)-)/i
 
-// Whether the site's policy lets an element carry a `style` attribute: the first of `style-src-attr`, `style-src` and `default-src` it sets must allow `'unsafe-inline'`, which a nonce or a hash in it switches off.
-export function allowsStyleAttributes(csp: Record<string, string[] | false> | false | undefined): boolean {
+// Whether the site's policy lets an element carry a `style` attribute, its report-only one included, which would log each: the first of `style-src-attr`, `style-src` and `default-src` it sets must allow `'unsafe-inline'`, which a nonce or a hash in it switches off.
+export function allowsStyleAttributes(csp: Record<string, string[] | false> | false | undefined, reportOnly?: Record<string, string[] | false>): boolean {
   if (csp === false)
-    return true
+    return reportOnly === undefined || allowsStyles({ ...DIRECTIVES, ...reportOnly })
 
-  const directives: Record<string, string[] | false | undefined> = { ...DIRECTIVES, ...csp }
+  return allowsStyles({ ...DIRECTIVES, ...csp }) && (reportOnly === undefined || allowsStyles({ ...DIRECTIVES, ...csp, ...reportOnly }))
+}
 
+function allowsStyles(directives: Record<string, string[] | false | undefined>): boolean {
   for (const name of ['style-src-attr', 'style-src', 'default-src']) {
     const sources = directives[name]
 

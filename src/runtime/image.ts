@@ -344,10 +344,10 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
 
   // The server's, which islands download without: see `KAY_BROWSER`.
   if (typeof KAY_BROWSER === 'undefined' && options.placeholder !== false) {
-    const colour = placeholderOf?.(src)
+    const color = placeholderOf?.(src)
 
-    if (colour !== undefined)
-      props.style = `background-color:#${colour}`
+    if (color !== undefined)
+      props.style = `background-color:#${color}`
   }
 
   return props

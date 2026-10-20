@@ -1,16 +1,16 @@
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { kay } from '../src/build/plugin'
 import { image as setImage } from '../src/runtime/dom-image'
 import { image, registerImage, setPlaceholders } from '../src/runtime/image'
-import { learnedVersion, learnPlaceholder, placeholderColour, registerPlaceholder } from '../src/runtime/placeholder'
+import { learnedVersion, learnPlaceholder, placeholderColor, registerPlaceholder } from '../src/runtime/placeholder'
 import { pages } from '../src/server'
-import { dominantColour } from '../src/server/image-colour'
+import { dominantColor, dominantColorOf } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
 import { gif } from './gif'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 
@@ -24,24 +24,24 @@ function flat(red: number, green: number, blue: number, { alpha = 255, width = 6
   return encodePng(pixels, width, height)
 }
 
-function channels(colour: string | undefined): number[] {
-  return [0, 2, 4].map(at => Number.parseInt(colour!.slice(at, at + 2), 16))
+function channels(color: string | undefined): number[] {
+  return [0, 2, 4].map(at => Number.parseInt(color!.slice(at, at + 2), 16))
 }
 
-function near(colour: string | undefined, expected: number[], tolerance = 4): void {
-  expect(colour).toMatch(/^[0-9a-f]{6}$/)
+function near(color: string | undefined, expected: number[], tolerance = 4): void {
+  expect(color).toMatch(/^[0-9a-f]{6}$/)
 
-  for (const [index, value] of channels(colour).entries())
+  for (const [index, value] of channels(color).entries())
     expect(Math.abs(value - expected[index]!)).toBeLessThanOrEqual(tolerance)
 }
 
-describe('dominantColour', () => {
+describe('dominantColor', () => {
   it('gives the mean color of an opaque image as six hex digits, in any format Bun.Image reads', async () => {
     const png = flat(200, 100, 50)
 
-    expect(await dominantColour(png)).toBe('c86432')
-    near(await dominantColour(await new Bun.Image(png).jpeg({ quality: 90 }).bytes()), [200, 100, 50])
-    near(await dominantColour(await new Bun.Image(png).webp({ quality: 90 }).bytes()), [200, 100, 50])
+    expect(await dominantColor(png)).toBe('c86432')
+    near(await dominantColor(await new Bun.Image(png).jpeg({ quality: 90 }).bytes()), [200, 100, 50])
+    near(await dominantColor(await new Bun.Image(png).webp({ quality: 90 }).bytes()), [200, 100, 50])
   })
 
   it('averages a gradient and an image of two halves', async () => {
@@ -50,23 +50,65 @@ describe('dominantColour', () => {
     for (let index = 0; index < 64 * 48; index++)
       pixels.set(index % 64 < 32 ? [255, 0, 0, 255] : [0, 0, 255, 255], index * 4)
 
-    near(await dominantColour(encodePng(pixels, 64, 48)), [128, 0, 128], 6)
+    near(await dominantColor(encodePng(pixels, 64, 48)), [128, 0, 128], 6)
   })
 
   it('gives none for an image with any transparency, whatever its format, and one for an image with an alpha channel that is opaque', async () => {
-    expect(await dominantColour(flat(200, 100, 50, { alpha: 120 }))).toBeUndefined()
+    expect(await dominantColor(flat(200, 100, 50, { alpha: 120 }))).toBeUndefined()
     // A whole row cleared, as the corner of a rounded logo is.
-    expect(await dominantColour(flat(200, 100, 50, { clear: 64 * 4 }))).toBeUndefined()
-    expect(await dominantColour(await new Bun.Image(flat(200, 100, 50, { alpha: 120 })).webp({ quality: 90 }).bytes())).toBeUndefined()
-    expect(await dominantColour(Bun.file(HERO))).toBeUndefined()
-    expect(await dominantColour(gif(40, 30, [3], 3))).toBeUndefined()
-    near(await dominantColour(gif(40, 30, [3])), [6, 249, 128])
-    expect(await dominantColour(flat(10, 20, 30))).toBe('0a141e')
+    expect(await dominantColor(flat(200, 100, 50, { clear: 64 * 4 }))).toBeUndefined()
+    expect(await dominantColor(await new Bun.Image(flat(200, 100, 50, { alpha: 120 })).webp({ quality: 90 }).bytes())).toBeUndefined()
+    expect(await dominantColor(Bun.file(HERO))).toBeUndefined()
+    expect(await dominantColor(gif(40, 30, [3], 3))).toBeUndefined()
+    near(await dominantColor(gif(40, 30, [3])), [6, 249, 128])
+    expect(await dominantColor(flat(10, 20, 30))).toBe('0a141e')
   })
 
   it('gives none for what it cannot read or may not decode', async () => {
-    expect(await dominantColour(new TextEncoder().encode('not an image'))).toBeUndefined()
-    expect(await dominantColour(flat(1, 2, 3, { width: 100, height: 100 }), 50)).toBeUndefined()
+    expect(await dominantColor(new TextEncoder().encode('not an image'))).toBeUndefined()
+    expect(await dominantColor(flat(1, 2, 3, { width: 100, height: 100 }), 50)).toBeUndefined()
+  })
+})
+
+describe('dominantColorOf', () => {
+  it('keeps a color on disk while the file holds, and reads it from there in another process', async () => {
+    const dir = await scratchDir('color-')
+    const file = join(dir, 'photo.png')
+    const cache = join(dir, 'cache')
+
+    await Bun.write(file, flat(200, 100, 50))
+    expect(await dominantColorOf(file, cache)).toBe('c86432')
+
+    const slot = (await readdir(cache)).find(name => name.endsWith('-color.json'))!
+    const kept = await Bun.file(join(cache, slot)).json() as { key: string, value: string }
+
+    expect(kept.value).toBe('c86432')
+
+    // A second process starts with no memo: the entry on disk answers, whatever the file decodes to.
+    await Bun.write(join(cache, slot), JSON.stringify({ ...kept, value: 'abcdef' }))
+
+    const reader = join(dir, 'read.ts')
+
+    await Bun.write(reader, `import { dominantColorOf } from ${JSON.stringify(join(import.meta.dir, '../src/server/image-color'))}\nconsole.log(await dominantColorOf(${JSON.stringify(file)}, ${JSON.stringify(cache)}))`)
+
+    const run = Bun.spawn([process.execPath, reader], { stdout: 'pipe' })
+
+    expect((await new Response(run.stdout).text()).trim()).toBe('abcdef')
+  })
+
+  it('keeps none for a transparent image and reads again when the file changes', async () => {
+    const dir = await scratchDir('color-')
+    const file = join(dir, 'clear.png')
+    const cache = join(dir, 'cache')
+
+    await Bun.write(file, flat(200, 100, 50, { alpha: 100 }))
+    expect(await dominantColorOf(file, cache)).toBeUndefined()
+
+    const slot = (await readdir(cache)).find(name => name.endsWith('-color.json'))!
+
+    expect((await Bun.file(join(cache, slot)).json() as { value: unknown }).value).toBeNull()
+    await Bun.write(file, flat(10, 20, 30, { width: 32, height: 32 }))
+    expect(await dominantColorOf(file, cache)).toBe('0a141e')
   })
 })
 
@@ -77,6 +119,7 @@ describe('image() placeholder', () => {
     const url = registerImage('/_kay/assets/solo-1.png', 640, 480)
 
     registerPlaceholder(url, '336699')
+    setPlaceholders(undefined)
     expect(image(url)).not.toHaveProperty('style')
     setPlaceholders(src => src === url ? '336699' : undefined)
     expect(image(url).style).toBe('background-color:#336699')
@@ -88,11 +131,11 @@ describe('image() placeholder', () => {
   it('registers nothing for a value that is no color, so a hostile one cannot reach the style', () => {
     registerPlaceholder('/_kay/assets/hostile-3.png', 'red;background:url(//evil)')
     registerPlaceholder('/_kay/assets/hostile-3.png', 'ABCDEF')
-    expect(placeholderColour('/_kay/assets/hostile-3.png')).toBeUndefined()
+    expect(placeholderColor('/_kay/assets/hostile-3.png')).toBeUndefined()
     learnPlaceholder('/uploads/x.png', 'v1', 'zzzzzz')
-    expect(placeholderColour('/uploads/x.png')).toBeUndefined()
+    expect(placeholderColor('/uploads/x.png')).toBeUndefined()
     learnPlaceholder('/uploads/x.png', 'v2', '00ff00')
-    expect(placeholderColour('/uploads/x.png')).toBe('00ff00')
+    expect(placeholderColor('/uploads/x.png')).toBe('00ff00')
     expect(learnedVersion('/uploads/x.png')).toBe('v2')
   })
 })
@@ -161,6 +204,11 @@ describe('placeholder on a page', () => {
     expect(img(html, 'styledspread')!.match(/style=/g)).toHaveLength(1)
     expect(img(html, 'styledspread')).toContain('style="border: 0"')
 
+    for (const [name, style] of [['stylefirst', 'border: 0'], ['dynamicfirst', 'margin: 0']]) {
+      expect(img(html, name!)!.match(/style=/g)).toHaveLength(1)
+      expect(img(html, name!)).toContain(`style="${style}"`)
+    }
+
     const off = await render(await open({ images: { dirs: { '/uploads/': uploads }, placeholder: false } }))
 
     expect(off).not.toContain('background-color')
@@ -177,6 +225,8 @@ describe('placeholder on a page', () => {
       expect(await render(await open({ security: { csp } }))).not.toContain('background-color')
 
     expect(await render(await open({ security: { csp: false } }))).toContain('background-color')
+    expect(await render(await open({ security: { reportOnly: { 'style-src': ['\'self\''] } } }))).not.toContain('background-color')
+    expect(await render(await open({ security: { csp: false, reportOnly: { 'style-src-attr': ['\'none\''] } } }))).not.toContain('background-color')
     expect(await render(await open({ dev: true }))).toContain('background-color:#c86432')
     expect(await render(await open({ security: { csp: { 'style-src-attr': ['\'unsafe-inline\''], 'style-src': ['\'self\''] } } }))).toContain('background-color')
   })
@@ -263,7 +313,7 @@ describe('placeholder on a page', () => {
     const written: string[] = []
     const element = { localName: 'img', setAttribute: (name: string) => written.push(name), removeAttribute: (name: string) => written.push(`-${name}`) } as unknown as Element
 
-    setPlaceholders(placeholderColour)
+    setPlaceholders(placeholderColor)
     registerPlaceholder(registerImage('/_kay/assets/island-9.png', 640, 480), '336699')
     setImage(element, '/_kay/assets/island-9.png', false)
     setPlaceholders(undefined)

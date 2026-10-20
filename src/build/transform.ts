@@ -174,7 +174,7 @@ export function keepAnalyses(files: ReadonlySet<string>): void {
 }
 
 // What a build keeps in `.kay/cache`: a file's compiled output, analysis and probed packages, and a package's answer, not what `kay check` keeps there.
-const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only|embedded-map)\.json$/
+const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only|embedded-map|color)\.json$/
 
 // What `kay check` keeps there, each a file's own entry.
 const CHECK_ENTRY = /^[\da-z]+-(?:shadow|renders-island|analysis-check)\.json$/

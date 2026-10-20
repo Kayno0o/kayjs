@@ -80,7 +80,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
 
   serveLocales(root, locales)
   const base = basePath(config.base)
-  const maxDensity = applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp))
+  const maxDensity = applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
   const site = config.site === undefined ? undefined : siteOrigin(config.site) + base
 
   // Holds copies of private files and their variants, so only this user may enter it.
