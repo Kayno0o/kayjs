@@ -79,7 +79,7 @@ describe('the tail of the pages server', () => {
         log.push('extension')
 
         return new Elysia()
-      } }] }, modeOf({ dev: false, prebuilt: true }))
+      } }] }, modeOf({ dev: true, prebuilt: false }))
       const done = new Promise<void>((resolve) => {
         release = resolve
       })
@@ -109,7 +109,7 @@ describe('the tail of the pages server', () => {
 
       await expect(servePages(project, async () => {
         throw new Error('client failed')
-      })).rejects.toThrow()
+      })).rejects.toThrow('client failed')
     }
     finally {
       delete seen[SEEN]

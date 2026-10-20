@@ -80,6 +80,11 @@ export function stampTime(stamp: string): number {
   return Number(stamp.slice(from, stamp.indexOf('-', from)))
 }
 
+// Whether the file of a `fileStamp` was written too close to `before`, in milliseconds since the epoch, for the stamp to tell a later write apart.
+export function unsettled(stamp: string, before: number): boolean {
+  return stamp !== '' && stampTime(stamp) >= before - SETTLED_MS
+}
+
 // Whether the file was written before `before`, in milliseconds since the epoch, with room for the timestamps' grain: undefined stamps and files written since are not.
 export function settledBefore(file: string, before: number): boolean {
   try {

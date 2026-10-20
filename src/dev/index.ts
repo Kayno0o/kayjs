@@ -14,6 +14,7 @@ import { projectPaths, savedPublicDir } from '../project'
 import { removeDevAddress, writeDevAddress } from './address'
 import { startClientBuilder } from './client'
 import { readConfigRecord, writeConfigRecord } from './config-record'
+import { mentionsPackage } from './fingerprint'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
@@ -182,6 +183,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let restartAsked = false
   // `r` was pressed since the last restart began, which restarts even when only stylesheets changed.
   let forced = false
+  // The file a forced restart is for, when it is not the user's key: the config naming another entry than the server runs.
+  let forcedFor: string | undefined
   let restartedAt = performance.now()
   let address: string | undefined
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
@@ -550,9 +553,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     const files = [...touched]
 
     const asked = forced
+    const askedFor = forcedFor
 
     touched = new Set()
     forced = false
+    forcedFor = undefined
 
     for (const file of files) {
       const hash = contentHash(join(root, file))
@@ -567,8 +572,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return
 
     restartedAt = performance.now()
-    restartedFor = changedFilesNamed(root, files)
-    restartAsked = asked && files.length === 0
+    restartedFor = askedFor !== undefined && files.length === 0 ? [askedFor] : changedFilesNamed(root, files)
+    restartAsked = asked && files.length === 0 && askedFor === undefined
     building = wantsClient ? buildClient() : undefined
 
     // The entry is the config's, which the types read: the new process starts on the one known, and another process follows once the types tell the config now names another.
@@ -614,13 +619,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
         await entryWrite
 
         if (!stopping && child !== undefined && entryToRun() !== runningEntry)
-          restartNow()
+          restartNow(CONFIG_FILE)
       })()
     }
 
     if (!configEdited && typesRead(files)) {
       // A code file the process did not load is read from disk by the write, so only the others need a new process.
-      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && ((!CODE_FILE.test(file) && file !== PACKAGE_FILE) || typesProcess.loaded(file)))
+      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || typesProcess.loaded(file)))
 
       // A write in flight may load a module this edit touched, which its answer reports: checked once it ends.
       if (typesWriting !== undefined)
@@ -671,17 +676,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     return resolves
   }
-  const stopWatching = watchProject(root, (file) => {
-    if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
-      return
+  // `inert` is an edit of package.json that changes nothing a process resolves, which still counts when a module imports the file for its version or scripts.
+  const changedFile = (file: string, inert: boolean) => {
+    startupChanged ||= !inert && STARTUP_FILE.test(file)
 
-    if (file === PACKAGE_FILE && !packageResolves())
-      return
-
-    startupChanged ||= STARTUP_FILE.test(file)
-
-    // The process building the client resolves modules the way Bun cached package.json for it, so an edit of what package.json resolves with starts a new one; the one writing the types reads it afresh on each write and is kept.
-    if (STARTUP_FILE.test(file) || file === CONFIG_FILE || builder?.loaded(file) === true) {
+    // The process building the client resolves modules the way Bun cached package.json for it, so an edit of what package.json resolves with starts a new one, as it does for the process writing the types.
+    if ((!inert && STARTUP_FILE.test(file)) || file === CONFIG_FILE || builder?.loaded(file) === true) {
       builderStale = true
       ownClient = false
     }
@@ -697,6 +697,21 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     clearTimeout(timer)
     timer = setTimeout(settle, DEBOUNCE_MS)
+  }
+  const stopWatching = watchProject(root, (file) => {
+    if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
+      return
+
+    if (file !== PACKAGE_FILE || packageResolves()) {
+      changedFile(file, false)
+
+      return
+    }
+
+    void (async () => {
+      if (await mentionsPackage(root))
+        changedFile(file, true)
+    })()
   }, {
     rootNaming: true,
     onScratch: () => {
@@ -741,7 +756,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   // As a change does, but for no file: open pages load the page again. A change still waiting on the debounce goes with it, its timer cleared so it does not restart again for nothing.
-  function restartNow() {
+  function restartNow(file?: string) {
+    forcedFor = file
     clearTimeout(timer)
     waitingSince = undefined
     waited = false
@@ -805,7 +821,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   // A config that loaded, with every file it read as it is now, has told the entry already: the first server need not wait for the types to read it again.
-  // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends as it does without this.
+  // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends, though the server's own failure may print before the types' error.
   const recorded = options.config === undefined && options.entry === undefined ? await readConfigRecord(devDir, root) : undefined
 
   if (recorded !== undefined)
@@ -837,7 +853,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
         // The first server started on the entry the last run's config named.
         if (booted && child !== undefined && entryToRun() !== runningEntry)
-          restartNow()
+          restartNow(CONFIG_FILE)
       }
 
       writeFirstTree = () => {

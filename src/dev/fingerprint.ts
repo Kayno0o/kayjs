@@ -2,20 +2,17 @@ import { readdirSync, realpathSync, rmSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { version } from '../../package.json'
 import { clientDir, KAY_DIR } from '../build/assets'
-import { fileStamp, findProjectFiles, stampTime, treeEntries, writeAtomically } from '../build/files'
+import { fileStamp, findProjectFiles, treeEntries, TS_FILE, unsettled, writeAtomically } from '../build/files'
 import { compilerFingerprint } from '../build/transform'
 import { BUILD_FAILURE, MANIFEST } from '../server/client'
 import { gitIgnoredNames, isSource } from './sources'
 
 // Written beside the manifest once a build and the rewriting of its maps are over: what the client build read, to tell a later `kay dev` that the build it left is still the one its sources would give.
 export const FINGERPRINT = 'fingerprint.json'
-// A file written this close to the build's start may share its timestamps with a write made while the build read it, as filesystems tell times apart by a tick or, on some, by two seconds.
-const SETTLED_MS = 2000
 // The stamp of a file that cannot be told unchanged, which no later look at the file equals.
 const RACY = 'racy'
 const MAP_FILE = /\.map$/
 const ANY_NAME = /^/
-const TS_FILE = /\.ts$/
 
 interface StampRecord {
   identity: string
@@ -44,6 +41,16 @@ export async function sourceFiles(root: string): Promise<string[]> {
   const ignored = gitIgnoredNames(root)
 
   return (await findProjectFiles(root, ANY_NAME, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+}
+
+const CODE_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
+const PACKAGE_MENTION = /package\.json/
+
+// Whether any source of the project names package.json, as `import { version } from '../package.json'` does: an edit of its scripts or version then changes what that module gives.
+export async function mentionsPackage(root: string): Promise<boolean> {
+  const files = (await sourceFiles(root)).filter(file => CODE_OR_KAY.test(file))
+
+  return (await Promise.all(files.map(async file => PACKAGE_MENTION.test(await Bun.file(file).text())))).includes(true)
 }
 
 async function outputsOf(root: string): Promise<Record<string, number>> {
@@ -151,7 +158,7 @@ export class BuildStamps {
       if (stamp === undefined) {
         stamp = fileStamp(file) ?? ''
 
-        if (stamp !== '' && stampTime(stamp) >= this.startedAt - SETTLED_MS)
+        if (unsettled(stamp, this.startedAt))
           stamp = RACY
       }
 

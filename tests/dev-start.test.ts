@@ -159,11 +159,14 @@ it('leaves the client build of an earlier run as it is when nothing the build re
   const root = await project('dev-warm-', { ...PAGES, 'package.json': JSON.stringify({ name: 'warm', imports: { '#label': './src/label-a.ts' } }), 'src/app.css': 'h1 { color: red }\n' })
   const run = async (action?: () => Promise<void>) => {
     const lines: string[] = []
-    const stop = await dev(root, { port: await freePort(), log: line => lines.push(line) })
+    const port = await freePort()
+    const stop = await dev(root, { port, log: line => lines.push(line) })
 
     try {
       await until(() => lines.some(line => line.includes('ready in')))
       await action?.()
+
+      return await (await fetch(`http://localhost:${port}/`)).text()
     }
     finally {
       await stop()
@@ -179,7 +182,7 @@ it('leaves the client build of an earlier run as it is when nothing the build re
     const built = manifestTime(root)
 
     await Bun.sleep(30)
-    await run()
+    expect(await run()).toContain('LABEL_A')
     expect(manifestTime(root)).toBe(built)
     expect(existsSync(join(dist(root), FINGERPRINT))).toBe(true)
 
@@ -242,3 +245,78 @@ it('starts the first server without waiting for the config to load again once a 
     await rm(root, { recursive: true, force: true })
   }
 }, 120_000)
+
+it('follows the entry the types name when the config now names another than the one a run recorded', async () => {
+  const flags = await mkdtemp(join(process.cwd(), 'node_modules/.cache/dev-entry-'))
+  const config = `import { existsSync } from 'node:fs'\n\nexport default { entry: existsSync(${JSON.stringify(join(flags, 'two.flag'))}) ? 'src/two.ts' : 'src/one.ts' }\n`
+  const root = await project('dev-entry-', { 'src/one.ts': SERVER('one'), 'src/two.ts': SERVER('two'), 'kay.config.ts': config })
+
+  settle(root)
+
+  try {
+    await (await dev(root))()
+    await until(() => existsSync(join(dist(root), 'config.json')))
+
+    // The files are as the record has them, so the first server starts on the old entry and the types then tell the new one.
+    await Bun.write(join(flags, 'two.flag'), '')
+
+    const lines: string[] = []
+    const port = await freePort()
+    const stop = await dev(root, { port, log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.some(line => line.includes('ready in')))
+
+      // Whether the first server was started on the old entry and replaced, or the new one came first, the one serving is on the entry the types named, and no key was pressed.
+      const url = () => (/http:\/\/localhost:\d+/).exec(lines.findLast(line => line.includes('ready in') || line.includes('now on')) ?? '')?.[0] ?? `http://localhost:${port}`
+      const served = async () => {
+        try {
+          return await (await fetch(url(), { signal: AbortSignal.timeout(2000) })).text()
+        }
+        catch {
+          return ''
+        }
+      }
+
+      for (const start = Date.now(); await served() !== 'two'; await Bun.sleep(100)) {
+        if (Date.now() - start > 15_000)
+          throw new Error(`still not on the new entry: ${JSON.stringify(lines)}`)
+      }
+
+      expect(lines.some(line => line.includes('r pressed'))).toBe(false)
+    }
+    finally {
+      await stop()
+    }
+  }
+  finally {
+    await rm(flags, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true })
+  }
+}, 90_000)
+
+it('reloads a module that imports package.json when only its version changed, and builds the client with the new one', async () => {
+  const stamp = (version: string) => JSON.stringify({ name: 'package-version', version })
+  const root = await project('dev-version-', {
+    'package.json': stamp('1.0.0'),
+    'kay.config.ts': 'export default {}\n',
+    'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport pkg from \'../package.json\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(n => n + 1)}) v{pkg.version} {count()}\n',
+    'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+  })
+  const lines: string[] = []
+  const port = await freePort()
+  const bundle = () => readdirSync(join(dist(root), 'dist')).filter(file => file.endsWith('.js')).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
+  const stop = await dev(root, { port, log: line => lines.push(line) })
+
+  try {
+    await until(() => lines.some(line => line.includes('ready in')))
+    await until(() => bundle().includes('1.0.0'))
+
+    await Bun.write(join(root, 'package.json'), stamp('2.5.7'))
+    await until(() => bundle().includes('2.5.7'))
+  }
+  finally {
+    await stop()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 90_000)

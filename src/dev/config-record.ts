@@ -1,13 +1,11 @@
 import { readdirSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { version } from '../../package.json'
-import { fileStamp, stampTime, writeAtomically } from '../build/files'
+import { fileStamp, unsettled, writeAtomically } from '../build/files'
 import { CONFIG_FILE } from '../config'
 
 // Written beside the client build once the process writing the types has loaded the config: what a later start needs of that load, so its first server need not wait for the load to be told the entry or that the config loads.
 const CONFIG_RECORD = 'config.json'
-// A file written this close to the load may share its stamp with a write made while the config was read.
-const SETTLED_MS = 2000
 const ROOT_FILES = [CONFIG_FILE, 'package.json', 'bun.lock', 'bun.lockb', 'bunfig.toml', 'tsconfig.json']
 const ENV_FILE = /^\.env/
 
@@ -54,7 +52,7 @@ export async function writeConfigRecord(output: string, root: string, entry: str
   for (const file of [...modules, ...rootFiles(realpathSync(root))]) {
     const stamp = fileStamp(file) ?? ''
 
-    if (stamp !== '' && stampTime(stamp) >= loadedAt - SETTLED_MS)
+    if (unsettled(stamp, loadedAt))
       return
 
     stamps[file] = stamp

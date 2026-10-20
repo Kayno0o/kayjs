@@ -38,7 +38,7 @@ import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
 
-// Imports every page, layout and API module, as the server does one by one when it registers them, so their compiling runs beside the client build; a failing import is raised again by the server's own.
+// Imports every page, layout and API module beside the client build, so their compiling is done when the first request renders them; a failing import is raised again where the server imports them itself.
 async function warmModules(routes: Route[], api: Promise<ApiModule[]>): Promise<void> {
   const files = new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))
 
@@ -127,11 +127,11 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
 
   setMarkdownDefaults(config.markdown)
 
-  // Imported after everything their code reads at import time is installed, and while the client builds.
+  // Imported while the client builds; the content place and collections are not installed yet, so an extension or API module reading them at import time is not supported.
   const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
-  void Promise.allSettled([extensions, api, prerendering ? undefined : warmModules(routes, api)])
+  void Promise.allSettled([extensions, api, !prerendering && mode.dev ? warmModules(routes, api) : undefined])
 
   const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const ownManifest = appServesManifest(files, endpoints, routes)

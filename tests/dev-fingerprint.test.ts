@@ -1,5 +1,5 @@
 import type { ClientOptions } from '../src/build/client'
-import { existsSync, readdirSync, rmSync, statSync, utimesSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -233,5 +233,30 @@ describe('the build an earlier kay dev left', () => {
     await Bun.sleep(100)
     await recorded()
     expect(await buildsAgain()).toBe(false)
+  })
+
+  it('builds everything for the first edit after a start that skipped the build, and keeps the record true after it', async () => {
+    await firstRun()
+    await Bun.sleep(100)
+
+    const started = devBuilder(project, OPTIONS)
+    const bundle = () => readdirSync(clientDir(project)).filter(file => file.endsWith('.js')).map(file => readFileSync(join(clientDir(project), file), 'utf8')).join('\n')
+
+    expect((await started(null)).failed).toBe(false)
+    expect(bundle()).toContain('one')
+
+    // The build the record describes held neither edit, and the builder in this process has built nothing yet: only a full build puts both in the output.
+    await Bun.write(join(project, 'src/one.kay'), ISLAND('edited'))
+    await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}#`\n')
+    expect((await started(['src/one.kay', 'src/util.ts'])).failed).toBe(false)
+    await Bun.sleep(100)
+    await recorded()
+    expect(bundle()).toContain('edited')
+    expect(bundle()).toContain('}#')
+    expect(await buildsAgain()).toBe(false)
+
+    await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}%`\n')
+    expect(await buildsAgain()).toBe(true)
+    expect(bundle()).toContain('}%')
   })
 })
