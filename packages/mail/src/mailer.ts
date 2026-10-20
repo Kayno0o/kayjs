@@ -9,7 +9,7 @@ import { s } from 'kay'
 import { escapeHtml as escape, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
-import { attempt, deliveryAddress } from './delivery'
+import { attempt, deliveryAddress, messageOf } from './delivery'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, smtp } from './smtp'
@@ -392,6 +392,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
   // Where `kay dev`'s "Send for real" switch sends every mail, once the environment can: the mail then also leaves over SMTP to that address alone, and the outbox keeps how it went.
   const realDelivery = transport === outbox && underKayDev() ? relay(options) : undefined
 
+  let unreadLogged = false
+
   const relayed = async (mail: Mail): Promise<Relayed | undefined> => {
     if (realDelivery === undefined)
       return undefined
@@ -405,7 +407,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (realDelivery.missing().length > 0)
         return undefined
     }
-    catch {
+    catch (error) {
+      if (!unreadLogged) {
+        unreadLogged = true
+        log.warn(`the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to ${to}: ${messageOf(error)}`)
+      }
+
       return undefined
     }
 

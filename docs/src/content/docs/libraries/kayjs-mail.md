@@ -305,6 +305,8 @@ To get every mail that way, turn on Send for real in the Mail tab and type an ad
 
 The switch is kept in `.kay` for your checkout, so it stays on when `kay dev` restarts the server. It works under `kay dev` only, never in production or in tests. Without `SMTP_HOST` and a sender, the tab names what is missing and the switch stays off.
 
+While the switch is on, a relay that is slow or cannot be reached holds up `send()` for up to the SMTP `timeout`, 10 seconds by default. The mail is handed to the relay before `send()` returns.
+
 ```ts
 // src/mails/welcome.preview.ts
 import type Welcome from './welcome.kay'

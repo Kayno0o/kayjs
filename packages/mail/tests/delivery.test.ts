@@ -7,6 +7,7 @@ import { memoryJobs } from 'kay/server'
 import { deliveryAddress } from '../src/delivery'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
+import { logged } from './fixture/tests/logged'
 import { startSmtp } from './helpers/smtp'
 
 // As `kay dev` runs the server: NODE_ENV=development with its change code, in the fixture app's folder, where the switch is kept under `.kay`.
@@ -43,7 +44,7 @@ beforeEach(() => {
 afterEach(async () => {
   await rm(SWITCH, { force: true })
 
-  for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_INSECURE'])
+  for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_INSECURE', 'SMTP_USER'])
     delete process.env[name]
 
   process.env.NODE_ENV = 'development'
@@ -176,6 +177,24 @@ describe('the "Send for real" switch', () => {
     expect(outbox.last()!.relayed).toBeUndefined()
     expect(server.received.length).toBe(received)
     expect(await (await request(app, '/_kay/mail/delivery')).json()).toMatchObject({ on: false, missing: ['SMTP_HOST'] })
+  })
+
+  it('logs once that settings it cannot read stop the delivery, the mail still reaching the outbox', async () => {
+    process.env.SMTP_USER = 'user'
+
+    const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
+
+    await Bun.write(SWITCH, JSON.stringify({ to: 'me@example.com' }))
+
+    const lines = await logged(async () => {
+      await app.send(mail('First'))
+      await app.send(mail('Second'))
+    })
+
+    delete process.env.SMTP_USER
+
+    expect(outbox.mails.map(each => [each.subject, each.relayed])).toEqual([['First', undefined], ['Second', undefined]])
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringContaining('the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to me@example.com: kayjs-mail: SMTP_USER and SMTP_PASS go together')]])
   })
 
   it('refuses a post from another site, an address that is not one, and several addresses', async () => {

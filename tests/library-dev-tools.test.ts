@@ -243,6 +243,48 @@ describe('the libraries\' dev tool tabs', () => {
     fetching.mockRestore()
   })
 
+  it('shows why a failed post of the switch failed even when the tab lost its state meanwhile', async () => {
+    let reading = true
+    const answer = Promise.withResolvers<Response>()
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/_kay/mail/delivery')
+        return answer.promise
+
+      if (url === '/_kay/mail.json')
+        return Response.json([])
+
+      if (url === '/_kay/mail/delivery')
+        return reading ? Response.json({ on: false, missing: [], server: 'localhost:1025' }) : new Response(null, { status: 500 })
+
+      return new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+
+    const turnOn = panel('mail').querySelector<HTMLButtonElement>('form button')!
+
+    panel('mail').querySelector<HTMLInputElement>('input[name=to]')!.value = 'you@example.com'
+    panel('mail').querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+    await Bun.sleep(5)
+    expect(turnOn.disabled).toBe(true)
+
+    // The tab shown again while the post is out, its read of the switch failing.
+    reading = false
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-problems')!.click()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+    answer.resolve(new Response('Refused: the relay is down', { status: 502 }))
+    await Bun.sleep(5)
+    expect(turnOn.disabled).toBe(false)
+    expect(panel('mail').textContent).toContain('Send for real')
+    expect(panel('mail').textContent).toContain('the relay is down')
+    fetching.mockRestore()
+  })
+
   it('clears the outbox from a Clear button, the list and the count going, and says why when it is refused', async () => {
     let mails: object[] = [{ id: 'a', sentAt: '2026-10-16T10:00:00Z', to: ['ada@example.com'], subject: 'Welcome', text: 'Hi' }]
     let refuse = true

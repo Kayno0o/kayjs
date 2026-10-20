@@ -216,8 +216,7 @@ export default function mailDevTool(tool: DevTool): void {
       const response = await fetch(DELIVERY_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to }) })
 
       if (!response.ok) {
-        if (known !== undefined)
-          drawSwitch(known, (await response.text()).replace(REFUSED, ''))
+        failed(button, (await response.text()).replace(REFUSED, ''))
 
         return
       }
@@ -225,9 +224,24 @@ export default function mailDevTool(tool: DevTool): void {
       drawSwitch(await response.json() as Delivery)
     }
     catch (error) {
-      if (known !== undefined)
-        drawSwitch(known, error instanceof Error ? error.message : String(error))
+      failed(button, error instanceof Error ? error.message : String(error))
     }
+  }
+
+  // The switch drawn again with why, or just why while the tab holds no state for it, as when its last read failed while the post was in flight.
+  function failed(button: HTMLButtonElement, reason: string): void {
+    button.disabled = false
+
+    if (known !== undefined) {
+      drawSwitch(known, reason)
+
+      return
+    }
+
+    const box = tool.make('div', 'stack')
+
+    box.append(heading('Send for real'), tool.make('div', 'error', reason))
+    switchBox.replaceChildren(box)
   }
 
   function drawSwitch(state: Delivery, failure?: string): void {
