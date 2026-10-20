@@ -30,6 +30,7 @@ import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
 import { renderPage, renderUnmatched } from './render'
+import { judgingReads, RequestRead } from './request-read'
 import { routeChain, scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
@@ -156,8 +157,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const renderedAt = Date.now()
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
-        // onError is the app's for requests it answers; the build logs what a prerendered page throws.
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true, guarded: guardedPage(route, config.requireGuards) })
+        // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
+        const refusal: { read?: RequestRead } = {}
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, guarded: guardedPage(route, config.requireGuards) })
         const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
         // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
         const token = pageToken(copy.key, tokens)
@@ -178,6 +180,20 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           await keepClasses(client, routeChain(route).files, shown)
           restyled = true
           ;({ response, html } = await once())
+        }
+
+        const refused = refusal.read
+
+        if (refused !== undefined) {
+          const reads = `reads \`${refused.read}\`${refused.file === undefined ? '' : ` at ${relative(root, refused.file)}:${refused.line}`}`
+
+          // A page the build took up on its own, or for a server island it holds, is rendered per request when it needs one.
+          if (auto || (marked && prerender === undefined && !options.exportAll))
+            return skip(`${reads}, which only a request holds`)
+
+          const inLayout = refused.file !== undefined && route.layouts.includes(refused.file)
+
+          throw new KayError('export-server-render', `kay: prerendering ${copy.path} from ${file} failed: it ${reads}, which only a request holds, and a prerendered page renders once, at build time; ${inLayout ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one' : 'drop `prerender` from `export const page` to render it per request'}`)
         }
 
         if (auto && response.status !== 200)
@@ -461,6 +477,18 @@ function unkeptBy(island: boolean, stamps: boolean, live: boolean): string {
     return 'reads a live value, which a server holds'
 
   return stamps ? 'holds a form stamp or a work challenge, signed per request' : 'reads the site URL, which no config sets'
+}
+
+// An `onError` for a render at build time that keeps the first read of a request it meets in `refusal`.
+function judged(refusal: { read?: RequestRead }): (error: unknown) => void {
+  const handler = (error: unknown) => {
+    if (error instanceof RequestRead)
+      refusal.read ??= error
+  }
+
+  judgingReads.add(handler)
+
+  return handler
 }
 
 function firstLine(text: string): string {

@@ -1306,3 +1306,93 @@ describe('a page reading only what its path fixes', () => {
     expect(await Bun.file(join(outputDir(root), 'pages/about.html')).text()).toContain('At /about/<')
   }, 60_000)
 })
+
+describe('a layout reading ctx.locals', () => {
+  const roots: string[] = []
+  const LOCALS_LAYOUT = '--- server\nconst who = ctx.locals.who\n---\nheader {who}\nslot\n'
+  const DERIVED = '.derive({ as: \'global\' }, () => ({ who: \'ann\' }))'
+  const FILES = { 'src/routes/_layout.kay': LOCALS_LAYOUT, 'src/routes/index.kay': 'h1 Home\n', 'src/routes/about.kay': 'h1 About\n' }
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  const fails = async (root: string, ...flags: string[]) => {
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', ...flags], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { code, text: `${out}${err}` }
+  }
+
+  it('leaves a page kept without prerender rendered per request, and the build passes', async () => {
+    const root = await project(FILES)
+
+    roots.push(root)
+    expect(await built(root)).toEqual([])
+
+    const { answers: [home, about] } = await servedWith(root, [{ path: '/' }, { path: '/about' }], '', DERIVED)
+
+    expect(home!.text).toContain('<header>ann</header>')
+    expect(about!.text).toContain('<header>ann</header>')
+    expect(about!.etag).toBeNull()
+  }, 60_000)
+
+  it('does the same through a nested layout, a component it reaches and a destructured read', async () => {
+    const root = await project({
+      'src/routes/_layout.kay': 'slot\n',
+      'src/routes/deep/_layout.kay': '--- server\nconst { locals } = ctx\n---\nheader {locals.who}\nslot\n',
+      'src/routes/deep/index.kay': 'h1 Deep\n',
+      'src/routes/part/index.kay': '---\nimport Who from \'../../who.kay\'\n---\nWho\n',
+      'src/who.kay': '--- server\nconst who = ctx.locals.who\n---\np {who}\n',
+      'src/routes/plain.kay': 'h1 Plain\n',
+    })
+
+    roots.push(root)
+    expect(await built(root)).toEqual(['/plain'])
+  }, 60_000)
+
+  it('leaves a page holding a server island rendered per request, and the build passes', async () => {
+    const root = await project({
+      ...FILES,
+      'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nh1 Home\nCard(server)\n',
+      'src/card.kay': 'p Card\n',
+    })
+
+    roots.push(root)
+    expect(await built(root)).toEqual([])
+
+    const [home] = (await servedWith(root, [{ path: '/' }], '', DERIVED)).answers
+
+    expect(home!.text).toContain('<header>ann</header>')
+  }, 60_000)
+
+  it('names the file and line that read ctx.locals when prerender asks for the page', async () => {
+    const root = await project({ ...FILES, 'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nh1 Home\n' })
+
+    roots.push(root)
+
+    const { code, text } = await fails(root)
+
+    expect(code).not.toBe(0)
+    expect(text).toContain('src/routes/_layout.kay:2')
+    expect(text).toContain('layout')
+  }, 60_000)
+
+  it('names the file and line in a static export, under a base', async () => {
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n' })
+
+    roots.push(root)
+
+    const { code, text } = await fails(root, '--static')
+
+    expect(code).not.toBe(0)
+    expect(text).toContain('src/routes/_layout.kay:2')
+  }, 60_000)
+
+  it('is kept per request under a base too', async () => {
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n' })
+
+    roots.push(root)
+    expect(await built(root)).toEqual([])
+  }, 60_000)
+})

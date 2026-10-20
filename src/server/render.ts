@@ -22,7 +22,6 @@ import type { Rendered } from './stream'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { browserOnlyHint, mappedStack } from '../build/sourcemap'
-import { KayError } from '../compiler/errors'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, entriesInPageOrder, placeFieldMarks, withFieldMarks } from '../runtime/fields'
@@ -60,6 +59,7 @@ import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
+import { RequestRead } from './request-read'
 import { guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
 import { inServerScope, markPrivate, readPersonally, wasReadPersonally, withOutcome } from './scope'
@@ -774,7 +774,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
 function needsRequest(name: string): () => never {
   return () => {
-    throw new KayError('export-server-render', `kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`prerender\` from \`export const page\`, or the \`server\` mark of a server island it holds, to render it per request`)
+    throw new RequestRead(name)
   }
 }
 

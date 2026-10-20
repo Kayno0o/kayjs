@@ -235,6 +235,8 @@ ContactForm(server="defer" noscript="Show the contact form")
 
 Leave it off when the island's content is reachable without it. `noscript` goes only with `server="defer"`.
 
+A layout that reads `ctx.locals`, `ctx.cookies` or `ctx.query` cannot be prerendered. A page holding a server island whose layout reads one is rendered on each request instead, and `kay build` lists it as `on request` with the file and line of the read. With `prerender: true`, or in a static export, the build fails with that file and line.
+
 ## Redirects
 
 Old URLs go in `kay.config.ts`.
