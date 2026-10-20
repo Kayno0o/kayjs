@@ -190,6 +190,14 @@ describe('kay grammar', () => {
     expect(lines[12]?.[0]).toBe('when: keyword.control.conditional.kay')
   })
 
+  it('reads a snippet line, its name and parameters, and leaves an element named snippets alone', () => {
+    const lines = tokenize(['snippet feature(title: string)', '  h3 {title}', 'snippet rule', 'snippets x'].join('\n'))
+
+    expect(lines[0]).toEqual(['snippet: storage.type.kay', 'feature: entity.name.function.kay', '(: punctuation.definition.parameters.begin.kay', 'title: variable.other.ts', ':: meta.embedded.expression.kay', 'string: variable.other.ts', '): punctuation.definition.parameters.end.kay'])
+    expect(lines[2]).toEqual(['snippet: storage.type.kay', 'rule: entity.name.function.kay'])
+    expect(lines[3]![0]).toBe('snippets: entity.name.tag.kay')
+  })
+
   it('reads a const line, its pattern and value as TypeScript, and leaves a var element alone', () => {
     const lines = tokenize(['for p of ps', '  const price = p.cents', '  const { a } = p', 'var x'].join('\n'))
 

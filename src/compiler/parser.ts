@@ -22,11 +22,11 @@ const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SHORTHAND_NAME = /^[\p{ID_Start}_$][\p{ID_Continue}$]*$/u
 const MEMBER_CHAIN = /^(?:[\p{ID_Start}_$][\p{ID_Continue}$]*\??\.)+([\p{ID_Start}_$][\p{ID_Continue}$]*)$/u
 const RESERVED_WORDS = new Set(['await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'])
+// What a binding may not be named in a module, which a snippet's name is.
+const STRICT_RESERVED_WORDS = new Set(['arguments', 'eval', 'implements', 'interface', 'let', 'package', 'private', 'protected', 'public', 'static'])
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
-// `snippet feature(title: string)`: a block named for reuse in this file.
-const SNIPPET_NAME = /[A-Z_$][\w$]*/iy
 const SNIPPET_HELP = '`snippet feature(title: string, text: string)`, then its lines indented below it'
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const COMMENT_HEAD = /\/\//y
@@ -377,8 +377,8 @@ class TemplateParser {
 
     this.pos += 'snippet'.length
     this.skipSpaces()
-    SNIPPET_NAME.lastIndex = this.pos
-    const match = SNIPPET_NAME.exec(this.src)
+    BRANCH_NAME.lastIndex = this.pos
+    const match = BRANCH_NAME.exec(this.src)
 
     if (!match) {
       this.error(start, this.scan.lineEnd(start), 'A snippet needs a name', { help: SNIPPET_HELP })
@@ -392,7 +392,7 @@ class TemplateParser {
     const name = { start: nameStart, end: nameEnd }
     let params: Span
 
-    if (RESERVED_WORDS.has(match[0]))
+    if (RESERVED_WORDS.has(match[0]) || STRICT_RESERVED_WORDS.has(match[0]))
       this.error(nameStart, nameEnd, `\`${match[0]}\` is a reserved word, so it cannot name a snippet`, { help: SNIPPET_HELP })
 
     this.pos = nameEnd

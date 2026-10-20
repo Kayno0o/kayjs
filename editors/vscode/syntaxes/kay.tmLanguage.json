@@ -22,6 +22,9 @@
       "include": "#named-slot"
     },
     {
+      "include": "#snippet"
+    },
+    {
       "include": "#expression-line"
     },
     {
@@ -153,6 +156,31 @@
         },
         "2": {
           "name": "entity.other.attribute-name.slot.kay"
+        },
+        "3": {
+          "name": "punctuation.definition.parameters.begin.kay"
+        },
+        "4": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "5": {
+          "name": "punctuation.definition.parameters.end.kay"
+        }
+      }
+    },
+    "snippet": {
+      "match": "^[ \\t]*(snippet)[ \\t]+([A-Za-z_$][\\w$]*)(?:(\\()(.*)(\\)))?[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "storage.type.kay"
+        },
+        "2": {
+          "name": "entity.name.function.kay"
         },
         "3": {
           "name": "punctuation.definition.parameters.begin.kay"

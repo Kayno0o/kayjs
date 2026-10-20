@@ -149,7 +149,8 @@ Runes become the signals of kay. A signal is read by calling it and written by a
 | `{#each items as item}` | `for item of items` |
 | `{#await promise}` | An `await` block with `then` and `catch` |
 | `{@render children()}` | `slot` |
-| A snippet passed as a prop | An `@name` block, which can take parameters, rendered with `slot name` |
+| `{#snippet x(a)}`, `{@render x(1)}` | `snippet x(a)` and `{x(1)}`, see [Templates](/essentials/templates#reuse-a-block-in-one-file) |
+| A snippet passed as a prop | An `@name` block, which can take parameters, rendered with `slot name`, or a snippet or function passed as `row={x}` |
 | `<svelte:head>` | A `head` block, see [Head and SEO](/essentials/head-and-seo) |
 | `setContext`, `getContext` | `context`, see the [islands reference](/llms/islands) |
 | `$env/static/public` | `publicEnv` in `kay.config.ts`, read from `kay` |

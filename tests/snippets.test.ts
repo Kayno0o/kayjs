@@ -58,6 +58,7 @@ describe('parsing a snippet', () => {
   it('reports a missing name, a reserved one, text after the parameters and an empty body', () => {
     expect(parseKay('snippet\n  p x\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['A snippet needs a name'])
     expect(parseKay('snippet class()\n  p x\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`class` is a reserved word, so it cannot name a snippet'])
+    expect(parseKay('snippet let()\n  p x\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`let` is a reserved word, so it cannot name a snippet'])
     expect(parseKay('snippet a() text\n  p x\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['Nothing may follow the parameters of a snippet on its line'])
     expect(parseKay('snippet a()\np x\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['A snippet needs lines below it'])
   })
@@ -80,6 +81,7 @@ describe('rendering a snippet on the server', () => {
     ['one holding a component', '---\nimport Box from \'./box.kay\'\n---\nsnippet boxed(label: string)\n  Box\n    b {label}\n{boxed(\'x\')}', {}, '<div class="box"><b>x</b></div>'],
     ['one holding the bare slot of its component', '---\nimport Shell from \'./shell.kay\'\n---\nShell\n  p Inside', {}, '<section><h2>Framed</h2><p>Inside</p></section>'],
     ['one holding if, for and match', '---\nconst { list, status } = props<{ list: string[], status: string }>()\n---\nsnippet panel(items: string[], state: string)\n  if items.length > 1\n    p many\n  else\n    p few\n  for item of items\n    i {item}\n  match state\n    when \'on\'\n      u on\n    else\n      u off\n{panel(list, status)}', { list: ['a', 'b'], status: 'on' }, '<p>many</p><i>a</i><i>b</i><u>on</u>'],
+    ['one holding an await block, whose pending part the server sends first', 'snippet later(p: Promise<string>)\n  await p\n    | loading\n  then value\n    b {value}\n{later(Promise.resolve(\'done\'))}', {}, 'loading'],
     ['one with destructuring, defaults and rest parameters', 'snippet card({ title, tags = [] }: { title: string, tags?: string[] }, size = \'md\', ...more: string[])\n  div(class={size})\n    h4 {title}\n    span {tags.join(\'+\')} {more.length}\n{card({ title: \'A\' })}\n{card({ title: \'B\', tags: [\'x\', \'y\'] }, \'lg\', \'1\', \'2\')}', {}, '<div class="md"><h4>A</h4><span> 0</span></div>\n<div class="lg"><h4>B</h4><span>x+y 2</span></div>'],
     ['one with no parameters and a line of text', 'snippet dot\n  | .\np a{dot()}b', {}, '<p>a.b</p>'],
     ['one passed to a component as a function prop', '---\nimport Rows from \'./rows.kay\'\n---\nsnippet item(name: string, i: number)\n  li {i}: {name}\nRows(items={[\'a\', \'b\']} row={item})', {}, '<ul><li>0: a</li><li>1: b</li></ul>'],

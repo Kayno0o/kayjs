@@ -467,6 +467,19 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a snippet named as a prop or as a loop variable around it', async () => {
+    const root = await scratchProject({
+      'src/list.kay': '---\nconst { names } = props<{ names: string[] }>()\n---\nsnippet names()\n  p x\nfor item of names\n  snippet item()\n    p x\n  p {item()}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([[4, '`names` is already declared'], [7, '`item` is already declared']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports invalidatePage imported from kay/server, which no longer exports it', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

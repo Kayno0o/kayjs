@@ -240,6 +240,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `error title` / `error` | Inside `form(action={add})`: `p.error` with the message a refused post gave `title`, or the form's own, which the field or the form is described by; nothing otherwise. See [Actions](actions.md). |
 | `pending` | Inside `form(action={add})`: its indented block shows only while that form posts, until the page a redirect leads to is in, hidden in the server render, after the answer, after a refused post and with JavaScript off, with no script of its own. The block is a `slot` laid out as its contents, unhidden by the runtime, which announces its text outside the form; in an island it shows as well while a call of the form's action is in flight and while its `onSubmit` awaits a promise. Outside a form posting to an action it is an error. See [Actions](actions.md#show-that-a-form-is-posting). |
 | `const name = value` | Names a value for the lines after it at its indentation and their children, computed once per render of its block; in an island it follows what it reads as a memo does, redrawing only what reads it. `const { a, b } = value` destructures. A name the template already sees, `let` and reassignment are errors. |
+| `snippet name(a, b)` | Declares a function returning the indented lines, called `{name(x, y)}` below it; see [Snippets](#snippets). |
 
 ```kay
 ---
@@ -404,8 +405,9 @@ List(items={todos})
 - `{name(args)}` renders it anywhere below, as a text line or in the text of an element, and `kay check` types the call as any call.
 - It reads the signals, script consts, template `const`s and loop variables around it, so it needs no parameter for them.
 - A signal read in the snippet updates there in place; one read in an argument, `{feature(title())}`, draws that call again.
-- It is scoped as a template `const` is: the lines after it at its indentation and their children see it, its own lines included, so it can call itself for a tree, and a later snippet can call an earlier one. Above its declaration or outside its block the name is unknown, and `kay check` reports it.
+- It is scoped as a template `const` is: the lines after it at its indentation and their children see it, its own lines included, so it can call itself for a tree, and a later snippet can call an earlier one; an `@name` block after it among a component's children does not see it. Above its declaration or outside its block the name is unknown, and `kay check` reports it.
 - A name another snippet, an import, a script const, a prop or a loop variable already holds is reported at the snippet, and assigning one is refused.
 - It can hold components, a bare `slot` of the component declaring it, `if`, `for`, `await`, `match` and other snippets, and is a plain function, so `List(row={feature})` passes it where a prop takes a function, which the component renders with `slot row(item, i)`.
+- An `error` line in a snippet reads the form around the snippet's declaration, so declare a snippet repeating a form field inside that form.
 - A static component passing one to an island renders as an island itself, as it does for a `@row(item)` block.
 - Markup used by several files is a component; a snippet is for one file.
