@@ -23,7 +23,27 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 
 `ask(prompt | messages, options?)` returns a `Reply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.
 
-Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `cache`, `signal`, `timeout`, `visitor` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), and `provider` to ask a provider built by hand.
+Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `cache`, `signal`, `timeout`, `visitor` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
+
+## An object instead of text
+
+```ts
+import { ask } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
+const verdict = await ask('Review the film Alien', { schema: review })
+```
+
+`ask(messages, { schema })` takes an object schema (`s.Object`, anything else throws a `TypeError`) and returns a `StructuredReply` instead of a `Reply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
+
+- Each provider is asked through its own JSON-schema output, so the model writes to the shape: Anthropic gets `output_config.format` (`json_schema`), an OpenAI-compatible server (OpenAI, Ollama, Mistral) gets `response_format` of type `json_schema`, strict when every field is required. A server answering 400 or 422 that names `response_format` is asked again with a tool call it is forced to make (`kay_answer`, `tool_choice: 'required'`), whose arguments are streamed as the text, once per process and base URL. A provider by hand reads `request.schema` and streams the JSON as `text` pieces.
+- What those outputs cannot hold (`minLength`, `maximum`, `pattern`, `format`, `minItems`, `default`) is not sent as a rule: the field's description carries it as `{minLength: 3}` for the model, every object is closed to other fields, and kayjs-ai checks the answer against your whole schema.
+- The answer must be the JSON object alone. One that is not JSON, has text around it, was cut by `maxTokens`, was refused (`filtered`) or ran out of `maxSteps` still calling tools, or that the schema refuses, fails the reply with an `AiError` of kind `schema`: `fields` names each field that does not fit (`author.name`, `tags[1]`, empty when the answer is no object), `partial` holds the text and the message says why. `usage`, `finish` and `calls` still resolve, and the tokens still count.
+- A snapshot holds a string field as far as it has come and any other field once complete: a number, a boolean or an array item shows when it ends, a nested object or array as it stands. Every field of a snapshot is optional in its type, and the last one `for await` gives is the checked value. A snapshot is not checked against the schema, only the end is.
+- `reply.deltas()` gives the JSON text in pieces, `usage`, `finish`, `calls` and `stop()` are the reply's own; `progress()` is not offered. `stop()` ends the request, and `await` then fails with a `schema` error as the cut text is no whole object.
+- `tools`, `maxSteps`, `confirm`, limits, the budget and `maxInputChars` work as without a schema; the schema counts for the tokens held against the budget. With tools, only the text of the step that answered is the object: a step that wrote text and then called tools drops it. The tools and the format go in one request; on the forced call, `kay_answer` is offered beside the tools.
+- An action returning the reply streams the snapshots to the island, whose `last()` is the object so far; an `async` handler returning it awaits it and answers the checked value. A plain form post or an MCP call gets the last snapshot.
 
 ## Prompt caching
 

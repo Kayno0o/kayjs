@@ -1,4 +1,5 @@
-import type { Action, Duration } from 'kay'
+import type { Action, Duration, Static } from 'kay'
+import type { TSchema } from 'kay/library'
 
 export interface Message {
   // `system` is not a role here: the prompt that frames the reply goes in `options.system`, so a history posted by a visitor cannot carry one.
@@ -50,6 +51,8 @@ export interface ProviderRequest {
   model: string
   maxTokens: number
   temperature: number | undefined
+  // JSON Schema of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
+  schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
   cache?: boolean | '1h' | undefined
   // Milliseconds a provider may take to answer, and to send the next chunk once it did.
@@ -67,7 +70,8 @@ export interface Timeouts {
 export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 
 // `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes.
-export type Piece = { text: string } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall }
+// `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
+export type Piece = { text: string } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { restart: true }
 
 export interface Provider {
   readonly name: string
@@ -117,6 +121,12 @@ export interface AskOptions {
   provider?: Provider | undefined
 }
 
+// The options of an ask for an object.
+export interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions {
+  // The object the model answers, a kay schema (`s.Object({ ... })`): `await ask(messages, { schema })` is the value it describes, typed by the schema and checked against it, and `for await` gives the object so far as it streams. An answer the schema refuses fails the reply with a `schema` error. Each provider is asked through its own JSON-schema output; `tools`, `maxSteps`, limits and `maxInputChars` apply as without one.
+  schema: Schema
+}
+
 // A tool call as the reply shows it, plain data a chat renders: `running` until the action answers, then `done` or `failed`.
 export interface ToolCall {
   id: string
@@ -158,3 +168,24 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   // Aborts the provider request; what was received stays the text of `await`.
   stop: () => void
 }
+
+// A value as it streams in: every field may be missing, those of a nested object or an array's items too, a string present as far as it came and any other field once it is complete.
+export type DeepPartial<Value> = Value extends readonly (infer Item)[]
+  ? DeepPartial<Item>[]
+  : Value extends (...args: never[]) => unknown ? Value
+    : Value extends Date ? Value
+      : Value extends object ? { [Key in keyof Value]?: DeepPartial<Value[Key]> } : Value
+
+// The reply to an ask with a `schema`: `await` gives the object, checked, `for await` the object so far, and the rest is the reply's own.
+// It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
+export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot> {
+  // The pieces of the JSON text as they came.
+  deltas: () => AsyncIterable<string>
+  readonly usage: Promise<Usage | undefined>
+  readonly finish: Promise<Finish | undefined>
+  readonly calls: Promise<ToolCall[]>
+  stop: () => void
+}
+
+// What `ask` gives for a schema: the checked value and its snapshots.
+export type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>

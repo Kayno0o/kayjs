@@ -21,6 +21,8 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const calls: ToolCall[] = []
   // Counts each change to the text or to a call, which `progress()` reads from.
   let version = 0
+  // Counts the times the text started over, which a reader meets by starting from the top.
+  let epoch = 0
   let reason: Finish | undefined
   let started = false
   let ended = false
@@ -41,6 +43,11 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       for await (const piece of open(controller.signal)) {
         if ('text' in piece) {
           deltas.push(piece.text)
+          version++
+        }
+        else if ('restart' in piece) {
+          deltas.length = 0
+          epoch++
           version++
         }
         else if ('usage' in piece) {
@@ -119,12 +126,19 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
     let cursor = 0
     let snapshot = ''
     let closed = false
+    let known = epoch
 
     return {
       async next() {
         for (;;) {
           if (closed)
             return { done: true, value: undefined }
+
+          if (known !== epoch) {
+            known = epoch
+            cursor = 0
+            snapshot = ''
+          }
 
           if (cursor < deltas.length) {
             const parts = deltas.slice(cursor)

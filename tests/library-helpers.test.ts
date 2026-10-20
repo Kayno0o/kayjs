@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer'
 import { createCipheriv, randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
-import { acceptedLocales, durationSeconds, escapeHtml, matchLocale, nameUser, openWith, sameText, sealWith, userOf, weakSecrets } from 'kay/library'
+import { s } from 'kay'
+import { acceptedLocales, checkAnswer, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, userOf, weakSecrets } from 'kay/library'
 import { escape, escapeAttribute } from '../src/runtime/escape'
 
 const KEY = new Uint8Array(32).fill(7)
@@ -80,5 +81,42 @@ describe('kay/library', () => {
     nameUser(request, () => 'u2')
     expect(await userOf(request)).toBe('u1')
     expect(await userOf(new Request('http://localhost/'))).toBeUndefined()
+  })
+
+  describe('an answer checked against a schema', () => {
+    const shape = s.Object({ 'title': s.String({ minLength: 2 }), 'tags': s.Array(s.Object({ name: s.String() })), 'a/b': s.Optional(s.Number()), 'when': s.Optional(s.Date()) })
+
+    it('gives the value of one that fits, decoded as the schema types it', () => {
+      expect(checkAnswer(shape, { title: 'ok', tags: [{ name: 'x' }] })).toEqual({ value: { title: 'ok', tags: [{ name: 'x' }] } })
+      expect(checkAnswer(shape, { title: 'ok', tags: [], when: '2030-05-06T07:08:09.000Z' })).toEqual({ value: { title: 'ok', tags: [], when: new Date('2030-05-06T07:08:09.000Z') } })
+    })
+
+    it('names each path that does not fit, once, as a person writes it', () => {
+      const checked = checkAnswer(shape, { 'title': 'x', 'tags': [{ name: 1 }, { name: 'ok' }, {}], 'a/b': 'text' })
+
+      expect('issues' in checked && checked.issues.map(issue => issue.path).sort()).toEqual(['a/b', 'tags[0].name', 'tags[2].name', 'title'])
+      expect('issues' in checked && checked.issues.every(issue => issue.message !== '')).toBe(true)
+    })
+
+    it('names a missing field and a value that is no object', () => {
+      expect(checkAnswer(shape, { title: 'ok' })).toMatchObject({ issues: [{ path: 'tags' }] })
+      expect(checkAnswer(shape, 'text')).toMatchObject({ issues: [{ path: '' }] })
+      expect(checkAnswer(shape, null)).toMatchObject({ issues: [{ path: '' }] })
+    })
+
+    it('reports at most twenty paths of a hostile answer', () => {
+      const wide = s.Object(Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`f${index}`, s.String()])))
+      const checked = checkAnswer(wide, {})
+
+      expect('issues' in checked && checked.issues).toHaveLength(20)
+    })
+
+    it('describes a schema as plain JSON Schema', () => {
+      expect(jsonSchemaOf(s.Object({ title: s.String({ minLength: 2, error: 'Short' }), n: s.Optional(s.Integer({ minimum: 1 })) }))).toMatchObject({
+        type: 'object',
+        properties: { title: { type: 'string', minLength: 2 }, n: { type: 'integer', minimum: 1 } },
+        required: ['title'],
+      })
+    })
   })
 })

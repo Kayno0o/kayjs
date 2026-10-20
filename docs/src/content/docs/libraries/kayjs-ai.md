@@ -164,6 +164,42 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 
+## Ask for an object
+
+When you want data and not prose, pass a `schema`. It is a kay schema made with `s.Object`. `await` then gives the value the schema describes, checked, and TypeScript knows its fields with no cast.
+
+```kay
+--- server
+import { s } from 'kay'
+import { ask } from '@kaynooo/kayjs-ai'
+
+const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
+const verdict = ask('Review the film Alien', { schema: review })
+---
+await verdict
+  p Reviewing
+then film
+  h3 {film.title}
+  p {film.score} out of 5
+  ul
+    for tag of film.tags
+      li {tag}
+catch
+  p The review failed
+```
+
+Each provider is asked in the way it holds a model to a shape. Anthropic gets `output_config.format`. An OpenAI-compatible server, Ollama included, gets `response_format` with a JSON schema. A server that refuses it is asked again with a tool call it must make, and kay remembers that for the rest of the run.
+
+A bound the provider cannot hold, such as `minLength` or `maximum`, is written into the field's description for the model to read. kay checks it on the answer, with the rest of your schema.
+
+An answer that does not fit fails with an `AiError` of kind `schema`. `fields` names the fields that are wrong, such as `author.name` or `tags[1]`, and `partial` holds the text. A reply cut by `maxTokens` or refused fails the same way, and the message says which.
+
+`for await` gives the object so far. A string field grows as it is written. A number, a boolean or a list item shows when it is complete, and a nested object shows as it stands. Every field may be missing in a snapshot, and its type says so. The last value is the checked object.
+
+An action returning the reply streams those snapshots to an island, whose `last()` is the object so far. `tools`, `maxSteps`, limits and `maxInputChars` work as they do for text.
+
+In a test, `fakeAi.reply({ data: { title: 'Alien', score: 5, tags: [] } })` answers an object. With nothing scripted, the fake builds one that fits your schema, so `kay dev` needs no key.
+
 ## Prompt caching
 
 Providers bill a repeated prompt at a fraction of the price when they cached it. kayjs-ai asks for that on every `ask`, so a chat does not pay full price for its system prompt, tools and earlier messages on each turn and each tool step. You set nothing. A prompt shorter than the provider's minimum is simply not cached.
@@ -306,7 +342,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited` or `too-long`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long` or `schema`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
 
 ## Test it
 

@@ -1,0 +1,34 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { action, s } from 'kay'
+import { verdict } from '../answers'
+import { testing } from '../testing'
+import { addNote } from './tools.kay'
+
+export const summarize = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { schema: verdict, provider: testing.provider }))
+
+export const triage = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { schema: verdict, tools: [addNote], provider: testing.provider }))
+
+export const outcome = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })) }), async ({ prompt, maxSteps }) => {
+  const reply = ask(prompt, { schema: verdict, tools: [addNote], maxSteps, provider: testing.provider })
+
+  return { value: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
+})
+
+export const whole = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), async ({ prompt }) => ask(prompt, { schema: verdict, provider: testing.provider }))
+
+const review = ask('Review the film', { schema: verdict, provider: testing.provider })
+--- script
+import VerdictView from '../components/verdict-view.kay'
+---
+h1 Verdicts
+await review
+  p Reviewing
+then film
+  p.title {film.title}
+  ul
+    for tag of film.tags
+      li {tag}
+catch
+  p.failed The review failed
+VerdictView

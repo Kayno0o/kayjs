@@ -1,0 +1,12 @@
+---
+import type { ActionStream } from 'kay'
+import type { DeepPartial } from '@kaynooo/kayjs-ai'
+import type { verdict } from '../answers'
+import type { Static } from 'kay'
+import { summarize } from '../routes/verdicts.kay'
+
+const shown = signal<ActionStream<DeepPartial<Static<typeof verdict>>> | undefined>(undefined)
+---
+button(onClick={async () => shown.set(await summarize({ prompt: 'Summarize' }))}) Summarize
+p {shown()?.last()?.title}
+p {shown()?.last()?.author?.name}

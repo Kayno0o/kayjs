@@ -345,7 +345,7 @@ function holdsFile(schema: unknown): boolean {
 const NUMERIC_TEXT = new Set<unknown>(['integer', 'numeric'])
 
 // A route's schema as JSON Schema; one kay cannot read, a model's name or another library's validator, says nothing.
-function schemaOf(schema: unknown): unknown {
+export function schemaOf(schema: unknown): unknown {
   return typeof schema !== 'object' || schema === null || '~standard' in schema ? {} : jsonSchema(schema)
 }
 

@@ -2,6 +2,7 @@ import type { ServerEvent } from './http'
 import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
+import { allRequired, outputSchema } from './output-schema'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface OpenAiOptions {
@@ -20,6 +21,11 @@ type Optional = 'stream_options' | 'prompt_cache_key'
 
 // Those a server refused once, by API root, so only the first ask of a process pays the retry.
 const refused = new Map<string, Set<Optional>>()
+
+// The roots whose server refused `response_format`, which are asked for an object through a forced tool call from then on.
+const unformatted = new Set<string>()
+// The tool a server without `response_format` is made to call: its arguments are the object, streamed on as the text of the reply.
+const ANSWER_TOOL = 'kay_answer'
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }
 
@@ -90,6 +96,21 @@ function turnsOf(message: ProviderMessage): object[] {
   }]
 }
 
+// What asks for the object of a schema: the format, or the forced call whose arguments are it, beside the tools of the ask.
+function shapeOf(request: ProviderRequest, mode: 'format' | 'tool' | undefined): object {
+  if (request.schema === undefined || mode === undefined)
+    return {}
+
+  const schema = outputSchema(request.schema)
+
+  if (mode === 'format')
+    return { response_format: { type: 'json_schema', json_schema: { name: 'answer', strict: allRequired(schema), schema } } }
+
+  const answer = { type: 'function', function: { name: ANSWER_TOOL, description: 'Give the answer: the arguments of this call are the object asked for', parameters: schema } }
+
+  return { tools: [...(request.tools ?? []).map(({ name, description, inputSchema }) => ({ type: 'function', function: { name, description, parameters: inputSchema } })), answer], tool_choice: 'required' }
+}
+
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
 export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = {}): Provider {
   const root = baseUrl.replace(TRAILING_SLASHES, '')
@@ -109,6 +130,12 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ type: 'function', function: { name, description, parameters: inputSchema } })) },
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
       }
+      // Asked through `response_format` json_schema where the server has it, else through a call it is forced to make.
+      let mode: 'format' | 'tool' | undefined = unformatted.has(root) ? 'tool' : 'format'
+
+      if (request.schema === undefined)
+        mode = undefined
+
       const headers = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }
       const url = `${root}/chat/completions`
       let finished = false
@@ -119,7 +146,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. Both optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without both), the root remembered once that works.
       const known = refused.get(root) ?? new Set<Optional>()
       const optional = (['stream_options', 'prompt_cache_key'] as const).filter(name => !known.has(name) && (name === 'stream_options' || request.cache !== false))
-      const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {} }, request.timeouts, signal, apiKey)
+      const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...shapeOf(request, mode), ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {} }, request.timeouts, signal, apiKey)
       let sent: readonly Optional[] = optional
       let events = open(sent)
       let first: IteratorResult<ServerEvent>
@@ -131,7 +158,18 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           break
         }
         catch (error) {
-          if (sent.length === 0 || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+          if (!(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+            throw error
+
+          if (mode === 'format' && error.message.includes('response_format')) {
+            mode = 'tool'
+            unformatted.add(root)
+            events = open(sent)
+
+            continue
+          }
+
+          if (sent.length === 0)
             throw error
 
           const named = sent.filter(name => error.message.includes(name))
@@ -162,6 +200,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           throw failureOf(failure)
 
         const choice = (chunk.choices as { delta?: { content?: unknown, tool_calls?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
+        let answered = ''
         const text = textOf(choice?.delta?.content)
 
         if (Array.isArray(choice?.delta?.tool_calls)) {
@@ -192,14 +231,17 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
             if (typeof piece.function?.name === 'string' && call.name.length <= MAX_NAME_LENGTH)
               call.name += piece.function.name
 
+            // The arguments of the answer call are the object, sent on as text as they come.
+            if (typeof piece.function?.arguments === 'string' && mode === 'tool' && call.name === ANSWER_TOOL)
+              answered += piece.function.arguments
             // Past the cap the arguments stop growing, and the loop answers them as too long.
-            if (typeof piece.function?.arguments === 'string' && call.arguments.length <= MAX_ARGUMENTS)
+            else if (typeof piece.function?.arguments === 'string' && call.arguments.length <= MAX_ARGUMENTS)
               call.arguments += piece.function.arguments
           }
         }
 
-        if (text !== '')
-          yield { text }
+        if (text !== '' || answered !== '')
+          yield { text: text + answered }
 
         if (typeof choice?.finish_reason === 'string') {
           // Mistral ends a stream that failed on `error`.
@@ -208,7 +250,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
 
           finished = true
 
-          yield* [...calls.values()].sort((a, b) => a.index - b.index).map(({ id, name, arguments: raw }) => ({ toolUse: { id, name, arguments: raw } }))
+          yield* [...calls.values()].filter(call => mode !== 'tool' || call.name !== ANSWER_TOOL).sort((a, b) => a.index - b.index).map(({ id, name, arguments: raw }) => ({ toolUse: { id, name, arguments: raw } }))
 
           calls.clear()
           byIndex.clear()

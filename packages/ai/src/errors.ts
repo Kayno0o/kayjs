@@ -19,6 +19,8 @@ export type AiErrorKind
     | 'limited'
   // The messages are longer than the `maxInputChars` of `ask`: nothing was sent to the provider.
     | 'too-long'
+  // The model's answer does not fit the `schema` of `ask`: it is no JSON object, was cut by `maxTokens` or refused, or breaks the schema. `fields` names the fields it refuses and `partial` holds the text.
+    | 'schema'
 
 // Which limit refused an ask: `asks` is `limit`, `budget` the visitor's tokens, `total` the tokens of all visitors.
 export type AiLimit = 'asks' | 'budget' | 'total'
@@ -37,6 +39,7 @@ export interface AiErrorDetails {
   status?: number | undefined
   retryAfter?: number | undefined
   partial?: string | undefined
+  fields?: string[] | undefined
   cause?: unknown
 }
 
@@ -49,15 +52,18 @@ export class AiError extends Error {
   readonly limit: AiLimit | undefined
   // The text received before a reply was cut or failed, filled in by the reply.
   partial: string | undefined
+  // The fields of a `schema` answer that do not fit, by path (`author.name`, `tags[1]`); empty when the answer is no JSON object at all.
+  readonly fields: string[] | undefined
   declare readonly [REFUSED]?: { status: number, retryAfter: number | undefined, message: string }
 
-  constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, cause }: AiErrorDetails = {}) {
+  constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }: AiErrorDetails = {}) {
     super(`kayjs-ai: ${message}`, { cause })
     this.kind = kind
     this.status = status
     this.retryAfter = retryAfter
     this.partial = partial
     this.limit = limit
+    this.fields = fields
 
     if (kind === 'too-long') {
       Object.defineProperty(this, REFUSED, { value: { status: 413, retryAfter: undefined, message: 'That conversation is too long; shorten it or start a new one' } })

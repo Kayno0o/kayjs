@@ -153,6 +153,13 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       return
     }
 
+    // Only the text of the step that answered is the object.
+    if (base.schema !== undefined && text !== '') {
+      yield { restart: true }
+
+      spoke = false
+    }
+
     if (step === maxSteps) {
       yield { finish: 'steps' }
 

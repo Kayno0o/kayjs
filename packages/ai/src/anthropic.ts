@@ -1,6 +1,7 @@
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
+import { outputSchema } from './output-schema'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface AnthropicOptions {
@@ -101,6 +102,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
         ...request.system === undefined ? {} : { system: request.system },
         ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
+        // The model answers the JSON of the schema as its text, whatever the tools.
+        ...request.schema === undefined ? {} : { output_config: { format: { type: 'json_schema', schema: outputSchema(request.schema) } } },
       }
 
       // Tool calls arrive as a block opened with the name, then the arguments in pieces.
