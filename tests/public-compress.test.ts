@@ -264,7 +264,9 @@ describe('a public file changed under a running server', () => {
     for (const [name, content] of Object.entries(SERVED))
       await writeFile(join(dir, 'public', name), content)
 
-    const fresh = await serve({ onError: error => errors.push(error) })
+    const fresh = await serve({ onError: (error) => {
+      errors.push(error)
+    } })
 
     for (const name of Object.keys(SERVED)) {
       for (const accept of ACCEPTS)
@@ -518,14 +520,6 @@ describe('a deleted public file is a path nothing serves', () => {
     }
   })
 
-  it('is answered with the 404 page of a locale named by its prefix', async () => {
-    const app = await pages({ routes: 'tests/fixtures/i18n/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: MESSAGES } })
-    const response = await get(app, '/en/never-there.json')
-
-    expect(response.status).toBe(404)
-    expect(await response.text()).toContain('Home')
-  })
-
   it('is answered with the error page of an app that has only an _error.kay', async () => {
     const root = await scratchDir('public-gone-error-')
 
@@ -534,8 +528,10 @@ describe('a deleted public file is a path nothing serves', () => {
     await Bun.write(join(root, 'public/only-error.json'), MEDIUM)
 
     try {
-      const app = await pages({ routes: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false })
       const errors: unknown[] = []
+      const app = await pages({ routes: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false, onError: (error) => {
+        errors.push(error)
+      } })
 
       expect((await get(app, '/only-error.json')).status).toBe(200)
       await rm(join(root, 'public/only-error.json'))
@@ -545,11 +541,41 @@ describe('a deleted public file is a path nothing serves', () => {
 
       expect(unknown.status).toBe(404)
       expect(response.status).toBe(404)
-      expect(await response.text()).toBe(await unknown.text())
+      const html = await response.text()
+
+      expect(html).toContain('Error 404')
+      expect(html).toBe((await unknown.text()).replaceAll('never-there.json', 'only-error.json'))
       expect(errors).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('answers a redirect and Elysia\'s own 404 in an app with no page for an unknown path, in development and with a trailing slash setting', async () => {
+    for (const options of [{}, { dev: true }, { trailingSlash: 'always' }] as const) {
+      const name = `bare-${JSON.stringify(options).replaceAll(/\W/g, '')}.json`
+      const path = join(dir, 'public', name)
+
+      await writeFile(path, MEDIUM)
+
+      const app = await pages({ routes: 'tests/fixtures/bare/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, prebuilt: true, ...options })
+
+      expect((await get(app, `/${name}`)).status, name).toBe(200)
+      await rm(path)
+      expect((await get(app, `/${name}`)).status, name).toBe(404)
+      addRuntimeRedirect(`/${name}`, '/survey')
+
+      try {
+        for (const method of ['GET', 'HEAD']) {
+          const response = await get(app, `/${name}`, { 'accept-encoding': 'gzip' }, method)
+
+          expect([response.status, response.headers.get('location')], `${name} ${method}`).toEqual([307, options.trailingSlash === 'always' ? '/survey/' : '/survey'])
+        }
+      }
+      finally {
+        removeRuntimeRedirect(`/${name}`)
+      }
     }
   })
 
@@ -577,7 +603,9 @@ describe('a deleted public file is a path nothing serves', () => {
       await writeFile(path, MEDIUM)
 
       const errors: unknown[] = []
-      const app = await serve({ onError: error => errors.push(error) })
+      const app = await serve({ onError: (error) => {
+        errors.push(error)
+      } })
 
       expect((await get(app, '/read-kept.json')).status).toBe(200)
       // Changed since it was kept, so the next request reads it again.

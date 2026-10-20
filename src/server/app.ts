@@ -241,7 +241,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const redirector = exported ? undefined : missingRedirector({ trailingSlash: options.trailingSlash, base })
 
-  // Before compression, whose `mapResponse` would answer a compressed 404 page first.
+  // Before compression, whose `mapResponse` would answer a compressed 404 page first; a redirect it answers skips the later `mapResponse` hooks, as the request log's timing and the dev tool's recording of the response.
   redirector?.pages(app)
 
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'

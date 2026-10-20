@@ -85,15 +85,8 @@ export interface MissingRedirector {
   unrouted: <App extends Elysia>(app: App) => App
 }
 
-// Answers a page request that found nothing with the redirect an editor added for its path, if there is one.
+// Answers a page request that found nothing with the redirect an editor added for its path, if there is one, in two hooks registered apart: the `mapResponse` ahead of compression, which would answer a 404 page first, and the `onError`, which reaches only the routes added after it.
 // Every other response costs one comparison of its status.
-export function redirectMissing<App extends Elysia>(app: App, options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): App {
-  const redirector = missingRedirector(options)
-
-  return redirector.unrouted(redirector.pages(app))
-}
-
-// The two hooks of `redirectMissing` apart, as a `mapResponse` ahead of the compression is the only one that sees a compressed 404 page first, and the `onError` of a hook reaches the routes added after it.
 export function missingRedirector(options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): MissingRedirector {
   const file = storeFile(options.file)
   let told = false

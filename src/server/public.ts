@@ -222,7 +222,7 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
 
       const page = await pageFor.unmatched?.(given)
 
-      // An app with no page for a path nothing serves answers Elysia's own 404, imported here so kay check, which reads this module, loads no Elysia.
+      // An app with no page for a path nothing serves answers Elysia's own 404; imported here, as `kay check` loads this module and must not load Elysia.
       if (!page)
         throw new (await import('elysia')).NotFoundError()
 

@@ -8,7 +8,7 @@ import { openSqlite } from '../src/runtime/sqlite.server'
 import { pages } from '../src/server'
 import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
 import { dropStore, missingPaths, pageRequested, sharedStore } from '../src/server/not-found'
-import { knowRuntimeRules, redirectMissing } from '../src/server/runtime-redirect-api'
+import { knowRuntimeRules, missingRedirector } from '../src/server/runtime-redirect-api'
 import { answerFor, RedirectRefused, redirectSet } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
 
@@ -418,7 +418,8 @@ describe('the store on disk', () => {
 
     dropStore()
 
-    const served = redirectMissing(new Elysia(), { file }).get('/*', ({ request }) => {
+    const redirector = missingRedirector({ file })
+    const served = redirector.unrouted(redirector.pages(new Elysia())).get('/*', ({ request }) => {
       pageRequested(request)
 
       return new Response('gone', { status: 404, headers: { 'content-type': 'text/html' } })
