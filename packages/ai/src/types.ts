@@ -169,12 +169,14 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   stop: () => void
 }
 
-// A value as it streams in: every field may be missing, those of a nested object or an array's items too, a string present as far as it came and any other field once it is complete.
-export type DeepPartial<Value> = Value extends readonly (infer Item)[]
-  ? DeepPartial<Item>[]
-  : Value extends (...args: never[]) => unknown ? Value
-    : Value extends Date ? Value
-      : Value extends object ? { [Key in keyof Value]?: DeepPartial<Value[Key]> } : Value
+// A value as it streams in: every field may be missing, those of a nested object or an array's items too, a string present as far as it came (so a literal or an enum is a plain string while it grows) and any other field once it is complete.
+export type DeepPartial<Value> = Value extends string
+  ? string
+  : Value extends readonly (infer Item)[]
+    ? DeepPartial<Item>[]
+    : Value extends (...args: never[]) => unknown ? Value
+      : Value extends Date ? Value
+        : Value extends object ? { [Key in keyof Value]?: DeepPartial<Value[Key]> } : Value
 
 // The reply to an ask with a `schema`: `await` gives the object, checked, `for await` the object so far, and the rest is the reply's own.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.

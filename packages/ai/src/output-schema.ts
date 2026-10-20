@@ -10,9 +10,17 @@ function isNode(value: unknown): value is Node {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+// Free keys and intersections cannot be held to a closed object, so a model would be told the field is empty.
+const UNSUPPORTED = ['patternProperties', 'allOf']
+
 function simplify(value: unknown): unknown {
   if (!isNode(value))
     return value
+
+  for (const key of UNSUPPORTED) {
+    if (key in value)
+      throw new TypeError('kayjs-ai: a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
+  }
 
   const out: Node = {}
   const moved: string[] = []
@@ -41,8 +49,17 @@ function simplify(value: unknown): unknown {
   return out
 }
 
+const outputs = new WeakMap<object, object>()
+
 export function outputSchema(schema: object): object {
-  return simplify(schema) as object
+  let output = outputs.get(schema)
+
+  if (output === undefined) {
+    output = simplify(schema) as object
+    outputs.set(schema, output)
+  }
+
+  return output
 }
 
 // Whether every object of the schema requires all of its fields, which is what OpenAI's strict mode takes.

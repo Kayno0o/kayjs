@@ -25,6 +25,7 @@ const refused = new Map<string, Set<Optional>>()
 // The roots whose server refused `response_format`, which are asked for an object through a forced tool call from then on.
 const unformatted = new Set<string>()
 // The tool a server without `response_format` is made to call: its arguments are the object, streamed on as the text of the reply.
+const INVALID_SCHEMA = /invalid schema|schema.*(?:invalid|not supported|unsupported)/i
 const ANSWER_TOOL = 'kay_answer'
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }
@@ -132,6 +133,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       }
       // Asked through `response_format` json_schema where the server has it, else through a call it is forced to make.
       let mode: 'format' | 'tool' | undefined = unformatted.has(root) ? 'tool' : 'format'
+      let switched = false
 
       if (request.schema === undefined)
         mode = undefined
@@ -161,9 +163,10 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           if (!(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
             throw error
 
-          if (mode === 'format' && error.message.includes('response_format')) {
+          // A server that has no `response_format` is remembered once the call works; one that refuses this schema is not, as the next ask may hold a schema it takes.
+          if (mode === 'format' && error.message.includes('response_format') && !INVALID_SCHEMA.test(error.message)) {
             mode = 'tool'
-            unformatted.add(root)
+            switched = true
             events = open(sent)
 
             continue
@@ -178,6 +181,9 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           events = open(sent)
         }
       }
+
+      if (switched)
+        unformatted.add(root)
 
       if (sent.length < optional.length)
         refused.set(root, new Set([...known, ...optional.filter(name => !sent.includes(name))]))
@@ -231,12 +237,14 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
             if (typeof piece.function?.name === 'string' && call.name.length <= MAX_NAME_LENGTH)
               call.name += piece.function.name
 
-            // The arguments of the answer call are the object, sent on as text as they come.
-            if (typeof piece.function?.arguments === 'string' && mode === 'tool' && call.name === ANSWER_TOOL)
-              answered += piece.function.arguments
-            // Past the cap the arguments stop growing, and the loop answers them as too long.
-            else if (typeof piece.function?.arguments === 'string' && call.arguments.length <= MAX_ARGUMENTS)
-              call.arguments += piece.function.arguments
+            if (typeof piece.function?.arguments === 'string') {
+              // The arguments of the answer call are the object, sent on as text as they come.
+              if (mode === 'tool' && call.name === ANSWER_TOOL)
+                answered += piece.function.arguments
+              // Past the cap the arguments stop growing, and the loop answers them as too long.
+              else if (call.arguments.length <= MAX_ARGUMENTS)
+                call.arguments += piece.function.arguments
+            }
           }
         }
 

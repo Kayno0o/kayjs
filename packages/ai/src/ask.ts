@@ -6,6 +6,7 @@ import { choose } from './config'
 import { AiError } from './errors'
 import { guarded } from './limits'
 import { converse } from './loop'
+import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { structured } from './structured'
 
@@ -74,14 +75,28 @@ function offer(actions: readonly ToolAction[]): Offered[] {
   return offered
 }
 
-// The JSON Schema a provider is asked for, from a kay schema that must describe an object.
-function answerSchema(schema: unknown): object {
+const answers = new WeakMap<object, { plain: object, chars: number }>()
+
+// The JSON Schema a provider is asked for, from a kay schema that must describe an object, and its length.
+function answerSchema(schema: unknown): { plain: object, chars: number } {
+  const known = typeof schema === 'object' && schema !== null ? answers.get(schema) : undefined
+
+  if (known)
+    return known
+
   const plain = typeof schema === 'object' && schema !== null ? jsonSchemaOf(schema) as { type?: unknown } : undefined
 
   if (plain?.type !== 'object')
     throw new TypeError('kayjs-ai: schema is an object schema, s.Object({ ... })')
 
-  return plain
+  // Refuses a shape no provider can be held to before anything is sent.
+  outputSchema(plain)
+
+  const answer = { plain, chars: JSON.stringify(plain).length }
+
+  answers.set(schema as object, answer)
+
+  return answer
 }
 
 // Asks the model and gives the reply back at once: `await ask(...)` is its text, `for await` its snapshots, and the request to the provider goes out when it is first read.
@@ -106,7 +121,8 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
 
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
-  const schema = answer === undefined ? undefined : answerSchema(answer)
+  const described = answer === undefined ? undefined : answerSchema(answer)
+  const schema = described?.plain
   const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, cache: options.cache, timeouts: timeoutsOf(options.timeout), schema }
   const messageChars = messages.reduce((sum, message) => sum + message.content.length, 0)
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
@@ -114,7 +130,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw new TypeError('kayjs-ai: maxInputChars is a number of characters of 1 or more')
 
-  const asker = { request: answering, visitor: options.visitor, chars: messageChars + (options.system?.length ?? 0) + (schema === undefined ? 0 : JSON.stringify(schema).length), maxTokens }
+  const asker = { request: answering, visitor: options.visitor, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
 
   if (messageChars > maxInputChars)

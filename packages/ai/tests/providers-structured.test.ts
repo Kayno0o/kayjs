@@ -176,6 +176,28 @@ describe('an OpenAI-compatible provider asked for a schema', () => {
     expect(server.seen[2]!.body).toHaveProperty('tool_choice', 'required')
   })
 
+  it('keeps asking through response_format after a 400 that refuses the schema, which is no server without it', async () => {
+    const server = serve(() => Response.json({ error: { message: 'Invalid schema for response_format \'answer\': bad', type: 'invalid_request_error' } }, { status: 400 }))
+    const provider = openai({ baseUrl: server.url, model: 'm' })
+
+    expect(await failure(ask('x', { schema: verdict, provider }))).toMatchObject({ kind: 'invalid', status: 400 })
+    expect(server.seen.every(seen => !('tool_choice' in seen.body))).toBe(true)
+    expect(await failure(ask('x', { schema: verdict, provider }))).toMatchObject({ kind: 'invalid' })
+    expect(server.seen.every(seen => 'response_format' in seen.body)).toBe(true)
+  })
+
+  it('does not remember a server as without response_format when the call by tool fails as well', async () => {
+    const server = serve((_request, { body }) => Response.json({ error: { message: body.response_format === undefined ? 'unknown model' : 'response_format is not here' } }, { status: 400 }))
+    const provider = openai({ baseUrl: server.url, model: 'm' })
+
+    await failure(ask('x', { schema: verdict, provider }))
+
+    const before = server.seen.length
+
+    await failure(ask('x', { schema: verdict, provider }))
+    expect(server.seen[before]!.body).toHaveProperty('response_format')
+  })
+
   it('does not take another 400 for a refused response_format', async () => {
     const server = serve(() => Response.json({ error: { message: 'unknown model' } }, { status: 400 }))
     const error = await failure(ask('x', { schema: verdict, provider: openai({ baseUrl: server.url, model: 'm' }) }))

@@ -117,6 +117,25 @@ describe('ask with a schema', () => {
     expect(() => ask('x', { schema: {} as never })).toThrow(TypeError)
   })
 
+  it('refuses a record or an intersection, which a model would be told is empty', () => {
+    expect(() => ask('x', { schema: s.Object({ scores: s.Record(s.String(), s.Number()) }) })).toThrow('s.Record')
+    expect(() => ask('x', { schema: s.Intersect([s.Object({ a: s.String() }), s.Object({ b: s.String() })]) })).toThrow('s.Intersect')
+  })
+
+  it('types a choice as the string it grows into while it streams', async () => {
+    const shape = s.Object({ label: s.UnionEnum(['spam', 'ham']) })
+    const labels: (string | undefined)[] = []
+
+    for await (const part of ask('x', { schema: shape, provider: typing('{"label":"sp', 'am"}') })) {
+      // @ts-expect-error a snapshot's choice may be a prefix of one
+      const narrow: 'spam' | 'ham' | undefined = part.label
+
+      labels.push(narrow)
+    }
+
+    expect(labels).toEqual(['sp', 'spam'])
+  })
+
   it('answers the value of a schema with optional fields, a number only a whole one and a choice', async () => {
     const shape = s.Object({ kind: s.UnionEnum(['bug', 'feature']), count: s.Integer({ minimum: 0 }), note: s.Optional(s.String()) })
 
