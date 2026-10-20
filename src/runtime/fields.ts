@@ -11,12 +11,12 @@ export interface EntryRef {
   locale?: string
 }
 
-// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the number read last when nothing was read or rendered since, and every entry read.
+// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the numbers read since anything unrelated to a field rendered, and every entry read.
 export interface FieldMarks {
   refs: string[]
   indexes: Map<string, number>
   unrendered: Map<string, number[]>
-  last: { value: number, ref: number } | undefined
+  numbers: { value: number, ref: number }[]
   entries: Map<string, EntryRef>
   wrapped: WeakMap<object, object>
   // Set apart from any text an entry holds, which may use these private-use characters too, an icon font's glyphs say.
@@ -72,7 +72,7 @@ export function editMarks(): FieldMarks | undefined {
   if (!state.marks) {
     const nonce = crypto.randomUUID().slice(0, 8)
 
-    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), last: undefined, entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
+    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
   }
 
   return state.marks
@@ -126,7 +126,7 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
   return editable
 }
 
-// A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or a number read right before.
+// A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or a number read since nothing unrelated to a field rendered.
 export function markedText(value: string | number, markup: string): string {
   const ref = fieldOf(value)
 
@@ -206,16 +206,19 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
 
 function fieldOf(value: string | number): number | undefined {
   const marks = fieldMarks.marking!
+  const ref = typeof value === 'string' ? marks.unrendered.get(value)?.shift() : claimNumber(marks, value)
 
-  // Anything rendered forgets the number read last, so one rendered later, a row's index say, is not taken for the field.
-  const last = marks.last
+  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field.
+  if (ref === undefined)
+    marks.numbers.length = 0
 
-  marks.last = undefined
+  return ref
+}
 
-  if (typeof value === 'string')
-    return marks.unrendered.get(value)?.shift()
+function claimNumber(marks: FieldMarks, value: number): number | undefined {
+  const index = marks.numbers.findIndex(read => read.value === value)
 
-  return last?.value === value ? last.ref : undefined
+  return index < 0 ? undefined : marks.numbers.splice(index, 1)[0]!.ref
 }
 
 function refIndex(marks: FieldMarks, ref: string): number {
@@ -247,15 +250,20 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
 
       const read = Reflect.get(target, key, receiver) as unknown
 
-      // Any other read comes between a number and its render, the number then no longer told apart from one computed.
-      if (typeof key === 'string')
-        marks.last = undefined
+      if (typeof key === 'symbol' || !Object.hasOwn(target, key) || !configurable(target, key) || (key === 'length' && Array.isArray(target))) {
+        // Any other read comes between a number and its render, the number then no longer told apart from one computed.
+        if (typeof key === 'string')
+          marks.numbers.length = 0
 
-      if (typeof key === 'symbol' || !Object.hasOwn(target, key) || !configurable(target, key) || (key === 'length' && Array.isArray(target)))
         return read
+      }
 
-      if (typeof read === 'number')
-        marks.last = { value: read, ref: refIndex(marks, fieldPath(name, [...path, key])) }
+      if (typeof read === 'number') {
+        const field = refIndex(marks, fieldPath(name, [...path, key]))
+
+        marks.numbers = marks.numbers.filter(each => each.ref !== field)
+        marks.numbers.push({ value: read, ref: field })
+      }
 
       // A blank text tells nothing apart: `''` is what any empty branch renders.
       if (typeof read === 'string' && !BLANK.test(read)) {
@@ -269,6 +277,15 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
       }
 
       return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
+    },
+    // A copy by descriptor, as `merge` hands an entry down to a component, would hold the values themselves: it gets a getter reading through the proxy again, so the component's reads are the field's.
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
+
+      if (descriptor === undefined || typeof key === 'symbol' || !descriptor.configurable || !('value' in descriptor) || (key === 'length' && Array.isArray(target)))
+        return descriptor
+
+      return { get: () => proxy[key as keyof typeof proxy], enumerable: descriptor.enumerable ?? false, configurable: true }
     },
   })
 

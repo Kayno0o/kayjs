@@ -345,7 +345,7 @@ Set `preview: { secret }` in `kay.config.ts` to let an editor see drafts on the 
 
 Edit mode is preview mode for a CMS that edits content on the page. Enter it with `enterPreview(ctx, { edit: true })` or `previewUrl(path, { edit: true })`. `editing()` from `kay` tells whether the page is in it.
 
-In edit mode the page marks the markup each field and body renders, so the CMS can find them. An extension names its editor island with `editor`, and `showDraft(entries)` from `kay/edit` shows the page with the entries the editor has not saved.
+In edit mode the page marks the markup each field and body renders, so the CMS can find them. That holds in a component the entry was handed down to as well as in the page itself. An extension names its editor island with `editor`, and `showDraft(entries)` from `kay/edit` shows the page with the entries the editor has not saved.
 
 <ReadMore href="/llms/content-cms#preview-mode">The signed link, which fields get marked and which do not, the editor island and what each special page renders are in the full content reference.</ReadMore>
 

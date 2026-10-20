@@ -1,0 +1,13 @@
+--- server
+import { pages } from '../../content.config'
+
+const entry = await pages.get(ctx.params.slug) ?? ctx.notFound()
+const { data } = entry
+// All the fence reads of the entry: the markup below renders what its component is handed.
+const description = JSON.stringify({ name: data.title })
+--- script
+import Down from '../../components/down.kay'
+---
+head
+  script(type="application/ld+json") {description}
+Down({...data})

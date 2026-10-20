@@ -157,7 +157,7 @@ export function styleText(value: unknown): string {
 }
 
 // A child value, part by part: a string or a number as its text, `null`, `undefined`, a boolean and a symbol as nothing, a function as what it returns, an array item by item; any other object as it is, for the renderer to read.
-export function eachChild(value: unknown, part: (part: string | object) => void): void {
+export function eachChild(value: unknown, part: (part: string | object, original?: unknown) => void): void {
   if (value == null || typeof value === 'boolean' || typeof value === 'symbol')
     return
 
@@ -169,6 +169,6 @@ export function eachChild(value: unknown, part: (part: string | object) => void)
       eachChild(item, part)
   }
   else {
-    part(typeof value === 'object' ? value : String(value))
+    part(typeof value === 'object' ? value : String(value), value)
   }
 }

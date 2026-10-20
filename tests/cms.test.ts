@@ -21,6 +21,7 @@ import { child, loop } from '../src/runtime/html'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
 import { html as renderedHtml } from '../src/runtime/rendered'
+import { merge } from '../src/runtime/values'
 import { editedEntry, editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { entryUrls } from '../src/server/entry-urls'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
@@ -1087,6 +1088,69 @@ describe('preview mode', () => {
 
       expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">Same</h1><p>Same</p>')
     }, true)
+  })
+
+  it('marks the fields a component renders from an entry its page handed down, whatever its fence read', async () => {
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const preview = await previewCookie(previewUrl('/news'))
+    const { html } = await get('/marks-down/about', edit)
+
+    // The fence read the title alone, for a description; every other field is read by the components rendering it.
+    expect(html).toContain('<h1 data-kay-field="pages:about:title">About</h1><em class="echo" data-kay-field="pages:about:title">About</em><p class="order" data-kay-field="pages:about:order">2</p>')
+    expect(html).toContain('<ul data-kay-list="pages:about:tags"><li><i class="pill" data-kay-field="pages:about:tags.0">team</i></li><li><i class="pill" data-kay-field="pages:about:tags.1">story</i></li></ul>')
+    // A string built from a field and a transformed one are no field's markup.
+    expect(html).toContain('<p class="joined">About!</p><p class="upper">ABOUT</p>')
+    // An island's markup stays as hydration claims it.
+    expect(html).toContain('<button class="island-title">About</button><div class="island-slot"></div></slot>')
+    expect(html).not.toMatch(/[\uE000-\uE004]/)
+
+    const plain = (await get('/marks-down/about', preview)).html
+
+    expect(plain).not.toContain('data-kay-')
+    expect(plain).toBe((await get('/marks-down/about')).html)
+  })
+
+  it('marks what a component reads of an entry handed down by a spread, at any depth, and copies what a proxy cannot carry, frozen fields say, as it is', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const frozen = Object.freeze({ code: 'F1', nested: Object.freeze({ code: 'F2' }) })
+      const bare = Object.assign(Object.create(null) as Record<string, unknown>, { word: 'Bare' })
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { name: 'Delphine', age: 38, members: [{ role: 'Pilot', ratings: [{ label: 'Speed', value: 4 }] }], at: new Date(0), frozen, bare }, Content: () => renderedHtml('') })
+      // What a page's `Crew({...data})` hands the component: the props are copied by descriptor, the fence having read none of them.
+      const props = merge(entry.data) as typeof entry.data
+      const html = withFieldMarks(marks, () => {
+        const [member] = props.members
+
+        return `<h3>${child(props.name)}</h3><span>${child(props.age)}</span> ans<p>${child(member!.role)}</p>${loop(member!.ratings, (rating) => {
+          const { label, value } = rating as { label: string, value: number }
+
+          return `<b>${child(label)}</b><u>${child(value)}</u>`
+        })}<i>${child(props.frozen.nested.code)}</i><s>${child(props.bare.word)}</s>`
+      })
+
+      expect(props.at).toBeInstanceOf(Date)
+      expect(Object.isFrozen(props.frozen)).toBe(true)
+      expect(placeFieldMarks(html, marks)).toBe('<h3 data-kay-field="crew:a:name">Delphine</h3><span data-kay-field="crew:a:age">38</span> ans<p data-kay-field="crew:a:members.0.role">Pilot</p><b data-kay-field="crew:a:members.0.ratings.0.label">Speed</b><u data-kay-field="crew:a:members.0.ratings.0.value">4</u><i>F2</i><s data-kay-field="crew:a:bare.word">Bare</s>')
+    }, true)
+  })
+
+  it('marks a number after a sibling text read later, and each part of a mixed child', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { age: 38, role: 'Pilot' }, Content: () => renderedHtml('') })
+      // The children are all read before any renders, as an array of them is.
+      const html = withFieldMarks(marks, () => `<p>${child([entry.data.age, ' ans', entry.data.role])}</p><p>${child(() => [entry.data.role, entry.data.age])}</p>`)
+
+      expect(placeFieldMarks(html, marks)).toBe('<p><!--kay-field crew:a:age-->38<!--/kay-field--> ans<!--kay-field crew:a:role-->Pilot<!--/kay-field--></p><p><!--kay-field crew:a:role-->Pilot<!--/kay-field--><!--kay-field crew:a:age-->38<!--/kay-field--></p>')
+    }, true)
+  })
+
+  it('copies props outside edit mode as they are, holding no proxy and no accessor', () => {
+    const data = { title: 'T', members: [{ role: 'R' }] }
+    const props = merge(data)
+
+    expect(Object.getOwnPropertyDescriptors(props)).toEqual({ title: { value: 'T', writable: true, enumerable: true, configurable: true }, members: { value: data.members, writable: true, enumerable: true, configurable: true } })
+    expect(props.members).toBe(data.members)
   })
 
   it('places the marks of a long listing in one pass', () => {

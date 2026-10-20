@@ -1,0 +1,20 @@
+---
+import Echo from './echo.kay'
+import IslandTitle from './island-title.kay'
+
+const { title, order, tags } = props<{ title: string, order: number, tags?: string[] }>()
+const heading = `${title}!`
+const list = tags ?? []
+---
+snippet pill(text: string)
+  i.pill {text}
+h1 {title}
+Echo(text={title})
+p.order {order}
+p.joined {heading}
+p.upper {title.toUpperCase()}
+if list.length > 0
+  ul
+    for tag of list
+      li {pill(tag)}
+IslandTitle(title={title})

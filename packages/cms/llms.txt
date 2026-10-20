@@ -4,7 +4,7 @@
 
 ## Rules that are easy to get wrong
 
-- The app writes no marker: in edit mode kay marks each element rendering an entry's field itself, `data-kay-field="<collection>:<slug>[@<locale>]:<path>"`, each segment URI-encoded, the path dotted with list indexes (`sections.1.heading`). A field in an attribute is `data-kay-field-<attribute>`, a field sharing its element's text sits between `<!--kay-field …-->` and `<!--/kay-field-->`, and a Markdown body is `data-kay-body="<collection>:<slug>"` or a `kay-body` comment pair.
+- The app writes no marker: in edit mode kay marks each element rendering an entry's field itself, `data-kay-field="<collection>:<slug>[@<locale>]:<path>"`, each segment URI-encoded, the path dotted with list indexes (`sections.1.heading`). A field in an attribute is `data-kay-field-<attribute>`, a field sharing its element's text sits between `<!--kay-field …-->` and `<!--/kay-field-->`, fields are marked wherever the data is read, a component handed the entry's data included, and a Markdown body is `data-kay-body="<collection>:<slug>"` or a `kay-body` comment pair.
 - The body's path is the `BODY` symbol, never a string, so a data field named `body` stays a data field.
 - Outside edit mode the page is unchanged and the editor is not rendered.
 - Draft rendering happens on the server: the editor sends the changed entries, kay renders the page with them and swaps it in, islands kept.
