@@ -3,6 +3,7 @@ import process from 'node:process'
 import { FILES_MARKER, loadedFiles } from '../check/loaded'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
+import { setImageColors } from '../server/image-color'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from './claims'
 import { setMarkdownDefaults } from './load'
 import { contentProblems } from './server'
@@ -13,7 +14,10 @@ const [root, config, site] = process.argv.slice(2)
 // The checking machine lacks the server's environment, as `kay build` does.
 buildingWithoutEnv()
 
-setMarkdownDefaults((await loadConfig(root!)).markdown)
+const loaded = await loadConfig(root!)
+
+setMarkdownDefaults(loaded.markdown)
+setImageColors(loaded.images?.placeholder !== false)
 
 const { problems, uses, feeds, read } = await contentProblems(root!, config === undefined || config === '' ? undefined : config, site === 'site')
 

@@ -12,7 +12,8 @@ let ready: Promise<void> | undefined
 // Without `settings`, the project's `kay.config.ts` gives them, so whichever caller registers first renders libraries as the app configured them.
 // Under `kay dev`, every element carries its source position for its inspector.
 export async function registerLoader(root: string, settings?: Record<string, string>): Promise<void> {
-  const chosen = settings ?? (await loadConfig(root)).settings ?? {}
+  const config = await loadConfig(root)
+  const chosen = settings ?? config.settings ?? {}
   const key = JSON.stringify(Object.entries(chosen).sort(([a], [b]) => a.localeCompare(b)))
 
   if (registered?.early === true) {
@@ -30,7 +31,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
 
   if (registered === undefined) {
     registered = { root, settings: key, early: false }
-    ready = register(root, chosen)
+    ready = register(root, chosen, config.images?.placeholder)
   }
   else if (registered.root !== root) {
     throw new Error(`kay: the .kay loader is registered for ${registered.root}; one process serves one project`)
@@ -54,8 +55,8 @@ export async function registerEarlyLoader(root: string): Promise<void> {
   registered!.early = true
 }
 
-async function register(root: string, settings: Record<string, string>): Promise<void> {
+async function register(root: string, settings: Record<string, string>, placeholder: false | undefined): Promise<void> {
   const { kay } = await import('../build/plugin')
 
-  await plugin(kay({ target: 'ssr', root, cacheDir: projectPaths(root).cache, settings, inspect: underKayDev() }))
+  await plugin(kay({ target: 'ssr', root, cacheDir: projectPaths(root).cache, settings, placeholder, inspect: underKayDev() }))
 }

@@ -185,7 +185,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings, embedMaps: true, rewrite }), ...config.plugins ?? []],
+    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings, placeholder: config.images?.placeholder, embedMaps: true, rewrite }), ...config.plugins ?? []],
   })
 
   if (!build.success)

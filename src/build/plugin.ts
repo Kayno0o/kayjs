@@ -28,6 +28,8 @@ export interface KayPluginOptions {
   root?: string | undefined
   // Keeps compiled files here between runs; off when unset.
   cacheDir?: string | undefined
+  // `false` reads no imported image for the color its box shows until it loads: `images.placeholder`.
+  placeholder?: false | undefined
   // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `settings`.
   settings?: Record<string, string> | undefined
   // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
@@ -261,7 +263,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         if (fileImports.has(path))
           return build.config === undefined ? { exports: { default: path }, loader: 'object' } : { contents: await Bun.file(path).bytes(), loader: 'file' }
 
-        return { contents: await assetModule(path, await writeAsset(path, root, dist), target === 'ssr', options.cacheDir), loader: 'js' }
+        return { contents: await assetModule(path, await writeAsset(path, root, dist), target === 'ssr' && options.placeholder !== false, options.cacheDir), loader: 'js' }
       })
 
       // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.

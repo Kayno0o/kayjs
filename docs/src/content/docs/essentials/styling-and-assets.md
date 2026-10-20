@@ -200,7 +200,7 @@ import hero from '../hero.jpg'
 img(src={hero} no-placeholder alt="The workshop")
 ```
 
-`image(hero, { placeholder: false })` does the same for a spread, and an `img` with a `style` of its own keeps it. `images: { placeholder: false }` turns the colors off everywhere. A content security policy that does not allow inline styles, `security.reportOnly` included, turns them off too, since the browser would drop them. Put after a spread, `no-placeholder` also drops a `style` the spread brings.
+`image(hero, { placeholder: false })` does the same for a spread, and an `img` with a `style` of its own keeps it. `images: { placeholder: false }` turns the colors off everywhere, and no image is read for its color at build. A content security policy that does not allow inline styles, `security.reportOnly` included, turns them off too, since the browser would drop them. Put after a spread, `no-placeholder` also drops a `style` the spread brings.
 
 ### Density and shapes
 

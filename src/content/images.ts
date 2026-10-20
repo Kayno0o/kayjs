@@ -9,7 +9,7 @@ import { projectPaths } from '../project'
 import { escapeAttribute } from '../runtime/escape'
 import { image, RESIZABLE } from '../runtime/image'
 import { registerPlaceholder } from '../runtime/placeholder'
-import { dominantColorOf } from '../server/image-color'
+import { dominantColorOf, imageColors } from '../server/image-color'
 import { imageHeader } from '../server/image-format'
 
 // An image a body links, as the entry's cache keeps it: the file, relative to the project root, and the URL it was built to, which a changed file renames.
@@ -89,7 +89,7 @@ async function linkedImage(src: string, entryDir: string, folder: string, root: 
     const { width, height, animated } = await imageHeader(Bun.file(file))
     const { mtimeMs, size } = await stat(file)
 
-    return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated, color: animated ? undefined : await dominantColorOf(file, projectPaths(root).cache) }
+    return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated, color: animated || !imageColors() ? undefined : await dominantColorOf(file, projectPaths(root).cache) }
   }
   catch {
     // A file not there yet, or half copied, is linked once it is, which the entry's cache looks for.

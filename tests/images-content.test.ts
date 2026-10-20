@@ -13,7 +13,9 @@ import { compileMarkdown } from '../src/content/markdown'
 import { image, imageUrl, parseWidths, setImageWidths, setPlaceholders } from '../src/runtime/image'
 import { placeholderColor } from '../src/runtime/placeholder'
 import { pages } from '../src/server'
+import { setImageColors } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
+import { countColorReads } from './color-reads'
 import { fixtureCopy } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -626,6 +628,34 @@ describe('Markdown images placeholder', () => {
       expect(await colorOf()).toBe('0a141e')
     }
     finally {
+      await restore()
+    }
+  })
+})
+
+describe('Markdown images with images.placeholder: false', () => {
+  afterAll(() => setImageColors(true))
+
+  it('reads no image for its color and writes no marker, and does again once the color is back', async () => {
+    const { restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': opaque(200, 100, 50) })
+    const reads = countColorReads()
+    const markdown = async () => ((await loadEntries('posts', { live: true }))[0]!.segments as string[]).join('')
+
+    try {
+      setImageColors(false)
+
+      const off = await markdown()
+
+      expect(reads.count()).toBe(0)
+      expect(off).toContain('data-kay-image="48x32"')
+      expect(off).not.toContain('data-kay-placeholder')
+
+      setImageColors(true)
+      expect(await markdown()).toContain('data-kay-placeholder="c86432"')
+      expect(reads.count()).toBe(1)
+    }
+    finally {
+      reads.restore()
       await restore()
     }
   })

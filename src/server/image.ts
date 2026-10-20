@@ -18,7 +18,7 @@ import { learnedVersion, learnPlaceholder, placeholderColor } from '../runtime/p
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
-import { dominantColor } from './image-color'
+import { dominantColor, setImageColors } from './image-color'
 import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
@@ -661,6 +661,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, widt
   setResolvedImages(images?.resolve !== undefined)
   // A color is a `style` attribute, which a policy refusing inline styles would drop.
   setPlaceholders(images?.placeholder === false || !inlineStyles ? undefined : placeholderColor)
+  setImageColors(images?.placeholder !== false)
   recordVariants()
 
   return maxDensity

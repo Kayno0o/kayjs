@@ -30,6 +30,7 @@ import { writeDictionaryCopies } from '../server/dictionary'
 import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
 import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
+import { setImageColors } from '../server/image-color'
 import { hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
@@ -382,6 +383,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   report({ step: 'prerendering' })
 
   setMarkdownDefaults(config.markdown)
+  setImageColors(config.images?.placeholder !== false)
 
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, paths.output, config.content)

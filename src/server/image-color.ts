@@ -32,6 +32,17 @@ export async function dominantColor(source: Blob | Uint8Array, maxPixels?: numbe
   }
 }
 
+let enabled = true
+
+// Whether the images of Markdown content are read for their color: off with `images.placeholder: false`.
+export function imageColors(): boolean {
+  return enabled
+}
+
+export function setImageColors(on: boolean): void {
+  enabled = on
+}
+
 // Bumped when the way a color is read changes, so the colors kept on disk are read again.
 const ALGORITHM = '1'
 // The colors read in this process, by file and stamp, so an image several entries and components use is read once.

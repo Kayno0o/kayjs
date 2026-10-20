@@ -10,6 +10,7 @@ import { pages } from '../src/server'
 import { dominantColor, dominantColorOf } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
 import { allowsStyleAttributes } from '../src/server/security'
+import { countColorReads } from './color-reads'
 import { gif } from './gif'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -166,6 +167,55 @@ describe('image() placeholder', () => {
     learnPlaceholder('/uploads/x.png', 'v2', '00ff00')
     expect(placeholderColor('/uploads/x.png')).toBe('00ff00')
     expect(learnedVersion('/uploads/x.png')).toBe('v2')
+  })
+})
+
+describe('images.placeholder: false', () => {
+  const photo = async (color: number) => {
+    const root = resolve(await scratchDir('colors-off-'))
+
+    await Bun.write(join(root, 'src/photo.png'), flat(color, 100, 50))
+
+    return root
+  }
+
+  it('reads no image for its color in a bundle, and reads it for a bundle that does not opt out', async () => {
+    const root = await photo(201)
+    const entry = join(root, 'src/entry.ts')
+
+    await Bun.write(entry, 'import photo from \'./photo.png\'\nconsole.log(photo)\n')
+
+    const reads = countColorReads()
+
+    try {
+      const bundle = async (placeholder?: false) => (await Bun.build({ entrypoints: [entry], target: 'bun', plugins: [kay({ target: 'ssr', root, placeholder })] })).outputs[0]!.text()
+      const off = await bundle(false)
+
+      expect(reads.count()).toBe(0)
+      expect(off).not.toContain('registerPlaceholder')
+      expect(await bundle()).toContain('"c96432"')
+      expect(reads.count()).toBe(1)
+    }
+    finally {
+      reads.restore()
+    }
+  })
+
+  it('reads none through the loader of a project whose config sets it, and one through a project that does not', async () => {
+    const run = async (config: string, color: number) => {
+      const root = await photo(color)
+      const script = join(root, 'load.ts')
+
+      await Bun.write(join(root, 'kay.config.ts'), config)
+      await Bun.write(script, `import { join } from 'node:path'\nimport { placeholderColor } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/placeholder'))}\nimport { registerLoader } from ${JSON.stringify(join(import.meta.dir, '../src/server/loader'))}\nimport { countColorReads } from ${JSON.stringify(join(import.meta.dir, 'color-reads'))}\nconst reads = countColorReads()\nawait registerLoader(${JSON.stringify(root)})\nconst { default: url } = await import(join(${JSON.stringify(root)}, 'src/photo.png'))\nconsole.log(JSON.stringify({ reads: reads.count(), color: placeholderColor(url) ?? null }))\n`)
+
+      const child = Bun.spawn([process.execPath, script], { cwd: root, stdout: 'pipe', stderr: 'inherit' })
+
+      return JSON.parse(await new Response(child.stdout).text()) as { reads: number, color: string | null }
+    }
+
+    expect(await run('export default { images: { placeholder: false } }\n', 202)).toEqual({ reads: 0, color: null })
+    expect(await run('export default {}\n', 203)).toEqual({ reads: 1, color: 'cb6432' })
   })
 })
 

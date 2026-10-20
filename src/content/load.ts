@@ -10,6 +10,7 @@ import { pruneCache, touchCacheFile } from '../build/cache'
 import { resolveFrom, scriptLoader, transpilerFor, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
+import { imageColors } from '../server/image-color'
 import { projectSource } from '../server/source'
 import { linkImages, statOf } from './images'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
@@ -184,7 +185,7 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
   const cacheDir = projectCache(root, 'content')
   // Bun's Markdown output, the highlighter's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
   const imported = highlight === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
-  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${Bun.version}:${highlight?.toString() ?? ''}:${imported}`).toString(36)
+  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${Bun.version}:${highlight?.toString() ?? ''}:${imported}`).toString(36)
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
