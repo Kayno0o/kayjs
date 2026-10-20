@@ -238,7 +238,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (security)
     sendSecurityHeaders(app, security, filePaths)
 
-  if (options.compress ?? process.env.NODE_ENV === 'production')
+  const compressing = options.compress ?? process.env.NODE_ENV === 'production'
+
+  if (compressing)
     compress(app, client, base, options.onError)
 
   // kay's own messages go out whether requests are logged or not.
@@ -430,7 +432,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Read in development too, so a duration that is none stops it there rather than in production.
   const publicCache = publicCacheRules(options.publicCache)
 
-  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache)
+  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev)
   serveRedirects(app, redirects, mode.dev)
 
   // Before the page routes, which a hook registered after them does not reach.

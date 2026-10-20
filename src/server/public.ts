@@ -1,11 +1,12 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
 import type { Claim, ServedPaths } from './served-paths'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { wholeSeconds } from '../runtime/duration'
+import { COMPRESSIBLE_TYPE, readResponse } from './compress'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -26,6 +27,9 @@ const FONT = /\.(?:woff2?|ttf|otf|eot)$/i
 const IMAGE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i
 const FONT_CONTROL = `public, max-age=${30 * 86_400}`
 const IMAGE_CONTROL = 'public, max-age=86400'
+// The text files kept in memory so compressing one reads nothing again: none above the first, and no more than the second altogether.
+const KEPT_FILE_BYTES = 256 * 1024
+const KEPT_TOTAL_BYTES = 8 * 1024 * 1024
 
 export interface PublicFile {
   path: string
@@ -148,14 +152,57 @@ function defaultControl(url: string): string {
   return IMAGE.test(url) ? IMAGE_CONTROL : REVALIDATE
 }
 
+// The bytes of a file as they stand, read again only when its size or date changed; undefined for a file too large to keep, or one that would pass the total.
+// What `held` counts is shared by every file of the server, which pass it in.
+function keeper(path: string, held: { bytes: number }): () => Uint8Array<ArrayBuffer> | undefined {
+  let kept: { size: number, mtimeMs: number, bytes: Uint8Array<ArrayBuffer> } | undefined
+
+  return () => {
+    const stat = statSync(path, { throwIfNoEntry: false })
+
+    if (!stat?.isFile())
+      return undefined
+
+    if (kept?.size === stat.size && kept.mtimeMs === stat.mtimeMs)
+      return kept.bytes
+
+    held.bytes -= kept?.bytes.length ?? 0
+    kept = undefined
+
+    if (stat.size > KEPT_FILE_BYTES || held.bytes + stat.size > KEPT_TOTAL_BYTES)
+      return undefined
+
+    const bytes = new Uint8Array(readFileSync(path))
+
+    kept = { size: stat.size, mtimeMs: stat.mtimeMs, bytes }
+    held.bytes += bytes.length
+
+    return bytes
+  }
+}
+
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
-export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE): Promise<void> {
+// With `compressing`, a text file small enough is answered from its bytes kept in memory, which compression takes as they are; a range request, which Bun answers from the file, and the rest stream the file.
+export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false): Promise<void> {
+  const held = { bytes: 0 }
+
   for (const { path, url } of files.filter(file => served.holds(file.claim))) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
     const cache = cacheFor(url)
+    const { type } = Bun.file(path)
+    const read = compressing && COMPRESSIBLE_TYPE.test(type) ? keeper(path, held) : undefined
 
-    app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path), {}, cache))
+    app.get(url, ({ request }) => {
+      const bytes = request.headers.has('range') ? undefined : read?.()
+
+      if (!bytes)
+        return revalidated(request, etag, () => Bun.file(path), {}, cache)
+
+      const response = revalidated(request, etag, () => bytes, { 'content-type': type }, cache)
+
+      return response.status === 200 ? readResponse(response, bytes) : response
+    })
   }
 }

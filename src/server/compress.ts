@@ -37,8 +37,9 @@ const acceptedWeights = new Map<string, Record<Encoding, number>>()
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 6
 const ZSTD_LEVEL = 3
+
 // Response types worth compressing: text, the structured data and scripts sent as text, and the fonts that carry no compression of their own.
-const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm|(?:x-)?ndjson)|font\/(?:ttf|otf)|image\/svg\+xml)/i
+export const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm|(?:x-)?ndjson)|font\/(?:ttf|otf)|image\/svg\+xml)/i
 // Statuses with no body to compress, or a partial one.
 const BODILESS = new Set([101, 204, 205, 206, 304])
 const NO_TRANSFORM = /\bno-transform\b/i
@@ -607,6 +608,13 @@ function gzipMember(chunks: Uint8Array[], crc: number, length: number): Uint8Arr
 
 // The bytes of a route's own Response read whole, by the Response.
 const readBodies = new WeakMap<Response, Uint8Array<ArrayBuffer>>()
+
+// The response with the bytes its route holds already, which compression reads as they are rather than through a stream of the body.
+export function readResponse(response: Response, bytes: Uint8Array<ArrayBuffer>): Response {
+  readBodies.set(response, bytes)
+
+  return response
+}
 
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
 const wholeSizes = new WeakMap<Response, number>()
