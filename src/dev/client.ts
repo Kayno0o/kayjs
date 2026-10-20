@@ -108,8 +108,11 @@ export function startClientBuilder(root: string, env: Record<string, string | un
 
     const outcome = new Promise<BuildOutcome | undefined>(resolve => state.waiting.push(resolve))
 
-    // A process already dead drops it: its exit then answers undefined.
-    state.child.send({ build: changed } satisfies BuildRequest)
+    // A process already dead drops it, or throws once its channel closed before `exited` settled, as after the idle kill: its exit then answers undefined.
+    try {
+      state.child.send({ build: changed } satisfies BuildRequest)
+    }
+    catch {}
 
     return outcome
   }
