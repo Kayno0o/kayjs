@@ -1,0 +1,10 @@
+--- server
+import { talks } from '../../content.config'
+
+export const page = { prerender: true }
+
+const entries = await talks.all()
+---
+ul
+  for entry of entries key={entry.slug}
+    li {entry.data.title}

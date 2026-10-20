@@ -53,3 +53,26 @@ test('Alt with an arrow in a field of an item moves it, and a move past either e
 
   expect(drafts.value(ENTRY, 'tags')).toEqual(['a', 'c', 'b'])
 })
+
+test('a date and time is shown and typed in UTC, stored as a full date, and cleared with nothing stored', async () => {
+  const drafts = createDrafts({ show: async () => ({}) })
+  const field: Field = { key: 'tags', label: 'Publish at', hint: undefined, required: false, kind: 'datetime' }
+
+  drafts.open({ ...ENTRY, data: { tags: '2026-10-20T08:00:00+02:00' } })
+  mounted = await mountComponent('src/components/list-field.kay', { drafts, field })
+
+  const input = mounted.root.querySelector<HTMLInputElement>('input[type="datetime-local"]')!
+  const type = (text: string) => {
+    input.value = text
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  expect(input.value).toBe('2026-10-20T06:00')
+  expect(mounted.root.textContent).toContain('Time in UTC')
+  type('2026-10-21T09:30')
+  await settle()
+  expect(drafts.value(ENTRY, 'tags')).toBe('2026-10-21T09:30:00.000Z')
+  type('')
+  await settle()
+  expect(drafts.value(ENTRY, 'tags')).toBeUndefined()
+})

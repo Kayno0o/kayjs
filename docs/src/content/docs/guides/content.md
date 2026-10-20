@@ -64,6 +64,29 @@ export const news = collection('content/news', { schema, live: true })
 
 The page is rendered for each request then, so `kay build` cannot keep it as a file. See [Data from the cache](/guides/live-and-realtime#data-from-the-cache).
 
+## Scheduling an entry
+
+Name a date field with `publishAt` in the collection, beside `draft`:
+
+```ts
+export const posts = collection('src/content/posts', {
+  schema: s.Object({ title: s.String(), publishAt: s.Optional(s.Date()) }),
+  publishAt: 'publishAt',
+})
+```
+
+An entry whose date is still ahead is held back as a draft is: it is left out of `all()`, `get()`, the sitemap, the feed and the pages built from it. At that time it appears by itself. An entry with no date, or a date in the past, is published. A draft stays a draft whatever its date.
+
+The date is read in UTC, never in the server's time zone. `2026-10-20` means midnight UTC. To say an hour in your own zone, write the offset: `2026-10-20T08:00:00+02:00`.
+
+Your app writes no cron, job or webhook. Each server process watches the dates of its own collections. When one passes, it builds again the pages that read the collection, and the sitemap. A server that was down at that time does it as it starts. Several replicas each do it for themselves.
+
+The page of the new entry itself was not listed when the site was built, so it is rendered on each visit until the next build.
+
+A [static export](/guides/static-export) has no server, so it cannot change by itself. Build it again on a schedule, for example from CI, and the entry appears in the next build.
+
+A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start.
+
 ## A page per entry
 
 A page named after the slug reads one entry and prerenders a page for each of them.

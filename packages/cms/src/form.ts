@@ -3,6 +3,7 @@ import type { Drafts } from './drafts'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import { guardLeave, navigate, signal } from 'kay'
 import { wording } from 'kay/words'
+import { scheduledFor } from './datetime'
 import { createDrafts } from './drafts'
 import { deleteSaved, saveDraft } from './editor/save'
 import { shipWords } from './editor/words'
@@ -36,6 +37,8 @@ export interface EntryForm extends FormScope {
   saving: Signal<boolean>
   stored: StoredEntry | undefined
   isDraft: () => boolean
+  // When a published entry whose `publishAt` date is ahead goes live, in UTC, as the form holds it now.
+  scheduled: () => string | undefined
   save: () => Promise<void>
   publish: () => Promise<void>
   remove: () => Promise<void>
@@ -108,6 +111,8 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     return now && nameOf() !== now.slug ? slugLine(now) : now?.locale
   }
 
+  const isDraft = () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true
+
   async function save(): Promise<void> {
     saving.set(true)
 
@@ -146,7 +151,8 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     get stored() {
       return stored()
     },
-    isDraft: () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true,
+    isDraft,
+    scheduled: () => !isDraft() && collection.publishField !== undefined ? scheduledFor(collection, { [collection.publishField]: drafts.value(ref, collection.publishField) }) : undefined,
     save,
     async publish() {
       if (collection.draftField === undefined)

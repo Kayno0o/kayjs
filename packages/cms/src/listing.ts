@@ -1,4 +1,5 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
+import { scheduledFor } from './datetime'
 import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
@@ -12,6 +13,8 @@ export interface EntryRow {
   locale?: string | undefined
   title: string
   draft: boolean
+  // For a published entry whose `publishAt` date is ahead, when it goes live in UTC.
+  scheduled?: string | undefined
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
@@ -27,7 +30,7 @@ export interface EntryRow {
 export const PAGE_SIZE = 50
 
 // A row per entry, titled by the entry's first one-line text field, else its slug.
-export function rowsOf(collection: ScreenCollection, entries: SourceEntry[]): EntryRow[] {
+export function rowsOf(collection: ScreenCollection, entries: SourceEntry[], now = Date.now()): EntryRow[] {
   const fields = fieldsOf(collection.schema)
   const titleKey = fields.find(field => field.kind === 'text')?.key
   const columns = listColumns(fields, collection.layout?.list)
@@ -36,7 +39,7 @@ export function rowsOf(collection: ScreenCollection, entries: SourceEntry[]): En
     const title = titleKey === undefined ? undefined : data?.[titleKey]
     const cells = columns.length === 0 ? undefined : Object.fromEntries(columns.map(field => [field.key, cellText(field, data?.[field.key])]))
 
-    return { slug, locale, url, draft, problem, cells, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    return { slug, locale, url, draft, problem, cells, ...!draft && { scheduled: scheduledFor(collection, data, now) }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 

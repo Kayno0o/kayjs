@@ -195,7 +195,22 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
   const matches = typeof key === 'string' ? (name: string) => name === key : key
   const dropped = new Set<string>(typeof key === 'string' ? [key] : [])
 
-  for (const name of dropEntries(matches))
+  dropAndTell(matches, matches, dropped)
+
+  if (dropped.size > 0)
+    broadcast({ keys: [...dropped] })
+}
+
+// Drops what is built from `key` and tells the listeners it changed, in this process alone: the key's own value stays and nothing is sent to the other processes. For a change the clock made, which every process sees by itself.
+export function refreshLocally(key: string): void {
+  const reads = (name: string) => name === key
+
+  dropAndTell(() => false, reads, new Set())
+}
+
+// Drops the entries and stored rows `named` matches, and those built from a read `built` matches, then tells the key listeners; `dropped` gathers the keys, which `invalidate` sends on.
+function dropAndTell(named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): void {
+  for (const name of dropEntries(named, built))
     dropped.add(name)
 
   for (const store of stores) {
@@ -212,7 +227,7 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
     }
 
     for (const name of store.keys()) {
-      if (matches(name) || dropped.has(name) || (!entries.has(name) && builtFrom(name).some(read => read === ALL_READS || matches(read)))) {
+      if (named(name) || dropped.has(name) || (!entries.has(name) && builtFrom(name).some(read => read === ALL_READS || built(read)))) {
         store.delete(name)
         dropped.add(name)
       }
@@ -220,20 +235,17 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
   }
 
   for (const listener of keyListeners) {
-    for (const name of listener(name => matches(name) || dropped.has(name)))
+    for (const name of listener(name => named(name) || built(name) || dropped.has(name)))
       dropped.add(name)
   }
-
-  if (dropped.size > 0)
-    broadcast({ keys: [...dropped] })
 }
 
 // Drops the entries a matcher names and those built from one it names, giving back their keys.
-function dropEntries(matches: (key: string) => boolean): string[] {
+function dropEntries(named: (key: string) => boolean, built: (key: string) => boolean = named): string[] {
   const names: string[] = []
 
   for (const [name, entry] of entries) {
-    if (matches(name) || entry.deps?.some(dep => dep === ALL_READS || matches(dep))) {
+    if (named(name) || entry.deps?.some(dep => dep === ALL_READS || built(dep))) {
       entries.delete(name)
       names.push(name)
     }

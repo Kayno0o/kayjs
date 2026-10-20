@@ -8,6 +8,7 @@ import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { Unmatched } from './page-routes'
+import type { Publishing } from './publishing'
 import type { ServedPage } from './render'
 import type { Claim } from './served-paths'
 import type { PageSetup } from './setup'
@@ -59,6 +60,7 @@ import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
 import { claimPublic, publicCacheRules, servePublic } from './public'
+import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
@@ -189,7 +191,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
 }
 
 // Tracked for `invalidatePage` while the app runs, each page the build rendered for another site, or that read the site, waiting for a fresh render first.
-function trackWhileRunning(app: App, prerendered: Map<string, Map<string, ServedPage>>, client: ClientBuild, site: string | undefined, mode: Mode, output: string) {
+function trackWhileRunning(app: App, prerendered: Map<string, Map<string, ServedPage>>, client: ClientBuild, site: string | undefined, mode: Mode, output: string, publishing: Publishing) {
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site
 
@@ -197,13 +199,15 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
   if (moved && client.site !== undefined)
     kayLog('warn', `kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
-  const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true))
+  const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true || publishing.passed(page)))
 
   app.onStart(() => {
     for (const { track } of tracked)
       track()
   })
   app.onStop(() => {
+    publishing.stop()
+
     for (const { release } of tracked)
       release()
 
@@ -435,7 +439,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
   await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
-  trackWhileRunning(app, prerendered, client, site, mode, paths.output)
+  // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
+  const publishing = exported || mode.dev ? NOT_PUBLISHING : await watchPublishing(collections)
+
+  trackWhileRunning(app, prerendered, client, site, mode, paths.output, publishing)
 
   // `kay dev` prints its own.
   if (log !== false && !mode.dev)

@@ -66,6 +66,8 @@ export interface CollectionInfo {
   dir?: string | undefined
   // The boolean field `draft: 'field'` names, true for a draft: publishing writes false to it.
   draftField?: string | undefined
+  // The date field `publishAt` names, which holds an entry back until its time: a CMS shows it and marks an entry whose date is ahead.
+  publishField?: string | undefined
   // The number field `order` names, which the entries are ordered by and a CMS moves one by writing.
   orderField?: string | undefined
   // How many entries it holds, every locale's; absent when `problem` says why they fail to read.
@@ -233,7 +235,7 @@ export async function collectionInfo(name: string, { counts = true }: { counts?:
 }
 
 async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
-  const { draft, localized = false, order, schema, title } = collection.options
+  const { draft, localized = false, order, publishAt, schema, title } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
   const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
   const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
@@ -249,6 +251,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...localized && site?.locales && { locales: [...site.locales] },
     ...inRepo !== undefined && { dir: inRepo },
     ...typeof draft === 'string' && { draftField: draft },
+    ...publishAt !== undefined && { publishField: publishAt },
     ...order !== undefined && { orderField: order },
     ...count !== undefined && { count },
     ...problem !== undefined && { problem },

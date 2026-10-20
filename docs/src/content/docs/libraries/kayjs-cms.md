@@ -284,6 +284,14 @@ In the list, `columns` are field keys shown after the title, and `actions` keeps
 
 The editor on the page follows the form's layout too. A name twice, or an action that does not exist, throws when `kay.config.ts` loads. A field the schema lacks logs a warning at boot.
 
+## Scheduling an entry
+
+A collection with `publishAt: 'publishAt'` (see [Scheduling an entry](/guides/content#scheduling-an-entry)) shows that date field in the entry form like any other. The editor sets, changes or clears it and saves. The cms only edits the field: kay shows the entry at that time, with no job in your app.
+
+In the list, a published entry whose date is ahead has `Scheduled for 2026-10-20 08:00 UTC` in the Status column, and the entry screen shows the same badge. A draft stays a draft, so Publish on a draft with a date confirms the schedule.
+
+The date and time input shows and stores UTC, and says so under the field. A date field you clear stores nothing.
+
 ## Replacing a screen
 
 Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. A `src/routes/admin/_layout.kay` replaces the cms's own layout for all of them, which holds the Content link, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. The cms guard still runs before your page.

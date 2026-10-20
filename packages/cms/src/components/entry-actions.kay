@@ -6,13 +6,15 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import { wording } from 'kay/words'
 import { onPagePath } from '../listing'
 
-// The Draft badge and the buttons of an entry's screen: Edit on page, Publish and Delete for a saved entry, Reset once edited, Save or Create. Meant for the header's slot.
+// The Draft badge, or the Scheduled one for a published entry whose date is ahead, and the buttons of an entry's screen: Edit on page, Publish and Delete for a saved entry, Reset once edited, Save or Create. Meant for the header's slot.
 const { form } = props<{ form: EntryForm }>()
 
 const entry = form.stored
 ---
 if form.isDraft()
   Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
+else if form.scheduled() as at
+  Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at })})
 .kcms-entry-actions
   if entry
     if entry.url as url

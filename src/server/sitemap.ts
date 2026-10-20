@@ -16,6 +16,7 @@ import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
 import { chainSetting, pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
+import { onPublished } from './publishing'
 import { reportServerError } from './report'
 import { routeChain, slashedPath } from './routes'
 import { ROBOTS, SITEMAP } from './site-paths'
@@ -58,6 +59,10 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   // `files` holds the documents of the sitemap: the one `/sitemap.xml`, or its index followed by each part.
   const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number, degraded: boolean }>()
   const settings = options.locales
+
+  // An entry published at its time shows in the sitemap then, not up to an hour later.
+  app.onStop(onPublished(() => cached.clear()))
+
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
   const reading = (locale: string | undefined, report: (error: unknown) => void) => {
     let sitemap = cached.get(locale)

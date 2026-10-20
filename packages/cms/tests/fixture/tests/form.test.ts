@@ -36,6 +36,29 @@ describe('createShown', () => {
   })
 })
 
+describe('a scheduled entry\'s form', () => {
+  const talks: ScreenCollection = { name: 'talks', kind: 'folder', localized: false, components: [], publishField: 'at', draftField: 'draft', schema: { properties: { title: { type: 'string' }, at: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } } }
+  const ahead = new Date(Date.now() + 86_400_000).toISOString()
+  const scheduledEntry = (data: Record<string, unknown>) => ({ ...entry('talk', 'Talk'), data }) as StoredEntry
+
+  test('says when the entry goes live while its date is ahead and it is no draft, following the edits', () => {
+    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: scheduledEntry({ title: 'Talk', at: ahead }) })
+
+    expect(form.scheduled()).toBe(`${ahead.slice(0, 10)} ${ahead.slice(11, 16)} UTC`)
+    form.drafts.set(form.entry, 'at', undefined)
+    expect(form.scheduled()).toBeUndefined()
+    form.drafts.set(form.entry, 'at', '2020-01-01T00:00:00.000Z')
+    expect(form.scheduled()).toBeUndefined()
+  })
+
+  test('leaves a draft a draft, and a collection with no publishAt alone', () => {
+    const drafted = createEntryForm({ prefix: '/admin', collection: talks, entry: scheduledEntry({ title: 'Talk', at: ahead, draft: true }) })
+    const plain = createEntryForm({ prefix: '/admin', collection: { ...talks, publishField: undefined }, entry: scheduledEntry({ title: 'Talk', at: ahead }) })
+
+    expect([drafted.isDraft(), drafted.scheduled(), plain.scheduled()]).toEqual([true, undefined, undefined])
+  })
+})
+
 describe('createEntryForm', () => {
   test.each(['/', '/admin', '/studio/cms/admin'])('carries the prefix %s the parts write their links from', (prefix) => {
     const form = createEntryForm({ prefix, collection: posts, entry: entry('notes/a b@c', 'Title') })

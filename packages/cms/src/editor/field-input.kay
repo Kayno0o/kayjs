@@ -12,6 +12,7 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import { wording } from 'kay/words'
+import { inputValue, storedValue } from '../datetime'
 import { emptyValue, itemAt } from '../fields'
 import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
@@ -103,10 +104,10 @@ function setJson(next: string): void {
         TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="date" value={text().slice(0, 10)} onInput={set})
+        TextInput(type="date" value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
     when 'datetime'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="datetime-local" value={text().slice(0, 16)} onInput={set})
+      FormField(label={current.label} hint={[current.hint, wording('cms.field.utc', 'Time in UTC')].filter(Boolean).join(' ')} issue={issue()} required={starred()})
+        TextInput(type="datetime-local" value={inputValue(text())} onInput={next => set(storedValue(next ?? ''))})
     when 'select'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Select(value={text()} options={current.options} emptyOption={!current.required} onChange={next => set(current.options.find(option => option.value === next)?.raw)})

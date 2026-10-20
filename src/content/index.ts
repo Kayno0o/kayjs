@@ -14,7 +14,7 @@ import { editableEntries } from '../runtime/fields'
 import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
-import { isDraft } from './drafts'
+import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
@@ -29,8 +29,12 @@ export type { Page, Paginated } from './paginate'
 export { isPaginated, paginate } from './paginate'
 
 export const COLLECTION = Symbol.for('kay.collection')
+// The dates the collection's entries are published at, which the server watches to refresh the pages that read it.
+export const PUBLISH_TIMES = Symbol.for('kay.publishTimes')
 // Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.
 declare const FEED_PATH: unique symbol
+// The cache key a page that read the collection carries, which `invalidate` refreshes the page for.
+export const contentKey = (name: string) => `kay:content:${name}`
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
 
@@ -92,6 +96,9 @@ type NumberField<Data> = { [Name in keyof Data]-?: Data[Name] extends number | u
 // The fields of the data holding a boolean, which `draft` may name.
 type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean | undefined ? Name : never }[keyof Data] & string
 
+// The fields of the data holding a date, which `publishAt` may name.
+type DateField<Data> = { [Name in keyof Data]-?: Data[Name] extends Date | null | undefined ? Name : never }[keyof Data] & string
+
 export interface CollectionOptions<Schema extends TSchema> {
   // The name a CMS screen titles the collection with, `Produits`; the export's name, humanized, when left out. The name still keeps the URLs, the markers and the upload folder.
   title?: string | undefined
@@ -109,6 +116,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   imageSizes?: string | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
+  // A date field, `'publishAt'`, holding an entry back as a draft is until that time and showing it by itself then: in `all()`, `get()`, the pages prerendered from it, the sitemap and the feed. A date alone is 00:00 UTC, a date with an offset is that instant; an entry without one is published. A draft stays one whatever its date.
+  publishAt?: DateField<Static<Schema>> | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
   order?: NumberField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by `order`, else by slug.
@@ -126,6 +135,8 @@ export interface CollectionOptions<Schema extends TSchema> {
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
   readonly [COLLECTION]: true
   readonly [FEED_PATH]?: FeedPath
+  // The dates `publishAt` reads from the entries, in order and once each.
+  readonly [PUBLISH_TIMES]: () => Promise<number[]>
   // The folder, relative to the project root, or the loader's name.
   readonly name: string
   // The folder, or undefined for a collection a loader fills.
@@ -162,10 +173,13 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const components = options.components ?? {}
   const loader = typeof source === 'string' ? undefined : source
   const name = typeof source === 'string' ? source : source.name
-  const key = `kay:content:${name}`
+  const key = contentKey(name)
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
-  const { draft, localized = false } = options
+  const { draft, localized = false, publishAt } = options
+
+  if (publishAt !== undefined)
+    checkPublishField(name, options.schema, publishAt)
 
   const decodeEach = (raw: RawEntry[]) => {
     const { readingSpeed, imageSizes } = markdownOf(options)
@@ -308,12 +322,25 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return withDrafts(await (loader ? fromLoader : fromFolder)())
   }
-  const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && isDraft(draft, entry)
+  const scheduled = (entry: Entry<Data>) => {
+    const time = publishAt === undefined ? undefined : publishTime(publishAt, entry)
+
+    return time !== undefined && time > Date.now()
+  }
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 
   return {
     [COLLECTION]: true,
+    [PUBLISH_TIMES]: async () => {
+      if (publishAt === undefined)
+        return []
+
+      const times = (await (loader ? fromLoader : fromFolder)()).list.map(entry => publishTime(publishAt, entry))
+
+      return [...new Set(times.filter(time => time !== undefined))].toSorted((a, b) => a - b)
+    },
     name,
     dir: loader ? undefined : name,
     loader,

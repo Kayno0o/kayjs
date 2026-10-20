@@ -1,0 +1,8 @@
+--- server
+import { talks } from '../../content.config'
+
+export const page = { prerender: talks }
+
+const talk = await talks.get(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {talk.data.title}
