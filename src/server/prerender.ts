@@ -265,17 +265,22 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     return pending
   }
 
-  // The page a path no route serves is answered with, in the default locale, as every other prerendered page is drawn.
+  // The page a path no route serves is answered with, in the default locale, as every other prerendered page is drawn; none when it fails to render, which a visit to it would report.
   const renderedMissing = async (): Promise<string> => {
     const request = new Request('http://localhost/_kay-dictionary')
     const token = pageToken('/_kay-dictionary', tokens)
     const render = async () => withPageToken(token, async () => {
       const response = await renderUnmatched(source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: undefined, prerendering: true })
 
-      return response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
+      return response.status === 404 && response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
     })
 
-    return runInLocale(stateFor(locales, locales.settings.defaultLocale, '/', request), render)
+    try {
+      return await runInLocale(stateFor(locales, locales.settings.defaultLocale, '/', request), render)
+    }
+    catch {
+      return ''
+    }
   }
 
   // What keeps a page from a static export, each named, so one build reports them all.
@@ -347,10 +352,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (restyled)
     await dropOrphanCopies(client, dir, pages)
 
-  // A static host cannot answer by what the browser holds, so only a server build has a dictionary.
-  const dictionary = options.exportAll ? undefined : await writeDictionary(client.dir, await renderedMissing())
+  // A static host cannot answer by what the browser holds, so only a server build has a dictionary, and one with a prerendered page, whose layouts the build renders already.
+  const dictionary = options.exportAll || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
 
-  delete manifest.dictionary
   await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))
   client.dictionary = dictionary

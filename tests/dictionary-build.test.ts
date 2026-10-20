@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { zstdDecompressSync } from 'node:zlib'
+import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
@@ -34,6 +34,8 @@ const paragraphs = (topic: string, count = 30) => Array.from({ length: count }, 
 
 function files(config: string, i18n: boolean): Record<string, string> {
   return {
+    // Rendered again in the background once a second old.
+    'src/routes/tick.kay': `--- server\nexport const page = { prerender: true, revalidate: 1 }\nconst stamp = Date.now()\n---\nh1 Tick\np tick-{stamp}\n${paragraphs('Tick')}\n`,
     'tsconfig.json': tsconfig,
     'kay.config.ts': config,
     'src/routes/_layout.kay': layout('/'),
@@ -68,7 +70,7 @@ async function build(root: string, ...args: string[]): Promise<void> {
     throw new Error(out + err)
 }
 
-async function project(config: string, i18n = false): Promise<string> {
+async function project(config: string, i18n = false, only?: Record<string, string>): Promise<string> {
   const cache = join(import.meta.dir, '../node_modules/.cache')
 
   await mkdir(cache, { recursive: true })
@@ -76,7 +78,7 @@ async function project(config: string, i18n = false): Promise<string> {
   const root = await mkdtemp(join(cache, 'dictionary-'))
 
   roots.push(root)
-  await Promise.all(Object.entries(files(config, i18n)).map(async ([name, content]) => Bun.write(join(root, name), content)))
+  await Promise.all(Object.entries(only ?? files(config, i18n)).map(async ([name, content]) => Bun.write(join(root, name), content)))
 
   return root
 }
@@ -117,6 +119,16 @@ async function get(site: Site, pathname: string, headers: Record<string, string>
 
 const manifestOf = async (site: Site) => await Bun.file(join(outputDir(site.root), 'manifest.json')).json() as { dictionary?: { file: string, hash: string } }
 
+function decoded(reply: Reply, dictionary: Buffer): string {
+  switch (reply.headers.get('content-encoding') ?? 'identity') {
+    case 'dcz': return zstdDecompressSync(reply.body.subarray(40), { dictionary }).toString()
+    case 'br': return brotliDecompressSync(reply.body).toString()
+    case 'zstd': return zstdDecompressSync(reply.body).toString()
+    case 'gzip': return gunzipSync(reply.body).toString()
+    default: return reply.body.toString()
+  }
+}
+
 // A page as a browser holding the dictionary receives it, and the page the same browser would have without one.
 async function asDictionary(site: Site, pathname: string, headers: Record<string, string> = {}): Promise<{ reply: Reply, text: string, plain: string, dictionary: Buffer }> {
   const { dictionary } = (await manifestOf(site))
@@ -124,19 +136,21 @@ async function asDictionary(site: Site, pathname: string, headers: Record<string
   const reply = await get(site, pathname, { 'accept-encoding': ACCEPT, 'available-dictionary': `:${dictionary!.hash}:`, ...headers })
   const plain = await get(site, pathname, { 'accept-encoding': 'identity', ...headers })
 
-  return { reply, text: reply.headers.get('content-encoding') === 'dcz' ? zstdDecompressSync(reply.body.subarray(40), { dictionary: bytes }).toString() : reply.body.toString(), plain: plain.body.toString(), dictionary: bytes }
+  return { reply, text: decoded(reply, bytes), plain: plain.body.toString(), dictionary: bytes }
 }
 
 beforeAll(async () => {
-  const [root, mounted] = await Promise.all([
+  const [root, mounted, plain] = await Promise.all([
     project('export default {}\n'),
     project('export default { base: \'/repo\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', true),
+    project('export default { compress: false }\n'),
   ])
 
   // One build at a time, as each starts the compilers.
   await build(root)
   await build(mounted)
-  sites = await Promise.all([serve(root), serve(mounted, '/repo')])
+  await build(plain)
+  sites = await Promise.all([serve(root), serve(mounted, '/repo'), serve(plain)])
 }, 300_000)
 
 afterAll(async () => {
@@ -237,6 +251,7 @@ describe('a page against the dictionary', () => {
 
     expect(again.reply.status).toBe(304)
     expect(again.reply.body.length).toBe(0)
+    expect(again.reply.headers.get('vary')).toContain('available-dictionary')
     expect(other.reply.status).toBe(200)
     expect(other.reply.headers.get('content-encoding')).toBe('dcz')
   })
@@ -306,6 +321,55 @@ describe('a page against the dictionary', () => {
 
     expect(zstdDecompressSync((await asDictionary(mounted!, '/fr/about/')).reply.body.subarray(40), { dictionary: (await asDictionary(mounted!, '/about/')).dictionary }).toString()).toContain('lang="fr"')
   })
+})
+
+describe('a page that changes under the server', () => {
+  it('goes to a browser holding the dictionary as its new render, not the build\'s', async () => {
+    const [root] = sites
+    const stamp = (text: string) => (/tick-(\d+)/).exec(text)![1]
+    const first = await asDictionary(root!, '/tick')
+
+    expect(first.reply.headers.get('content-encoding')).toBe('dcz')
+
+    const built = stamp(first.plain)
+    let latest = first
+
+    for (let tries = 0; tries < 50 && stamp(latest.plain) === built; tries++) {
+      await Bun.sleep(200)
+      latest = await asDictionary(root!, '/tick')
+    }
+
+    expect(stamp(latest.plain)).not.toBe(built)
+
+    const after = await asDictionary(root!, '/tick')
+
+    expect(stamp(after.text)).toBe(stamp(after.plain))
+    expect(after.reply.headers.get('content-encoding')).not.toBe('dcz')
+  })
+})
+
+describe('a server with no dictionary to use', () => {
+  it('compresses nothing itself with compress: false, so a browser holding another build\'s dictionary or none gets the build\'s copies and no link', async () => {
+    const plain = sites[2]!
+    const dictionary = (await manifestOf(plain)).dictionary!
+    const reply = await get(plain, '/about', { 'accept-encoding': ACCEPT, 'available-dictionary': `:${dictionary.hash}:` })
+
+    expect(reply.headers.get('content-encoding')).toBe('br')
+    expect(reply.headers.get('link')).toBeNull()
+    expect(reply.headers.get('etag')).toEndWith('-br"')
+    expect(reply.headers.get('vary')).not.toContain('available-dictionary')
+  })
+
+  it('is not built for an app with no prerendered page, or whose 404 page fails to render, which still builds', async () => {
+    const dynamic = await project('export default {}\n', false, { 'tsconfig.json': tsconfig, 'kay.config.ts': 'export default {}\n', 'src/routes/_layout.kay': layout('/'), 'src/routes/live.kay': 'h1 Live\n' })
+    const failing = await project('export default {}\n', false, { 'tsconfig.json': tsconfig, 'kay.config.ts': 'export default {}\n', 'src/routes/_404.kay': '--- server\nthrow new Error(\'no 404 today\')\n---\nh1 Nothing\n', 'src/routes/index.kay': `--- server\nexport const page = { prerender: true }\n---\nh1 Home\n${paragraphs('Home')}\n` })
+
+    await build(dynamic)
+    await build(failing)
+
+    for (const root of [dynamic, failing])
+      expect((await Bun.file(join(outputDir(root), 'manifest.json')).json() as { dictionary?: unknown }).dictionary).toBeUndefined()
+  }, 120_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a browser', () => {

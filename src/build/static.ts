@@ -4,7 +4,7 @@ import type { ClientBuild } from '../server/client'
 import type { Redirects } from '../server/redirects'
 import { existsSync } from 'node:fs'
 import { cp, mkdir, readdir, rm } from 'node:fs/promises'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
@@ -18,7 +18,6 @@ import { pagesApp } from '../server/app'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
-import { DICTIONARY_PREFIX } from '../server/dictionary'
 import { localeSettings } from '../server/i18n'
 import { limiter } from '../server/limit'
 import { routesWithSecurity } from '../server/page-headers'
@@ -74,7 +73,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   // What is written here rather than copied from the build, compressed once it is all in.
   const written: string[] = []
 
-  await cp(client.dir, join(out, '_kay'), { recursive: true, filter: source => !SOURCE_MAP.test(source) && !basename(source).startsWith(DICTIONARY_PREFIX) })
+  await cp(client.dir, join(out, '_kay'), { recursive: true, filter: source => !SOURCE_MAP.test(source) })
 
   const limit = limiter(FILES_AT_ONCE)
   let failed = false

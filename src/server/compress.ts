@@ -671,8 +671,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
-  const dictionaryAsk = html && dictionaryAsked(request, dictionary.ref) ? dictionary : undefined
-  const encoding = dictionaryAsk ? 'dcz' : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
+  const encoding = html && dictionaryAsked(request, dictionary.ref) ? dictionary : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
   const read = readBodies.get(response)
 
   // A streamed body is sent once: a route returning it again gets an error naming it, rather than an empty or broken reply.
@@ -683,24 +682,24 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   }
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read, or what was read of it before.
-  if (!encoding) {
+  if (encoding === undefined) {
     varyOnEncoding(headers)
 
     return read && new Response(read, { status, statusText: response.statusText, headers })
   }
 
   if (read)
-    return compressBody(response, read, encoding, request.headers.get('accept-encoding'), dictionaryAsk)
+    return compressBody(response, read, encoding, request.headers.get('accept-encoding'))
 
   // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
   if (!response.body)
     return undefined
 
-  const splice = encoding !== 'dcz' && fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
+  const splice = typeof encoding === 'string' && fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 
   const pieces = splice ? wholePieces.get(response) : undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), dictionaryAsk, splice, pieces && { pieces, size: wholeSizes.get(response)! })
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: wholeSizes.get(response)! })
 }
 
 function advertise(headers: Headers, { link }: ServedDictionary): void {
@@ -714,6 +713,10 @@ function advertise(headers: Headers, { link }: ServedDictionary): void {
 function varyOnEncoding(headers: Headers): void {
   if (!VARY_ENCODING.test(headers.get('vary') ?? ''))
     headers.append('vary', 'accept-encoding')
+}
+
+function encodingName(encoding: Encoding | ServedDictionary): Encoding | 'dcz' {
+  return typeof encoding === 'string' ? encoding : 'dcz'
 }
 
 function compressedHeaders(headers: Headers, used: Encoding | 'dcz'): Headers {
@@ -730,7 +733,7 @@ function compressedHeaders(headers: Headers, used: Encoding | 'dcz'): Headers {
   return compressed
 }
 
-async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding | 'dcz', accept: string | null, dictionary: ServedDictionary | undefined, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
+async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding | ServedDictionary, accept: string | null, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
   const { headers, status, statusText } = response
 
   // A page whose render knows its pieces and whose gzip is kept is answered without reading its body.
@@ -765,10 +768,10 @@ async function compressBody(response: Response, source: Response | ReadableStrea
   }
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
-  const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, dictionary && encoding === 'dcz' ? { dictionary: await dictionary.load(), id: `dcz:${dictionary.ref.hash}:` } : encoding as Encoding)
+  const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, typeof encoding === 'string' ? encoding : { dictionary: await encoding.load(), id: `dcz:${encoding.ref.hash}:` })
   const reply = (bytes: Uint8Array<ArrayBuffer>) => late ? lateBody(bytes) : bytes
 
-  return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(headers, spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
+  return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(headers, spliced ? 'gzip' : encodingName(encoding)) }) : new Response(reply(body.bytes), { status, statusText, headers })
 }
 
 // Bun writes a reply resolved after a macrotask, a zlib callback included, uncorked once its body reaches this size: each header name, value and separator goes as its own send(), some forty segments a reply (#141). `lateBody` can go once oven-sh/bun#41341 corks every write.

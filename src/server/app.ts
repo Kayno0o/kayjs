@@ -429,7 +429,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (favicon !== undefined)
     serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
 
-  const prerendered = await loadPrerendered(client)
+  const prerendered = await loadPrerendered(client, compressing && !mode.dev)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
   await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })

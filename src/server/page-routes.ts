@@ -55,7 +55,7 @@ export interface ResponderOptions {
 
 // The prerendered pages by route pattern, then by path, with the compressed copies `kay build` wrote: only the brotli one is read into memory, at boot, the others served from their files.
 // A page with no copy is held as text, which compression then knows too small or not worth compressing again.
-export async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
+export async function loadPrerendered(client: ClientBuild, dictionary: boolean): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
   const dir = join(client.dir, '..', PRERENDERED_DIR)
   const files = await filesUnder(dir)
@@ -66,8 +66,8 @@ export async function loadPrerendered(client: ClientBuild): Promise<Map<string, 
     const file = join(dir, page.file)
     const encodings = copies.get(file)
     const encoded: ServedPage['encoded'] = {}
-    // Written against this build's dictionary alone, so a build without one serves none.
-    const dcz = client.dictionary !== undefined && dictionaryCopies.has(`${file}${DCZ_SUFFIX}`) ? Bun.file(`${file}${DCZ_SUFFIX}`) : undefined
+    // Written against this build's dictionary alone, so a build without one serves none, nor does a server compressing nothing or in development.
+    const dcz = dictionary && client.dictionary !== undefined && dictionaryCopies.has(`${file}${DCZ_SUFFIX}`) ? Bun.file(`${file}${DCZ_SUFFIX}`) : undefined
 
     if (!encodings)
       return { html: await Bun.file(file).text(), encoded, dcz }

@@ -74,7 +74,7 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
     const encoded = await compressText(html)
 
     // All at once, so no request reads the new html with the old tag.
-    Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
+    Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now(), dcz: undefined })
     revalidation.renderedAfter = started
     revalidation.staleAt = Date.now() + period
 

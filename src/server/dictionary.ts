@@ -1,5 +1,4 @@
 import type { ClientBuild } from './client'
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { joinBase } from '../runtime/base'
@@ -68,7 +67,19 @@ export function servedDictionary(client: ClientBuild, base: string): ServedDicti
 
   let loaded: Promise<LoadedDictionary> | undefined
 
-  return { ref: dictionary, link: dictionaryLink(base, dictionary), load: async () => loaded ??= loadDictionary(client, dictionary) }
+  const load = async () => {
+    try {
+      return await (loaded ??= loadDictionary(client, dictionary))
+    }
+    catch (error) {
+      // The next page reads it again.
+      loaded = undefined
+
+      throw error
+    }
+  }
+
+  return { ref: dictionary, link: dictionaryLink(base, dictionary), load }
 }
 
 async function loadDictionary(client: Pick<ClientBuild, 'dir'>, { file, hash }: DictionaryRef): Promise<LoadedDictionary> {
@@ -142,17 +153,14 @@ export async function writeDictionaryCopies(pagesDir: string, client: ClientBuil
   const loaded = await loadDictionary(client, dictionary)
   const limit = limiter(COPIES_AT_ONCE)
 
-  await Promise.all([...client.pages.values()].map(async ({ file }) => limit(async () => {
+  await Promise.all([...client.pages.values()].map(async ({ file, islands, stamps, readsSite }) => limit(async () => {
     const path = join(pagesDir, file)
     const bytes = await Bun.file(path).bytes()
     const brotli = Bun.file(`${path}.br`)
     const rival = await brotli.exists() ? brotli.size : bytes.length * 0.9
-    const body = bytes.length < MIN_PAGE_BYTES ? undefined : await dictionaryBody(loaded, bytes, BUILD_LEVEL)
+    const body = bytes.length < MIN_PAGE_BYTES || islands !== undefined || stamps || readsSite ? undefined : await dictionaryBody(loaded, bytes, BUILD_LEVEL)
 
     if (body !== undefined && body.length < rival)
       await Bun.write(`${path}${DCZ_SUFFIX}`, body)
-    // A copy of an earlier build is against another dictionary.
-    else
-      await rm(`${path}${DCZ_SUFFIX}`, { force: true })
   })))
 }

@@ -544,8 +544,8 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
   }
 
   const { names: encodings, available } = storedEncodings(page.encoded)
-  const dictionary = page.dcz !== undefined && client.dictionary !== undefined && dictionaryAsked(context.request, client.dictionary)
-  const encoding = dictionary ? 'dcz' : preferredEncoding(context.request.headers.get('accept-encoding'), available)
+  const asksDictionary = page.dcz !== undefined && client.dictionary !== undefined && dictionaryAsked(context.request, client.dictionary)
+  const encoding = asksDictionary ? 'dcz' : preferredEncoding(context.request.headers.get('accept-encoding'), available)
   // Each encoding is a representation of its own, with its own tag.
   const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag
 
@@ -553,7 +553,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
 
   // Added to what a guard varies on, such as the cookie it reads.
   if (encodings.length > 0 || page.dcz !== undefined)
-    headers.append('vary', 'accept-encoding')
+    headers.append('vary', page.dcz === undefined ? 'accept-encoding' : 'accept-encoding, available-dictionary')
 
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
   if (route.guards.length > 0)

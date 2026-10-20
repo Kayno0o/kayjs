@@ -208,7 +208,7 @@ Have the proxy pass `X-Forwarded-Proto`, or set `site` in kay.config.ts to the h
 
 ## Pages that send only their difference
 
-A server build uses its 404 page as a dictionary. Every page carries a `Link` header naming it, so a browser downloads it once, when it is idle, and keeps it as long as the build lives.
+A server build with prerendered pages uses its 404 page as a dictionary, which `kay build` renders with its layouts. Every page carries a `Link` header naming it, so a browser downloads it once, when it is idle, and keeps it as long as the build lives.
 
 After that the browser sends `Available-Dictionary` with each request for a page, and kay answers with `Content-Encoding: dcz`: the page as its difference from the dictionary. The shared header, navigation and styles cost nothing the second time. On kay's own docs a 41 KB page that is 9 KB with brotli goes in 4.4 KB.
 
