@@ -1374,8 +1374,31 @@ describe('a layout reading ctx.locals', () => {
     const { code, text } = await fails(root)
 
     expect(code).not.toBe(0)
-    expect(text).toContain('src/routes/_layout.kay:2')
-    expect(text).toContain('layout')
+    expect(text).toContain('reads `ctx.locals` at src/routes/_layout.kay:2')
+    expect(text).toContain('every page under that layout renders it')
+  }, 60_000)
+
+  it('reads the line of a layout in a route group, and lists the page as on request', async () => {
+    const root = await project({
+      'src/routes/(shop)/_layout.kay': LOCALS_LAYOUT,
+      'src/routes/(shop)/index.kay': '---\nimport Card from \'../../card.kay\'\n---\nCard(server)\n',
+      'src/card.kay': 'p Card\n',
+    })
+
+    roots.push(root)
+
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--format', 'json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect(code, err).toBe(0)
+    expect(out).toContain('reads `ctx.locals` at src/routes/(shop)/_layout.kay:2')
+
+    await Bun.write(join(root, 'src/routes/(shop)/index.kay'), '--- server\nexport const page = { prerender: true }\n---\nh1 Shop\n')
+
+    const failed = await fails(root)
+
+    expect(failed.text).toContain('reads `ctx.locals` at src/routes/(shop)/_layout.kay:2')
+    expect(failed.text).toContain('every page under that layout renders it')
   }, 60_000)
 
   it('names the file and line in a static export, under a base', async () => {
@@ -1386,7 +1409,8 @@ describe('a layout reading ctx.locals', () => {
     const { code, text } = await fails(root, '--static')
 
     expect(code).not.toBe(0)
-    expect(text).toContain('src/routes/_layout.kay:2')
+    expect(text).toContain('reads `ctx.locals` at src/routes/_layout.kay:2')
+    expect(text).toContain('a static export renders every page at build time')
   }, 60_000)
 
   it('is kept per request under a base too', async () => {

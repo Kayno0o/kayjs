@@ -1,8 +1,8 @@
 import { mapStack } from '../build/sourcemap'
 import { KayError } from '../compiler/errors'
 
-const STACK_FRAME = /\(?((?:\/|[A-Z]:[\\/])[^():]+):(\d+):\d+\)?$/i
-const THIS_FOLDER = import.meta.dir
+const STACK_FRAME = /^at (?:.* \()?((?:\/|[A-Z]:[\\/]).+?):(\d+):\d+\)?$/i
+const THIS_FOLDER = `${import.meta.dir}/`
 
 // The `onError` handlers of a build judging a page it renders once, which take a `RequestRead` for their own instead of its being logged as a failure.
 export const judgingReads = new WeakSet<object>()

@@ -173,6 +173,24 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const once = async () => withPageToken(token, read)
         const { result: first, reads: dataRead } = await readsOf(once)
         let { response, html } = first
+        const refused = refusal.read
+
+        if (refused !== undefined) {
+          const readAt = `reads \`${refused.read}\`${refused.file === undefined ? '' : ` at ${relative(root, refused.file)}:${refused.line}`}`
+
+          // A page the build took up on its own, or for a server island it holds, is rendered per request when it needs one.
+          if (auto || (marked && prerender === undefined && !options.exportAll))
+            return skip(`${readAt}, which only a request holds`)
+
+          const inLayout = refused.file !== undefined && route.layouts.includes(refused.file)
+          const instead = inLayout
+            ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one'
+            : 'drop `prerender` from `export const page` to render it per request'
+          const advice = options.exportAll ? 'a static export renders every page at build time, so the read has to go, or the site needs a server' : instead
+
+          throw new KayError('export-server-render', `kay: prerendering ${copy.path} from ${file} failed: it ${readAt}, which only a request holds, and a prerendered page renders once, at build time; ${advice}`)
+        }
+
         // What the page shows that its source does not spell out, a class built from data, is kept in its head: the rules come from the page as it rendered.
         const shown = missingClasses(client, routeChain(route).files, html)
 
@@ -180,20 +198,6 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           await keepClasses(client, routeChain(route).files, shown)
           restyled = true
           ;({ response, html } = await once())
-        }
-
-        const refused = refusal.read
-
-        if (refused !== undefined) {
-          const reads = `reads \`${refused.read}\`${refused.file === undefined ? '' : ` at ${relative(root, refused.file)}:${refused.line}`}`
-
-          // A page the build took up on its own, or for a server island it holds, is rendered per request when it needs one.
-          if (auto || (marked && prerender === undefined && !options.exportAll))
-            return skip(`${reads}, which only a request holds`)
-
-          const inLayout = refused.file !== undefined && route.layouts.includes(refused.file)
-
-          throw new KayError('export-server-render', `kay: prerendering ${copy.path} from ${file} failed: it ${reads}, which only a request holds, and a prerendered page renders once, at build time; ${inLayout ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one' : 'drop `prerender` from `export const page` to render it per request'}`)
         }
 
         if (auto && response.status !== 200)
@@ -290,7 +294,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const request = new Request('http://localhost/_kay-dictionary')
     const token = pageToken('/_kay-dictionary', tokens)
     const render = async () => withPageToken(token, async () => {
-      const response = await renderUnmatched(source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: undefined, prerendering: true })
+      const response = await renderUnmatched(source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: judged({}), prerendering: true })
 
       return response.status === 404 && response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
     })
