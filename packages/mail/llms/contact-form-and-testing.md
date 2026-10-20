@@ -46,7 +46,14 @@ it('welcomes a new account', async () => {
 - `outbox.mails` lists the mails sent, oldest first, each a `Mail` with `id` and `sentAt`; `last()`, `to(address)` (among `to`, `cc` and `bcc`, any case), `find(id)` and `clear()` read it. It keeps the last 500.
 - `outbox.links(mail)` gives the addresses a mail links to, in order, each once, as a confirmation test needs: its html's links, or the URLs its text holds. `await outbox.waitFor(address, { timeout })` resolves with the newest mail to that address once one is there, failing after `timeout`, 5 seconds by default, for a mail a server sends on its own time. `outbox.watch(listener)` calls `listener` with each mail sent from then on, until the function it returns is called.
 - A browser test driving `kay dev` from another process, as Playwright does, reads the outbox from `/_kay/mail.json`, served under `kay dev` only, never by a server started with `NODE_ENV=development` some other way: every mail, oldest first, with its html, text and headers, an attachment's bytes in base64 (`encoding: 'base64'`); `?to=<address>` keeps the mails to that address.
-- An enqueued mail reaches the outbox once the queue runs: `site.runJobs()` from `kay/test`, or the mailer's `drain()`.
+- An enqueued mail reaches the outbox once the queue runs: `site.runJobs()` from `kay/test`, or the mailer's `drain()`. Pass the site to wait for it instead: `await outbox.waitFor(address, { site, find, timeout })` runs the site's queues, the jobs they enqueue included, until the newest mail to that address that `find` (a predicate on the mail, optional) accepts is delivered, and fails after `timeout` with the mails the outbox holds. It needs only a `runJobs()`, so `kay/test`'s `testSite()` fits and kayjs-mail does not import kay's test module.
+- `outbox.link(mail, match)` gives the first link of a mail whose address holds `match` (a string or a pattern; the first link without one) and `outbox.token(mail, match)` its `token` query parameter, as a confirmation, magic-link or reset test needs; both fail naming the links the mail holds when none matches:
+
+```ts
+await site.submit(request, { email }, { from: '/auth/reset-password' })
+
+const token = outbox.token(await outbox.waitFor(email, { site }), '/auth/reset-password')
+```
 
 ## Development
 

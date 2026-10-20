@@ -4,7 +4,7 @@ import { testSite } from 'kay/test'
 import board from '../src/api/board'
 import { auth } from '../src/auth'
 import { post } from '../src/routes/index.kay'
-import { mailTo } from './members'
+import { } from './members'
 
 // The site takes the plugins of kay.config.ts's extensions, the mailer's queue included, which `runJobs()` also drains here and now.
 const site = await testSite()
@@ -52,7 +52,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
   expect((await site.visit(`/notices/${id}`)).title()).toBe('Bake sale | Noticeboard')
 
   // The queue runs the announcement, which queues one mail per confirmed member but the author, sent as the queues drain.
-  await mailTo(site, reader)
+  await outbox.waitFor(reader, { site })
   expect(outbox.to(reader).map(each => each.subject)).toEqual(['New notice: Bake sale'])
   expect(outbox.to(reader)[0]!.html).toContain(`http://localhost:3000/notices/${id}`)
   expect(outbox.to(author)).toEqual([])

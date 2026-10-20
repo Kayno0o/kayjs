@@ -28,6 +28,14 @@ export interface SentMail extends Mail {
   relayed?: Relayed | undefined
 }
 
+export interface WaitOptions {
+  timeout?: Duration | undefined
+  // Keeps the mails it answers true for.
+  find?: ((mail: SentMail) => boolean) | undefined
+  // A `testSite()`, or anything with its `runJobs()`.
+  site?: { runJobs: () => Promise<number> } | undefined
+}
+
 export interface Outbox extends Transport {
   // Keeps the mail, noting how the switch delivered it when `relayed` is given.
   send: (mail: Mail, relayed?: Relayed) => Promise<Delivery>
@@ -40,8 +48,12 @@ export interface Outbox extends Transport {
   clear: () => void
   // The addresses a mail links to, in order, each once: its html's links, or the URLs its text holds when it has no html.
   links: (mail: Mail) => string[]
-  // The newest mail to this address once there is one, as `to` finds them, failing after `timeout`, 5 seconds by default.
-  waitFor: (address: string, options?: { timeout?: Duration | undefined }) => Promise<SentMail>
+  // The first link of a mail whose address holds `match` (a string or a pattern), or its first link without one; fails naming the links the mail holds when none does.
+  link: (mail: Mail, match?: string | RegExp) => string
+  // The `token` query parameter of that link, as a confirmation, magic link or reset mail carries it.
+  token: (mail: Mail, match?: string | RegExp) => string
+  // The newest mail to this address, and `find` when given, once there is one, failing after `timeout`, 5 seconds by default, with the mails the outbox holds. With a `site` from `kay/test`, its queues run until the mail is delivered, for one the app enqueues.
+  waitFor: (address: string, options?: WaitOptions) => Promise<SentMail>
   // Calls `listener` with each mail sent from now on, until the function it returns is called.
   watch: (listener: (mail: SentMail) => void) => () => void
 }
@@ -55,6 +67,7 @@ const OUTBOX_FILE = 'mail-outbox.json'
 const OUTBOX = Symbol.for('kayjs-mail.outbox')
 const DEFAULT_WAIT_MS = 5000
 const TEXT_URL = /https?:\/\/[^\s<>()]+/g
+const POLL_MS = 5
 
 export function addressOf(address: Address): string {
   if (typeof address !== 'string')
@@ -107,6 +120,10 @@ function writeFile(file: string, mails: readonly SentMail[]): void {
   renameSync(aside, file)
 }
 
+function withinOutbox(mails: readonly SentMail[]): string {
+  return mails.length === 0 ? 'the outbox is empty' : `the outbox holds ${mails.map(mail => `"${mail.subject}" to ${mail.to.map(addressOf).join(', ')}`).join('; ')}`
+}
+
 // Under `kay dev` alone the outbox is read from `file` as it starts and written to it after each change; given none, it lives in memory.
 export function createOutbox(file?: string): Outbox {
   const mails: SentMail[] = file === undefined ? [] : readFile(file)
@@ -134,7 +151,7 @@ export function createOutbox(file?: string): Outbox {
     }
   }
 
-  return {
+  const kept: Outbox = {
     mails,
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     send: async (mail, relayed): Promise<Delivery> => {
@@ -165,20 +182,57 @@ export function createOutbox(file?: string): Outbox {
       keep()
     },
     links: mail => mail.html === undefined ? [...new Set(mail.text.match(TEXT_URL))] : linksOf(mail.html),
+    link: (mail, match) => {
+      const links = kept.links(mail)
+      const found = match === undefined ? links[0] : links.find(href => typeof match === 'string' ? href.includes(match) : match.test(href))
+
+      if (found === undefined)
+        throw new Error(`kayjs-mail: mail "${mail.subject}" has no link${match === undefined ? '' : ` matching ${String(match)}`}, its links are ${links.length === 0 ? 'none' : links.join(', ')}`)
+
+      return found
+    },
+    token: (mail, match) => {
+      const href = kept.link(mail, match)
+      const token = new URL(href, 'http://localhost').searchParams.get('token')
+
+      if (token === null)
+        throw new Error(`kayjs-mail: the link ${href} of mail "${mail.subject}" has no token`)
+
+      return token
+    },
     waitFor: async (address, options = {}) => {
       const wanted = address.toLowerCase()
-      const found = mails.findLast(mail => sentTo(mail, wanted))
+      const { find = () => true, site } = options
+      const lookup = () => mails.findLast(mail => sentTo(mail, wanted) && find(mail))
       const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout', 'kayjs-mail') * 1000
+      const fail = () => new Error(`kayjs-mail: no mail to ${address} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
+      let found = lookup()
 
       if (found)
         return found
 
+      if (site) {
+        const deadline = Date.now() + wait
+
+        while (Date.now() < deadline) {
+          await site.runJobs()
+          found = lookup()
+
+          if (found)
+            return found
+
+          await Bun.sleep(POLL_MS)
+        }
+
+        throw fail()
+      }
+
       const { promise, resolve, reject } = Promise.withResolvers<SentMail>()
       const unwatch = watch((mail) => {
-        if (sentTo(mail, wanted))
+        if (sentTo(mail, wanted) && find(mail))
           resolve(mail)
       })
-      const timer = setTimeout(() => reject(new Error(`kayjs-mail: no mail to ${address} reached the outbox within ${wait} ms`)), wait)
+      const timer = setTimeout(() => reject(fail()), wait)
 
       try {
         return await promise
@@ -190,6 +244,8 @@ export function createOutbox(file?: string): Outbox {
     },
     watch,
   }
+
+  return kept
 }
 
 // Where mails go in development and under `bun test` instead of leaving the machine: `kay dev` lists them at `/_kay/mail`, and a test reads them here.

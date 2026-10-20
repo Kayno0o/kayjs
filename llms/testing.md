@@ -114,6 +114,8 @@ await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/'
 expect(await site.runJobs()).toBe(1)
 ```
 
+A mail an action enqueues, and the jobs it enqueues in turn, are waited for by kayjs-mail's `outbox`, which runs the site's queues until the mail is there: `await outbox.waitFor(address, { site })` resolves with the newest mail to that address, and `outbox.token(mail, '/auth/verify-email')` reads the token of its link ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing)).
+
 ### Test a websocket route
 
 `site.socket(module, path, options)` opens the route as an island does, and `next()` resolves with the oldest message not read yet:

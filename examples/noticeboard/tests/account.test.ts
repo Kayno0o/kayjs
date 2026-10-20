@@ -1,7 +1,7 @@
 import { outbox } from '@kaynooo/kayjs-mail'
 import { afterAll, beforeEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { joinAs, mailedToken } from './members'
+import { joinAs } from './members'
 import { magicLink, password, register, request, reset, signOut, spend, verify } from './pages'
 
 const site = await testSite()
@@ -20,7 +20,7 @@ it('joins, signed in at once, and mails a link that confirms the address', async
   expect((await site.visit('/')).find('nav a')[1]?.text).toBe('Ada')
   expect((await site.visit('/auth/account')).html).toContain('Not verified')
 
-  const token = await mailedToken(site, email, '/auth/verify-email')
+  const token = outbox.token(await outbox.waitFor(email, { site }), '/auth/verify-email')
 
   expect(outbox.to(email)[0]?.subject).toContain('Confirm')
 
@@ -53,7 +53,7 @@ it('signs in from a mailed link, which only its button spends', async () => {
   await signOut(site)
   outbox.clear()
   await site.submit(magicLink, { email }, { from: await site.visit('/auth/sign-in') })
-  const token = await mailedToken(site, email, '/auth/magic-link')
+  const token = outbox.token(await outbox.waitFor(email, { site }), '/auth/magic-link')
 
   expect((await site.visit(`/auth/magic-link?token=${token}`)).find('nav a')[1]?.text).toBe('Sign in')
   expect((await site.submit(spend, { token }, { from: `/auth/magic-link?token=${token}` })).find('nav a')[1]?.text).toBe('Linus')
@@ -68,7 +68,7 @@ it('resets a forgotten password from a mailed link', async () => {
   await signOut(site)
   outbox.clear()
   await site.submit(request, { email }, { from: await site.visit('/auth/reset-password') })
-  const token = await mailedToken(site, email, '/auth/reset-password')
+  const token = outbox.token(await outbox.waitFor(email, { site }), '/auth/reset-password')
 
   expect((await site.submit(reset, { token, password: 'short' }, { from: `/auth/reset-password?token=${token}` })).status).toBe(400)
   expect((await site.submit(reset, { token, password: 'a brand new passphrase' }, { from: `/auth/reset-password?token=${token}` })).find('nav a')[1]?.text).toBe('Barbara')

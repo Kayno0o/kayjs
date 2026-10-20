@@ -219,6 +219,41 @@ describe('the outbox helpers', () => {
     expect((await outbox.waitFor('bob@example.com')).subject).toBe('Not this one')
     await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('no mail to carol@example.com reached the outbox within 50 ms')
   })
+
+  it('waits for a mail matching a predicate, running the site\'s queues until it is delivered, and lists what the outbox holds on failure', async () => {
+    let runs = 0
+    const site = {
+      runJobs: async () => {
+        runs++
+
+        if (runs === 3)
+          await mail.send({ to: 'ada@example.com', subject: 'Second', text: 'Hi' })
+
+        return 0
+      },
+    }
+
+    await mail.send({ to: 'ada@example.com', subject: 'First', text: 'Hi' })
+
+    expect((await outbox.waitFor('ada@example.com', { site, find: each => each.subject === 'Second' })).subject).toBe('Second')
+    expect(runs).toBe(3)
+    await expect(outbox.waitFor('ada@example.com', { site, find: each => each.subject === 'Third', timeout: 0.05 })).rejects.toThrow('the outbox holds "First" to ada@example.com; "Second" to ada@example.com')
+    await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('"Second" to ada@example.com')
+  })
+
+  it('reads a link and its token from a mail', async () => {
+    await mail.send({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
+
+    const sent = outbox.last()!
+
+    expect(outbox.link(sent)).toBe(URL)
+    expect(outbox.link(sent, '/confirm')).toBe(URL)
+    expect(outbox.link(sent, /token=a/)).toBe(URL)
+    expect(outbox.token(sent, '/confirm')).toBe('a')
+    expect(() => outbox.link(sent, '/reset')).toThrow(`has no link matching /reset, its links are ${URL}`)
+    await mail.send({ to: 'bob@example.com', subject: 'Plain', text: 'Open https://fixture.test/help' })
+    expect(() => outbox.token(outbox.last()!)).toThrow('has no token')
+  })
 })
 
 describe('the queue', () => {
