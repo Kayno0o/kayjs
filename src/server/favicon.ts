@@ -64,6 +64,8 @@ export interface FaviconOptions {
   source: FaviconSource
   // Where `kay build` wrote the files, read instead of the source when there; a server not serving a build leaves it out, so an older build never shadows the source.
   builtDir?: string | undefined
+  // Where the icons drawn from the source are kept, so a reload or a restart of the server draws them once; `kay build` keeps its own there.
+  cache?: string | undefined
   // The site's `seo.name` and `seo.description`; the manifest of each locale reading a text of its own is served beside the default locale's.
   name?: Localized | undefined
   description?: Localized | undefined
@@ -278,9 +280,15 @@ function sitePath(path: string, what: string): string {
 export function serveFavicons(app: Elysia, served: ServedPaths, options: FaviconOptions): void {
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
   const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG], ...options.source.maskable === undefined ? [] : Object.keys(MASKABLE_FILES)]
+  const drawn = async () => {
+    if (options.cache === undefined)
+      return faviconFiles(options.source)
+
+    return (await import('../build/favicons')).cachedFaviconFiles(options.source, options.cache)
+  }
   const read = async () => {
     if (options.builtDir === undefined)
-      return faviconFiles(options.source)
+      return drawn()
 
     const built = new Map<string, Uint8Array<ArrayBuffer>>()
 
@@ -288,7 +296,7 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
       const file = Bun.file(join(options.builtDir, path.slice(1)))
 
       if (!await file.exists())
-        return faviconFiles(options.source)
+        return drawn()
 
       built.set(path, await file.bytes())
     }

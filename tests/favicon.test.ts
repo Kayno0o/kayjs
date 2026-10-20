@@ -307,6 +307,46 @@ describe('favicon', () => {
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).toContain('<meta name="theme-color" content="#1e1e2e">')
   })
 
+  it('keeps the icons it draws from the source across servers sharing a cache, and warns of a small source once, until the source changes', async () => {
+    const dir = await scratchDir('favicon-served-')
+    const cache = join(dir, 'cache')
+    const small = join(dir, 'small.png')
+    const served = async (path: string) => {
+      const own = new Elysia()
+
+      serveFavicons(own, new ServedPaths(), { source: { image: small }, cache })
+
+      return new Uint8Array(await (await own.handle(new Request(`http://localhost${path}`))).arrayBuffer())
+    }
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await Bun.write(small, await new Bun.Image(SOURCE).resize(256, 256).png().bytes())
+
+      const first = await served('/icon-512.png')
+
+      expect(warned).toHaveBeenCalledTimes(1)
+      expect(await widthOf(first)).toBe(512)
+
+      const again = await served('/icon-512.png')
+
+      expect(again).toEqual(first)
+      expect((await served('/favicon.ico')).length).toBeGreaterThan(0)
+      expect(warned).toHaveBeenCalledTimes(1)
+      expect(await readdir(cache)).toHaveLength(1)
+
+      await Bun.write(small, await new Bun.Image(SOURCE).resize(128, 128).png().bytes())
+
+      expect(await widthOf(await served('/icon-512.png'))).toBe(512)
+      expect(warned).toHaveBeenCalledTimes(2)
+      expect(await readdir(cache)).toHaveLength(1)
+    }
+    finally {
+      warned.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a source that is not square, enlarges one smaller than the largest icon with a warning, and writes the files for a build', async () => {
     const wide = join(scratch, 'wide.png')
     const small = join(scratch, 'small.png')

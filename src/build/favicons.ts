@@ -33,6 +33,18 @@ export async function writeCachedFavicons(source: FaviconSource, dir: string, ca
 
   countCache('favicons', false)
 
+  const { files, warnings } = await draw(source, warn)
+
+  await mkdir(dir, { recursive: true })
+
+  for (const [path, bytes] of files)
+    await Bun.write(join(dir, path.slice(1)), bytes)
+
+  if (entry !== undefined)
+    await keep(cache, key!, files, warnings)
+}
+
+async function draw(source: FaviconSource, warn?: (message: string) => void): Promise<{ files: Map<string, Uint8Array<ArrayBuffer>>, warnings: Warning[] }> {
   const warnings: Warning[] = []
   const files = await faviconFiles(source, (message) => {
     warnings.push({ message, always: false })
@@ -42,13 +54,35 @@ export async function writeCachedFavicons(source: FaviconSource, dir: string, ca
     kayLog('warn', message)
   })
 
-  await mkdir(dir, { recursive: true })
+  return { files, warnings }
+}
 
-  for (const [path, bytes] of files)
-    await Bun.write(join(dir, path.slice(1)), bytes)
+// The icons a server not serving a build answers with, from the same entry a build keeps: drawn once per source, with its warnings printed then, not each time a reload makes the server draw them again.
+export async function cachedFaviconFiles(source: FaviconSource, cache: string): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  const key = await entryKey(source)
+  const entry = key === undefined ? undefined : join(cache, key)
+
+  if (entry !== undefined && await Bun.file(join(entry, DONE_FILE)).exists()) {
+    try {
+      const files = new Map<string, Uint8Array<ArrayBuffer>>()
+
+      for (const name of await readdir(entry)) {
+        if (name !== WARNINGS_FILE && name !== DONE_FILE)
+          files.set(`/${name}`, await Bun.file(join(entry, name)).bytes())
+      }
+
+      if (files.size > 0)
+        return files
+    }
+    catch {}
+  }
+
+  const { files, warnings } = await draw(source)
 
   if (entry !== undefined)
     await keep(cache, key!, files, warnings)
+
+  return files
 }
 
 // Written aside and moved into place, so a build never reads half an entry; a read-only disk only loses the cache.

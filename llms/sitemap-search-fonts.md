@@ -109,7 +109,7 @@ Past 50,000 URLs or 50 MB (the protocol's limits) `/sitemap.xml` is a sitemap in
 `favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `favicon: 'src/favicon.png'`.
 
 - kay serves it as `/favicon.ico` (16, 32 and 48 pixels), `/apple-touch-icon.png` (180), `/icon-192.png` and `/icon-512.png`, plus `/manifest.webmanifest`, and links them from every page.
-- `kay build` writes them, which a server serving that build reads; any other, development and `testSite` included, makes them from the image on first request, so an older build never shows a changed favicon.
+- `kay build` writes them, which a server serving that build reads; any other, development and `testSite` included, makes them from the image on first request, so an older build never shows a changed favicon. The icons it draws are kept in `.kay/cache`, as the build's are, so a reload or a restart draws them again only when the image changed, and a source too small warns once.
 - Each path a public file or a page already serves is left to it.
 - `favicon: { image: 'src/favicon.png', svg: 'src/favicon.svg' }` adds an SVG of it, served as `/favicon.svg` as it is and linked after the ICO, so browsers drawing SVG icons use it, sharp at any size; the icons are still made from `image`.
 - A square SVG named alone, `favicon: 'src/favicon.svg'`, is both: kay draws every icon from it at its own size and serves it as `/favicon.svg`, linked after the ICO.

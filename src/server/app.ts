@@ -20,7 +20,7 @@ import { pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
-import { offlineOf } from '../project'
+import { cacheDir, offlineOf } from '../project'
 import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
@@ -485,7 +485,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
 
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
