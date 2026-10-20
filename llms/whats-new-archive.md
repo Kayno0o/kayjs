@@ -1,6 +1,51 @@
 # What's new, older releases
 
-What each release before 1.59 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.60 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.59.0
+
+- A public text file is answered from memory in production, 2 to 3 times cheaper in CPU per request than when it was read and compressed again on every request, with the same headers, encodings and tags ([Production](proxy-and-security.md)).
+- A queue's run that lost its hold to another process no longer logs its failure or calls `onFailed`: a `JobStore`'s `retry` and `fail` may resolve with `false` for a write they refused, as `sqliteJobs`, `memoryJobs` and `pgJobs` do ([Queues](queues.md)).
+- kayjs-ui's keyline `--kui-border-width` also sizes chips, the icon picker's grid, the scatter plot, the image cropper's stage, toggles and the table's filter and selection bars and sort buttons ([Setup](../packages/ui/llms/setup.md)); see [Upgrading](upgrading.md).
+- `rooms()` gives `response`, a schema for the ws route that types an island `socket()`'s messages as the rooms' `Message` without a schema written for typing, and `memberOf(ws, room)`, the member a connection joined a room as ([Rooms](rooms.md)).
+- `Static` and `InputOf` from `kay` type a value read off a schema or an action's input, so an island and a module read the schema the server validates with instead of writing its shape again ([Schemas](schemas.md)).
+- `elementSize()` from `kay` gives an island an element's width and height as reactive values, the `ResizeObserver` and its cleanup handled by kay ([Islands](islands.md#element-size)).
+- kay declares `sideEffects` in its package.json, so an app's bundles drop the runtime modules nothing reaches: the eager JS of the static fixture is 53 B lighter and the i18n fixture 133 B, with nothing to change in an app ([Build and start](build-and-start.md)).
+- A `markdown` line with indented lines renders them as Markdown at build time, `{expr}` holes and components included ([Templates](templates.md)).
+- `kay fmt` sorts the shorthand's classes in Tailwind's order in an app that imports Tailwind ([Tools](check-and-tools.md#format-the-templates)).
+- A new app with Tailwind gets a `.vscode/settings.json` for Tailwind IntelliSense (`tailwindCSS.experimental.classRegex`) that finds the classes of the shorthand and of `class="..."` ([Commands](project.md#commands)).
+- A bare `{title}` in an attribute list is `title={title}`, on elements and components ([Templates](templates.md)).
+- kay's analytics notice and information line take the site's look: kayjs-ui's tokens when present, else the page's colors, and `--kay-notice-*` properties restyle them ([Privacy](privacy.md)).
+- A shorthand class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` reads `gap-1.5` and `p-0.5` where it split each in two, and `kay migrate astro` and `kay fmt` write such classes as shorthand ([Templates](templates.md)).
+- A `kay/test` visit has `page.settled`, the page as the visitor ends up seeing it, each streamed `await` block's last part swapped in place ([Testing](testing.md#reading-a-page)).
+- `persistedCookie(name, value)` from `kay/test` sets a cookie-kept `persisted` value by name, for `site.as()` ([Testing](testing.md#requests-jobs-sockets-and-sessions)).
+- `kay check` keeps what an enclosing `if`, `match` or `for` narrows inside the blocks of an `await` and a `try`, a property path such as `dossier.latest` included ([Rendering](rendering.md#streaming)).
+- An action prop typed with the handler's success output, `Action<{ name: string }, string>`, accepts a handler that can also `ctx.fail`, where it failed with an error about `failed()` and `FormFailure`; `FailureData` is `unknown` for an output naming no `Failure` ([Pass an action to a component](actions-from-islands.md#pass-an-action-to-a-component)).
+- `sqliteRates`, `sqliteRooms` and `sqliteStore` create their file on first use, not when they are called, so a `kay.config.ts` naming one makes no file in `kay build`, `kay check` or a test run, and an unwritable path now fails on the first use rather than when the config loads ([Privacy](privacy.md)).
+- The error reporter loads with the first error and the prefetch code with the first link a visitor points at, presses or focuses (replayed, so that link is still prefetched), not with every page: the entry is about 60 bytes (static page) to 200 bytes (bigger pages) gzip lighter, with no extra request at start; a static export has no reporter ([Navigation](navigation.md#full-loads-and-prefetching)).
+- An effect keeps its sources between runs and subscribes only what changed, so a list of 10,000 rows swaps pairs in 6.6 ms instead of 10 and updates in 0.9 ms instead of 1.1; the entry grows by about 160 bytes gzip, so net of the line above it is 103 bytes heavier on the static test page and 50 to 60 lighter on the others measured ([Islands](islands.md)).
+- An `if` or `match` naming no value builds one memo, and toggling 2000 blocks takes 22.7 ms instead of 26.5 ([Islands](islands.md)).
+- Transitions write all their classes before reading any style, so entering 200 rows forces 7 style recalculations instead of 205, a page swap compares a 1500-row list with 68 `matches` calls instead of 6115, and `followLog` on 5000 lines costs 3.3 ms of script instead of 146 per 60 scroll events.
+- A page request skips its promises and round trips on the common paths: a denied guard answers in 12.3 us instead of 16.2, a page under a `base` in 33.4 instead of 39.7, a localized page in 24.7 instead of 27.9 ([Server](server.md)).
+- Links on a localized site match their route patterns compiled once per site on the server, about 4 to 90 us per page of 50 links instead of 1.1 ms, and the browser keeps the plain matcher ([Locales](locales.md)).
+- `kay dev` saves faster: a types-only write runs no project check and keeps each shadow in memory (68.7 ms to 49.6 per save on the docs), and editing a code file the types process did not load no longer boots a new one (305 ms to 47).
+- `kay dev`'s builder keeps the source maps of chunks an edit left alone and no longer holds file text for class tokens: CPU per island edit goes from 1440 ms to 940 and its memory after edits from 293 MB to 265; it exits after 30 seconds without a build, so the first edit after an idle period takes about 0.4 s longer ([The dev server](dev-server.md)).
+- `kay add <library>` places the import it writes in `kay.config.ts` where the app's `perfectionist/sort-imports` rule sorts it, so the file passes `kay lint` as written ([Project](project.md)).
+- `kay check --fix` declares the raw `process.env.X` reads `kay env` warns of in the app's `defineEnv` schema (or a new `src/env.ts`), keeping a `?? 'default'` as the default and rewriting the reads to `env.X` ([Check](check-and-tools.md)).
+- A queue's run writes about its job (`complete`, `retry`, `fail`) only while the hold it was claimed with is still the job's, so one that outlived its hold no longer completes or fails the job another process runs; a `JobStore` gets the hold as a last argument and may return the one it stored in `heldUntil` ([Queues](queues.md)).
+- `sqliteCache` creates its file on the first value stored or invalidation published instead of in every process loading the module naming it, and `invalidate` still reaches what it kept after a restart ([Rendering](rendering.md#caching)).
+- `pgJobs` takes holds from the database's clock, so replicas' clocks need no longer agree ([Queues](queues.md)).
+- `kay/pg-orm` exports `jobTables`, the job queue's `kay_jobs` and `kay_locks` as pg-orm definitions: an app lists them in `new Database({ tables })` and its own migrations create them, instead of `ignoreTables` plus `createJobTables(db)`; pg-orm is an optional peer of kay ([Queues](queues.md)).
+- A `pending` block inside `form(action={...})` shows only while that form posts, with no script of an island or of the page: hidden in the render, after the answer, after a refused post and with JavaScript off, and announced to screen readers once shown ([Actions](actions.md#refused-fields-and-their-messages), [Templates](templates.md)).
+- A `pending` block inside `form(action={...})` shows only while that form posts, with no script of an island or of the page: hidden in the render, after the answer, after a refused post and with JavaScript off, and announced to screen readers once shown ([Actions](actions.md#show-that-a-form-is-posting), [Templates](templates.md)).
+- `add.settled()` on an action, and on a `track()` handle, resolves once no call is in flight, whichever way they went, so an island that fired writes without awaiting them waits for them there, with no list of promises of its own ([Actions](actions-from-islands.md#calling-from-an-island)).
+- `refusalMessage(error, fallback)` from `kay` gives the message to show for a caught `call()` error: the route's when it answered, else the fallback, with no `instanceof ApiError` check ([Calling API routes from islands](api-from-islands.md#call-a-route-from-an-event-handler)).
+- A streaming action whose own result removes the block its call was made in keeps streaming, handed to the block around it, rather than closing after its first value ([Calling API routes from islands](api-from-islands.md#streaming-actions)).
+- The `.class` shorthand takes Tailwind's brackets, variables and star variants whole: `.w-[calc(100%-2rem)]`, `.[&>svg]:size-4`, `.bg-(--brand)/50`, `.*:p-2`, and ends a class ending in a digit before a `2xl:` class, `.col-2.2xl:flex`, so `kay fmt --from-html` and `kay migrate astro` write such classes as shorthand ([Templates](templates.md)).
+- `kay fmt` moves the shorthand classes of an element into a `class="..."` inside the parentheses when they make its line longer than 120 characters, the value over several lines when it is long, and a static `class="..."` may run over lines, its words joined by single spaces ([Templates](templates.md)).
+- An `_actions.kay` is a `--- server` fence alone, with no closing `---` line, and `kay fmt` leaves a fence running to the end of the file as it is ([Actions](actions.md#declaring-an-action)).
+- `s.UnionKeys(record)` is an enum schema over a record's keys, typed as their union where `s.UnionEnum(Object.keys(record) as [...])` needed a cast ([Actions](actions.md#forms)).
+- A `kay/test` visit has `stamp(action)`, the stamp its form for `action` rendered with, and `site.submit` takes it back as `{ stamp }`, so a test of a refused form needs no `kay_since` field ([Testing](testing.md#test-site)).
 
 ## 1.58.0
 
@@ -57,43 +102,4 @@ What each release before 1.59 added, newest first, each feature with where it is
 - A page whose lazy runtime chunk fails to load with the build unchanged (offline, a dev server restarting) stays correct: the page an action refreshes reloads (unless something was typed), and an island hydrating on `visible` or `idle` hydrates at once instead of staying inert ([Production](production.md)).
 - A page carrying inlined stylesheets whose gzip is kept is found from the pieces its render put it together from, without reading or searching its body: about 8% less main-thread time per request on a page with 110 KB inlined, and the response a hook or a test reads is unchanged.
 
-## 1.56.0
-
-- `kay dev` writes its types without looking for the problems only `kay check` reports, and `kay check` skips them for a library's components it does not reach: about 0.25 s of CPU less on a cold start.
-- `kay dev` no longer spends a core of its server process, about 0.45 s of CPU on a cold start, while the server waits for the first client build.
-- Fathom, Cloudflare and `custom` with `consent: false` show the information line and the opt-out too, kay loading their script until the visitor opts out, which `info: false` leaves to the app; `custom` loaded through kay's script under a `base` points its tracker at the right route ([Privacy](privacy.md)).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`, `deprecated-auth-event`, `deprecated-time-ms` (a bare number of milliseconds now throws), `deprecated-test-mount`, `deprecated-ui-prop`; see [Upgrading](upgrading.md).
-- kayjs-auth no longer counts a passkey made without user verification as a way in: `passkeys()` lists `userVerified`, see [Upgrading](upgrading.md).
-- kayjs-auth: a bearer or OAuth token can no longer create or rename an organization, send, list or revoke invitations, or accept or decline one ([kayjs-auth](../packages/auth/llms/admin-and-organizations.md)).
-- `deprecated-analytics-consent` also reads `as const`, `satisfies`, a template-literal provider and options held in a variable; Fathom and Cloudflare with `consent` unset are covered by a browser test ([Lints](lints.md)).
-- `consent.set()` before the tracker loads keeps `consent.maxAge`, and `analytics()` refuses an unused `info` (lint `deprecated-analytics-info`) ([Privacy](privacy.md)).
-- kayjs-auth `register` under `requireVerified` runs `onSignUp`, and the `onDelete` of an unverified account it replaces, after the response, so a free address answers as fast as a held one ([Passwords and mails](../packages/auth/llms/passwords-and-mails.md)).
-- kayjs-auth no longer resets the account-wide sign-in ceiling when the holder signs in, and mails `sign-in-locked` at most once a day per account ([Limits](../packages/auth/llms/hardening-and-testing.md)).
-- kayjs-ui `Sortable` names a handle after its item's text without its other controls (`Reorder Milk`, not `Reorder Milk Delete`) and renames it when that text changes ([Drag and drop](../packages/ui/llms/charts-drag-and-media.md)).
-- kayjs-ai `Chat` learns a lower `maxInputChars` of the action's `ask` from its 413, posting less and asking again, so the app states it once ([Chat](../packages/ai/llms/chat.md)).
-- `kay/server` exports `typeOfName` and `holdsType`, the file route's name-to-type rule and its image and PDF signature checks, which kayjs-cms now uses to judge an upload instead of its own copies ([Files](files.md#storing-and-linking)).
-- The code focusing the first invalid field of a form the server refused loads when a form is refused, not with every page: the entry is about 150 bytes gzip lighter.
-- The code deferring an island to `hydrate="visible"` or `"idle"`, or a server island, is a chunk of its own that only a page with one loads: the entry is about 105 bytes gzip lighter on every other page.
-- An island that is not `persist` no longer pays for the code giving a kept island the next page's props: the entry is about 230 bytes gzip lighter on every page, and a `persist` island loads that code as a chunk of its own.
-- A static export's entry is 190 bytes gzip lighter: it no longer carries the code reading the build header, which a static host never sends ([Production](production.md)).
-- `navigate()` and `refresh()` load with the first action call, redirect or live refresh that needs them, or with the app code importing them, not with every page: the entry is about 190 bytes gzip lighter on every page.
-- `health.check` runs at most once every 3 s, the probes between sharing its answer, so a balancer and a container check polling every second no longer hit the database each time ([Production](production.md#check-the-database-in-the-health-route)).
-- A collection's feed sends an ETag and answers 304 to a reader holding it ([Content](content.md#serve-an-rss-feed)).
-- A link followed while an earlier visit's page is still loading cancels that fetch, so a slow page no longer keeps downloading behind the one shown ([Navigation](navigation.md)).
-- A 404 costs the server less: the missing paths are written to `data/not-found.sqlite` in one transaction a second instead of four statements per request, and the runtime redirects are answered from memory that follows the file ([Routing](routing-endpoints-and-base.md)).
-- `sqliteRooms` wakes on the file changing instead of reading every 25 ms while a socket is open, falling back to a 250 ms read, which `poll` still sets ([Rooms](rooms.md)).
-- A hidden tab closes its live-values connection and stops renewing the proof, and opens the connection again, with every value as it is then, when shown; the entry of a page with live values is about 40 bytes gzip heavier for it ([Live values](api-from-islands.md)).
-- The variants the image route draws on request (runtime, stored and remote images) are removed after 30 days, at start and once a day, where they stayed for good ([Images](images.md)).
-- The default image ladder stops at 2560 px and no variant is wider than its last width, so a large photograph builds and serves fewer, smaller files; list `3840` in `images.widths` for wider screens, see [Upgrading](upgrading.md).
-
-## 1.55.1
-
-- The `deprecated-api-tool` lint, which only warned while `kay upgrade` moved an app from before 1.51, is gone ([Checks](checks.md)).
-- An `_error.kay` drawn for a hook that threw reads the locals your `derive` added before it threw.
-- A sitemap built with a `lastmod` left out is kept for a minute, not an hour.
-- The analytics notice is fetched again after a failed load and carries the tracker's CSP nonce.
-- kayjs-ui `Sortable` names a bare handle after its item (`Reorder Milk`) and leaves an image with `alt` to name it, `mountComponent` mounts a component that `call()`s a library's API, and a numbered CMS list says the place a moved item left ([Drag and drop](../packages/ui/llms/charts-drag-and-media.md)).
-- kayjs-ai `Chat` takes `maxChars` (40,000), to match a lower `maxInputChars` ([Chat](../packages/ai/llms/chat.md)).
-- Fathom and Cloudflare keep `'self'` in the policy's `script-src` and `connect-src`; it was replaced, which blocked the site's own scripts ([Privacy](privacy.md)).
-
-Releases before 1.55.1 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.56.1 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
