@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const more = signal(false)
+---
+button.more(onClick={() => more.set(true)}) More
+if more()
+  a.added(href="/added") Added

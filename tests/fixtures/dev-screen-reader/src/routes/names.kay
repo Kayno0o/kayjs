@@ -1,0 +1,35 @@
+head
+  title Names
+main
+  h1 Names
+  a(href="/logo")
+    img(src="/none.png" alt="Home logo")
+  a(href="/blank")
+    img(src="/none.png" alt="")
+  button.close
+    span(aria-hidden="true") x
+    span Close
+  label
+    span Wrapped
+    input.wrapped(type="text")
+  span#one(hidden) First
+  span#two Second
+  button.pair(aria-labelledby="one two") x
+  a#loop(href="/loop" aria-labelledby="loop")
+  input(type="submit")
+  input(type="submit" value="Send")
+  input(type="text" placeholder="Search")
+  div(style="display: none")
+    a(href="/gone") Gone
+  div(style="visibility: hidden")
+    a(href="/invisible") Invisible
+  div(role="button" tabindex="0") Fake
+  section(aria-label="Related")
+    p Related things
+  section
+    p Unnamed
+  article
+    header
+      h2 Inner
+  form(aria-label="Search form")
+    p Form text

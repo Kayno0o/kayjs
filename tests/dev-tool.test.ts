@@ -382,7 +382,7 @@ describe('the dev tool', () => {
     const icons = () => [...shadow().querySelectorAll<HTMLButtonElement>('.head .icon')].map(button => [button.getAttribute('aria-label'), button.title, button.textContent])
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
-    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'not-found', 'other'].map(id => `kay-dev-tab-${id}`))
+    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'not-found', 'other'].map(id => `kay-dev-tab-${id}`))
     expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Show the tab order', 'Show the tab order', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })

@@ -1,0 +1,37 @@
+---
+import More from '../components/more.kay'
+---
+head
+  title Reading
+header
+  nav(aria-label="Primary")
+    a(href="/") Home
+    a(href="/more") Read more
+main
+  h1#page Reading order
+  h3 Third level
+  h2 Second level
+  h2(hidden) Hidden heading
+  a(href="/other") Read more
+  a(href="/docs") Docs
+  a(href="/docs") Docs
+  a(href="/nothing")
+  a(href="/settings" aria-label="Settings")
+  a(href="/title" title="By title")
+  a(href="/labelled" aria-labelledby="page")
+  a(href="/hidden" aria-hidden="true") Hidden link
+  button.go Go
+  button.close(title="Close")
+  More
+  form
+    label(for="email") Email
+    input#email(type="email" required aria-describedby="hint")
+    p#hint We never share it
+    input.bare(type="text")
+    label(for="news") Newsletter
+    input#news(type="checkbox")
+    select(aria-label="Country")
+      option France
+    textarea(aria-label="Message" aria-required="true")
+footer
+  p Made with kay

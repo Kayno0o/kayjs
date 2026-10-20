@@ -1,0 +1,6 @@
+head
+  title Two mains
+main
+  h1 First
+main
+  h1 Second

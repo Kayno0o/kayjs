@@ -223,6 +223,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .entry .name { min-width: 0; overflow-wrap: anywhere; }
 .entry a.name { color: var(--accent); text-decoration: none; }
 .entry a.name:hover { text-decoration: underline; }
+.entry .accname { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.entry .accname.none { color: var(--error); font-weight: 400; font-style: italic; }
 .entry .val { min-width: 0; overflow-wrap: anywhere; color: var(--sub); }
 .entry .issue { display: flex; gap: 6px; align-items: flex-start; color: var(--warn); font-size: 12.5px; }
 .entry .issue.error { color: var(--error); }
@@ -331,6 +333,7 @@ const ICONS = {
   'search': 'circle~cx~11~cy~11~r~8|path~d~m21 21-4.3-4.3',
   'user-round': 'circle~cx~12~cy~8~r~5|path~d~M20 21a8 8 0 0 0-16 0',
   'pencil': 'path~d~M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z|path~d~m15 5 4 4',
+  'ear': 'path~d~M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0|path~d~M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4',
   'puzzle': 'path~d~M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z',
 } as const
 
@@ -394,7 +397,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1248,6 +1251,7 @@ export function startDevTool(doc: Document = document): DevTool {
   request = requestTab(doc, tool)
   networkTab(doc, tool, listening.signal)
   headTab(doc, tool, listening.signal)
+  readingTab(doc, tool, listening.signal)
   envTab(doc, tool, listening.signal)
   const vitals = watchVitals(doc.defaultView!, listening.signal)
 
@@ -3728,25 +3732,22 @@ interface Reach {
   roots: ShadowRoot[]
 }
 
-function reach(doc: Document): Reach {
-  const found: HTMLElement[] = []
+// Visits the page's elements as they are laid out: an open shadow root's contents where its host has them and a slot's where its assigned elements go. `visit` returns false to leave an element's contents out. Gives the open shadow roots met.
+function walkComposed(doc: Document, visit: (element: Element) => boolean): ShadowRoot[] {
   const roots: ShadowRoot[] = []
 
   function visitChildren(parent: Document | ShadowRoot | Element): void {
     for (const child of parent.children)
-      visit(child)
+      walk(child)
   }
 
-  function visit(element: Element): void {
-    if (element.localName === HOST || element.hasAttribute('inert'))
+  function walk(element: Element): void {
+    if (!visit(element))
       return
-
-    if (element instanceof HTMLElement && element.matches(FOCUSABLE) && isStop(element))
-      found.push(element)
 
     if (element instanceof HTMLSlotElement) {
       for (const node of element.assignedElements().length > 0 ? element.assignedElements() : element.children)
-        visit(node)
+        walk(node)
     }
     else if (element.shadowRoot === null) {
       visitChildren(element)
@@ -3759,6 +3760,20 @@ function reach(doc: Document): Reach {
 
   visitChildren(doc)
 
+  return roots
+}
+
+function reach(doc: Document): Reach {
+  const found: HTMLElement[] = []
+  const roots = walkComposed(doc, (element) => {
+    if (element.localName === HOST || element.hasAttribute('inert'))
+      return false
+
+    if (element instanceof HTMLElement && element.matches(FOCUSABLE) && isStop(element))
+      found.push(element)
+
+    return true
+  })
   const positive = found.filter(element => element.tabIndex > 0).sort((a, b) => a.tabIndex - b.tabIndex)
 
   return { stops: [...positive, ...found.filter(element => element.tabIndex === 0)], roots }
@@ -4154,6 +4169,555 @@ function startTabOrder(doc: Document, root: ShadowRoot, make: DevTool['make']): 
   return {
     show,
     stop: () => show(false),
+  }
+}
+
+// Waiting for the page to stop changing before it is read again.
+const READING_WAIT = 250
+// How many times a read takes the page may be left alone for before it is read again.
+const READING_SLACK = 10
+const SPACES_RUN = /\s+/g
+const HEADING_TAG = /^h([1-6])$/
+// What a screen reader announces as a stop of its own: the elements that may have a role of a landmark, heading, link, control or field.
+const READABLE = 'a[href], area[href], button, summary, input, select, textarea, h1, h2, h3, h4, h5, h6, nav, main, aside, header, footer, section, form, search, [role]'
+const LANDMARKS = new Set(['banner', 'complementary', 'contentinfo', 'form', 'main', 'navigation', 'region', 'search'])
+const CONTROLS = new Set(['button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio'])
+const FIELDS = new Set(['textbox', 'searchbox', 'checkbox', 'radio', 'combobox', 'listbox', 'slider', 'spinbutton', 'switch'])
+// The roles whose name comes from their content.
+const NAMED_BY_CONTENT = new Set(['button', 'link', 'heading', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'checkbox', 'radio', 'switch', 'cell', 'gridcell', 'columnheader', 'rowheader', 'treeitem', 'tooltip'])
+const BUTTON_DEFAULTS: Record<string, string> = { submit: 'Submit', reset: 'Reset' }
+const BUTTON_INPUTS = new Set(['button', 'submit', 'reset', 'image', 'file', 'color'])
+const TEXT_INPUTS = new Set(['', 'text', 'email', 'tel', 'url', 'password'])
+const SECTIONING = 'article, aside, main, nav, section, [role=article], [role=complementary], [role=main], [role=navigation], [role=region]'
+const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress'])
+const READING_OBSERVED = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-description', 'aria-required', 'aria-level', 'aria-hidden', 'role', 'alt', 'title', 'href', 'for', 'id', 'required', 'value', 'placeholder', 'type', 'inert', 'hidden', 'class', 'style', 'aria-busy'] }
+
+export type ReadingKind = 'landmark' | 'heading' | 'link' | 'control' | 'field'
+
+// One stop of a screen reader's walk through the page.
+export interface ReadingItem {
+  element: Element
+  kind: ReadingKind
+  role: string
+  name: string
+  // A heading's level.
+  level?: number
+  // Where a link goes, as the browser resolves it.
+  target?: string
+  description?: string
+  required?: boolean
+}
+
+// What is wrong with the page as a whole, and the elements to outline for it.
+export interface ReadingPageIssue {
+  text: string
+  elements: Element[]
+}
+
+export interface ReadingFlags {
+  page: ReadingPageIssue[]
+  items: Map<ReadingItem, string[]>
+}
+
+const NO_NAME = 'No accessible name'
+
+// What is wrong with the items read: a heading level skipped, no main landmark or several, a link, control or field with no name, and links of one name going to different places. Pure, so it needs no page.
+export function readingFlags(items: ReadingItem[]): ReadingFlags {
+  const flags = new Map<ReadingItem, string[]>()
+  const page: ReadingPageIssue[] = []
+  const flag = (item: ReadingItem, text: string) => flags.set(item, [...flags.get(item) ?? [], text])
+  const links = new Map<string, ReadingItem[]>()
+  let level = 0
+
+  for (const item of items) {
+    if (item.kind === 'heading') {
+      const own = item.level ?? 2
+
+      if (level === 0 && own > 1)
+        flag(item, `Starts at h${own}, with no h1 before it`)
+      else if (own > level + 1)
+        flag(item, `Skips from h${level} to h${own}`)
+
+      level = own
+    }
+
+    if (item.kind !== 'landmark' && item.name === '')
+      flag(item, NO_NAME)
+
+    if (item.kind === 'link' && item.name !== '') {
+      const key = item.name.toLowerCase()
+
+      links.set(key, [...links.get(key) ?? [], item])
+    }
+  }
+
+  for (const same of links.values()) {
+    for (const item of same) {
+      const elsewhere = same.filter(other => other.target !== item.target).length
+
+      if (elsewhere > 0)
+        flag(item, elsewhere === 1 ? 'Same name as 1 other link that goes elsewhere' : `Same name as ${elsewhere} other links that go elsewhere`)
+    }
+  }
+
+  const mains = items.filter(item => item.role === 'main')
+
+  if (mains.length === 0)
+    page.push({ text: 'No main landmark, so a screen reader user cannot jump to the content', elements: [] })
+
+  if (mains.length > 1) {
+    page.push({ text: `A page has one main landmark, this one has ${mains.length}`, elements: mains.map(main => main.element) })
+
+    for (const main of mains)
+      flag(main, `One of ${mains.length} main landmarks`)
+  }
+
+  return { page, items: flags }
+}
+
+// Whether a screen reader would skip the element: not rendered, or `inert`, or `aria-hidden`.
+function hiddenFromReader(element: Element): boolean {
+  return element.getAttribute('aria-hidden') === 'true' || element.hasAttribute('inert') || !isRendered(element)
+}
+
+// Rendered, a `display: contents` element counting as rendered when the element around it is, as it has no box and still reads.
+function isRendered(element: Element): boolean {
+  if (typeof element.checkVisibility !== 'function' || element.checkVisibility({ visibilityProperty: true }))
+    return true
+
+  const parent = parentOf(element)
+
+  return getComputedStyle(element).display === 'contents' && parent !== null && isRendered(parent)
+}
+
+// The element's role: the first word of `role`, else what its tag stands for. A `header` or `footer` inside a section is no landmark, and a `section` or `form` is one only with a name, which `named: false` does not look for, as the name's own steps ask for the role.
+function roleOf(element: Element, named = true): string {
+  const explicit = element.getAttribute('role')?.trim().split(SPACES_RUN)[0]
+
+  if (explicit !== undefined && explicit !== '')
+    return explicit
+
+  const tag = element.localName
+  const heading = HEADING_TAG.test(tag)
+  const input = element instanceof HTMLInputElement ? element : undefined
+
+  if (heading)
+    return 'heading'
+
+  if (input !== undefined)
+    return inputRole(input)
+
+  switch (tag) {
+    case 'a':
+    case 'area':
+      return element.hasAttribute('href') ? 'link' : ''
+    case 'button':
+    case 'summary':
+      return 'button'
+    case 'nav':
+      return 'navigation'
+    case 'main':
+      return 'main'
+    case 'aside':
+      return 'complementary'
+    case 'search':
+      return 'search'
+    case 'header':
+      return element.closest(SECTIONING) === null ? 'banner' : ''
+    case 'footer':
+      return element.closest(SECTIONING) === null ? 'contentinfo' : ''
+    case 'section':
+      return named && accessibleName(element) !== '' ? 'region' : ''
+    case 'form':
+      return named && accessibleName(element) !== '' ? 'form' : ''
+    case 'textarea':
+      return 'textbox'
+    case 'select':
+      return (element as HTMLSelectElement).multiple || (element as HTMLSelectElement).size > 1 ? 'listbox' : 'combobox'
+    default:
+      return ''
+  }
+}
+
+function inputRole(input: HTMLInputElement): string {
+  const type = input.type
+
+  if (type === 'hidden')
+    return ''
+
+  if (BUTTON_INPUTS.has(type))
+    return 'button'
+
+  if (type === 'checkbox' || type === 'radio')
+    return type
+
+  if (type === 'range')
+    return 'slider'
+
+  if (type === 'number')
+    return 'spinbutton'
+
+  if (type === 'search')
+    return input.list === null ? 'searchbox' : 'combobox'
+
+  return TEXT_INPUTS.has(type) && input.list !== null ? 'combobox' : 'textbox'
+}
+
+function kindOf(role: string): ReadingKind | undefined {
+  if (LANDMARKS.has(role))
+    return 'landmark'
+
+  if (role === 'heading')
+    return 'heading'
+
+  if (role === 'link')
+    return 'link'
+
+  if (CONTROLS.has(role))
+    return 'control'
+
+  return FIELDS.has(role) ? 'field' : undefined
+}
+
+// How a name is being worked out: from a node `aria-labelledby` or `aria-describedby` names (`labelled`, whose own `aria-labelledby` is not followed again, and `direct` for the node itself, read even when hidden), or from within another node's content (`nested`); `seen` holds the elements being read, so a loop ends.
+interface NameContext {
+  labelled: boolean
+  direct: boolean
+  nested: boolean
+  seen: Set<Element>
+}
+
+function squeezed(text: string): string {
+  return text.replace(SPACES_RUN, ' ').trim()
+}
+
+function referenced(element: Element, attribute: string): Element[] {
+  const root = element.getRootNode() as Document | ShadowRoot
+
+  return (element.getAttribute(attribute)?.split(SPACES_RUN) ?? []).flatMap(id => id === '' ? [] : root.getElementById(id) ?? [])
+}
+
+// The element's accessible name, by the steps of the accessible name computation: `aria-labelledby`, `aria-label`, what the element is (`alt`, a `label`, a button's `value`), its content when its role is named by it, and `title`. It approximates the browser's: the text a CSS `::before` or `::after` adds is not read.
+export function accessibleName(element: Element): string {
+  return squeezed(nameFrom(element, { labelled: false, direct: false, nested: false, seen: new Set() }))
+}
+
+function nameFrom(element: Element, context: NameContext): string {
+  if (context.seen.has(element) || (!context.direct && hiddenFromReader(element)))
+    return ''
+
+  context.seen.add(element)
+
+  try {
+    if (!context.labelled) {
+      const named = referenced(element, 'aria-labelledby').map(other => squeezed(nameFrom(other, { ...context, labelled: true, direct: true, nested: false }))).join(' ').trim()
+
+      if (named !== '')
+        return named
+    }
+
+    const label = squeezed(element.getAttribute('aria-label') ?? '')
+
+    if (label !== '')
+      return label
+
+    // A field inside another's label gives its value.
+    if (context.nested && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement))
+      return element.value
+
+    if (context.nested && element instanceof HTMLSelectElement)
+      return [...element.selectedOptions].map(option => option.text).join(' ')
+
+    const native = nativeName(element, context)
+
+    if (native !== undefined && native.trim() !== '')
+      return native
+
+    if (context.direct || context.nested || NAMED_BY_CONTENT.has(roleOf(element, false))) {
+      const content = squeezed(contentOf(element, context))
+
+      if (content !== '')
+        return content
+    }
+
+    const title = element.getAttribute('title') ?? ''
+
+    return title === '' ? placeholderOf(element) : title
+  }
+  finally {
+    context.seen.delete(element)
+  }
+}
+
+function placeholderOf(element: Element): string {
+  return (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) ? element.placeholder : ''
+}
+
+// What the element is called by its kind: an image's `alt`, a button input's `value`, the `label` elements of a field.
+function nativeName(element: Element, context: NameContext): string | undefined {
+  if (element instanceof HTMLImageElement || element instanceof HTMLAreaElement)
+    return element.getAttribute('alt') ?? undefined
+
+  if (element instanceof HTMLInputElement && BUTTON_INPUTS.has(element.type)) {
+    const fallback = BUTTON_DEFAULTS[element.type] ?? ''
+
+    return element.type === 'image' ? element.alt || element.value : element.value || fallback
+  }
+
+  if (!LABELABLE.has(element.localName) || !('labels' in element))
+    return undefined
+
+  const labels = [...(element.labels as NodeListOf<HTMLLabelElement> | null) ?? []]
+
+  return labels.map(label => contentOf(label, { ...context, direct: false, nested: true })).join(' ')
+}
+
+// The text of an element's content, an image's `alt` and an element's own name counting, a box laid out as a block set apart by spaces.
+function contentOf(element: Element, context: NameContext): string {
+  const nodes: Node[] = []
+
+  if (element.shadowRoot !== null)
+    nodes.push(...element.shadowRoot.childNodes)
+  else if (element instanceof HTMLSlotElement)
+    nodes.push(...element.assignedNodes({ flatten: true }).length > 0 ? element.assignedNodes({ flatten: true }) : element.childNodes)
+  else
+    nodes.push(...element.childNodes)
+
+  return nodes.map((node) => {
+    if (node.nodeType === Node.TEXT_NODE)
+      return node.textContent ?? ''
+
+    if (!(node instanceof Element))
+      return ''
+
+    const text = nameFrom(node, { ...context, direct: false, nested: true })
+    const gap = getComputedStyle(node).display.startsWith('inline') ? '' : ' '
+
+    return `${gap}${text}${gap}`
+  }).join('')
+}
+
+// What describes a field beyond its name: the elements `aria-describedby` names, else `aria-description`, else the `title` when it did not name the field.
+function descriptionOf(element: Element, name: string): string {
+  const described = referenced(element, 'aria-describedby')
+
+  if (described.length > 0)
+    return squeezed(described.map(other => nameFrom(other, { labelled: true, direct: true, nested: false, seen: new Set() })).join(' '))
+
+  const own = squeezed(element.getAttribute('aria-description') ?? '')
+
+  if (own !== '')
+    return own
+
+  const title = squeezed(element.getAttribute('title') ?? '')
+
+  return title === name ? '' : title
+}
+
+function isRequired(element: Element): boolean {
+  if (element.getAttribute('aria-required') === 'true')
+    return true
+
+  return (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) && element.required
+}
+
+function readingItem(element: Element): ReadingItem | undefined {
+  const role = roleOf(element)
+  const kind = kindOf(role)
+
+  if (kind === undefined || hiddenFromReader(element))
+    return undefined
+
+  const name = accessibleName(element)
+  const item: ReadingItem = { element, kind, role, name }
+
+  if (kind === 'heading')
+    item.level = Number(HEADING_TAG.exec(element.localName)?.[1] ?? element.getAttribute('aria-level') ?? 2)
+
+  if (kind === 'link')
+    item.target = typeof (element as Partial<HTMLAnchorElement>).href === 'string' ? (element as HTMLAnchorElement).href : element.getAttribute('href') ?? ''
+
+  if (kind === 'field') {
+    item.required = isRequired(element)
+    item.description = descriptionOf(element, name)
+  }
+
+  return item
+}
+
+// Every stop of the page a screen reader reads, in the order it reads them, and the open shadow roots met on the way.
+export function readPage(doc: Document): { items: ReadingItem[], roots: ShadowRoot[] } {
+  const items: ReadingItem[] = []
+  const roots = walkComposed(doc, (element) => {
+    if (element.localName === HOST || element.localName === 'head' || element.hasAttribute('hidden') || element.hasAttribute('inert') || element.getAttribute('aria-hidden') === 'true')
+      return false
+
+    const item = element.matches(READABLE) ? readingItem(element) : undefined
+
+    if (item !== undefined)
+      items.push(item)
+
+    return true
+  })
+
+  return { items, roots }
+}
+
+// The `.kay` position of the element, or of the nearest element around it that has one.
+function sourceOf(element: Element): string | undefined {
+  for (let node: Element | null = element; node !== null; node = parentOf(node)) {
+    const source = node.getAttribute('data-kay-src')
+
+    if (source !== null)
+      return source
+  }
+
+  return undefined
+}
+
+function roleText(item: ReadingItem): string {
+  return item.kind === 'heading' ? `heading ${item.level}` : item.role
+}
+
+// A link's address as the page would show it: the path of one on this site, else the whole address.
+function targetText(target: string, here: Location): string {
+  try {
+    const url = new URL(target, here.href)
+
+    return url.origin === here.origin ? `${url.pathname}${url.search}${url.hash}` : url.href
+  }
+  catch {
+    return target
+  }
+}
+
+// The page as a screen reader reads it, in its order: landmarks, headings, links, controls and form fields each with the name a screen reader would speak, what is wrong flagged, and a hover or focus outlines the element and names the `.kay` file that wrote it. It reads the page again after it changes, a page swap and an island included, and counts what it flags on its tab.
+function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  const tab = tool.tab({ id: 'screen-reader', label: 'Screen reader', icon: 'ear', shown: () => draw(), hidden: () => tool.hideOutline() })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter by role, name or problem', () => bar.apply(content), true)
+  let read: { items: ReadingItem[], flags: ReadingFlags } | undefined
+  let timer = 0
+  // A page that changes all the time is read at most this often, slower the longer a read takes.
+  let wait = READING_WAIT
+  const busy = () => doc.documentElement.hasAttribute('aria-busy')
+  const changes = new MutationObserver(schedule)
+
+  tab.panel.append(bar.element, content)
+  signal.addEventListener('abort', () => {
+    win.clearTimeout(timer)
+    changes.disconnect()
+  })
+  changes.observe(doc.documentElement, READING_OBSERVED)
+  schedule()
+
+  // After the page stops changing for a moment.
+  function schedule(): void {
+    if (timer === 0)
+      timer = win.setTimeout(scan, wait)
+  }
+
+  function scan(): void {
+    timer = 0
+
+    // The end of a page swap changes the page again.
+    if (busy())
+      return
+
+    const started = win.performance.now()
+    const page = readPage(doc)
+
+    // Changes inside an open shadow root are not seen from the page's.
+    for (const root of page.roots)
+      changes.observe(root, READING_OBSERVED)
+
+    changes.takeRecords()
+
+    const flags = readingFlags(page.items)
+    const flagged = flags.page.length + flags.items.size
+
+    read = { items: page.items, flags }
+    tab.count(flagged, flagged > 0 ? 'warn' : undefined)
+    draw()
+    wait = Math.max(READING_WAIT, (win.performance.now() - started) * READING_SLACK)
+  }
+
+  function outlineOf(item: ReadingItem): string {
+    const source = sourceOf(item.element)
+
+    return source === undefined ? item.element.localName : `${item.element.localName}  ${source}`
+  }
+
+  // Scrolled into view, since a row selected by a click may be of an element out of sight.
+  function reveal(element: Element, text: string): void {
+    element.scrollIntoView({ block: 'center' })
+    win.requestAnimationFrame(() => tool.outline([element], text))
+  }
+
+  function highlight(row: HTMLElement, elements: Element[], text: string): void {
+    row.tabIndex = 0
+    row.setAttribute('role', 'group')
+    row.onpointerenter = row.onfocus = () => tool.outline(elements, text)
+    row.onpointerleave = row.onblur = () => tool.hideOutline()
+    row.onclick = (event) => {
+      if (elements[0] !== undefined && !(event.target as Element).closest('button'))
+        reveal(elements[0], text)
+    }
+  }
+
+  function draw(): void {
+    if (read === undefined || tab.panel.hidden === true)
+      return
+
+    tool.hideOutline()
+
+    const rows: HTMLElement[] = []
+
+    for (const issue of read.flags.page) {
+      const label = pill(tool, 'page')
+      const row = entry(tool, 'reading', { name: label, issues: [{ text: issue.text, tone: 'warn' }] })
+
+      label.classList.add('role')
+      row.setAttribute('aria-label', issue.text)
+
+      if (issue.elements.length > 0)
+        highlight(row, issue.elements, issue.elements[0]!.localName)
+
+      rows.push(filterable(row, `page ${issue.text}`, true))
+    }
+
+    for (const item of read.items) {
+      const flags = read.flags.items.get(item) ?? []
+      const role = pill(tool, roleText(item))
+      const source = sourceOf(item.element)
+      const chips = [
+        ...item.target === undefined ? [] : [targetText(item.target, win.location)],
+        ...item.required === true ? ['required'] : [],
+        ...item.description === undefined || item.description === '' ? [] : [`described by: ${item.description}`],
+      ]
+      const label = tool.make('span', item.name === '' && item.kind !== 'landmark' ? 'accname none' : 'accname', item.name === '' ? 'no name' : item.name)
+      const row = entry(tool, 'reading', {
+        name: role,
+        after: [...item.name === '' && item.kind === 'landmark' ? [] : [label], ...source === undefined ? [] : [positionButton(tool, source)]],
+        chips,
+        issues: flags.map(text => ({ text, tone: 'warn' as const })),
+      })
+
+      role.classList.add('role')
+      row.dataset.kind = item.kind
+      row.setAttribute('aria-label', `${roleText(item)}${item.name === '' ? '' : `, ${item.name}`}`)
+      highlight(row, [item.element], outlineOf(item))
+      rows.push(filterable(row, [roleText(item), item.name, ...chips, ...flags].join(' '), flags.length > 0))
+    }
+
+    bar.element.hidden = rows.length === 0
+    content.replaceChildren(
+      ...rows.length === 0 ? [tool.make('div', 'empty', 'Nothing here for a screen reader to stop at.')] : rows,
+      bar.empty,
+      tool.make('div', 'note', 'Names are worked out from the page by the steps of the accessible name computation and may differ in small ways from the browser\'s own: text a stylesheet adds with ::before or ::after is not read.'),
+    )
+    bar.apply(content)
   }
 }
 

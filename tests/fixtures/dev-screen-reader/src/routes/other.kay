@@ -1,0 +1,5 @@
+head
+  title Other
+div
+  h2 Only a second level
+  a(href="/") Back

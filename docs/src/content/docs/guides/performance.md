@@ -32,6 +32,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Request | The route, layouts, params, locale, guards, redirects, response headers and the time the server spent on guards, imports, loads and render |
 | Network | What the page fetched since its load and over the last page swaps, with each request's kind, status, size and time |
 | Head | The search result, canonical and hreflang links, social tags and JSON-LD |
+| Screen reader | The page's landmarks, headings, links, controls and form fields in reading order, with the names a screen reader speaks |
 | Routes | Every page, endpoint and API route the server serves |
 | Env | The variables `publicEnv` sends to the browser |
 | Images | Each image's variant, format, size and what it is drawn at |
@@ -62,6 +63,16 @@ A badge in amber means that element shows nothing when it has focus, no outline 
 Nothing is checked while focus is inside a closed shadow root, as the tool could not give focus back. The page reports the host in that case, so the check also waits while focus is on a custom element or a block element such as a `div` with a `tabindex`, and runs at the next change to the page once focus has moved on.
 
 A dashed red box marks a place the keyboard may get stuck: a part of the page marked `inert` while no dialog is open, or a modal that is not an open `dialog` element, which only a script can keep focus in. That second one is a hint, not proof, so press Tab and Escape inside it. Each finding also shows under Problems, with the elements it names outlined on hover.
+
+## The screen reader view
+
+The Screen reader tab lists what a screen reader stops at, in the order it reads: landmarks (`header`, `nav`, `main`, `footer` and elements with a landmark `role`), headings with their level, links, buttons and other controls, and form fields. Each row shows the role and the accessible name, a link's address, and a field's description and whether it is required.
+
+A row is flagged when a person using a screen reader would be stuck: a heading level skipped, a page with no `main` landmark or with two, a link, control or field with no name, and links with the same name that go to different places, such as two "Read more". The tab's count is the number of flags.
+
+Hover or focus a row to outline its element in the page, and click it to scroll there. The row names the `.kay` file that wrote the element, and a click on the file opens it in your editor. The list is read again after each page swap and each change to the page, an island's included.
+
+The names follow the steps browsers use: `aria-labelledby`, `aria-label`, `label` elements, `alt`, the element's text and `title`. The tool works them out from the page itself, so a name can differ in small ways from the browser's own. Text a stylesheet adds with `::before` or `::after` is not read, and anything hidden with `display: none`, `visibility: hidden`, `hidden`, `inert` or `aria-hidden` is left out.
 
 ## Request and head
 
