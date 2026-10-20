@@ -46,6 +46,9 @@ function tabsOf(room: string): Tab[] {
   for (const text of roomStore().members(PREFIX + room)) {
     const colon = text.indexOf(':')
 
+    if (colon === -1)
+      continue
+
     tabs.set(text.slice(0, colon), text.slice(colon + 1))
   }
 

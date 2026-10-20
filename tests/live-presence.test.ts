@@ -118,6 +118,22 @@ describe('presence on the server', () => {
     await leaves(rooms, ROOM, 0)
   })
 
+  it('skips a stored member with no tab, which an older kay left in a shared store', async () => {
+    const ann = await enter(site, 'Ann', 'ann-tab')
+
+    await ann.next()
+    rooms.add(ROOM, 'old-conn', 'legacy')
+    rooms.publish(ROOM, '', {})
+
+    const { html } = await site.visit('/entry/1', { headers: { 'x-user': 'Bob' } })
+    const [page] = pagesOf(html)
+
+    expect(page!.values).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), [ANN]]])
+    rooms.remove(ROOM, 'old-conn')
+    await ann.close()
+    await leaves(rooms, ROOM, 0)
+  })
+
   it('refuses a forged room, a forged member and a proof past its lifetime, and joins nothing', async () => {
     const { proofs, keys } = await visit(site, '/entry/1', 'Ann')
     const ask = async (key: string) => (await connect(site, proofs, [key], 'forger')).status
