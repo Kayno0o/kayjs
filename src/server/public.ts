@@ -201,9 +201,15 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
     const cache = cacheFor(url)
     const { type } = Bun.file(path)
     const keeps = compressing && size <= KEPT_FILE_BYTES && COMPRESSIBLE_TYPE.test(type)
-    const read = keeps ? keepers.get(path) ?? keepers.set(path, keeper(path, held)).get(path) : undefined
+    let read = keeps ? keepers.get(path) : undefined
+
+    if (keeps && !read) {
+      read = keeper(path, held)
+      keepers.set(path, read)
+    }
 
     app.get(url, ({ request }) => {
+      // A range or a matching tag is answered from the file itself, so the kept bytes only ever back a 200.
       const bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.()
 
       if (!bytes)
