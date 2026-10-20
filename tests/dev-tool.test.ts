@@ -475,6 +475,7 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.grip.n')!.getAttribute('role')).toBe('separator')
     expect(shadow().querySelector<HTMLElement>('.ui')!.style.getPropertyValue('--dock')).toBe('320px')
     expect(padding()).toContain('padding-bottom: 320px')
+    expect(padding()).toContain('--kay-dev-inset-bottom: 320px')
     expect(shadow().querySelector<HTMLElement>('.size')!.hidden).toBe(true)
 
     // Up grows a drawer docked at the bottom, never past its smallest height: happy-dom lays nothing out, so the drawer measures 0 high.
@@ -483,6 +484,7 @@ describe('the dev tool', () => {
 
     dockTo('Dock to the right')
     expect(padding()).toContain('padding-right: 448px')
+    expect(padding()).toContain('--kay-dev-inset-right: 448px')
     expect(reached()).toEqual(['w'])
 
     shadow().querySelector<HTMLButtonElement>('.mark')!.click()

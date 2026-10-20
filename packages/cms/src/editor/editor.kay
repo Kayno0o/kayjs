@@ -2,15 +2,19 @@
 import type { EditorProps } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, FieldPath } from '../markers'
+import type { Dock, Layout } from './dock'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
+import layoutBottom from '~icons/tabler/layout-bottombar'
+import layoutSide from '~icons/tabler/layout-sidebar-right'
 import { call, listen, refresh } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
+import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
@@ -25,7 +29,115 @@ shipWords()
 const open = signal(true)
 const focused = signal<FieldMarker>()
 const leaving = signal(false)
+// Where the editor was left, read once mounted since the server has no storage: the page renders with the window's choice, then takes the kept one.
+const chosen = signal<Dock>()
+const side = signal<number>()
+const bottom = signal<number>()
+const ready = signal(false)
+const room = signal({ width: 0, height: 0 })
 let panel: HTMLElement | undefined
+
+const layout = (): Layout => ({ open: open(), dock: chosen(), side: side(), bottom: bottom() })
+// None until the window is measured, which the server cannot do.
+const dock = memo(() => room().width === 0 ? undefined : dockOf(layout(), room().width))
+const size = (at: Dock) => sizeOf(layout(), at, room())
+
+function measure(): void {
+  room = { width: window.innerWidth, height: window.innerHeight }
+}
+
+onMount(() => {
+  const kept = readLayout(browserStorage())
+
+  open = kept.open
+  chosen = kept.dock
+  side = kept.side
+  bottom = kept.bottom
+  measure()
+  ready = true
+})
+
+listen(() => window, 'resize', measure)
+
+effect(() => {
+  const value = layout()
+
+  if (ready())
+    writeLayout(browserStorage(), value)
+})
+
+// What another tool already holds along the edge, as the dev tool's docked drawer publishes it.
+function taken(at: Dock): number {
+  return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(at === 'side' ? '--kay-dev-inset-right' : '--kay-dev-inset-bottom')) || 0
+}
+
+function resizeTo(next: number): void {
+  const at = dock()
+
+  if (!at)
+    return
+
+  const kept = clampSize(at, next, room(), taken(at))
+
+  if (at === 'side')
+    side = kept
+  else
+    bottom = kept
+}
+
+// Dragging the edge toward the page grows the editor.
+function startResize(event: PointerEvent): void {
+  const at = dock()
+
+  if (!at || !panel)
+    return
+
+  const handle = event.currentTarget as HTMLElement
+  const box = panel.getBoundingClientRect()
+  const from = at === 'side' ? { point: event.clientX, size: box.width } : { point: event.clientY, size: box.height }
+  const move = (next: PointerEvent) => resizeTo(from.size + from.point - (at === 'side' ? next.clientX : next.clientY))
+
+  event.preventDefault()
+  handle.setPointerCapture(event.pointerId)
+  handle.addEventListener('pointermove', move)
+
+  // A cancelled drag, as when the browser takes a touch over, ends it too, keeping the size it reached.
+  const end = () => {
+    handle.removeEventListener('pointermove', move)
+    handle.removeEventListener('pointerup', end)
+    handle.removeEventListener('pointercancel', end)
+  }
+
+  handle.addEventListener('pointerup', end)
+  handle.addEventListener('pointercancel', end)
+}
+
+function resizeByKey(event: KeyboardEvent): void {
+  const at = dock()
+
+  if (!at)
+    return
+
+  const step = (at === 'side' ? SIDE : BOTTOM).step * (event.shiftKey ? 4 : 1)
+  const grow = at === 'side' ? 'ArrowLeft' : 'ArrowUp'
+  const shrink = at === 'side' ? 'ArrowRight' : 'ArrowDown'
+  const delta = event.key === grow ? step : event.key === shrink ? -step : 0
+
+  if (delta === 0)
+    return
+
+  event.preventDefault()
+  resizeTo(size(at) + delta)
+}
+
+// Scrolls the page so a clicked element lies above the bottom sheet, not under it.
+function reveal(element: Element): void {
+  const covered = open() && dock() === 'bottom' && panel ? panel.getBoundingClientRect().top : window.innerHeight
+  const by = revealBy(element.getBoundingClientRect(), { top: 0, bottom: covered - 16 })
+
+  if (by !== 0)
+    window.scrollBy({ top: by })
+}
 
 // The field a click on the page asked for, when it belongs to that entry.
 function focusIn(entry: EntryRef): FieldPath | undefined {
@@ -53,6 +165,7 @@ listen(() => document, 'click', (event) => {
   event.preventDefault()
   event.stopPropagation()
   focused = field.marker
+  reveal(field.element)
 }, { capture: true })
 
 // Renders the page again as visitors see it, once kay forgot the edit mode.
@@ -73,13 +186,37 @@ effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
   onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
 })
+
+// The page's own styles read the dock and the sizes from its root, where the editor's room is made.
+effect(() => {
+  const root = document.documentElement
+  const at = dock()
+
+  root.classList.toggle('kcms-dock-side', at === 'side')
+  root.classList.toggle('kcms-dock-bottom', at === 'bottom')
+
+  if (at) {
+    root.style.setProperty('--kcms-side', `${size('side')}px`)
+    root.style.setProperty('--kcms-bottom', `${size('bottom')}px`)
+  }
+
+  onCleanup(() => {
+    root.classList.remove('kcms-dock-side', 'kcms-dock-bottom')
+    root.style.removeProperty('--kcms-side')
+    root.style.removeProperty('--kcms-bottom')
+  })
+})
 ---
 aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open() }} aria-label={wording('cms.editor.label', 'Content editor')})
   header.kcms-editor-head
     if open()
       h2.kcms-editor-title {wording('cms.editor.title', 'Edit this page')}
       Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={stopEditing})
+    if open() && dock() && canSide(room().width)
+      IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
     IconButton(icon={open() ? 'close' : 'menu'} label={open() ? wording('cms.editor.hide', 'Hide the editor') : wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = !open()})
+  if open() && dock() as at
+    .kcms-editor-grip(role="separator" tabindex="0" aria-label={wording('cms.editor.resize', 'Resize the editor')} aria-orientation={at === 'side' ? 'vertical' : 'horizontal'} aria-valuenow={size(at)} aria-valuemin={at === 'side' ? SIDE.min : BOTTOM.min} aria-valuemax={clampSize(at, Number.MAX_SAFE_INTEGER, room())} onPointerDown={startResize} onKeyDown={resizeByKey})
   if open()
     .kcms-editor-body
       if drafts.failure() as failure

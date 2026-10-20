@@ -1,8 +1,14 @@
+/* The size the open editor takes, kept clear of the dev tool's own docked drawer, which publishes what it holds as `--kay-dev-inset-right` and `-bottom`. The 22rem and 10rem are what the page keeps of the window. */
+html.kcms-editing {
+  --kcms-width: max(17.5rem, min(var(--kcms-side, 24rem), calc(100vw - var(--kay-dev-inset-right, 0px) - 22rem)));
+  --kcms-height: max(10rem, min(var(--kcms-bottom, 50dvh), calc(100dvh - var(--kay-dev-inset-bottom, 0px) - 10rem)));
+}
+
 .kcms-editor {
   position: fixed;
   z-index: 2147483000;
-  right: 1rem;
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1rem + var(--kay-dev-inset-right, 0px));
+  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + env(safe-area-inset-bottom, 0px));
   color: var(--color-kui-text);
   background: var(--color-kui-mantle);
   border: 1px solid var(--color-kui-surface2);
@@ -10,13 +16,14 @@
   box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.25);
 }
 
+/* Docked at the side: the full height, beside the page. */
 .kcms-editor-open {
   top: 0;
-  right: 0;
-  bottom: 0;
+  right: var(--kay-dev-inset-right, 0px);
+  bottom: var(--kay-dev-inset-bottom, 0px);
   display: flex;
   flex-direction: column;
-  width: min(24rem, 100vw);
+  width: var(--kcms-width, min(24rem, 100vw));
   border-width: 0 0 0 1px;
   border-radius: 0;
 }
@@ -68,45 +75,113 @@
   border-bottom: 1px solid var(--color-kui-surface2);
 }
 
+/* Stays at the top of the form on one line, so its buttons are always in reach and never cover the fields. */
 .kcms-entry-head {
+  position: sticky;
+  z-index: 1;
+  top: 0;
   display: flex;
-  align-items: start;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  margin: -1rem -1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--color-kui-mantle);
+  border-bottom: 1px solid var(--color-kui-surface2);
+}
+
+.kcms-entry-head hgroup {
+  min-width: 0;
+  flex: 1;
+}
+
+.kcms-entry-title,
+.kcms-entry-slug {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kcms-entry-title {
-  margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .kcms-entry-slug {
-  margin: 0;
   font-size: 0.8rem;
   color: var(--color-kui-subtext0);
-  overflow-wrap: anywhere;
 }
 
-/* The page makes room for the open editor beside it, and shows what a click would edit. */
+/* The page makes room for the open editor on the edge it is docked to, so no site content hides under it. */
+html.kcms-editing.kcms-dock-side body {
+  margin-right: var(--kcms-width);
+}
+
+html.kcms-editing.kcms-dock-bottom body {
+  padding-bottom: var(--kcms-height);
+}
+
+/* At the bottom the editor is a sheet across the page, where a fixed header at the top and the page's width stay as they are. */
+html.kcms-dock-bottom .kcms-editor-open {
+  top: auto;
+  right: var(--kay-dev-inset-right, 0px);
+  left: 0;
+  width: auto;
+  height: var(--kcms-height, 50dvh);
+  border-width: 1px 0 0;
+}
+
+/* Before the editor has read where it was left, the window's width picks: the side from 64rem, the bottom below. */
 @media (min-width: 64rem) {
-  html.kcms-editing body {
-    margin-right: 24rem;
+  html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) body {
+    margin-right: var(--kcms-width);
   }
 }
 
-/* On a phone the editor takes the lower part of the screen, leaving the page above it to tap. */
-@media (max-width: 40rem) {
-  .kcms-editor-open {
+@media (max-width: 63.999rem) {
+  html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) body {
+    padding-bottom: var(--kcms-height);
+  }
+
+  html:not(.kcms-dock-side):not(.kcms-dock-bottom) .kcms-editor-open {
     top: auto;
-    height: 60dvh;
-    width: 100vw;
+    right: var(--kay-dev-inset-right, 0px);
+    left: 0;
+    width: auto;
+    height: var(--kcms-height, 50dvh);
     border-width: 1px 0 0;
   }
+}
 
-  html.kcms-editing body {
-    padding-bottom: 60dvh;
-  }
+/* The edge that resizes the editor, dragged or moved with the arrow keys. */
+.kcms-editor-grip {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+
+html.kcms-dock-side .kcms-editor-grip {
+  top: 0;
+  bottom: 0;
+  left: -0.25rem;
+  width: 0.5rem;
+  cursor: ew-resize;
+}
+
+html.kcms-dock-bottom .kcms-editor-grip {
+  top: -0.5rem;
+  right: 0;
+  left: 0;
+  height: 1rem;
+  cursor: ns-resize;
+}
+
+.kcms-editor-grip:hover,
+.kcms-editor-grip:focus-visible {
+  background: color-mix(in srgb, var(--color-kui-accent) 40%, transparent);
+  outline: none;
 }
 
 html.kcms-editing [data-kay-field]:hover,

@@ -47,6 +47,12 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
 
+The editor never covers the page it edits. From 64rem wide it docks to the right and moves the page's body aside by its width. On a narrower window, and always below 40rem, it is a sheet at the bottom and pads the page by its height, so the page keeps its width and a fixed header at the top stays in view.
+
+Drag the editor's inner edge, or focus it and press the arrow keys, to resize it. The button in its head docks it to the other edge, and the hide button folds it into one button. It remembers the edge, the size and whether it is hidden in the browser.
+
+When the dev tool is docked to the right or the bottom, the editor sits beside it instead of under it. Clicking an element of the page scrolls it above the sheet when the sheet would hide it.
+
 An edit cookie or link is tied to no user, so it reads only the entries the pages it showed in edit mode read, never a customer or order collection the page does not render. A signed-in editor the guard admits reads any entry. The list of those entries lives in the server's memory, so after a restart, or on another replica, load the page again.
 
 Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
