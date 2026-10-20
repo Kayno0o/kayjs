@@ -799,14 +799,26 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('has bun check type-check a project whose package.json has a check script of its own, as kay\'s own apps do', async () => {
+  it('has bun check type-check a project whose package.json has a check script of its own, as kay\'s own apps do, under a script of another project too', async () => {
     const root = await scratchProject({ 'src/a.ts': 'export const a: number = \'a\'\n', 'package.json': JSON.stringify({ scripts: { check: 'echo ran > ran.txt' } }) })
+    const outer = process.env.npm_package_json
 
     try {
       expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['a.ts', 'TS2322']])
       expect(await Bun.file(join(root, 'ran.txt')).exists()).toBe(false)
+
+      // As under `bun run test`, which names the package.json of the project running the tests.
+      process.env.npm_package_json = join(import.meta.dir, '../package.json')
+      await rm(join(root, '.kay/cache/check'), { recursive: true, force: true })
+      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['a.ts', 'TS2322']])
+      expect(await Bun.file(join(root, 'ran.txt')).exists()).toBe(false)
     }
     finally {
+      if (outer === undefined)
+        delete process.env.npm_package_json
+      else
+        process.env.npm_package_json = outer
+
       await rm(root, { recursive: true, force: true })
     }
   })

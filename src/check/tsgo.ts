@@ -162,8 +162,8 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const obsolete = dropObsoleteState(state)
   const generated = checked?.hashes ?? await contentHashes(shadowDir)
   const started = Date.now()
-  // A project's own `check` script would run in the place of the type checker, which Bun skips for a process started as that script is.
-  const child = Bun.spawn([process.execPath, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, npm_lifecycle_event: 'check' } })
+  // A project's own `check` script would run in the place of the type checker, which Bun skips for a process started as that script is, unless `npm_package_json` names another project's package.json, as it does under a script of the project that runs kay.
+  const child = Bun.spawn([process.execPath, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, npm_lifecycle_event: 'check', npm_package_json: undefined } })
   let stopped = false
   // A timer of kay's own rather than the spawn's `timeout`, which a loaded parallel test run was seen to let pass.
   const timer = setTimeout(() => {
