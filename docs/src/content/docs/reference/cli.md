@@ -526,6 +526,8 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 
 In an app whose stylesheet imports Tailwind, `kay fmt` also puts the shorthand's classes in Tailwind's order, the one the Tailwind rules of `@kaynooo/eslint` use, and keeps a class Tailwind does not know where it stands, first. When it moves the classes into a `class` attribute, the words already in that attribute are sorted with them as one list. The editor's format does the same.
 
+To know Tailwind's order, `kay fmt` loads the app's `tailwindcss` and runs the plugin and config modules the stylesheet names, as the build does. It fetches nothing: before `bun install`, or with a package missing, the classes stay as written. The editor picks up an edit to any stylesheet the entry imports on its next format. A line that is long for its other attributes, not its classes, is left as written.
+
 `kay fmt --from-html` reads a file, or stdin, and prints the HTML as a template, with what it could not carry over listed on stderr. [Migrating from HTML](/migrating/from-html) shows what it writes.
 
 `kay explain` and `kay fmt` take `--format json` too, see [Output for tools](#output-for-tools).

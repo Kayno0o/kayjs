@@ -1,6 +1,6 @@
 import type { ClassSorter } from '../compiler/format'
 import { existsSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles } from '../build/files'
 import { stylesheetPath, TAILWIND_IMPORT } from '../dev/tailwind'
 
@@ -12,27 +12,38 @@ type LoadDesign = (css: string, options: object) => Promise<Design>
 
 // Where the entry stylesheet usually is, tried before the others.
 const ENTRY = 'src/app.css'
-const sorters = new Map<string, { stamp: number, sorter: Promise<ClassSorter | undefined> }>()
+const PACKAGE_NAME = /^(?:@[^/]+\/)?[^/]+/
+
+// A design system and every stylesheet it read with the time each was last changed, so an edit to any of them loads it again.
+interface Loaded {
+  sorter: ClassSorter | undefined
+  files: Map<string, number>
+}
+
+const loads = new Map<string, { entry: string, loaded: Promise<Loaded> }>()
 
 // Tailwind's own order for a class list, from the design system of the app's `tailwindcss` and its entry stylesheet, as `eslint-plugin-better-tailwindcss` orders a class string: unknown classes first as written, then by Tailwind's index.
-// Undefined when the app does not use Tailwind or its design system does not load, which leaves the classes as written.
+// Undefined when the app does not use Tailwind or its design system does not load, which leaves the classes as written; a design system that did not load is tried again on the next call.
 export async function tailwindSorter(root: string): Promise<ClassSorter | undefined> {
   const entry = await tailwindEntry(root)
 
   if (entry === undefined)
     return undefined
 
-  const stamp = Bun.file(entry).lastModified
-  const known = sorters.get(root)
+  const known = loads.get(root)
 
-  if (known?.stamp === stamp)
-    return known.sorter
+  if (known?.entry === entry) {
+    const { sorter, files } = await known.loaded
 
-  const sorter = designSorter(entry)
+    if (sorter && [...files].every(([file, stamp]) => Bun.file(file).lastModified === stamp))
+      return sorter
+  }
 
-  sorters.set(root, { stamp, sorter })
+  const loaded = loadDesign(entry)
 
-  return sorter
+  loads.set(root, { entry, loaded })
+
+  return (await loaded).sorter
 }
 
 async function tailwindEntry(root: string): Promise<string | undefined> {
@@ -69,7 +80,25 @@ export function installed(name: string, from: string): boolean {
   }
 }
 
-async function designSorter(entry: string): Promise<ClassSorter | undefined> {
+// A stylesheet or module the design system asks for, which is a package only when it is installed.
+function assertResolvable(id: string, from: string): void {
+  if (id.startsWith('.') || isAbsolute(id))
+    return
+
+  const name = PACKAGE_NAME.exec(id)?.[0] ?? id
+
+  if (!installed(name, from))
+    throw new Error(`${name} is not installed`)
+}
+
+async function loadDesign(entry: string): Promise<Loaded> {
+  const files = new Map([[entry, Bun.file(entry).lastModified]])
+
+  return { sorter: await designSorter(entry, files), files }
+}
+
+// Runs the project's own Tailwind plugin and config modules, as its build does, so the order holds for the utilities they add; none that is not installed.
+async function designSorter(entry: string, files: Map<string, number>): Promise<ClassSorter | undefined> {
   try {
     const base = dirname(entry)
 
@@ -80,11 +109,17 @@ async function designSorter(entry: string): Promise<ClassSorter | undefined> {
     const design = await tailwind.__unstable__loadDesignSystem?.(await Bun.file(entry).text(), {
       base,
       loadStylesheet: async (id: string, from: string) => {
+        assertResolvable(id, from)
+
         const path = await stylesheetPath(id, from)
+
+        files.set(path, Bun.file(path).lastModified)
 
         return { path, base: dirname(path), content: await Bun.file(path).text() }
       },
       loadModule: async (id: string, from: string) => {
+        assertResolvable(id, from)
+
         const path = id.startsWith('.') ? resolve(from, id) : Bun.resolveSync(id, from)
 
         return { path, base: dirname(path), module: (await import(path) as { default: unknown }).default }

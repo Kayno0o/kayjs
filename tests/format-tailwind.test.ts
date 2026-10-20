@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -89,6 +89,35 @@ describe('Tailwind\'s order', () => {
     const root = await project({ 'src/app.css': `${entry}@import './missing-plugin.css';\n@plugin './missing.js';\n`, 'src/routes/index.kay': page })
 
     expect(await tailwindSorter(root)).toBeUndefined()
+  })
+
+  it('sorts again when a stylesheet the entry imports changes', async () => {
+    const root = await project({ 'src/app.css': `${entry}@import './theme.css';\n`, 'src/theme.css': '@theme { --color-brand: red; }\n' })
+
+    expect((await tailwindSorter(root))!(['gap-gap', 'flex'])).toEqual(['gap-gap', 'flex'])
+
+    await Bun.write(join(root, 'src/theme.css'), '@theme { --spacing-gap: 3px; }\n')
+    await utimes(join(root, 'src/theme.css'), new Date(Date.now() + 5000), new Date(Date.now() + 5000))
+
+    expect((await tailwindSorter(root))!(['gap-gap', 'flex'])).toEqual(['flex', 'gap-gap'])
+  })
+
+  it('tries a design system that did not load again, rather than keeping the failure', async () => {
+    const root = await project({ 'src/app.css': `${entry}@import './later.css';\n` })
+
+    expect(await tailwindSorter(root)).toBeUndefined()
+
+    await Bun.write(join(root, 'src/later.css'), '@theme { --spacing-gap: 3px; }\n')
+
+    expect((await tailwindSorter(root))!(['gap-gap', 'flex'])).toEqual(['flex', 'gap-gap'])
+  })
+
+  it('leaves a stylesheet or plugin package that is not installed unresolved, so nothing is fetched', async () => {
+    const root = await project({ 'src/app.css': `${entry}@plugin 'kay-not-installed-plugin';\n` })
+    const stylesheet = await project({ 'src/app.css': `${entry}@import '@kay-test/not-installed';\n` })
+
+    expect(await tailwindSorter(root)).toBeUndefined()
+    expect(await tailwindSorter(stylesheet)).toBeUndefined()
   })
 
   it('reaches no network for an app that is not installed: no node_modules above it, no sorting', async () => {
