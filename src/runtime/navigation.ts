@@ -218,6 +218,7 @@ export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement |
 // The browser posts the form, as it would have without the swap.
 export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | null): void {
   navigation.released = true
+  navigation.loads++
   nativeSubmits.add(form)
   form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
 }

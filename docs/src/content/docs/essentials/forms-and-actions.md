@@ -147,9 +147,9 @@ form(action={add})
     p Saving...
 ```
 
-The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in, and while a page from another origin, or a reload after a lost answer, is loading. Its text goes to screen readers through a polite live region the runtime writes outside the form.
+The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in, and while a page from another origin, or a reload after a lost answer, is loading. A load that never replaces the page, such as a download, loses it after ten seconds. Its text goes to screen readers through a polite live region the runtime writes outside the form.
 
-In an island, the form shows it as well while a call of its action is in flight, however the handler or a button made it, and while its `onSubmit` waits for a promise. It follows every call of the action, so the forms of a list sharing one action all show it while one of them is saved.
+In an island, the form shows it as well while a call of its action is in flight, however the handler or a button made it, and while its `onSubmit` waits for a promise. It follows every call of the action, so the forms of a list sharing one action all show it while one of them is saved. A handle from `add.track()` follows only its own calls and is no action a form can post to, so it is not written in `action`.
 
 The block adds no element of its own to the layout: what it holds sits in the form as if written there. No style is involved, so a strict `style-src` leaves it working. Outside a form that posts to an action, `pending` is an error.
 

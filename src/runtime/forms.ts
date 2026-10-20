@@ -58,11 +58,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
         pendingBlocks(form, 'post', false)
       }
       else {
-        // The page may come back from the back-forward cache as it was left.
-        window.addEventListener('pageshow', (event) => {
-          if (event.persisted)
-            pendingBlocks(form, 'post', false)
-        })
+        keepShown(form)
       }
     }
 
@@ -70,6 +66,26 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
   }
 
   busyForms.delete(form)
+}
+
+// How long a block stays shown for a load that does not replace the page (a download, a stopped load); a slower one loses it early.
+const LOAD_GRACE = 10_000
+
+// A load began that replaces the page, whose block stays shown meanwhile; one that does not (a download, a stopped load) or a page restored from the back-forward cache gets it hidden.
+function keepShown(form: HTMLFormElement): void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const restore = (event?: PageTransitionEvent) => {
+    if (event && !event.persisted)
+      return
+
+    clearTimeout(timer)
+    window.removeEventListener('pageshow', restore)
+    pendingBlocks(form, 'post', false)
+  }
+
+  timer = setTimeout(restore, LOAD_GRACE)
+  window.addEventListener('pageshow', restore)
 }
 
 async function loadChecks(): Promise<typeof import('./validate')> {

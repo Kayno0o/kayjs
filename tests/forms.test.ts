@@ -22,9 +22,9 @@ function fakeElement(): Element {
   } as unknown as Element
 }
 
-// The islands built for the island form's tests, which load pages in Chromium only once they open one.
 // What a page being left reports, as a page mid-navigation cannot be asked.
 const reported: string[] = []
+// The islands built for the island form's tests, which load pages in Chromium only once they open one.
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true, use: [new Elysia().get('/reported/:state', ({ params }) => {
   reported.push(params.state)
 
