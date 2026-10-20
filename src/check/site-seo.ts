@@ -4,6 +4,7 @@ import type { Route } from '../server/routes'
 import type { CheckDiagnostic } from './index'
 import type { OtherPage, RenderedPage, SiteSeo } from './seo'
 import { sep } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { basePath } from '../server/base'
 import { fillTarget } from '../server/redirects'
 import { slashedPath } from '../server/routes'
@@ -237,8 +238,11 @@ export function redirectChainLints(config: SiteSeoConfig, options: Pick<SiteSeoO
   try {
     return siteSeoLints({ ...config, base: undefined }, [], [], options)
   }
-  catch {
-    return []
+  catch (error) {
+    if (error instanceof KayError)
+      return []
+
+    throw error
   }
 }
 
