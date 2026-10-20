@@ -132,6 +132,14 @@ const admin = await testSite({
 
 A site made with `headers` sends them with every request. `site.as()` gives the same site more of them, and a string is a `Cookie` header, such as `auth.sessionCookie` returns.
 
+To sign a site in as a member, call `auth.signInAs(site, { email, username })` with the app's own `auth`. It makes the member when none has that email or username, and sets the session cookie on the site, with no form to fill. Call it again to switch member, and `auth.signOut(site)` to sign out.
+
+```ts
+await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })
+
+expect((await site.visit('/')).find('nav a')[1]?.text).toBe('Ada')
+```
+
 ```ts
 const asAdmin = site.as(await auth.sessionCookie(admin.id))
 

@@ -3,6 +3,7 @@ import type { AuthSessionData } from '../src/auth'
 import { afterEach, describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
+import { cookieJar } from 'kay/test'
 import { setSite } from '../../../src/runtime/site'
 import { Auth, createAuth } from '../src/auth'
 import { memoryStore } from '../src/memoryStore'
@@ -30,6 +31,34 @@ describe('createAuth', () => {
 
     expect(await response.json()).toMatchObject({ id: 'u1', email: 'ada@example.com' })
     await expect(auth.sessionCookie('nobody')).rejects.toThrow('no user nobody')
+  })
+
+  test('signInAs signs a test site in as a member it makes when none exists, and again as an existing one, and signOut drops it', async () => {
+    const { auth, app } = testApp()
+    const site = cookieJar()
+    const who = async () => {
+      const text = await (await site.send(app.handle, new Request('http://localhost/me'))).text()
+
+      return text === 'anonymous' ? text : JSON.parse(text) as unknown
+    }
+
+    expect(await who()).toBe('anonymous')
+
+    const ada = await auth.signInAs(site, { email: 'Ada@Example.com', username: 'Ada', roles: ['editor'], emailVerified: true })
+
+    expect(await who()).toMatchObject({ id: ada.id, email: 'ada@example.com', username: 'Ada', roles: ['editor'], emailVerified: true })
+
+    const grace = await auth.signInAs(site, { email: 'grace@example.com' })
+
+    expect(await who()).toMatchObject({ id: grace.id })
+    expect(await auth.signInAs(site, { email: 'ADA@example.com' })).toMatchObject({ id: ada.id })
+    expect(await who()).toMatchObject({ id: ada.id })
+
+    site.cookies.set('theme', 'dark')
+    auth.signOut(site)
+    expect(await who()).toBe('anonymous')
+    expect(site.cookies.get('theme')).toBe('dark')
+    await expect(auth.signInAs(site, { email: 'not an address' })).rejects.toThrow('could not make the member')
   })
 
   describe('sessionCookie against the server\'s scheme rule', () => {

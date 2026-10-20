@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
+import { auth } from '../src/auth'
 import { post } from '../src/routes/index.kay'
-import { joinAs } from './members'
 
 const site = await testSite({ browser: true })
 
@@ -13,8 +13,8 @@ afterAll(async () => {
 describe.skipIf(browserPath() === undefined)('in a browser', () => {
   it('pins a notice from the dialog, and shows another member\'s at once with a toast, the live island kept', async () => {
     // The browser signs in as Ada; the test site, which keeps cookies of its own, stays Grace.
-    await joinAs(site, 'Ada')
-    await joinAs(site, 'Grace')
+    await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada', password: 'correct horse battery' })
+    await auth.signInAs(site, { email: 'grace@example.com', username: 'Grace' })
 
     const page = await site.open('/auth/sign-in')
 

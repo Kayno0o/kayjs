@@ -58,6 +58,16 @@ The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, su
 
 A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`. It mints `session`, which a request over http reads; one over https (directly or with `x-forwarded-proto: https`) reads `__Host-session` alone, so it mints the one the app reads from a request with no `x-forwarded-proto`: `__Host-session` in production when kay.config.ts `site` is https, else `session`. `auth.sessionCookie(userId, { secure: true })` asks for `__Host-session` (`secure: false` for `session`), as for a request sent over https in a test, or a site with no `site` behind a proxy sending `x-forwarded-proto: https`.
 
+A test site signs in with one call, no form round trip: `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username (`createUser`'s fields: `email`, `username`, `password`, `roles`, `emailVerified`, `locale`), signs an existing one in as they are, sets the session cookie in the site's cookie jar and returns the user. A second call switches member and `auth.signOut(site)` makes the site anonymous again, its other cookies kept. It goes through the store, so it works on `pgStore` as on `memoryStore`. `auth` is the app's own `createAuth` result, so `kay/test` imports nothing of kayjs-auth and the app declares nothing.
+
+```ts
+import { auth } from '../src/auth'
+
+await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada', emailVerified: true })
+expect((await site.visit('/')).find('nav a')[1]?.text).toBe('Ada')
+auth.signOut(site)
+```
+
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
 
 ## Dev tool

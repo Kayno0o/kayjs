@@ -65,7 +65,7 @@ import { createUser, register, signInWithPassword, userProblems } from './passwo
 import { pruneWhenDue } from './prune'
 import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
-import { PROFILE_MAX_LENGTH, resolveRules } from './rules'
+import { normalizeEmail, normalizeUsername, PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 import { userDataRules } from './userData'
@@ -89,6 +89,8 @@ const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 
 const SOCKET_USER_GONE = 1008
 // The sockets `socketUser` answered a user for, to close once that user is gone.
 const servedSockets = new WeakSet<object>()
+// The session cookies `signInAs` set in a test site's jar, so `signOut` and the next sign-in drop just those.
+const signedInCookies = new WeakMap<Bun.CookieMap, string[]>()
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
@@ -1270,6 +1272,29 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (core.organizations && create !== undefined)
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
+  const mintSessionCookie = async (userId: string, secure: boolean | undefined): Promise<string> => {
+    let failure: unknown
+    const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
+      try {
+        await auth.signIn({ id: userId })
+      }
+      catch (error) {
+        failure = error
+      }
+    })
+    const response = await signer.handle(new Request(secure === true ? 'https://localhost/' : 'http://localhost/', { method: 'POST', headers: secure === false ? { 'x-forwarded-proto': 'http' } : {} }))
+
+    if (failure !== undefined)
+      throw failure
+
+    // `name=value` off each Set-Cookie line, its attributes dropped.
+    return response.headers.getSetCookie().map((line) => {
+      const end = line.indexOf(';')
+
+      return end === -1 ? line : line.slice(0, end)
+    }).join('; ')
+  }
+
   return withPluginOwner({
     [PAGES_OF]: core.pages && pagesHandle(core, options),
     // What `kay auth create-user` asks before the password: what `createUser` would refuse the login for.
@@ -1291,27 +1316,53 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // The `Cookie` header of a new session signed in as `userId`, as `signIn` makes it, for a test or a script to send by hand; throws for a missing or banned user.
     // The cookie is the one kay's server names for the scheme it sees: by default the plugin signs in over `http://localhost/`, so the server's own rule applies (an https `site` in kay.config.ts makes it `__Host-session` in production); `secure: true` mints the one an https request reads, `secure: false` the plain one.
     async sessionCookie(userId: string, cookieOptions: { secure?: boolean } = {}): Promise<string> {
-      const { secure } = cookieOptions
-      let failure: unknown
-      const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
-        try {
-          await auth.signIn({ id: userId })
-        }
-        catch (error) {
-          failure = error
-        }
-      })
-      const response = await signer.handle(new Request(secure === true ? 'https://localhost/' : 'http://localhost/', { method: 'POST', headers: secure === false ? { 'x-forwarded-proto': 'http' } : {} }))
+      return mintSessionCookie(userId, cookieOptions.secure)
+    },
 
-      if (failure !== undefined)
-        throw failure
+    // Signs a test site in as a member, making them first when no user has their email or username, with no form round trip: `createUser`'s fields (`email`, `username`, `password`, `roles`, `emailVerified`, `locale`) for a new member, an existing one signed in as they are. It sets the session cookie in the site's cookie jar, so a second call switches member; returns the user.
+    async signInAs(site: { cookies: Bun.CookieMap }, who: CreateUserInput): Promise<BareUser> {
+      const email = who.email === undefined ? undefined : normalizeEmail(who.email)
+      const username = who.username === undefined ? undefined : normalizeUsername(who.username)
+      const found = (email === undefined ? undefined : await core.store.users.findByEmail(email)) ?? (username === undefined ? undefined : await core.store.users.findByUsername(username))
+      let user: BareUser
 
-      // `name=value` off each Set-Cookie line, its attributes dropped.
-      return response.headers.getSetCookie().map((line) => {
-        const end = line.indexOf(';')
+      if (found) {
+        user = publicUser(found)
+      }
+      else {
+        const created = await createUser(core, who)
 
-        return end === -1 ? line : line.slice(0, end)
-      }).join('; ')
+        if (!created.ok)
+          throw new Error(`kayjs-auth: signInAs could not make the member: ${JSON.stringify(created.errors)}`)
+
+        user = created.user
+      }
+
+      const names = signedInCookies.get(site.cookies) ?? []
+
+      for (const name of names)
+        site.cookies.delete(name)
+
+      names.length = 0
+
+      for (const piece of (await mintSessionCookie(user.id, undefined)).split('; ')) {
+        const split = piece.indexOf('=')
+
+        site.cookies.set(piece.slice(0, split), piece.slice(split + 1))
+        names.push(piece.slice(0, split))
+      }
+
+      signedInCookies.set(site.cookies, names)
+
+      return user
+    },
+
+    // Signs a test site out of the member `signInAs` signed it in as, by dropping the session cookie it set: the site is anonymous again, its other cookies kept.
+    signOut(site: { cookies: Bun.CookieMap }): void {
+      for (const name of signedInCookies.get(site.cookies) ?? [])
+        site.cookies.delete(name)
+
+      signedInCookies.delete(site.cookies)
     },
 
     // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`, and read again past 30 seconds: null for an anonymous one, or a socket opened on an app without the plugin. A socket whose user is gone since, signed out, revoked or banned, is closed.

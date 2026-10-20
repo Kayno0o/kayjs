@@ -2,9 +2,9 @@ import { outbox } from '@kaynooo/kayjs-mail'
 import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import board from '../src/api/board'
+import { auth } from '../src/auth'
 import { post } from '../src/routes/index.kay'
-import { joinAs, mailTo } from './members'
-import { signOut } from './pages'
+import { mailTo } from './members'
 
 // The site takes the plugins of kay.config.ts's extensions, the mailer's queue included, which `runJobs()` also drains here and now.
 const site = await testSite()
@@ -22,16 +22,16 @@ it('shows an empty board, and the button to pin a notice to members only', async
 })
 
 it('pins a notice, which every open board hears of at once and confirmed members by mail', async () => {
-  const reader = await joinAs(site, 'Ada', { confirmed: true })
-  const unconfirmed = await joinAs(site, 'Linus')
+  const reader = (await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada', emailVerified: true })).email!
+  const unconfirmed = (await auth.signInAs(site, { email: 'linus@example.com', username: 'Linus' })).email!
 
-  await signOut(site)
+  auth.signOut(site)
 
   const watching = site.socket(board, '/')
 
   expect(await watching.next()).toEqual({ type: 'present', names: [], guests: 1 })
 
-  const author = await joinAs(site, 'Grace', { confirmed: true })
+  const author = (await auth.signInAs(site, { email: 'grace@example.com', username: 'Grace', emailVerified: true })).email!
   const live = site.socket(board, '/')
 
   expect(await watching.next()).toEqual({ type: 'present', names: ['Grace'], guests: 1 })
@@ -64,6 +64,6 @@ it('pins a notice, which every open board hears of at once and confirmed members
 })
 
 it('refuses an empty notice with the field it is missing', async () => {
-  await joinAs(site, 'Barbara')
+  await auth.signInAs(site, { email: 'barbara@example.com', username: 'Barbara' })
   await expect(site.call(post, { title: ' ', body: 'Text' })).rejects.toMatchObject({ status: 422, errors: { title: 'Write a title' } })
 })
