@@ -21,7 +21,52 @@ export interface Selector {
 }
 
 // A rule's prelude split at its top-level commas, comments, strings and escapes read past whole.
+// A selector that is one `:is(...)` holding a single selector, as Tailwind writes a `*:` variant's `:is(.\*\:p-2 > *)`, has the classes of what it holds.
 export function selectors(prelude: string): Selector[] {
+  return scan(prelude).map((selector) => {
+    const inner = isOnly(selector.text)
+    const held = inner === undefined ? [] : scan(inner)
+
+    return held.length === 1 ? { text: selector.text, classes: held[0]!.classes } : selector
+  })
+}
+
+// What a selector holds when all of it is one `:is(...)`.
+function isOnly(selector: string): string | undefined {
+  const text = selector.trim()
+
+  if (!text.startsWith(':is(') || !text.endsWith(')'))
+    return undefined
+
+  const inner = text.slice(4, -1)
+  let depth = 0
+
+  for (let at = 0; at < inner.length; at++) {
+    const char = inner[at]!
+
+    if (char === '\\')
+      at += escapeLength(inner, at) - 1
+    else if (char === '"' || char === '\'')
+      at = skipString(inner, at)
+    else if (char === '(' || char === '[')
+      depth++
+    else if ((char === ')' || char === ']') && --depth < 0)
+      return undefined
+  }
+
+  return depth === 0 ? inner : undefined
+}
+
+function skipString(text: string, from: number): number {
+  let at = from + 1
+
+  while (at < text.length && text[at] !== text[from])
+    at += text[at] === '\\' ? 2 : 1
+
+  return at
+}
+
+function scan(prelude: string): Selector[] {
   const found: Selector[] = []
   let classes: string[] = []
   let depth = 0

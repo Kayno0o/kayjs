@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
-import { pruneNodes, selectors, styledClassNames } from '../src/build/class-rules'
+import { pruneNodes, pruneUnescaped, selectors, styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
 import { classTokens, unusedLibraryClasses } from '../src/build/prune'
@@ -47,6 +47,21 @@ describe('pruneNodes', () => {
 
   it('keeps a selector naming an unused class only inside a pseudo-class or an attribute', () => {
     const css = ':is(.gone, .kept)::before{a:b}:where(.gone:hover) .kept{c:d}.kept:not(.gone){e:f}[data-x=".gone"]{g:h}'
+
+    expect(pruneClasses(css, unused)).toBe(css)
+  })
+
+  it('reads the class of a star variant, which Tailwind writes inside one :is(), and drops its rule where the class is unused', () => {
+    const css = ':is(.\\*\\:p-2 > *){a:b}:is(.\\*\\*\\:p-2 *){a:b}:is(.hover\\:\\*\\:p-2:hover > *){a:b}@media (hover: hover){:is(.group-hover\\:\\*\\:p-2:is(:where(.group):hover *) > *){a:b}}.kept{c:d}'
+
+    expect(selectors(':is(.\\*\\:p-2 > *)').map(each => each.classes)).toEqual([['\\*\\:p-2']])
+    expect(styledClassNames(parse(css))).toEqual(new Set(['*:p-2', '**:p-2', 'hover:*:p-2', 'group-hover:*:p-2', 'kept']))
+    expect(print(pruneNodes(parse(css), new Set(['\\*\\:p-2', 'hover\\:\\*\\:p-2'])))).toBe(':is(.\\*\\*\\:p-2 *){a:b}@media (hover: hover){:is(.group-hover\\:\\*\\:p-2:is(:where(.group):hover *) > *){a:b}}.kept{c:d}')
+    expect(print(pruneUnescaped(parse(css), new Set(['*:p-2', '**:p-2', 'hover:*:p-2', 'group-hover:*:p-2'])))).toBe('.kept{c:d}')
+  })
+
+  it('keeps an :is() that is not the whole selector, or holds a list', () => {
+    const css = ':is(.gone > *) .kept{a:b}.kept:is(.gone > *){a:b}:is(.gone, .kept > *){a:b}:is(.kept):is(.gone){a:b}'
 
     expect(pruneClasses(css, unused)).toBe(css)
   })

@@ -49,6 +49,9 @@ async function copyOfFixture(): Promise<string> {
 
   await Bun.write(join(dir, 'src/routes/bulk.kay'), `h1 Bulk\na.to-other(href="/other-bulk") other\np(class="${BULK}") bulk\n`)
   await Bun.write(join(dir, 'src/routes/half.kay'), `h1 Half\np(class="${HALF}") half\n`)
+  // Tailwind writes a star variant's rule as `:is(.\*\:p-2 > *)`, the class inside the :is().
+  await Bun.write(join(dir, 'src/routes/star.kay'), 'ul.*:p-2.**:m-1\n  li star\n')
+  await Bun.write(join(dir, 'src/routes/no-star.kay'), 'p.italic no star\n')
   await Bun.write(join(dir, 'src/routes/other-bulk.kay'), `h1 Other\np(class="${OTHER_BULK}") other\n`)
   // Pages that build a class from data and are rendered at build time; the second has rules of its own past the limit, so its head links a copy.
   await Bun.write(join(dir, 'src/routes/tone.kay'), TONE)
@@ -269,6 +272,20 @@ describe('a page\'s head', () => {
     const dynamic = await head(await serve(), '/dynamic')
 
     expect(hasRule(dynamic.styles, 'border-red-500')).toBe(true)
+  })
+
+  it('carries the rule of a star variant on the page that writes it, and not on one that does not', async () => {
+    const app = await serve()
+    const star = await head(app, '/star')
+    const plain = await head(app, '/no-star')
+
+    for (const name of ['*:p-2', '**:m-1'])
+      expect(star.styles, name).toContain(escaped(name))
+
+    for (const name of ['*:p-2', '**:m-1'])
+      expect(plain.styles, name).not.toContain(escaped(name))
+
+    expect(await sharedText(client, wholeUrl())).toContain(escaped('*:p-2'))
   })
 
   it('does not carry the rule of a class nothing on the page writes, though another page does', async () => {
