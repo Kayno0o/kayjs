@@ -45,7 +45,7 @@ async function kay(args: string[], options: { cwd?: string, env?: Record<string,
 }
 
 describe('kay check', () => {
-  // Each on a copy of the fixture, so no shadow tree or tsgo state an earlier run, branch or test left in its `.kay` reaches the check.
+  // Each on a copy of the fixture, so no shadow tree or check state an earlier run, branch or test left in its `.kay` reaches the check.
   it('passes a valid app, .ts files importing .kay components included', async () => {
     const root = await fixtureCopy('app')
 
@@ -736,7 +736,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('fails when tsgo reports an error without a position, or exits non-zero with nothing to say', async () => {
+  it('fails when the type check reports an error without a position, or exits non-zero with nothing to say', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'empty/tsconfig.json': '{"include":["nothing"]}' })
 
     try {
@@ -787,9 +787,12 @@ describe.concurrent('kay check, edge cases', () => {
 
       expect(afterManifest).not.toBe(kept)
       await startedLater(root, 3_600_000)
+
+      const shifted = await lastCleanStart(root)
+
       await Bun.write(join(root, 'bun.lock'), '{}\n')
       expect(await check(root)).toEqual([])
-      expect(await lastCleanStart(root)).not.toBe(afterManifest + 3_600_000)
+      expect(await lastCleanStart(root)).not.toBe(shifted)
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1868,7 +1871,7 @@ function firstLine(text: string): string {
 }
 
 describe('kay check on compiler output', () => {
-  // On a copy of the fixture, as the app fixture's tests are, so no shadow tree or tsgo state an earlier run or branch left in its `.kay` reaches the check.
+  // On a copy of the fixture, as the app fixture's tests are, so no shadow tree or check state an earlier run or branch left in its `.kay` reaches the check.
   it('types annotated server declarations, duplicate imports, prop defaults, script types, component tags and merged classes', async () => {
     const root = await fixtureCopy('compiler')
 

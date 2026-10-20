@@ -190,7 +190,7 @@ async function shadowedConfig(root: string, tsconfig: string, options: CheckOpti
   return [types, await resolvedConfig(root, tsconfig)] as const
 }
 
-// One extension program's tsgo run, state kept apart from the app's and the other programs'.
+// One extension program's type check, state kept apart from the app's and the other programs'.
 async function runProgram(root: string, { dir, tsconfig }: ExtensionProgram) {
   const { output, errors, code } = await typecheck(root, tsconfig, await resolvedConfig(root, tsconfig), `extension-${Bun.hash(dir).toString(36)}`)
 

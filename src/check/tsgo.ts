@@ -22,10 +22,11 @@ const CHECK_TIMEOUT = 5 * 60_000
 const CLOCK_SLACK = 1000
 // What `bun check` prints on stderr that is not a failure: the count of errors or the all-clear, the errors per file and line below it, and the notes explaining a stop the errors already show.
 const SUMMARY_LINE = /^(?:Found \d+ errors?\b|✓ No type errors |note: | +\d+ +\S.*:\d+$|$)/
-const INDENTED = /^\s/
+const LISTED_FILE = /^(?:bundled:|\/|[A-Za-z]:[\\/])/
+const LINE_BREAK = /\r?\n/
 const LOCK_FILES = ['bun.lock', 'bun.lockb']
 
-// What tsgo printed, one diagnostic a line, the lines after one that start no other added to its message.
+// What tsgo or `bun check` printed, one diagnostic a line, the lines after one that start no other added to its message.
 export function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {
   const diagnostics: CheckDiagnostic[] = []
 
@@ -190,13 +191,13 @@ async function dropObsoleteState(state: string): Promise<void> {
   await Promise.all(['tsbuildinfo', 'declarations'].map(async name => rm(join(state, name), { force: true })))
 }
 
-// `--listFiles` prints the files after the diagnostics, one path to a line at the start of it, where a diagnostic's lines either match the pattern or continue one with an indent.
-function splitListing(stdout: string): { output: string, listed: string[] } {
+// `--listFiles` prints the files after the diagnostics, one absolute path to a line, so any other line belongs to a diagnostic.
+export function splitListing(stdout: string): { output: string, listed: string[] } {
   const output: string[] = []
   const listed: string[] = []
 
-  for (const line of stdout.split('\n')) {
-    if (line === '' || INDENTED.test(line) || TSC_LINE.test(line) || TSC_GLOBAL_LINE.test(line))
+  for (const line of stdout.split(LINE_BREAK)) {
+    if (TSC_LINE.test(line) || !LISTED_FILE.test(line))
       output.push(line)
     else if (!line.startsWith('bundled:'))
       listed.push(line)
@@ -205,9 +206,9 @@ function splitListing(stdout: string): { output: string, listed: string[] } {
   return { output: output.join('\n'), listed }
 }
 
-// What `bun check` says on stderr besides a failure to run: the count of errors or the all-clear, and the notes that explain a stop already visible in the errors.
-function withoutSummary(stderr: string): string {
-  return stderr.split('\n').filter(line => !SUMMARY_LINE.test(line)).join('\n').trim()
+// What `bun check` says on stderr besides a failure to run, so a line Bun adds to its summary shows as a problem rather than going unseen: the count of errors or the all-clear, and the notes that explain a stop already visible in the errors.
+export function withoutSummary(stderr: string): string {
+  return stderr.split(LINE_BREAK).filter(line => !SUMMARY_LINE.test(line)).join('\n').trim()
 }
 
 interface CleanRun {
