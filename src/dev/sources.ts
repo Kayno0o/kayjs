@@ -17,7 +17,7 @@ const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|
 // The root files no server reads but a stylesheet's pruning does: a class named in a README is kept.
 const ROOT_NAMING_FILE = /\.(?:mdx?|htm)$/
 // Tests, which no server imports: a root directory such as `tests`, `e2e`, `tests-e2e` or `e2e_tests`, a `.test`, `.spec` or `.e2e` file, and a test runner's own root config.
-const TEST_DIR = /^(?:__tests__|(?:.+[-_.])?(?:tests?|e2e)(?:[-_.].+)?)$/
+const TEST_DIR = /^(?:.+[-_.])?(?:tests?|e2e)(?:[-_.].+)?$/
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec|e2e)\.[cm]?[jt]sx?$/
 const TEST_CONFIG = /^(?:playwright|vitest|jest|cypress)\.config\.[cm]?[jt]s$/
 // The files editors write beside a source while saving it, its backup, swap or temporary copy, Vim's `4913` and Emacs' `.#` lock included.
