@@ -99,6 +99,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
     const page = await site.open('/')
 
     await page.waitFor('h1', { text: 'Home' })
+    // A loaded host can paint after the click, and LCP stops at input, so the click waits for the beacon to have read one.
+    await page.evaluate(async () => new Promise<void>(resolve => new PerformanceObserver(() => setTimeout(resolve)).observe({ type: 'largest-contentful-paint', buffered: true })))
     await page.click('a.second')
     await page.waitFor('h1', { text: 'Second' })
 
