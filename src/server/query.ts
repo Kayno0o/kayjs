@@ -1,14 +1,12 @@
 import type { TSchema } from 'elysia'
-import type { TypeCheck } from 'elysia/type-system'
 import type { ParamRule, QueryRules } from '../runtime/query-param'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { mapValueError } from 'elysia'
-import { TypeCompiler } from 'elysia/type-system'
 import { ARRIVAL_PARAM } from '../runtime/arrival'
 import { formInput } from '../runtime/form'
 import { errorText } from './field-errors'
 import { pageSetting } from './page-settings'
+import { compiledCheck, fieldOf, refusals, summaryOf } from './schema-check'
 import { Denied } from './signals'
 
 export type ReadFields = { value: Record<string, unknown> } | { refused: Map<string, string> }
@@ -31,12 +29,9 @@ interface ParamSchema {
 }
 
 const KIND = Symbol.for('TypeBox.Kind')
-const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
 const rulesCache = new WeakMap<TSchema, QueryRules>()
 const mergedQueries = new WeakMap<TSchema, { parts: TSchema[], merged: TSchema }>()
 const PLAIN_TYPES = new Set<unknown>(['string', 'number', 'integer', 'boolean', 'array'])
-// The top-level field of a validation path such as `/page`.
-const FIELD = /^\/([^/]*)/
 
 // The schema a route's `ctx.query` is read against: its layouts' `query` and its page's merged, a name two of them declare allowed when their schemas are the same and an error otherwise.
 // `files` and `modules` are the route's chain, the page last.
@@ -148,26 +143,13 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, form
   }
 
   const value = formInput(schema, filled, form) as Record<string, unknown>
-  let check = checks.get(schema)
-
-  if (!check)
-    checks.set(schema, check = TypeCompiler.Compile(schema))
+  const check = compiledCheck(schema)
 
   // Decoding turns what a schema reads from text, such as an `s.Date()`, into the value its type says.
   if (check.Check(value))
     return { value: check.Decode<Record<string, unknown>>(value) }
 
-  const refused = new Map<string, string>()
-
-  for (const issue of check.Errors(value)) {
-    const name = FIELD.exec(issue.path)?.[1] ?? ''
-    const custom = (issue.schema as { error?: unknown }).error
-
-    if (!refused.has(name))
-      refused.set(name, errorText(custom) ?? mapValueError(issue)?.summary ?? issue.message)
-  }
-
-  return { refused }
+  return { refused: refusals(check, value, fieldOf, issue => errorText((issue.schema as { error?: unknown }).error) ?? summaryOf(issue)) }
 }
 
 // The rules of a page's `query` schema, which its islands' `queryParam` reads its params by: a param the rules cannot tell the type of reads as its text.

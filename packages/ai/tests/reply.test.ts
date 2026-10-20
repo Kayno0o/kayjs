@@ -1,7 +1,9 @@
+import type { Piece } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { currentRequest } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { ask, fakeAi, openai } from '../src'
+import { createReply } from '../src/reply'
 import { openaiEvents, provider, stream } from './helpers/provider'
 
 afterEach(() => fakeAi.clear())
@@ -117,5 +119,61 @@ describe('what ask() takes', () => {
   it('needs a model', async () => {
     expect(() => ask('Hi', { provider: { name: 'bare', stream: silent } })).toThrow('set AI_MODEL')
     await expect(Promise.resolve(ask('Hi', { provider: { name: 'bare', stream: silent }, model: 'm' }))).resolves.toBe('')
+  })
+})
+
+describe('a reply whose text starts over', () => {
+  async function* restarting(): AsyncGenerator<Piece> {
+    yield { text: 'Let me ' }
+    yield { text: 'check. ' }
+    await Bun.sleep(10)
+    yield { restart: true }
+    yield { text: '{"a"' }
+    yield { text: ':1}' }
+  }
+
+  it('tells a deltas() reader, which drops what it had so its pieces add up to the final text', async () => {
+    const reply = createReply(restarting, [])
+    let kept = ''
+    let restarts = 0
+
+    for await (const piece of reply.deltas({ onRestart: () => {
+      restarts++
+      kept = ''
+    } })) {
+      kept += piece
+    }
+
+    expect(restarts).toBe(1)
+    expect(kept).toBe('{"a":1}')
+    expect(kept).toBe(await reply)
+  })
+
+  it('tells it before the first piece of the new text, and not a reader that was given nothing', async () => {
+    const reply = createReply(restarting, [])
+    const events: string[] = []
+
+    for await (const piece of reply.deltas({ onRestart: () => events.push('restart') }))
+      events.push(piece)
+
+    expect(events.indexOf('restart')).toBeGreaterThan(0)
+    expect(events.at(events.indexOf('restart') + 1)).toMatch(/^\{/)
+
+    // Read once the reply ended, the text is already the last step's.
+    let late = 0
+
+    for await (const piece of reply.deltas({ onRestart: () => late++ }))
+      expect(piece).toBe('{"a":1}')
+
+    expect(late).toBe(0)
+  })
+
+  it('still gives a snapshot reader the text from the top', async () => {
+    const seen: string[] = []
+
+    for await (const text of createReply(restarting, []))
+      seen.push(text)
+
+    expect(seen.at(-1)).toBe('{"a":1}')
   })
 })

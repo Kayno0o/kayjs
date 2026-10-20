@@ -2,7 +2,7 @@ import type { TSchema } from 'kay/library'
 import type { Reply, StructuredReply } from './types'
 import { checkAnswer } from 'kay/library'
 import { AiError } from './errors'
-import { parsePartial } from './partial-json'
+import { partialParser } from './partial-json'
 
 const MAX_MESSAGE = 500
 
@@ -57,8 +57,12 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
     // eslint-disable-next-line kaynooo/no-then -- the thenable's own `then`, passed through
     then: async (onFulfilled, onRejected) => once().then(onFulfilled, onRejected),
     [Symbol.asyncIterator]: () => {
-      const source = base[Symbol.asyncIterator]()
-      let last: string | undefined
+      // Reads the pieces, each parsed once; a step that wrote text before calling tools starts the parser over.
+      let parser = partialParser()
+      const source = base.deltas({ onRestart: () => {
+        parser = partialParser()
+      } })[Symbol.asyncIterator]()
+      let last: Record<string, unknown> | undefined
       let closed = false
 
       return {
@@ -70,23 +74,20 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
               closed = true
 
               const value = await once()
-              const encoded = JSON.stringify(value)
 
-              if (encoded === last)
+              if (last !== undefined && JSON.stringify(value) === JSON.stringify(last))
                 break
 
               return { done: false, value }
             }
 
-            const part = parsePartial(step.value)
-            const encoded = part === undefined ? undefined : JSON.stringify(part)
-
-            if (part === undefined || encoded === last)
+            if (!parser.push(step.value))
               continue
 
-            last = encoded
+            last = parser.value()
 
-            return { done: false, value: part }
+            if (last !== undefined)
+              return { done: false, value: last }
           }
 
           return { done: true, value: undefined }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { parsePartial } from '../src/partial-json'
+import { parsePartial, partialParser } from '../src/partial-json'
 
 describe('a JSON answer read before it is whole', () => {
   it('shows a string as far as it came, and nothing before the object opened', () => {
@@ -75,5 +75,87 @@ describe('a JSON answer read before it is whole', () => {
 
     expect((parsePartial(text) as { items: unknown[] }).items).toHaveLength(2000)
     expect(performance.now() - started).toBeLessThan(500)
+  })
+})
+
+describe('partialParser', () => {
+  const text = '{"title":"Hello \\"w\\u00e9\\" 😀","n":-1.5e3,"ok":true,"none":null,"tags":["a","b",[1,2]],"author":{"name":"Al","age":4},"__proto__":{"x":1}} trailing'
+
+  it('reads the same object however the text is cut into pieces', () => {
+    for (let size = 1; size <= text.length; size++) {
+      const parser = partialParser()
+
+      for (let at = 0; at < text.length; at += size) {
+        parser.push(text.slice(at, at + size))
+        expect(parser.value()).toEqual(parsePartial(text.slice(0, Math.min(at + size, text.length))))
+      }
+    }
+  })
+
+  it('says whether a piece changed what shows, so a piece that adds nothing is no new snapshot', () => {
+    const parser = partialParser()
+
+    expect(parser.push('  ')).toBe(false)
+    expect(parser.push('{')).toBe(true)
+    expect(parser.push('"title"')).toBe(false)
+    expect(parser.push(':')).toBe(false)
+    expect(parser.push('"He')).toBe(true)
+    expect(parser.push('llo')).toBe(true)
+    expect(parser.push('\\u00')).toBe(false)
+    expect(parser.push('e9')).toBe(true)
+    expect(parser.push('"')).toBe(true)
+    expect(parser.push(',"n":12')).toBe(false)
+    expect(parser.push(',')).toBe(true)
+    expect(parser.push('"tags":[')).toBe(true)
+    expect(parser.push(']')).toBe(false)
+    expect(parser.push('}')).toBe(false)
+    expect(parser.push('more')).toBe(false)
+    expect(parser.value()).toEqual({ title: 'Helloé', n: 12, tags: [] })
+  })
+
+  it('shows no half of a surrogate pair', () => {
+    const parser = partialParser()
+
+    expect(parser.push('{"a":"x\\ud83d')).toBe(true)
+    expect(parser.value()).toEqual({ a: 'x' })
+    expect(parser.push('\\ude00')).toBe(true)
+    expect(parser.value()).toEqual({ a: 'x😀' })
+  })
+
+  it('hands out snapshots that later pieces do not change', () => {
+    const parser = partialParser()
+
+    parser.push('{"items":[{"n":1},{"n":"a')
+
+    const before = parser.value()
+
+    parser.push('b"},{"n":3}]}')
+    expect(before).toEqual({ items: [{ n: 1 }, { n: 'a' }] })
+    expect(parser.value()).toEqual({ items: [{ n: 1 }, { n: 'ab' }, { n: 3 }] })
+  })
+
+  it('stays undefined once the text is malformed, whatever follows', () => {
+    const parser = partialParser()
+
+    parser.push('{"a":x')
+    expect(parser.push('"}')).toBe(false)
+    expect(parser.value()).toBeUndefined()
+  })
+
+  it('reads a long answer piece by piece in time linear in its size', () => {
+    const body = Array.from({ length: 4000 }, (_, index) => `{"n":${index},"label":"item ${index}"}`).join(',')
+    const full = `{"items":[${body}]}`
+    const parser = partialParser()
+    const started = performance.now()
+    let changes = 0
+
+    for (let at = 0; at < full.length; at += 4) {
+      if (parser.push(full.slice(at, at + 4)))
+        changes++
+    }
+
+    expect(changes).toBeGreaterThan(1000)
+    expect((parser.value() as { items: unknown[] }).items).toHaveLength(4000)
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })

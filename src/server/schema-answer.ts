@@ -1,7 +1,5 @@
 import type { TSchema } from 'elysia'
-import type { TypeCheck } from 'elysia/type-system'
-import { mapValueError } from 'elysia'
-import { TypeCompiler } from 'elysia/type-system'
+import { compiledCheck, refusals } from './schema-check'
 
 export interface AnswerIssue {
   // Where the value is wrong, as a person writes it: `author.name`, `tags[1]`, empty for the value itself.
@@ -11,7 +9,6 @@ export interface AnswerIssue {
 
 export type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
 
-const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
 const SEGMENT = /\/([^/]*)/g
 const INDEX = /^\d+$/
 const MAX_ISSUES = 20
@@ -30,10 +27,7 @@ function pathOf(pointer: string): string {
 
 // A value a model gave checked against a schema, then decoded the way a form's fields are: the value as the schema types it, or where and why it does not fit, one issue per path.
 export function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer {
-  let check = checks.get(schema)
-
-  if (!check)
-    checks.set(schema, check = TypeCompiler.Compile(schema))
+  const check = compiledCheck(schema)
 
   if (check.Check(value)) {
     try {
@@ -44,21 +38,5 @@ export function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer {
     }
   }
 
-  const seen = new Set<string>()
-  const issues: AnswerIssue[] = []
-
-  for (const issue of check.Errors(value)) {
-    const path = pathOf(issue.path)
-
-    if (seen.has(path))
-      continue
-
-    seen.add(path)
-    issues.push({ path, message: mapValueError(issue)?.summary ?? issue.message })
-
-    if (issues.length >= MAX_ISSUES)
-      break
-  }
-
-  return { issues }
+  return { issues: [...refusals(check, value, pathOf, undefined, MAX_ISSUES)].map(([path, message]) => ({ path, message })) }
 }

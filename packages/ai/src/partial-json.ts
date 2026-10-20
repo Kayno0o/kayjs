@@ -1,284 +1,387 @@
-interface Read {
-  value: unknown
-  complete: boolean
+interface Frame {
+  array: boolean
+  // The children complete so far; the child being read is not in it.
+  value: Record<string, unknown> | unknown[]
+  // The key of the child being read, of an object.
+  key: string
 }
 
-const MALFORMED = Symbol('malformed')
+type Mode = 'start' | 'key' | 'colon' | 'value' | 'after' | 'string' | 'token' | 'done' | 'dead'
+
+export interface PartialParser {
+  // Reads the next piece of the text and tells whether the object so far changed.
+  push: (piece: string) => boolean
+  // The object so far, undefined while the text is no JSON object (nothing yet, text around it, malformed).
+  value: () => Record<string, unknown> | undefined
+}
+
 const MAX_DEPTH = 64
-const SPACE = new Set([' ', '\n', '\r', '\t'])
 const NUMBER_CHARS = new Set('0123456789+-.eE')
 const NUMBER = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
-const HEX = /^[\da-f]{4}$/i
+const HEX = /^[\da-f]$/i
 const ESCAPES: Record<string, string> = { '"': '"', '\\': '\\', '/': '/', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t' }
 const LITERALS: Record<string, unknown> = { true: true, false: false, null: null }
 const HIGH_SURROGATE_FIRST = 0xD800
 const HIGH_SURROGATE_LAST = 0xDBFF
+const SPACE = new Set([' ', '\n', '\r', '\t'])
+const NONE = Symbol('none')
 
 function set(target: Record<string, unknown>, key: string, value: unknown): void {
   // A key such as `__proto__` is data, as `JSON.parse` keeps it.
   Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true })
 }
 
-// Reads a JSON object that may stop anywhere, as a model's answer does while it streams: the object as far as it came, a string as far as it was written and any other value once it is complete.
-// Undefined when the text is no JSON object (nothing yet, text around it, malformed); what follows a closed object is left alone.
-export function parsePartial(text: string): Record<string, unknown> | undefined {
-  let at = 0
+// How much of a string shows: a high surrogate waits for its pair.
+function shownLength(text: string): number {
+  const last = text.charCodeAt(text.length - 1)
 
-  const skip = () => {
-    while (at < text.length && SPACE.has(text[at]!))
-      at++
+  return last >= HIGH_SURROGATE_FIRST && last <= HIGH_SURROGATE_LAST ? text.length - 1 : text.length
+}
+
+// Reads a JSON object that may stop anywhere, as a model's answer does while it streams, one piece at a time: the work is the size of the piece, not of the text so far.
+// The object is as far as it came, a string as far as it was written and any other value once it is complete. What follows a closed object is left alone.
+export function partialParser(): PartialParser {
+  const stack: Frame[] = []
+  let root: Record<string, unknown> | undefined
+  let mode: Mode = 'start'
+  let afterComma = false
+  let changed = false
+  // The string being read, and whether it is a key; `escape` holds a backslash sequence cut by the end of a piece.
+  let isKey = false
+  let out = ''
+  let shown = 0
+  let escape = ''
+  // The number or literal being read.
+  let token = ''
+  let numeric = false
+
+  const top = (): Frame => stack.at(-1)!
+
+  const dead = () => {
+    mode = 'dead'
   }
 
-  const readString = (): { value: string, complete: boolean } => {
-    let out = ''
+  const attach = (value: unknown) => {
+    const frame = top()
 
-    at++
+    if (frame.array)
+      (frame.value as unknown[]).push(value)
+    else
+      set(frame.value as Record<string, unknown>, frame.key, value)
 
-    while (at < text.length) {
-      const char = text[at]!
+    mode = 'after'
+  }
+
+  const add = (value: unknown) => {
+    attach(value)
+    changed = true
+  }
+
+  const open = (array: boolean) => {
+    stack.push({ array, value: array ? [] : {}, key: '' })
+    mode = array ? 'value' : 'key'
+    afterComma = false
+    changed = true
+  }
+
+  const close = () => {
+    const frame = stack.pop()!
+
+    if (stack.length === 0) {
+      root = frame.value as Record<string, unknown>
+      mode = 'done'
+
+      return
+    }
+
+    // The container was shown while it grew, so closing it changes nothing.
+    attach(frame.value)
+  }
+
+  const startValue = (char: string) => {
+    if (stack.length > MAX_DEPTH) {
+      dead()
+
+      return
+    }
+
+    afterComma = false
+
+    if (char === '"') {
+      mode = 'string'
+      isKey = false
+      out = ''
+      shown = 0
+      changed = true
+    }
+    else if (char === '{') {
+      open(false)
+    }
+    else if (char === '[') {
+      open(true)
+    }
+    else {
+      numeric = char === '-' || (char >= '0' && char <= '9')
+      token = char
+
+      mode = !numeric && !Object.keys(LITERALS).some(word => word.startsWith(char)) ? 'dead' : 'token'
+    }
+  }
+
+  const endString = () => {
+    if (isKey) {
+      top().key = out
+      mode = 'colon'
+
+      return
+    }
+
+    add(out)
+  }
+
+  // Reads the unescaped run of a string from `from`, then the escape or the end that stops it; returns where to go on.
+  const readString = (piece: string, from: number): number => {
+    let at = from
+
+    while (at < piece.length) {
+      if (escape !== '') {
+        const char = piece[at]!
+
+        if (escape === '\\') {
+          if (char === 'u') {
+            escape = '\\u'
+          }
+          else {
+            const unescaped = ESCAPES[char]
+
+            if (unescaped === undefined) {
+              dead()
+
+              return piece.length
+            }
+
+            out += unescaped
+            escape = ''
+          }
+        }
+        else if (HEX.test(char)) {
+          escape += char
+
+          if (escape.length === 6) {
+            out += String.fromCharCode(Number.parseInt(escape.slice(2), 16))
+            escape = ''
+          }
+        }
+        else {
+          dead()
+
+          return piece.length
+        }
+
+        at++
+
+        continue
+      }
+
+      let end = at
+
+      while (end < piece.length) {
+        const code = piece.charCodeAt(end)
+
+        if (code === 0x22 || code === 0x5C || code < 0x20)
+          break
+
+        end++
+      }
+
+      out += piece.slice(at, end)
+      at = end
+
+      if (at >= piece.length)
+        break
+
+      const char = piece[at]!
 
       if (char === '"') {
         at++
+        endString()
 
-        return { value: out, complete: true }
+        return at
       }
-
-      if (char < ' ')
-        throw MALFORMED
 
       if (char !== '\\') {
-        out += char
-        at++
+        dead()
 
-        continue
+        return piece.length
       }
 
-      const escape = text[at + 1]
+      escape = '\\'
+      at++
+    }
 
-      if (escape === undefined)
+    return at
+  }
+
+  const finishNumber = (): boolean => {
+    if (!NUMBER.test(token)) {
+      dead()
+
+      return false
+    }
+
+    add(Number(token))
+
+    return true
+  }
+
+  const push = (piece: string): boolean => {
+    changed = false
+
+    for (let at = 0; at < piece.length; at++) {
+      if (mode === 'done' || mode === 'dead')
         break
 
-      if (escape === 'u') {
-        const hex = text.slice(at + 2, at + 6)
+      if (mode === 'string') {
+        at = readString(piece, at) - 1
 
-        if (hex.length < 4) {
-          if (!HEX.test(hex.padEnd(4, '0')))
-            throw MALFORMED
+        // A string that closed was added, which counted as a change.
+        if (mode === 'string' && !isKey) {
+          const now = shownLength(out)
 
-          break
+          if (now !== shown)
+            changed = true
+
+          shown = now
         }
-
-        if (!HEX.test(hex))
-          throw MALFORMED
-
-        out += String.fromCharCode(Number.parseInt(hex, 16))
-        at += 6
 
         continue
       }
 
-      const unescaped = ESCAPES[escape]
+      const char = piece[at]!
 
-      if (unescaped === undefined)
-        throw MALFORMED
+      if (mode === 'token') {
+        if (numeric) {
+          if (NUMBER_CHARS.has(char)) {
+            token += char
 
-      out += unescaped
-      at += 2
+            continue
+          }
+
+          // The token ended before this character, which the value's parent reads.
+          if (!finishNumber())
+            break
+
+          at--
+
+          continue
+        }
+
+        token += char
+
+        if (Object.hasOwn(LITERALS, token))
+          add(LITERALS[token])
+        else if (!Object.keys(LITERALS).some(word => word.startsWith(token)))
+          dead()
+
+        continue
+      }
+
+      if (SPACE.has(char))
+        continue
+
+      if (mode === 'start') {
+        if (char === '{')
+          open(false)
+        else
+          dead()
+      }
+      else if (mode === 'key') {
+        if (char === '}' && !afterComma) {
+          close()
+        }
+        else if (char === '"') {
+          afterComma = false
+          mode = 'string'
+          isKey = true
+          out = ''
+        }
+        else {
+          dead()
+        }
+      }
+      else if (mode === 'colon') {
+        if (char === ':')
+          mode = 'value'
+        else
+          dead()
+      }
+      else if (mode === 'value') {
+        if (char === ']' && top().array && !afterComma)
+          close()
+        else
+          startValue(char)
+      }
+      else if (mode === 'after') {
+        const frame = top()
+
+        if (char === ',') {
+          afterComma = true
+          mode = frame.array ? 'value' : 'key'
+        }
+        else if (char === (frame.array ? ']' : '}')) {
+          close()
+        }
+        else {
+          dead()
+        }
+      }
     }
 
-    // A high surrogate waits for its pair.
-    const last = out.charCodeAt(out.length - 1)
-
-    return { value: last >= HIGH_SURROGATE_FIRST && last <= HIGH_SURROGATE_LAST ? out.slice(0, -1) : out, complete: false }
+    return changed && mode !== 'dead'
   }
 
-  const readNumber = (): Read | null => {
-    let end = at
-
-    while (end < text.length && NUMBER_CHARS.has(text[end]!))
-      end++
-
-    // A number running to the end of the text may still grow.
-    if (end === text.length)
-      return null
-
-    const token = text.slice(at, end)
-
-    if (!NUMBER.test(token))
-      throw MALFORMED
-
-    at = end
-
-    return { value: Number(token), complete: true }
-  }
-
-  const readLiteral = (): Read | null => {
-    for (const [word, value] of Object.entries(LITERALS)) {
-      if (text.startsWith(word, at)) {
-        at += word.length
-
-        return { value, complete: true }
-      }
-
-      const rest = text.slice(at)
-
-      if (rest.length < word.length && word.startsWith(rest))
-        return null
-    }
-
-    throw MALFORMED
-  }
-
-  const readObject = (depth: number): Read => {
-    const object: Record<string, unknown> = {}
-    let afterComma = false
-
-    at++
-
-    for (;;) {
-      skip()
-
-      if (at >= text.length)
-        return { value: object, complete: false }
-
-      if (text[at] === '}') {
-        if (afterComma)
-          throw MALFORMED
-
-        at++
-
-        return { value: object, complete: true }
-      }
-
-      if (text[at] !== '"')
-        throw MALFORMED
-
-      const key = readString()
-
-      if (!key.complete)
-        return { value: object, complete: false }
-
-      skip()
-
-      if (at >= text.length)
-        return { value: object, complete: false }
-
-      if (text[at] !== ':')
-        throw MALFORMED
-
-      at++
-
-      const read = readValue(depth + 1)
-
-      if (read)
-        set(object, key.value, read.value)
-
-      if (!read?.complete)
-        return { value: object, complete: false }
-
-      skip()
-
-      if (at >= text.length)
-        return { value: object, complete: false }
-
-      if (text[at] === '}') {
-        at++
-
-        return { value: object, complete: true }
-      }
-
-      if (text[at] !== ',')
-        throw MALFORMED
-
-      at++
-      afterComma = true
-    }
-  }
-
-  const readArray = (depth: number): Read => {
-    const items: unknown[] = []
-    let afterComma = false
-
-    at++
-
-    for (;;) {
-      skip()
-
-      if (at >= text.length)
-        return { value: items, complete: false }
-
-      if (text[at] === ']') {
-        if (afterComma)
-          throw MALFORMED
-
-        at++
-
-        return { value: items, complete: true }
-      }
-
-      const read = readValue(depth + 1)
-
-      if (read)
-        items.push(read.value)
-
-      if (!read?.complete)
-        return { value: items, complete: false }
-
-      skip()
-
-      if (at >= text.length)
-        return { value: items, complete: false }
-
-      if (text[at] === ']') {
-        at++
-
-        return { value: items, complete: true }
-      }
-
-      if (text[at] !== ',')
-        throw MALFORMED
-
-      at++
-      afterComma = true
-    }
-  }
-
-  // Null when the value has not come far enough to show.
-  function readValue(depth: number): Read | null {
-    if (depth > MAX_DEPTH)
-      throw MALFORMED
-
-    skip()
-
-    if (at >= text.length)
-      return null
-
-    const char = text[at]!
-
-    if (char === '"')
-      return readString()
-
-    if (char === '{')
-      return readObject(depth)
-
-    if (char === '[')
-      return readArray(depth)
-
-    return char === '-' || (char >= '0' && char <= '9') ? readNumber() : readLiteral()
-  }
-
-  skip()
-
-  if (text[at] !== '{')
-    return undefined
-
-  try {
-    return readObject(0).value as Record<string, unknown>
-  }
-  catch (error) {
-    if (error === MALFORMED)
+  const value = (): Record<string, unknown> | undefined => {
+    if (mode === 'dead' || mode === 'start')
       return undefined
 
-    throw error
+    if (root)
+      return root
+
+    // Only the containers still open are copied, the complete ones inside are shared.
+    let inner: unknown = mode === 'string' && !isKey ? out.slice(0, shown) : NONE
+
+    for (let index = stack.length - 1; index >= 0; index--) {
+      const frame = stack[index]!
+
+      if (frame.array) {
+        const items = (frame.value as unknown[]).slice()
+
+        if (inner !== NONE)
+          items.push(inner)
+
+        inner = items
+      }
+      else {
+        const fields = { ...frame.value as Record<string, unknown> }
+
+        if (inner !== NONE)
+          set(fields, frame.key, inner)
+
+        inner = fields
+      }
+    }
+
+    return inner as Record<string, unknown>
   }
+
+  return { push, value }
+}
+
+// Reads a JSON object that may stop anywhere in one go: undefined when the text is no JSON object (nothing yet, text around it, malformed); what follows a closed object is left alone.
+export function parsePartial(text: string): Record<string, unknown> | undefined {
+  const parser = partialParser()
+
+  parser.push(text)
+
+  return parser.value()
 }

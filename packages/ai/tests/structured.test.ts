@@ -381,6 +381,48 @@ describe('streaming a structured reply', () => {
   })
 })
 
+describe('streaming a structured reply that starts over', () => {
+  // A step that wrote some text before calling a tool, then the answer of the last step.
+  function restarting(...texts: string[]): Provider {
+    return {
+      name: 'restarting',
+      model: 'm',
+      async* stream(): AsyncGenerator<Piece> {
+        yield { text: 'Let me note that. ' }
+        await Bun.sleep(4)
+        yield { restart: true }
+
+        for (const text of texts) {
+          yield { text }
+          await Bun.sleep(4)
+        }
+
+        yield { finish: 'stop' }
+      },
+    }
+  }
+
+  it('reads the object of the last step alone, as snapshots start over', async () => {
+    const seen = await snapshots(ask('x', { schema: verdict, provider: restarting('{"title":"Hel', 'lo","score":1,"tags":[],"author":{"name":"A"}}') }))
+
+    expect(seen.at(-1)).toEqual({ title: 'Hello', score: 1, tags: [], author: { name: 'A' } })
+    expect(seen.some(part => part.title === 'Hel')).toBe(true)
+  })
+
+  it('tells a deltas() reader when the text starts over, so its pieces add up to the JSON answered', async () => {
+    const reply = ask('x', { schema: verdict, provider: restarting('{"title":"Hel', 'lo","score":1,"tags":[],"author":{"name":"A"}}') })
+    let kept = ''
+
+    for await (const piece of reply.deltas({ onRestart: () => {
+      kept = ''
+    } })) {
+      kept += piece
+    }
+
+    expect(JSON.parse(kept)).toEqual(await reply)
+  })
+})
+
 describe('structured replies with tools', () => {
   it('runs the tools and answers the object of the last step, whatever the model said before calling', async () => {
     fakeAi.reply({ text: 'Let me note that. ', calls: [{ name: 'add_note', input: { title: 'Milk' } }] })

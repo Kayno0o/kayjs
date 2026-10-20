@@ -196,6 +196,8 @@ An answer that does not fit fails with an `AiError` of kind `schema`. `fields` n
 
 `for await` gives the object so far. A string field grows as it is written. A number, a boolean or a list item shows when it is complete, and a nested object shows as it stands. Every field may be missing in a snapshot, and its type says so. The last value is the checked object.
 
+If you read `reply.deltas()` to collect the JSON text, pass `onRestart` and clear what you kept in it: `deltas({ onRestart: () => { kept = '' } })`. It runs when the model wrote some text and then called a tool, because only the text of the last step is the answer. The pieces you keep after that add up to the JSON that `await` checks.
+
 An action returning the reply streams those snapshots to an island, whose `last()` is the object so far. `tools`, `maxSteps`, limits and `maxInputChars` work as they do for text.
 
 In a test, `fakeAi.reply({ data: { title: 'Alien', score: 5, tags: [] } })` answers an object. With nothing scripted, the fake builds one that fits your schema, so `kay dev` needs no key.

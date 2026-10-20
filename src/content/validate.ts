@@ -1,9 +1,7 @@
 import type { TSchema } from 'elysia'
-import type { TypeCheck } from 'elysia/type-system'
 import type { RawEntry } from './load'
 import type { ComponentSegment, Segment } from './markdown'
-import { mapValueError } from 'elysia'
-import { TypeCompiler } from 'elysia/type-system'
+import { compiledCheck, dottedPath, fieldOf, refusals } from '../server/schema-check'
 
 export interface ContentProblem {
   // Relative to the project root.
@@ -28,12 +26,9 @@ interface ObjectSchema {
   properties?: Record<string, { default?: unknown }>
 }
 
-const FIELD = /^\/([^/]*)/
-const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
-
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
 export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
-  const check = checkOf(schema)
+  const check = compiledCheck(schema)
 
   const problems: ContentProblem[] = []
   const decoded: { entry: RawEntry, data: unknown }[] = []
@@ -57,17 +52,8 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
       continue
     }
 
-    const seen = new Set<string>()
-
-    for (const issue of check.Errors(data)) {
-      const field = FIELD.exec(issue.path)?.[1] ?? ''
-
-      if (seen.has(field))
-        continue
-
-      seen.add(field)
-      problems.push({ file: entry.file, line: entry.lines[field] ?? 1, message: `${field === '' ? 'the data' : field}: ${mapValueError(issue)?.summary ?? issue.message}` })
-    }
+    for (const [field, message] of refusals(check, data, fieldOf))
+      problems.push({ file: entry.file, line: entry.lines[field] ?? 1, message: `${field === '' ? 'the data' : field}: ${message}` })
   }
 
   if (problems.length > 0)
@@ -99,30 +85,13 @@ function pairingProblem(entry: RawEntry, paired: Map<string, RawEntry>, problems
 
 // Where a draft's data fails the schema, each field by its dotted path, `tags.0`, at most once.
 export function dataIssues(schema: TSchema, data: unknown): { path: string, message: string }[] {
-  const check = checkOf(schema)
+  const check = compiledCheck(schema)
   const filled = withDefaults(data, schema)
-  const issues = new Map<string, string>()
 
   if (check.Check(filled))
     return []
 
-  for (const issue of check.Errors(filled)) {
-    const path = issue.path.split('/').slice(1).map(segment => segment.replaceAll('~1', '/').replaceAll('~0', '~')).join('.')
-
-    if (!issues.has(path))
-      issues.set(path, mapValueError(issue)?.summary ?? issue.message)
-  }
-
-  return [...issues].map(([path, message]) => ({ path, message }))
-}
-
-function checkOf(schema: TSchema): TypeCheck<TSchema> {
-  let check = checks.get(schema)
-
-  if (!check)
-    checks.set(schema, check = TypeCompiler.Compile(schema))
-
-  return check
+  return [...refusals(check, filled, dottedPath)].map(([path, message]) => ({ path, message }))
 }
 
 function withDefaults(data: unknown, schema: TSchema): unknown {

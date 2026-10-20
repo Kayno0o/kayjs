@@ -1,4 +1,4 @@
-import type { CodeBlock, Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
+import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
 import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
@@ -120,7 +120,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       throw failure.error
   }
 
-  const read = (snapshots: boolean): AsyncIterator<string> => {
+  const read = (snapshots: boolean, onRestart?: () => void): AsyncIterator<string> => {
     start()
 
     let cursor = 0
@@ -136,6 +136,11 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
           if (known !== epoch) {
             known = epoch
+
+            // A reader that was given nothing has no text to drop.
+            if (cursor > 0)
+              onRestart?.()
+
             cursor = 0
             snapshot = ''
           }
@@ -272,7 +277,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       return text.then(onFulfilled, onRejected)
     },
     [Symbol.asyncIterator]: () => read(true),
-    deltas: () => ({ [Symbol.asyncIterator]: () => read(false) }),
+    deltas: (options?: DeltasOptions) => ({ [Symbol.asyncIterator]: () => read(false, options?.onRestart) }),
     progress: () => ({ [Symbol.asyncIterator]: progress }),
     get calls() {
       start()

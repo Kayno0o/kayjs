@@ -152,11 +152,16 @@ export interface CodeBlock {
   html: string
 }
 
+export interface DeltasOptions {
+  // Called when the text starts over: a reply with a `schema` that wrote some text before calling tools keeps only the text of its last step, so a reader drops the pieces it has to make them add up to the answer. Called before the first piece of the new text, and only to a reader that was given some.
+  onRestart?: (() => void) | undefined
+}
+
 // A reply: `await` gives its whole text, `for await` its snapshots, each the text so far, which an `await` block and a streaming action take as they are.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
 export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   // The pieces as they came, not the text so far.
-  deltas: () => AsyncIterable<string>
+  deltas: (options?: DeltasOptions) => AsyncIterable<string>
   // The token counts once the reply ended (with the cache reads and writes when the provider reported them), or undefined when the provider gave none or the reply failed; never rejects. Reading it starts the reply.
   readonly usage: Promise<Usage | undefined>
   // Why the reply ended, undefined when it failed or the provider said nothing; a reply stopped by `maxTokens` is `length`, which `await` returns as if it were whole. Never rejects, and reading it starts the reply.
@@ -181,8 +186,8 @@ export type DeepPartial<Value> = Value extends string
 // The reply to an ask with a `schema`: `await` gives the object, checked, `for await` the object so far, and the rest is the reply's own.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
 export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot> {
-  // The pieces of the JSON text as they came.
-  deltas: () => AsyncIterable<string>
+  // The pieces of the JSON text as they came; after a tool step that wrote some text `onRestart` is called, and the pieces from then on are the answer's.
+  deltas: (options?: DeltasOptions) => AsyncIterable<string>
   readonly usage: Promise<Usage | undefined>
   readonly finish: Promise<Finish | undefined>
   readonly calls: Promise<ToolCall[]>
