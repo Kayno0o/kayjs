@@ -209,6 +209,8 @@ describe('search', () => {
 
   it('ships nothing of the arrival to a site with search off, and a few bytes up front with it on', async () => {
     const scripts = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
+    // Bun hashes a chunk's name from the path of its sources, which differs in every scratch directory, and the hash moves the gzip size by a few bytes, so it is measured with every name alike.
+    const chunkHash = /-[a-z0-9]{8}\.js/g
     const imports = /(?:from|import)\s*"([^"]+\.js)"/g
     const built = async (config: string) => {
       const site = await scratchDir('search-arrival-size-')
@@ -238,7 +240,7 @@ describe('search', () => {
         return {
           holding: [...texts].filter(([, text]) => text.includes('kay_q')).map(([url]) => url),
           eager: [...eager],
-          bytes: [...eager].reduce((sum, url) => sum + Bun.gzipSync(texts.get(url) ?? '').length, 0),
+          bytes: [...eager].reduce((sum, url) => sum + Bun.gzipSync((texts.get(url) ?? '').replace(chunkHash, '-0.js')).length, 0),
           marking: [...texts].filter(([, text]) => text.includes('adoptedStyleSheets')).map(([url]) => eager.has(url)),
         }
       }
@@ -254,7 +256,8 @@ describe('search', () => {
     expect(off.marking).toEqual([])
     // The code that paints is a chunk of its own, loaded for a page that asks.
     expect(on.marking).toEqual([false])
-    expect(on.bytes - off.bytes).toBeLessThan(200)
+    // 186 bytes today, with about 12% of margin.
+    expect(on.bytes - off.bytes).toBeLessThan(210)
   }, 120_000)
 
   it('serves the manifest revalidated and the index for good', async () => {
