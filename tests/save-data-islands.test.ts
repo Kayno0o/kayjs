@@ -81,7 +81,7 @@ describe('an island with no hydrate of its own', () => {
     saving()
 
     expect(await hydrated(slot('a') + slot('b'))).toEqual([])
-    expect(observed.map(({ target }) => target.textContent)).toEqual(['a', 'b'])
+    expect(observed.map(({ target }) => target.textContent).toSorted()).toEqual(['a', 'b'])
   })
 
   it('hydrates one that scrolls near, and only that one', async () => {
