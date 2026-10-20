@@ -52,7 +52,7 @@ kay new my-app --template app --without docker
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works for now, with a warning |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
-| `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the registry's kay at the same minor |
+| `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |
 | `--quiet` | Prints the summary line only |
 
