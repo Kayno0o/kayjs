@@ -118,7 +118,7 @@ kay dev --port 4000 --open
 
 `kay dev` runs `src/server.ts` with `NODE_ENV=development`. An edit to a template, island, loader or API route reloads in the same process. A change it cannot reload that way, such as the config or the entry, starts a new process.
 
-A change to a file at the project root, such as `.env` or `package.json`, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again.
+A change to a file at the project root, such as `.env` or `package.json`, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again. Set `KAY_DEV_RELOAD_GROWTH_MB` to change that number of MiB.
 
 These changes reload nothing: tests (`tests/`, `test/`, `e2e/`, `__tests__/`, and `*.test.*` and `*.spec.*` files anywhere), root files no server reads such as a README or a LICENSE, and the backup and temporary files an editor writes beside a source. A save that touches `.css` files alone restarts nothing and swaps the stylesheets in the open pages.
 
@@ -548,7 +548,7 @@ kay migrate astro . --outdir ../kay-site
 | Option | Effect |
 | --- | --- |
 | `[dir]` | The Astro project, the current directory by default |
-| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project |
+| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. `--out` is the older spelling and still works |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.
 

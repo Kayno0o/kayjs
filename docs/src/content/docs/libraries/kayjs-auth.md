@@ -324,7 +324,7 @@ An island asks for a passkey with `@kaynooo/kayjs-auth/browser`. It calls the br
 
 `askPasskey(options)` and `makePasskey(options)` take the options an action returned. They answer the JSON the next action takes, or null when the person picked none.
 
-`askPasskey(options, { autofill: true })` offers the passkeys in the autofill of a field with `autocomplete="username webauthn"` instead. `canAskPasskey()` and `canMakePasskey()` say whether to show the button. `passkeyFailure(caught, errors, failed)` gives the message for what threw.
+`askPasskey(options, { autofill: true })` offers the passkeys in the autofill of a field with `autocomplete="username webauthn"` instead. `canAskPasskey()` and `canMakePasskey()` say whether to show the button. `passkeyFailure(caught, errors, failed)` gives the message for what threw. `rememberChoice()` says whether the page's "keep me signed in" box, `input[name="remember"]`, is checked, and is undefined when the page has none: pass it as the `remember` of `signInWithPasskey`.
 
 An action takes that answer with `passkeyAssertion` for a sign-in, a second factor or a proof, and `passkeyAttestation` for adding a passkey. They type it as kayjs-auth reads it, so no cast is needed. An answer missing a part is refused with a 422.
 
@@ -376,6 +376,8 @@ import { auth } from '../../auth'
 
 export default auth.guard({ require: 'editor' })
 ```
+
+The pieces behind `auth.hasRole` and `auth.gate()` are exported for an app that keeps its own users. `createRoleHierarchy(hierarchy, user => user.roles)` gives `isGranted` and `hasRole`. `createGate` is the Elysia plugin that closes every route after it. `scopeAllows(scopes, wanted)` says whether a bearer token's scopes meet what a route asks. A requirement is typed `Requirement`, and a custom check `Predicate`, which reads a `PolicyContext` of `params`, `body` and `query`.
 
 ## Events and the audit log
 

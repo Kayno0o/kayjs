@@ -18,6 +18,8 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 <Demo name="form-field/issue" />
 
+A form of your own that calls an action from an island can feed its FormFields the same way. Inside it, `formIssues.provide(() => ({ title: 'Too short' }))` from kayjs-ui gives a message per field name, and each FormField reads the one for its `name`. FormDialog and SaveForm do exactly this.
+
 <ReadMore href="/ui/form-dialog">FormDialog shows each refused field's message on its FormField.</ReadMore>
 
 ## Screen readers

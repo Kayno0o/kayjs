@@ -52,15 +52,18 @@ In production the mailer reads its settings from the environment. `SMTP_HOST` is
 | `SMTP_HOST` | The server to send through. Required. |
 | `SMTP_PORT` | Optional, 465 by default. |
 | `SMTP_USER`, `SMTP_PASS` | Optional, both or neither, for a server needing no login. |
+| `SMTP_RATE_LIMIT` | Optional. The most mails sent a second, for a provider capping the rate. |
+| `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
+| `SMTP_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
 | `SMTP_FROM` | The sender, unless `from` is set. |
 | `SMTP_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
 | `MAIL_TO` | Optional. Where a mail naming no recipient goes, such as a contact form's. |
 
 On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `SMTP_INSECURE=true` for a local Mailpit. A set `SMTP_PASS` overrides it, so a password never goes in clear.
 
-Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full. DKIM signing and a rate limit have variables of their own.
+Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
-What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit`. An option left out keeps the default.
+What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails a second, unlimited by default). An option left out keeps the default.
 
 A name, a timeout or a count that cannot be used stops the boot. `smtp` cannot go with a `transport`, which replaces the SMTP: give them to `smtp()` instead.
 
@@ -94,6 +97,19 @@ Layout(preheader="Your account is ready")
 A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 
 It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` with `Column` for columns that stack on a phone. `Fields` lays out a form's answers as label and value pairs, and `Quote` sets a visitor's message apart. They hold in Outlook for Windows.
+
+Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColours`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.
+
+```ts
+import { cssColours, defaults } from '@kaynooo/kayjs-mail'
+import stylesheet from './styles/global.css' with { type: 'text' }
+
+const colour = cssColours(stylesheet, 'styles/global.css')
+
+export default { ...defaults, text: colour('--color-ink'), accent: colour('--color-wine') }
+```
+
+Import the stylesheet's text as above, which also works in an executable. A URL, `new URL('./styles/global.css', import.meta.url)`, reads the file as the server boots, and an executable has no such file. A property that is missing, or that is no opaque colour, stops the boot and names it.
 
 ### Dark mode
 
@@ -236,7 +252,7 @@ export const mail = mailer({
 
 In production a mailer with a custom `transport` still needs a sender, `from` or `SMTP_FROM`, or the boot stops naming both. Development and tests keep sending from `kay@localhost`.
 
-`smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
+`smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. It takes the options of `mailer({ smtp })` as well as `insecure` and `dkim: { domain, selector, privateKey }`, which signs each mail for a relay that does not. The private key is PEM, and the public key is published at `<selector>._domainkey.<domain>`. `outbox` is a transport too, for a staging server that must never send.
 
 ## A contact form
 

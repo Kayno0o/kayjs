@@ -23,8 +23,10 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `presence` | Who else has a room or a page open, as `others()` and `count()` that follow joins and leaves. See [Live and realtime](/guides/live-and-realtime#who-else-is-here) |
 | `watch`, `debounced` | Code running on a change only, handed the value before, and a value once it stops changing |
 | `every` | A timer running while an island lives, and while a condition holds |
+| `durationMs` | The milliseconds a duration written with its unit stands for, `durationMs('3s')` being 3000, for a timer of your own. A bare number throws |
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
+| `followLog` | Keeps a scrolling list at its bottom while the reader is there. See [Islands](/essentials/islands#following-a-log) |
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
@@ -38,6 +40,7 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status`, 0 when no answer came, and its `answer`. See [API routes](/guides/api-routes) |
+| `refusalMessage` | The text to show for a caught `call()` error: the route's message when it answered, else your fallback. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
 | `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
@@ -68,6 +71,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `retryLater`, `memoryJobs`, `sqliteJobs`, `pgJobs`, `createJobTables`, `jobTables` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
+| `sqliteData` | One SQLite file for the `store` of `kay.config.ts`: jobs, schedule locks, rate limit counts and presence members. See [Background jobs](/guides/background-jobs) |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
 | `editedEntry` | Whether a page rendered in edit mode for a request's cookie read an entry |
@@ -75,6 +79,8 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `renderLocale` | The locale `renderToString` renders in: the one given, the request's, else the site's default |
 | `processImage`, `imageSize` | Resize or measure an image |
 | `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |
+| `typeOfName`, `holdsType`, `SNIFFED_BYTES` | The file route's own rules for a route of yours that takes uploads: the type a name's extension stands for, whether a file's first `SNIFFED_BYTES` bytes really are that type, and how many that is. See [File storage](/guides/file-storage) |
+| `safePath` | The real path of a file inside a folder for a name a visitor typed, or `undefined`. See [Styling and assets](/essentials/styling-and-assets) |
 | `shutdown` | Stops the server gracefully |
 | `inlineScriptHashes` | The CSP hashes of kay's inline scripts, for a policy written elsewhere |
 
@@ -84,7 +90,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 
 | Entry | Exports |
 | --- | --- |
-| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `bodyHtml`, `MarkdownError`, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`, `customField`, `untranslated`. See [Content](/guides/content) |
+| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `bodyHtml`, `MarkdownError`, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`, `customField`, `untranslated`. `isCollection`, `isPaginated` and `COLLECTION` are how kay recognizes a collection or a paginated result, not API. See [Content](/guides/content) |
 | `kay/edit` | `showDraft`, which shows the page with an editor's unsaved entries in edit mode, and the `EditorProps` an extension's `editor` is given. See [Content](/guides/content) |
 | `kay/dev-tool` | The `DevTool` type a library's `devTool` module is given, with `make`, `tab`, `button`, `outline`, `hideOutline` and `open`, and the `DevTab` and `DevTabOptions` of `tab`. See [A tab for a library](/llms/component-libraries#a-tab-for-a-library) |
 | `kay/compiler` | `compileKay`, which compiles one `.kay` source, `formatDiagnostic`, which prints a problem it found, and the `Diagnostic`, `CompileOptions` and `CompileResult` types. See [Compiling a component](/llms/check-and-tools#compile-a-component-from-a-tool) |
@@ -106,6 +112,8 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/mount` | `mount`, which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
 | `kay/tsconfig.json` | The base tsconfig a project extends |
+| `kay/jsx-runtime` | Where TypeScript finds the JSX types, through the `jsxImportSource` of the base tsconfig. Nothing to import |
+| `kay/html`, `kay/dom`, `kay/island`, `kay/await`, `kay/internal` and the like | What compiled `.kay` files import. Not API, and free to change in any release |
 
 <Callout type="note">
 

@@ -107,7 +107,13 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
-Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them) and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `errorMessage`.
+
+The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`.
+
+The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
+
+The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
 
 The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
@@ -315,7 +321,9 @@ expect(await ask('Hi')).toBe('It works')
 expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
-`fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back. `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+`fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
+
+A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
 

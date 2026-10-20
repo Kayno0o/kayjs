@@ -13,6 +13,7 @@ kay writes `.kay/` at the project's root, and nothing in it is the project's to 
   client/  the browser build kay build writes
   dev/  the browser build kay dev writes
   cache/  compiled files, so a restart compiles only what changed
+  screenshots/  the PNGs kay screenshot writes
   classes.txt  the .class shorthand's classes, handed to Tailwind
 " />
 

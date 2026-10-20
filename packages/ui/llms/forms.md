@@ -94,7 +94,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 ```
 
 - FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.
-- When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open.
+- When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open. That is the `formIssues` context of kayjs-ui, which FormDialog and SaveForm provide in an island and a FormField reads: a form of your own calling an action does `formIssues.provide(() => ({ title: 'Too short' }))` to show messages the same way.
 - A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failure`.
 - A refusal of the handler, `ctx.fail(400, { error: 'Slug taken' })`, reaches the dialog through `refused`, which reads that data and answers a message per field (`{ slug: data.error }`), shown on the FormFields, or one message (`data.error`), toasted. Without `refused`, or when it answers undefined, `failure` is toasted: `FormDialog(... failure="Could not save" refused={data => data.error})`.
 - A save hands what the action returned to `onSaved`, then closes the dialog.

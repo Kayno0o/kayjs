@@ -146,6 +146,7 @@ Pages live in `src/routes/`:
 | `docs/[...path].kay` | `/docs/*`, read as `ctx.params.path` |
 | `blog/[[page]].kay` | `/blog` and `/blog/:page`, `ctx.params.page` a `string \| undefined` |
 | `items/[id=integer].kay` | `/items/:id` where the matcher `integer` takes the segment, `ctx.params.id` the `number` it returns |
+| `docs/[...path=segments].kay` | `/docs/*` where the matcher `segments` takes the rest of the path as one string, `a/b/c`, `ctx.params.path` the value it returns |
 | `(marketing)/pricing.kay` | `/pricing`: a group, in parentheses, adds nothing to the URL, only its `_layout.kay` and `_guard.ts` |
 | `_layout.kay` | Wraps every page in its directory and below, outermost first, rendering the page at its `slot`. |
 | `_actions.kay` | A server fence of actions and no template, served behind the guards of its directory and above, which pages and components import by path; see [Actions](actions.md#declaring-an-action). |

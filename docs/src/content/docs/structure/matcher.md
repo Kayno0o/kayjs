@@ -22,4 +22,6 @@ A URL the matcher refuses falls through to the page without one serving the same
 
 An [optional param](/structure/optional) takes a matcher too, as in `[[page=integer]].kay`.
 
+So does a [rest param](/structure/rest), as in `[...path=segments].kay`. The matcher is given the rest of the path as one string, `a/b/c`, and `ctx.params.path` is what it returns.
+
 <ReadMore href="/llms/routing">Matchers in full, in the routing reference.</ReadMore>

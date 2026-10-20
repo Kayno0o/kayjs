@@ -165,6 +165,8 @@ A redirect answers with a 307, which browsers do not keep, so Remove undoes it f
 
 A redirect added here can only go to a page of your site, and kay refuses a loop or a target no page serves. To allow another site, list its host in `runtimeRedirects` in `kay.config.ts`. You can also copy the line into `redirects` in `kay.config.ts`, or run `kay not-found --redirect <path>`, to keep the redirect in the repository.
 
+The buttons call `POST /api/cms/redirects` with `{ from, to, permanent }`, and `POST /api/cms/redirects/remove` with `{ from }`. A refusal comes back as a 400 with its reason. Your own code may call them too, and they need the same `guard`.
+
 ## Languages
 
 Every text the screens and the editor show, `Edit this page`, `Save`, `Not valid JSON`, is looked up in your messages before its English. Word them once in `src/messages/<locale>.ts` under `cms`, named for the area and the text, and the screens and the editor read them, the editor in the browser.
@@ -244,6 +246,10 @@ const saver: FileSaver = {
 ```
 
 `base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflict`, which the editor shows with its Keep my edits button.
+
+## The entries API
+
+The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry as the editor opens it, with its `version`. Add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
