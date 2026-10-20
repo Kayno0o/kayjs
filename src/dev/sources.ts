@@ -26,16 +26,30 @@ const ANY_FILE = /^/
 
 // What Bun loaded from the `.env` files of the directory this process started in, as it read them then: the child loads them again, but never over a variable already set.
 // A variable the shell set to the very value its `.env` holds cannot be told from one the file set, and follows the file.
+// The probe runs twice: the first, on no variables, names the keys the files hold; the second keeps the shell's others, so a value expanding `$HOME` or another key resolves as it does for the real process and follows the file rather than looking set by the shell.
 export async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
-  const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: process.cwd(), env: process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }, stdout: 'pipe', stderr: 'ignore' })
-  const [output, code] = await Promise.all([new Response(probe.stdout).text(), probe.exited])
+  const base = process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }
+  const first = await dotenvProbe(base)
 
-  if (code !== 0)
+  if (first === undefined)
     return process.env
 
-  const loaded = JSON.parse(output) as Record<string, string>
+  const named = new Set(Object.keys(first))
+  const shell = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && !named.has(entry[0])))
+  const loaded = await dotenvProbe({ ...shell, ...base })
 
-  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => loaded[key] !== value))
+  if (loaded === undefined)
+    return process.env
+
+  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => !named.has(key) || loaded[key] !== value))
+}
+
+// The environment a process started on `env` in this directory ends up with, or undefined when it could not be read.
+async function dotenvProbe(env: Record<string, string>): Promise<Record<string, string> | undefined> {
+  const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: process.cwd(), env, stdout: 'pipe', stderr: 'ignore' })
+  const [output, code] = await Promise.all([new Response(probe.stdout).text(), probe.exited])
+
+  return code === 0 ? JSON.parse(output) as Record<string, string> : undefined
 }
 
 // The root directories the project itself ignores: a service writing its data into the repository, as a bind-mounted database does, must not restart the server on every write.

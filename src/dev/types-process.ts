@@ -21,6 +21,8 @@ export class TypesProcess {
   configuredEntry: string | undefined
   // The project modules the running process loaded, as its last answer reported them.
   private modules: Set<string> | undefined
+  // The environment the process starts with, which leaves out what the `.env` files hold so it reads them itself on every start; the parent's own until `kay dev` sets it.
+  env: Record<string, string | undefined> = process.env
 
   constructor(private root: string, private entry: string | undefined) {}
 
@@ -122,7 +124,7 @@ export class TypesProcess {
   }
 
   private spawn(refuse: string) {
-    const child = Bun.spawn([process.execPath, TYPES, this.root, this.entry ?? '', refuse], { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+    const child = Bun.spawn([process.execPath, TYPES, this.root, this.entry ?? '', refuse], { env: { ...this.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
 
     this.child = child
     this.lines = lines(child.stdout)

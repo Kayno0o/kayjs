@@ -322,6 +322,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   const env = await environmentWithoutDotenv()
+
+  typesProcess.env = env
   // Set once the first types settled, which say a config that does not load: until then a builder started ahead of them stays quiet about its own exit.
   let typesSettled = false
   // The builder exited before the types settled, so its notice waits for them.

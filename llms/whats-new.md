@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay dev` follows a `.env` edit for a value that expands another (`A=$HOME/x`, `B=${A}`), which kept its first value, and the process loading `kay.config.ts` for the editor types reads the new `.env` values as the server does ([Dev server](dev-server.md)).
 - A post behind a proxy that ends TLS swaps its page in place: the redirect back is a path, so the browser no longer reads `http:` against its own `https:` and loads the page in full ([Actions](actions.md#forms)).
 - Edit mode in kayjs-cms marks every field a page renders from an entry, also one a component reads from data its page handed down (`Crew({...data})`), and each part of a mixed child like `{age} ans`: [Edit mode](content-cms.md#edit-mode).
 - The on-page editor lists the entries a page read in the order the page shows their first marked field, so the forms follow the page and no longer swap places after a draft render ([content CMS](content-cms.md)).
