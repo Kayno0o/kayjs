@@ -705,8 +705,8 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     const english = (await visit('/confirm-words')).html
 
     expect(plain).toContain('aria-label="Supprimer"')
-    // The fixture words the title itself; the shipped French has the other keys.
-    expect(plain).toContain('aria-label="Supprimer cet élément ?"')
+    // The fixture words the title itself, and a French page writes a non-breaking space before its question mark.
+    expect(plain).toContain('aria-label="Supprimer cet élément\u00A0?"')
     expect(english).toContain('aria-label="Delete"')
     expect(english).not.toContain('Supprimer')
   })
