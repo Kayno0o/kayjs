@@ -61,6 +61,23 @@ describe('createAuth', () => {
     await expect(auth.signInAs(site, { email: 'not an address' })).rejects.toThrow('could not make the member')
   })
 
+  test('signOut signs out a site signed in by a cookie it did not set, and a refused sign-in keeps the current member', async () => {
+    const { auth, app, store } = testApp()
+    const site = cookieJar()
+    const who = async () => (await site.send(app.handle, new Request('http://localhost/me'))).text()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', username: 'ada', passwordHash: 'hash' }))
+    site.cookies.set('session', (await auth.sessionCookie('u1')).split('=').slice(1).join('='))
+    expect(await who()).toContain('"u1"')
+    auth.signOut(site)
+    expect(await who()).toBe('anonymous')
+
+    await auth.signInAs(site, { username: 'ADA'.toLowerCase() })
+    expect(await who()).toContain('"u1"')
+    await expect(auth.signInAs(site, { email: 'not an address' })).rejects.toThrow('could not make the member')
+    expect(await who()).toContain('"u1"')
+  })
+
   describe('sessionCookie against the server\'s scheme rule', () => {
     const previous = process.env.NODE_ENV
     const proto = { 'x-forwarded-proto': 'https' }

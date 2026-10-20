@@ -60,13 +60,13 @@ const site = await testSite({
 
 `headers` gives every request of the site a header, and `site.as(cookie | headers)` is the same site with more of them, a string being a `Cookie` header such as `await auth.sessionCookie(userId)` returns, so a test does not repeat `{ headers: { cookie } }` on each call:
 
-A test site is signed in as a member with kayjs-auth's `await auth.signInAs(site, { email, username })`, which makes the member when none exists and sets the session cookie in the site's jar with no form round trip; `auth.signOut(site)` signs it out, and a second `signInAs` switches member (see [kayjs-auth](../packages/auth/llms/hardening-and-testing.md)).
-
 ```ts
 const asAdmin = site.as(await auth.sessionCookie(admin.id))
 
 expect((await asAdmin.visit('/admin')).status).toBe(200)
 ```
+
+A test site is signed in as a member with kayjs-auth's `await auth.signInAs(site, { email, username })`, which makes the member when none exists and sets the session cookie in the site's jar with no form round trip; `auth.signOut(site)` signs it out, and a second `signInAs` switches member (see [kayjs-auth](../packages/auth/llms/hardening-and-testing.md)).
 
 ### Check a page's metadata
 

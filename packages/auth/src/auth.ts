@@ -89,7 +89,7 @@ const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 
 const SOCKET_USER_GONE = 1008
 // The sockets `socketUser` answered a user for, to close once that user is gone.
 const servedSockets = new WeakSet<object>()
-// The session cookies `signInAs` set in a test site's jar, so `signOut` and the next sign-in drop just those.
+// The session cookie names `signInAs` set in a test site's jar, dropped with the default ones when the site signs out or in again.
 const signedInCookies = new WeakMap<Bun.CookieMap, string[]>()
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
@@ -1272,6 +1272,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (core.organizations && create !== undefined)
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
+  const dropSession = (cookies: Bun.CookieMap) => {
+    for (const name of new Set(['session', '__Host-session', ...signedInCookies.get(cookies) ?? []]))
+      cookies.delete(name)
+
+    signedInCookies.delete(cookies)
+  }
+
   const mintSessionCookie = async (userId: string, secure: boolean | undefined): Promise<string> => {
     let failure: unknown
     const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
@@ -1338,14 +1345,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         user = created.user
       }
 
-      const names = signedInCookies.get(site.cookies) ?? []
+      const minted = (await mintSessionCookie(user.id, undefined)).split('; ')
 
-      for (const name of names)
-        site.cookies.delete(name)
+      dropSession(site.cookies)
 
-      names.length = 0
+      const names: string[] = []
 
-      for (const piece of (await mintSessionCookie(user.id, undefined)).split('; ')) {
+      for (const piece of minted) {
         const split = piece.indexOf('=')
 
         site.cookies.set(piece.slice(0, split), piece.slice(split + 1))
@@ -1357,12 +1363,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return user
     },
 
-    // Signs a test site out of the member `signInAs` signed it in as, by dropping the session cookie it set: the site is anonymous again, its other cookies kept.
+    // Signs a test site out, however it was signed in, by dropping its session cookie: the site is anonymous again, its other cookies kept.
     signOut(site: { cookies: Bun.CookieMap }): void {
-      for (const name of signedInCookies.get(site.cookies) ?? [])
-        site.cookies.delete(name)
-
-      signedInCookies.delete(site.cookies)
+      dropSession(site.cookies)
     },
 
     // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`, and read again past 30 seconds: null for an anonymous one, or a socket opened on an app without the plugin. A socket whose user is gone since, signed out, revoked or banned, is closed.

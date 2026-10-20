@@ -64,8 +64,9 @@ A test site signs in with one call, no form round trip: `await auth.signInAs(sit
 import { auth } from '../src/auth'
 
 await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada', emailVerified: true })
-expect((await site.visit('/')).find('nav a')[1]?.text).toBe('Ada')
+expect((await site.visit('/auth/account')).status).toBe(200)
 auth.signOut(site)
+expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
 ```
 
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
