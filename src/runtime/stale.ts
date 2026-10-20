@@ -1,4 +1,4 @@
-import { dirtyGuard, navigation } from './navigation'
+import { dirtyGuard, loadAgain, navigation } from './navigation'
 import { BUILD_HEADER, BUILD_META } from './swap'
 
 // Defined by `kay build --static`, whose host names no build in a header. Tested where it is read, so the bundler drops the code reading one.
@@ -141,8 +141,7 @@ export function reload(): boolean {
     return false
   }
 
-  navigation.released = true
-  location.reload()
+  loadAgain()
 
   return true
 }

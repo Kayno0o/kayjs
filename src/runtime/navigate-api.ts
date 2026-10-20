@@ -1,7 +1,7 @@
 import type { CheckedHref } from './checks'
 import { withBase } from './base'
 import { follow } from './navigate'
-import { leave, mayLeave, navigation, prefetched, swappable } from './navigation'
+import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
 
 export interface NavigateOptions {
   // Replaces the current history entry instead of adding one.
@@ -62,8 +62,7 @@ export async function refresh(): Promise<void> {
     return
 
   if (!navigation.hooks) {
-    navigation.released = true
-    location.reload()
+    loadAgain()
 
     return
   }

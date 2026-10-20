@@ -23,6 +23,14 @@ export const leavesLate = action(t.Object({}), async (_input, ctx) => {
   await Bun.sleep(200)
   ctx.redirect('/late')
 })
+
+// Where the `external` form's post redirects to, a slow server of the test's own on another origin.
+export const away = action(t.Object({}), async (_input, ctx) => {
+  await Bun.sleep(200)
+  ctx.redirect(process.env.KAY_PENDING_AWAY!)
+})
+
+await Bun.sleep(Number(process.env.KAY_PENDING_HOLD ?? 0))
 ---
 h1 Pending
 form.slow(action={slow})
@@ -38,6 +46,14 @@ form.leaves(action={leaves})
   pending
     p.saving Saving leaves
 Saving
+form.external(action={away})
+  button Away
+  pending
+    p.saving Saving external
+form.reloads(action={slow})
+  button Reload
+  pending
+    p.saving Saving reloads
 form.late(action={leavesLate})
   button Late
   pending

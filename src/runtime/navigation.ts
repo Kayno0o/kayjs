@@ -80,13 +80,15 @@ export const navigation: {
   // How many swaps to another path were shown, which a stream no island owns reads to tell whether the path it was started on is gone.
   arrivals?: number
   released: boolean
+  // How many full loads kay started, which a form posting reads to tell whether its answer ended in a document replacing the page.
+  loads: number
   // A response showed the server runs another build than this page's: the next link loads in full, as the new build's pages are not this page's to swap in.
   stale?: boolean
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.
   typed?: boolean
-} = { shown: '', at: 0, page: 0, current: 0, released: false }
+} = { shown: '', at: 0, page: 0, current: 0, released: false, loads: 0 }
 
 // Run once a swap to another path is shown: what an action streams to a caller no island owns closes there.
 export const leaving = new Set<() => void>()
@@ -126,8 +128,16 @@ function askLeave(): boolean {
 // A full load instead, taking the place of the current entry when `replace`, as one going back already made.
 export function leave(target: URL, replace = false): void {
   navigation.released = true
+  navigation.loads++
 
   location[replace ? 'replace' : 'assign'](target)
+}
+
+// The same page loaded in full again.
+export function loadAgain(): void {
+  navigation.released = true
+  navigation.loads++
+  location.reload()
 }
 
 export function historyState(): HistoryState {

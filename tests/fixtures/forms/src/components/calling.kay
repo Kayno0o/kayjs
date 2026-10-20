@@ -14,3 +14,7 @@ form.click(action={slow})
   button(type="button" onClick={() => void slow({}, { refresh: false })}) Click
   pending
     p.saving Saving click
+form.with(action={slow.with({})})
+  button(type="button" onClick={() => void slow({}, { refresh: false })}) With
+  pending
+    p.saving Saving with

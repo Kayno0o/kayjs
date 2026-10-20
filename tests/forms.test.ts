@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
-import { t } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
 import { action, actionStub, formDescribed, formMarked } from '../src/runtime/action'
@@ -23,7 +23,13 @@ function fakeElement(): Element {
 }
 
 // The islands built for the island form's tests, which load pages in Chromium only once they open one.
-const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true })
+// What a page being left reports, as a page mid-navigation cannot be asked.
+const reported: string[] = []
+const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true, use: [new Elysia().get('/reported/:state', ({ params }) => {
+  reported.push(params.state)
+
+  return ''
+})] })
 const { save, ping, busy, odd, enrol } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
   save: Action<Record<string, string | boolean>, unknown, 'website'>
   ping: Action<Record<string, never>, string>
@@ -410,7 +416,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   it('renders a pending block hidden, with no style of its own and no wrapper taking a place in the layout', async () => {
     const { html } = await site.visit('/pending')
 
-    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click|boxed)<\/p><\/slot>/g)).toHaveLength(8)
+    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click|boxed|external|reloads|with)<\/p><\/slot>/g)).toHaveLength(11)
     expect(html).not.toContain('role="status"')
     expect(html).not.toContain('display:block')
   })
@@ -487,6 +493,102 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect((await shown(page, 'late')).late).toBe(true)
 
     await page.waitFor('h1', { text: 'Late' })
+    expect(page.errors).toEqual([])
+  })
+
+  // A server of the test's own on another origin, answering a page slowly: the one a post's redirect leads to.
+  async function slowAway(run: (url: string) => Promise<void>): Promise<void> {
+    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', async fetch() {
+      await Bun.sleep(3000)
+
+      return new Response('<h1>Away</h1>', { headers: { 'content-type': 'text/html' } })
+    } })
+
+    try {
+      await run(`http://127.0.0.1:${server.port}/`)
+    }
+    finally {
+      await server.stop(true)
+    }
+  }
+
+  // Once the page starts to leave, reports whether the named form's block is shown, then again after the page comes back from the cache.
+  async function reportLeaving(page: Awaited<ReturnType<typeof site.open>>, name: string): Promise<void> {
+    reported.length = 0
+    await page.evaluate((name) => {
+      const visible = () => document.querySelector(`form.${name} [data-kay-pending] > *`)?.checkVisibility() ?? null
+
+      addEventListener('beforeunload', () => {
+        setTimeout(() => {
+          void fetch(`/reported/leaving-${visible()}`)
+          dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+          void fetch(`/reported/restored-${visible()}`)
+        }, 300)
+      })
+    }, name)
+  }
+
+  async function reportedTwice(): Promise<string[]> {
+    const until = Date.now() + 5000
+
+    while (reported.length < 2 && Date.now() < until)
+      await Bun.sleep(50)
+
+    return reported
+  }
+
+  it('keeps it shown while a redirect to another origin loads, and hides it again when the page comes back from the cache', async () => {
+    const page = await site.open('/pending', { path })
+
+    await slowAway(async (url) => {
+      process.env.KAY_PENDING_AWAY = url
+
+      try {
+        await reportLeaving(page, 'external')
+        await page.click('form.external button')
+        expect(await reportedTwice()).toEqual(['leaving-true', 'restored-false'])
+      }
+      finally {
+        delete process.env.KAY_PENDING_AWAY
+      }
+    })
+
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps it shown while the page reloads after an answer that was lost', async () => {
+    const page = await site.open('/pending', { path })
+
+    // The upload went whole, then the connection failed: the action has run, so the page loads rather than the form posting again.
+    await page.evaluate(() => {
+      // eslint-disable-next-line ts/unbound-method -- applied to the request it is called on
+      const send = XMLHttpRequest.prototype.send
+
+      XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, ...args: Parameters<typeof send>) {
+        send.apply(this, args)
+        this.upload.addEventListener('load', () => this.dispatchEvent(new ProgressEvent('error')))
+      }
+    })
+    await reportLeaving(page, 'reloads')
+    process.env.KAY_PENDING_HOLD = '1500'
+
+    try {
+      await page.click('form.reloads button')
+      expect(await reportedTwice()).toEqual(['leaving-true', 'restored-false'])
+    }
+    finally {
+      delete process.env.KAY_PENDING_HOLD
+    }
+
+    expect(page.errors).toEqual([])
+  })
+
+  it('follows a form whose action is written with `with`, as the action itself', async () => {
+    const page = await site.open('/pending', { path })
+
+    await page.click('form.with button')
+    await page.waitUntil(() => document.querySelector('form.with [data-kay-pending] > *')?.checkVisibility() === true)
+    await page.waitUntil(() => document.querySelector('form.with [data-kay-pending] > *')?.checkVisibility() === false)
     expect(page.errors).toEqual([])
   })
 

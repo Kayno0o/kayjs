@@ -1,5 +1,5 @@
 import { withoutBase } from './base'
-import { busyForms, checkedForms, leave, navigation, prefetched, submitNatively, swappable } from './navigation'
+import { busyForms, checkedForms, leave, loadAgain, navigation, prefetched, submitNatively, swappable } from './navigation'
 import { pendingBlocks } from './pending'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
@@ -45,14 +45,25 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
   if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
-    // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included.
+    // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included; a document that replaces the page keeps them shown while it loads.
+    const loads = navigation.loads
+
     pendingBlocks(form, 'post', true)
 
     try {
       await send(form, submitter, url, swapper, navigated)
     }
     finally {
-      pendingBlocks(form, 'post', false)
+      if (navigation.loads === loads) {
+        pendingBlocks(form, 'post', false)
+      }
+      else {
+        // The page may come back from the back-forward cache as it was left.
+        window.addEventListener('pageshow', (event) => {
+          if (event.persisted)
+            pendingBlocks(form, 'post', false)
+        })
+      }
     }
 
     return
@@ -142,8 +153,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     if (delivery.reached) {
       // A visitor who went elsewhere meanwhile is left there.
       if (navigation.visits === navigated) {
-        navigation.released = true
-        location.reload()
+        loadAgain()
       }
 
       return
