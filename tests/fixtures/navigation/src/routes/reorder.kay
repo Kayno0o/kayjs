@@ -1,0 +1,7 @@
+---
+import Reorder from '../components/reorder.kay'
+---
+head
+  title Reorder
+h1 Reorder
+Reorder

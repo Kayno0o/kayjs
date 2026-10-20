@@ -148,6 +148,8 @@ match post.status
 
 A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`.
 
+A row that moves keeps its focus, its playing video and its loaded iframe in a browser that has `Element.moveBefore`.
+
 Rows of plain objects with no `id`, edited immutably, need no key. Avoid `key={index}` for them, because it matches rows by position.
 
 <ReadMore href="/llms/templates">How rows are matched without a key, and when to give them an `id`.</ReadMore>

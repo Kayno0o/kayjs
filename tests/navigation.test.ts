@@ -1,7 +1,7 @@
 import type { Browser, ConsoleMessage, Dialog, Page } from 'playwright-core'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 
 const LISTENING = /port (\d+)/
@@ -226,6 +226,249 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await fresh.close()
     }
   }
+
+  // A page of its own, as the tests after these count on the document and the history the shared page holds.
+  describe('nodes moved in place', () => {
+    let own: Page
+
+    beforeEach(async () => {
+      own = await browser.newPage()
+    })
+
+    afterEach(async () => {
+      await own.close()
+    })
+
+    // An iframe, a field holding the focus with a selection, and an open popover put into the persistent island, whose state a move through insertBefore resets.
+    async function stateInIsland(on: Page): Promise<void> {
+      await on.evaluate(() => {
+        const state = window as { kayFocusIns?: number }
+        const island = document.querySelector('slot[data-persist]')!
+        const frame = document.createElement('iframe')
+
+        frame.src = 'about:blank'
+        island.append(frame)
+        ;(frame.contentWindow as Window & { kayMark?: string }).kayMark = 'loaded'
+
+        const input = document.createElement('input')
+
+        input.value = 'typed here'
+        input.setAttribute('aria-label', 'held')
+        island.append(input)
+        state.kayFocusIns = 0
+        input.addEventListener('focusin', () => {
+          state.kayFocusIns!++
+        })
+        input.focus()
+        input.setSelectionRange(2, 4)
+
+        const menu = document.createElement('div')
+
+        menu.setAttribute('popover', '')
+        menu.id = 'menu'
+        island.append(menu)
+        menu.showPopover()
+      })
+    }
+
+    async function islandState(on: Page): Promise<{ mark: string | undefined, focused: boolean, selection: number[], focusIns: number | undefined, menuOpen: boolean }> {
+      return on.evaluate(() => {
+        const input = document.querySelector<HTMLInputElement>('slot[data-persist] input')!
+
+        return {
+          mark: (document.querySelector<HTMLIFrameElement>('slot[data-persist] iframe')!.contentWindow as Window & { kayMark?: string }).kayMark,
+          focused: document.activeElement === input,
+          selection: [input.selectionStart!, input.selectionEnd!],
+          focusIns: (window as { kayFocusIns?: number }).kayFocusIns,
+          menuOpen: document.querySelector('#menu')!.matches(':popover-open'),
+        }
+      })
+    }
+
+    // A refresh keeps the focus where it was, which a link followed moves to the new page's heading.
+    async function refreshed(on: Page): Promise<void> {
+      const before = await on.textContent('p.bumps')
+
+      await on.evaluate(() => document.querySelector<HTMLElement>('button.bump')!.click())
+      await on.waitForFunction(text => document.querySelector('p.bumps')!.textContent !== text, before)
+    }
+
+    it('moves the persistent island in place, its iframe loaded and its field focused, and still closes a popover left open', async () => {
+      await own.goto(origin)
+      await own.locator('button.player').waitFor()
+      await stateInIsland(own)
+      await refreshed(own)
+
+      // No focus event after the first: the field was never taken out, so nothing had to give the focus back.
+      expect(await islandState(own)).toEqual({ mark: 'loaded', focused: true, selection: [2, 4], focusIns: 1, menuOpen: false })
+    })
+
+    it('places the persistent island where a wrapper of the next page puts it, keeping its state', async () => {
+      await own.goto(origin)
+      await own.locator('button.player').waitFor()
+      await stateInIsland(own)
+      await own.evaluate(() => document.querySelector<HTMLElement>('a.second')!.click())
+      await own.locator('h1', { hasText: 'Second' }).waitFor()
+      await own.evaluate(() => {
+        const link = document.createElement('a')
+
+        link.href = '/wrapped'
+        link.className = 'wrapped'
+        link.textContent = 'Wrapped'
+        document.querySelector('nav')!.append(link)
+      })
+      await own.evaluate(() => document.querySelector<HTMLElement>('a.wrapped')!.click())
+      await own.locator('h1', { hasText: 'Wrapped' }).waitFor()
+
+      expect(await own.evaluate(() => document.querySelectorAll('section.wrapper > slot[data-persist]').length)).toBe(1)
+      expect(await own.evaluate(() => document.querySelectorAll('slot[data-persist]').length)).toBe(1)
+      expect(await islandState(own)).toMatchObject({ mark: 'loaded', menuOpen: false })
+      expect(await own.evaluate(() => document.documentElement.lastElementChild === document.body)).toBe(true)
+    })
+
+    it('swaps on a browser without moveBefore, the focus given back to the field the island took with it', async () => {
+      const fresh = await browser.newPage()
+      const errors: string[] = []
+
+      fresh.on('pageerror', error => errors.push(error.message))
+      await fresh.addInitScript(() => {
+        for (const prototype of [Element.prototype, Document.prototype, DocumentFragment.prototype])
+          Reflect.deleteProperty(prototype, 'moveBefore')
+      })
+      await fresh.goto(origin)
+      await fresh.locator('button.player').waitFor()
+      await stateInIsland(fresh)
+      await refreshed(fresh)
+
+      const state = await islandState(fresh)
+
+      expect(state).toMatchObject({ focused: true, selection: [2, 4], menuOpen: false })
+      // Taken out and put back, the field lost the focus and the swap gave it back.
+      expect(state.focusIns).toBe(2)
+      expect(errors).toEqual([])
+      await fresh.close()
+    })
+
+    describe('rows moved in a keyed list', () => {
+      const MOVES: Record<string, (rows: string[]) => string[]> = {
+        'to-end': rows => [...rows.slice(1), rows[0]!],
+        'to-front': rows => [rows.at(-1)!, ...rows.slice(0, -1)],
+        'swap': rows => [rows[1]!, rows[0]!, ...rows.slice(2)],
+        'reverse': rows => [...rows].reverse(),
+      }
+
+      async function rowsOf(on: Page): Promise<string[]> {
+        return on.evaluate(() => [...document.querySelectorAll('ul.rows > li.row')].map(row => (row as HTMLElement).dataset.id!))
+      }
+
+      async function subsOf(on: Page, id: string): Promise<string[]> {
+        return on.evaluate((row: string) => [...document.querySelectorAll(`li.row[data-id="${row}"] li.sub`)].map(sub => (sub as HTMLElement).dataset.id!), id)
+      }
+
+      // What each row's iframe still holds from before the move, in the order the rows are in.
+      async function marks(on: Page): Promise<string[]> {
+        return on.evaluate(() => [...document.querySelectorAll<HTMLIFrameElement>('li.row > iframe')].map(frame => (frame.contentWindow as Window & { kayMark?: string }).kayMark ?? 'lost'))
+      }
+
+      async function opened(on: Page): Promise<void> {
+        await on.goto(`${origin}/reorder`)
+        await on.locator('button.to-end').waitFor()
+        await on.evaluate(() => {
+          for (const frame of document.querySelectorAll<HTMLIFrameElement>('li.row > iframe'))
+            (frame.contentWindow as Window & { kayMark?: string }).kayMark = frame.title
+        })
+      }
+
+      // The field takes the focus and the button is pressed by script, as a click would take the focus to the button.
+      async function move(on: Page, button: string, focus: string): Promise<void> {
+        await on.evaluate(([name, target]: [string, string]) => {
+          document.querySelector<HTMLInputElement>(`[aria-label="${target}"]`)!.focus()
+          document.querySelector<HTMLElement>(`button.${name}`)!.click()
+        }, [button, focus] as [string, string])
+      }
+
+      async function focused(on: Page): Promise<string | null> {
+        return on.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null)
+      }
+
+      for (const [name, order] of Object.entries(MOVES)) {
+        it(`keeps the iframe and the focus of every row when the list goes ${name}`, async () => {
+          const errors: string[] = []
+
+          page.on('pageerror', error => errors.push(error.message))
+          await opened(own)
+
+          for (const target of ['a', 'b', 'c', 'd']) {
+            const before = await rowsOf(own)
+
+            await move(own, name, target)
+
+            expect(await rowsOf(own)).toEqual(order(before))
+            expect(await focused(own)).toBe(target)
+            expect(await marks(own)).toEqual(order(before))
+          }
+
+          expect(errors).toEqual([])
+        })
+      }
+
+      it('keeps the focus of a row of a nested list moved inside its row', async () => {
+        await opened(own)
+        await move(own, 'nested', 'b2')
+
+        expect(await subsOf(own, 'b')).toEqual(['b2', 'b3', 'b1'])
+        expect(await focused(own)).toBe('b2')
+        await move(own, 'nested', 'b1')
+
+        expect(await subsOf(own, 'b')).toEqual(['b3', 'b1', 'b2'])
+        expect(await focused(own)).toBe('b1')
+        expect(await marks(own)).toEqual(['a', 'b', 'c', 'd'])
+      })
+
+      it('moves the rows of a list that is out of the document, and they are in place once it is back', async () => {
+        const errors: string[] = []
+
+        page.on('pageerror', error => errors.push(error.message))
+        await opened(own)
+        await own.evaluate(() => {
+          const rows = document.querySelector('ul.rows')!
+          const anchor = rows.parentNode!.insertBefore(document.createComment(''), rows)
+
+          rows.remove()
+          document.querySelector<HTMLElement>('button.to-end')!.click()
+          document.querySelector<HTMLElement>('button.swap')!.click()
+          anchor.parentNode!.insertBefore(rows, anchor)
+        })
+
+        expect(await rowsOf(own)).toEqual(['c', 'b', 'd', 'a'])
+        expect(errors).toEqual([])
+      })
+
+      it('puts the rows in order on a browser without moveBefore', async () => {
+        const fresh = await browser.newPage()
+        const errors: string[] = []
+
+        fresh.on('pageerror', error => errors.push(error.message))
+        await fresh.addInitScript(() => {
+          for (const prototype of [Element.prototype, Document.prototype, DocumentFragment.prototype])
+            Reflect.deleteProperty(prototype, 'moveBefore')
+        })
+        await opened(fresh)
+
+        let rows = ['a', 'b', 'c', 'd']
+
+        for (const [name, order] of Object.entries(MOVES)) {
+          await move(fresh, name, 'a')
+          rows = order(rows)
+
+          expect(await rowsOf(fresh)).toEqual(rows)
+        }
+
+        expect(errors).toEqual([])
+        await fresh.close()
+      })
+    })
+  })
 
   it('loads no prefetch code on a page without speculation rules, and fetches nothing when a link is hovered', async () => {
     expect(await prefetching(undefined, async on => on.hover('a.second'))).toEqual({ fetched: [], loaded: false })

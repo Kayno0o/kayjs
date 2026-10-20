@@ -5,6 +5,7 @@ import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
 import { frenchText, frenchTree } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
+import { place } from './move'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
@@ -345,7 +346,7 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
     return
 
   if (!(unit instanceof Range)) {
-    parent.insertBefore(unit, before)
+    place(parent, unit, before)
 
     return
   }
@@ -355,7 +356,7 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
     if (node === before)
       before = node.nextSibling
     else
-      parent.insertBefore(node, before)
+      place(parent, node, before)
   }
 
   unit.nodes = undefined

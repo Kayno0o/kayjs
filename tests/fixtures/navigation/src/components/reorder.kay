@@ -1,0 +1,29 @@
+---
+import { signal } from 'kay'
+
+const rows = signal([
+  { id: 'a', subs: ['a1', 'a2', 'a3'] },
+  { id: 'b', subs: ['b1', 'b2', 'b3'] },
+  { id: 'c', subs: ['c1', 'c2', 'c3'] },
+  { id: 'd', subs: ['d1', 'd2', 'd3'] },
+])
+const toEnd = () => rows.set(list => [...list.slice(1), list[0]!])
+const toFront = () => rows.set(list => [list.at(-1)!, ...list.slice(0, -1)])
+const swap = () => rows.set(list => [list[1]!, list[0]!, ...list.slice(2)])
+const reverse = () => rows.set(list => [...list].reverse())
+const nested = () => rows.set(list => list.map(row => row.id === 'b' ? { ...row, subs: [...row.subs.slice(1), row.subs[0]!] } : row))
+---
+button.to-end(onClick={toEnd}) To end
+button.to-front(onClick={toFront}) To front
+button.swap(onClick={swap}) Swap
+button.reverse(onClick={reverse}) Reverse
+button.nested(onClick={nested}) Nested
+ul.rows
+  for row of rows() key={row.id}
+    li.row(data-id={row.id})
+      input(aria-label={row.id})
+      iframe(src="about:blank" title={row.id})
+      ul.subs
+        for sub of row.subs key={sub}
+          li.sub(data-id={sub})
+            input(aria-label={sub})

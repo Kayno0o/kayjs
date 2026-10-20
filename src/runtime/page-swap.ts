@@ -1,5 +1,6 @@
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { ISLAND } from './markers'
+import { place } from './move'
 import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
@@ -634,13 +635,25 @@ function swapBody(next: Document, policy: Policy): void {
   const focused = heldFocus()
 
   const kept = new Set<Element>()
+  // An island kept waits in a connected element while the morph runs, where a move keeps its state, and the next body holds its placeholder, emptied, in its stead.
+  const parking = document.createElement('div')
+  const standIns = new Map<Element, Element>()
+
+  const keep = (placeholder: Element, live: Element) => {
+    if (!parking.isConnected)
+      document.documentElement.append(parking)
+
+    place(parking, live, null)
+    placeholder.replaceChildren()
+    standIns.set(placeholder, live)
+    kept.add(live)
+  }
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(PERSISTENT)) {
     const live = old.querySelector<KeptIsland>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)
 
     if (live && live.dataset.component === placeholder.dataset.component) {
-      placeholder.replaceWith(live)
-      kept.add(live)
+      keep(placeholder, live)
 
       const props = placeholder.dataset.props
 
@@ -661,7 +674,7 @@ function swapBody(next: Document, policy: Policy): void {
 
     for (const placeholder of body.querySelectorAll<HTMLElement>(ISLAND)) {
       // One in the static slot of an island kept went along with it, or away with the copy it replaced.
-      if (!body.contains(placeholder) || [...kept].some(island => island.contains(placeholder)))
+      if (!body.contains(placeholder) || standIns.has(placeholder))
         continue
 
       const index = unchanged.findIndex(live => old.contains(live) && live.dataset.component === placeholder.dataset.component && live.dataset.props === placeholder.dataset.props && live.dataset.slots === placeholder.dataset.slots && (live.dataset.slots === undefined || (live._$h ?? live.innerHTML) === placeholder.innerHTML))
@@ -669,8 +682,7 @@ function swapBody(next: Document, policy: Policy): void {
       if (index !== -1) {
         const [live] = unchanged.splice(index, 1)
 
-        placeholder.replaceWith(live!)
-        kept.add(live!)
+        keep(placeholder, live!)
       }
     }
   }
@@ -678,8 +690,8 @@ function swapBody(next: Document, policy: Policy): void {
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
 
-  // A browser without popovers throws on the selector.
-  const opened = 'popover' in HTMLElement.prototype ? [...old.querySelectorAll(':popover-open')] : []
+  // A browser without popovers throws on the selector. One open in an island kept closes too, as it did when moving the island hid it.
+  const opened = 'popover' in HTMLElement.prototype ? [old, ...kept].flatMap(root => [...root.querySelectorAll(':popover-open')]) : []
 
   // What ran already, the hydration script for one, runs once.
   const ran = new Set([...document.scripts].map(scriptMarkup))
@@ -695,6 +707,15 @@ function swapBody(next: Document, policy: Policy): void {
 
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   morphChildren(old, body)
+
+  for (const [standIn, live] of standIns) {
+    if (standIn.isConnected)
+      place(standIn.parentNode!, live, standIn)
+
+    standIn.remove()
+  }
+
+  parking.remove()
 
   if (focused && document.activeElement !== focused.element && [...kept].some(island => island.contains(focused.element)))
     focused.restore()

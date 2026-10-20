@@ -7,6 +7,8 @@ Tone.provide('layout')
 const page = ctx.url.pathname
 // A page whose layout sets nothing on `<html>`, and serves another theme colour.
 const bare = page === '/later'
+// A page that puts the persistent island in a wrapper of its own.
+const wrapped = page === '/wrapped'
 ---
 head
   meta(name="theme-color" content={bare ? '#000000' : '#ffffff'})
@@ -24,5 +26,9 @@ nav
 ul#side(style="height: 40px; overflow-y: auto; margin: 0")
   li(style="height: 400px") Side
 div#drawer(popover) Drawer
-Player(persist page={page})
+if wrapped
+  section.wrapper
+    Player(persist page={page})
+else
+  Player(persist page={page})
 slot
