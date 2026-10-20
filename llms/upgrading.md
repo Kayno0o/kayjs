@@ -6,7 +6,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### French pages get non-breaking spaces
 
-A page whose `lang` is `fr` or `fr-...` now has its plain space before `: ; ! ?` and inside `« »` rewritten as U+00A0 in its text and its `alt`, `title`, `aria-label` and description, so the markup of a French site changes and a test or a snapshot reading `Total : 3` with a plain space fails. Expect `Total\u00A0: 3`, or set `typography: false` in `kay.config.ts` to keep the text as it was typed. A U+00A0 or U+202F typed already is kept. No lint can see it, as it is a rendering change; the `&nbsp;` and `\u00A0` an app typed by hand can go ([Locales](locales.md#french-typography)).
+A page whose `lang` is `fr` or `fr-...` now has its plain space before `: ; ! ?` and inside `« »` rewritten as U+00A0 in its text and its `alt`, `title`, `aria-label` and description, so the markup of a French site changes and a test or a snapshot reading `Total : 3` with a plain space fails. Expect `Total\u00A0: 3`, or set `typography: false` in `kay.config.ts` to keep the text as it was typed. A U+00A0 or U+202F typed already is kept. An island on such a page writes the same spaces in the browser, so a component test or a browser test reading an island's French text expects them too. No lint can see it, as it is a rendering change; the `&nbsp;` and `\u00A0` an app typed by hand can go ([Locales](locales.md#french-typography)).
+
+### A `pending` block is a hidden `slot`
+
+The block a form shows while it posts renders as `<slot data-kay-pending hidden>` the runtime unhides, instead of a `<div data-kay-pending hidden>` inside a `<div role="status">` with a `<style>` of its own, and its announcement comes from a live region kay writes outside the form. CSS or a test reaching the block through `[role=status]` or as a `div` reads `[data-kay-pending]` instead, and the slot lays out as its contents; no lint can see a selector in a stylesheet or a test ([Actions](actions.md#show-that-a-form-is-posting)).
 
 ## 1.59.0
 
