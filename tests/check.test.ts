@@ -9,7 +9,7 @@ import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check as checkProject } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
-import { DESCRIPTION_LENGTH, pageSeoLints } from '../src/check/seo'
+import { DESCRIPTION_LENGTH, pageSeoLints, TITLE_LENGTH } from '../src/check/seo'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { warnOtherKay } from '../src/commands/command'
@@ -2676,13 +2676,14 @@ describe.concurrent('kay check, unused code', () => {
     const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
     const root = await scratchProject({
       'src/routes/index.kay': head(['title Home', 'meta(name="description" content="Fine")']),
-      'src/routes/bare.kay': head(['meta(name="description" content="Fine")']),
+      'src/routes/bare.kay': head(['meta(name="description" content="Bare")']),
       'src/routes/same.kay': head(['title Home', 'meta(name="description" content="Fine")']),
       'src/routes/mute.kay': head(['title Mute']),
       'src/routes/long.kay': head(['title Long', `meta(name="description" content="${long}")`]),
-      'src/routes/image.kay': head(['title Image', 'meta(name="description" content="Fine")', 'meta(property="og:image" content="https://example.com/a.png")']),
-      'src/routes/hidden.kay': head(['title Hidden', 'meta(name="description" content="Fine")', 'meta(name="robots" content="noindex")']),
+      'src/routes/image.kay': head(['title Image', 'meta(name="description" content="Image")', 'meta(property="og:image" content="https://example.com/a.png")']),
+      'src/routes/hidden.kay': head(['title Hidden', 'meta(name="description" content="Hidden")', 'meta(name="robots" content="noindex")']),
       'src/routes/dynamic.kay': head(['title {name}', 'meta(name="description" content={name})']).replace('---\nhead', 'const name = "x"\n---\nhead'),
+      'src/routes/wordy.kay': head([`title ${'Wordy '.repeat(TITLE_LENGTH / 6 + 1)}`, 'meta(name="description" content="Wordy")']),
       'src/routes/later.kay': '--- server\nexport const page = {}\n---\nh1 Not prerendered\n',
     })
 
@@ -2696,6 +2697,8 @@ describe.concurrent('kay check, unused code', () => {
         ['long.kay', 'long-description'],
         ['mute.kay', 'undescribed-page'],
         ['same.kay', 'duplicate-title'],
+        ['same.kay', 'duplicate-description'],
+        ['wordy.kay', 'long-title'],
       ])
       expect(await check(root, { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: { seo: 'allow' } })).toEqual([])
 
@@ -2707,6 +2710,7 @@ describe.concurrent('kay check, unused code', () => {
         ['hidden.kay', 'noindex-in-sitemap'],
         ['image.kay', 'unsized-share-image'],
         ['same.kay', 'duplicate-title'],
+        ['wordy.kay', 'long-title'],
       ])
     }
     finally {
@@ -2757,6 +2761,7 @@ describe.concurrent('kay check, unused code', () => {
         ['one.kay', 'untitled-page'],
         ['three.kay', 'undescribed-page'],
         ['two.kay', 'untitled-page'],
+        ['two.kay', 'duplicate-description'],
       ])
     }
     finally {

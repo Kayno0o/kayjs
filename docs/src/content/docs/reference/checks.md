@@ -98,6 +98,12 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `long-description` | warn | seo | A description over 160 characters: `seo.description` in kay.config.ts (reported at that key), or a page's own, which only `kay build` reads |
 | `unsized-share-image` | warn | seo | A share image of unknown size |
 | `noindex-in-sitemap` | warn | seo | A `noindex` page the sitemap lists |
+| `long-title` | warn | seo | A page title over 60 characters |
+| `duplicate-description` | warn | seo | Two pages with one description |
+| `orphan-page` | warn | seo | A page no link and no sitemap entry reaches |
+| `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
+| `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
+| `redirect-chain` | warn | seo | A redirect whose target redirects again |
 
 ## Errors
 

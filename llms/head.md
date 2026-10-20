@@ -207,3 +207,4 @@ export default defineConfig({
 - `noindex: true` in the `page` object a page's server fence exports asks search engines to leave it out, `<meta name="robots" content="noindex">` in its head, a `robots` tag of its own still winning.
 - `noindex: true` also leaves the page out of the sitemap, as legal pages often are.
 - Without `site` and `seo`, a page's head holds only the tags it and its layouts set.
+- `kay build` reads the prerendered pages against one another and warns of shared titles and descriptions, a title over 60 characters, an orphan page, a canonical link or redirect leading to a redirect or a missing page and alternates that do not point back: the `seo` lints in [Lints](lints.md#seo-lints).

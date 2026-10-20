@@ -1,6 +1,6 @@
 // What `kay build` does, stage by stage, answering what each found and made for the command line to print.
 import type { CheckDiagnostic } from '../check'
-import type { RenderedPage } from '../check/seo'
+import type { OtherPage, RenderedPage } from '../check/seo'
 import type { KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
@@ -13,8 +13,9 @@ import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { check, configCheckOptions } from '../check'
 import { pageSeoLints, unkeptPageLints } from '../check/seo'
+import { siteSeoLints } from '../check/site-seo'
 import { lintLevel } from '../compiler/lints'
-import { pageHooks } from '../config'
+import { CONFIG_FILE, pageHooks } from '../config'
 import { setMarkdownDefaults } from '../content/load'
 import { writeContentManifests } from '../content/server'
 import { cacheDir, clientOptionsOf, resolveProject } from '../project'
@@ -392,7 +393,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   const rendered: RenderedPage[] = []
-  const others: Pick<RenderedPage, 'file' | 'html'>[] = []
+  const others: OtherPage[] = []
   const routes: Route[] = []
   const stops = new Map<string, KeptStop>()
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, stops, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
@@ -414,7 +415,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await pruneCompileCache(cacheDir(root))
 
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
+  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile: join(root, CONFIG_FILE), exported, unseen: hasUnseenPages(routes, rendered, others) }), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
@@ -458,6 +459,13 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   lap('compress')
 
   return { prerendered, entries, linted, routes: sizes, stages }
+}
+
+// Whether a page without a guard was not rendered, which a server renders per request: its links are ones the build never saw.
+function hasUnseenPages(routes: Route[], rendered: Pick<RenderedPage, 'file'>[], others: Pick<OtherPage, 'file'>[]): boolean {
+  const seen = new Set([...rendered, ...others].map(page => page.file))
+
+  return routes.some(route => route.guards.length === 0 && !seen.has(route.file))
 }
 
 function imageProgress(report: Report): (done: number, total: number) => void {

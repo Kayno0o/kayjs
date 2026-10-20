@@ -1,4 +1,4 @@
-import type { RenderedPage } from '../check/seo'
+import type { OtherPage, RenderedPage } from '../check/seo'
 import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { ClientBuild, PrerenderedPage } from './client'
@@ -69,8 +69,8 @@ export interface PrerenderOptions {
   exportAll?: boolean
   // Receives every page rendered, for `kay build` to lint their heads.
   rendered?: RenderedPage[] | undefined
-  // Receives the pages that answered a status other than 200, which the head lints and the search index leave out, for `kay build` to weigh the scripts they load.
-  others?: Pick<RenderedPage, 'file' | 'html'>[] | undefined
+  // Receives the pages that answered a status other than 200, which the head lints and the search index leave out, for `kay build` to weigh the scripts they load and to tell what points at them.
+  others?: OtherPage[] | undefined
   // Receives every route of the project, for `kay build` to weigh what each loads.
   routes?: Route[] | undefined
   // Receives, by route pattern, what stopped each page from being kept without being asked for, and whether the page said `keep: true`, for `kay build` to show it.
@@ -248,10 +248,12 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           const noindex = chainSetting(chain, 'noindex') === true
           const indexed = config.search === true && !noindex && !guardedPage(route, config.requireGuards)
 
-          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: indexed ? await weight() : false })
+          const sitemap = pageSetting(module, 'sitemap')
+
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, host: copy.host, html, noindex, sitemap: sitemap !== undefined, search: indexed ? await weight() : false, listed: !noindex && sitemap !== false && (sitemap !== undefined || route.guards.length === 0), guarded: route.guards.length > 0 })
         }
         else if (!auto) {
-          options.others?.push({ file: route.file, html })
+          options.others?.push({ file: route.file, html, path: copy.path, host: copy.host, status: response.status, location: response.headers.get('location') ?? undefined })
         }
 
         const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }

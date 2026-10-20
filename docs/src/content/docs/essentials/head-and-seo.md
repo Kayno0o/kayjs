@@ -151,6 +151,12 @@ head
 
 `images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, as `{ family: 'Inter', weight: 800 }`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
 
+## Checks across the site
+
+`kay build` reads the pages it prerendered against one another and warns with the page and a fix. It reports a title or description two pages share, a title over 60 characters, a page no link and no sitemap entry reaches, a canonical link or redirect that leads to a redirect or a missing page, and `hreflang` alternates that do not point back.
+
+Each is a lint you can set in `lints`, listed in [Checks](/reference/checks). A page rendered per request is not read, so a site made of those gets fewer warnings, never a wrong one.
+
 ## Sitemap and robots.txt
 
 A project with a `site` serves `/sitemap.xml` and `/robots.txt`. The robots file allows every crawler and points at the sitemap.

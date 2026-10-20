@@ -7,7 +7,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { localizedText, localizedTexts } from '../runtime/localized'
 import { cardImageSizes } from '../server/seo'
-import { decode, DESCRIPTION_LENGTH, isPublicSite, lintReporter, NOINDEX } from './seo'
+import { decode, DESCRIPTION_LENGTH, isPublicSite, lintReporter, NOINDEX, TITLE_LENGTH } from './seo'
 
 // A value a head tag gives, with its text when the template writes it as a string; an expression is present, its value unknown.
 interface Given {
@@ -67,6 +67,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     return known
   }
   const titles = new Map<string, string>()
+  const descriptions = new Map<string, string>()
   const own = routes.filter(route => route.file.startsWith(routesDir + sep))
   const sizeOf = await cardImageSizes(publicDir)
 
@@ -102,14 +103,27 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
         titles.set(title, route.pattern)
       else
         report('duplicate-title', { ...at, message: `\`${route.pattern}\` has the title of \`${first}\`, "${title}"`, help: 'name what sets this page apart in its title' })
+
+      if (facts.title !== undefined && title.length > TITLE_LENGTH)
+        report('long-title', { ...at, message: `The title of \`${route.pattern}\` runs ${title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page, and leave the site\'s name to `seo.titleTemplate`' })
     }
 
     const description = facts.description?.text
 
-    if (facts.description === undefined && !facts.unknownMeta && siteDescriptions.length === 0)
+    if (facts.description === undefined && !facts.unknownMeta && siteDescriptions.length === 0) {
       report('undescribed-page', { ...at, message: `\`${route.pattern}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
-    else if (description !== undefined && description.length > DESCRIPTION_LENGTH && !siteDescriptions.includes(description))
-      report('long-description', { ...at, message: `The description of \`${route.pattern}\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
+    }
+    else if (description !== undefined && !siteDescriptions.includes(description)) {
+      const first = descriptions.get(description)
+
+      if (first === undefined)
+        descriptions.set(description, route.pattern)
+      else
+        report('duplicate-description', { ...at, message: `\`${route.pattern}\` has the description of \`${first}\`, "${description}"`, help: 'say what sets this page apart in its description' })
+
+      if (description.length > DESCRIPTION_LENGTH)
+        report('long-description', { ...at, message: `The description of \`${route.pattern}\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
+    }
 
     const image = facts.image === undefined ? siteImage : facts.image.text
 

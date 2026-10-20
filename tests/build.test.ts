@@ -941,6 +941,55 @@ describe('kay build checks the project first', () => {
     expect(document.problems.map(problem => problem.code)).toEqual(['duplicate-title'])
   }, 60_000)
 
+  it('lints what the prerendered pages say of one another: a page nothing reaches, a redirect chain, a canonical to a redirect', async () => {
+    const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { description: 'The site' }, redirects: { '/old': '/mid', '/mid': '/about' }, lints: ${lints} }\n`
+    const page = (title: string, body: string, head = '') => `--- server\nexport const page = { prerender: true${body.startsWith('//') ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${head}${body.replace(/^\/\//, '')}`
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': config('{ \'missing-share-image\': \'allow\' }'),
+      'src/routes/index.kay': page('Home', 'a(href="/about") About\n'),
+      'src/routes/about.kay': page('About', 'a(href="/") Home\n', '  link(rel="canonical" href="https://example.com/mid")\n'),
+      'src/routes/lost.kay': page('Lost', '//p Nobody links here\n'),
+    })
+
+    const warned = await build(root)
+
+    expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual([
+      'warning[broken-canonical]: The canonical link of `/about` points at `/mid`, which redirects to `/about`',
+      'warning[redirect-chain]: The redirect from `/old` goes to `/mid`, which redirects to `/about`',
+      'warning[orphan-page]: `/lost` has no link to it and is not in the sitemap',
+    ])
+    expect(warned.code).toBe(0)
+
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'missing-share-image\': \'allow\' }'))
+
+    const refused = await build(root)
+
+    expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[broken-canonical]', 'error[redirect-chain]'])
+    expect(refused.code).toBe(1)
+  }, 60_000)
+
+  it('has the hreflang alternates and canonical links of a localized site point at each other', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', messages: \'src/messages\' } }\n',
+      'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'About\' })\n',
+      'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'A propos\' })\n',
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home page")\na(href="/about") {t(\'title\')}\n',
+      'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title {t(\'title\')}\n  meta(name="description" content="About page")\np About\n',
+    })
+
+    const built = await build(root)
+
+    const alternates = await Array.fromAsync(new Bun.Glob('.kay/**/about.html').scan({ cwd: root }))
+
+    expect(built.report).toContain('prerendered')
+    expect(built.report.match(/^\w+\[[\w-]+\]: .*/gm)).toBeNull()
+    expect(built.code).toBe(0)
+    // The pages carry the alternates the lints read, so a clean report is not for want of any.
+    expect(await Promise.all(alternates.map(async file => (await Bun.file(join(root, file)).text()).includes('hreflang="fr"')))).toEqual([true, true])
+  }, 60_000)
+
   describe('--format json and github', () => {
     it('prints what the check found before what the prerendered pages log, and gives the problems found so far, though their code ends the process', async () => {
       const root = await scratchProject({

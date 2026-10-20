@@ -8,6 +8,8 @@ import { configLocator } from './config-keys'
 
 // What search results show of a description before cutting it.
 export const DESCRIPTION_LENGTH = 160
+// What search results show of a title before cutting it, about 600 pixels.
+export const TITLE_LENGTH = 60
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
 
@@ -26,20 +28,36 @@ export interface RenderedPage {
   // The page's module, which a problem points at.
   file: string
   locale?: string | undefined
+  // The host it is served on when locales go by domain, where two locales share a path.
+  host?: string | undefined
   html: string
   // Whether its module exports `noindex = true`, or a `sitemap` deciding whether the sitemap lists it.
   noindex: boolean
   sitemap: boolean
   // What its words weigh in the search index; false when it is left out, by a guard covering it, `noindex` or `search: false`.
   search: number | false
+  // Whether the sitemap lists it; unknown when left out. A page with params counts as listed unless its `sitemap` is false, as the list is not read back.
+  listed?: boolean | undefined
+  // Whether a guard covers it, so no crawler reaches it.
+  guarded?: boolean | undefined
 }
 
-interface Head {
+// A page the build rendered that answered a status other than 200.
+export interface OtherPage extends Pick<RenderedPage, 'file' | 'html' | 'host'> {
+  path: string
+  status: number
+  // Where a redirect sends, as the response said.
+  location?: string | undefined
+}
+
+export interface Head {
   title?: string | undefined
   description?: string | undefined
   image?: string | undefined
   imageWidth: boolean
   noindex: boolean
+  canonical?: string | undefined
+  alternates: { hreflang: string, href: string }[]
 }
 
 // A site search engines and social networks read: one with `site` or `seo` set, or exported to a static host. The `seo` lints say nothing of any other unless `lints` turns them on.
@@ -85,9 +103,11 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
   const found: CheckDiagnostic[] = []
   const report = lintReporter(config, exported, found)
   const titles = new Map<string, string>()
+  const descriptions = new Map<string, string>()
+  const inherited = localizedTexts(config.seo?.description)
 
   for (const page of pages) {
-    const head = readHead(page.html)
+    const head = headOf(page)
     const at = { file: page.file, line: 1, column: 1 }
 
     if (head.title === undefined) {
@@ -101,13 +121,27 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
         titles.set(key, page.path)
       else
         report('duplicate-title', { ...at, message: `\`${page.path}\` has the title of \`${first}\`, "${head.title}"`, help: 'name what sets this page apart in its title' })
+
+      if (head.title.length > TITLE_LENGTH)
+        report('long-title', { ...at, message: `The title of \`${page.path}\` runs ${head.title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page, and leave the site\'s name to `seo.titleTemplate`' })
     }
 
-    if (head.description === undefined)
+    if (head.description === undefined) {
       report('undescribed-page', { ...at, message: `\`${page.path}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
+    }
     // The site's own description is told once, in kay.config.ts, not at every page that inherits it.
-    else if (head.description.length > DESCRIPTION_LENGTH && !localizedTexts(config.seo?.description).includes(head.description))
-      report('long-description', { ...at, message: `The description of \`${page.path}\` runs ${head.description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
+    else if (!inherited.includes(head.description)) {
+      const key = `${page.locale ?? ''}\n${head.description}`
+      const first = descriptions.get(key)
+
+      if (first === undefined)
+        descriptions.set(key, page.path)
+      else
+        report('duplicate-description', { ...at, message: `\`${page.path}\` has the description of \`${first}\`, "${head.description}"`, help: 'say what sets this page apart in its description' })
+
+      if (head.description.length > DESCRIPTION_LENGTH)
+        report('long-description', { ...at, message: `The description of \`${page.path}\` runs ${head.description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
+    }
 
     if (head.image !== undefined && !head.imageWidth)
       report('unsized-share-image', { ...at, message: `The share image of \`${page.path}\` has no size`, note: `kay reads no size off ${head.image}, so a network fetches it before laying the card out`, help: 'link a public file, an imported image, `shareImage()` or `shareCard()`, or set `og:image:width` and `og:image:height`' })
@@ -141,12 +175,38 @@ export function lintReporter(config: SiteSeo, exported: boolean, found: CheckDia
   }
 }
 
+const heads = new WeakMap<object, Head>()
+
+// The head of a page, read once for every lint that looks at it.
+export function headOf(page: Pick<RenderedPage, 'html'>): Head {
+  let head = heads.get(page)
+
+  if (head === undefined)
+    heads.set(page, head = readHead(page.html))
+
+  return head
+}
+
 function readHead(html: string): Head {
-  const head: Head = { imageWidth: false, noindex: false }
+  const head: Head = { imageWidth: false, noindex: false, alternates: [] }
   let title: string | undefined
 
   new HTMLRewriter()
     .on('head > title', { text: (text) => { title = (title ?? '') + text.text } })
+    .on('head > link', {
+      element: (element) => {
+        const rel = element.getAttribute('rel')?.toLowerCase()
+        const href = decode(element.getAttribute('href') ?? '').trim()
+
+        if (href === '')
+          return
+
+        if (rel === 'canonical')
+          head.canonical ??= href
+        else if (rel === 'alternate' && element.getAttribute('hreflang') !== null)
+          head.alternates.push({ hreflang: element.getAttribute('hreflang')!, href })
+      },
+    })
     .on('head > meta', {
       element: (element) => {
         const name = element.getAttribute('name') ?? element.getAttribute('property')

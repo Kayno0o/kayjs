@@ -141,6 +141,12 @@ kay check --only seo
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
 | `over-budget` | warn | code | A page loading more JavaScript or CSS, compressed, than `budget` in kay.config.ts allows: reported by `kay build` at the route's file with the modules weighing most in its scripts, never by `kay check`, and no `// kay-allow` comment reaches it. `kay build --deny-warnings` or `lints: { 'over-budget': 'deny' }` fails the build on it. |
 | `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
+| `long-title` | warn | seo | A prerendered page whose title runs over 60 characters, which search results cut. |
+| `duplicate-description` | warn | seo | A prerendered page with the description of another of the same locale; the `seo.description` every page inherits is left alone. |
+| `orphan-page` | warn | seo | A prerendered page no other page links to and the sitemap does not list, reported by `kay build` alone, on a site with `site` set whose pages are all prerendered: a page rendered per request may link to anything. The home page, a locale's root, `noindex` pages and guarded pages are left out. |
+| `broken-canonical` | warn | seo | A prerendered page whose canonical link points at a page the build rendered as a 404 or a redirect, or at a path `redirects` sends elsewhere; reported by `kay build` alone. |
+| `one-way-hreflang` | warn | seo | An alternate (`hreflang`) of a page that does not point back at it from the page it names, or names a page that is not a 200; reported by `kay build` alone, at the page lacking the link back. |
+| `redirect-chain` | warn | seo | A redirect in `redirects` or a prerendered redirect whose target redirects again; reported by `kay build` alone, naming the target to send it to directly. |
 
 ### SEO lints
 
@@ -152,6 +158,9 @@ kay check --only seo
 - They point at kay.config.ts.
 - `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
 - `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` or `ORIGIN` when it boots, and one with `seo` set and no site warns then.
-- `kay check` reads the head blocks of the pages that say `prerender` (every page without params under `--static`) and their layouts, without rendering them, and reports `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image` and `noindex-in-sitemap` at the page's file; a tag whose value is an expression, or sits under an `if` or `for`, counts as given and is judged by its presence alone, so `kay check` is approximate: `kay build`, which reads the rendered HTML, may report a lint it does not, such as an `untitled-page` behind a branch that renders no title, or a `duplicate-title` between titles written as expressions.
+- `kay check` reads the head blocks of the pages that say `prerender` (every page without params under `--static`) and their layouts, without rendering them, and reports `untitled-page`, `undescribed-page`, `duplicate-title`, `long-title`, `duplicate-description`, `long-description`, `unsized-share-image` and `noindex-in-sitemap` at the page's file; a tag whose value is an expression, or sits under an `if` or `for`, counts as given and is judged by its presence alone, so `kay check` is approximate: `kay build`, which reads the rendered HTML, may report a lint it does not, such as an `untitled-page` behind a branch that renders no title, or a `duplicate-title` between titles written as expressions.
+- `kay build` alone reads the pages against one another, from the HTML it rendered: `orphan-page`, `broken-canonical`, `one-way-hreflang` and `redirect-chain`.
+- What a build did not render is not read: a page rendered per request, its canonical or alternates pointing at one, another site's pages, so a site with such pages gets fewer reports and none is wrong for them; `orphan-page` is left out altogether while a page without a guard renders per request, and for a site with no `site`.
+- Links are read as rendered, with `base`, `trailingSlash` and the host of a locale served by domain taken off.
 - They point at the page's module and name the path; a page rendered per request is not read.
 - One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
