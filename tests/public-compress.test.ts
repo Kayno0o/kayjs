@@ -626,5 +626,49 @@ describe('a deleted public file is a path nothing serves', () => {
       expect((await get(app, '/read-kept.json')).status).toBe(404)
       expect(errors).toEqual([])
     })
+
+    // The body of a file is opened after the route returned, by Bun streaming it or compression reading it, so the route cannot catch it: the server's error handler answers.
+    it('answers 404, not a 500, over a real connection for a file Bun opens to stream', async () => {
+      const cases = [
+        ['stream.txt', LARGE, { 'accept-encoding': 'gzip' }],
+        ['stream.png', new Uint8Array(2000).fill(7), {}],
+        ['range.txt', LARGE, { range: 'bytes=0-9' }],
+        ['identity.txt', LARGE, { 'accept-encoding': 'identity' }],
+      ] as const
+      const errors: unknown[] = []
+
+      for (const [name, content] of cases)
+        await writeFile(join(dir, 'public', name), content)
+
+      const app = await serve({ onError: (error) => {
+        errors.push(error)
+      } })
+      const server = new Elysia().use(app).listen({ port: 0, hostname: '127.0.0.1' })
+
+      try {
+        for (const [name, , headers] of cases) {
+          const path = join(dir, 'public', name)
+
+          expect((await fetch(`http://127.0.0.1:${server.server!.port}/${name}`, { headers })).status, name).toBeLessThan(300)
+
+          const watching = goneAtRead(path)
+
+          try {
+            const response = await fetch(`http://127.0.0.1:${server.server!.port}/${name}`, { headers })
+
+            expect(response.status, name).toBe(404)
+            await response.arrayBuffer()
+          }
+          finally {
+            watching.mockRestore()
+          }
+        }
+      }
+      finally {
+        await server.stop(true)
+      }
+
+      expect(errors).toEqual([])
+    })
   })
 })

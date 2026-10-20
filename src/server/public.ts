@@ -1,3 +1,4 @@
+import type { Server } from 'bun'
 import type { Elysia } from 'elysia'
 import type { Stats } from 'node:fs'
 import type { Duration } from '../runtime/duration'
@@ -196,14 +197,18 @@ function keeper(path: string, held: { bytes: number }): (current: Stats | undefi
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
 // With `compressing`, a text file of up to 256 KB at boot is answered from its bytes kept in memory, 8 MB in all, which compression takes as they are; a range request, a conditional one and the rest stream the file.
 // A file deleted since boot is answered by `pageFor.unmatched`, set once the page routes exist, else by Elysia's 404.
-// One deleted between the stat and Bun opening it to stream it fails in Bun, after the route returned: the lazy open of a file body cannot be caught, and reading it first would cost the streaming.
+// One deleted between the stat and the open of its body, which happens after the route returned, fails in Bun: the server's error handler answers it a plain 404, as catching the open would cost the streaming.
 export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false, pageFor: { unmatched?: Unmatched | undefined }): Promise<void> {
   const held = { bytes: 0 }
   // The URLs an HTML file is also served at share its bytes.
   const keepers = new Map<string, ReturnType<typeof keeper>>()
+  const paths = new Set<string>()
 
   for (const { path, url } of files.filter(file => served.holds(file.claim))) {
     const { size } = await stat(path)
+
+    paths.add(path)
+
     const cache = cacheFor(url)
     const { type } = Bun.file(path)
     const keeps = compressing && size <= KEPT_FILE_BYTES && COMPRESSIBLE_TYPE.test(type)
@@ -259,4 +264,24 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
       return readResponse(revalidated(request, etag, () => bytes, { 'content-type': type }, cache), bytes)
     })
   }
+
+  answerVanished(app, paths)
+}
+
+// The open of a public file's body, by Bun streaming it or by compression reading it, happens once the route returned, so a file deleted before it fails there with no request left: the server answers a plain 404, as Elysia does for an unknown path.
+// It costs a request nothing, as the handler only runs for the failure.
+function answerVanished(app: Elysia, paths: ReadonlySet<string>): void {
+  app.onStart((root) => {
+    const { server } = root
+    const own = root.config.serve?.error
+
+    // Bun drops a table of static routes when only its error handler is reloaded; Elysia lays its own back as the modules it waits on resolve, a microtask after it starts listening.
+    server?.reload({
+      async error(error: Error) {
+        const { code, path } = error as NodeJS.ErrnoException
+
+        return code === 'ENOENT' && path !== undefined && paths.has(path) ? new Response('NOT_FOUND', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } }) : own?.call(server, error)
+      },
+    } as Parameters<Server<unknown>['reload']>[0])
+  })
 }
