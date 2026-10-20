@@ -77,6 +77,8 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   collection: 'folder',
   isCollection: 'free',
   COLLECTION: 'free',
+  PUBLISH_TIMES: 'free',
+  contentKey: 'free',
   reference: 'free',
   imageField: 'free',
   fileField: 'free',
