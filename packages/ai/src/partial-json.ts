@@ -38,7 +38,7 @@ function shownLength(text: string): number {
   return last >= HIGH_SURROGATE_FIRST && last <= HIGH_SURROGATE_LAST ? text.length - 1 : text.length
 }
 
-// Reads a JSON object that may stop anywhere, as a model's answer does while it streams, one piece at a time: the work is the size of the piece, not of the text so far.
+// Reads a JSON object that may stop anywhere, as a model's answer does while it streams, one piece at a time: the parsing is the size of the piece, not of the text so far, and a snapshot copies only the containers still open.
 // The object is as far as it came, a string as far as it was written and any other value once it is complete. What follows a closed object is left alone.
 export function partialParser(): PartialParser {
   const stack: Frame[] = []
@@ -136,7 +136,11 @@ export function partialParser(): PartialParser {
       return
     }
 
-    add(out)
+    // The string showed as far as `shown` while it grew, so closing it changes what shows only by the rest.
+    attach(out)
+
+    if (out.length !== shown)
+      changed = true
   }
 
   // Reads the unescaped run of a string from `from`, then the escape or the end that stops it; returns where to go on.
@@ -244,7 +248,6 @@ export function partialParser(): PartialParser {
       if (mode === 'string') {
         at = readString(piece, at) - 1
 
-        // A string that closed was added, which counted as a change.
         if (mode === 'string' && !isKey) {
           const now = shownLength(out)
 
@@ -347,7 +350,7 @@ export function partialParser(): PartialParser {
     if (root)
       return root
 
-    // Only the containers still open are copied, the complete ones inside are shared.
+    // Only the containers still open are copied, the complete ones inside are shared between snapshots and read-only.
     let inner: unknown = mode === 'string' && !isKey ? out.slice(0, shown) : NONE
 
     for (let index = stack.length - 1; index >= 0; index--) {

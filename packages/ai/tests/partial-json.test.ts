@@ -103,7 +103,7 @@ describe('partialParser', () => {
     expect(parser.push('llo')).toBe(true)
     expect(parser.push('\\u00')).toBe(false)
     expect(parser.push('e9')).toBe(true)
-    expect(parser.push('"')).toBe(true)
+    expect(parser.push('"')).toBe(false)
     expect(parser.push(',"n":12')).toBe(false)
     expect(parser.push(',')).toBe(true)
     expect(parser.push('"tags":[')).toBe(true)
@@ -120,6 +120,24 @@ describe('partialParser', () => {
     expect(parser.value()).toEqual({ a: 'x' })
     expect(parser.push('\\ude00')).toBe(true)
     expect(parser.value()).toEqual({ a: 'x😀' })
+  })
+
+  it('counts the closing quote as a change only when it shows more', () => {
+    const parser = partialParser()
+
+    expect(parser.push('{"a":"x')).toBe(true)
+    expect(parser.push('y"')).toBe(true)
+    expect(parser.push(',"b":"z\\ud83d')).toBe(true)
+    expect(parser.push('"')).toBe(true)
+    expect(parser.value()).toEqual({ a: 'xy', b: 'z\uD83D' })
+  })
+
+  it('refuses nesting past 64 levels, as it always did', () => {
+    const nested = (depth: number) => '{"a":'.repeat(depth)
+
+    expect(parsePartial(`${nested(64)}1}`)).toBeDefined()
+    expect(parsePartial(`${nested(65)}[`)).toBeUndefined()
+    expect(parsePartial(`${nested(65)}1`)).toBeUndefined()
   })
 
   it('hands out snapshots that later pieces do not change', () => {
@@ -150,8 +168,10 @@ describe('partialParser', () => {
     let changes = 0
 
     for (let at = 0; at < full.length; at += 4) {
-      if (parser.push(full.slice(at, at + 4)))
+      if (parser.push(full.slice(at, at + 4))) {
         changes++
+        parser.value()
+      }
     }
 
     expect(changes).toBeGreaterThan(1000)
