@@ -38,4 +38,4 @@ A session handing issues to subagents lands for them: a subagent goes through st
 
 ## Releases
 
-`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay's minor, the lockfile; `tests/packages.test.ts` holds them together), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.
+`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay's minor, the lockfile; `tests/packages.test.ts` holds them together), tags and pushes both at once, dropping the bump when `tests/upgrade.test.ts` finds a deprecation past its three minors at the new version; the tag's workflow publishes kay and each library not marked `private` to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.

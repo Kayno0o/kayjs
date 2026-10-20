@@ -17,6 +17,12 @@ release level:
 	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
 	bun scripts/version.ts {{level}}
 	tag=$(git tag --points-at HEAD)
+	# A deprecation past its three minors fails only once the version moves, so it is caught here rather than on the tag's CI.
+	if ! bun test tests/upgrade.test.ts; then
+	  git tag -d "$tag"
+	  git reset --keep HEAD~1
+	  exit 1
+	fi
 	before=$(tea actions runs ls -o json --limit 1 | jq -r '.[0].id // 0')
 	if ! git push --atomic origin HEAD "$tag"; then
 	  git tag -d "$tag"
