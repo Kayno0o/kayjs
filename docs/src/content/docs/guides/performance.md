@@ -53,11 +53,13 @@ Click a problem to open its `.kay` file in your editor. Dismiss hides a problem 
 
 ## The tab order
 
-The list icon in the drawer's head turns on the tab order. Each element the keyboard reaches gets a numbered badge, in the order Tab walks them, with a line from one to the next. The overlay stays on when the drawer is closed, and follows scrolling, page swaps and changes to the page.
+The list icon in the drawer's head turns on the tab order. Each element the keyboard reaches gets a numbered badge, in the order Tab walks them, with a line from one to the next. The overlay stays on when the drawer is closed, and follows scrolling, page swaps and changes to the page. It numbers the elements inside open shadow roots too, but cannot see into closed ones.
 
 A line that moves up the page is dashed red and its badge ends in "!". It comes from a positive `tabindex` or from a visual order unlike the document's.
 
-A badge in amber means that element shows nothing when it has focus, no outline or ring. To check that, the tool moves focus through the elements and puts it back, so an `onfocus` handler on your page runs. It only checks elements the browser would draw a focus ring on, so a button you clicked with the mouse may be skipped until you use the keyboard.
+A badge in amber means that element shows nothing when it has focus, no outline or ring. To check that, the tool moves focus through the elements and puts it back, so an `onfocus` handler on your page runs. It checks again when a class or style changes, and only checks elements the browser would draw a focus ring on, so a button you clicked with the mouse may be skipped until you use the keyboard.
+
+Nothing is checked while focus is inside a closed shadow root, as the tool could not give focus back.
 
 A dashed red box marks a place the keyboard may get stuck: a part of the page marked `inert` while no dialog is open, or a modal that is not an open `dialog` element, which only a script can keep focus in. That second one is a hint, not proof, so press Tab and Escape inside it. Each finding also shows under Problems, with the elements it names outlined on hover.
 
