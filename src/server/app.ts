@@ -71,6 +71,7 @@ import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { securityHeaders, setSecurityHeaders } from './security'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
+import { setSiteFacts } from './site-facts'
 import { serveSitemap } from './sitemap'
 import { trackPrerendered } from './stale-pages'
 import { serveFiles } from './storage'
@@ -231,6 +232,21 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const served = new ServedPaths()
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
+  const pageMatch = routeMatch(table, matchers, options.trailingSlash)
+
+  setSiteFacts(app, {
+    pageRoute: (path) => {
+      for (const route of routes) {
+        if (pageMatch.posted(route, path))
+          return pageMatch.served(route)
+      }
+
+      return undefined
+    },
+    base,
+    asksConsent: options.extensions?.some(extension => extension.asksConsent === true) ?? false,
+  })
+
   const writes = countWrites(app, [mcpPath(options.mcp)].filter(path => path !== undefined))
   // Hashed as they go out, under the mount point.
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'

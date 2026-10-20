@@ -36,6 +36,7 @@ import { SITEMAP } from '../server/site-paths'
 import { signStamp, stampTime } from '../server/stamp'
 import { memoryFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
+import { memoryVitals } from '../server/vitals-store'
 import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
 import { cookieJar, withKept } from './cookies'
@@ -295,7 +296,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the jobs, rate counts and presence rooms of its `store`.
-  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms() } : loaded.store }
+  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
   const wanted = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined

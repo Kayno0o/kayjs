@@ -90,6 +90,8 @@ It flags an image served at more than four times the pixels it shows (an SVG is 
 
 The Performance tab shows the Web Vitals of the page load as the browser reports them. LCP, CLS and INP each appear against their good limit, 2.5 s, 0.1 and 200 ms.
 
+The dev tool shows your own load only. To see what real visitors get, add `vitals()` ([Measuring how fast pages load](/guides/privacy/#measuring-how-fast-pages-load)).
+
 The weight of the page follows: the HTML, the CSS and the JS it loaded, gzipped, file by file. These are dev sizes, with nothing minified, so `kay build` makes them smaller.
 
 Under them, "Last kay build" gives the scripts and stylesheets the last build measured for the page's route. A `~` marks an estimate.

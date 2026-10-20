@@ -1,0 +1,30 @@
+.kay-vitals {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.kay-vitals-scroll {
+  overflow-x: auto;
+}
+
+.kay-vitals table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kay-vitals th,
+.kay-vitals td {
+  padding: 0.5rem 0.75rem;
+  text-align: start;
+  border-bottom: 1px solid color-mix(in srgb, currentcolor 20%, transparent);
+}
+
+.kay-vitals td[data-rating='poor'] strong {
+  text-decoration: underline;
+  text-decoration-style: wavy;
+}
+
+.kay-vitals-views {
+  font-variant-numeric: tabular-nums;
+}

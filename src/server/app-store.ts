@@ -1,13 +1,15 @@
 import type { RateStore } from '../runtime/action'
 import type { JobStore } from './queue'
 import type { RoomStore } from './rooms'
+import type { VitalsStore } from './vitals-store'
 
-// What the app keeps beyond one process: queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`.
+// What the app keeps beyond one process: queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`, the Web Vitals visitors reported in `vitals`.
 // Each is used by every queue, locked schedule, rate limit and presence room that names no store of its own.
 export interface AppStore {
   jobs?: JobStore | undefined
   rates?: RateStore | undefined
   rooms?: RoomStore | undefined
+  vitals?: VitalsStore | undefined
 }
 
 let current: AppStore | undefined

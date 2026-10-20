@@ -135,7 +135,7 @@ export interface KayConfig {
   preview?: PreviewConfig | false | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
   storage?: FileStore | undefined
-  // Where queued jobs, schedule locks and rate limit counts live for every queue, schedule and limit naming no store of its own, and the tabs a page's `presence()` lists: `sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms }` of your own, Redis say. Jobs stay in `data/jobs.sqlite`, the others in memory by default.
+  // Where queued jobs, schedule locks and rate limit counts live for every queue, schedule and limit naming no store of its own, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts: `sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms, vitals }` of your own, Redis say. Jobs stay in `data/jobs.sqlite`, the others in memory by default.
   store?: AppStore | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
@@ -385,6 +385,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
   // Set when the extension does nothing without a running server, as a tracker posting to a route of its own: `kay build --static` warns of it, as that export runs no extension's server.
   needsServer?: boolean | undefined
+  // Set when the extension counts visitors only after their yes on the `kay_analytics` cookie, so another extension measuring visitors, such as `vitals()`, waits for the same yes.
+  asksConsent?: boolean | undefined
   // Files a static export writes into the site, by their path, for what the extension's server would otherwise serve as a constant, such as a script every page loads: `kay build --static` runs no server plugin.
   staticFiles?: Record<string, string> | undefined
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.

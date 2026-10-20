@@ -9,6 +9,7 @@ import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated, NOTICE_SCRIPT_PATH } from './analytics'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 import { BASE_PATH, routerPath } from './base'
+import { declined } from './consent-cookie'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 
@@ -31,8 +32,6 @@ const MAX_SCRIPT_BYTES = 512 * 1024
 const COLLECTS_PER_MINUTE = 600
 const SCRIPT_TTL_MS = 3_600_000
 const COLLECT_TYPES = new Set(['application/json', 'text/plain', 'application/x-www-form-urlencoded'])
-const CONSENT_COOKIE = 'kay_analytics=yes'
-const OPT_OUT_COOKIE = 'kay_analytics=no'
 // What a visit may carry from its query string: the campaign a link names, and nothing a page holds for one visitor, such as a token or an address.
 const KEPT_PARAMETERS = /^(?:utm_[a-z]+|ref|source)$/
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]+/gu
@@ -347,13 +346,6 @@ async function fetchScript(url: string): Promise<string | undefined> {
 
     return undefined
   }
-}
-
-// A gated provider needs the visitor's yes; one counting without asking stops for a visitor who opted out.
-function declined(request: Request, gated: boolean): boolean {
-  const cookies = new Set((request.headers.get('cookie') ?? '').split(';').map(cookie => cookie.trim()))
-
-  return gated ? !cookies.has(CONSENT_COOKIE) : cookies.has(OPT_OUT_COOKIE)
 }
 
 // The visit a browser reported, or undefined when anything is off: the page must be one of this site's own, so the route forwards for no other host.

@@ -1,0 +1,45 @@
+--- server
+import { wording } from 'kay/words'
+import { limitText, RATING_LABELS, shown } from '../vitals-screen'
+import { vitalsReport, WINDOW_DAYS } from '../vitals-store'
+import './vitals.css'
+
+const rows = await vitalsReport()
+const columns = [
+  { vital: 'lcp' as const, name: wording('kay.vitals.lcp', 'Largest Contentful Paint') },
+  { vital: 'cls' as const, name: wording('kay.vitals.cls', 'Cumulative Layout Shift') },
+  { vital: 'inp' as const, name: wording('kay.vitals.inp', 'Interaction to Next Paint') },
+]
+---
+head
+  title {wording('kay.vitals.title', 'Web Vitals')}
+  meta(name="robots" content="noindex")
+main.kay-vitals
+  h1 {wording('kay.vitals.title', 'Web Vitals')}
+  p {wording('kay.vitals.intro', 'The 75th percentile of what visitors saw over the last {days} days, per page route, against the limit Google calls good.', { days: WINDOW_DAYS })}
+  if rows.length === 0
+    p {wording('kay.vitals.empty', 'No page views reported yet. Numbers appear once visitors have loaded a page and left it.')}
+  else
+    div.kay-vitals-scroll
+      table
+        thead
+          tr
+            th(scope="col") {wording('kay.vitals.route', 'Route')}
+            for column of columns key={column.vital}
+              th(scope="col")
+                | {column.name}
+                br
+                small {wording('kay.vitals.limit', 'good up to {limit}', { limit: limitText(column.vital) })}
+            th(scope="col") {wording('kay.vitals.views', 'Views')}
+        tbody
+          for row of rows key={row.route}
+            tr
+              th(scope="row") {row.route}
+              for column of columns key={column.vital}
+                if row[column.vital] as summary
+                  td(data-rating={summary.rating})
+                    strong {shown(column.vital, summary)}
+                    |  {RATING_LABELS[summary.rating]()}
+                else
+                  td -
+              td.kay-vitals-views {Math.max(row.lcp?.views ?? 0, row.cls?.views ?? 0, row.inp?.views ?? 0)}

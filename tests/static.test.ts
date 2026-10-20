@@ -296,6 +296,24 @@ describe('kay build --static', () => {
     }
   })
 
+  it('refuses a static export of a site using vitals(), naming the screen only a server can guard', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const config = join(fixture, 'kay.config.ts')
+
+    try {
+      await Bun.write(config, (await Bun.file(config).text()).replace('extensions: [{', 'extensions: [vitals({ guard: () => undefined }), {').replace('import { defineConfig }', 'import { vitals } from \'kay/analytics\'\nimport { defineConfig }'))
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(code).not.toBe(0)
+      expect(errors).toContain('vitals-routes/index.kay: a guard covers it')
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('ships the island title code to the page setting one alone, with the template it wraps the title in', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))

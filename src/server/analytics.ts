@@ -6,6 +6,9 @@ import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
+export { vitals } from './vitals'
+export type { LazyGuard, VitalsOptions } from './vitals'
+export type { RouteVitals, VitalsStore, VitalSummary } from './vitals'
 
 // A text for the consent notice, or one per language: `{ en: 'We count visits', fr: 'Nous comptons les visites' }`, the page's `lang` picking one and the first listed when none fits.
 export type AnalyticsText = string | Record<string, string>
@@ -200,6 +203,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     return {
       name: 'kay/analytics',
       needsServer: true,
+      asksConsent: asking,
       server: async () => (await import('./analytics-server')).analyticsServer(options),
       config: { head: [{ tag: 'script', props: { src: ANALYTICS_SCRIPT_PATH, defer: true, ...gate, ...counting } }] },
     }
@@ -217,6 +221,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   // The provider's own script needs no route of ours, except the one that shows the notice and loads it.
   return {
     name: 'kay/analytics',
+    asksConsent: asking,
     // Fathom and Cloudflare only need the notice's script, which a static export writes itself.
     ...loads && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT, [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
     ...options.provider === 'custom' && { needsServer: true },

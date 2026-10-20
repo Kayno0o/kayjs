@@ -97,6 +97,28 @@ export default defineConfig({
 - A provider answering 4xx or 5xx to a visit (a wrong site id, domain or secret) logs one warning per provider and status a minute, naming the status and no URL, so lost stats show in the log.
 - The visitor's address is sent only to a provider that needs it to tell visitors apart or place them: Plausible as `X-Forwarded-For`, Umami as `ip` in the payload, Matomo as `cip` with a `tokenAuth`, GA4 as `ip_override` and `custom` as `X-Forwarded-For`, the last two only with `address: true`; Simple Analytics not at all. It is the one `proxy` yields, so set `proxy` behind a CDN: without it every visitor shares the proxy's address, Plausible counts one visitor and the 120 a minute limit is shared by the whole site.
 
+### Measure how fast pages load for real visitors
+
+`vitals()` from `kay/analytics` reports the LCP, CLS and INP of real visits from your own origin and shows a 75th percentile per route, with no script, route or table on your side:
+
+```ts
+import { defineConfig, sqliteData } from 'kay/server'
+import { vitals } from 'kay/analytics'
+
+export default defineConfig({
+  store: sqliteData('data/app.sqlite'),
+  extensions: [vitals({ guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) } })],
+})
+```
+
+- Every page's head gets `/_kay/vitals.js`, about 700 bytes of gzip, `async`, so it is off the critical path; a site without `vitals()` loads nothing. It sends one `POST /_kay/vitals` (through `sendBeacon`, under the `base`) per view, when the tab is hidden: no request at load. A page swap (`kay:navigate`) sends the view it replaced and starts a new one with no LCP, and a page restored from the back-forward cache starts a new view too.
+- The body is `{ p, l, c, i }` (path, LCP in ms, CLS score, INP in ms; a metric the view lacks is left out). The server matches the path to the page's route (`/blog/:slug`), so the store holds a row per route, metric and bucket and never one per URL.
+- `store.vitals` keeps counts per UTC day, route, metric and log bucket (about 10 % wide), seven days back; `sqliteData(path)` holds it, so replicas sharing the file add up, and another store implements `VitalsStore` (`add`, `counts`). Without one it is this process's memory, and a production start warns. The percentile is within about 5 % of the exact one.
+- The screen is `prefix` (`/vitals` by default), a table per route of LCP, CLS and INP with their view count, rated `good` up to 2.5 s, 0.1 and 200 ms, `poor` past 4 s, 0.25 and 500 ms. It answers 403 without a `guard` (a function like `auth.guard({ require: 'admin' })`, or `{ load }` returning one, run on the first request); the numbers are collected either way. `vitalsReport()` reads the same numbers in code.
+- No cookie, address, title or user agent is kept. `consent: true` waits for `kay_analytics=yes`; left out it follows `analytics({ consent })` when the site has it, and counts at once otherwise. A visitor with `kay_analytics=no` is never counted, from any page. The script served carries the gate, so a visitor who has not said yes sends nothing.
+- A report is refused when cross-site (403), over 512 bytes (413), malformed or out of range (400), or past 300 a minute from one address (429). `kay dev`, tests, a declined visitor and a path no page serves answer 204 and keep nothing.
+- It needs a running server: `kay build --static` refuses it, as the screen cannot be guarded in an export.
+
 ### Consent, legal basis and processors per provider
 
 Reading the device (screen, language, title) and storing on it fall under ePrivacy art. 5(3), cookie or not, so a cookieless id does not remove the need for consent by itself. The CNIL exempts audience measurement only when all hold: the purpose is anonymous statistics for the site's own account, the provider reuses the data for nothing else and tracks no one across sites, visitors are told and can object easily, and the data is not kept past 25 months. That is one regulator's position: other EU states may ask for consent. Raw addresses reach `plausible`, `umami` and `matomo` for visitor counting, so the exemption holds only if that tool drops them (self-hosted, or its DPA says so). `ga4` is never exempt. kay shows the information line and opt-out in the ungated mode, which is the notice and objection the exemption asks for, not the whole exemption.
@@ -191,6 +213,7 @@ export async function archive(scan: File) {
 - A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
 - The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
+- `store.vitals` (`vitals()`) keeps a count per UTC day, route, metric and bucket for seven days, pruned once a day: no address, cookie or per-visit row.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteStore`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
 

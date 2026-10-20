@@ -223,6 +223,28 @@ It is the same cookie kay's notice writes, so the two never disagree, and the se
 
 The route is open to anyone, so it checks everything. It refuses a page that is not on your host (add other hosts with `hosts: ['www.example.com']`; a proxy that rewrites the `Host` header needs your real host there, and kay logs a warning when it drops a visit for this), a body over 4 KB, a post from another site, and more than 120 visits a minute from one address. The tool's address comes from your config alone, never from the request.
 
+## Measuring how fast pages load
+
+The Performance tab of the dev tool shows one load on your machine. `vitals()` shows what real visitors get. It measures the largest paint (LCP), the layout shift (CLS) and the slowest interaction (INP) of each page view, and your server keeps the 75th percentile per route over the last seven days.
+
+```ts
+import { defineConfig, sqliteData } from 'kay/server'
+import { vitals } from 'kay/analytics'
+
+export default defineConfig({
+  store: sqliteData('data/app.sqlite'),
+  extensions: [vitals({ guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) } })],
+})
+```
+
+That is all the app writes. kay adds a script of about 700 bytes to every page, loaded after the page itself. It sends one report when the visitor leaves or hides the tab, and a page swap counts as a new view. Nothing is sent while the page loads.
+
+The numbers are on `/vitals`, or the `prefix` you pick, for whoever your `guard` lets in. Each route shows its three values against the good limits: 2.5 s, 0.1 and 200 ms. Without a `guard` the page answers 403, and the numbers are still collected.
+
+The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own.
+
+Reports are checked like visits: a post from another site, a large or malformed body and more than 300 a minute from one address are refused. The screen needs a server, so a static export refuses `vitals()`.
+
 ## Another script behind consent
 
 For a script that needs the visitor's browser, such as a tracker that sets cookies, an island keeps the visitor's answer in a persisted signal and loads the script once it is yes. A button stays to ask again.
