@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A page's head leaves out the rules of the star variants (`*:p-2`, `**:p-2`, `*:hover:p-2`) it does not use, as it does any other class ([Styles and assets](styles-and-assets.md)).
 - `kay fmt` in an app with Tailwind sorts the shorthand and a `class` attribute as one list when it moves the classes into the attribute, and a Tailwind fix deleting a class from a `class="..."` over lines takes its line or its space with it ([Tools](check-and-tools.md#format-the-templates)).
 - The `deprecated-analytics-consent` lint is gone, three minors after 1.55 changed what a missing `consent` means: it is `consent: true` for `ga4`, `fathom`, `cloudflare` and `custom`, as before ([Privacy](privacy.md), [Lints](lints.md)).
 

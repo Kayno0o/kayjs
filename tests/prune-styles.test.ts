@@ -60,6 +60,14 @@ describe('pruneNodes', () => {
     expect(print(pruneUnescaped(parse(css), new Set(['*:p-2', '**:p-2', 'hover:*:p-2', 'group-hover:*:p-2'])))).toBe('.kept{c:d}')
   })
 
+  it('reads the class of a star variant followed by another variant, whose rule has pseudo-classes or attributes after the :is()', () => {
+    const css = ':is(.\\*\\:hover\\:p-2 > *):hover{a:b}:is(.\\*\\*\\:before\\:p-2 *)::before{a:b}:is(.\\*\\:data-\\[x\\]\\:p-2 > *)[data-x]{a:b}:is(.\\*\\:has-\\[\\.x\\]\\:p-2 > *):has(.x){a:b}'
+
+    expect(styledClassNames(parse(css))).toEqual(new Set(['*:hover:p-2', '**:before:p-2', '*:data-[x]:p-2', '*:has-[.x]:p-2']))
+    expect(print(pruneUnescaped(parse(css), new Set(['*:hover:p-2', '**:before:p-2', '*:data-[x]:p-2', '*:has-[.x]:p-2'])))).toBe('')
+    expect(print(pruneUnescaped(parse(css), new Set(['*:hover:p-2'])))).not.toContain('hover')
+  })
+
   it('keeps an :is() that is not the whole selector, or holds a list', () => {
     const css = ':is(.gone > *) .kept{a:b}.kept:is(.gone > *){a:b}:is(.gone, .kept > *){a:b}:is(.kept):is(.gone){a:b}'
 

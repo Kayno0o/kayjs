@@ -5,6 +5,8 @@ import { COMMENTS } from './supports'
 const CONDITIONAL = /^@(?:media|container|supports|layer|scope|starting-style|document)\b/i
 const NAMED_LAYER = /^@layer\s+[^\s{]/i
 const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
+// What may follow a rule's opening :is() for the classes inside it to stay required: pseudo-classes and -elements with one level of arguments, and attributes.
+const SUFFIX = /^(?:::?[\w-]+(?:\([^()]*\))?|\[[^\]]*\])*$/
 const HEX_ESCAPE = /^\\[\da-f]{1,6}[ \t\n\r\f]?/i
 
 // How many UTF-16 units the escape starting at `at` takes: a hex escape and the one space ending it, or the backslash and the character after, a surrogate pair included.
@@ -16,45 +18,46 @@ function escapeLength(text: string, at: number): number {
 
 export interface Selector {
   text: string
-  // The classes some element it matches, or one around or beside it, must carry: those outside any parentheses or brackets, `.a :is(.b)` needing `a` alone.
+  // The classes some element it matches, or one around or beside it, must carry: those outside any parentheses or brackets, `.a :is(.b)` needing `a` alone, and those of an opening `:is(...)` holding one selector.
   classes: string[]
 }
 
 // A rule's prelude split at its top-level commas, comments, strings and escapes read past whole.
-// A selector that is one `:is(...)` holding a single selector, as Tailwind writes a `*:` variant's `:is(.\*\:p-2 > *)`, has the classes of what it holds.
+// A selector that opens with one `:is(...)` holding a single selector, as Tailwind writes a `*:` variant's `:is(.\*\:p-2 > *)` and its `:hover` or `[data-x]` after it, has the classes of what that holds.
 export function selectors(prelude: string): Selector[] {
   return scan(prelude).map((selector) => {
-    const inner = isOnly(selector.text)
+    const inner = leadingIs(selector.text)
     const held = inner === undefined ? [] : scan(inner)
 
     return held.length === 1 ? { text: selector.text, classes: held[0]!.classes } : selector
   })
 }
 
-// What a selector holds when all of it is one `:is(...)`.
-function isOnly(selector: string): string | undefined {
+// What a selector's opening `:is(...)` holds, when only pseudo-classes, pseudo-elements and attributes follow it.
+function leadingIs(selector: string): string | undefined {
   const text = selector.trim()
 
-  if (!text.startsWith(':is(') || !text.endsWith(')'))
+  if (!text.startsWith(':is('))
     return undefined
 
-  const inner = text.slice(4, -1)
-  let depth = 0
+  let depth = 1
 
-  for (let at = 0; at < inner.length; at++) {
-    const char = inner[at]!
+  for (let at = 4; at < text.length; at++) {
+    const char = text[at]!
 
     if (char === '\\')
-      at += escapeLength(inner, at) - 1
+      at += escapeLength(text, at) - 1
     else if (char === '"' || char === '\'')
-      at = skipString(inner, at)
+      at = skipString(text, at)
+    else if (char === '/' && text[at + 1] === '*')
+      return undefined
     else if (char === '(' || char === '[')
       depth++
-    else if ((char === ')' || char === ']') && --depth < 0)
-      return undefined
+    else if ((char === ')' || char === ']') && --depth === 0)
+      return SUFFIX.test(text.slice(at + 1)) ? text.slice(4, at) : undefined
   }
 
-  return depth === 0 ? inner : undefined
+  return undefined
 }
 
 function skipString(text: string, from: number): number {
@@ -85,12 +88,7 @@ function scan(prelude: string): Selector[] {
     }
 
     if (char === '"' || char === '\'') {
-      at++
-
-      while (at < prelude.length && prelude[at] !== char)
-        at += prelude[at] === '\\' ? 2 : 1
-
-      at++
+      at = skipString(prelude, at) + 1
 
       continue
     }
