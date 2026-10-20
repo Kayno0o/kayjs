@@ -12,14 +12,15 @@ const transpiler = new Bun.Transpiler({ loader: 'ts', define: { 'process.env.NOD
 const EFFECTS = new Set(['ExpressionStatement', 'IfStatement', 'ForStatement', 'ForOfStatement', 'ForInStatement', 'WhileStatement', 'DoWhileStatement', 'TryStatement', 'SwitchStatement', 'ThrowStatement', 'BlockStatement', 'StaticBlock'])
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod'])
-// A call, an assignment or an await inside a declaration, an export or a static initializer runs as the module loads; `new`, `Symbol.for` and a call marked pure do not count, as the bundler drops or allows them.
-const EXPRESSION_EFFECTS = new Set(['CallExpression', 'OptionalCallExpression', 'AssignmentExpression', 'AwaitExpression', 'TaggedTemplateExpression'])
-const BENIGN_CALLEES = new Set(['Symbol', 'Symbol.for', 'String.raw'])
+// A call, an assignment or an await inside a declaration, an export or a static initializer runs as the module loads; `new` of a builtin, `Symbol.for` and a call marked pure do not count, as the bundler drops or allows them.
+const EXPRESSION_EFFECTS = new Set(['CallExpression', 'NewExpression', 'OptionalCallExpression', 'AssignmentExpression', 'AwaitExpression', 'TaggedTemplateExpression'])
+const BENIGN_CALLEES = new Set(['Symbol', 'Symbol.for', 'String.raw', 'Map', 'Set', 'WeakMap', 'WeakSet', 'WeakRef', 'URL', 'URLSearchParams', 'RegExp', 'Date', 'Error', 'TypeError', 'RangeError', 'TextEncoder', 'TextDecoder', 'Headers', 'AbortController', 'Uint8Array', 'Uint16Array', 'Uint32Array', 'Int32Array', 'Float64Array', 'ArrayBuffer', 'Proxy', 'AsyncLocalStorage'])
 // The initializers that call something as their module loads and are fine to drop with it: each starts with the code it names, and says why dropping it changes nothing.
 const KNOWN: Record<string, [code: string, why: string][]> = {
   'await.server.ts': [['globalThis[EARLY] ??= installEarlyRejections()', 'the listener only matters to a page that awaits, which keeps the module']],
   'cache.server.ts': [['crypto.randomUUID()', 'an id for this process, read by the module\'s own functions']],
   'consent.ts': [['Object.assign(', 'adds the setters to the reader it exports']],
+  'markdown.client.ts': [['new Marked(', 'builds the renderer the module\'s functions use']],
   'page-swap.ts': [['servedRoot(document)', 'reads the page\'s own markup into a map the module\'s functions use']],
   'work.ts': [['Array.from(', 'constants worked out from other constants'], ['Uint32Array.from(', 'constants worked out from other constants']],
 }
@@ -36,11 +37,14 @@ function calleeName(node: Node): string {
 
 const isNode = (value: unknown): value is Node => typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string'
 
+// The KNOWN entries some initializer matched, so one left over from code that went is reported.
+const matchedKnown = new Set<string>()
+
 function calleeOf(node: Node): Node | undefined {
   if (node.type === 'TaggedTemplateExpression')
     return node.tag
 
-  return node.type === 'CallExpression' || node.type === 'OptionalCallExpression' ? node.callee : undefined
+  return node.type === 'CallExpression' || node.type === 'OptionalCallExpression' || node.type === 'NewExpression' ? node.callee : undefined
 }
 
 function initializerEffects(node: Node, source: string, known: string[], found: { line: number, type: string, code: string }[] = []) {
@@ -54,8 +58,13 @@ function initializerEffects(node: Node, source: string, known: string[], found: 
     const benign = callee !== undefined && BENIGN_CALLEES.has(calleeName(callee))
     const code = source.slice(node.start ?? 0, node.end ?? 0)
 
-    if (known.some(start => code.startsWith(start)))
+    const knownStart = known.find(start => code.startsWith(start))
+
+    if (knownStart !== undefined) {
+      matchedKnown.add(knownStart)
+
       return found
+    }
 
     if (!pure && !benign)
       found.push({ line: node.loc?.start.line ?? 0, type: node.type, code })
@@ -112,6 +121,9 @@ describe('the sideEffects of package.json', () => {
       }
     }
 
+    const unmatched = Object.values(KNOWN).flatMap(entries => entries.map(([code]) => code)).filter(code => !matchedKnown.has(code))
+
+    expect(unmatched, 'an entry of KNOWN matching no initializer is gone from its module: remove it').toEqual([])
     expect(effects, 'a module of src/runtime running a statement as it loads goes in `sideEffects` of package.json, or the bundler drops it when nothing it exports is used').toEqual([])
   })
 
@@ -122,6 +134,7 @@ describe('the sideEffects of package.json', () => {
     expect(effectsOf('export default listen()')).toEqual(['CallExpression'])
     expect(effectsOf('export const ready = await load()')).toEqual(['AwaitExpression', 'CallExpression'])
     expect(effectsOf('class A { static on = listen(); static [key()] = 1 }')).toEqual(['CallExpression', 'CallExpression'])
+    expect(effectsOf('const registry = new Registry()')).toEqual(['NewExpression'])
     expect(effectsOf('const lazy = () => listen()\nfunction f() { listen() }\nclass A { field = listen(); method() { listen() } }')).toEqual([])
     expect(effectsOf('const id = Symbol.for("a"), m = new Map(), re = String.raw`a`, p = /* @__PURE__ */ make()')).toEqual([])
   })

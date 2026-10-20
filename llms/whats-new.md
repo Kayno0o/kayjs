@@ -7,13 +7,13 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page's head leaves out the rules of the star variants (`*:p-2`, `**:p-2`, `*:hover:p-2`) it does not use, as it does any other class ([Styles and assets](styles-and-assets.md)).
 - `kay fmt` in an app with Tailwind sorts the shorthand and a `class` attribute as one list when it moves the classes into the attribute, and a Tailwind fix deleting a class from a `class="..."` over lines takes its line or its space with it ([Tools](check-and-tools.md#format-the-templates)).
 - The `deprecated-analytics-consent` lint is gone, three minors after 1.55 changed what a missing `consent` means: it is `consent: true` for `ga4`, `fathom`, `cloudflare` and `custom`, as before ([Privacy](privacy.md), [Lints](lints.md)).
+- `kay check` warns (`untyped-socket`) about a `.ws()` route with a `body` and no `response`, as an island's `socket()` receives its messages as `unknown`; `rooms().response` or a `response` schema types them ([Rooms](rooms.md)).
 
 ## 1.59.0
 
 - A public text file is answered from memory in production, 2 to 3 times cheaper in CPU per request than when it was read and compressed again on every request, with the same headers, encodings and tags ([Production](proxy-and-security.md)).
 - A queue's run that lost its hold to another process no longer logs its failure or calls `onFailed`: a `JobStore`'s `retry` and `fail` may resolve with `false` for a write they refused, as `sqliteJobs`, `memoryJobs` and `pgJobs` do ([Queues](queues.md)).
 - kayjs-ui's keyline `--kui-border-width` also sizes chips, the icon picker's grid, the scatter plot, the image cropper's stage, toggles and the table's filter and selection bars and sort buttons ([Setup](../packages/ui/llms/setup.md)); see [Upgrading](upgrading.md).
-- `kay check` warns (`untyped-socket`) about a `.ws()` route with a `body` and no `response`, as an island's `socket()` receives its messages as `unknown`; `rooms().response` or a `response` schema types them ([Rooms](rooms.md)).
 - `rooms()` gives `response`, a schema for the ws route that types an island `socket()`'s messages as the rooms' `Message` without a schema written for typing, and `memberOf(ws, room)`, the member a connection joined a room as ([Rooms](rooms.md)).
 - `Static` and `InputOf` from `kay` type a value read off a schema or an action's input, so an island and a module read the schema the server validates with instead of writing its shape again ([Schemas](schemas.md)).
 - `elementSize()` from `kay` gives an island an element's width and height as reactive values, the `ResizeObserver` and its cleanup handled by kay ([Islands](islands.md#element-size)).

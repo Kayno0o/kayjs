@@ -4,7 +4,7 @@ import type { ServedProject } from './shadow-types'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
-import { apiScope, fromApi, keyName } from './api-scope'
+import { apiScope, fromApi } from './api-scope'
 import { walk } from './ast'
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/
@@ -65,6 +65,10 @@ function untypedRoutes(source: string): { at: t.Node, path: string }[] {
 
     const names = new Set(hooks.properties.map(optionName))
 
+    // A computed key may be the `response`.
+    if (names.has(null))
+      return
+
     if (names.has('body') && !names.has('response'))
       routes.push({ at: node.callee.property, path: path.type === 'StringLiteral' ? path.value : source.slice(path.start! + 1, path.end! - 1) })
   })
@@ -72,10 +76,13 @@ function untypedRoutes(source: string): { at: t.Node, path: string }[] {
   return routes
 }
 
-// The name of an option written as `name: value`, `name() {}` or `'name': value`.
-function optionName(property: t.ObjectProperty | t.ObjectMethod | t.SpreadElement): string | undefined {
-  if (property.type === 'ObjectProperty')
-    return keyName(property)
+// The name of an option written as `name: value`, `name() {}` or `'name': value`, or null for one that is computed.
+function optionName(property: t.ObjectProperty | t.ObjectMethod | t.SpreadElement): string | null {
+  if (property.type === 'SpreadElement' || property.computed)
+    return null
 
-  return property.type === 'ObjectMethod' && !property.computed && property.key.type === 'Identifier' ? property.key.name : undefined
+  if (property.key.type === 'Identifier')
+    return property.key.name
+
+  return property.key.type === 'StringLiteral' ? property.key.value : null
 }

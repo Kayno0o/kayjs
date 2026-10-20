@@ -30,6 +30,7 @@ describe('the untyped-socket lint', () => {
   .ws('/bare', { message() {} })
   .ws('/spread', { ...chats, body: s.String() })
   .ws('/held', held)
+  .ws('/computed', { body: s.String(), ['response']: chats.response })
   .get('/other', () => 1, { body: s.String() })`)).toEqual([])
     expect(await problems(`import { api } from './my-api'\nexport default api().ws('/a', { body: 1 })`)).toEqual([])
   })

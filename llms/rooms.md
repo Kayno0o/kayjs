@@ -75,6 +75,7 @@ export default api()
       s.Object({ type: s.Literal('say'), text: s.String() }),
       s.Object({ type: s.Literal('play'), cell: s.Integer() }),
     ]),
+    response: games.response,
     open(ws) {
       games.join(ws, ws.data.params.room, ws.data.user.name)
     },
