@@ -1,4 +1,5 @@
 import type { ClientBuild } from './client'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { joinBase } from '../runtime/base'
@@ -162,5 +163,8 @@ export async function writeDictionaryCopies(pagesDir: string, client: ClientBuil
 
     if (body !== undefined && body.length < rival)
       await Bun.write(`${path}${DCZ_SUFFIX}`, body)
+    // A copy an earlier run left of the page is of another body.
+    else
+      await rm(`${path}${DCZ_SUFFIX}`, { force: true })
   })))
 }
