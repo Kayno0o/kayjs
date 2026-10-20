@@ -1,19 +1,23 @@
 ---
 import type { ScreenCollection, StoredEntry } from '../kay/contract'
+import type { EntryPresence as Editors } from '../presence'
 import EntryFields from '../editor/entry-fields.kay'
 import { createEntryForm } from '../form'
 import EntryActions from './entry-actions.kay'
 import EntryHeader from './entry-header.kay'
 import EntryIdentity from './entry-identity.kay'
+import EntryPresence from './entry-presence.kay'
 
-// An entry's form on its own screen, or a new entry's when `entry` is left out.
+// An entry's form on its own screen, or a new entry's when `entry` is left out; `presence`, from `entryPresence`, lists who else has the entry open.
 // An app's own screen builds the same from `createEntryForm` and the parts this one is made of.
-const { prefix, collection, entry, locale } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined, locale?: string | undefined }>()
+const { prefix, collection, entry, locale, presence } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined, locale?: string | undefined, presence?: Editors | undefined }>()
 
 const form = createEntryForm({ prefix, collection, entry, locale })
 ---
 form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
     EntryActions(form={form})
+  if presence
+    EntryPresence(room={presence.room} member={presence.member})
   EntryIdentity(form={form})
   EntryFields(form={form})

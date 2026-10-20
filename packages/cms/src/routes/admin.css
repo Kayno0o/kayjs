@@ -87,6 +87,12 @@
   color: var(--color-kui-subtext0);
 }
 
+.kcms-entry-presence p {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-kui-subtext0);
+}
+
 .kcms-entry-header .kcms-entry-actions {
   display: flex;
   flex-wrap: wrap;

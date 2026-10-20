@@ -1,0 +1,20 @@
+---
+import { memo, presence } from 'kay'
+import { wording } from 'kay/words'
+
+// Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`.
+const { room, member } = props<{ room: string, member: { name: string } }>()
+const here = presence(room, member)
+const names = memo(() => here.others().map(other => other.name).filter(name => name !== ''))
+const text = memo(() => {
+  if (here.count() === 0)
+    return ''
+
+  return names().length > 0
+    ? wording('cms.entry.alsoOpen', 'Also open: {names}', { names: names().join(', ') })
+    : wording('cms.entry.otherEditors', here.count() === 1 ? '1 other editor' : '{count} other editors', { count: here.count() })
+})
+---
+.kcms-entry-presence(role="status")
+  if text() !== ''
+    p {text()}

@@ -60,6 +60,12 @@ author: async ({ locals }) => {
 }
 ```
 
+## Who else has an entry open
+
+The screen of a saved entry says when someone else has the same entry open, so two editors do not overwrite each other. It names them when `author` gives a name, which is the name the other editor sees for you too, and only counts them when it does not: "1 other editor". The same editor in two tabs is not listed to themselves. A new entry shows nothing, as no one else can have it open.
+
+A screen of your own built from the parts shows the same list by passing `presence` to `EntryEditor`, or `room` and `member` to `EntryPresence`. `entryPresence(ctx, collection, entry)` from `@kaynooo/kayjs-cms/presence` returns both.
+
 ## Collection titles
 
 The screens title a collection with its export's name, humanized: `blogPosts` shows as "Blog posts". A collection can say its own title with the `title` option, which suits a site that is not in English:

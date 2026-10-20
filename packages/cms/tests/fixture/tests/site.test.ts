@@ -671,7 +671,8 @@ test('a custom kind\'s value is validated by its schema alone on save', async ()
 
 test('picking a colour in the browser sets the draft and a save writes it', async () => {
   const built = await browser()
-  const page = await built.open('/admin/collections/products/mug')
+
+  await using page = await built.open('/admin/collections/products/mug')
 
   await page.waitUntil(() => document.querySelector('[data-kcms-path="color"] input[type="color"]') !== null)
   await page.evaluate(() => {
@@ -708,7 +709,8 @@ test('an image pasted into the Markdown body is uploaded to the collection\'s fo
   saved.length = 0
 
   const built = await browser()
-  const page = await built.open('/admin/collections/posts/hello')
+
+  await using page = await built.open('/admin/collections/posts/hello')
   const body = '[data-kcms-body] textarea'
 
   await page.click(body)
@@ -732,7 +734,8 @@ test('an image pasted into the Markdown body is uploaded to the collection\'s fo
 
 test('a refused upload toasts, and leaves the body as it was', async () => {
   const built = await browser()
-  const page = await built.open('/admin/collections/posts/hello')
+
+  await using page = await built.open('/admin/collections/posts/hello')
   const body = '[data-kcms-body] textarea'
   const before = await page.value(body)
 
@@ -746,7 +749,8 @@ test('a refused upload toasts, and leaves the body as it was', async () => {
 
 test('a file field offers only the types the server takes, and says why a dropped file is left out', async () => {
   const built = await browser()
-  const page = await built.open('/admin/collections/products/mug')
+
+  await using page = await built.open('/admin/collections/products/mug')
 
   await page.waitUntil(() => document.querySelector('.kcms-file input[type=file]')?.getAttribute('accept') === 'image/png,image/jpeg,image/webp,image/gif,image/avif')
   await page.evaluate(() => {
@@ -762,7 +766,8 @@ test('a file field offers only the types the server takes, and says why a droppe
 
 test('a list of images takes several files at once, one item per file in order, a refused one toasted while the others land', async () => {
   const built = await browser()
-  const page = await built.open('/admin/collections/products/mug')
+
+  await using page = await built.open('/admin/collections/products/mug')
 
   await page.waitUntil(() => document.querySelector('[data-kcms-path="gallery"] input[type=file]')?.getAttribute('accept') === 'image/png,image/jpeg,image/webp,image/gif,image/avif')
   expect(await page.evaluate(() => document.querySelector('[data-kcms-path="gallery"] input[type=file]')?.hasAttribute('multiple'))).toBe(true)
@@ -787,7 +792,8 @@ test('a list of images takes several files at once, one item per file in order, 
 
 test('a file over the size limit is refused before it is sent, with its size in the toast', async () => {
   const built = await browser()
-  const page = await built.open('/admin/collections/products/mug')
+
+  await using page = await built.open('/admin/collections/products/mug')
 
   await page.waitUntil(() => document.querySelector('.kcms-file input[type=file]')?.getAttribute('accept') !== null)
   await page.evaluate(() => {
@@ -876,4 +882,32 @@ test('the unused-uploads screen fits a 375 px phone with an upload to delete', a
     await built.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: [key] }) })
     setSystemTime()
   }
+}, 60_000)
+
+test('an entry\'s screen carries a presence proof for its entry\'s room and the name the app\'s author gives, a new entry\'s none', async () => {
+  const proof = (page: Awaited<ReturnType<typeof site.visit>>) => page.find('script[data-kay-live]').map(script => script.html).join('')
+  const entry = await site.visit('/admin/collections/posts/notes/garden?as=Ann')
+
+  expect(proof(entry)).toContain('kay:presence')
+  expect(proof(entry)).toContain('cms:posts:notes/garden')
+  expect(proof(entry)).toContain('Ann')
+  expect(entry.find('.kcms-entry-presence[role=status]')).toHaveLength(1)
+  expect(entry.find('.kcms-entry-presence p')).toEqual([])
+  expect(proof(await site.visit('/admin/new/products'))).not.toContain('kay:presence')
+})
+
+test('two tabs on one entry\'s screen name each other, and the one left is told when the other closes', async () => {
+  const built = await browser()
+  const text = () => document.querySelector('.kcms-entry-presence')?.textContent?.trim()
+
+  await using ann = await built.open('/admin/collections/posts/notes/garden?as=Ann')
+  await using bob = await built.open('/admin/collections/posts/notes/garden?as=Bob')
+
+  await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Bob')
+  await bob.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Ann')
+  bob.close()
+  await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '', { timeout: 15_000 })
+
+  expect(await ann.evaluate(text)).toBe('')
+  expect(ann.errors).toEqual([])
 }, 60_000)

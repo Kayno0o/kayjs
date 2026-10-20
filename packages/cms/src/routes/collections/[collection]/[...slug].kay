@@ -5,6 +5,7 @@ import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
 import EntryHeader from '../../../components/entry-header.kay'
 import { collectionTitle, entryTitle } from '../../../listing'
+import { entryPresence } from '../../../presence'
 import { entryScreen } from '../../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
@@ -12,13 +13,14 @@ export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
 const { prefix, collection } = screen
 const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
+const presence = entry ? await entryPresence(ctx, collection.name, entry) : undefined
 const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head
   title {entry ? entryTitle(collection, entry) : name} - {title}
 if entry
-  EntryEditor(prefix={prefix} collection={collection} entry={entry})
+  EntryEditor(prefix={prefix} collection={collection} entry={entry} presence={presence})
 else
   EntryHeader(prefix={prefix} collection={collection} title={name})
   EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={collection.problem})
