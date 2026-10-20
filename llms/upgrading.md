@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-cms's delete confirmation names the entry
 
-`cms.entry.deleteMessage` and `cms.table.deleteMessage` are replaced by `cms.entry.deleteNamed` (`Delete {title}? This cannot be undone.`) and `cms.entry.deletePage`, used on the entry screen and in the list alike. A catalog that worded either old key reads the English until it words the new ones ([texts](../packages/cms/llms/words.md)).
+`cms.entry.deleteMessage` takes `{title}` now, as `cms.table.deleteMessage` does, so the entry screen asks `Delete {title}?`. A catalog wording it without `{title}` still works but names no entry, and `kay check` reports the message as lacking `{title}` ([texts](../packages/cms/llms/words.md)). No deprecated lint is needed: no key is renamed, and `kay check` already finds the old text.
 
 ### Images carry their average color as a `style`
 

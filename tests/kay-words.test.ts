@@ -155,6 +155,20 @@ describe('kay check on the catalogs', () => {
     ].toSorted())
   })
 
+  it('reports a French delete question of the entry screen that names no entry, as the key takes {title}', async () => {
+    const root = await scratchDir('kay-words-delete-')
+    const messages = join(root, 'messages')
+    const write = async (locale: string, body: string) => Bun.write(join(messages, `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)
+
+    await write('en', '{ title: \'Words\' }')
+    await write('fr', '{ title: \'Mots\', cms: { entry: { deleteMessage: \'Supprimer cette entrée ?\' }, table: { deleteMessage: \'Supprimer {title} ?\' } } }')
+
+    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], defaultLocale: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
+
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('cms.entry.deleteMessage without {title}')
+  })
+
   it('asks a locale no installed library ships for none of its keys, which read the default locale\'s', async () => {
     const root = await scratchDir('kay-words-libraries-')
     const write = async (locale: string, body: string) => Bun.write(join(root, 'src/messages', `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)

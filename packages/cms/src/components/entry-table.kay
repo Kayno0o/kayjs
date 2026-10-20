@@ -84,7 +84,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
         if actions.has('delete')
-          ConfirmDelete(message={deleteMessage(row.title, row.url)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table')} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry\'s title or slug holds every word searched.')})

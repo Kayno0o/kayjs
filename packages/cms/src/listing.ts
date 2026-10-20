@@ -180,9 +180,9 @@ export function onPagePath(prefix: string, url: string): string {
   return screenPath(prefix, `/page?path=${encodeURIComponent(url)}`)
 }
 
-// What a delete confirmation asks: the entry by its title, and, for one with a page, that the page goes and links to it break.
-export function deleteMessage(title: string, url?: string | undefined): string {
-  const asked = wording('cms.entry.deleteNamed', 'Delete {title}? This cannot be undone.', { title })
+// What a delete confirmation asks: the entry by its title, and, for one with a page, that the page goes and links to it break. The list and the entry screen word the question under their own keys.
+export function deleteMessage(title: string, url?: string | undefined, where: 'entry' | 'table' = 'entry'): string {
+  const asked = where === 'table' ? wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title }) : wording('cms.entry.deleteMessage', 'Delete {title}? This cannot be undone.', { title })
 
   return url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
 }
