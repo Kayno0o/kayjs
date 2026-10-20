@@ -227,7 +227,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const writes = countWrites(app, [mcpPath(options.mcp)].filter(path => path !== undefined))
   // Hashed as they go out, under the mount point.
-  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)))] }
+  const compressing = options.compress ?? process.env.NODE_ENV === 'production'
+  // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
+  const dictionaryUsed = compressing && !mode.dev && client.dictionary !== undefined
+  const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
+  const securityOptions = { ...options, dev: mode.dev, islands: directives, scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)))] }
   const security = securityHeaders(securityOptions)
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
@@ -247,8 +251,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // Before compression, whose `mapResponse` would answer a compressed 404 page first; a redirect it answers skips the later `mapResponse` hooks, as the request log's timing and the dev tool's recording of the response.
   redirector?.pages(app)
-
-  const compressing = options.compress ?? process.env.NODE_ENV === 'production'
 
   if (compressing)
     compress(app, client, base, mode, options.onError)
@@ -429,7 +431,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (favicon !== undefined)
     serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
 
-  const prerendered = await loadPrerendered(client, compressing && !mode.dev)
+  const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
   await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })

@@ -1,16 +1,19 @@
 import type { Subprocess } from 'bun'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
+import { pages } from '../src/server'
 import { browserPath } from '../src/test'
 
 const CLI = resolve('src/cli.ts')
 const MAGIC = Buffer.from([0x5E, 0x2A, 0x4D, 0x18, 0x20, 0, 0, 0])
+const LISTENING = /localhost:(\d+)/
 const ACCEPT = 'gzip, deflate, br, zstd, dcb, dcz'
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
@@ -140,17 +143,19 @@ async function asDictionary(site: Site, pathname: string, headers: Record<string
 }
 
 beforeAll(async () => {
-  const [root, mounted, plain] = await Promise.all([
+  const [root, mounted, plain, restricted] = await Promise.all([
     project('export default {}\n'),
     project('export default { base: \'/repo\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', true),
     project('export default { compress: false }\n'),
+    project('export default { security: { csp: { \'connect-src\': [\'https://api.example.com\'] } } }\n'),
   ])
 
   // One build at a time, as each starts the compilers.
   await build(root)
   await build(mounted)
   await build(plain)
-  sites = await Promise.all([serve(root), serve(mounted, '/repo'), serve(plain)])
+  await build(restricted)
+  sites = await Promise.all([serve(root), serve(mounted, '/repo'), serve(plain), serve(restricted)])
 }, 300_000)
 
 afterAll(async () => {
@@ -348,6 +353,32 @@ describe('a page that changes under the server', () => {
   })
 })
 
+describe('development', () => {
+  it('has no dictionary, even over a build that has one and with compression asked for', async () => {
+    const [root] = sites
+    const { dictionary } = await manifestOf(root!)
+    const app = await pages({ root: root!.root, dev: true, prebuilt: true, compress: true, log: false })
+    const reply = await app.handle(new Request('http://localhost/about', { headers: { 'accept-encoding': ACCEPT, 'available-dictionary': `:${dictionary!.hash}:` } }))
+    const file = await app.handle(new Request(`http://localhost/_kay/${dictionary!.file}`))
+
+    expect(reply.status).toBe(200)
+    expect(reply.headers.get('link')).toBeNull()
+    expect(reply.headers.get('content-encoding')).not.toBe('dcz')
+    expect(reply.headers.get('vary') ?? '').not.toContain('available-dictionary')
+    expect(file.headers.get('use-as-dictionary')).toBeNull()
+  }, 60_000)
+})
+
+describe('a policy of the app', () => {
+  it('lets the browser fetch the dictionary: kay adds \'self\' to a connect-src of the app without it', async () => {
+    const restricted = sites[3]!
+    const reply = await get(restricted, '/about', { 'accept-encoding': ACCEPT })
+
+    expect(reply.headers.get('content-security-policy')).toContain('connect-src https://api.example.com \'self\';')
+    expect(reply.headers.get('link')).toContain('rel="compression-dictionary"')
+  })
+})
+
 describe('a server with no dictionary to use', () => {
   it('compresses nothing itself with compress: false, so a browser holding another build\'s dictionary or none gets the build\'s copies and no link', async () => {
     const plain = sites[2]!
@@ -373,8 +404,8 @@ describe('a server with no dictionary to use', () => {
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a browser', () => {
-  it('fetches the dictionary once idle and gets its next pages as dcz, a navigation and a fetch alike', async () => {
-    const [root] = sites
+  it.each([0, 3])('fetches the dictionary once idle and gets its next pages as dcz, a navigation and a fetch alike, under kay\'s policy and under an app\'s connect-src (site %#)', async (index) => {
+    const root = sites[index]!
     const browser = await chromium.launch({ executablePath: path!, args: ['--no-sandbox'] })
 
     try {
@@ -391,9 +422,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a brows
 
       page.on('pageerror', error => errors.push(error.message))
       page.on('console', message => message.type() === 'error' && errors.push(message.text()))
-      await page.goto(`${root!.origin}/`, { waitUntil: 'networkidle' })
+      await page.goto(`${root.origin}/`, { waitUntil: 'networkidle' })
 
-      const { dictionary } = await manifestOf(root!)
+      const { dictionary } = await manifestOf(root)
 
       // Fetched when the page is idle, at low priority.
       for (let tries = 0; tries < 50 && !seen.some(({ pathname }) => pathname === `/_kay/${dictionary!.file}`); tries++)
@@ -402,7 +433,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a brows
       expect(seen.find(({ pathname }) => pathname === '/')!.encoding).not.toBe('dcz')
       expect(seen.some(({ pathname }) => pathname === `/_kay/${dictionary!.file}`)).toBe(true)
 
-      await page.goto(`${root!.origin}/about`, { waitUntil: 'networkidle' })
+      await page.goto(`${root.origin}/about`, { waitUntil: 'networkidle' })
       expect(seen.find(({ pathname }) => pathname === '/about')).toMatchObject({ encoding: 'dcz', dictionary: expect.stringContaining(dictionary!.hash.slice(0, 10)) })
       expect(await page.textContent('h1')).toBe('About')
 
@@ -416,6 +447,52 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a brows
       await browser.close()
     }
   }, 60_000)
+})
+
+describe('a compiled executable', () => {
+  it('serves the dictionary and the prerendered pages\' dcz copies from what it embeds, started in an empty folder', async () => {
+    const root = await project('export default {}\n')
+    const executable = join(root, 'bin/server')
+    const empty = await mkdtemp(join(tmpdir(), 'dictionary-exe-'))
+
+    roots.push(empty)
+    await build(root, '--compile', executable)
+
+    const child = Bun.spawn([executable], { cwd: empty, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0' } })
+
+    try {
+      const reader = child.stdout.getReader()
+      let output = ''
+
+      while (!LISTENING.test(output)) {
+        const { value, done } = await reader.read()
+
+        if (done)
+          throw new Error(`the executable exited: ${output}${await new Response(child.stderr).text()}`)
+
+        output += new TextDecoder().decode(value)
+      }
+
+      const site: Site = { root, origin: `http://localhost:${LISTENING.exec(output)![1]}`, server: child, base: '' }
+      const { dictionary } = await manifestOf(site)
+      const file = await get(site, `/_kay/${dictionary!.file}`, { 'accept-encoding': 'identity' })
+
+      expect(file.status).toBe(200)
+      expect(file.headers.get('use-as-dictionary')).toBe('match="/*"')
+      expect(new Bun.CryptoHasher('sha256').update(file.body).digest('base64')).toBe(dictionary!.hash)
+
+      for (const pathname of ['/about', '/live?topic=exe']) {
+        const { reply, text, plain } = await asDictionary(site, pathname)
+
+        expect(reply.headers.get('content-encoding'), pathname).toBe('dcz')
+        expect(text, pathname).toBe(plain)
+      }
+    }
+    finally {
+      child.kill()
+      await child.exited
+    }
+  }, 300_000)
 })
 
 describe('a static export', () => {
