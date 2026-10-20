@@ -34,6 +34,8 @@ export interface GenerateOptions {
   inspect?: boolean | undefined
   // The file as written when the template was expanded from it, so the positions the inspector shows are the file's.
   inspectSource?: { text: string, real: (offset: number) => number } | undefined
+  // Type checking a page, a layout or a special page, which render once on the server, whether or not they carry a server fence.
+  route?: boolean | undefined
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
   check?: boolean | undefined
   // Type-checking a static component only islands render: the props it passes its children are not serialized, so they are not asserted.
@@ -412,12 +414,12 @@ class ModuleShell {
     return this.mode === 'html' || this.mode === 'dom'
   }
 
-  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it; the type check knows it of a file with a server fence, not of a component an island may render.
+  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it; the type check knows it of a route file, not of a component an island may render.
   private get staticLoops(): boolean {
     if (this.kind === 'island')
       return false
 
-    return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined
+    return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined || this.options.route === true
   }
 
   // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.

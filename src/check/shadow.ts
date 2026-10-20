@@ -109,7 +109,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

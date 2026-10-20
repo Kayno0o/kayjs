@@ -199,6 +199,17 @@ describe('control flow', () => {
       expect(writes(component('i'), 'src/comp.kay', check)).toEqual(['`row` is read-only here'])
     }
   })
+
+  it('reads the loops of a page or a layout without a server fence as static in the check build, as the build does', () => {
+    const body = 'for row, i of rows key={row}\n  p {row = 3} {i = 4}\n'
+    const writes = (source: string, file: string, options: { page?: boolean } = {}) => compileKay(source, file, { check: true, ...options }).diagnostics.map(d => d.message)
+
+    expect(writes(`---\nconst rows = [1, 2]\n---\n${body}`, 'src/routes/index.kay', { page: true })).toEqual([])
+    expect(writes(`---\nconst rows = [1, 2]\n---\n${body}`, 'src/routes/_layout.kay')).toEqual([])
+    expect(writes(`---\nconst rows = [1, 2]\n---\n${body}`, 'src/routes/_404.kay')).toEqual([])
+    expect(writes(`---\nconst { rows } = props<{ rows: number[] }>()\n---\n${body}`, 'src/comp.kay')).toEqual(['`row` is read-only here', '`i` is read-only here'])
+    expect(writes(`---\nconst rows = [1, 2]\n---\nbutton(onClick={() => {}}) x\n${body}`, 'src/routes/index.kay', { page: true })).toEqual(['`row` is read-only here', '`i` is read-only here'])
+  })
 })
 
 describe('elements', () => {
