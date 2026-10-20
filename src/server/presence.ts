@@ -10,6 +10,8 @@ const PREFIX = 'kay:presence:'
 const GRACE_MS = 3000
 // How often a room's members are read again, which picks up a process that crashed without leaving.
 const RECHECK_MS = 5000
+// What tells this process's rows from another process's for one tab, which a reconnect may land on.
+const PROCESS = crypto.randomUUID()
 
 interface Seat {
   // The streams of the tab holding it.
@@ -18,7 +20,12 @@ interface Seat {
   leaving: ReturnType<typeof setTimeout> | undefined
 }
 
-type Recheck = (members: string[]) => void
+interface Tab {
+  tab: string
+  member: string
+}
+
+type Recheck = (tabs: Tab[]) => void
 
 // The tabs in a room by the room and the tab, and the streams watching a room.
 const seats = new Map<string, Seat>()
@@ -32,12 +39,25 @@ function roomStore(): RoomStore {
   return appStore()?.rooms ?? (fallback ??= memoryRooms())
 }
 
+// A room's tabs, each once: a tab reconnecting to another process is in the store under both until the first lets go of it.
+function tabsOf(room: string): Tab[] {
+  const tabs = new Map<string, string>()
+
+  for (const text of roomStore().members(PREFIX + room)) {
+    const colon = text.indexOf(':')
+
+    tabs.set(text.slice(0, colon), text.slice(colon + 1))
+  }
+
+  return [...tabs].map(([tab, member]) => ({ tab, member }))
+}
+
 function membersOf(room: string): string[] {
-  return roomStore().members(PREFIX + room)
+  return tabsOf(room).map(entry => entry.member)
 }
 
 // The room and member a presence key names, or undefined for a key that is none.
-export function parsePresenceKey(key: string): { room: string, member: string } | undefined {
+function parsePresenceKey(key: string): { room: string, member: string } | undefined {
   try {
     const [room, member] = JSON.parse(key) as unknown[]
 
@@ -60,10 +80,15 @@ function recheckRoom(room: string): void {
   if (rechecks === undefined)
     return
 
-  const members = membersOf(room)
+  try {
+    const tabs = tabsOf(room)
 
-  for (const recheck of rechecks)
-    recheck(members)
+    for (const recheck of rechecks)
+      recheck(tabs)
+  }
+  catch (error) {
+    kayLog('error', 'reading a presence room failed', error)
+  }
 }
 
 // Hears the joins and leaves of every process sharing the store, once per store.
@@ -102,9 +127,14 @@ function join(room: string, tab: string, member: string): void {
     seat.member = member
   }
 
-  listen()
-  roomStore().add(PREFIX + room, tab, member)
-  tell(room)
+  try {
+    listen()
+    roomStore().add(PREFIX + room, `${tab}@${PROCESS}`, `${tab}:${member}`)
+    tell(room)
+  }
+  catch (error) {
+    kayLog('error', 'putting a tab in a presence room failed', error)
+  }
 }
 
 function leave(room: string, tab: string): void {
@@ -118,7 +148,7 @@ function leave(room: string, tab: string): void {
     seats.delete(at)
 
     try {
-      roomStore().remove(PREFIX + room, tab)
+      roomStore().remove(PREFIX + room, `${tab}@${PROCESS}`)
       tell(room)
     }
     catch (error) {
@@ -145,32 +175,24 @@ export function presenceEntry(key: string, tab: string): { value: () => string[]
 
   const { room, member } = parsed
   let last = ''
-  const others = (members: string[]) => {
-    const rest = [...members]
-    const own = rest.indexOf(member)
-
-    if (own !== -1)
-      rest.splice(own, 1)
-
-    return rest
-  }
+  const others = (tabs: Tab[]) => tabs.filter(entry => entry.tab !== tab).map(entry => entry.member)
 
   return {
     value() {
-      const rest = others(membersOf(room))
+      const rest = others(tabsOf(room))
 
       last = JSON.stringify(rest)
 
       return rest
     },
     watch(notify) {
-      const recheck: Recheck = (members) => {
-        if (JSON.stringify(others(members)) !== last)
+      const recheck: Recheck = (tabs) => {
+        if (JSON.stringify(others(tabs)) !== last)
           notify()
       }
 
       join(room, tab, member)
-      last = JSON.stringify(others(membersOf(room)))
+      last = JSON.stringify(others(tabsOf(room)))
 
       let rechecks = watchers.get(room)
 

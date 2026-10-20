@@ -40,6 +40,9 @@ async function enter(site: TestSite, user: string, tab: string, path = '/entry/1
   return new Feed(await connect(site, proofs, keys, tab))
 }
 
+// What a room holds, without the tab each member is stored beside.
+const held = (rooms: ReturnType<typeof memoryRooms>, room: string) => rooms.members(room).map(text => text.slice(text.indexOf(':') + 1))
+
 async function leaves(rooms: ReturnType<typeof memoryRooms>, room: string, left: number, within = 10_000): Promise<void> {
   for (let waited = 0; rooms.members(room).length !== left; waited += 50) {
     if (waited > within)
@@ -109,7 +112,7 @@ describe('presence on the server', () => {
 
     await first.next()
     expect(await second.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), [ANN]]])
-    expect(rooms.members(ROOM)).toEqual([ANN, ANN])
+    expect(held(rooms, ROOM)).toEqual([ANN, ANN])
     await first.close()
     await second.close()
     await leaves(rooms, ROOM, 0)
@@ -133,8 +136,8 @@ describe('presence on the server', () => {
       setSystemTime()
     }
 
-    expect(rooms.members(ROOM)).toEqual([])
-    expect(rooms.members('kay:presence:entry:2')).toEqual([])
+    expect(held(rooms, ROOM)).toEqual([])
+    expect(held(rooms, 'kay:presence:entry:2')).toEqual([])
   })
 
   it('refuses a request whose other keys are proven but whose room is not', async () => {
@@ -142,13 +145,15 @@ describe('presence on the server', () => {
     const answer = await connect(site, proofs, [keys[0]!, keyOf('entry:9', { name: 'Ann' })], 'half')
 
     expect(answer.status).toBe(403)
-    expect(rooms.members(ROOM)).toEqual([])
+    expect(held(rooms, ROOM)).toEqual([])
   })
 
   it('refuses a tab that is not a short string', async () => {
     const { proofs, keys } = await visit(site, '/entry/1', 'Ann')
 
     expect((await connect(site, proofs, keys, 'x'.repeat(65))).status).toBe(400)
+    expect((await connect(site, proofs, keys, '')).status).toBe(400)
+    expect((await connect(site, proofs, keys, 'a:b')).status).toBe(400)
     expect((await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs, watch: [[PRESENCE_LIVE_ID, keys[0]]], tab: 7 }) })).status).toBe(400)
   })
 
@@ -169,7 +174,7 @@ describe('presence on the server', () => {
 
     await again.next()
     await Bun.sleep(3300)
-    expect(rooms.members(ROOM)).toEqual([BOB, ANN])
+    expect(held(rooms, ROOM)).toEqual([BOB, ANN])
 
     const quiet = Symbol('quiet')
     const told = watching.next()
@@ -203,9 +208,9 @@ describe('presence on the server', () => {
     const second = new Feed(await connect(site, proofs, keys, 'ann-tab'))
 
     await second.next()
-    expect(rooms.members(ROOM)).toEqual([BOB, ANN])
+    expect(held(rooms, ROOM)).toEqual([BOB, ANN])
     await Bun.sleep(3300)
-    expect(rooms.members(ROOM)).toEqual([BOB, ANN])
+    expect(held(rooms, ROOM)).toEqual([BOB, ANN])
     await second.close()
     await watching.close()
     await leaves(rooms, ROOM, 0)
@@ -275,7 +280,7 @@ describe('presence across processes', () => {
       const ann = await enter(site, 'Ann', 'ann-tab')
 
       expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), []]])
-      other.add(ROOM, 'bob-conn', BOB)
+      other.add(ROOM, 'bob-conn', `bob-tab:${BOB}`)
       other.publish(ROOM, '', {})
       expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), [BOB]]])
 
@@ -294,6 +299,37 @@ describe('presence across processes', () => {
     }
     finally {
       await site.close()
+      rooms.close()
+    }
+  }, 20_000)
+})
+
+describe('a tab reconnecting to another process', () => {
+  it('stays listed once the first process lets go of it, and is listed once while both hold it', async () => {
+    const file = join(await scratchDir('presence-'), 'presence.sqlite')
+    const rooms = sqliteRooms(file, { poll: '25ms' })
+    const other = sqliteRooms(file, { poll: '25ms' })
+    const site = await testSite({ root: ROOT, store: { rooms } })
+
+    try {
+      const bob = await enter(site, 'Bob', 'bob-tab')
+      const ann = await enter(site, 'Ann', 'ann-tab')
+
+      await bob.next()
+      expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), [BOB]]])
+
+      // The tab's next connection lands on the other process, which holds it under a row of its own.
+      other.add(ROOM, 'ann-tab@elsewhere', `ann-tab:${ANN}`)
+      other.publish(ROOM, '', {})
+      await ann.close()
+      await Bun.sleep(3300)
+      expect(await bob.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), [ANN]]])
+      expect(rooms.members(ROOM).filter(text => text.startsWith('ann-tab:'))).toHaveLength(1)
+      await bob.close()
+    }
+    finally {
+      await site.close()
+      other.close()
       rooms.close()
     }
   }, 20_000)

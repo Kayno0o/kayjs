@@ -28,7 +28,8 @@ const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
-const MAX_TAB_LENGTH = 64
+// A tab's id: letters, digits and hyphens, so it never reads as part of a presence member beside it in the store.
+const TAB_ID = /^[\w-]{1,64}$/
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
@@ -346,10 +347,7 @@ function readRequest(text: string): LiveRequest | undefined {
     if (!watch.every(entry => Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string' && entry[1].length <= MAX_KEY_LENGTH))
       return undefined
 
-    if (tab !== undefined && (typeof tab !== 'string' || tab.length > MAX_TAB_LENGTH))
-      return undefined
-
-    return { proofs, watch, tab }
+    return tab !== undefined && (typeof tab !== 'string' || !TAB_ID.test(tab)) ? undefined : { proofs, watch, tab }
   }
   catch {
     return undefined

@@ -5,7 +5,7 @@ import { currentServerScope } from './reactive'
 // The id the members of a room are known by on the live connection: one keyed value, whose key is the room with the member the visitor is listed as, and whose value is the members of the room besides the visitor's own tab, as JSON.
 export const PRESENCE_LIVE_ID = 'kay:presence'
 // A key is at most this long, as any live key is.
-export const MAX_PRESENCE_KEY = 256
+const MAX_PRESENCE_KEY = 256
 
 // Who else has a room open.
 export interface Presence<Member> {
@@ -18,7 +18,7 @@ export interface Presence<Member> {
 type Handle = (key: string) => string[]
 
 let handle: Handle | undefined
-let readMembers: ((key: string) => string[]) | undefined
+let readMembers: Handle | undefined
 
 // Installed by the server: the members a room holds now, for the render to write into the page.
 export function readPresenceWith(read: (key: string) => string[]): void {

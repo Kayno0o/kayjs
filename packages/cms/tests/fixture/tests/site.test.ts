@@ -905,6 +905,12 @@ test('two tabs on one entry\'s screen name each other, and the one left is told 
 
   await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Bob')
   await bob.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Ann')
+  // The same editor's second tab is no one else to them.
+  await using again = await built.open('/admin/collections/posts/notes/garden?as=Ann')
+
+  await again.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Bob')
+  await Bun.sleep(300)
+  expect(await ann.evaluate(text)).toBe('Also open: Bob')
   bob.close()
   await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '', { timeout: 15_000 })
 
