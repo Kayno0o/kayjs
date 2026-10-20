@@ -14,7 +14,7 @@ const CLI = resolve('src/cli.ts')
 const BASE = '/repo'
 // The gzipped JS a page with one small island loads before anything is clicked, a few bytes above what it measures: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
 // The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
-const EAGER_JS_BUDGET = 8_655
+const EAGER_JS_BUDGET = 8_602
 const LAZY_CHUNKS = ['fetch-island', 'forms', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
