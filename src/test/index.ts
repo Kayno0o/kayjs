@@ -43,7 +43,7 @@ import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, N
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
 
-export type { A11yViolation, BrowserOptions, ClickOptions, FetchedResponse, FulfillOptions, PageRequest, PageResponse, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
+export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
 export type { CookieJar } from './cookies'
 export { cookieJar } from './cookies'

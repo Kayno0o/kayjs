@@ -32,6 +32,9 @@ const server = Bun.serve({
       return new Response('x', { headers })
     }
 
+    if (url.pathname === '/cached.js')
+      return new Response('window.cached = "server"', { headers: { 'cache-control': 'max-age=3600', 'content-type': 'text/javascript' } })
+
     if (url.pathname === '/old')
       return new Response(null, { status: 302, headers: { location: '/api/hello' } })
 
@@ -147,6 +150,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     await page.route('/api/hello', async request => request.fulfill({ body: 'second' }))
 
     expect(await call(page, '/api/hello')).toBe('200 second')
+    await page.unroute()
+  })
+
+  it('answers a script the browser kept in its cache, which no route would see otherwise', async () => {
+    const load = async () => page.evaluate(async () => {
+      const script = document.createElement('script')
+
+      script.src = '/cached.js'
+      document.head.append(script)
+      await new Promise(resolve => script.addEventListener('load', resolve))
+      script.remove()
+
+      return (window as { cached?: string }).cached
+    })
+
+    expect(await load()).toBe('server')
+
+    await page.route('/cached.js', async request => request.fulfill({ body: 'window.cached = "routed"', headers: { 'content-type': 'text/javascript' } }))
+
+    expect(await load()).toBe('routed')
+
     await page.unroute()
   })
 

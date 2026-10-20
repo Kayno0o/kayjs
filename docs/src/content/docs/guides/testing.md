@@ -272,6 +272,8 @@ The page clicks and types as a user does.
 | `waitUntil(fn)` | Waits until a function run in the page returns something truthy |
 | `evaluate(fn, ...args)` | Runs a function in the page |
 | `goto`, `back`, `forward`, `reload`, `path()` | Navigate and read where the page is |
+| `upload(selector, files)` | Puts files, given by path, in a file input, as the picker does |
+| `onDialog(handler)` | Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs |
 
 The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
 
@@ -286,6 +288,23 @@ A page behind a session opens signed in with `cookies`, a `Cookie` header string
 
 ```ts
 const page = await site.open('/account', { cookies: await auth.sessionCookie(user.id) })
+```
+
+A page opens as a visitor with other settings through the same options. `colorScheme: 'dark'` and `reducedMotion: 'reduce'` set the preferences the page reads, `javaScript: false` turns JavaScript off so a test sees what the server rendered, and `page.warnings` lists the console warnings the way `page.errors` lists the errors.
+
+```ts
+const plain = await site.open('/signup', { javaScript: false })
+
+await plain.fill('input[name="email"]', 'ada@example.com')
+await plain.click('form button')
+await plain.waitFor('.notice', { text: 'Check your inbox' })
+```
+
+A dialog stays open until it is answered, and the page waits on it. `page.onDialog(handler)` answers each one: the handler gets its `type`, `message` and `defaultPrompt`, and returns `true` to accept, `false` to dismiss, or a string to answer a prompt.
+
+```ts
+await page.onDialog(dialog => dialog.message.startsWith('Delete'))
+await page.click('button.delete')
 ```
 
 `browse(url)` from `kay/test` opens the same page for a server that is already running, such as one the test started itself.
@@ -331,6 +350,8 @@ await page.click('button.sync')
 await page.waitFor('.banner', { text: 'You are offline' })
 await page.online()
 ```
+
+While a route exists the browser's cache is off, as a response it served from its cache would never reach the route.
 
 The view runs one DevTools command at a time, so use `page.cdp(method, params)` where `page.view.cdp()` would be called: it queues behind the page's own commands and a route's.
 

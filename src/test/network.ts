@@ -467,9 +467,15 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     void answer(paused)
   })
 
+  // A response served from the browser's cache never reaches the Fetch domain, so the cache is off while a route may answer, or a route would miss what an earlier page loaded.
+  const intercept = async () => {
+    await send('Network.setCacheDisabled', { cacheDisabled: true })
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
+  }
+
   const enable = async () => {
     if (enabling === undefined) {
-      enabling = send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
+      enabling = intercept()
       fetching = true
     }
 
@@ -526,6 +532,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
 
         awaited.clear()
         await send('Fetch.disable')
+        await send('Network.setCacheDisabled', { cacheDisabled: false })
       }
     },
     offline: async offline => send('Network.emulateNetworkConditions', { offline, ...NO_THROTTLE }),

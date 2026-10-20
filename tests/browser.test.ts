@@ -200,6 +200,132 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(await page.text('button.note')).toBe('Note none')
   })
 
+  it('opens a page with JavaScript off, its islands never hydrating, and still reads it and follows its links', async () => {
+    const plain = await site.open('/', { javaScript: false })
+
+    try {
+      const before = await plain.text('button.player')
+
+      await plain.click('button.player')
+      await Bun.sleep(200)
+
+      expect(await plain.text('button.player')).toBe(before)
+      expect(await plain.count('slot[data-component]')).toBeGreaterThan(0)
+
+      await plain.evaluate(() => {
+        (window as { kayMark?: string }).kayMark = 'first document'
+      })
+      await plain.hover('a.second')
+      await plain.click('a.second')
+      await plain.waitFor('h1', { text: 'Second' })
+
+      expect(await plain.path()).toBe('/second')
+      expect(await plain.evaluate(() => (window as { kayMark?: string }).kayMark)).toBeUndefined()
+
+      await plain.back()
+
+      expect(await plain.text('h1')).toBe('Home')
+      expect(plain.errors).toEqual([])
+    }
+    finally {
+      plain.close()
+    }
+  })
+
+  it('asks the page for the colour scheme and the motion it is given, the one not given left as the browser has it', async () => {
+    const asked = await site.open('/', { reducedMotion: 'reduce', colorScheme: 'dark' })
+
+    try {
+      expect(await asked.evaluate(() => [matchMedia('(prefers-reduced-motion: reduce)').matches, matchMedia('(prefers-color-scheme: dark)').matches])).toEqual([true, true])
+    }
+    finally {
+      asked.close()
+    }
+
+    const plain = await site.open('/', { reducedMotion: 'no-preference' })
+
+    try {
+      expect(await plain.evaluate(() => [matchMedia('(prefers-reduced-motion: reduce)').matches, matchMedia('(prefers-color-scheme: dark)').matches])).toEqual([false, false])
+    }
+    finally {
+      plain.close()
+    }
+  })
+
+  it('answers the dialogs of the page with its handler, which sees their type, message and default text', async () => {
+    const dialogs = await site.open('/')
+    const seen: string[] = []
+    let answer: boolean | string = true
+
+    try {
+      await dialogs.onDialog((dialog) => {
+        seen.push(`${dialog.type}|${dialog.message}|${dialog.defaultPrompt}`)
+
+        return answer
+      })
+
+      /* eslint-disable no-alert -- the test opens the dialogs it answers */
+      expect(await dialogs.evaluate(() => confirm('sure?'))).toBe(true)
+      answer = false
+      expect(await dialogs.evaluate(() => confirm('really?'))).toBe(false)
+      answer = 'typed'
+      expect(await dialogs.evaluate(() => prompt('name?', 'dflt'))).toBe('typed')
+      answer = true
+      await dialogs.evaluate(() => alert('done'))
+      /* eslint-enable no-alert */
+      expect(seen).toEqual(['confirm|sure?|', 'confirm|really?|', 'prompt|name?|dflt', 'alert|done|'])
+      expect(dialogs.errors).toEqual([])
+    }
+    finally {
+      dialogs.close()
+    }
+  })
+
+  it('collects the warnings of the page beside its errors', async () => {
+    const warned = await site.open('/')
+
+    try {
+      await warned.evaluate(() => console.warn('careful', { a: 1 }))
+      // The console reaches the test a moment after the call.
+      for (let tries = 0; tries < 50 && warned.warnings.length === 0; tries++)
+        await Bun.sleep(20)
+
+      expect(warned.warnings).toHaveLength(1)
+
+      expect(warned.warnings[0]).toStartWith('careful')
+      expect(warned.errors).toEqual([])
+    }
+    finally {
+      warned.close()
+    }
+  })
+
+  it('puts files in a file input as the picker does, firing change, and fails for what is no element', async () => {
+    const uploading = await site.open('/posted')
+    const file = join(await scratchDir('upload-'), 'note.txt')
+
+    try {
+      await Bun.write(file, 'hello')
+      await uploading.evaluate(() => {
+        const changes: string[] = []
+
+        ;(window as { changes?: string[] }).changes = changes
+        document.querySelector('form.upload input')!.addEventListener('change', event => changes.push((event.target as HTMLInputElement).files![0]!.name))
+      })
+      await uploading.upload('form.upload input', file)
+
+      expect(await uploading.evaluate(() => {
+        const [selected] = document.querySelector<HTMLInputElement>('form.upload input')!.files!
+
+        return [selected!.name, selected!.size, (window as { changes?: string[] }).changes]
+      })).toEqual(['note.txt', 5, ['note.txt']])
+      await expect(uploading.upload('nothing-here', file)).rejects.toThrow('timed out')
+    }
+    finally {
+      uploading.close()
+    }
+  })
+
   it('waits for an element to show up or go away, runs a function with its arguments, undefined ones included, and times out naming what it waited for', async () => {
     await page.goto('/')
     await page.evaluate(() => void setTimeout(() => document.body.append(Object.assign(document.createElement('p'), { className: 'late' })), 200))

@@ -2,7 +2,7 @@ import type { AxeResults } from '../runtime/dev-a11y'
 import type { Network, PageResponse } from './network'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { afterAll } from 'bun:test'
@@ -23,6 +23,10 @@ export interface BrowserOptions {
   lenient?: boolean | undefined
   // The colour scheme the page is asked for from its first load, `prefers-color-scheme` and `matchMedia` alike.
   colorScheme?: 'light' | 'dark' | undefined
+  // The motion preference the page is asked for from its first load, `prefers-reduced-motion` and `matchMedia` alike.
+  reducedMotion?: 'reduce' | 'no-preference' | undefined
+  // `false` turns JavaScript off for the page, as a visitor who disabled it: its scripts never run, so a test sees what the server rendered, and `evaluate` and the waits still read the page.
+  javaScript?: boolean | undefined
   // Cookies the page's first load carries, for a site's origin, such as a session's: a `Cookie` header string, as `auth.sessionCookie` returns, or a list.
   cookies?: string | { name: string, value: string }[] | undefined
 }
@@ -73,6 +77,16 @@ export interface A11yViolation {
   nodes: { target: string, html: string }[]
 }
 
+// A dialog the page opened.
+export interface PageDialog {
+  type: 'alert' | 'confirm' | 'prompt' | 'beforeunload'
+  message: string
+  // A prompt's default text, else an empty string.
+  defaultPrompt: string
+}
+
+export type DialogHandler = (dialog: PageDialog) => boolean | string | Promise<boolean | string>
+
 export type { FetchedResponse, FulfillOptions, PageRequest, PageResponse, RouteHandler, RouteMatch } from './network'
 
 export interface TestPage {
@@ -82,6 +96,8 @@ export interface TestPage {
   cdp: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
   // The console errors and uncaught exceptions of the page so far.
   errors: string[]
+  // The console warnings of the page so far.
+  warnings: string[]
   // Loads a path of the site, or any URL, resolving once the page loaded and its eager islands hydrated.
   goto: (path: string) => Promise<void>
   // The current path and query, a swapped page's included.
@@ -90,6 +106,10 @@ export interface TestPage {
   click: (selector: string, options?: ClickOptions) => Promise<void>
   // Replaces a field's text with `text`, as typing it does, firing `input`.
   fill: (selector: string, text: string) => Promise<void>
+  // Puts files in a file input, by path, as choosing them in the picker does, firing `input` and `change`.
+  upload: (selector: string, files: string | string[]) => Promise<void>
+  // Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs, which otherwise stay open and stop the page: the handler returns `true` to accept, `false` to dismiss, or a string to accept a prompt with that text. A later call replaces the handler.
+  onDialog: (handler: DialogHandler) => Promise<void>
   // Types into the focused element.
   type: (text: string) => Promise<void>
   press: (key: Parameters<Bun.WebView['press']>[0], options?: Parameters<Bun.WebView['press']>[1]) => Promise<void>
@@ -150,6 +170,8 @@ const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
 // What the message of a wait that ran out of time starts with.
 const UNSETTLED = 'kay: timed out after'
+// Loaded, for a page with JavaScript off, which hydrates no island.
+const LOADED = `document.readyState === 'complete'`
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
@@ -219,6 +241,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const timeout = options.timeout ?? TIMEOUT_MS
   const strict = options.strict ?? true
   const errors: string[] = []
+  const warnings: string[] = []
   // How many of `errors` a call already looked through for kay's own.
   let seen = 0
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
@@ -236,6 +259,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       console: (type, ...args) => {
         if (type === 'error')
           errors.push(args.map(consoleText).join(' '))
+        else if (type === 'warn' || type === 'warning')
+          warnings.push(args.map(consoleText).join(' '))
       },
     })
   }
@@ -391,19 +416,46 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
+  const ready = options.javaScript === false ? LOADED : SETTLED
+
   const traverse = async (step: string) => {
     const entry = await inView<string>('navigation.currentEntry.key')
 
     // `history`, not the view's own back and forward, which wait for a load a swapped page never fires.
     await inView(`void ${step}`)
-    await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${SETTLED}`, 'the page to settle')
+    await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${ready}`, 'the page to settle')
   }
+
+  let dialogs: DialogHandler | undefined
+  let dialogsOn = false
+  const answerDialog = async (dialog: PageDialog) => {
+    try {
+      const answer = await dialogs?.(dialog) ?? false
+
+      await cdp('Page.handleJavaScriptDialog', { accept: answer !== false, ...typeof answer === 'string' ? { promptText: answer } : {} })
+    }
+    catch (error) {
+      if (!gone && !closed)
+        errors.push(`kay: answering a dialog failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // The middle of the element, two frames on when scripts run, once a scroll or a transition settled.
+  const center = async (selector: string) => inView<[number, number]>(script(async (target: string, frames: boolean) => {
+    if (frames)
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+    const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
+
+    return [left + width / 2, top + height / 2]
+  }, [selector, options.javaScript !== false]))
 
   const network = createNetwork({ view, cdp, origin: () => origin, errors, timeout })
   const page: TestPage = {
     view,
     cdp,
     errors,
+    warnings,
     responses: network.responses,
     waitForResponse: network.waitForResponse,
     route: network.route,
@@ -422,14 +474,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         return element !== null && element.getClientRects().length > 0
       }, [selector]), selector, wait.timeout)
 
-      // Two frames on, once a scroll or a transition settled.
-      const [x, y] = await inView<[number, number]>(script(async (target: string) => {
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-
-        const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
-
-        return [left + width / 2, top + height / 2]
-      }, [selector]))
+      const [x, y] = await center(selector)
 
       await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
     }),
@@ -447,7 +492,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         await live(async () => view.navigate(target.href))
       }
 
-      await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
+      await settle(ready, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
     click: async (selector, { modifiers, ...wait } = {}) => serial(async () => {
@@ -467,7 +512,15 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         const tried = Date.now()
 
         try {
-          await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
+          // Bun's click waits for the element with a script of its own, which a page with JavaScript off does not run.
+          if (options.javaScript === false) {
+            const [x, y] = await center(selector)
+
+            await live(async () => view.click(x, y, modifiers === undefined ? {} : { modifiers }))
+          }
+          else {
+            await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
+          }
 
           return
         }
@@ -487,6 +540,30 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }, [selector]))
 
       await live(async () => text === '' ? view.press('Delete') : view.type(text))
+    }),
+    upload: async (selector, files) => serial(async () => {
+      await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
+
+      const { result } = await cdp<{ result: { objectId?: string } }>('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` })
+
+      if (result.objectId === undefined)
+        throw new Error(`kay: ${selector} is not an element to upload to`)
+
+      await cdp('DOM.setFileInputFiles', { objectId: result.objectId, files: (Array.isArray(files) ? files : [files]).map(file => resolvePath(file)) })
+    }),
+    onDialog: async handler => serial(async () => {
+      dialogs = handler
+
+      if (dialogsOn)
+        return
+
+      dialogsOn = true
+      view.addEventListener('Page.javascriptDialogOpening', (event) => {
+        const { type, message, defaultPrompt } = (event as MessageEvent<{ type: PageDialog['type'], message: string, defaultPrompt?: string }>).data
+
+        void answerDialog({ type, message, defaultPrompt: defaultPrompt ?? '' })
+      })
+      await cdp('Page.enable')
     }),
     type: async text => serial(async () => live(async () => view.type(text))),
     press: async (key, keyOptions) => serial(async () => live(async () => view.press(key, keyOptions))),
@@ -534,7 +611,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {
       await live(async () => view.reload())
-      await settle(SETTLED, 'the page to reload and hydrate its islands')
+      await settle(ready, 'the page to reload and hydrate its islands')
     }),
     close: () => {
       network.close()
@@ -561,8 +638,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     await cdp('Inspector.enable')
     await cdp('Network.enable')
 
-    if (options.colorScheme !== undefined)
-      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: options.colorScheme }] })
+    const media = [
+      ...options.colorScheme === undefined ? [] : [{ name: 'prefers-color-scheme', value: options.colorScheme }],
+      ...options.reducedMotion === undefined ? [] : [{ name: 'prefers-reduced-motion', value: options.reducedMotion }],
+    ]
+
+    if (media.length > 0)
+      await cdp('Emulation.setEmulatedMedia', { features: media })
+
+    if (options.javaScript === false)
+      await cdp('Emulation.setScriptExecutionDisabled', { value: true })
 
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
