@@ -2,7 +2,7 @@
 
 ## Setup
 
-`kay add mail` does the install and the two files below.
+`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mailExtension('./src/mail')` in `kay.config.ts`; the files below add `from` and `lang`.
 
 kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
 

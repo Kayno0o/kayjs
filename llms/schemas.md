@@ -44,7 +44,7 @@ const { initial } = props<{ initial: Choice }>()
 
 - `s` from `kay` is Elysia's schema builder under a name that leaves `t` to translations, there to save an import in server fences and server modules, `defineEnv` and API modules included.
 - The browser has none, nor Elysia's, which reads `Bun`: schemas live in modules only the server imports, and what an island needs of one, a length or a list of choices, in another module both import.
-- A client build, `kay dev`'s and `kay test`'s included, refuses an island reaching kay's `s`, naming the modules taking it from `kay`.
+- A client build, `kay dev`'s and `bun test`'s included, refuses an island reaching kay's `s`, naming the modules taking it from `kay`.
 - An island reads a schema's type, not its value: `import type { Choice } from '../schemas'`, or `import type { choice } from '../schemas'` for `Static<typeof choice>`, is erased from the browser build, so the module may build its schemas with `s`.
 - `Static<typeof schema>` and `InputOf<typeof action>` are types from `kay` and cost the browser nothing.
 - A module holding a value an island needs, a list of choices to draw as buttons, exports it apart from the schema, in a module with no `s`.

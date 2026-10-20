@@ -18,7 +18,7 @@
 
 ## Setup
 
-`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which only makes `kay env` list the variables.
+`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which lists the variables in `kay env`, applies `limit`/`budget`/`visitor` and adds `kay i18n translate`; without it `ask` is unlimited.
 
 ```ts
 // kay.config.ts

@@ -10,7 +10,7 @@ Both save the same way. A file entry is a Forgejo commit, or a change in the wor
 ## Install
 
 ```sh
-bun add @kaynooo/kayjs-cms @iconify-json/tabler
+bun add @kaynooo/kayjs-cms @kaynooo/kayjs-ui @iconify-json/tabler
 ```
 
 The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).

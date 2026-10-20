@@ -24,4 +24,4 @@ The picker takes a function, so it renders inside an island.
 
 ## Labels
 
-`searchLabel` names the search box and `placeholder` fills it, `Search icons` and `Search icons…` by default. `gridLabel` names the grid, `Icons`. `searchingLabel`, `emptyLabel`, `clearLabel` and `moreLabel` word the searching state, the empty result, the clear button and the Show more button. Set them to translate the picker.
+`searchLabel` names the search box and `placeholder` fills it, `Search icons` and `Search icons…` by default. `gridLabel` names the grid, `Icons`. `searchingLabel`, `emptyLabel`, `errorLabel`, `clearLabel` and `moreLabel` word the searching state, the empty result, a search that failed (`The icons could not be loaded.`), the clear button and the Show more button. Set them to translate the picker.

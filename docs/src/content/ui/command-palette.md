@@ -36,4 +36,4 @@ Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) opens and closes 
 
 ## Texts
 
-`placeholder` fills the search box, `Search` by default, and `emptyLabel` is what the list says when nothing matches, `No results`.
+`placeholder` fills the search box, `Search` by default, and `emptyLabel` is what the list says when nothing matches, `No results`. `recentLabel` heads the recent links, `Recent`.

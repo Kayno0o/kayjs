@@ -26,6 +26,8 @@ Call `toast` once what the user started has finished, with the outcome as its ty
 
 `attempt` toasts a failed call. To show its message where it happens instead, in a notice or beside a field, `messageOf(error, fallback)` reads the words the route answered with, or an action's refusal, when they read as a message, and gives `fallback` for a network failure, a 5xx or any other error.
 
-## Dismiss label
+## Dismiss label and hotkey
 
 `dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.
+
+`hotkey` is the key that, with Alt, moves the focus to the first toast's close button, `t` by default. Pass `hotkey={null}` to turn it off.

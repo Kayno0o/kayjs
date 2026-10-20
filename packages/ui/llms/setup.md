@@ -8,6 +8,8 @@ kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/pack
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
 ```
 
+Two peers are optional, installed only when used: `chartist` for `LineChart`, `hls.js` for an `.m3u8` video in a browser without native HLS.
+
 `src/app.css`, imported by the root `_layout.kay`, imports the theme right after Tailwind. kay collects the classes of the library's templates along with the app's own, so no `@source` line has to point into `node_modules`:
 
 ```css
@@ -76,7 +78,7 @@ const settings: Settings = { ...defaults, icons: { ...defaults.icons, close } }
 export default settings
 ```
 
-`kay check` checks this module against `Settings`. The server, the browser, `kay build` and `kay test` all render with it.
+`kay check` checks this module against `Settings`. The server, the browser, `kay build` and `bun test` all render with it.
 
 ## Testing an app's use of it
 

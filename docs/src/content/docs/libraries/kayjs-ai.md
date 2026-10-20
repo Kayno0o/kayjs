@@ -19,7 +19,7 @@ kay is a peer. kayjs-ai is released with kay, at kay's own version, and peers on
 
 In a kay project, `kay add ai` does the install and the line below for you.
 
-List the extension in `kay.config.ts`. It only makes `kay env` show the variables below; `ask` works without it.
+List the extension in `kay.config.ts`. It makes `kay env` show the variables below, sets your limits and adds `kay i18n translate`. `ask` works without it, with no limits.
 
 ```ts
 import { ai } from '@kaynooo/kayjs-ai'
@@ -40,7 +40,7 @@ Then pick a provider with environment variables:
 
 For Mistral, set `AI_BASE_URL=https://api.mistral.ai/v1`, put its key in `OPENAI_API_KEY` and set `AI_MODEL` to a dated model such as `mistral-small-2603`. Avoid an alias like `mistral-small-latest`: it moves to the next model, and you pay that model's price. Nothing else is needed.
 
-With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill.
+With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill. With `AI_PROVIDER=anthropic`, `AI_BASE_URL` is the root of a proxy for Anthropic.
 
 ## Ask in a page
 
@@ -97,7 +97,7 @@ Chat(action={reply} label="Assistant")
 A page, with or without a `server` fence, hands the action straight to `Chat`. The action has to be exported by a page or endpoint.
 
 - Enter sends and Shift+Enter starts a new line.
-- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
+- Stop, or Escape anywhere in the chat, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
 - An empty chat says `greeting` and offers the `suggestions` you give it, a few questions that send on a click.
 - The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; `toolLabels` words each tool, `{ search_docs: 'Searched the docs' }`, and a tool without one shows its name.

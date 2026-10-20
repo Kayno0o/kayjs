@@ -19,7 +19,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Setup
 
-In a kay project, `kay add mail` does the install and the two files below for you.
+In a kay project, `kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` that reads SMTP from the environment, and lists `mailExtension('./src/mail')` in `kay.config.ts`. Set `from` and `lang` there as below.
 
 `src/mail.ts` creates the mailer. `from` is your own address. A visitor's address goes in `replyTo`.
 
@@ -93,7 +93,7 @@ Layout(preheader="Your account is ready")
 
 A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 
-It also ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows.
+It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` with `Column` for columns that stack on a phone. `Fields` lays out a form's answers as label and value pairs, and `Quote` sets a visitor's message apart. They hold in Outlook for Windows.
 
 ### Dark mode
 

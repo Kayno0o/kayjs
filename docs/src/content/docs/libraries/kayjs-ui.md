@@ -13,7 +13,7 @@ bun add @kaynooo/kayjs-ui @iconify-json/tabler
 
 The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
-kay and Tailwind v4 are peers, and the default icons are Tabler's. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+kay and Tailwind v4 are peers, and the default icons are Tabler's. Two peers are optional: `bun add chartist` for `LineChart`, and `bun add hls.js` for an `.m3u8` video in a browser without native HLS. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
 An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
