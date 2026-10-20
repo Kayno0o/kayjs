@@ -1,4 +1,5 @@
 import type { ScratchBuild } from './prerendered'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { invalidate, onKeysInvalidated } from '../src/runtime/cache'
 import { schedule, talks } from './fixtures/scheduled/src/content.config'
@@ -60,6 +61,7 @@ afterEach(() => {
   setSystemTime()
   schedule.items = []
   schedule.loads = 0
+  schedule.afterRead = undefined
   talks.invalidate()
   invalidate(() => true)
 })
@@ -116,6 +118,21 @@ describe('a prerendered site with a scheduled entry', () => {
 
       expect(listing).toContain('Late')
       expect(listing).toContain('Old')
+    })
+  })
+
+  it('renders a page again when its date falls between the start of its render and its end', async () => {
+    await build(async (scratch) => {
+      setSystemTime(NOW)
+      schedule.items = [{ slug: 'edge', title: 'Edge', at: '2026-10-19T12:00:01Z' }]
+      schedule.afterRead = () => setSystemTime(new Date('2026-10-19T12:00:05Z'))
+      await scratch.prerender(OPTIONS)
+      schedule.afterRead = undefined
+      expect(await Bun.file(join(scratch.pages, 'talks.html')).text()).not.toContain('Edge')
+
+      const app = await serve(scratch)
+
+      expect((await visit(app, '/talks')).text).toContain('Edge')
     })
   })
 

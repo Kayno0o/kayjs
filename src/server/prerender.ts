@@ -152,6 +152,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         // Rendered at the path the server answers it at, which `trailingSlash` spells.
         const served = slashedPath(copy.path, config.trailingSlash)
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`)
+        // Taken before the render, so a date passing during it counts as passed since.
+        const renderedAt = Date.now()
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
         // onError is the app's for requests it answers; the build logs what a prerendered page throws.
@@ -256,7 +258,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html, path: copy.path, host: copy.host, status: response.status, location: response.headers.get('location') ?? undefined })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt, revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored

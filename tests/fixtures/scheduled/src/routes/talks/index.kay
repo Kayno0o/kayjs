@@ -1,9 +1,11 @@
 --- server
-import { talks } from '../../content.config'
+import { schedule, talks } from '../../content.config'
 
 export const page = { prerender: true }
 
 const entries = await talks.all()
+
+schedule.afterRead?.()
 ---
 ul
   for entry of entries key={entry.slug}

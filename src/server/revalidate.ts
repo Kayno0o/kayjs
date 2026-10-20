@@ -50,6 +50,8 @@ async function strengthen(page: ServedPage, html: string): Promise<void> {
 
 async function rerender(page: ServedPage, render: () => Promise<Response>, revalidation: Revalidation, report: (error: unknown) => void): Promise<void> {
   const started = invalidationCount()
+  // Taken before the render, so a date passing during it counts as passed since.
+  const renderedAt = Date.now()
   const period = page.revalidate === undefined ? Infinity : page.revalidate * 1000
   const failed = () => {
     revalidation.retryAt = Date.now() + Math.min(period, RETRY_MS)
@@ -74,7 +76,7 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
     const encoded = await compressText(html)
 
     // All at once, so no request reads the new html with the old tag.
-    Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now(), dcz: undefined })
+    Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt, dcz: undefined })
     revalidation.renderedAfter = started
     revalidation.staleAt = Date.now() + period
 
