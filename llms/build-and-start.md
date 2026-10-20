@@ -59,6 +59,7 @@ kay build --static --outdir dist
   - The public directory cannot be named `client`.
   - The executable carries `kay.config.ts` without its `plugins`, nor the imports and top-level declarations only they used, side effects included, so a build plugin such as Tailwind's, whose native addon loads from node_modules, never runs there;
   - Plugins set other than as a property of the object the file exports by default, or beside a spread, stay in, with a warning.
+  - `import.meta.dir`, `dirname`, `path`, `filename` and `file` in `kay.config.ts` name the project's folder and file as the build saw them, so a config reading a file beside it as it loads (`readdirSync(join(import.meta.dir, '../llms'))`) boots; the file itself is not in the executable, so it must be there where the executable runs, and a module other than the config sees `/$bunfs/root`.
   - `./server --licenses` prints the licence of every package it carries: the browser build's, and every package the project's `dependencies` install, theirs included.
 - `kay build [dir] --static [--outdir dist]`:
   - The same, then writes the whole site to `--outdir` for a host with no server; see [Static export](prerendering.md#static-export).

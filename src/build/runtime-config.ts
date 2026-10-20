@@ -2,6 +2,7 @@ import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { BunPlugin } from 'bun'
 import { realpathSync } from 'node:fs'
+import { basename, dirname } from 'node:path'
 import { parse } from '@babel/parser'
 import { loadTraverse } from '../compiler/rewrite'
 
@@ -17,7 +18,7 @@ interface Token extends Range {
 const COMMENTS = new Set(['CommentBlock', 'CommentLine'])
 const TS_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
 
-// `kay.config.ts` as the compiled server loads it: a build plugin and what only it imports never reach the executable, where a native addon such as Tailwind's cannot load.
+// `kay.config.ts` as the compiled server loads it: a build plugin and what only it imports never reach the executable, where a native addon such as Tailwind's cannot load, and `import.meta.dir` names the project's folder, as inside the executable it would name `/$bunfs/root`.
 export function runtimeConfig(file: string, contents: string): BunPlugin {
   // Bun loads a module by its real path, a symlinked project's included.
   const real = realpathSync(file)
@@ -25,7 +26,7 @@ export function runtimeConfig(file: string, contents: string): BunPlugin {
   return {
     name: 'kay-runtime-config',
     setup(build) {
-      build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}$`) }, () => ({ contents, loader: 'ts' }))
+      build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}$`) }, () => ({ contents: withProjectPaths(contents, real), loader: 'ts' }))
     },
   }
 }
@@ -90,6 +91,32 @@ export function withoutPlugins(source: string): string | undefined {
     stripped = stripped.slice(0, start) + stripped.slice(end)
 
   return parseModule(stripped, false) ? stripped : undefined
+}
+
+// The source with the `import.meta` paths of the module written out as the file's, so a config reading a file beside it at load, as `readdirSync(join(import.meta.dir, '../llms'))`, finds it where the build did instead of in the executable's own file system.
+export function withProjectPaths(source: string, file: string): string {
+  const ast = parseModule(source, false)
+  const paths: Record<string, string> = { dir: dirname(file), dirname: dirname(file), path: file, filename: file, file: basename(file) }
+  const found: (Range & { value: string })[] = []
+
+  if (!ast)
+    return source
+
+  loadTraverse()(ast, {
+    MemberExpression(path) {
+      const { object, property, computed } = path.node
+
+      if (!computed && object.type === 'MetaProperty' && object.meta.name === 'import' && property.type === 'Identifier' && Object.hasOwn(paths, property.name))
+        found.push({ start: path.node.start!, end: path.node.end!, value: paths[property.name]! })
+    },
+  })
+
+  let pinned = source
+
+  for (const { start, end, value } of found.toSorted((a, b) => b.start - a.start))
+    pinned = pinned.slice(0, start) + JSON.stringify(value) + pinned.slice(end)
+
+  return pinned
 }
 
 // Undefined for what Babel does not read, though Bun might: the config then goes in as it is.

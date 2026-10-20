@@ -166,7 +166,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   if (runtime === undefined && (config.plugins?.length ?? 0) > 0)
     console.warn(`kay: the plugins in ${CONFIG_FILE} cannot be told apart from the rest of the config, which they can as a property of the object it exports by default with no spread beside them, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
 
-  const configPlugins = runtime === undefined ? [] : [runtimeConfig(configFile, runtime)]
+  const configPlugins = configSource === undefined ? [] : [runtimeConfig(configFile, runtime ?? configSource)]
   const since = raisedMark()
   const build = await Bun.build({
     // The AVIF encoder's worker too, which the executable starts from `/$bunfs/root/avif-worker.js`.

@@ -22,7 +22,7 @@ import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersion
 import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
 import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
-import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
+import { runtimeConfig, withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
 import { analyzeKayCached, compilerFingerprint, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
@@ -2294,6 +2294,50 @@ describe('the files a build writes', () => {
     bare.stack = 'Error\n    at x (/a.ts:1:1)'
     expect(describeThrown(bare)).toBe('Error\n    at x (/a.ts:1:1)')
   })
+})
+
+describe('a config reading files beside it', () => {
+  it('writes the module\'s import.meta paths out as the file\'s, in code only', () => {
+    const source = [
+      'const topics = readdirSync(join(import.meta.dir, \'../llms\'))',
+      'const same = import.meta.dirname + import.meta.path + import.meta.filename + import.meta.file',
+      'const other = import.meta.url + import.meta.env + import.meta[\'dir\']',
+      '// import.meta.dir',
+      'const text = \'import.meta.dir\'',
+    ].join('\n')
+
+    expect(withProjectPaths(source, '/app/docs/kay.config.ts')).toBe([
+      'const topics = readdirSync(join("/app/docs", \'../llms\'))',
+      'const same = "/app/docs" + "/app/docs/kay.config.ts" + "/app/docs/kay.config.ts" + "kay.config.ts"',
+      'const other = import.meta.url + import.meta.env + import.meta[\'dir\']',
+      '// import.meta.dir',
+      'const text = \'import.meta.dir\'',
+    ].join('\n'))
+    expect(withProjectPaths('export default { (', '/app/kay.config.ts')).toBe('export default { (')
+  })
+
+  it('boots in a compiled executable, with its plugins left out or kept, wherever it starts', async () => {
+    for (const config of ['export default { redirects: redirects() }', 'export default { plugins: [], redirects: redirects(), ...{} }', 'export default { plugins: [], redirects: redirects() }']) {
+      const project = await scratchProject({
+        'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { elysia: '*' } }),
+        'tsconfig.json': tsconfig,
+        'kay.config.ts': `import { readdirSync } from 'node:fs'\nimport { join } from 'node:path'\n\nfunction redirects() {\n  return Object.fromEntries(readdirSync(join(import.meta.dir, 'topics')).map(topic => [\`/\${topic}\`, '/']))\n}\n\n${config}\n`,
+        'topics/alpha': '',
+        'src/routes/index.kay': 'p Home\n',
+        'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst moved = await app.handle(new Request(\'http://localhost/alpha\'))\n\nconsole.log(JSON.stringify({ status: moved.status, location: moved.headers.get(\'location\') }))\nprocess.exit(0)\n',
+      })
+      const elsewhere = await scratchDir('kay-elsewhere-')
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check', '--compile', join(project, 'server')], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(code, report).toBe(0)
+
+      const child = Bun.spawn([join(project, 'server')], { cwd: elsewhere, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect(errors).not.toContain('ENOENT')
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 308, location: '/' })
+    }
+  }, 120_000)
 })
 
 describe('a compiled server\'s images', () => {

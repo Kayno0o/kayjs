@@ -38,6 +38,8 @@ The server listens on every address unless `HOST` names one. `HOST=127.0.0.1 POR
 
 The executable reads a `.env` and a `bunfig.toml` where it runs, but nothing else of the project. A file a page reads by path at runtime is not in it.
 
+In `kay.config.ts`, `import.meta.dir` and its siblings name the project's folder as the build saw it. A config that reads a file beside it when it loads therefore starts, but the file must still be there where the executable runs. In any other module, `import.meta.dir` names a folder inside the executable.
+
 ### Prove the executable starts
 
 The executable is bundled apart from what `kay dev` runs, so a module it cannot load only shows when it starts. `--verify` starts it as part of the build:

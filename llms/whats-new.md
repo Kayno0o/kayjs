@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A `kay.config.ts` reading a file beside it as it loads, `readdirSync(join(import.meta.dir, '../llms'))`, no longer fails with ENOENT on `/$bunfs` when a `--compile` executable boots: the config's `import.meta.dir` names the project's folder as the build saw it ([Build and start](build-and-start.md#build-one-executable)).
 - A button takes `commandfor` and `command` in a template, typed by `kay check` (`show-modal`, `close`, `request-close`, `show-popover`, `hide-popover`, `toggle-popover` or a `--custom` name), so a popover or a dialog opens with no handler and the component stays static ([Islands](islands.md#islands)).
 - kayjs-ui's `SiteNav` and `AppHeader` ship no JavaScript: the menu is a popover its toggle opens, the browser closing it on Escape or a press outside and giving the focus back, and a page with no other island loads no script for it ([kayjs-ui](../packages/ui/llms/tables-navigation-and-layout.md)); see [Upgrading](upgrading.md).
 - `kay check` type-checks with Bun's own `bun check` instead of tsgo: a cold check of the docs site takes 1.3 s and 4.4 s of CPU instead of 2.0 s and 7.2 s, at 310 MB instead of 760 MB, with the same diagnostics at the same `.kay` lines; a warm check of a project nothing changed in still skips the type check ([Checks](checks.md)).
