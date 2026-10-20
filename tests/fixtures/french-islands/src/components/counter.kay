@@ -1,0 +1,20 @@
+---
+import { signal } from 'kay'
+
+const n = signal(0)
+const label = signal('Début')
+const shown = signal(true)
+---
+div.counter
+  p.total Total : {n()} !
+  p.label {label()}
+  p.mixed Prix : {label()} ?
+  if shown()
+    | Reste : {n()} !
+  code.code {label()}
+  pre.pre
+    | Ligne : {label()}
+  button.plus(type="button" onClick={() => { n.set(n() + 1); label.set(`Reste : ${n()} !`) }}) Plus
+  button.typed(type="button" onClick={() => label.set('Déjà : fin ! « a ». 12:30 http://a.fr:80/x?y=1')}) Typed
+  button.hostile(type="button" onClick={() => label.set('<b>x</b> : y')}) Hostile
+  button.toggle(type="button" onClick={() => shown.set(!shown())}) Toggle

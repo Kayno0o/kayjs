@@ -1,0 +1,5 @@
+---
+import Counter from '../components/counter.kay'
+---
+h1 Compteur
+Counter

@@ -1,9 +1,6 @@
-const NBSP = '\u00A0'
-const FRENCH = /^fr(?:-|$)/i
-// The plain space before a mark, with the mark, and the plain space after an opening guillemet.
-const BEFORE_MARK = / ([:;!?»])/g
-const AFTER_OPENING = /« /g
-// The same two, searched for where the next one to change is.
+import { isFrench, spaced } from '../runtime/french'
+
+// The plain space before a mark, and after an opening guillemet, searched for where the next one to change is.
 const MARK = / [:;!?»]/g
 const OPENING = /« /g
 const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|[^\s"'=<>`]+))?/g
@@ -27,10 +24,7 @@ const LETTER_K = 107
 const LETTER_S = 115
 const LETTER_T = 116
 
-// Whether a page in this language gets French spaces: `fr` and `fr-CA`, not another language starting with the same letters.
-export function isFrench(lang: string): boolean {
-  return FRENCH.test(lang)
-}
+export { isFrench }
 
 // What a page rendered in this language runs its markup through, or nothing when it is not French or the app turned `typography` off.
 export function typographyFor(lang: string, typography: boolean | undefined): ((html: string) => string) | undefined {
@@ -91,12 +85,6 @@ function moveTo(html: string, next: { mark: number, opening: number }, to: numbe
     next.opening = find(OPENING, html, to, 1)
 
   return Math.min(next.mark, next.opening)
-}
-
-function spaced(text: string, guillemets: boolean): string {
-  const marked = text.replace(BEFORE_MARK, `${NBSP}$1`)
-
-  return guillemets ? marked.replace(AFTER_OPENING, `«${NBSP}`) : marked
 }
 
 // A page's markup with a plain space before `: ; ! ?` and inside `« »` made non-breaking, in its text and in the `alt`, `title`, `aria-label` and description `content` it writes.

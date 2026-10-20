@@ -13,7 +13,8 @@ import { fixtureCopy } from './scratch'
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 // What a page of an app with locales, its one small island importing nothing of kay/i18n, loads up front, gzipped, a little above what it is: the links an island sets go in the page's locale from the start, the messages and formatters wait for an island using them.
 // About 1% above it, as the hashed chunk names alone move it by a dozen bytes from one project path to the next.
-const EAGER_JS_BUDGET = 15_129
+// This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.
+const EAGER_JS_BUDGET = 15_145
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
 describe('an island of an app with locales', () => {
@@ -26,7 +27,8 @@ describe('an island of an app with locales', () => {
 
     const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
 
-    site = await testSite({ root: copy, i18n, browser: { path: chrome } })
+    // The French spacing of an island's text has its own budget, in tests/typography-islands.test.ts.
+    site = await testSite({ root: copy, i18n, typography: false, browser: { path: chrome } })
   }, 60_000)
 
   afterAll(async () => {

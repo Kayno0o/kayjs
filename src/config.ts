@@ -115,7 +115,7 @@ export interface KayConfig {
   inlineStyles?: boolean | undefined
   // Whether a page that inlines its own rules also links the whole stylesheet, loaded after the first paint: the rules of a class the build cannot read, one an island sets from a value or a server builds from data, then still apply, at the cost of the whole sheet's bytes on every first visit. Off by default, so a page ships only its own rules, and the build warns of a class it cannot read.
   lateStyles?: boolean | undefined
-  // Whether a page in French (a `lang` of `fr` or `fr-...`) has the plain space before `: ; ! ?` and inside `« »` in its text, `alt`, `title`, `aria-label` and description made non-breaking, so a mark never wraps alone. On by default, `false` leaves the text as it was typed; islands are not rewritten.
+  // Whether a page in French (a `lang` of `fr` or `fr-...`) has the plain space before `: ; ! ?` and inside `« »` in its text, `alt`, `title`, `aria-label` and description made non-breaking, so a mark never wraps alone. On by default, `false` leaves the text as it was typed. Islands write the same spaces in the browser, in an app whose `lang` or `i18n` locales are French.
   typography?: boolean | undefined
   // How far ahead of the viewport islands start to load, as CSS root margins: `visible` for an island marked `hydrate="visible"` (`'200px'` by default), `serverIslands` for a deferred server island (`'100% 0px'`, a screen ahead, by default).
   hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined

@@ -3,12 +3,15 @@
 
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
+import { frenchText } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
+
+declare const KAY_FRENCH: true | undefined
 
 export { holdSubmits, listenSubmit } from './form-hold'
 export { renderEffect as effect, memo, untrack } from './reactive'
@@ -127,8 +130,12 @@ function claimNode(): Node {
 }
 
 // Claims a text node holding `data`, making one when the server wrote nothing, as for an empty string.
+// On a page in French the data is spaced as the server spaced the markup, so the text it wrote stays.
 function claimText(data: string): Text {
   const next = claim!.next
+
+  if (typeof KAY_FRENCH !== 'undefined')
+    data = frenchText(data, claim!.parent)
 
   if (next?.nodeType === 3) {
     claim!.next = next.nextSibling
@@ -237,7 +244,7 @@ export function text(parent: Node, data: string): void {
   if (claim)
     claimText(data)
   else
-    parent.appendChild(document.createTextNode(data))
+    parent.appendChild(document.createTextNode(typeof KAY_FRENCH === 'undefined' ? data : frenchText(data, parent)))
 }
 
 let paragraph: (() => Element) | undefined
@@ -457,13 +464,16 @@ function rowUnit(made: Unit[]): Unit | null {
   return made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!))
 }
 
+// Where the units being made go, set by a dynamic part on a page in French so a text inside code is left as it is.
+let into: Node | undefined
+
 // The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
 function units(value: unknown): Unit[] {
   const out: Unit[] = []
 
   eachChild(value, (part) => {
     if (typeof part === 'string') {
-      out.push(claim ? claimText(part) : document.createTextNode(part))
+      out.push(claim ? claimText(part) : document.createTextNode(typeof KAY_FRENCH === 'undefined' ? part : frenchText(part, into)))
     }
     else if (part instanceof Range) {
       out.push(part)
@@ -527,7 +537,7 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 
   const update = (value: unknown) => {
     if (typeof value === 'string' || typeof value === 'number') {
-      const data = String(value)
+      const data = typeof KAY_FRENCH === 'undefined' ? String(value) : frenchText(String(value), region.parent)
 
       // Text replacing text keeps its node.
       if (current.length === 1 && (current[0] as Node).nodeType === 3) {
@@ -546,7 +556,13 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
       }
     }
 
+    if (typeof KAY_FRENCH !== 'undefined')
+      into = region.parent
+
     const next = units(value)
+
+    if (typeof KAY_FRENCH !== 'undefined')
+      into = undefined
 
     if (next.length === current.length && next.every((unit, index) => unit === current[index]))
       return
