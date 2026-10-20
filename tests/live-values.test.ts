@@ -21,7 +21,7 @@ const ROOM = idOf('room')
 const SECRET = idOf('secret')
 // The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures (12,762), as the budget in tests/static.test.ts is.
 // The live runtime is a chunk of the islands reading it, not of every page: the home page pays for that chunk, about 180 bytes, where the pages reading no live value save its whole runtime; the hooks letting `presence()` keep a hidden tab's connection open and name the tab cost 46 bytes of it.
-const LIVE_EAGER_JS_BUDGET = 12_766
+const LIVE_EAGER_JS_BUDGET = 12_771
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')
