@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
-import { LLMS_GUIDES } from '../docs/src/reference'
+import { CROSS_PATH_SOURCE, crossHref, LLMS_GUIDES } from '../docs/src/reference'
 import { renderMarkdown } from '../src/content/markdown'
 
 const ROOT = join(import.meta.dir, '..')
@@ -10,10 +10,12 @@ const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(#[\w-]*)?[)"]/g
 // Code blocks and spans, whose links are examples rather than links of the site.
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 
-// A link between the Markdown files of llms/, `](islands.md#navigation)`, or into the same file, `](#navigation)`.
-export const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
+// A link between the Markdown files of llms/, `](islands.md#navigation)`, one by path into a library or another doc, `](../packages/ui/llms/forms.md)`, or into the same file, `](#navigation)`.
+export const LINK = new RegExp(String.raw`\]\(((?:llms\/)?[\w-]+\.md|${CROSS_PATH_SOURCE})?(#[\w-]+)?\)`, 'g')
+const CROSS = /^\.\.\//
 const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
 const LLMS_PREFIX = /^llms\//
+const docHref = (path: string) => CROSS.test(path) ? crossHref(path) : `/llms/${path.replace(LLMS_PREFIX, '').slice(0, -'.md'.length)}`
 const ARCHIVE_PAGE = /^llms\/[\w-]+-archive\.md$/
 const ARCHIVE_ADVICE = 'an archive loses its oldest sections at a release: link the page, or the current one'
 const ARCHIVE_ANCHOR = /-archive\.md#/
@@ -59,7 +61,7 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
     const own = file === 'llms.txt' ? '/llms.txt' : `/${file.slice(0, -'.md'.length)}`
 
     for (const [, path, anchor] of (await read(file)).matchAll(LINK)) {
-      resolve(file, path === undefined ? own : `/llms/${path.replace(LLMS_PREFIX, '').slice(0, -'.md'.length)}`, anchor?.slice(1))
+      resolve(file, path === undefined ? own : docHref(path), anchor?.slice(1))
 
       // An archive drops its oldest releases at a release, so a link into one by anchor goes stale.
       if (path !== undefined && anchor !== undefined && ARCHIVE_ANCHOR.test(`${path}${anchor}`) && !ARCHIVE_PAGE.test(file))

@@ -15,6 +15,18 @@ describe('the release\'s link check', () => {
     expect(await brokenLinks(new Map([['llms/islands.md', islands], ['llms/upgrading.md', `${upgrading}\n## A section the release dropped\n`]]))).toEqual([])
   })
 
+  it('checks a link by path into a library or another doc, whose target must exist', async () => {
+    const islands = await read('llms/islands.md')
+    const broken = async (target: string) => brokenLinks(new Map([['llms/islands.md', islands.replace('# ', `[Library](${target})\n\n# `)]]))
+
+    expect(await broken('../packages/ui/llms/forms.md#components')).toEqual([])
+    expect(await broken('../packages/cms/llms.txt')).toEqual([])
+    expect(await broken('../packages/ui/llms/forms.md#nope')).toEqual(['llms/islands.md: /llms/kayjs-ui-forms#nope'])
+    expect(await broken('../packages/ui/llms/nope.md')).toEqual(['llms/islands.md: /llms/kayjs-ui-nope'])
+    expect(await broken('../packages/nope/llms.txt')).toEqual(['llms/islands.md: /llms/kayjs-nope'])
+    expect(await broken('../../../llms/nope.md')).toEqual(['llms/islands.md: /llms/nope'])
+  })
+
   it('refuses a link into an archive by anchor, as the archive loses its oldest sections at a release', async () => {
     const archive = await read('llms/upgrading-archive.md')
     const anchor = (await renderMarkdown(archive)).headings.at(-1)!.id

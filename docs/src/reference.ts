@@ -11,6 +11,11 @@ const ROOT = join(import.meta.dir, '../..')
 const DOC = /^- \[[^\]]+\]\((llms\/[\w-]+\.md)\)/gm
 // A link to a doc, `actions.md` from another doc or `llms/server.md#locals` from llms.txt, made a link to its page under /llms.
 const DOC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
+
+// A link out of a doc to another file of the repo, as the forge resolves it: `../packages/ui/llms/forms.md` or `../packages/cms/llms.txt` from llms/, `../../../llms/privacy.md` from a library's topic.
+export const CROSS_PATH_SOURCE = String.raw`(?:\.\.\/)+(?:packages\/\w+\/llms(?:\/[\w-]+\.md|\.txt)|llms\/[\w-]+\.md)`
+const CROSS_PATH = /^(?:\.\.\/)+(?:packages\/(\w+)\/llms(?:\/([\w-]+)\.md)?|llms\/([\w-]+)\.md)/
+const CROSS_LINK = new RegExp(String.raw`\]\((${CROSS_PATH_SOURCE})(#[\w-]+)?\)`, 'g')
 const TITLE = /^# (.+)\n+/
 const QUOTED = /^> /gm
 
@@ -29,7 +34,17 @@ const GUIDE_OF = new Map<string, string>(LLMS_GUIDES.map(guide => [guide.topic, 
 
 export const llmsHref = (slug: string) => slug === 'overview' ? '/llms' : `/llms/${slug}`
 
-const linked = (markdown: string) => markdown.replace(DOC_LINK, (_link, slug: string, anchor = '') => `](${GUIDE_OF.get(slug) ?? `/llms/${slug}`}${anchor})`)
+// The page of the site a CROSS_PATH link names: a library's index or topic, or one of kay's docs.
+export function crossHref(path: string): string {
+  const [, library, topic, doc] = CROSS_PATH.exec(path)!
+
+  return library === undefined ? GUIDE_OF.get(doc!) ?? `/llms/${doc}` : `/llms/kayjs-${library}${topic === undefined ? '' : `-${topic}`}`
+}
+
+// A doc's links to the libraries' pages and to kay's other docs by path, made links between pages.
+export const crossLinked = (markdown: string) => markdown.replace(CROSS_LINK, (_link, path: string, anchor = '') => `](${crossHref(path)}${anchor})`)
+
+const linked = (markdown: string) => crossLinked(markdown).replace(DOC_LINK, (_link, slug: string, anchor = '') => `](${GUIDE_OF.get(slug) ?? `/llms/${slug}`}${anchor})`)
 
 // llms.txt as the overview, then one page per doc it lists, in its order, links between them made links between pages.
 export async function loadReference(): Promise<ReferencePage[]> {

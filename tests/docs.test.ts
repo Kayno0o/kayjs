@@ -66,6 +66,9 @@ describe('the documentation site', () => {
     expect(pages.find(page => page.slug === 'server')!.data.title).toBe('Locals, sessions and guards')
     expect(pages.flatMap(page => [...page.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
     expect(pages.find(page => page.slug === 'project')!.body).toContain('](/llms/server#locals)')
+    // A link by path into a library, which the forge resolves from the file, is a link to the library's page.
+    expect(pages.find(page => page.slug === 'content-cms')!.body).toContain('](/llms/kayjs-cms)')
+    expect(pages.find(page => page.slug === 'whats-new')!.body).toContain('](/llms/kayjs-ui-')
   })
 
   it('gives each library its full reference, and each kayjs-ui component a page with its usage and the props it declares', async () => {
@@ -79,6 +82,7 @@ describe('the documentation site', () => {
     // The topic files an index lists are pages of their own, the links between them links between pages.
     expect(libraries.find(library => library.slug === 'kayjs-auth-setup')!.data).toMatchObject({ library: 'kayjs-auth', source: 'llms/setup.md' })
     expect(libraries.find(library => library.slug === 'kayjs-auth')!.body).toContain('](/llms/kayjs-auth-setup)')
+    expect(libraries.find(library => library.slug === 'kayjs-ai-personal-data')!.body).toContain('](/llms/privacy)')
     expect(libraries.flatMap(library => [...library.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
     expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
     // FormDialog posts to an action, which the static site cannot serve, so its page shows code alone.

@@ -1,5 +1,6 @@
 import type { Prop } from './ui-props'
 import { join } from 'node:path'
+import { crossLinked } from './reference'
 import { propsOf } from './ui-props'
 
 export interface LibraryReference {
@@ -37,7 +38,7 @@ export async function loadLibraries(): Promise<LibraryReference[]> {
     const dir = join(PACKAGES, name)
     const text = await Bun.file(join(dir, 'llms.txt')).text()
     const { version } = await Bun.file(join(dir, 'package.json')).json() as { version: string }
-    const linked = (markdown: string) => markdown.replace(TOPIC_LINK, (_link, topic: string, anchor = '') => `](/llms/${name}-${topic}${anchor})`)
+    const linked = (markdown: string) => crossLinked(markdown).replace(TOPIC_LINK, (_link, topic: string, anchor = '') => `](/llms/${name}-${topic}${anchor})`)
     const topics = await Promise.all([...text.matchAll(TOPIC)].map(async ([, topic], position) => {
       const markdown = await Bun.file(join(dir, 'llms', `${topic}.md`)).text()
 
