@@ -93,6 +93,17 @@ describe('a post answered behind a TLS-terminating proxy', () => {
     })
   }
 
+  it('keeps the locale segment, a fragment and a bare base on the way back', async () => {
+    const app = await serve(site, { base: '/repo', trailingSlash: 'never', dev: false, proxy: 'declared' })
+
+    for (const how of ['form', 'swap'] as const) {
+      expect(where(await addFrom(app, { how, page: '/repo/fr/x?a=1', headers: FORWARDED.proto! }), how)).toBe('/repo/fr/x?a=1')
+      expect(where(await addFrom(app, { how, back: '/repo/en/x#top', headers: FORWARDED.proto! }), how)).toBe('/repo/en/x#top')
+      // The base without its slash is the home page, which the router names `/repo/`.
+      expect(where(await addFrom(app, { how, page: '/repo' }), how)).toBe('/repo/')
+    }
+  })
+
   it('counts an https site in kay.config.ts as the browser\'s scheme without any forwarded header', async () => {
     const app = await serve(site, { base: '', trailingSlash: 'never', dev: false, proxy: 'none', site: PUBLIC })
 
