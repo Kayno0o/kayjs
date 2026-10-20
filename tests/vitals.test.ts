@@ -57,6 +57,20 @@ beforeEach(() => {
 
 type Site = Awaited<ReturnType<typeof pages>>
 
+// A site built in production writes the paths it answered 404 to data/not-found.sqlite in the working folder, so it is built as a test server and asked as a production one: the vitals check reads the environment per request.
+async function build(...args: Parameters<typeof pages>): Promise<Site> {
+  const kept = process.env.NODE_ENV
+
+  process.env.NODE_ENV = 'test'
+
+  try {
+    return await pages(...args)
+  }
+  finally {
+    restoreEnvironment(kept)
+  }
+}
+
 const sites = new Map<string, Site>()
 
 // Building a site costs most of a test, so one is built per setup, over the store each test starts with.
@@ -67,7 +81,7 @@ async function site(options: VitalsOptions = {}, more: Record<string, unknown> =
   if (kept)
     return kept
 
-  const built = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals(options)], proxy: { hops: 1 }, store: { vitals: store }, ...more })
+  const built = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals(options)], proxy: { hops: 1 }, store: { vitals: store }, ...more })
 
   sites.set(key, built)
 
@@ -110,7 +124,7 @@ describe('the script and the page', () => {
   })
 
   it('adds nothing to a site that does not use it', async () => {
-    const plain = await pages({ routes: join(dir, 'routes'), prebuilt: false })
+    const plain = await build({ routes: join(dir, 'routes'), prebuilt: false })
     const home = await (await plain.handle(new Request('http://localhost/'))).text()
 
     expect(home).not.toContain('vitals')
@@ -290,7 +304,7 @@ describe('the consent gate', () => {
       setupStore({ vitals: store })
 
       const extensions = order.map(name => name === 'vitals' ? vitals() : analytics(asked))
-      const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions, proxy: { hops: 1 }, store: { vitals: store } })
+      const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions, proxy: { hops: 1 }, store: { vitals: store } })
 
       expect(await (await app.handle(new Request('http://localhost/_kay/vitals.js'))).text()).toBe(vitalsScript(true))
       await report(app, view({ p: '/' }), visit())
@@ -302,7 +316,7 @@ describe('the consent gate', () => {
 
   it('counts at once with consent: false though analytics asks, and serves the script that does not wait', async () => {
     const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', consent: true }
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(asked), vitals({ consent: false })], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(asked), vitals({ consent: false })], proxy: { hops: 1 }, store: { vitals: store } })
 
     expect(await (await app.handle(new Request('http://localhost/_kay/vitals.js'))).text()).toBe(vitalsScript(false))
     await report(app, view({ p: '/' }), visit())
@@ -310,7 +324,7 @@ describe('the consent gate', () => {
   })
 
   it('does not wait for a yes an analytics counter that asks no one never asked', async () => {
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: 'http://localhost:9' }), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: 'http://localhost:9' }), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
 
     await report(app, view({ p: '/' }), visit())
     expect((await vitalsReport())[0]!.lcp!.views).toBe(1)
@@ -466,7 +480,7 @@ describe('the app\'s store', () => {
 
   it('goes through the store of the config when the site has one', async () => {
     const mine = memoryVitals()
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: mine } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: mine } })
 
     await report(app, view({ p: '/' }))
     expect((await mine.counts(0)).length).toBeGreaterThan(0)
@@ -486,7 +500,7 @@ describe('the app\'s store', () => {
 
 describe('the screen', () => {
   async function screen(options: VitalsOptions, headers: Record<string, string> = {}, path = '/vitals') {
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals(options)], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals(options)], proxy: { hops: 1 }, store: { vitals: store } })
 
     return app.handle(new Request(`http://localhost${path}`, { headers }))
   }
@@ -508,7 +522,7 @@ describe('the screen', () => {
 
   it('takes a guard built when the first request reaches it', async () => {
     let built = 0
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: { load: () => {
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: { load: () => {
       built++
 
       return () => undefined
@@ -530,7 +544,7 @@ describe('the screen', () => {
   })
 
   it('lists each route with its three numbers, their ratings and the number of views', async () => {
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
 
     for (let at = 0; at < 4; at++)
       await report(app, { p: '/blog/x', l: 3000, c: 0.03, i: 600 })
@@ -556,7 +570,7 @@ describe('the screen', () => {
   })
 
   it('does not tell the page of a visitor from its title or address: nothing but route names are shown', async () => {
-    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
 
     await report(app, { p: '/blog/secret-slug', l: 1000 })
 
@@ -604,7 +618,7 @@ describe('the route a view is counted at', () => {
       await Bun.write(join(own, 'routes/docs/[...rest].kay'), 'h1 Docs\n')
       await Bun.write(join(own, 'routes/docs/intro.kay'), 'h1 Intro\n')
 
-      const app = await pages({ routes: join(own, 'routes'), prebuilt: false, extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+      const app = await build({ routes: join(own, 'routes'), prebuilt: false, extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
 
       for (const path of ['/about', '/zzz', '/docs/intro', '/docs/a/b'])
         await report(app, view({ p: path }))
