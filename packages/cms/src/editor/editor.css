@@ -165,23 +165,26 @@ html.kcms-dock-bottom .kcms-editor-open {
 html.kcms-dock-side .kcms-editor-grip {
   top: 0;
   bottom: 0;
-  left: -0.25rem;
-  width: 0.5rem;
+  left: -0.75rem;
+  width: 1.5rem;
   cursor: ew-resize;
 }
 
 html.kcms-dock-bottom .kcms-editor-grip {
-  top: -0.5rem;
+  top: -0.75rem;
   right: 0;
   left: 0;
-  height: 1rem;
+  height: 1.5rem;
   cursor: ns-resize;
 }
 
 .kcms-editor-grip:hover,
 .kcms-editor-grip:focus-visible {
   background: color-mix(in srgb, var(--color-kui-accent) 40%, transparent);
-  outline: none;
+}
+
+.kcms-editor-grip:focus-visible {
+  outline: 2px solid var(--color-kui-accent);
 }
 
 html.kcms-editing [data-kay-field]:hover,

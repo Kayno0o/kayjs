@@ -130,10 +130,14 @@ function resizeByKey(event: KeyboardEvent): void {
   resizeTo(size(at) + delta)
 }
 
-// Scrolls the page so a clicked element lies above the bottom sheet, not under it.
-function reveal(element: Element): void {
-  const covered = open() && dock() === 'bottom' && panel ? panel.getBoundingClientRect().top : window.innerHeight
-  const by = revealBy(element.getBoundingClientRect(), { top: 0, bottom: covered - 16 })
+// Scrolls the page so a clicked element lies above the bottom sheet, not under it; a click already in the visible part leaves the page, whatever the size of the element around it.
+function reveal(element: Element, clickedAt: number): void {
+  const covered = (open() && dock() === 'bottom' && panel ? panel.getBoundingClientRect().top : window.innerHeight) - 16
+
+  if (clickedAt >= 0 && clickedAt <= covered)
+    return
+
+  const by = revealBy(element.getBoundingClientRect(), { top: 0, bottom: covered })
 
   if (by !== 0)
     window.scrollBy({ top: by })
@@ -165,7 +169,7 @@ listen(() => document, 'click', (event) => {
   event.preventDefault()
   event.stopPropagation()
   focused = field.marker
-  reveal(field.element)
+  reveal(field.element, event.clientY)
 }, { capture: true })
 
 // Renders the page again as visitors see it, once kay forgot the edit mode.

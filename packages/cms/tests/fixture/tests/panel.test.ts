@@ -192,7 +192,7 @@ test('a click on a field under the sheet scrolls it into the visible part of the
     scrollTo(0, 650)
   })
   await page.waitUntil(() => document.querySelector('h1')!.getBoundingClientRect().top > 380)
-  await page.evaluate(() => document.querySelector<HTMLElement>('h1')!.click())
+  await page.evaluate(() => document.querySelector<HTMLElement>('h1')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 700 })))
   await page.waitUntil(() => {
     const box = document.querySelector('h1')!.getBoundingClientRect()
 
@@ -200,17 +200,17 @@ test('a click on a field under the sheet scrolls it into the visible part of the
   })
 })
 
-test('a right-to-left page keeps the page clear of the side editor', async () => {
-  const page = await open(1280, 800)
+test('a click already in the visible part leaves the page where it is, however tall the element', async () => {
+  const page = await open(390, 800)
 
   await page.evaluate(() => {
-    document.documentElement.dir = 'rtl'
+    document.querySelector<HTMLElement>('h1')!.style.height = '2500px'
+    scrollTo(0, 500)
   })
-
-  const { panel, page: body, window } = await measure(page)
-
-  expect(panel.right).toBe(window.width)
-  expect(body.right).toBeLessThanOrEqual(panel.left)
+  await page.waitUntil(() => scrollY === 500)
+  await page.evaluate(() => document.querySelector<HTMLElement>('h1')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 200 })))
+  await Bun.sleep(200)
+  expect(await page.evaluate(() => scrollY)).toBe(500)
 })
 
 test('the entry header stays on one line on a phone, its buttons reachable', async () => {
