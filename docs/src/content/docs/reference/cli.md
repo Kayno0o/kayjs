@@ -122,7 +122,7 @@ Editing the scripts or version in `package.json` restarts nothing, unless a modu
 
 A change to a file at the project root, such as `.env` or a `package.json` field Bun resolves, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again. Set `KAY_DEV_RELOAD_GROWTH_MB` to change that number of MiB.
 
-A `.env` value built from another, such as `URL=${HOST}/x`, follows the file as well, and so does `kay.config.ts`, which the process writing the editor types loads.
+A `.env` value built from another, such as `URL=${HOST}/x`, follows the file as well. The process that loads `kay.config.ts` for the editor types sees the new values too.
 
 These changes reload nothing: tests (a root `tests/`, `test/`, `e2e/` or a name joining them such as `tests-e2e/`, `__tests__/`, `*.test.*`, `*.spec.*` and `*.e2e.*` files anywhere, and a root Playwright, Vitest, Jest or Cypress config), root files no server reads such as a README or a LICENSE, and the backup and temporary files an editor writes beside a source. A save that touches `.css` files alone restarts nothing and swaps the stylesheets in the open pages.
 
