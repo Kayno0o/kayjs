@@ -24,8 +24,9 @@ const refused = new Map<string, Set<Optional>>()
 
 // The roots whose server refused `response_format`, which are asked for an object through a forced tool call from then on.
 const unformatted = new Set<string>()
+// A 400 saying the schema itself is invalid: another ask may hold a schema the server takes, so it is no server without `response_format`.
+const INVALID_SCHEMA = /invalid[_ ]schema|schema (?:is|was) invalid/i
 // The tool a server without `response_format` is made to call: its arguments are the object, streamed on as the text of the reply.
-const INVALID_SCHEMA = /invalid schema|schema.*(?:invalid|not supported|unsupported)/i
 const ANSWER_TOOL = 'kay_answer'
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }

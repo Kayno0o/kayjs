@@ -186,6 +186,15 @@ describe('an OpenAI-compatible provider asked for a schema', () => {
     expect(server.seen.every(seen => 'response_format' in seen.body)).toBe(true)
   })
 
+  it('falls back to the tool call on a server saying response_format json_schema is not supported', async () => {
+    const server = serve((_request, { body }) => body.response_format === undefined
+      ? stream(openaiAnswer(JSON_PIECES)).response
+      : Response.json({ error: { message: 'response_format type json_schema is not supported' } }, { status: 400 }))
+
+    expect(await ask('x', { schema: verdict, provider: openai({ baseUrl: server.url, model: 'm' }) })).toEqual(ANSWER)
+    expect(server.seen[1]!.body).toHaveProperty('tool_choice', 'required')
+  })
+
   it('does not remember a server as without response_format when the call by tool fails as well', async () => {
     const server = serve((_request, { body }) => Response.json({ error: { message: body.response_format === undefined ? 'unknown model' : 'response_format is not here' } }, { status: 400 }))
     const provider = openai({ baseUrl: server.url, model: 'm' })
