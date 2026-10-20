@@ -1,6 +1,6 @@
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { ISLAND } from './markers'
-import { place } from './move'
+import { moves, place } from './move'
 import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
@@ -635,18 +635,23 @@ function swapBody(next: Document, policy: Policy): void {
   const focused = heldFocus()
 
   const kept = new Set<Element>()
-  // An island kept waits in a connected element while the morph runs, where a move keeps its state, and the next body holds its placeholder, emptied, in its stead.
-  const parking = document.createElement('div')
+  // With `moveBefore`, an island kept waits in a connected element while the morph runs, so each move keeps its state, and the next body holds its placeholder, emptied, in its stead; elsewhere a move resets the state either way, so it goes straight into the next body.
   const standIns = new Map<Element, Element>()
+  let parking: HTMLElement | undefined
 
   const keep = (placeholder: Element, live: Element) => {
-    if (!parking.isConnected)
-      document.documentElement.append(parking)
+    kept.add(live)
 
+    if (!moves) {
+      placeholder.replaceWith(live)
+
+      return
+    }
+
+    parking ??= document.documentElement.appendChild(document.createElement('div'))
     place(parking, live, null)
     placeholder.replaceChildren()
     standIns.set(placeholder, live)
-    kept.add(live)
   }
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(PERSISTENT)) {
@@ -674,7 +679,7 @@ function swapBody(next: Document, policy: Policy): void {
 
     for (const placeholder of body.querySelectorAll<HTMLElement>(ISLAND)) {
       // One in the static slot of an island kept went along with it, or away with the copy it replaced.
-      if (!body.contains(placeholder) || standIns.has(placeholder))
+      if (!body.contains(placeholder) || standIns.has(placeholder) || [...kept].some(island => island.contains(placeholder)))
         continue
 
       const index = unchanged.findIndex(live => old.contains(live) && live.dataset.component === placeholder.dataset.component && live.dataset.props === placeholder.dataset.props && live.dataset.slots === placeholder.dataset.slots && (live.dataset.slots === undefined || (live._$h ?? live.innerHTML) === placeholder.innerHTML))
@@ -706,16 +711,19 @@ function swapBody(next: Document, policy: Policy): void {
   }
 
   // The server writes `<body>` bare, so every attribute it holds is a script's.
-  morphChildren(old, body)
+  try {
+    morphChildren(old, body)
 
-  for (const [standIn, live] of standIns) {
-    if (standIn.isConnected)
-      place(standIn.parentNode!, live, standIn)
+    for (const [standIn, live] of standIns) {
+      if (standIn.isConnected)
+        place(standIn.parentNode!, live, standIn)
 
-    standIn.remove()
+      standIn.remove()
+    }
   }
-
-  parking.remove()
+  finally {
+    parking?.remove()
+  }
 
   if (focused && document.activeElement !== focused.element && [...kept].some(island => island.contains(focused.element)))
     focused.restore()
@@ -733,7 +741,7 @@ function swapBody(next: Document, policy: Policy): void {
   }
 }
 
-// The focused element with its caret and selection, which moving the island holding it takes away: the swap gives them back, so a field typed in keeps taking the keys.
+// The focused element with its caret and selection, which moving the island holding it takes away in a browser without `moveBefore`: the swap gives them back, so a field typed in keeps taking the keys.
 function heldFocus(): { element: HTMLElement, restore: () => void } | undefined {
   const element = document.activeElement
 

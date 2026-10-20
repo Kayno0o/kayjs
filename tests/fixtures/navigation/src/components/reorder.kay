@@ -27,3 +27,9 @@ ul.rows
         for sub of row.subs key={sub}
           li.sub(data-id={sub})
             input(aria-label={sub})
+dl.defs
+  for row of rows() key={row.id}
+    dt.term(data-id={row.id}) {row.id}
+    dd.def(data-id={row.id})
+      input(aria-label={`def-${row.id}`})
+      iframe(src="about:blank" title={`def-${row.id}`})

@@ -242,13 +242,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     // An iframe, a field holding the focus with a selection, and an open popover put into the persistent island, whose state a move through insertBefore resets.
     async function stateInIsland(on: Page): Promise<void> {
       await on.evaluate(() => {
-        const state = window as { kayFocusIns?: number }
+        const state = window as { kayFocusIns?: number, kayLoads?: number }
         const island = document.querySelector('slot[data-persist]')!
         const frame = document.createElement('iframe')
 
         frame.src = 'about:blank'
         island.append(frame)
         ;(frame.contentWindow as Window & { kayMark?: string }).kayMark = 'loaded'
+        state.kayLoads = 0
+        frame.addEventListener('load', () => {
+          state.kayLoads!++
+        })
 
         const input = document.createElement('input')
 
@@ -271,12 +275,13 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       })
     }
 
-    async function islandState(on: Page): Promise<{ mark: string | undefined, focused: boolean, selection: number[], focusIns: number | undefined, menuOpen: boolean }> {
+    async function islandState(on: Page): Promise<{ mark: string | undefined, loads: number | undefined, focused: boolean, selection: number[], focusIns: number | undefined, menuOpen: boolean }> {
       return on.evaluate(() => {
         const input = document.querySelector<HTMLInputElement>('slot[data-persist] input')!
 
         return {
           mark: (document.querySelector<HTMLIFrameElement>('slot[data-persist] iframe')!.contentWindow as Window & { kayMark?: string }).kayMark,
+          loads: (window as { kayLoads?: number }).kayLoads,
           focused: document.activeElement === input,
           selection: [input.selectionStart!, input.selectionEnd!],
           focusIns: (window as { kayFocusIns?: number }).kayFocusIns,
@@ -300,7 +305,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await refreshed(own)
 
       // No focus event after the first: the field was never taken out, so nothing had to give the focus back.
-      expect(await islandState(own)).toEqual({ mark: 'loaded', focused: true, selection: [2, 4], focusIns: 1, menuOpen: false })
+      expect(await islandState(own)).toEqual({ mark: 'loaded', loads: 0, focused: true, selection: [2, 4], focusIns: 1, menuOpen: false })
     })
 
     it('places the persistent island where a wrapper of the next page puts it, keeping its state', async () => {
@@ -343,8 +348,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       const state = await islandState(fresh)
 
       expect(state).toMatchObject({ focused: true, selection: [2, 4], menuOpen: false })
-      // Taken out and put back, the field lost the focus and the swap gave it back.
+      // Taken out and put back once, the field lost the focus and the swap gave it back, the iframe loading once more.
       expect(state.focusIns).toBe(2)
+      expect(state.loads).toBe(1)
       expect(errors).toEqual([])
       await fresh.close()
     })
@@ -395,7 +401,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         it(`keeps the iframe and the focus of every row when the list goes ${name}`, async () => {
           const errors: string[] = []
 
-          page.on('pageerror', error => errors.push(error.message))
+          own.on('pageerror', error => errors.push(error.message))
           await opened(own)
 
           for (const target of ['a', 'b', 'c', 'd']) {
@@ -411,6 +417,27 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
           expect(errors).toEqual([])
         })
       }
+
+      it('moves a row of several nodes whole, its iframe loaded and its field focused', async () => {
+        await opened(own)
+        await own.evaluate(() => {
+          for (const frame of document.querySelectorAll<HTMLIFrameElement>('dd.def > iframe'))
+            (frame.contentWindow as Window & { kayMark?: string }).kayMark = frame.title
+        })
+
+        let rows = ['a', 'b', 'c', 'd']
+
+        for (const [name, order] of Object.entries(MOVES)) {
+          for (const target of rows) {
+            await move(own, name, `def-${target}`)
+            rows = order(rows)
+
+            expect(await own.evaluate(() => [...document.querySelectorAll('dl.defs > *')].map(node => `${node.localName}:${(node as HTMLElement).dataset.id}`))).toEqual(rows.flatMap(id => [`dt:${id}`, `dd:${id}`]))
+            expect(await focused(own)).toBe(`def-${target}`)
+            expect(await own.evaluate(() => [...document.querySelectorAll<HTMLIFrameElement>('dd.def > iframe')].map(frame => (frame.contentWindow as Window & { kayMark?: string }).kayMark ?? 'lost'))).toEqual(rows.map(id => `def-${id}`))
+          }
+        }
+      })
 
       it('keeps the focus of a row of a nested list moved inside its row', async () => {
         await opened(own)
@@ -428,7 +455,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       it('moves the rows of a list that is out of the document, and they are in place once it is back', async () => {
         const errors: string[] = []
 
-        page.on('pageerror', error => errors.push(error.message))
+        own.on('pageerror', error => errors.push(error.message))
         await opened(own)
         await own.evaluate(() => {
           const rows = document.querySelector('ul.rows')!
