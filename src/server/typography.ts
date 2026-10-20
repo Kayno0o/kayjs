@@ -32,7 +32,7 @@ export function typographyFor(lang: string, typography: boolean | undefined): ((
 
 // The last few markups the pass read and what it made of them: a page rendered per request, as a not-found page, writes the same markup again, which is found for the price of comparing it, not of reading its tags again.
 const REMEMBERED = 4
-// A longer markup is left out, so what is held stays within a few hundred KB.
+// A longer markup is left out, so what is held stays within 1 MB.
 const REMEMBERED_LENGTH = 65_536
 const recent: ({ html: string, spaced: string } | undefined)[] = Array.from({ length: REMEMBERED })
 let oldest = 0

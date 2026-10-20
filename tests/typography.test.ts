@@ -33,7 +33,7 @@ describe('what a page is run through', () => {
     expect(typographyFor('en', undefined)).toBeUndefined()
   })
 
-  it('gives the pass\'s result for a markup it saw before, the markups after it, and a long one', () => {
+  it('gives the pass\'s result whatever it remembers: a markup seen before, more than it holds, and a long one', () => {
     const polish = typographyFor('fr', undefined)!
     const markups = Array.from({ length: 20 }, (_, index) => `<p title="n${index} : x">Texte ${index} : fin !</p>${index % 2 === 0 ? '<code>a : b</code>' : ''}`)
     const long = `<p>${'mot '.repeat(20_000)}: fin</p>`

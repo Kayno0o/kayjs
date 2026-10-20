@@ -455,9 +455,11 @@ function piecesSize({ strings, texts }: BodyPieces): number {
   return strings.reduce((total, string) => total + Buffer.byteLength(string), 0) + texts.reduce((total, text) => total + text.bytes.length, 0)
 }
 
-// The kept gzip of a body in pieces, if one is kept for its bytes, and the body's size.
-function keptPieces(pieces: BodyPieces, size: number): Uint8Array<ArrayBuffer> | undefined {
-  const { key, check } = partsKey(pieces.strings.map(string => Buffer.from(string)), pieces.texts, size)
+// The kept gzip of a body in pieces, if one is kept for its bytes.
+function keptPieces(pieces: BodyPieces): Uint8Array<ArrayBuffer> | undefined {
+  const arounds = pieces.strings.map(string => Buffer.from(string))
+  const size = arounds.reduce((total, around) => total + around.length, 0) + pieces.texts.reduce((total, text) => total + text.bytes.length, 0)
+  const { key, check } = partsKey(arounds, pieces.texts, size)
   const gzip = keptCopy(key, check)
 
   return gzip && gzip.length < size * 0.9 ? gzip : undefined
@@ -628,14 +630,13 @@ export function readResponse(response: Response, bytes: Uint8Array<ArrayBuffer>)
   return response
 }
 
-// The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
+// The size of each body kay made whole, or for a body in pieces a lower bound of it, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
 const wholeSizes = new WeakMap<Response, number>()
 
 // The pieces a page's body was put together from, for the responses made with them.
 const wholePieces = new WeakMap<Response, BodyPieces>()
 
-// The size compression judges a body by: its bytes, or for a body in pieces the fixed texts alone once they reach `MIN_SIZE`, as it only asks whether the body is small, and counting the bytes of every piece was a visible part of a page rendered per request.
-// The exact size of the pieces is counted where a kept copy is looked for.
+// The size compression judges a body by: its bytes, or for a body in pieces the fixed texts alone once they reach `MIN_SIZE`, as it only asks whether the body is small and counting the bytes of every piece was a visible part of a page rendered per request.
 function sizeOf(body: string | Uint8Array<ArrayBuffer>, pieces: BodyPieces | undefined): number {
   if (pieces) {
     const fixed = pieces.texts.reduce((total, text) => total + text.bytes.length, 0)
@@ -704,7 +705,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
 
   const pieces = splice ? wholePieces.get(response) : undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: piecesSize(pieces) })
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces)
 }
 
 function advertise(headers: Headers, { link }: ServedDictionary): void {
@@ -738,11 +739,11 @@ function compressedHeaders(headers: Headers, used: Encoding | 'dcz'): Headers {
   return compressed
 }
 
-async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding | ServedDictionary, accept: string | null, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
+async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding | ServedDictionary, accept: string | null, fixed?: FixedText[], pieces?: BodyPieces): Promise<Response> {
   const { headers, status, statusText } = response
 
   // A page whose render knows its pieces and whose gzip is kept is answered without reading its body.
-  const kept = pieced && keptPieces(pieced.pieces, pieced.size)
+  const kept = pieces && keptPieces(pieces)
 
   if (kept) {
     // The page's text, never read, is let go at once rather than held until a collection: about 20 MiB of peak memory at 16 connections.
