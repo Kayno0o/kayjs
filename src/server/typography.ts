@@ -42,6 +42,7 @@ function named(html: string, from: number, name: string): boolean {
 }
 
 // The element a tag opens or closes as the pass treats it: one whose content is left alone, one whose content is raw text up to its end tag, or any other.
+// Char codes rather than a sticky `/<\/?(code|pre|kbd|samp|script|style|textarea)(?=[\s/>])/iy`: the regex made a 23 KB page about 15% slower (about 160 against 185 microseconds), as it runs on every tag read.
 function kindOf(html: string, from: number): 'skipped' | 'script' | 'style' | 'textarea' | undefined {
   switch (html.charCodeAt(from) | LOWER_CASE) {
     case LETTER_C:
