@@ -78,37 +78,6 @@ async function eachCall(root: string, visit: (call: Call) => void): Promise<void
   }
 }
 
-// An `analytics({ provider })` of `ga4`, `fathom`, `cloudflare` or `custom` that leaves `consent` out: it counted every visit before 1.55 and asks for a yes now.
-export async function analyticsConsent(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  const level = lintLevel('deprecated-analytics-consent', options.lints)
-
-  if (level === 'allow')
-    return []
-
-  const found: CheckDiagnostic[] = []
-
-  await eachCall(root, ({ file, source, argument, keyed }) => {
-    const provider = keyed('provider')
-    const name = textOf(provider?.value)
-
-    if (provider === undefined || name === undefined || !ASKING.has(name) || argument.properties.some(property => property.type !== 'ObjectProperty' && property.type !== 'ObjectMethod') || keyed('consent') !== undefined)
-      return
-
-    found.push({
-      file,
-      ...positionAt(source, provider.key.start!),
-      end: provider.value.end!,
-      message: `\`analytics({ provider: '${name}' })\` now asks for a yes before counting a visit, where it counted every one before`,
-      help: 'write `consent: true` to ask with kay\'s notice, or `consent: false` to count without asking',
-      code: 'deprecated-analytics-consent',
-      severity: level === 'warn' ? 'warning' : 'error',
-      fixes: [{ title: 'Ask for consent', edits: [{ start: provider.key.start!, end: provider.key.start!, text: 'consent: true, ' }], safe: true }],
-    })
-  })
-
-  return found
-}
-
 // An `info` object while `consent` asks, where the notice is worded by `consent` and no information line shows, which 1.56 refuses at start.
 export async function analyticsInfo(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-analytics-info', options.lints)

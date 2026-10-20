@@ -82,7 +82,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `island-action` | deny | islands | An action handed to an island that never types a prop with `Action` from `kay`, which its chunk needs to revive it |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
-| `deprecated-analytics-consent` | warn | deprecated | `analytics()` of Google Analytics, Fathom, Cloudflare or `custom` with no `consent`, which now asks for a yes; the options may be held in a `const` and passed by name |
 | `deprecated-analytics-info` | warn | deprecated | `analytics()` with an `info` object while `consent` asks, where no information line is shown, which is refused at start since 1.56 |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |

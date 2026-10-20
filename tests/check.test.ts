@@ -2903,81 +2903,6 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports an analytics provider that now asks for consent and was left without it, and --fix writes consent: true', async () => {
-    const root = await scratchProject({
-      'src/a.ts': 'import { analytics } from \'kay/analytics\'\n\nexport const a = analytics({ provider: \'ga4\', measurementId: \'G-ABCD\', apiSecret: \'x\' })\nexport const b = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false })\nexport const c = analytics({ provider: \'plausible\' })\n',
-      'src/b.ts': 'import * as stats from \'kay/analytics\'\n\nconst more = {}\n\nexport const d = stats.analytics({ provider: \'cloudflare\', token: \'tok\' })\nexport const e = stats.analytics({ provider: \'custom\', ...more })\n',
-      'src/mine.ts': 'export function analytics(options: { provider: string }): string {\n  return options.provider\n}\n',
-      'src/c.ts': 'import { analytics } from \'./mine\'\n\nexport const f = analytics({ provider: \'ga4\' })\n',
-    })
-
-    try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-analytics-consent/g)).toHaveLength(2)
-      expect(output).not.toContain('src/c.ts')
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('analytics({ consent: true, provider: \'ga4\'')
-      expect(await Bun.file(join(root, 'src/b.ts')).text()).toContain('stats.analytics({ consent: true, provider: \'cloudflare\'')
-      expect((await runCheck(root)).output).not.toContain('deprecated-analytics-consent')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reads the analytics provider through as const, satisfies, a template literal and options held in a variable', async () => {
-    const root = await scratchProject({
-      'src/a.ts': [
-        'import type { AnalyticsOptions } from \'kay/analytics\'',
-        'import { analytics } from \'kay/analytics\'',
-        '',
-        'const held = { provider: \'ga4\', measurementId: \'G-ABCD\', apiSecret: \'x\' } as const',
-        'const shared = { provider: \'fathom\', siteId: \'ABCDEFGH\' }',
-        'const kept = { provider: \'cloudflare\', token: \'tok\', consent: false }',
-        '',
-        'export const a = analytics(held)',
-        'export const b = analytics({ provider: \'fathom\' as const, siteId: \'ABCDEFGH\' })',
-        'export const c = analytics({ provider: `custom`, script: \'s\', endpoint: \'e\' } satisfies AnalyticsOptions)',
-        'export const d = analytics(shared)',
-        'export const e = analytics(shared)',
-        'export const f = analytics(kept)',
-        'export const g = analytics({ provider: `${\'ga4\'}` } as AnalyticsOptions)',
-        '',
-        'function other() {',
-        '  const twice = { provider: \'ga4\' }',
-        '',
-        '  return analytics(twice as AnalyticsOptions)',
-        '}',
-        '',
-        'function another() {',
-        '  const twice = { provider: \'ga4\', consent: true }',
-        '',
-        '  return analytics(twice as AnalyticsOptions)',
-        '}',
-        '',
-      ].join('\n'),
-    })
-
-    try {
-      const { output } = await runCheck(root)
-
-      // held, b, c and shared once for d and e; neither declaration of `twice` is one object to point at.
-      expect(output.match(/deprecated-analytics-consent/g)).toHaveLength(4)
-      await runCheck(root, '--fix')
-
-      const fixed = await Bun.file(join(root, 'src/a.ts')).text()
-
-      expect(fixed).toContain('const held = { consent: true, provider: \'ga4\'')
-      expect(fixed).toContain('const shared = { consent: true, provider: \'fathom\'')
-      expect(fixed).toContain('analytics({ consent: true, provider: `custom`')
-      expect((await runCheck(root)).output).not.toContain('deprecated-analytics-consent')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('reports an analytics info object while consent asks, and --fix removes it', async () => {
     const root = await scratchProject({
       'src/a.ts': [
@@ -3004,7 +2929,7 @@ describe.concurrent('kay check, unused code', () => {
 
       const fixed = await Bun.file(join(root, 'src/a.ts')).text()
 
-      expect(fixed).toContain('analytics({ consent: true, provider: \'fathom\', siteId: \'ABCDEFGH\', })')
+      expect(fixed).toContain('analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', })')
       expect(fixed).toContain('analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })')
       expect(fixed).toContain('analytics({ provider: \'plausible\', consent: true, policyUrl: \'/p\' })')
       expect(fixed).toContain('info: { text: \'Counting\' } as const, provider: \'ga4\'')

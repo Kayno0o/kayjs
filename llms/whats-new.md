@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- The `deprecated-analytics-consent` lint is gone, three minors after 1.55 changed what a missing `consent` means: it is `consent: true` for `ga4`, `fathom`, `cloudflare` and `custom`, as before ([Privacy](privacy.md), [Lints](lints.md)).
+
 ## 1.59.0
 
 - A public text file is answered from memory in production, 2 to 3 times cheaper in CPU per request than when it was read and compressed again on every request, with the same headers, encodings and tags ([Production](proxy-and-security.md)).
