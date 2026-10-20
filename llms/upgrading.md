@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.61.0
+
+### kayjs-ui's SiteNav menu is a popover
+
+`SiteNav` and `AppHeader` render their menu toggle as a `popovertarget` button over a `popover` list, with no island. The nav no longer carries `data-open`, and the toggle no longer carries `aria-expanded` and `aria-controls` as attributes (the browser exposes the state), so CSS or a test reading them changes: style the open list with `:popover-open` and read `matches(':popover-open')`. A link to a `#section` of the page leaves the menu open until a press outside or Escape. A browser without the Popover API (before Chrome and Edge 114, Firefox 125, Safari 17) shows the links as a plain list and hides the toggle.
+
 ## 1.60.0
 
 ### French pages get non-breaking spaces

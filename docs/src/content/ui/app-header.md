@@ -22,7 +22,7 @@ A sticky header covers what an anchor link scrolls to. Give the page `scroll-pad
 
 ## Narrow screens
 
-Below the `lg` breakpoint the links fold behind SiteNav's menu button, which closes on Escape, a click on a link or a click outside. The button follows the brand, in the tab order too, and the end area keeps the far end. A long brand or end area wraps instead of widening the bar. `label` names the navigation and `menuLabel` the button.
+Below the `lg` breakpoint the links fold behind SiteNav's menu button, which opens them as a popover the browser closes on Escape or a click outside. The button follows the brand, in the tab order too, and the end area keeps the far end. A long brand or end area wraps instead of widening the bar. `label` names the navigation and `menuLabel` the button.
 
 ## Colors
 

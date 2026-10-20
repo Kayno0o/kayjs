@@ -14,7 +14,11 @@ For a whole header with the site's brand and an area at the far end, use [AppHea
 
 ## Narrow screens
 
-`label` names the navigation for screen readers, and `menuLabel` the button shown on a narrow screen, which opens the links and closes on Escape, a click on a link or a click outside. The fold depends on the screen width, so it cannot be shown in a demo on a wide frame: narrow the window to see it.
+`label` names the navigation for screen readers, and `menuLabel` the button shown on a narrow screen. The fold depends on the screen width, so it cannot be shown in a demo on a wide frame: narrow the window to see it.
+
+The button opens the links as a [popover](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API), so the browser closes them on Escape or a click outside and gives the focus back, and SiteNav ships no JavaScript. Following a link to another page closes them with the page swap. A link to a section of the same page leaves them open until the next click outside.
+
+The popover needs Chrome and Edge 114, Firefox 125 or Safari 17. An older browser shows the links as a plain list and hides the button.
 
 ## Icons
 

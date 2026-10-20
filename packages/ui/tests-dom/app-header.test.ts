@@ -1,7 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
-import { mountComponent, settle } from 'kay/test'
-import { click } from './dom'
+import { mountComponent } from 'kay/test'
 
 let mounted: Mounted | undefined
 
@@ -50,19 +49,11 @@ test('marks the section holding the page as current, draws icons decoratively an
   expect(view.link('<b>Data</b>').querySelector('svg')).toBeNull()
 })
 
-test('opens its links from the menu button and closes them on Escape, handing the focus back', async () => {
+test('folds its links into a popover the menu button opens', async () => {
   const view = await header()
   const toggle = view.main.querySelector<HTMLButtonElement>('.kui-site-nav-toggle')!
+  const list = view.main.querySelector<HTMLElement>('.kui-site-nav-list')!
 
-  click(toggle)
-  await settle()
-
-  expect(toggle.getAttribute('aria-expanded')).toBe('true')
-
-  view.link('Home').focus()
-  view.link('Home').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-  await settle()
-
-  expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(document.activeElement).toBe(toggle)
+  expect(list.hasAttribute('popover')).toBe(true)
+  expect(toggle.getAttribute('popovertarget')).toBe(list.id)
 })

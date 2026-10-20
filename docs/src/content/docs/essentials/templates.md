@@ -181,6 +181,24 @@ button(onClick={() => name.set('')}) Clear
 
 `bind:value` and `bind:checked` read and write a signal both ways.
 
+### Open a popover or a dialog with no script
+
+A button can open a popover or a dialog on its own, so the component stays static and ships no JavaScript. `popovertarget` toggles a popover, and `commandfor` with `command` also opens a dialog.
+
+```kay
+button(popovertarget="menu") Menu
+ul#menu(popover)
+  li: a(href="/account") Account
+
+button(commandfor="settings" command="show-modal") Settings
+dialog#settings
+  button(commandfor="settings" command="close") Close
+```
+
+`command` is `show-modal`, `close`, `request-close`, `show-popover`, `hide-popover` or `toggle-popover`, or a name starting with two hyphens, such as `--rotate-left`, which the target hears as a `command` event. `kay check` reports any other value.
+
+`popovertarget` works in Chrome and Edge 114, Firefox 125 and Safari 17. `commandfor` and `command` need Chrome and Edge 135, Firefox 144 and Safari 26.2, newer than kay's [browser floor](/essentials/islands#browser-only-code), so keep `popovertarget` or an `onClick` where older browsers matter.
+
 ## Markup in a spread
 
 A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for. It drops any other value, with a warning in development.

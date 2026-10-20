@@ -450,7 +450,7 @@ describe('theme.css', () => {
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
-    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav[data-open]) .kui-site-nav-list', '.kui-line-chart-tooltip'])
+    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open)', '.kui-line-chart-tooltip'])
       expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\(length:--kui-border-width\)/)
 
     expect(theme.match(/var\(--kui-border-card\)/g)).toHaveLength(1)

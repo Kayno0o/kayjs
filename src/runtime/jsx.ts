@@ -143,9 +143,12 @@ type OwnAttributes<Target> = {
   [Name in keyof Target as Name extends keyof HTMLElement ? never : string extends Name ? never : Target[Name] extends (...args: never[]) => unknown ? never : Name extends string ? Name | Lowercase<Name> : never]?: AttributeValue
 }
 
+type ButtonCommand = 'show-modal' | 'close' | 'request-close' | 'show-popover' | 'hide-popover' | 'toggle-popover' | `--${string}`
+
 // Attributes HTML spells differently from their property.
 interface SpelledAttributes {
-  button: { popovertarget?: AttributeValue }
+  // `commandfor` names the element a press acts on and `command` the action, both ways to open a popover or a dialog with no script: the HTML keywords, or a `--custom` one the element hears as a `command` event.
+  button: { popovertarget?: AttributeValue, commandfor?: AttributeValue, command?: ButtonCommand | undefined }
   form: { 'accept-charset'?: AttributeValue }
   input: { popovertarget?: AttributeValue }
   label: { for?: AttributeValue }

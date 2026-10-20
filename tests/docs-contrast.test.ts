@@ -177,7 +177,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
       expect(closed).toEqual({ list: 'none', beforeEnd: true, plain: false, long: false, atFarEnd: true })
 
       await narrow.click('.kui-app-header .kui-site-nav-toggle')
-      await narrow.waitUntil(() => document.querySelector('.kui-app-header .kui-site-nav[data-open]') !== null)
+      await narrow.waitUntil(() => document.querySelector('.kui-app-header .kui-site-nav-list:popover-open') !== null)
 
       expect(await narrow.evaluate(() => {
         const list = document.querySelector('.kui-app-header .kui-site-nav-list')!.getBoundingClientRect()

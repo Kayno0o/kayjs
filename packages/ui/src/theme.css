@@ -130,6 +130,13 @@
   display: none;
 }
 
+/* The same for a site nav's links, a popover below lg whatever a list rule of the app's, such as a prose style, gives its `ul`. */
+@media (width < theme(--breakpoint-lg)) {
+  .kui-site-nav-list:not(:popover-open) {
+    display: none;
+  }
+}
+
 /* Every selector below weighs one class plus its state, with variants and nested parts inside :where(), so rules win in source order and the app's own, imported later, win over these. */
 @layer components {
   /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --kui-shell-line and --kui-shell-fill. */
@@ -1643,20 +1650,31 @@
     @apply text-kui-subtext0;
   }
 
-  /* Below lg the links fold behind the toggle, opening as a panel under it; from lg they sit in a row and the toggle hides. */
+  /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
+  .kui-site-nav {
+    @apply flex items-center;
+  }
+
   .kui-site-nav-toggle {
     @apply lg:hidden;
   }
 
+  @supports not selector(:popover-open) {
+    .kui-site-nav-toggle {
+      @apply hidden;
+    }
+  }
+
   .kui-site-nav-list {
-    @apply hidden items-center gap-1 lg:flex;
+    @apply gap-1 lg:static lg:m-0 lg:flex lg:min-w-0 lg:flex-row lg:items-center lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:text-inherit;
   }
 
   /* Anchored under the toggle wherever it sits in the header, and flipped by the browser when it would run off the screen. */
-  :where(.kui-site-nav[data-open]) .kui-site-nav-list {
+  :where(.kui-site-nav-list:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
-    @apply absolute z-30 mt-2 flex min-w-56 flex-col items-stretch border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
+    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2 text-kui-text;
+    inset: auto;
   }
 
   .kui-site-nav-link {

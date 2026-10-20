@@ -297,11 +297,11 @@ test('TextInput and Textarea without onInput render plain fields whose attribute
 })
 
 describe('layout', () => {
-  test('SiteNav marks the page on screen and the section holding it, its links folded behind a closed toggle they are anchored to', async () => {
-    expect(await attributes('/layout', '#site-nav nav, #site-nav nav > button, #site-nav ul', ['aria-label', 'aria-expanded', 'aria-controls', 'id'])).toEqual([
-      { 'aria-label': 'Main', 'aria-expanded': null, 'aria-controls': null, 'id': null },
-      { 'aria-label': 'Ouvrir le menu', 'aria-expanded': 'false', 'aria-controls': 'main-links', 'id': null },
-      { 'aria-label': null, 'aria-expanded': null, 'aria-controls': null, 'id': 'main-links' },
+  test('SiteNav marks the page on screen and the section holding it, its links a popover the toggle opens and anchors', async () => {
+    expect(await attributes('/layout', '#site-nav nav, #site-nav nav > button, #site-nav ul', ['aria-label', 'aria-expanded', 'popovertarget', 'popover', 'id'])).toEqual([
+      { 'aria-label': 'Main', 'aria-expanded': null, 'popovertarget': null, 'popover': null, 'id': null },
+      { 'aria-label': 'Ouvrir le menu', 'aria-expanded': null, 'popovertarget': 'main-links', 'popover': null, 'id': null },
+      { 'aria-label': null, 'aria-expanded': null, 'popovertarget': null, 'popover': '', 'id': 'main-links' },
     ])
     expect((await find('/layout', '#site-nav a')).map(link => `${link.attributes.href}${link.attributes['aria-current'] ? ` ${link.attributes['aria-current']}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
   })

@@ -145,6 +145,7 @@ inBrowser('FormField in an island', () => {
     const site = await shared()
 
     await using page = await site.open('/borders')
+    await page.evaluate(() => document.querySelector<HTMLElement>('#site-nav-list')!.showPopover())
 
     // Each box with the sides it draws, in the order top, right, bottom, left; the others stay 0. A button draws its keyline in ::before.
     const boxes: Record<string, [selector: string, sides: string]> = {
@@ -196,6 +197,43 @@ inBrowser('FormField in an island', () => {
     expect(await widths('--kui-border-width: 2px solid red')).toEqual(all(1))
     expect(await widths('--kui-border-card: 2px solid red')).toEqual(all(1))
     expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('SiteNav opens its links from the toggle with no island, closes them on Escape or a press outside, and gives the focus back', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/layout', { width: 600 })
+    const open = async () => page.evaluate(() => document.querySelector('#main-links')!.matches(':popover-open'))
+
+    expect(await open()).toBe(false)
+
+    await page.click('#site-nav button')
+    expect(await open()).toBe(true)
+
+    await page.press('Escape')
+    expect(await open()).toBe(false)
+    expect(await page.evaluate(() => document.activeElement === document.querySelector('#site-nav button'))).toBe(true)
+
+    await page.click('#site-nav button')
+    await page.click('#header h1')
+    expect(await open()).toBe(false)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('SiteNav keeps its links hidden below lg whatever display an app gives its lists, and a row from lg', async () => {
+    const site = await shared()
+    const display = async (width: number) => {
+      await using page = await site.open('/borders', { width })
+
+      await page.evaluate(() => document.head.append(Object.assign(document.createElement('style'), { textContent: 'ul { display: flex }' })))
+
+      const shown = await page.evaluate(() => getComputedStyle(document.querySelector('#site-nav-list')!).display)
+
+      return shown
+    }
+
+    expect(await display(600)).toBe('none')
+    expect(await display(1200)).toBe('flex')
   }, 120_000)
 
   test('hydrates over the ids the server handed its control, then links the message once one shows', async () => {

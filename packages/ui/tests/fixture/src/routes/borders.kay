@@ -32,6 +32,6 @@ main
         tr#narrow-head
           th.kui-table-head-cell
             button#sort-btn.kui-table-sort-btn(type="button") sort
-  nav.kui-site-nav(data-open)
-    ul#site-nav-list.kui-site-nav-list
+  nav.kui-site-nav
+    ul#site-nav-list.kui-site-nav-list(popover)
       li.kui-site-nav-link link
