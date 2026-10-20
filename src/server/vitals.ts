@@ -1,16 +1,15 @@
 import type { KayExtension } from '../config'
 import type { Guard } from '../runtime/core'
+import type { LazyGuard } from './lazy-guard'
 import { KayError } from '../compiler/errors'
 import { BASE_PATH } from './base'
+import { lazily } from './lazy-guard'
+
+export type { LazyGuard } from './lazy-guard'
 
 export type { RouteVitals, VitalSummary } from './vitals-store'
 export { vitalsReport } from './vitals-store'
 export type { VitalsStore } from './vitals-store'
-
-// A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) }`.
-export interface LazyGuard {
-  load: () => Guard | Promise<Guard>
-}
 
 export interface VitalsOptions {
   // Where the numbers are shown, `/vitals` by default.
@@ -63,34 +62,5 @@ export function vitals(options: VitalsOptions = {}): KayExtension {
     server: async () => (await import('./vitals-server')).vitalsServer(options),
     routes: { dir: `${import.meta.dir}/vitals-routes`, prefix },
     config: { head: [{ tag: 'script', props: { src: VITALS_SCRIPT_PATH, defer: true } }] },
-  }
-}
-
-// A guard that loads on its first call, and tries again after a load that failed.
-function lazily(guard: Guard | LazyGuard): Guard {
-  if (typeof guard === 'function')
-    return guard
-
-  const { load: build } = guard
-  let loaded: Promise<Guard> | undefined
-
-  async function load(): Promise<Guard> {
-    // Forgetting a failure must come after `loaded` is set, even when the loader throws at once.
-    await Promise.resolve()
-
-    try {
-      return await build()
-    }
-    catch (error) {
-      loaded = undefined
-
-      throw error
-    }
-  }
-
-  return async (ctx) => {
-    loaded ??= load()
-
-    return (await loaded)(ctx)
   }
 }

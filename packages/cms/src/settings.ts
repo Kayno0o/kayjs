@@ -1,16 +1,11 @@
 import type { Guard, GuardContext } from 'kay'
-import type { ByteSize } from 'kay/library'
+import type { ByteSize, LazyGuard } from 'kay/library'
 import type { FileSaver, Identity } from './files'
 import type { CollectionLayout } from './kay/contract'
-import { byteSize } from 'kay/library'
+import { byteSize, lazily } from 'kay/library'
 import { workingTree } from './files'
 import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
-
-// A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`.
-export interface LazyGuard {
-  load: () => Guard | Promise<Guard>
-}
 
 export interface UploadOptions {
   types?: string[] | undefined
@@ -90,35 +85,6 @@ function uploadSize(maxSize: ByteSize | undefined): number {
     throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
-}
-
-// A guard that loads on its first call, and tries again after a load that failed.
-function lazily(guard: Guard | LazyGuard): Guard {
-  if (typeof guard === 'function')
-    return guard
-
-  const { load: build } = guard
-  let loaded: Promise<Guard> | undefined
-
-  async function load(): Promise<Guard> {
-    // Forgetting a failure must come after `loaded` is set, even when the loader throws at once.
-    await Promise.resolve()
-
-    try {
-      return await build()
-    }
-    catch (error) {
-      loaded = undefined
-
-      throw error
-    }
-  }
-
-  return async (ctx) => {
-    loaded ??= load()
-
-    return (await loaded)(ctx)
-  }
 }
 
 // What `cms()` in kay.config.ts was given.
