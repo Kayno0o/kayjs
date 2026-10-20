@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const pressed = signal(0)
+---
+button.late(onClick={() => pressed.set(n => n + 1)}) Pressed {pressed()}

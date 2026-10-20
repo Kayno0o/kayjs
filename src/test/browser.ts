@@ -168,6 +168,8 @@ const FAILED_WAIT_MS = 1000
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
+// How long a click or a hover waits for a loading page to finish before it scrolls: a page that never finishes, as with a stalled image, is acted on after it.
+const LOAD_WAIT_MS = 1000
 // What the message of a wait that ran out of time starts with.
 const UNSETTLED = 'kay: timed out after'
 // Loaded, for a page with JavaScript off, which hydrates no island.
@@ -486,13 +488,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(run, args) })
     }),
     hover: async (selector, wait = {}) => serial(async () => {
-      await poll(script((target: string) => {
-        const element = document.querySelector(target)
-
-        element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
-
-        return element !== null && element.getClientRects().length > 0
-      }, [selector]), selector, wait.timeout)
+      await poll(script(scrolledTo, [selector, LOAD_WAIT_MS, true]), selector, wait.timeout)
 
       const [x, y] = await center(selector) as [number, number]
 
@@ -521,13 +517,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. Scrolled again between short waits, as a page restoring its scroll once loaded moves it away. An island not hydrated yet replays the click once it is.
       for (;;) {
-        await poll(script((target: string) => {
-          const element = document.querySelector(target)
-
-          element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
-
-          return element !== null
-        }, [selector]), selector, Math.max(until - Date.now(), 1))
+        await poll(script(scrolledTo, [selector, LOAD_WAIT_MS, false]), selector, Math.max(until - Date.now(), 1))
 
         const tried = Date.now()
 
@@ -946,6 +936,22 @@ async function axeSource(): Promise<string> {
 
 // A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
 // A function argument crosses as its source, so it must read nothing from its module.
+// Runs in the page: scrolls the element to the middle once the page loaded, as the browser restoring a reload's scroll position until then would move it away from the place a press is aimed at; whether it is there, and drawn when `drawn`.
+async function scrolledTo(target: string, loadWait: number, drawn: boolean): Promise<boolean> {
+  if (document.readyState !== 'complete') {
+    await new Promise((resolve) => {
+      addEventListener('load', resolve, { once: true })
+      setTimeout(resolve, loadWait)
+    })
+  }
+
+  const element = document.querySelector(target)
+
+  element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
+
+  return element !== null && (!drawn || element.getClientRects().length > 0)
+}
+
 function script(run: (...args: never[]) => unknown, args: unknown[]): string {
   return `(${run.toString()})(${args.map((arg) => {
     if (arg === undefined)

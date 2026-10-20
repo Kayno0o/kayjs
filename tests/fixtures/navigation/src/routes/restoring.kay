@@ -1,0 +1,8 @@
+---
+import Late from '../components/late.kay'
+---
+head
+  title Restoring
+h1 Restoring
+img(src="/late.png" alt="")
+Late

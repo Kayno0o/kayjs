@@ -9,6 +9,9 @@ const PAGE = `<!doctype html><title>t</title><style>.box{width:80px;height:40px;
 <h1>Network</h1><div class="box"></div><div class="far">far</div>
 <script>window.seenAtParse = window.marker ?? 'none'; document.querySelector('.box').addEventListener('mouseenter', () => { window.entered = (window.entered ?? 0) + 1 })</script>`
 
+// How many times the server was asked for the cacheable script.
+let cachedHits = 0
+
 const server = Bun.serve({
   port: 0,
   async fetch(request) {
@@ -33,6 +36,8 @@ const server = Bun.serve({
     }
 
     if (url.pathname === '/cached.js') {
+      cachedHits++
+
       return new Response('window.cached = "server"', { headers: { 'cache-control': 'max-age=3600', 'content-type': 'text/javascript' } })
     }
 
@@ -173,6 +178,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(await load()).toBe('routed')
 
     await page.unroute()
+
+    // The cache is back once the last route went: of two loads the server sees one at most.
+    const before = cachedHits
+
+    expect(await load()).toBe('server')
+    expect(await load()).toBe('server')
+    expect(cachedHits - before).toBeLessThanOrEqual(1)
   })
 
   it('stops answering what a route matched once unrouted, the others kept', async () => {
