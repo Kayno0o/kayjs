@@ -4,7 +4,7 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { clientOptionsOf, PRODUCTION } from '../src/project'
-import { spaced } from '../src/runtime/french'
+import { LEFT_ALONE, spaced } from '../src/runtime/french'
 import { frenchSpaces } from '../src/server/typography'
 import { browserPath, testSite } from '../src/test'
 import { eagerJs } from './eager-js'
@@ -78,6 +78,13 @@ describe('the French spaces in the text an island writes', () => {
       expect(spaced(text, true)).toBe(frenchSpaces(`<p>${text}</p>`).slice(3, -4))
   })
 
+  it('leaves the same elements alone in the browser as on the server', () => {
+    for (const tag of ['code', 'pre', 'kbd', 'samp', 'script', 'style', 'textarea'])
+      expect(frenchSpaces(`<${tag}>a : b</${tag}>`), tag).toBe(`<${tag}>a : b</${tag}>`)
+
+    expect(LEFT_ALONE.split(',').toSorted()).toEqual(['code', 'kbd', 'pre', 'samp', 'script', 'style', 'textarea'])
+  })
+
   it('is asked of the client build by a French lang or locale, and not by anything else or `typography: false`', () => {
     const french = (config: Parameters<typeof clientOptionsOf>[0]) => clientOptionsOf(config, PRODUCTION).french
     const locales = (list: string[]) => ({ locales: list, defaultLocale: list[0]! })
@@ -89,7 +96,7 @@ describe('the French spaces in the text an island writes', () => {
 })
 
 // What the island spacing adds to the gzipped JS a page loads up front, hashed chunk names included.
-const FRENCH_COST = 260
+const FRENCH_COST = 340
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
 async function eager(site: TestSite): Promise<number> {
@@ -138,6 +145,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
 
     await press(page, 'typed', '.counter .label')
     expect((await shown(page)).label).toBe('Déjà~: fin^! «~a~». 12:30 http://a.fr:80/x?y=1')
+  }, 60_000)
+
+  it('writes them in the static text of an element built in the browser, a block shown later or a row, and not inside code', async () => {
+    const { page } = await open({ lang: 'fr' })
+    const late = async () => page.evaluate(() => [...document.querySelectorAll('.late > *')].map(element => `${element.className}=${element.textContent.replaceAll('\u00A0', '~')}`))
+
+    expect(await late()).toEqual(['row=Ligne~: un~?'])
+
+    await page.click('button.open')
+    await page.waitFor('p.fresh')
+
+    expect(await late()).toEqual(['fresh=Tard~: fin~!', 'fresh-code=Tard : fin Début', 'row=Ligne~: un~?', 'row=Ligne~: deux~?'])
+    expect(page.errors).toEqual([])
   }, 60_000)
 
   it('shows a value that is markup as text, spaced', async () => {

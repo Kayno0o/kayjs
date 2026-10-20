@@ -7,7 +7,6 @@ import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
 import { TSCONFIG } from './build/files'
-import { isFrench } from './runtime/french'
 import { IMAGE_WIDTHS, parseWidths } from './runtime/image'
 import { basePath } from './server/base'
 
@@ -94,7 +93,7 @@ export function cacheDir(root: string, ...names: string[]): string {
   return join(projectPaths(root).cache, ...names)
 }
 
-type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints' | 'fonts' | 'search' | 'hydration' | 'lateStyles' | 'lang' | 'typography'>
+type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints' | 'fonts' | 'search' | 'hydration' | 'lateStyles'>
 
 // How a server runs. In development it shows errors with their stack and maps and swaps islands; prebuilt, it serves the browser build `kay build` wrote rather than bundling one; under `kay dev`, each element carries its source for the inspector.
 export interface Mode {
@@ -155,7 +154,6 @@ export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | '
     api: config.api,
     navigation: config.navigation,
     i18n: config.i18n !== undefined,
-    french: config.typography !== false && (config.i18n ? config.i18n.locales.some(isFrench) : config.lang !== undefined && isFrench(config.lang)),
     search: config.search,
     hydration: config.hydration,
     lateStyles: config.lateStyles,

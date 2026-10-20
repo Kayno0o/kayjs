@@ -24,8 +24,6 @@ const LETTER_K = 107
 const LETTER_S = 115
 const LETTER_T = 116
 
-export { isFrench }
-
 // What a page rendered in this language runs its markup through, or nothing when it is not French or the app turned `typography` off.
 export function typographyFor(lang: string, typography: boolean | undefined): ((html: string) => string) | undefined {
   return typography !== false && isFrench(lang) ? frenchSpaces : undefined

@@ -3,8 +3,9 @@ const FRENCH = /^fr(?:-|$)/i
 // The plain space before a mark, with the mark, and the plain space after an opening guillemet.
 const BEFORE_MARK = / ([:;!?»])/g
 const AFTER_OPENING = /« /g
+
 // The elements whose text a page in French leaves as it is.
-const LEFT_ALONE = 'code,pre,kbd,samp,script,style,textarea'
+export const LEFT_ALONE = 'code,pre,kbd,samp,script,style,textarea'
 
 // Whether a page in this language gets French spaces: `fr` and `fr-CA`, not another language starting with the same letters.
 export function isFrench(lang: string): boolean {
@@ -27,4 +28,12 @@ export function frenchText(data: string, parent: Node | undefined): string {
     return data
 
   return (parent as Element | undefined)?.closest?.(LEFT_ALONE) ? data : written
+}
+
+// A template's static text, spaced once for every copy of it a client-built element makes; its attributes are left as they are.
+export function frenchTree(root: Node): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+
+  for (let text = walker.nextNode() as Text | null; text; text = walker.nextNode() as Text | null)
+    text.data = frenchText(text.data, text.parentNode ?? undefined)
 }

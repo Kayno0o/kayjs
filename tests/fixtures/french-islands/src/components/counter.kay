@@ -4,6 +4,8 @@ import { signal } from 'kay'
 const n = signal(0)
 const label = signal('Début')
 const shown = signal(true)
+const open = signal(false)
+const rows = signal(['un'])
 ---
 div.counter
   p.total Total : {n()} !
@@ -14,7 +16,14 @@ div.counter
   code.code {label()}
   pre.pre
     | Ligne : {label()}
+  div.late
+    if open()
+      p.fresh Tard : fin !
+      code.fresh-code Tard : fin {label()}
+    for row of rows()
+      p.row Ligne : {row} ?
   button.plus(type="button" onClick={() => { n.set(n() + 1); label.set(`Reste : ${n()} !`) }}) Plus
   button.typed(type="button" onClick={() => label.set('Déjà : fin ! « a ». 12:30 http://a.fr:80/x?y=1')}) Typed
   button.hostile(type="button" onClick={() => label.set('<b>x</b> : y')}) Hostile
+  button.open(type="button" onClick={() => { open.set(true); rows.set([...rows(), 'deux']) }}) Open
   button.toggle(type="button" onClick={() => shown.set(!shown())}) Toggle

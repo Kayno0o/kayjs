@@ -3,7 +3,7 @@
 
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
-import { frenchText } from './french'
+import { frenchText, frenchTree } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
@@ -200,6 +200,9 @@ export function template(html: string): () => Element {
         holder.innerHTML = `<svg>${html}</svg>`
         node = holder.content.firstChild!.firstChild as Element
       }
+
+      if (typeof KAY_FRENCH !== 'undefined')
+        frenchTree(node)
     }
 
     return node.cloneNode(true) as Element
@@ -464,16 +467,33 @@ function rowUnit(made: Unit[]): Unit | null {
   return made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!))
 }
 
-// Where the units being made go, set by a dynamic part on a page in French so a text inside code is left as it is.
-let into: Node | undefined
+// Where the units about to be made go, noted by a dynamic part of a page in French, so a text inside code is left as it is.
+let target: Node | undefined
+
+// The value, once `parent` is noted as where its units go.
+function within<T>(parent: Node, value: T): T {
+  target = parent
+
+  return value
+}
+
+// `add` noting the same parent before each part, as a function child rendering a part of its own in between would change it.
+function keepingParent<T>(add: (part: T) => void): (part: T) => void {
+  const parent = target
+
+  return (part) => {
+    target = parent
+    add(part)
+  }
+}
 
 // The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
 function units(value: unknown): Unit[] {
   const out: Unit[] = []
 
-  eachChild(value, (part) => {
+  const add = (part: string | object) => {
     if (typeof part === 'string') {
-      out.push(claim ? claimText(part) : document.createTextNode(typeof KAY_FRENCH === 'undefined' ? part : frenchText(part, into)))
+      out.push(claim ? claimText(part) : document.createTextNode(typeof KAY_FRENCH === 'undefined' ? part : frenchText(part, target)))
     }
     else if (part instanceof Range) {
       out.push(part)
@@ -490,7 +510,9 @@ function units(value: unknown): Unit[] {
       else if (firstChild && lastChild)
         out.push(firstChild === lastChild ? firstChild : new Range(firstChild, lastChild))
     }
-  })
+  }
+
+  eachChild(value, typeof KAY_FRENCH === 'undefined' ? add : keepingParent(add))
 
   return out
 }
@@ -556,13 +578,7 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
       }
     }
 
-    if (typeof KAY_FRENCH !== 'undefined')
-      into = region.parent
-
-    const next = units(value)
-
-    if (typeof KAY_FRENCH !== 'undefined')
-      into = undefined
+    const next = units(typeof KAY_FRENCH === 'undefined' ? value : within(region.parent, value))
 
     if (next.length === current.length && next.every((unit, index) => unit === current[index]))
       return
@@ -666,7 +682,7 @@ function show(region: Region, previous: Unit[], render: () => unknown, entering:
   for (const unit of previous)
     removeUnit(unit)
 
-  const next = units(render())
+  const next = units(typeof KAY_FRENCH === 'undefined' ? render() : within(region.parent, render()))
 
   for (const unit of next)
     region.insert(unit)
@@ -771,7 +787,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       }
 
       const value = render(readItem, readIndex)
-      const made = units(value)
+      const made = units(typeof KAY_FRENCH === 'undefined' ? value : within(region.parent, value))
 
       return { key: rowKey, unit: rowUnit(made), setItem: setItem as (item: unknown) => void, setIndex, dispose }
     }))
