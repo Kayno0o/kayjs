@@ -30,7 +30,7 @@ interface Entry {
 // A locale's messages are the app's laid over its extensions', as the server reads them.
 export async function messageProblems(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<ContentProblem[]> {
   const problems: ContentProblem[] = []
-  const read = new Map<string, { file: string, entries: Map<string, Entry> }>()
+  const read = new Map<string, { file: string, entries: Map<string, Entry>, shipped: Set<string> }>()
 
   for (const locale of config.locales) {
     const catalog = await localeCatalog(root, config, extensions, locale)
@@ -41,7 +41,7 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
       continue
     }
 
-    const { file, source, own, entries } = catalog
+    const { file, source, own, entries, shipped } = catalog
 
     for (const key of own) {
       if (key.split('.').includes(''))
@@ -51,7 +51,7 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
     for (const { key, line } of draftMessages(source))
       problems.push({ file, line, message: `gives ${key} as a draft, which no one has checked yet`, code: 'draft-message' })
 
-    read.set(locale, { file, entries })
+    read.set(locale, { file, entries, shipped })
   }
 
   const reference = read.get(config.defaultLocale)
@@ -59,12 +59,16 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   if (!reference)
     return problems
 
-  for (const [locale, { file, entries }] of read) {
+  for (const [locale, { file, entries, shipped }] of read) {
     if (locale === config.defaultLocale)
       continue
 
     for (const [key, { message, file: from }] of reference.entries) {
       const own = entries.get(key)
+
+      // A library shipping no catalog for the locale leaves it the default locale's texts, which the app need not translate.
+      if (own === undefined && from !== reference.file && !shipped.has(dirname(from)))
+        continue
 
       if (own === undefined) {
         problems.push({ file, line: 1, message: `lacks ${key}, which ${from} has` })
@@ -167,8 +171,8 @@ export async function missingMessages(root: string, config: I18nConfig, extensio
   return missing
 }
 
-// A locale's messages as the server reads them, the app's laid over its extensions', each with the catalog it comes from, and the keys of the app's own file; or why there are none to read.
-async function localeCatalog(root: string, config: I18nConfig, extensions: KayExtension[], locale: string): Promise<{ file: string, source: string, own: string[], entries: Map<string, Entry> } | { problem: ContentProblem }> {
+// A locale's messages as the server reads them, the app's laid over its extensions', each with the catalog it comes from, the keys of the app's own file and the folders of the extensions' catalogs it has; or why there are none to read.
+async function localeCatalog(root: string, config: I18nConfig, extensions: KayExtension[], locale: string): Promise<{ file: string, source: string, own: string[], entries: Map<string, Entry>, shipped: Set<string> } | { problem: ContentProblem }> {
   const path = messagesFile(root, config, locale)
   const file = relative(root, path)
   const libraries = extensionMessageFiles(root, extensions, locale).filter(existsSync)
@@ -200,7 +204,7 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   for (const [key, message] of messages)
     entries.set(key, { message, file, source })
 
-  return { file, source, own: [...messages.keys()], entries }
+  return { file, source, own: [...messages.keys()], entries, shipped: new Set(libraries.map(catalog => dirname(relative(root, catalog)))) }
 }
 
 const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail'], ['ai', 'kayjs-ai']])

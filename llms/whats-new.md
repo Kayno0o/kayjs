@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` type-checks with Bun's own `bun check` instead of tsgo: a cold check of the docs site takes 1.3 s and 4.4 s of CPU instead of 2.0 s and 7.2 s, at 310 MB instead of 760 MB, with the same diagnostics at the same `.kay` lines; a warm check of a project nothing changed in still skips the type check ([Checks](checks.md)).
 - A keyed row that moves, and an island kept by `persist` across a page swap, keep their loaded iframe, playing video and focus in a browser with `Element.moveBefore` (Chrome 133, Firefox 144) ([Templates](templates.md), [Navigation](navigation.md)).
 - A server build sends each page after the first as its difference from the build's 404 page to a browser holding it (Compression Dictionary Transport, `Content-Encoding: dcz`): no setup, off in development and in a static export, and a browser without the feature gets what it did before; on kay's docs a 41 KB page goes in 4.4 KB instead of 9.2 KB with brotli ([Production](proxy-and-security.md#compression)).
+- `kay check` no longer asks an app's locale for the `ui.*` or `mail.*` keys of kayjs-ui or kayjs-mail when the library ships no catalog for it, `de` for one: the locale reads the default locale's texts ([Locales](locales.md)).
 
 ## 1.60.1
 

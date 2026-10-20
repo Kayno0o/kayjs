@@ -1,7 +1,9 @@
 import type { Action } from '../src/runtime'
+import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
+import { libraryMessageExtensions } from '../src/build/manifests'
 import { messageProblems } from '../src/check/messages'
 import { sizeText } from '../src/runtime/size-text'
 import { wording } from '../src/runtime/words.server'
@@ -151,6 +153,31 @@ describe('kay check on the catalogs', () => {
       'gives ui.table.filterLabel a {x}, which its English has not, so nothing fills it',
       'gives ai.chat.disclosure a {x}, which its English has not, so nothing fills it',
     ].toSorted())
+  })
+
+  it('asks a locale no installed library ships for none of its keys, which read the default locale\'s', async () => {
+    const root = await scratchDir('kay-words-libraries-')
+    const write = async (locale: string, body: string) => Bun.write(join(root, 'src/messages', `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)
+
+    try {
+      await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': 'workspace:*', '@kaynooo/kayjs-mail': 'workspace:*' } }))
+      await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
+      await symlink(join(import.meta.dir, '../packages/ui'), join(root, 'node_modules/@kaynooo/kayjs-ui'))
+      await symlink(join(import.meta.dir, '../packages/mail'), join(root, 'node_modules/@kaynooo/kayjs-mail'))
+      await write('en', '{ title: \'Words\', bye: \'Bye\' }')
+      await write('fr', '{ title: \'Mots\', bye: \'Salut\' }')
+      await write('de', '{ title: \'Wörter\' }')
+      const extensions = libraryMessageExtensions(root)
+
+      expect(extensions.map(({ name }) => name).toSorted()).toEqual(['@kaynooo/kayjs-mail', '@kaynooo/kayjs-ui'])
+
+      // kayjs-ui ships fr alone and kayjs-mail en and fr: de is held to the app's own keys.
+      for (const defaultLocale of ['en', 'fr'])
+        expect((await messageProblems(root, { locales: ['en', 'fr', 'de'], defaultLocale }, extensions)).map(({ file, message }) => `${file}: ${message}`)).toEqual([`src/messages/de.ts: lacks bye, which src/messages/${defaultLocale}.ts has`])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('lets a locale word the kay.* keys the default locale does not give', async () => {
