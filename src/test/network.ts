@@ -118,7 +118,7 @@ const ANNOUNCE_WAIT_MS = 500
 // How long a finished response waits for the extra info that carries its wire headers.
 const EXTRA_GRACE_MS = 200
 // What DevTools says of a request that was cancelled while paused, a navigation away or a closed stream.
-const GONE = /Invalid InterceptionId|No such|not found/i
+const GONE = /Invalid InterceptionId|No such|not found|Fetch domain is not enabled/i
 const GLOBAL_STICKY = /[gy]/g
 const KEBAB = /-([a-z])/g
 
