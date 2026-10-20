@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { MAPS_DIR } from '../build/assets'
-import { extensionServers, pageHooks } from '../config'
+import { pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
@@ -256,7 +256,7 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
 export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
-  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints, appManifest } = setup
+  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints, appManifest, extensions, api: apiImport } = setup
   const routes = await servedRoutes(setup, options.requireGuards)
   const served = new ServedPaths()
   const table = routeTable(routes, i18n?.settings, served)
@@ -348,7 +348,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
   const mountedByExtensions: OwnRoutes['extensions'] = []
 
-  for (const { name, server } of await extensionServers(options.extensions, root)) {
+  for (const { name, server } of await extensions) {
     if (!mode.dev) {
       app.use(server)
 
@@ -365,7 +365,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards, cors: options.cors }
-  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options)])
+  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0
   const publicServed = claimPublic(served, files)

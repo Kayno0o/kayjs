@@ -1,5 +1,6 @@
 import type { Collection } from '../content'
 import type { Project } from '../project'
+import type { ApiModule } from './api-modules'
 import type { Cards } from './card'
 import type { ClientBuild } from './client'
 import type { I18n } from './i18n'
@@ -10,12 +11,14 @@ import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { extensionServers } from '../config'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
 import { setupStore } from './app-store'
 import { basePath } from './base'
+import { importModule } from './bundle'
 import { setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
@@ -34,6 +37,16 @@ import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
+
+// Imports every page, layout and API module, as the server does one by one when it registers them, so their compiling runs beside the client build; a failing import is raised again by the server's own.
+async function warmModules(routes: Route[], api: Promise<ApiModule[]>): Promise<void> {
+  const files = new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))
+
+  for (const module of await api)
+    files.add(module.file)
+
+  await Promise.allSettled([...files].map(async file => importModule(file)))
+}
 
 export interface PageSetup {
   source: ProjectSource
@@ -58,6 +71,9 @@ export interface PageSetup {
   endpoints: Endpoint[]
   // Whether the app serves the default manifest itself, which kay then links in place of the locales'.
   appManifest: boolean
+  // The extension servers and API modules, imported while the client builds; nothing prerendering reads.
+  extensions: Promise<Awaited<ReturnType<typeof extensionServers>>>
+  api: ReturnType<ProjectSource['api']>
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
@@ -68,7 +84,12 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   const source = projectSource()
 
   await source.prepare(root, config.settings)
-  const [routes, client] = await Promise.all([source.routes(paths.routes, mounts), loadClient()])
+  // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
+  const loadingClient = loadClient()
+
+  void Promise.allSettled([loadingClient])
+
+  const routes = await source.routes(paths.routes, mounts)
 
   refuseClashes(paths.routes, routes)
   const [matchers, i18n] = await Promise.all([loadMatchers(paths.routes, routes), config.i18n && loadI18n(root, config.i18n, config.extensions)])
@@ -104,11 +125,20 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }
 
-  if (!mode.dev)
-    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes), config.offline === undefined || config.offline === false, config.lateStyles === true)
+  setMarkdownDefaults(config.markdown)
+
+  // Imported after everything their code reads at import time is installed, and while the client builds.
+  const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)
+  const api = prerendering ? Promise.resolve([]) : source.api(root, config)
+
+  void Promise.allSettled([extensions, api, prerendering ? undefined : warmModules(routes, api)])
 
   const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const ownManifest = appServesManifest(files, endpoints, routes)
+  const client = await loadingClient
+
+  if (!mode.dev)
+    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes), config.offline === undefined || config.offline === false, config.lateStyles === true)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {
@@ -117,13 +147,11 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
     return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
 
-  setMarkdownDefaults(config.markdown)
-
   const [{ head, scripts, styles, cards, fontCss }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest, extensions, api }
 }
