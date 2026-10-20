@@ -51,7 +51,7 @@ export interface Analysis {
 
 // The packages a compile runs through, their versions part of every cache key.
 const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
-let fingerprint: string | undefined
+const fingerprints = new Map<string, string>()
 const SCRIPT_FILE = /\.tsx?$/
 // Each file's last analysis in this process, which spares reading its cache entry from disk again while the inputs stay the same.
 const analyzed = new Map<string, { file: string, key: string, analysis: Analysis }>()
@@ -263,11 +263,13 @@ function probedPackages(source: string): string[] {
   return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }
 
-export function compilerFingerprint(): string {
+export function compilerFingerprint(bunVersion = Bun.version): string {
+  let fingerprint = fingerprints.get(bunVersion)
+
   if (fingerprint === undefined) {
     const hasher = new Bun.CryptoHasher('sha256')
 
-    // What a compile depends on besides its source: kay's compiler with every module it imports, kay's own version, and the packages it runs through, tsgo's among them for the browser globals it declares.
+    // What a compile depends on besides its source: kay's compiler with every module it imports, kay's own version, the packages it runs through, tsgo's among them for the browser globals it declares, and Bun's version, as a markdown block is lowered with `Bun.markdown`.
     const compilerDir = join(import.meta.dir, '../compiler')
     const sources = [
       ...compilerModules(compilerDir),
@@ -282,7 +284,9 @@ export function compilerFingerprint(): string {
     for (const file of sources)
       hasher.update(readFileSync(file))
 
+    hasher.update(`\0bun ${bunVersion}`)
     fingerprint = hasher.digest('hex')
+    fingerprints.set(bunVersion, fingerprint)
   }
 
   return fingerprint

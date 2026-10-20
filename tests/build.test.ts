@@ -25,7 +25,7 @@ import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
-import { analyzeKayCached, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
+import { analyzeKayCached, compilerFingerprint, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -1188,6 +1188,12 @@ describe('compile cache', () => {
     expect(modules).toContain('compiler/parser.ts')
     expect(modules).toEqual(expect.arrayContaining(['runtime/markers.ts', 'runtime/base.ts', 'runtime/root.ts', 'runtime/form.ts', 'runtime/action.ts']))
     expect(modules.filter(file => file.startsWith('server/'))).toEqual([])
+  })
+
+  it('keys every entry on Bun\'s version, which a markdown block is lowered by', () => {
+    expect(compilerFingerprint()).toBe(compilerFingerprint(Bun.version))
+    expect(compilerFingerprint('1.4.3')).not.toBe(compilerFingerprint('1.4.4'))
+    expect(compilerFingerprint('1.4.3')).toBe(compilerFingerprint('1.4.3'))
   })
 
   it('serves an unchanged file from the cache, recompiles a changed one, and still maps its stacks', async () => {
