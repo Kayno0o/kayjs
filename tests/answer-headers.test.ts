@@ -80,8 +80,8 @@ describe('the headers of every kind of answer', () => {
     const response = await get('/')
 
     expect(page).toContain('default-src \'self\'')
-    await expectAnswer(response, 200, { 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, accept-encoding' })
-    await expectAnswer(await get('/', { 'accept-encoding': 'br' }), 200, { 'cache-control': 'private, no-cache', 'content-encoding': 'br', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, accept-encoding' })
+    await expectAnswer(response, 200, { 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, Save-Data, accept-encoding' })
+    await expectAnswer(await get('/', { 'accept-encoding': 'br' }), 200, { 'cache-control': 'private, no-cache', 'content-encoding': 'br', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, Save-Data, accept-encoding' })
     await expectAnswer(await get('/nothing'), 404, {})
   })
 
@@ -91,7 +91,7 @@ describe('the headers of every kind of answer', () => {
 
     expect(Number(length)).toBeGreaterThan(0)
     expect(policy).toBe(page)
-    expect(seen).toEqual({ ...SECURITY, 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie' })
+    expect(seen).toEqual({ ...SECURITY, 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, Save-Data' })
   })
 
   it('an API route carries them beside its own headers, whether it answers a value or a Response', async () => {

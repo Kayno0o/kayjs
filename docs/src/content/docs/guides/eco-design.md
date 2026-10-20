@@ -42,7 +42,7 @@ An imported image gets WebP variants at several widths. Each also comes as AVIF,
 | 4.8 Few fonts | App | `fonts` self-hosts font files. Each family gets a fallback of matching metrics. A font in several subsets loads only the files the page's text needs. How many families you declare is up to you. |
 | 5.8 Archive or delete old content | App | `files.delete` removes a file with its variants. The server removes image variants nobody asked for in 30 days. |
 
-A visitor who asks for less data gets a lighter site with no setting. Browsers with `Save-Data: on` receive the next image width down, no font preloads or speculation rules, and fonts shown only once cached. Pages vary on `Save-Data`, so caches keep both copies. `prefers-reduced-data` skips the preloads and the link prefetch too. `saveData: false` turns it all off.
+A visitor who asks for less data gets a lighter site with no setting. Browsers sending `Save-Data: on` receive the next image width down, no font preloads or speculation rules, and fonts shown only once cached. Pages vary on `Save-Data`, so caches keep both copies. In a browser with `prefers-reduced-data` or a saving connection, links are not prefetched. `saveData: false` turns it all off.
 
 [Styling and assets](/essentials/styling-and-assets) covers fonts and imported files. The [file storage guide](/guides/file-storage) covers stored images. [Responsive images](/llms/images#responsive-images) has every rule.
 

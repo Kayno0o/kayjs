@@ -8,7 +8,7 @@ import { Elysia } from 'elysia'
 import { pages, processImage } from '../src/server'
 import { sourceHash } from '../src/server/csp'
 import { serveImages } from '../src/server/image'
-import { savesData } from '../src/server/save-data'
+import { savesData, withSavedData } from '../src/server/save-data'
 import { speculationRules } from '../src/server/speculation'
 import { scratchBuild } from './prerendered'
 
@@ -19,7 +19,6 @@ const FONTS = [
 ]
 const RULES = speculationRules('moderate')
 const PRELOAD = /<link[^>]*rel="preload"[^>]*as="font"[^>]*>/
-const REDUCED_DATA = 'media="(prefers-reduced-data: no-preference)"'
 const ON = { 'save-data': 'on' }
 
 const request = (path: string, headers: Record<string, string> = {}) => new Request(`http://localhost${path}`, { headers })
@@ -105,14 +104,13 @@ describe.each([
   it.each([
     ['off', { 'save-data': 'off' }],
     ['absent', {}],
-  ])('keeps them, behind a media query for prefers-reduced-data, with Save-Data %s', async (_name, headers) => {
+  ])('keeps them with Save-Data %s', async (_name, headers) => {
     const { app, remove } = await served()
 
     try {
       const html = await (await app.handle(request('/about', headers))).text()
 
       expect(html).toMatch(PRELOAD)
-      expect(PRELOAD.exec(html)![0]).toContain(REDUCED_DATA)
       expect(html).toContain(RULES)
       expect(fontStyle(html)).toContain('font-display:swap')
       expect(fontStyle(html)).toContain('font-display:block')
@@ -198,7 +196,6 @@ describe.each([
       const html = await saving.text()
 
       expect(html).toMatch(PRELOAD)
-      expect(PRELOAD.exec(html)![0]).not.toContain('prefers-reduced-data')
       expect(html).toContain(RULES)
       expect(fontStyle(html)).toContain('font-display:swap')
       expect(varies(saving)).not.toContain('save-data')
@@ -282,6 +279,78 @@ describe('a prerendered page with server islands', () => {
     finally {
       await build.remove()
     }
+  })
+})
+
+describe('the page wrapper', () => {
+  const PRELOAD_TAG = '<link rel="preload" href="/f.woff2" as="font" type="font/woff2" crossorigin="">'
+  const encoder = new TextEncoder()
+  const answering = (pieces: string[], headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8' }, status = 200) => withSavedData(async () => new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const piece of pieces)
+        controller.enqueue(encoder.encode(piece))
+
+      controller.close()
+    },
+  }), { status, headers }), { prefetch: 'moderate' })
+  const ask = async (respond: ReturnType<typeof answering>, headers: Record<string, string> = ON, method = 'GET') => respond({} as never, {}, { request: new Request('http://localhost/', { headers, method }) }, new URL('http://localhost/'))
+
+  it('finds the end of the head split across chunks, or in the middle of a character', async () => {
+    const pieces = [`<html><head><title>é</title>${PRELOAD_TAG}</he`, 'ad><body>héllo ', '€</body></html>']
+    const text = await (await ask(answering(pieces))).text()
+
+    expect(text).toBe('<html><head><title>é</title></head><body>héllo €</body></html>')
+
+    const bytes = encoder.encode(pieces.join(''))
+    const cut = bytes.indexOf(0xE2) + 1
+    const split = withSavedData(async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.subarray(0, cut))
+        controller.enqueue(bytes.subarray(cut))
+        controller.close()
+      },
+    }), { headers: { 'content-type': 'text/html' } }), { prefetch: 'moderate' })
+
+    expect(await (await ask(split)).text()).toBe(text)
+  })
+
+  it('passes a document with no head through whole', async () => {
+    const response = await ask(answering(['<p>a fragment ', PRELOAD_TAG, '</p>']))
+
+    expect(await response.text()).toBe(`<p>a fragment ${PRELOAD_TAG}</p>`)
+    expect(varies(response)).toContain('save-data')
+  })
+
+  it('answers a visitor not saving data as it came, with the Vary', async () => {
+    const response = await ask(answering([`<head>${PRELOAD_TAG}</head>`]), {})
+
+    expect(await response.text()).toBe(`<head>${PRELOAD_TAG}</head>`)
+    expect(varies(response)).toEqual(['save-data'])
+  })
+
+  it('adds Save-Data to a Vary already there, once, and to a 304', async () => {
+    const twice = await ask(answering([`<head></head>`], { 'content-type': 'text/html', 'vary': 'Cookie, Save-Data' }))
+    const unchanged = await ask(answering([], { vary: 'accept-encoding' }, 304))
+
+    expect(varies(twice)).toEqual(['cookie', 'save-data'])
+    expect(varies(unchanged)).toEqual(['accept-encoding', 'save-data'])
+  })
+
+  it('leaves what is no page alone, a HEAD answer without a body included', async () => {
+    const json = await ask(answering(['{}'], { 'content-type': 'application/json' }))
+    const head = await ask(withSavedData(async () => new Response(null, { headers: { 'content-type': 'text/html' } }), { prefetch: 'moderate' }), ON, 'HEAD')
+
+    expect(varies(json)).toEqual([''])
+    expect(head.status).toBe(200)
+    expect(varies(head)).toContain('save-data')
+  })
+
+  it('is no wrapper at all when there is nothing to leave out, or the config says so', async () => {
+    const respond = async () => new Response('x')
+
+    expect(withSavedData(respond, { prefetch: false })).toBe(respond)
+    expect(withSavedData(respond, { saveData: false })).toBe(respond)
+    expect(withSavedData(respond, { prefetch: false, fontCss: '@font-face{}' })).not.toBe(respond)
   })
 })
 

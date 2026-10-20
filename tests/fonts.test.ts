@@ -22,7 +22,7 @@ describe('fonts', () => {
   it('declares every font in the head and preloads the ones asked for', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
-    const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="" media="\(prefers-reduced-data: no-preference\)">/g)].map(match => [match[1], match[2]])
+    const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="">/g)].map(match => [match[1], match[2]])
     const css = (/<style>([^<]+)<\/style>/).exec(html)![1]!
 
     expect(preloads).toEqual([[expect.stringMatching(/^\/_kay\/assets\/display-\w+\.woff2$/), 'font/woff2']])

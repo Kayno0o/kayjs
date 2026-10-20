@@ -34,6 +34,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -88,6 +92,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -140,6 +148,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -304,6 +316,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -363,7 +379,7 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       ],
       [
         "vary",
-        "cookie",
+        "cookie, Save-Data",
       ],
       [
         "x-content-type-options",
@@ -590,6 +606,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -644,6 +664,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -696,6 +720,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -804,6 +832,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -1184,6 +1216,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -1236,6 +1272,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -1400,6 +1440,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -1458,6 +1502,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -1514,6 +1562,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -1688,6 +1740,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -1930,6 +1986,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -1988,6 +2048,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -2044,6 +2108,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -2160,6 +2228,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -2568,6 +2640,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -2624,6 +2700,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -2800,6 +2880,10 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -2859,6 +2943,10 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -2911,6 +2999,10 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -3235,6 +3327,10 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -4275,6 +4371,10 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -4563,6 +4663,10 @@ exports[`the page answers of a site with slash answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -5782,6 +5886,10 @@ exports[`the page answers of a site with based answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -7140,6 +7248,10 @@ exports[`the page answers of a site with based answers every path as pinned 1`] 
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -11278,6 +11390,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -11332,6 +11448,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -11384,6 +11504,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -11548,6 +11672,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -11607,7 +11735,7 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       ],
       [
         "vary",
-        "cookie",
+        "cookie, Save-Data",
       ],
       [
         "x-content-type-options",
@@ -11834,6 +11962,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -11888,6 +12020,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -11940,6 +12076,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -12050,6 +12190,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -12104,6 +12248,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -12156,6 +12304,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -12428,6 +12580,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -12480,6 +12636,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -12644,6 +12804,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -12702,6 +12866,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -12758,6 +12926,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -12932,6 +13104,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -13174,6 +13350,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -13232,6 +13412,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -13288,6 +13472,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -13406,6 +13594,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -13464,6 +13656,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -13520,6 +13716,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -13812,6 +14012,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
         "max-age=31536000",
       ],
       [
+        "vary",
+        "Save-Data",
+      ],
+      [
         "x-content-type-options",
         "nosniff",
       ],
@@ -13868,6 +14072,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",
@@ -14042,6 +14250,10 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
       [
         "strict-transport-security",
         "max-age=31536000",
+      ],
+      [
+        "vary",
+        "Save-Data",
       ],
       [
         "x-content-type-options",

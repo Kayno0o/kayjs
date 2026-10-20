@@ -4,7 +4,7 @@ import { speculationRules } from './speculation'
 
 const SAVING = /^\s*on\s*$/i
 const FONT_PRELOAD = /<link\s[^>]*?\brel="preload"[^>]*?\bas="font"[^>]*>/g
-const CLOSING_QUOTE = /"$/
+const VARY_ALL = new Set(['save-data', '*'])
 const FONT_DISPLAY = /font-display:[a-z-]+/g
 const HEAD_END = Buffer.from('</head>')
 
@@ -34,15 +34,14 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
     return respond
 
   const rules = speculationRules(options.prefetch, options.base)
-  const { fontCss } = options
-  const lightCss = fontCss === undefined ? undefined : lightFontCss(fontCss)
+  const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   const lighter = (head: string) => {
     let lightened = head.replace(FONT_PRELOAD, '')
 
     if (rules !== '')
       lightened = lightened.replace(rules, () => '')
 
-    return fontCss === undefined || lightCss === undefined ? lightened : lightened.replace(fontCss, () => lightCss)
+    return fonts === undefined ? lightened : lightened.replace(fonts.full, () => fonts.light)
   }
 
   return async (route, params, context, url) => {
@@ -58,12 +57,8 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
       return response
 
     const lightened = new Response(lightHead(response.body, lighter), response)
-    const etag = lightened.headers.get('etag')
 
     lightened.headers.delete('content-length')
-
-    if (etag !== null && !etag.endsWith('-sd"'))
-      lightened.headers.set('etag', etag.replace(CLOSING_QUOTE, '-sd"'))
 
     return lightened
   }
@@ -74,7 +69,7 @@ function varyOnSaveData(headers: Headers): void {
 
   if (vary === null)
     headers.set('vary', 'Save-Data')
-  else if (!vary.split(',').some(name => ['save-data', '*'].includes(name.trim().toLowerCase())))
+  else if (!vary.split(',').some(name => VARY_ALL.has(name.trim().toLowerCase())))
     headers.set('vary', `${vary}, Save-Data`)
 }
 

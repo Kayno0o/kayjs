@@ -42,13 +42,11 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     if (!fonts)
       throw new KayError('executable-incomplete', 'kay: this executable holds no fonts; build it again with kay build --compile')
 
-    const saving = config.saveData !== false
-
-    extra.push(...fontTags(fonts, saving))
+    extra.push(...fontTags(fonts))
     styles.push(fonts.css)
 
     // The copy a visitor saving data gets, which the policy lets through by its hash too.
-    if (saving)
+    if (config.saveData !== false)
       styles.push(lightFontCss(fonts.css))
   }
 
