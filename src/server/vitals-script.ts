@@ -86,3 +86,17 @@ export function vitalsScript(asks: boolean): string {
 
   return script
 }
+
+const etags = new Map<boolean, string>()
+
+// The validator of the script's text, so a browser that kept a script the config no longer builds is answered with the new one.
+export function vitalsEtag(asks: boolean): string {
+  let etag = etags.get(asks)
+
+  if (etag === undefined) {
+    etag = `"${Bun.hash(vitalsScript(asks)).toString(36)}"`
+    etags.set(asks, etag)
+  }
+
+  return etag
+}

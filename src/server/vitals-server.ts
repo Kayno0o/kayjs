@@ -9,9 +9,10 @@ import { routerPath } from './base'
 import { declined } from './consent-cookie'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
+import { revalidated } from './public'
 import { siteFacts } from './site-facts'
 import { VITALS_PATH, VITALS_SCRIPT_PATH } from './vitals'
-import { vitalsScript } from './vitals-script'
+import { vitalsEtag, vitalsScript } from './vitals-script'
 import { bucketOf, DAY_MS, MAXIMUM, vitalsStore } from './vitals-store'
 
 // A report is a path and three numbers: past this it is no report.
@@ -36,7 +37,8 @@ export function vitalsServer(options: VitalsOptions): AnyElysia {
   // The visitor's yes is awaited when the app says so, else when its analytics notice asks for it.
   const asking = (app: Elysia): boolean => options.consent ?? siteFacts(app)?.asksConsent === true
   const plugin = (app: Elysia) => app
-    .get(VITALS_SCRIPT_PATH, () => new Response(vitalsScript(asking(app)), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
+    // The script depends on the config's consent gate, at a URL that stays, so a browser asks again on every load.
+    .get(VITALS_SCRIPT_PATH, ({ request }) => revalidated(request, vitalsEtag(asking(app)), () => vitalsScript(asking(app)), { 'content-type': 'text/javascript; charset=utf-8' }))
     .post(VITALS_PATH, async ({ request, server }) => {
       if (isCrossSite(request))
         return new Response(null, { status: 403 })

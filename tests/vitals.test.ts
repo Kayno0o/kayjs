@@ -123,6 +123,62 @@ describe('the script and the page', () => {
     expect(vitalsScript(false)).toBe(text)
   })
 
+  it('is asked again on every load and answers 304 while it is unchanged, so no cache keeps a gate the config dropped', async () => {
+    const app = await site()
+    const first = await app.handle(new Request('http://localhost/_kay/vitals.js'))
+    const etag = first.headers.get('etag')!
+
+    expect(first.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+    expect(etag).toMatch(/^"[\w-]+"$/)
+
+    const again = await app.handle(new Request('http://localhost/_kay/vitals.js', { headers: { 'if-none-match': etag } }))
+
+    expect(again.status).toBe(304)
+    expect(again.headers.get('etag')).toBe(etag)
+    expect(await again.text()).toBe('')
+  })
+
+  it('answers a script cached before a consent gate came or went with the one the config has now', async () => {
+    const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', consent: true }
+    const fetchScript = async (app: Site, etag?: string) => app.handle(new Request('http://localhost/_kay/vitals.js', { headers: etag === undefined ? {} : { 'if-none-match': etag } }))
+    const plain = await site()
+    const gated = await build({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(asked), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+    const before = await fetchScript(plain)
+    const during = await fetchScript(gated)
+
+    expect(before.headers.get('etag')).not.toBe(during.headers.get('etag'))
+
+    // The browser holds the gated script and the config dropped the notice: the validator no longer matches.
+    const removed = await fetchScript(plain, during.headers.get('etag')!)
+
+    expect(removed.status).toBe(200)
+    expect(await removed.text()).toBe(vitalsScript(false))
+    expect(removed.headers.get('etag')).toBe(before.headers.get('etag'))
+
+    // And the other way, a notice added to a site whose script is cached.
+    const added = await fetchScript(gated, before.headers.get('etag')!)
+
+    expect(added.status).toBe(200)
+    expect(await added.text()).toBe(vitalsScript(true))
+    expect((await fetchScript(gated, during.headers.get('etag')!)).status).toBe(304)
+  })
+
+  it('answers a validator from an older kay or an unknown one with the script, in development as in production', async () => {
+    const app = await site()
+
+    for (const environment of ['production', 'development']) {
+      process.env.NODE_ENV = environment
+
+      for (const stale of ['"old-deploy"', 'W/"old-deploy"']) {
+        const answer = await app.handle(new Request('http://localhost/_kay/vitals.js', { headers: { 'if-none-match': stale } }))
+
+        expect(answer.status).toBe(200)
+        expect(answer.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+        expect(await answer.text()).toBe(vitalsScript(false))
+      }
+    }
+  })
+
   it('adds nothing to a site that does not use it', async () => {
     const plain = await build({ routes: join(dir, 'routes'), prebuilt: false })
     const home = await (await plain.handle(new Request('http://localhost/'))).text()
@@ -588,7 +644,12 @@ describe('under a base', () => {
       const home = await (await mounted.fetch('/shop/')).text()
 
       expect(home).toContain('src="/shop/_kay/vitals.js"')
-      expect((await mounted.fetch('/shop/_kay/vitals.js')).status).toBe(200)
+
+      const script = await mounted.fetch('/shop/_kay/vitals.js')
+
+      expect(script.status).toBe(200)
+      expect(script.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+      expect((await mounted.fetch('/shop/_kay/vitals.js', { headers: { 'if-none-match': script.headers.get('etag')! } })).status).toBe(304)
 
       const post = async (path: string, body: object) => mounted.fetch(path, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain', 'x-forwarded-for': `203.0.113.${++counter % 250}` } })
 
