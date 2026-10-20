@@ -182,7 +182,8 @@ function shadowTree(dir: string): ShadowTree {
     },
     removeStale: async (kept) => {
       const { files, links } = await treeEntries(dir)
-      const stale = [...files, ...links].filter(path => !written.has(path) && !kept.some(name => path === join(dir, name)))
+      // A kept name is written by another step meanwhile, through a draft `writeAtomically` is about to move into place.
+      const stale = [...files, ...links].filter(path => !written.has(path) && !kept.some(name => path === join(dir, name) || (path.startsWith(`${join(dir, name)}.`) && path.endsWith('.tmp'))))
 
       await Promise.all(stale.map(async path => rm(path)))
     },

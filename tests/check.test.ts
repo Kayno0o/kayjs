@@ -11,6 +11,7 @@ import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
 import { DESCRIPTION_LENGTH, pageSeoLints } from '../src/check/seo'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
+import { writeShadowTypes } from '../src/check/shadow-types'
 import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
 import { isErrorCode } from '../src/compiler/errors'
@@ -97,6 +98,25 @@ describe('kay check', () => {
 
       expect(await Bun.file(stale).exists()).toBe(false)
       expect(await Bun.file(kept).exists()).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the draft of a file another step of the check is writing alone, as the content props check is written beside the shadow tree', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n' })
+    const types = join(root, '.kay', 'types')
+    const draft = join(types, `kay-content.ts.${crypto.randomUUID()}.tmp`)
+    const stale = join(types, `gone.ts.${crypto.randomUUID()}.tmp`)
+
+    try {
+      await Bun.write(draft, 'export {}')
+      await Bun.write(stale, 'export {}')
+      await writeShadowTypes(root)
+
+      expect(await Bun.file(draft).exists()).toBe(true)
+      expect(await Bun.file(stale).exists()).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })
