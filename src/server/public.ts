@@ -7,7 +7,6 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { NotFoundError } from 'elysia'
 import { wholeSeconds } from '../runtime/duration'
 import { COMPRESSIBLE_TYPE, readResponse } from './compress'
 
@@ -224,9 +223,9 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
 
         const page = pageFor.unmatched?.({ ...given })
 
-        // An app with no page for a path nothing serves answers Elysia's own 404.
+        // An app with no page for a path nothing serves answers Elysia's own 404, imported here so kay check, which reads this module, loads no Elysia.
         if (!page)
-          throw new NotFoundError()
+          throw new (await import('elysia')).NotFoundError()
 
         return page
       }
