@@ -1764,7 +1764,7 @@ describe('a prerendered page posted to', () => {
     const followed = async (response: Response) => {
       const cookie = response.headers.get('set-cookie')!
 
-      expect(response.headers.get('location')).toBe('http://localhost/newsletter')
+      expect(response.headers.get('location')).toBe('/newsletter')
 
       return visit({ cookie: cookie.slice(0, cookie.indexOf(';')) })
     }

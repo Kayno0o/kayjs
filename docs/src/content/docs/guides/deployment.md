@@ -208,6 +208,8 @@ Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Set `prox
 
 Have the proxy pass `X-Forwarded-Proto`, or set `site` in kay.config.ts to the https address. Kay's cookies then stay `Secure`. Production warns once when it cannot tell.
 
+A form post goes back to its page as a path, not as a full address, so a proxy that ends TLS and reaches kay over http needs nothing more for the page to update in place after a post.
+
 ## Pages that send only their difference
 
 A server build with prerendered pages uses its 404 page as a dictionary, which `kay build` renders with its layouts. Every page carries a `Link` header naming it, so a browser downloads it once, when it is idle, and keeps it as long as the build lives.

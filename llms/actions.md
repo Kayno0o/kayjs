@@ -178,6 +178,7 @@ form(action={add})
 - An `_actions.kay` is served for the pages at or below its directory, so it sits at or above a page.
 - A button alone is one such form: `form(action={move.with({ id, to: 2 })}) button(aria-label="Move up") ↑`.
 - After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
+- The page it goes back to is answered as a path (`/shop/cart?x=1`), never an absolute URL, so behind a proxy that ends TLS and reaches kay over http the browser stays on its own https origin and the page swap updates the page in place, with or without `proxy` or `X-Forwarded-Proto`.
 - A visitor following a link to another page while the post is under way stays where it led, what the post answers dropped.
 - A line break a form posts, CRLF per the standard, is read as `\n`, the one character the `textarea` the visitor typed in counts, so a `maxLength` matches what the browser let them write.
 

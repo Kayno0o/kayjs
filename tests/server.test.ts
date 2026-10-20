@@ -507,7 +507,7 @@ describe('pages', () => {
     }))
 
     expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('http://localhost/')
+    expect(response.headers.get('location')).toBe('/')
     expect((await get('/')).html).toContain('From a form</a></li>')
   })
 
@@ -566,7 +566,7 @@ describe('pages', () => {
     const refused = await post({ referer: 'https://evil.example/' })
 
     expect(refused.headers.get('location')).toBeNull()
-    expect(await refused.text()).toContain('<base href="http://localhost/">')
+    expect(await refused.text()).toContain('<base href="/">')
   })
 
   it('answers a fetch call with the result and rejects input the schema refuses', async () => {
@@ -877,7 +877,7 @@ describe('route params in guards and actions', () => {
 
     expect(response.status).toBe(303)
     expect(response.headers.get('x-guarded')).toBe('{"org":"acme"}')
-    expect(response.headers.get('location')).toBe('http://localhost/orgs/acme')
+    expect(response.headers.get('location')).toBe('/orgs/acme')
 
     // Without one, its `Referer` names it.
     const plain = await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
@@ -1538,7 +1538,7 @@ describe('failed actions', () => {
     expect(page.headers.get('location')).toBeNull()
     expect(page.headers.get('set-cookie')).toBeNull()
     expect(page.headers.get('cache-control')).toBe('private, no-store')
-    expect(html).toContain('<base href="http://localhost/">')
+    expect(html).toContain('<base href="/">')
     expect(html).toContain('<input name="title" placeholder="New todo" value="" aria-invalid="true">')
     expect(html).toContain('<p class="error">Write a title</p>')
     expect((await get('/')).html).not.toContain('class="error"')
@@ -1602,7 +1602,7 @@ describe('failed actions', () => {
     const html = await page.text()
 
     expect(page.status).toBe(422)
-    expect(html).toContain('<base href="http://localhost/repo/">')
+    expect(html).toContain('<base href="/repo/">')
     expect(html).toContain('<p class="error">Write a title</p>')
     expect(html).toContain('<a href="/repo/todos/1">')
   })
@@ -1618,7 +1618,7 @@ describe('failed actions', () => {
     const html = await second.text()
 
     expect(second.status).toBe(422)
-    expect(html).toContain('<base href="http://localhost/repo/?sort=new">')
+    expect(html).toContain('<base href="/repo/?sort=new">')
     expect(html).toContain('<p class="error">Write a title</p>')
 
     const third = await post(actionOf(html), shown, '')
@@ -1626,9 +1626,9 @@ describe('failed actions', () => {
 
     expect(third.status).toBe(422)
     expect(through.status).toBe(303)
-    expect(through.headers.get('location')).toBe('http://localhost/repo/?sort=new')
+    expect(through.headers.get('location')).toBe('/repo/?sort=new')
     // A page on another site named in the action's URL is not one to go back to.
-    expect((await post(`${ADD}?kay_back=${encodeURIComponent('https://evil.example/')}`, 'http://localhost/repo/', `Elsewhere ${Bun.randomUUIDv7()}`)).headers.get('location')).toBe('http://localhost/repo/')
+    expect((await post(`${ADD}?kay_back=${encodeURIComponent('https://evil.example/')}`, 'http://localhost/repo/', `Elsewhere ${Bun.randomUUIDv7()}`)).headers.get('location')).toBe('/repo/')
   })
 
   it('marks the success cookie Secure when the browser came over https, through a proxy too', async () => {

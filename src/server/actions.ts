@@ -14,6 +14,7 @@ import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
+import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput, NUMERIC_FORMATS } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -717,8 +718,18 @@ function fromWhere(request: Request): string | undefined {
   return referer !== null && sameHost(request, URL.parse(referer)) ? referer : undefined
 }
 
-function backTo(request: Request): string {
-  return postedFrom(request) ?? '/'
+// The page a post goes back to as a path the router reads, which the redirect then puts under `base`: never an absolute URL, as behind a TLS-terminating proxy the request's own origin is `http:` while the browser is on `https:`, and an absolute target would read as another origin and load the page in full.
+// A path that is none of this site's pages (outside `base`, or starting with a second slash, which a browser reads as another host) is the home page.
+function backTo(request: Request, base: string): string {
+  const from = postedFrom(request)
+
+  if (from === undefined)
+    return '/'
+
+  const { pathname, search, hash } = new URL(from)
+  const path = routerPath(pathname, base)
+
+  return path.startsWith('//') || (base !== '' && path === pathname) ? '/' : path + search + hash
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
@@ -824,7 +835,7 @@ function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar
     return new Response(result === undefined ? null : encodeOrExplain(result, `what ${action.url} returned`), { status, headers })
   }
 
-  headers.set(redirectHeader(request), backTo(request))
+  headers.set(redirectHeader(request), backTo(request, base))
 
   return new Response(null, { status: 303, headers })
 }
@@ -1027,8 +1038,9 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
 // The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `ctx.failed` in memory, so all the visitor typed comes back whatever its length.
 // It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
 async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
-  const from = new URL(backTo(request), request.url)
-  const path = routerPath(from.pathname, base)
+  const from = new URL(backTo(request, base), request.url)
+  const path = from.pathname
+  const shown = joinBase(base, path) + from.search
   const sent = visitHeaders(request)
   const forget = handOver(sent, flash)
   let page: Response
@@ -1077,12 +1089,12 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   answer.set('cache-control', 'private, no-store')
   answer.set(FAILURE_HEADER, '1')
 
-  return new Response(swapped ? html : backedForms(html, from).replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}"><meta name="kay-posted">`), { status: flash.status, headers: answer })
+  return new Response(swapped ? html : backedForms(html, shown).replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(shown)}"><meta name="kay-posted">`), { status: flash.status, headers: answer })
 }
 
 // Each form posting to an action names the page, so a post refused again renders it again, and one that goes through goes back to it.
-function backedForms(html: string, from: URL): string {
-  const back = encodeURIComponent(from.pathname + from.search)
+function backedForms(html: string, shown: string): string {
+  const back = encodeURIComponent(shown)
 
   return html.replace(FORM_ACTION, (_, start: string, url: string) => `${start}${url}${url.includes('?') ? '&amp;' : '?'}${BACK_PARAMETER}=${back}`)
 }

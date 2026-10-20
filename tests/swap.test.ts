@@ -66,7 +66,7 @@ describe('page swap, on the server', () => {
 
     expect(added.status).toBe(303)
     expect(added.headers.get('location')).toBeNull()
-    expect(added.headers.get('x-kay-redirect')).toBe('http://localhost/second')
+    expect(added.headers.get('x-kay-redirect')).toBe('/second')
     expect(refused.status).toBe(422)
     expect(refused.headers.get('x-kay-redirect')).toBeNull()
     expect(refused.headers.get('x-kay-failure')).toBe('1')

@@ -157,17 +157,17 @@ describe('the headers of every kind of answer', () => {
   it('an action post carries them on its redirect, with its flash cookie, and on its refusal', async () => {
     const post = { method: 'POST', body: new URLSearchParams({ title: 'x' }) }
 
-    await expectAnswer(await get(action, { origin: ORIGIN, referer: `${ORIGIN}/` }, post), 303, { 'location': `${ORIGIN}/`, 'set-cookie': 'kay_flash=<value>; Path=<value>; Max-Age=<value>; HttpOnly; SameSite=<value>' })
+    await expectAnswer(await get(action, { origin: ORIGIN, referer: `${ORIGIN}/` }, post), 303, { 'location': '/', 'set-cookie': 'kay_flash=<value>; Path=<value>; Max-Age=<value>; HttpOnly; SameSite=<value>' })
     await expectAnswer(await get(action, { origin: 'http://evil.test' }, post), 403, { 'content-type': 'text/plain; charset=utf-8', 'vary': 'accept-encoding' })
   })
 
   it('sends a post back to the page its form names, else its script\'s, else its referer, never to another site', async () => {
     const back = async (path: string, headers: Record<string, string>) => (await get(path, { origin: ORIGIN, ...headers }, { method: 'POST', body: new URLSearchParams({ title: 'x' }) })).headers.get('location')
 
-    expect(await back(`${action}?kay_back=${encodeURIComponent('/named?a=1')}`, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/named?a=1`)
-    expect(await back(action, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/script`)
-    expect(await back(action, { referer: `${ORIGIN}/ref?b=2` })).toBe(`${ORIGIN}/ref?b=2`)
-    expect(await back(`${action}?kay_back=${encodeURIComponent('https://evil.test/x')}`, { 'x-kay-page': 'https://evil.test/y', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/ref`)
+    expect(await back(`${action}?kay_back=${encodeURIComponent('/named?a=1')}`, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe('/named?a=1')
+    expect(await back(action, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe('/script')
+    expect(await back(action, { referer: `${ORIGIN}/ref?b=2` })).toBe('/ref?b=2')
+    expect(await back(`${action}?kay_back=${encodeURIComponent('https://evil.test/x')}`, { 'x-kay-page': 'https://evil.test/y', 'referer': `${ORIGIN}/ref` })).toBe('/ref')
     expect(await back(action, { 'x-kay-page': '//evil.test/y', 'referer': 'https://evil.test/z' })).toBe('/')
     expect(await back(action, { referer: '/relative' })).toBe('/')
   })
