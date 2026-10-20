@@ -5,7 +5,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { pages } from '../src/server'
-import { analytics } from '../src/server/analytics'
+import { analytics, vitals } from '../src/server/analytics'
 import { DEV_ROUTES } from '../src/server/dev'
 import { plumbing } from '../src/server/plumbing'
 import { ServedPaths } from '../src/server/served-paths'
@@ -49,10 +49,16 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
     expect(lines({ mounted: [{ method: 'GET', path: '/_kay/analytics/script.js' }, { method: 'POST', path: '/_kay/analytics/collect' }] })).toEqual(['GET /_kay/analytics/script.js', 'POST /_kay/analytics/collect'])
   })
 
-  it('gives each a purpose and a page of the docs', () => {
-    const every = plumbing({ actions: true, publicEnv: true, preview: true, cspReports: true, buildFiles: ['/_kay/search.json', '/_kay/search/a/0.json', '/_kay/THIRD-PARTY-LICENSES.txt', '/_kay/images/a.webp', '/_kay/assets/a.png'], mounted: [['GET', '/_kay/analytics.js'], ['GET', '/_kay/analytics/notice.js'], ['POST', '/_kay/analytics'], ['GET', '/_kay/analytics/script.js'], ['POST', '/_kay/analytics/collect']].map(([method, path]) => ({ method: method!, path: path! })) })
+  it('lists the vitals beacon and its route once vitals() mounted them', () => {
+    const lines = plumbing({ ...NONE, mounted: [{ method: 'GET', path: '/_kay/vitals.js' }, { method: 'POST', path: '/_kay/vitals' }] }).map(line).filter(entry => !ALWAYS.includes(entry))
 
-    expect(every).toHaveLength(21)
+    expect(lines).toEqual(['GET /_kay/vitals.js', 'POST /_kay/vitals'])
+  })
+
+  it('gives each a purpose and a page of the docs', () => {
+    const every = plumbing({ actions: true, publicEnv: true, preview: true, cspReports: true, buildFiles: ['/_kay/search.json', '/_kay/search/a/0.json', '/_kay/THIRD-PARTY-LICENSES.txt', '/_kay/images/a.webp', '/_kay/assets/a.png'], mounted: [['GET', '/_kay/analytics.js'], ['GET', '/_kay/analytics/notice.js'], ['POST', '/_kay/analytics'], ['GET', '/_kay/analytics/script.js'], ['POST', '/_kay/analytics/collect'], ['GET', '/_kay/vitals.js'], ['POST', '/_kay/vitals']].map(([method, path]) => ({ method: method!, path: path! })) })
+
+    expect(every).toHaveLength(23)
 
     for (const { purpose, docs } of every) {
       expect(purpose).not.toBe('')
@@ -97,13 +103,13 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
       security: { reports: true },
       preview: { secret: 'a'.repeat(32) },
       publicEnv: t.Object({ KAY_TEST_MAP_KEY: t.String() }),
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com' })],
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com' }), vitals()],
     }).finally(() => {
       delete process.env.KAY_TEST_MAP_KEY
     })
     const lines = plumbed(found).map(line)
 
-    for (const expected of ['POST /_kay/action/<file>/<name>', 'POST /_kay/csp', 'GET /_kay/preview', 'POST /_kay/draft', 'GET /_kay/env.js', 'GET /_kay/analytics.js', 'POST /_kay/analytics'])
+    for (const expected of ['POST /_kay/action/<file>/<name>', 'POST /_kay/csp', 'GET /_kay/preview', 'POST /_kay/draft', 'GET /_kay/env.js', 'GET /_kay/analytics.js', 'POST /_kay/analytics', 'GET /_kay/vitals.js', 'POST /_kay/vitals'])
       expect(lines).toContain(expected)
 
     expect(lines.filter(entry => entry === 'GET /_kay/env.js')).toHaveLength(1)
