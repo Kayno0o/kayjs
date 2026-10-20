@@ -303,12 +303,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
     loading = undefined
   }
   const weakReset = new WeakRef(reset)
-  const stop = onKeysInvalidated((matches) => {
+  const stop = onKeysInvalidated((_, dropped) => {
     const target = weakReset.deref()
 
     if (!target)
       stop()
-    else if (matches(key))
+    else if (dropped(key))
       target()
 
     return []

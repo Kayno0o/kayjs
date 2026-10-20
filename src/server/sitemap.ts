@@ -61,7 +61,16 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   const settings = options.locales
 
   // An entry published at its time shows in the sitemap then, not up to an hour later.
-  app.onStop(onPublished(() => cached.clear()))
+  const hear = () => onPublished(() => cached.clear())
+  let stopHearing: (() => void) | undefined = hear()
+
+  app.onStart(() => {
+    stopHearing ??= hear()
+  })
+  app.onStop(() => {
+    stopHearing?.()
+    stopHearing = undefined
+  })
 
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
   const reading = (locale: string | undefined, report: (error: unknown) => void) => {

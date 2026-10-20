@@ -152,6 +152,19 @@ describe('a prerendered site with a scheduled entry', () => {
     })
   })
 
+  it('goes on publishing when the server stops and listens again', async () => {
+    await build(async (scratch) => {
+      const app = await schedulesAfter(scratch, 1500)
+
+      expect((await visit(app, '/sitemap.xml')).text).not.toContain('/talks/soon0')
+      app.listen(0)
+      await app.stop()
+      app.listen(0)
+      expect(await until(app, '/talks', 'Soon0')).toContain('Soon0')
+      expect((await visit(app, '/sitemap.xml')).text).toContain('https://talks.example/talks/soon0')
+    })
+  })
+
   it('refreshes nothing once the server stopped', async () => {
     await build(async (scratch) => {
       const app = await schedulesAfter(scratch, 700)

@@ -53,7 +53,10 @@ const pageListeners = new Set<(paths: string[]) => void>()
 let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
 let liveListener: ((key: string) => void) | undefined
-const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
+
+type KeyListener = (matches: (key: string) => boolean, dropped: (key: string) => boolean) => string[]
+
+const keyListeners = new Set<KeyListener>()
 // What hears the clock readings other processes tell of.
 const clockListeners = new Set<(at: number) => void>()
 
@@ -160,8 +163,9 @@ export function onLiveRead(listener: (key: string) => void): void {
 }
 
 // Hears each invalidation by what it matches, and gives back the keys it refreshed pages for, which go to the other processes too.
+// `dropped` tells the keys whose own value went, which `matches` also does for a key only what is built from it went for.
 // Gives back what stops it listening, for a listener that belongs to something a reload replaces.
-export function onKeysInvalidated(listener: (matches: (key: string) => boolean) => string[]): () => void {
+export function onKeysInvalidated(listener: KeyListener): () => void {
   keyListeners.add(listener)
 
   return () => void keyListeners.delete(listener)
@@ -235,7 +239,7 @@ function dropAndTell(named: (key: string) => boolean, built: (key: string) => bo
   }
 
   for (const listener of keyListeners) {
-    for (const name of listener(name => named(name) || built(name) || dropped.has(name)))
+    for (const name of listener(name => named(name) || built(name) || dropped.has(name), name => named(name) || dropped.has(name)))
       dropped.add(name)
   }
 }
@@ -285,10 +289,12 @@ function heard(message: string): void {
   if ('keys' in invalidation) {
     const named = new Set(invalidation.keys)
 
-    dropEntries(key => named.has(key))
+    const has = (key: string) => named.has(key)
+
+    dropEntries(has)
 
     for (const listener of keyListeners)
-      listener(key => named.has(key))
+      listener(has, has)
   }
   else {
     if (typeof invalidation.at === 'number') {

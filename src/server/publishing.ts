@@ -17,11 +17,6 @@ export function onPublished(listener: () => void): () => void {
   return () => void listeners.delete(listener)
 }
 
-// The dates `publishAt` reads from the collection's entries, in order and once each; none for a collection without it.
-export async function publishTimes(collection: Collection<unknown>): Promise<number[]> {
-  return collection[PUBLISH_TIMES]()
-}
-
 // The wait until `at`, no longer than a timer holds, which would fire at once.
 export function delayUntil(at: number, now: number): number {
   return Math.min(Math.max(at - now, 0), MAX_TIMER_MS)
@@ -31,14 +26,16 @@ export interface Publishing {
   // Whether a date passed since the page was rendered, so it shows entries held back then.
   passed: (page: ServedPage) => boolean
   stop: () => void
+  // Watches again after a `stop`, for an app that listens again.
+  start: () => void
 }
 
 // What a server watching nothing holds, such as a static export or `kay dev`, which show every entry or are written once.
-export const NOT_PUBLISHING: Publishing = { passed: () => false, stop: () => undefined }
+export const NOT_PUBLISHING: Publishing = { passed: () => false, stop: () => undefined, start: () => undefined }
 
 // Refreshes the pages that read a collection with a `publishAt` when one of its dates passes, in this process alone: every replica has its clock and its pages, so none needs a lock, a store or a message from another.
 // A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept.
-export async function watchPublishing(collections: Collection<unknown>[], report: (error: unknown) => void = error => kayLog('error', 'the publication dates of a collection could not be read', error)): Promise<Publishing> {
+export async function watchPublishing(collections: Collection<unknown>[]): Promise<Publishing> {
   const watched = collections.filter(collection => collection.options.publishAt !== undefined)
 
   if (watched.length === 0)
@@ -50,12 +47,15 @@ export async function watchPublishing(collections: Collection<unknown>[], report
   let stopped = false
   let since = Date.now()
   let next: number | undefined
+  // A fired run superseded before it refreshed leaves its refresh to the run that took over.
+  let owed = false
 
+  const report = (error: unknown) => kayLog('error', 'the publication dates of a collection could not be read', error)
   const read = async (): Promise<Map<Collection<unknown>, number[]>> => {
     const times = new Map<Collection<unknown>, number[]>()
 
     for (const collection of watched)
-      times.set(collection, await publishTimes(collection))
+      times.set(collection, await collection[PUBLISH_TIMES]())
 
     return times
   }
@@ -65,6 +65,7 @@ export async function watchPublishing(collections: Collection<unknown>[], report
     const mine = ++generation
     const early = next !== undefined && Date.now() < next
 
+    owed ||= fired && !early
     clearTimeout(timer)
     next = undefined
 
@@ -77,7 +78,7 @@ export async function watchPublishing(collections: Collection<unknown>[], report
       report(error)
 
       if (!stopped && mine === generation) {
-        timer = setTimeout(() => void run(fired && !early), RETRY_MS)
+        timer = setTimeout(() => void run(false), RETRY_MS)
         timer.unref()
       }
 
@@ -87,8 +88,10 @@ export async function watchPublishing(collections: Collection<unknown>[], report
     if (stopped || mine !== generation)
       return
 
-    if (fired && !early) {
+    if (owed) {
       const now = Date.now()
+
+      owed = false
 
       for (const [collection, dates] of times) {
         if (dates.some(at => at > since && at <= now))
@@ -127,12 +130,13 @@ export async function watchPublishing(collections: Collection<unknown>[], report
     report(error)
   }
 
-  const stopListening = onKeysInvalidated((matches) => {
+  const listen = () => onKeysInvalidated((matches) => {
     if (watched.some(collection => matches(contentKey(collection.name))))
       void run(false)
 
     return []
   })
+  let stopListening = listen()
 
   await run(false)
 
@@ -141,8 +145,17 @@ export async function watchPublishing(collections: Collection<unknown>[], report
     stop: () => {
       stopped = true
       generation++
+      next = undefined
       clearTimeout(timer)
       stopListening()
+    },
+    start: () => {
+      if (!stopped)
+        return
+
+      stopped = false
+      stopListening = listen()
+      void run(true)
     },
   }
 }

@@ -6,6 +6,7 @@ import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { onKeysInvalidated, refreshLocally } from '../src/runtime/cache'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
 import { feed } from './fixtures/production/src/news'
@@ -365,6 +366,36 @@ describe('cached with a store', () => {
     invalidate('post:1')
     expect([...rows.keys()].sort()).toEqual(['plain', 'seed'])
     expect(read).toHaveBeenCalled()
+  })
+
+  it('refreshes what is built from a key in this process alone, keeping the key and telling no other process', async () => {
+    const rows = new Map<string, string>([['page:1', '#deps ["post:1"]\n["one"]'], ['page:2', '#deps ["post:2"]\n["two"]']])
+    const sent = mock((_: string) => undefined)
+    const store = { get: (key: string) => rows.has(key) ? { text: rows.get(key)!, freshUntil: Date.now() + 60_000 } : undefined, set: (key: string, text: string) => void rows.set(key, text), delete: (key: string) => void rows.delete(key), keys: () => [...rows.keys()], publish: sent }
+    let loads = 0
+    const post = async () => cached('post:1', 60, () => ++loads, { store })
+    const heard: boolean[][] = []
+    const stopHearing = onKeysInvalidated((matches, dropped) => {
+      heard.push([matches('post:1'), dropped('post:1'), matches('page:1')])
+
+      return []
+    })
+
+    try {
+      expect(await post()).toBe(1)
+      refreshLocally('post:1')
+      expect([...rows.keys()].sort()).toEqual(['page:2', 'post:1'])
+      expect(await post()).toBe(1)
+      expect(loads).toBe(1)
+      expect(heard).toEqual([[true, false, true]])
+      expect(sent).not.toHaveBeenCalled()
+      invalidate('post:1')
+      expect(sent).toHaveBeenCalledTimes(1)
+      expect(heard.at(-1)).toEqual([true, true, false])
+    }
+    finally {
+      stopHearing()
+    }
   })
 
   it('refuses a value the store cannot hold, keeping nothing', async () => {

@@ -3,12 +3,13 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { t } from 'elysia'
 import { check } from '../src/check'
-import { collection, collectionInfo } from '../src/content'
+import { collection, collectionInfo, contentKey, PUBLISH_TIMES } from '../src/content'
 import { registerCollections } from '../src/content/edit'
-import { clearContentMode, setContentMode } from '../src/content/load'
+import { clearContentMode, contentPlace, setContentMode, setContentPlace } from '../src/content/load'
+import { refreshLocally } from '../src/runtime/cache'
 import { inPreview } from '../src/server/preview'
-import { delayUntil, publishTimes } from '../src/server/publishing'
-import { fixtureCopy } from './scratch'
+import { delayUntil } from '../src/server/publishing'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const NOW = new Date('2026-10-19T12:00:00Z')
 const DEV = { dev: true, prebuilt: false }
@@ -116,6 +117,32 @@ describe('publishAt', () => {
     expect((await talk.translation({ slug: 'hello', data: {} }, 'fr'))?.data.title).toBe('Bonjour')
   })
 
+  it('schedules the Markdown files of a folder, which a refresh for the date does not read again', async () => {
+    const dir = await scratchDir('publish-at-')
+    const before = contentPlace()
+
+    try {
+      setContentPlace(dir, dir)
+      setSystemTime(NOW)
+      await Bun.write(join(dir, 'talks/now.md'), '---\ntitle: Now\n---\nNow\n')
+      await Bun.write(join(dir, 'talks/later.md'), '---\ntitle: Later\nat: 2026-10-20T08:00:00Z\n---\nLater\n')
+
+      const talk = collection('talks', { schema: t.Object({ title: t.String(), at: t.Optional(t.Date()) }), publishAt: 'at' })
+      const first = await talk.all()
+
+      expect(first.map(entry => entry.slug)).toEqual(['now'])
+      refreshLocally(contentKey('talks'))
+      expect(await talk.all()).toEqual(first)
+      expect((await talk.all())[0]).toBe(first[0])
+      setSystemTime(new Date('2026-10-20T08:00:00Z'))
+      expect((await talk.all()).map(entry => entry.slug)).toEqual(['later', 'now'])
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a field that is not a date, at the collection', () => {
     expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), publishAt: 'title' as never })).toThrow('publishAt names title, which is not an s.Date() field')
     expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), publishAt: 'missing' as never })).toThrow('publishAt names missing, which is not an s.Date() field')
@@ -144,15 +171,15 @@ describe('the CMS', () => {
   })
 })
 
-describe('publishTimes', () => {
+describe('the dates a collection holds', () => {
   it('lists the dates of every entry that has one, once each and in order, held back or not', async () => {
     const talk = talks([{ slug: 'a', at: '2026-10-18T00:00:00Z' }, { slug: 'b', at: '2026-10-20T00:00:00Z' }, { slug: 'c', at: '2026-10-22T00:00:00Z' }, { slug: 'd', at: '2026-10-20T00:00:00Z' }, { slug: 'e' }])
 
-    expect(await publishTimes(talk)).toEqual([Date.parse('2026-10-18T00:00:00Z'), Date.parse('2026-10-20T00:00:00Z'), Date.parse('2026-10-22T00:00:00Z')])
+    expect(await talk[PUBLISH_TIMES]()).toEqual([Date.parse('2026-10-18T00:00:00Z'), Date.parse('2026-10-20T00:00:00Z'), Date.parse('2026-10-22T00:00:00Z')])
   })
 
   it('is empty for a collection with no publishAt', async () => {
-    expect(await publishTimes(collection({ name: 'plain', load: () => [{ slug: 'a', data: {} }] }, { schema: t.Object({}) }))).toEqual([])
+    expect(await collection({ name: 'plain', load: () => [{ slug: 'a', data: {} }] }, { schema: t.Object({}) })[PUBLISH_TIMES]()).toEqual([])
   })
 })
 

@@ -202,6 +202,8 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
   const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true || publishing.passed(page)))
 
   app.onStart(() => {
+    publishing.start()
+
     for (const { track } of tracked)
       track()
   })
