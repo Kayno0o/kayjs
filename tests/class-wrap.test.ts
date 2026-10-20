@@ -175,6 +175,23 @@ describe('kay fmt on an element whose classes make its line long', () => {
     expect(code).toContain('c30 last words\n  "\n  id="a"\n) x\n')
   })
 
+  it('sorts the shorthand and the words of the class attribute as one list when it is given an order', () => {
+    const { code } = formatKay(`div.${classes(30).split('.').filter(Boolean).reverse().join('.')}(class="c99 c00 last" id="a") x\n`, { sortClasses: classes => classes.toSorted() })
+    const words = code.slice(code.indexOf('class="\n') + 8, code.indexOf('\n  "')).split(/\s+/).filter(Boolean)
+
+    expect(words).toEqual(words.toSorted())
+    expect(words).toHaveLength(33)
+    expect(formatKay(code, { sortClasses: classes => classes.toSorted() }).code).toBe(code)
+  })
+
+  it('counts a class attribute\'s words without its quotes, so the rest of the line is 80 at most', () => {
+    const list = Array.from({ length: 40 }, (_, index) => `c${String(index + 1).padStart(2, '0')}`).join(' ')
+
+    // Beside the list, `div.a(class="" title="")` and the title leave 22 characters and the title's length.
+    expect(format(`div.a(class="${list}" title="${'t'.repeat(58)}") x\n`)).toStartWith('div(\n  class="\n')
+    expect(format(`div.a(class="${list}" title="${'t'.repeat(59)}") x\n`)).toStartWith('div.a(class=')
+  })
+
   it('moves the classes of a component too', () => {
     expect(format(`Card${classes(30)}(open) x\n`)).toStartWith('Card(\n  class="\n    c01 c02')
   })

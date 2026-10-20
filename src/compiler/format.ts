@@ -42,7 +42,7 @@ export function formatKay(source: string, options: FormatOptions = {}): FormatRe
     return { code: source, diagnostics: file.diagnostics }
 
   const sorted = options.sortClasses ? sortedClasses(file, options.sortClasses) : new Map<ElementNode, string[]>()
-  const lines = [...formatFences(file), ...formatTemplate(file, sorted)]
+  const lines = [...formatFences(file), ...formatTemplate(file, sorted, options.sortClasses)]
   const code = lines.length === 0 ? '' : `${lines.join('\n')}\n`
 
   // Sorting rewrites each class in the place of another, which could join two into one (a decimal's dot); a file whose classes read otherwise after it is formatted unsorted.
@@ -76,7 +76,7 @@ function formatFences(file: KayFile): string[] {
   return out.length === 0 || bodies.at(-1)!.end >= file.source.length ? out : [...out, '---']
 }
 
-function formatTemplate(file: KayFile, sorted: Map<ElementNode, string[]>): string[] {
+function formatTemplate(file: KayFile, sorted: Map<ElementNode, string[]>, sort: ClassSorter | undefined): string[] {
   const spans = multiLineSpans(file.template)
   // A span holding a template literal may carry significant whitespace across its lines, so they are kept byte for byte.
   const literals = spans.filter(span => file.source.slice(span.start, span.end).includes('`'))
@@ -140,7 +140,7 @@ function formatTemplate(file: KayFile, sorted: Map<ElementNode, string[]>): stri
 
     blank = false
     const offset = line.start + indent
-    const spread = edits.find(edit => edit.lines && edit.start >= offset && edit.start < offset + content.length) ?? classWrapEdit(file, wrappable.get(line.start), offset, owner.to, edits, sorted)
+    const spread = edits.find(edit => edit.lines && edit.start >= offset && edit.start < offset + content.length) ?? classWrapEdit(file, wrappable.get(line.start), offset, owner.to, edits, sorted, sort)
 
     if (!spread?.lines) {
       out.push(' '.repeat(owner.to) + applyEdits(content, offset, edits))
@@ -294,7 +294,7 @@ function classWrapCandidates(file: KayFile): Map<number, ElementNode[]> {
 
 // Where the classes of an element make its line longer than MAX_WIDTH, they move into a `class` attribute and its attributes go one to a line, the value running over lines when it is too long for one.
 // An element is left as written when it has a `class={...}`, a spread before its `class`, attributes over several lines or a quote in its classes, or when it would be too long without its classes, and only the one with the most classes on a line moves.
-function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, offset: number, column: number, edits: AttributeEdit[], sorted: Map<ElementNode, string[]>): AttributeEdit | undefined {
+function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, offset: number, column: number, edits: AttributeEdit[], sorted: Map<ElementNode, string[]>, sort: ClassSorter | undefined): AttributeEdit | undefined {
   const { source } = file
   const slice = (span: Span) => source.slice(span.start, span.end)
   let best: { edit: AttributeEdit, classes: number } | undefined
@@ -314,7 +314,9 @@ function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, off
       continue
 
     const attributes = element.attributes.filter(attribute => attribute !== named).map(attribute => attributeText(source, attribute))
-    const words = [...sorted.get(element) ?? element.classes.map(slice), ...named?.kind === 'static' ? named.text.split(WHITESPACE_RUN).filter(Boolean) : []]
+    const merged = [...sorted.get(element) ?? element.classes.map(slice), ...named?.kind === 'static' ? named.text.split(WHITESPACE_RUN).filter(Boolean) : []]
+    const order = named && sort ? sort(merged) : merged
+    const words = order.length === merged.length ? order : merged
 
     if (attributes.some(attribute => attribute.includes('\n')) || (named?.kind === 'static' && slice(named.value).includes('\n')) || words.some(word => word.includes('"')) || source.slice(parens?.start ?? end, end).includes('\n'))
       continue
@@ -362,12 +364,12 @@ function sortEdits(file: KayFile, sorted: Map<ElementNode, string[]>): Attribute
   return [...sorted].flatMap(([element, order]) => element.classes.flatMap((span, index) => order[index] === file.source.slice(span.start, span.end) ? [] : [{ ...span, text: order[index]! }]))
 }
 
-// Whether every element of the code has the classes it was sorted to, or kept, whether it still writes them in the shorthand or moved them to a `class` attribute.
+// Whether every element of the code has the classes it was sorted to, or kept, in any order since a wrap sorts the shorthand and the `class` attribute together, whether it still writes them in the shorthand or moved them to a `class` attribute.
 function keepsClasses(code: string, file: KayFile, sorted: Map<ElementNode, string[]>): boolean {
   const after = [...elementsIn(parseKay(code).template)]
   const before = [...elementsIn(file.template)]
 
-  return after.length === before.length && before.every((element, index) => classWords(code, after[index]!).join(' ') === classWords(file.source, element, sorted.get(element)).join(' '))
+  return after.length === before.length && before.every((element, index) => classWords(code, after[index]!).toSorted().join(' ') === classWords(file.source, element, sorted.get(element)).toSorted().join(' '))
 }
 
 // The shorthand's classes, then the words of a static `class` attribute.

@@ -29,6 +29,9 @@ interface ClassLiteral {
 }
 
 const QUOTE = /["']/
+const SPACE = /[ \t]/
+const WORD_EDGE = /["'\s]/
+const WHITESPACE = /\s/
 const WORD = /[^ \t\r\n]+/g
 const QUOTE_OR_BACKSLASH = /["'\\]/
 const groupsOf = new WeakMap<ShadowFile, ClassGroup[]>()
@@ -75,7 +78,35 @@ export function classEdit(shadow: ShadowFile, start: number, end: number, text: 
   const to = end - open - 1
   const inside = pieceAt(literal.group, from) ?? (from > 0 ? pieceAt(literal.group, from - 1) : undefined)
 
-  return inside && to <= inside.at + inside.length && !QUOTE_OR_BACKSLASH.test(text) ? { start: inside.start + from - inside.at, end: inside.start + to - inside.at, text } : undefined
+  if (!inside || to > inside.at + inside.length || QUOTE_OR_BACKSLASH.test(text))
+    return undefined
+
+  const span = { start: inside.start + from - inside.at, end: inside.start + to - inside.at }
+
+  return { ...text === '' ? withoutGap(shadow.source, span) : span, text }
+}
+
+// The span of a deleted word widened over the space it leaves: its whole line when it was alone on one, else the spaces after it, or before it when it ended its line.
+function withoutGap(source: string, span: Span): Span {
+  if (!WORD_EDGE.test(source[span.start - 1] ?? '') || !WORD_EDGE.test(source[span.end] ?? '') || WHITESPACE.test(source.slice(span.start, span.end)))
+    return span
+
+  let before = span.start
+  let after = span.end
+
+  while (SPACE.test(source[before - 1] ?? ''))
+    before--
+
+  while (SPACE.test(source[after] ?? ''))
+    after++
+
+  if (source[before - 1] === '\n' && source[after] === '\n')
+    return { start: before - 1, end: after }
+
+  if (after > span.end)
+    return { start: span.start, end: after }
+
+  return source[before - 1] === '\n' ? span : { start: before, end: span.end }
 }
 
 // The class string literal the TSX span lies in, and which classes of the template it joins; none when two strings of the element read the same, which cannot be told apart.

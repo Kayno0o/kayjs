@@ -524,7 +524,7 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 
 `kay fmt` keeps the `.class` shorthand while a line fits in 120 characters. When an element's classes make its line longer, it writes them as a `class` attribute inside the parentheses, over several lines when the list is long, so a long Tailwind list reads as a block.
 
-In an app whose stylesheet imports Tailwind, `kay fmt` also puts the shorthand's classes in Tailwind's order, the one the Tailwind rules of `@kaynooo/eslint` use, and keeps a class Tailwind does not know where it stands, first. The editor's format does the same. A line that is long for its other attributes, not its classes, is left as written.
+In an app whose stylesheet imports Tailwind, `kay fmt` also puts the shorthand's classes in Tailwind's order, the one the Tailwind rules of `@kaynooo/eslint` use, and keeps a class Tailwind does not know where it stands, first. When it moves the classes into a `class` attribute, the words already in that attribute are sorted with them as one list. The editor's format does the same.
 
 `kay fmt --from-html` reads a file, or stdin, and prints the HTML as a template, with what it could not carry over listed on stderr. [Migrating from HTML](/migrating/from-html) shows what it writes.
 

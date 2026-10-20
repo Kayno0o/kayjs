@@ -360,7 +360,7 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
 `
 
   // The tailwind rules of the plugin @kaynooo/eslint ships, run through the processor on the file, reports as they stand and after \`--fix\`.
-  async function lint(text: string) {
+  async function lint(text: string, rules: Record<string, string> = {}) {
     const { default: parser } = await import('@typescript-eslint/parser')
     const { default: plugin } = await import('eslint-plugin-better-tailwindcss')
     const { ESLint } = await import('eslint')
@@ -375,7 +375,7 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
         languageOptions: { parser },
         plugins: { 'better-tailwindcss': plugin },
         settings: { 'better-tailwindcss': { entryPoint: join(cwd, 'src', 'app.css') } },
-        rules: { 'better-tailwindcss/no-unknown-classes': 'warn', 'better-tailwindcss/enforce-shorthand-classes': 'warn', 'better-tailwindcss/enforce-consistent-class-order': 'warn' },
+        rules: { 'better-tailwindcss/no-unknown-classes': 'warn', 'better-tailwindcss/enforce-shorthand-classes': 'warn', 'better-tailwindcss/enforce-consistent-class-order': 'warn', ...rules },
       },
     ] as never
     const run = async (fix: boolean) => (await new ESLint({ cwd, overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: join(cwd, 'src', 'card.kay') }))[0]!
@@ -479,6 +479,19 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
 
     expect(found).toContain('5:zz-a')
     expect(fixed.output ?? text).toBe(text)
+  })
+
+  it('removes the line of a class a fix deletes from a static class over lines, and the gap of one inside a line', async () => {
+    const text = '---\n---\ndiv(\n  class="\n    flex\n    flex\n    p-2 p-2\n    underline underline\n  "\n) x\n'
+    const { fixed } = await lint(text, { 'better-tailwindcss/no-duplicate-classes': 'warn' })
+
+    expect(fixed.output).toBe('---\n---\ndiv(\n  class="\n    flex\n    p-2\n    underline\n  "\n) x\n')
+  })
+
+  it('removes the space a deleted class leaves in a one-line static class', async () => {
+    const { fixed } = await lint('---\n---\ndiv(class="flex flex underline underline")\n', { 'better-tailwindcss/no-duplicate-classes': 'warn' })
+
+    expect(fixed.output).toBe('---\n---\ndiv(class="flex underline")\n')
   })
 
   it('reports a class on a component call, and two strings of one element reading the same only once told apart', async () => {
