@@ -49,7 +49,7 @@ export interface KayConfig {
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
-  // The most JavaScript and CSS a page may load, compressed: `{ js: '20kb', css: '10kb' }`. `kay build` reports each page over it with `over-budget`, naming the modules weighing most; a key left out sets no limit, and with none nothing is checked.
+  // The most a page may load, compressed: `{ js: '20kb', css: '10kb' }` for its scripts and stylesheets, `weight: '500kb'` for the whole page and `grade: 'C'` for the worst EcoIndex grade it may have. `kay build` reports each page over it with `over-budget`, naming the modules weighing most for `js` and `css`; a key left out sets no limit, and with none nothing is checked.
   budget?: BudgetConfig | undefined
   // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO; a square SVG alone is both, every icon drawn from it. Defaults to kay's own mark; `false` serves none.
   favicon?: string | FaviconConfig | false | undefined

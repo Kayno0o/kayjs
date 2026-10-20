@@ -14,9 +14,11 @@ Each row below is one criterion relevant to a web app, marked `Met` (kay does it
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  budget: { js: '20kb', css: '10kb' },
+  budget: { js: '20kb', css: '10kb', weight: '500kb', grade: 'C' },
 })
 ```
+
+`weight` limits the whole page (HTML, CSS, JS, images and fonts) and `grade` its EcoIndex grade, as the table of pages `kay build` prints measures them: weight, requests, DOM elements, EcoIndex (version 5.10.0 of cnumr's `ecoindex`, from the elements, requests and kilobytes the page has) and grams of CO2e per view. The carbon follows the Sustainable Web Design model v4 as CO2.js 0.19 applies it: 0.3 kWh per gigabyte moved (data center, network and devices, operation and manufacture), 494 gCO2e per kWh, no green hosting assumed, three views in four loading everything and the rest 2% of it. The page is read from the HTML the build wrote, with no browser: images are measured for a 1280 px window, and a request to another site is counted without its weight.
 
 ### Load an image at the size it shows
 
@@ -59,7 +61,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 | 1.9 Standard interoperable technologies | Met | Pages render to plain HTML, a form posts to an action with or without JavaScript, and the rest of a page ships no JavaScript bundle | [Actions](actions.md), [Islands](islands.md#islands) |
 | 2.3 Usable over a slow connection or offline | App | `offline: true` turns on a service worker keeping the site's files and chosen pages, with a fallback page | [Offline](sitemap-search-fonts.md#offline) |
 | 2.6 Design and code reviews with environmental goals | App | `kay check` and `kay build` report the criteria marked `Checked` below, so a review can lean on them | [Checks](checks.md#what-kay-check-verifies) |
-| 2.9 Impact of ready-made UI components | App | `kay build` prints what each island and each route weighs, and `--analyze` names the modules weighing most | [Build](build-and-start.md#build-and-start-commands) |
+| 2.9 Impact of ready-made UI components | App | `kay build` prints what each island and each route weighs, whole, in requests and in carbon, and `--analyze` names the modules weighing most | [Build](build-and-start.md#build-and-start-commands) |
 | 2.10 Impact of third-party services | App | `analytics()` forwards visits from the server so the CSP needs no third-party host; the app chooses which other services it loads | [Privacy](privacy.md#count-visits-through-your-own-origin) |
 
 ### Architecture and UX
@@ -88,7 +90,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 
 | Criterion | Status | What kay does | Where |
 | --- | --- | --- | --- |
-| 6.1 A maximum weight and request count per screen | Checked | `budget` warns with `over-budget` for each route over it, and `--deny-warnings` or `lints: { 'over-budget': 'deny' }` fails the build; no default limit is set, and requests are not counted | [Build](build-and-start.md#build-and-start-commands) |
+| 6.1 A maximum weight and request count per screen | Checked | `budget` warns with `over-budget` for each route over its weight or EcoIndex grade, and `--deny-warnings` or `lints: { 'over-budget': 'deny' }` fails the build; no default limit is set, and `kay build` prints each route's requests, DOM elements, EcoIndex and carbon | [Build](build-and-start.md#build-and-start-commands) |
 | 6.2 Caching for what the service transfers | Met | Imported files and built scripts carry a year of immutable caching under a content-named URL; image variants too, and revalidate by ETag when made at runtime; fonts and images in `public/` cache for 30 days and a day, with an ETag | [Imported files](styles-and-assets.md#imported-files), [Public files](styles-and-assets.md#public-files) |
 | 6.3 Compression of what is transferred | Met | In production kay compresses pages, actions and routes with zstd, brotli or gzip, and `kay build` writes a brotli and a gzip copy of every text file; `compress: false` turns it off behind a proxy that compresses | [Compression](proxy-and-security.md#compression), [Build](build-and-start.md#build-and-start-commands) |
 | 6.4 Images at the size of their display | Met for imported, stored and remote images, Checked for the rest | The `srcset` ladder stops at the image's own width and `sizes` picks the variant; `unsized-image` warns of an `img` with no size and `large-public-image` of a raster over 256 KiB in `public/`, sent whole | [Responsive images](images.md#responsive-images), [Lints](lints.md) |

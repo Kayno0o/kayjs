@@ -45,6 +45,7 @@ export const DEV_ROUTES = '/_kay/dev/routes'
 export const DEV_HEAD = '/_kay/dev/head'
 export const DEV_REQUEST = '/_kay/dev/request'
 export const DEV_SIZES = '/_kay/dev/sizes'
+export const DEV_FOOTPRINT = '/_kay/dev/footprint'
 export const DEV_NOT_FOUND = '/_kay/dev/not-found'
 
 // Reloads a page kay does not render, such as a library's own, once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.

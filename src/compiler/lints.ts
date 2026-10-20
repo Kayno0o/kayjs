@@ -459,7 +459,7 @@ export const LINTS = {
     level: 'warn',
     group: 'code',
     site: true,
-    summary: 'A page loading more JavaScript or CSS, compressed, than `budget` in kay.config.ts allows. `kay build` reports it at the route\'s file with the modules weighing most in its scripts, `kay build --deny-warnings` or `lints` set to `deny` fails the build on it, and with no `budget` it reports nothing.',
+    summary: 'A page loading more JavaScript or CSS, compressed, than `budget` in kay.config.ts allows, or weighing more whole or with a worse EcoIndex grade than its `weight` and `grade`. `kay build` reports it at the route\'s file with the modules weighing most in its scripts for `js` and `css`, `kay build --deny-warnings` or `lints` set to `deny` fails the build on it, and with no `budget` it reports nothing.',
     wrong: 'export default defineConfig({ budget: { js: \'20kb\' } })',
     right: 'export default defineConfig({ budget: { js: \'60kb\' } })',
   },

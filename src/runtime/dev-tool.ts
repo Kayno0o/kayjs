@@ -16,6 +16,7 @@ const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
 const SIZES_URL = '/_kay/dev/sizes'
+const FOOTPRINT_URL = '/_kay/dev/footprint'
 const NOT_FOUND_URL = '/_kay/dev/not-found'
 // The navigations the Network tab keeps: the page's load, then each swap.
 const MAX_NAVIGATIONS = 5
@@ -2866,12 +2867,22 @@ function deliveredHtml(doc: Document): string {
   return `<!doctype html>${copy.outerHTML}`
 }
 
+const MEDIA_KINDS: Record<string, 'images' | 'fonts'> = { font: 'fonts', image: 'images' }
+
 interface Weight {
   html: number
   css: { url: string, bytes: number }[]
   entry: { url: string, bytes: number }[]
   islands: { url: string, bytes: number }[]
   other: { url: string, bytes: number }[]
+  images: { url: string, bytes: number }[]
+  fonts: { url: string, bytes: number }[]
+  files: { url: string, bytes: number }[]
+  // The page's elements and the requests it made, the document's own included, for the EcoIndex.
+  dom: number
+  requests: number
+  // Requests whose size the browser does not tell, another site's, counted as requests only.
+  unweighed: number
 }
 
 // A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
@@ -2880,19 +2891,40 @@ const DIRECTORY_PREFIX = /^.*\//
 const KAY_SUFFIX = /\.kay$/
 const SCRIPT_OR_STYLE = /\.(?:js|css)$/
 
-// The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
+// The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The images, fonts and other files it loaded count as many bytes as the browser says came. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
 async function pageWeight(doc: Document): Promise<Weight> {
   const win = doc.defaultView!
   const here = win.location.origin
   const linked = new Set([...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new URL(link.href, here).pathname))
   const latest = new Map<string, string>()
+  const media = new Map<string, { url: string, bytes: number, kind: 'images' | 'fonts' | 'files', known: boolean }>()
   const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(DIRECTORY_PREFIX, '').replace(KAY_SUFFIX, '')))
 
   for (const entry of win.performance.getEntriesByType('resource')) {
     const url = parseUrl(entry.name, here)
 
-    if (url === undefined || url.origin !== here || !SCRIPT_OR_STYLE.test(url.pathname) || url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js')
+    if (url === undefined)
       continue
+
+    const own = url.origin === here
+
+    if (own && (url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js'))
+      continue
+
+    if (!own || !SCRIPT_OR_STYLE.test(url.pathname)) {
+      const fetched = entry as PerformanceResourceTiming
+      const kind = fetchKind(fetched, url)
+
+      // A page a swap or prefetch fetched and an action are the visitor's moves, not what the page loaded.
+      if (kind === 'page' || kind === 'action')
+        continue
+
+      const bytes = [fetched.encodedBodySize, fetched.transferSize].find(size => size > 0) ?? 0
+
+      media.set(url.href, { url: own ? `${url.pathname}${url.search}` : url.href, bytes, kind: MEDIA_KINDS[kind] ?? 'files', known: own || bytes > 0 })
+
+      continue
+    }
 
     if (url.pathname.endsWith('.css') && !linked.has(url.pathname))
       continue
@@ -2917,13 +2949,44 @@ async function pageWeight(doc: Document): Promise<Weight> {
   const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
   const isIsland = (url: string) => components.has(HASHED_NAME.exec(url.slice(url.lastIndexOf('/') + 1))?.[1] ?? '')
   const scripts = files.filter(file => file.url.endsWith('.js'))
+  const loaded = [...media.values()]
+  const ofKind = (kind: 'images' | 'fonts' | 'files') => loaded.filter(file => file.kind === kind && file.known)
 
   return {
+    // The root and its descendants, as the EcoIndex counts them, without the dev tool's own.
+    dom: 1 + doc.documentElement.querySelectorAll('*').length - [...doc.querySelectorAll(HOST)].reduce((sum, host) => sum + 1 + host.querySelectorAll('*').length, 0),
+    requests: 1 + latest.size + media.size,
+    unweighed: loaded.filter(file => !file.known).length,
+    images: ofKind('images'),
+    fonts: ofKind('fonts'),
+    files: ofKind('files'),
     html: await gzipSize(deliveredHtml(doc)),
     css: files.filter(file => file.url.endsWith('.css')),
     entry: scripts.filter(file => isEntry(file.url)),
     islands: scripts.filter(file => !isEntry(file.url) && isIsland(file.url)),
     other: scripts.filter(file => !isEntry(file.url) && !isIsland(file.url)),
+  }
+}
+
+interface Footprint {
+  score: number
+  grade: string
+  co2: number
+  ecoindex: string
+  swd: number
+}
+
+const GRADE_TONES = { A: 'ok', B: 'ok', C: 'warn', D: 'warn' } as const
+
+// The EcoIndex and the carbon of the page, worked out on the server by the models `kay build` uses; nothing when it does not answer.
+async function pageFootprint(win: Window & typeof globalThis, weight: Weight, bytes: number): Promise<Footprint | undefined> {
+  try {
+    const response = await ownFetch(win, `${FOOTPRINT_URL}?dom=${weight.dom}&requests=${weight.requests}&bytes=${bytes}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
+
+    return response.ok ? (await response.json()) as Footprint : undefined
+  }
+  catch {
+    return undefined
   }
 }
 
@@ -2946,6 +3009,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
   const tab = tool.tab({ id: 'performance', label: 'Performance', icon: 'gauge', shown: () => reread() })
   const vitalsPanel = tool.make('div', 'vitals')
   const weightPanel = tool.make('section', 'group')
+  const footprintPanel = tool.make('section', 'group')
   const loadNote = tool.make('div', 'note')
   let asked = 0
   const vital = (name: VitalName, label: string, value: number | undefined, detail?: string) => {
@@ -3019,6 +3083,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
 
     renderVitals()
     weightPanel.replaceChildren(tool.make('div', 'note', 'Measuring the weight...'))
+    footprintPanel.replaceChildren()
 
     let weight: Weight
 
@@ -3040,8 +3105,9 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     const rows: [string, number, { url: string, bytes: number }[]][] = [
       ['HTML', weight.html, []],
       ['CSS', total(weight.css), weight.css],
-      ...([['Entry', weight.entry], ['Islands', weight.islands], ['Other chunks', weight.other]] as const).flatMap(([name, files]) => files.length === 0 ? [] : [[name, total(files), files] as [string, number, { url: string, bytes: number }[]]]),
+      ...([['Entry', weight.entry], ['Islands', weight.islands], ['Other chunks', weight.other], ['Images', weight.images], ['Fonts', weight.fonts], ['Other files', weight.files]] as const).flatMap(([name, files]) => files.length === 0 ? [] : [[name, total(files), files] as [string, number, { url: string, bytes: number }[]]]),
     ]
+    const bytes = rows.reduce((sum, [, size]) => sum + size, 0)
     const longest = Math.max(...rows.map(([, bytes]) => bytes))
 
     for (const [name, bytes, files] of rows) {
@@ -3056,12 +3122,31 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
         grid.append(tool.make('span', 'files', files.map(file => `${file.url} ${formatBytes(file.bytes)}`).join(', ')))
     }
 
-    grid.append(tool.make('span', 'rule'), tool.make('span', 'total', 'Total'), tool.make('span'), tool.make('span', 'v total', formatBytes(rows.reduce((sum, [, bytes]) => sum + bytes, 0))))
-    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), grid, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
+    grid.append(tool.make('span', 'rule'), tool.make('span', 'total', 'Total'), tool.make('span'), tool.make('span', 'v total', formatBytes(bytes)))
+    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, compressed'), grid, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
 
-    const built = await builtSizes(doc.defaultView!)
+    const [footprint, built] = await Promise.all([pageFootprint(doc.defaultView!, weight, bytes), builtSizes(doc.defaultView!)])
 
-    if (ask !== asked || built === undefined)
+    if (ask !== asked)
+      return
+
+    if (footprint !== undefined) {
+      const facts = tool.make('dl', 'facts')
+      const fact = (term: string, ...values: (Node | string)[]) => {
+        const value = tool.make('dd')
+
+        value.append(...values)
+        facts.append(tool.make('dt', '', term), value)
+      }
+
+      fact('EcoIndex', pill(tool, footprint.grade, GRADE_TONES[footprint.grade as keyof typeof GRADE_TONES] ?? 'error'), `${footprint.score} of 100`)
+      fact('Carbon', `${footprint.co2.toFixed(footprint.co2 < 0.1 ? 3 : 2)} gCO2e per view`)
+      fact('DOM elements', String(weight.dom))
+      fact('Requests', String(weight.requests))
+      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), facts, tool.make('div', 'note', `Measured in this browser, with the dev sizes above, so \`kay build\` reports a lighter page.${weight.unweighed === 0 ? '' : ` ${weight.unweighed} ${weight.unweighed === 1 ? 'request' : 'requests'} of another site, of unknown weight, not counted.`} EcoIndex ${footprint.ecoindex}, Sustainable Web Design v${footprint.swd}.`))
+    }
+
+    if (built === undefined)
       return
 
     const production = tool.make('div', 'build')
@@ -3098,7 +3183,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
   const vitalsSection = tool.make('section', 'group')
 
   vitalsSection.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), vitalsPanel, loadNote)
-  tab.panel.append(vitalsSection, weightPanel)
+  tab.panel.append(vitalsSection, footprintPanel, weightPanel)
   renderVitals()
 }
 

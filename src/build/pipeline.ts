@@ -6,6 +6,7 @@ import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
 import type { KeptStop } from '../server/prerender'
 import type { Route } from '../server/routes'
+import type { RouteFootprint } from './footprint'
 import type { BuildSummary, RouteSize, SizeReport, StageTime, StoredReport } from './report'
 import { existsSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
@@ -31,18 +32,19 @@ import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
 import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { setImageColors } from '../server/image-color'
-import { hookPrerendered } from '../server/page-hook'
+import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
-import { budgetLints, checkBudget } from './budget'
+import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
 import { cachedCopies, pruneCopies } from './compressed'
 import { writeCachedFavicons } from './favicons'
 import { inWalkScope } from './files'
+import { routeFootprints } from './footprint'
 import { restoreKept, setAsideKept } from './kept'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { readStoredReport, storedReport, writeStoredReport } from './report'
@@ -233,7 +235,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   result.linted = linted
 
   if (!failing(linted, options.denyWarnings)) {
-    const summary: BuildSummary = { routes: made.routes, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
+    const summary: BuildSummary = { routes: made.routes, footprints: made.footprints, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
 
     result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: options.analyze === true ? client.report : withoutModules(client.report), summary, previous: lastReport, ms: performance.now() - started }
   }
@@ -367,7 +369,7 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
 }
 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
-async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[], routes: RouteSize[], stages: StageTime[] }> {
+async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[], routes: RouteSize[], footprints: RouteFootprint[], stages: StageTime[] }> {
   const { root, config, paths } = project
   const stages: StageTime[] = []
   let lapStart = performance.now()
@@ -464,7 +466,13 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   lap('compress')
 
-  return { prerendered, entries, linted, routes: sizes, stages }
+  // Read from the files the build wrote, hooks included, with the image variants they link and the gzip copies a host serves.
+  const footprints = await routeFootprints(join(paths.output, PRERENDERED_DIR), client.pages, routes, assetFiles({ clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }), !exported && avifQuality(config.images) !== undefined)
+
+  linted.push(...footprintLints(config.budget, config.lints, footprints, routes))
+  lap('page footprints')
+
+  return { prerendered, entries, linted, routes: sizes, footprints, stages }
 }
 
 function imageProgress(report: Report): (done: number, total: number) => void {

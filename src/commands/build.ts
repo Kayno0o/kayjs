@@ -207,7 +207,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
     ...problemCounts(problems),
     problems,
     ...failed && { failed: { stage: failed.stage } },
-    ...built && { built: { islands: built.islands, stylesheets: built.stylesheets, prerendered: built.prerendered, entries: built.entries, ms: Math.round(built.ms), sizes: built.report, routes: built.summary.routes, stages: built.summary.stages.map(stage => ({ name: stage.name, ms: Math.round(stage.ms) })), caches: built.summary.caches } },
+    ...built && { built: { islands: built.islands, stylesheets: built.stylesheets, prerendered: built.prerendered, entries: built.entries, ms: Math.round(built.ms), sizes: built.report, routes: built.summary.routes, footprints: built.summary.footprints, stages: built.summary.stages.map(stage => ({ name: stage.name, ms: Math.round(stage.ms) })), caches: built.summary.caches } },
     ...exported && { exported: { pages: exported.pages, files: exported.files, dir: shown(exported.dir), ms: Math.round(exported.ms) } },
     ...compiled && { compiled: { executable: shown(compiled.executable), ms: Math.round(compiled.ms), ...compiled.verifiedMs !== undefined && { verifiedMs: Math.round(compiled.verifiedMs) } } },
   })

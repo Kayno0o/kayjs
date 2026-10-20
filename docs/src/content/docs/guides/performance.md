@@ -100,7 +100,9 @@ The Performance tab shows the Web Vitals of the page load as the browser reports
 
 The dev tool shows your own load only. To see what real visitors get, add `vitals()` ([Measuring how fast pages load](/guides/privacy/#measuring-how-fast-pages-load)).
 
-The weight of the page follows: the HTML, the CSS and the JS it loaded, gzipped, file by file. These are dev sizes, with nothing minified, so `kay build` makes them smaller.
+Above the weight is the page's footprint: its DOM elements, its requests, its EcoIndex grade and the grams of CO2e one view costs, the same figures `kay build` prints for a route.
+
+The weight of the page follows: the HTML, the CSS and the JS it loaded, gzipped, then its images, fonts and other files, file by file. These are dev sizes, with nothing minified, so `kay build` makes them smaller.
 
 Under them, "Last kay build" gives the scripts and stylesheets the last build measured for the page's route. A `~` marks an estimate.
 
@@ -163,17 +165,34 @@ kay build --analyze
 
 Use it when an island is larger than you expect. The module at the top is usually a library you can load later or replace.
 
+## Requests, EcoIndex and carbon
+
+After the routes, `kay build` prints one line for each route's heaviest prerendered page. It gives the weight of its HTML, CSS, JavaScript, images and fonts, the number of requests and DOM elements, its EcoIndex grade from A to G, and the grams of CO2e one view costs.
+
+```txt
+route   weight  requests  DOM  EcoIndex  gCO2e
+/        412 KB        9  214   A (85)   0.046
+```
+
+The build reads each page's HTML as it wrote it, so a page hook's changes count, and starts no browser. Images are read for a 1280 px window, and a font counts when the page preloads it. A request to another site counts as a request, with a note that its weight is unknown.
+
+A route with params is measured on the pages its `prerender` list made. A route none of whose pages was prerendered is shown as not measured.
+
+The dev tool's Performance tab shows the same figures for the page you have open, measured in the browser. Its sizes are the development ones, so they are larger than the build's.
+
+The grade follows EcoIndex 5.10.0, which places the page's elements, requests and kilobytes among the pages it measured. The carbon follows the Sustainable Web Design model, version 4. It takes 0.3 kWh per gigabyte moved, 494 gCO2e per kWh and no green hosting. Three views in four load everything, and the rest load 2% of it.
+
 ## Set a budget
 
 A budget makes the build warn when a page loads too much. Nothing is limited until you set one.
 
 ```ts
-export default defineConfig({ budget: { js: '20kb', css: '10kb' } })
+export default defineConfig({ budget: { js: '20kb', css: '10kb', weight: '500kb', grade: 'C' } })
 ```
 
-Each key is a size in bytes, or a string ending in `b`, `kb` or `mb`. It limits what one page loads, compressed as a host serves it.
+Each size is in bytes, or a string ending in `b`, `kb` or `mb`. `js` and `css` limit the scripts and stylesheets one page loads, compressed as a host serves it. `weight` limits the whole page, and `grade` is the worst [EcoIndex](#requests-ecoindex-and-carbon) grade it may have, from `'A'` to `'G'`.
 
-The build then warns with `over-budget` for each route over its budget. The warning names the file and the three modules that weigh most in its scripts.
+The build then warns with `over-budget` for each route over its budget. The warning names the file, and for `js` and `css` the three modules that weigh most in its scripts.
 
 Set the lint to `deny` to fail the build on it, or pass `--deny-warnings`. Each limit must be a positive size. `kay check` refuses zero, a negative number and an exponent.
 

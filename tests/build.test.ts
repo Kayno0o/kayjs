@@ -1976,7 +1976,7 @@ describe('the size report', () => {
 })
 
 describe('the build report', () => {
-  const summary = (routes: RouteSize[]): BuildSummary => ({ routes, stages: [{ name: 'check', ms: 4210 }, { name: 'bundle', ms: 87.4 }], caches: [{ name: 'image variants', cached: 40, made: 2 }, { name: 'components', cached: 0, made: 3 }] })
+  const summary = (routes: RouteSize[]): BuildSummary => ({ routes, footprints: [], stages: [{ name: 'check', ms: 4210 }, { name: 'bundle', ms: 87.4 }], caches: [{ name: 'image variants', cached: 40, made: 2 }, { name: 'components', cached: 0, made: 3 }] })
   const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, islands: [], pages, kept: 0, estimated: pages === 0 })
 
   it('shows one row per route with its scripts, stylesheets and whether it was prerendered, the change since the last build beside each size', () => {
@@ -2178,7 +2178,7 @@ describe('the build report', () => {
     // Not prerendered, so the scripts are what its components can load: the entry and the island.
     expect(byRoute['/live']).toMatchObject({ pages: 0, estimated: true })
     expect(byRoute['/live']!.js).toBe(byRoute['/']!.js)
-    expect(first.summary.stages.map(stage => stage.name)).toEqual(['check', 'bundle', 'prerender', 'route sizes', 'images and cards', 'favicons', 'page hooks', 'compress'])
+    expect(first.summary.stages.map(stage => stage.name)).toEqual(['check', 'bundle', 'prerender', 'route sizes', 'images and cards', 'favicons', 'page hooks', 'compress', 'page footprints'])
     expect(first.summary.stages.every(stage => stage.ms >= 0)).toBe(true)
     expect(first.summary.caches.find(cache => cache.name === 'components')).toBeDefined()
     expect(first.summary.caches.find(cache => cache.name === 'components')!.made).toBeGreaterThan(0)

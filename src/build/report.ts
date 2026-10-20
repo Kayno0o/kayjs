@@ -1,7 +1,9 @@
 import type { ClientManifest } from '../server/client'
+import type { RouteFootprint } from './footprint'
 import { join, relative, resolve } from 'node:path'
 import { ASSET_PREFIX } from './assets'
 import { writeAtomically } from './files'
+import { ECOINDEX_VERSION, SWD_VERSION, VIEWPORT_WIDTH } from './footprint-models'
 
 export interface Size {
   raw: number
@@ -161,6 +163,7 @@ export interface CacheCount {
 // What the report says besides the island sizes.
 export interface BuildSummary {
   routes: RouteSize[]
+  footprints: RouteFootprint[]
   stages: StageTime[]
   caches: CacheCount[]
 }
@@ -280,6 +283,42 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
   ].join('\n')
 }
 
+// One row per route, the heaviest first: what a browser loads for its heaviest prerendered page, whole, with the DOM size, the request count, the EcoIndex grade and the carbon of a view; a route none of whose pages was prerendered is said to be unmeasured.
+export function formatFootprintTable(footprints: RouteFootprint[], { width = Infinity }: ReportView = {}): string {
+  if (footprints.length === 0)
+    return ''
+
+  const ordered = footprints.toSorted((a, b) => (b.footprint?.weight ?? -1) - (a.footprint?.weight ?? -1) || a.route.localeCompare(b.route))
+  const shown = ordered.slice(0, SHOWN_ROUTES)
+  const header = ['route', 'weight', 'requests', 'DOM', 'EcoIndex', 'gCO2e'] as const
+  const rows = shown.map(({ route, footprint }) => footprint === undefined ? [route, '', '', '', '', ''] as const : [route, wholeSize(footprint.weight), String(footprint.requests), String(footprint.dom), `${footprint.grade} (${footprint.score})`, footprint.co2.toFixed(footprint.co2 < 0.1 ? 3 : 2)] as const)
+  const widths = [0, 1, 2, 3, 4, 5].map(column => Math.max(...[header, ...rows].map(row => row[column as 0].length)))
+  const name = Math.min(widths[0]!, Math.max(12, width - widths.slice(1).reduce((sum, each) => sum + each, 0) - 14))
+  const note = (text: string) => `      ${shorten(text, Math.max(20, width - 8))}`
+  const hidden = ordered.length - shown.length
+
+  return [
+    shorten(`Pages as a browser loads them (the heaviest prerendered page of each route; images read at ${VIEWPORT_WIDTH} px; EcoIndex ${ECOINDEX_VERSION}, Sustainable Web Design v${SWD_VERSION}; gCO2e per view):`, width),
+    ...[header, ...rows].flatMap((row, index) => {
+      const line = `  ${shorten(row[0], name).padEnd(name)}  ${row.slice(1).map((cell, column) => cell.padStart(widths[column + 1]!)).join('  ')}`
+
+      if (index === 0)
+        return [line]
+
+      const { footprint, pages, path } = shown[index - 1]!
+
+      if (footprint === undefined)
+        return [`  ${shorten(row[0], name).padEnd(name)}  not measured: no page of it was prerendered`]
+
+      const { parts, unweighed } = footprint
+      const breakdown = Object.entries(parts).filter(([, bytes]) => bytes > 0).map(([part, bytes]) => `${part} ${wholeSize(bytes)}`).join(', ')
+
+      return [line, note(`${breakdown}${pages > 1 ? `; heaviest of ${pages} pages, ${path}` : ''}${unweighed > 0 ? `; ${unweighed} request${unweighed === 1 ? '' : 's'} of unknown weight, not counted` : ''}`)]
+    }),
+    ...hidden > 0 ? [`  and ${hidden} more route${hidden === 1 ? '' : 's'}, lighter than these`] : [],
+  ].join('\n')
+}
+
 // The stages with the time each took.
 export function formatStages(stages: StageTime[]): string {
   if (stages.length === 0)
@@ -331,6 +370,7 @@ export function formatBuildReport(report: SizeReport | undefined, summary: Build
   return [
     report === undefined ? '' : formatSizeReport(report, view),
     formatRouteTable(summary.routes, view),
+    formatFootprintTable(summary.footprints, view),
     formatRemoved(report, summary, view.previous, view.width),
     formatStages(summary.stages),
     formatCaches(summary.caches),
@@ -364,6 +404,13 @@ function pagesLabel(pages: number, kept: number): string {
 
 function kb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
+}
+
+function wholeSize(bytes: number): string {
+  if (bytes < 1024)
+    return `${bytes} B`
+
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : kb(bytes)
 }
 
 // The change since the last build as ` [+3.2 KB]`: nothing when it rounds to none or there was no build to compare to, `[new]` for what the last build did not have.

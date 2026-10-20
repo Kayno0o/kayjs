@@ -20,12 +20,12 @@ Kay ships little to the browser. A page with no interactive part sends no JavaSc
 
 | Criterion | Mark | What kay does |
 | --- | --- | --- |
-| 6.1 A weight limit per screen | Checked | `budget` in `kay.config.ts` warns when a page loads more JavaScript or CSS than you allow. `kay build --deny-warnings` fails the build. No limit is set by default, and requests are not counted. |
+| 6.1 A weight limit per screen | Checked | `budget` in `kay.config.ts` warns when a page weighs more than you allow, or has a worse EcoIndex grade. `kay build --deny-warnings` fails the build. No limit is set by default, and `kay build` prints each route's requests. |
 | 6.2 Caching | Met | Built files and imported files get a content-named URL and a year of caching. Image variants are cached too. Fonts and images in `public/` are cached for 30 days and a day. |
 | 6.3 Compression | Met | In production kay compresses pages and answers with zstd, brotli or gzip. `kay build` also writes a brotli and a gzip copy of every text file. |
 | 6.5 No unused resources | Met | A component with nothing interactive ships no JavaScript. Every image loads lazily. Setting `hydrate="visible"` or `"idle"` on an island is up to you. |
 | 6.7 One domain for static resources | Met | Scripts, styles, fonts and image variants come from your own origin. A script or image from elsewhere is your choice. |
-| 2.9 Impact of ready-made components | App | `kay build` prints what each island and each route weighs. `--analyze` names the heaviest modules. |
+| 2.9 Impact of ready-made components | App | `kay build` prints what each island and each route weighs, whole, and its carbon per view. `--analyze` names the heaviest modules. |
 | 7.1 Server cache | App | `cached(key, ttl, load)` keeps what a load fetches. `prerender` renders a page once, at build time. |
 
 [Performance](/guides/performance) shows the size report and the budget. [Caching and streaming](/guides/caching-and-streaming) covers `cached`. [Deployment](/guides/deployment) covers compression behind a proxy.

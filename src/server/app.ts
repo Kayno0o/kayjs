@@ -34,7 +34,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { remoteLimits } from './config-limits'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
@@ -383,6 +383,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     const { devSizes } = await import('./dev-sizes')
 
     app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(JSON_EXTENSION, '-static.json')] }))
+    const { devFootprint } = await import('./dev-footprint')
+
+    app.get(DEV_FOOTPRINT, ({ request }) => devFootprint(request))
     const { devNotFound, devRedirect } = await import('./dev-not-found')
     const redirected = Object.keys(options.redirects ?? {})
 

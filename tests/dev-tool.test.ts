@@ -5,6 +5,7 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t } from 'elysia'
+import { figuresOf } from '../src/build/footprint-models'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
@@ -1567,8 +1568,17 @@ describe('the dev tool', () => {
       '/_kay/old-1.css': 'a { color: red }\n',
     }
     // What the browser loaded over the page's life: the island rebuilt since, a stylesheet swapped with a query, and one the page no longer links.
-    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
+    const loaded = ['/img/hero-640.webp', '/fonts/body.woff2', 'https://cdn.example/widget.js', '/_kay/action/save', '/next', '/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
+    // What the browser says of the files that are not the page's own scripts and styles: an image and a font with their sizes, another site's script with none, an action and a swapped page, which are not what the page loaded.
+    const details: Record<string, object> = {
+      '/img/hero-640.webp': { initiatorType: 'img', encodedBodySize: 40_000, transferSize: 40_300 },
+      '/fonts/body.woff2': { initiatorType: 'css', encodedBodySize: 20_000, transferSize: 0, decodedBodySize: 21_000 },
+      'https://cdn.example/widget.js': { initiatorType: 'script', encodedBodySize: 0, transferSize: 0 },
+      '/_kay/action/save': { initiatorType: 'fetch', encodedBodySize: 90, transferSize: 90 },
+      '/next': { initiatorType: 'fetch', contentType: 'text/html', encodedBodySize: 5000, transferSize: 5000 },
+    }
     const fetched: string[] = []
+    let footprintQuery = ''
 
     happyDOM.setURL('http://localhost/')
     // The stylesheet is only linked: the test reads its address, the browser's own load is not part of it.
@@ -1578,11 +1588,19 @@ describe('the dev tool', () => {
     document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/_kay/_layout-1.css?kay-dev=2">')
     document.body.innerHTML = '<slot data-component="src/components/counter.kay"></slot><slot data-component="src/components/search.kay"></slot>'
 
-    const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? loaded.map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
+    const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? loaded.map(path => ({ name: path.startsWith('http') ? path : `http://localhost${path}`, ...details[path] })) : []) as unknown as typeof window.performance.getEntriesByType)
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       // The Head, Env and Not found tabs read as the tool starts, to count their warnings.
       if (!['/_kay/dev/head', '/_kay/env.js', '/_kay/dev/not-found'].includes(url))
         fetched.push(new URL(url, 'http://localhost').pathname)
+
+      if (url.startsWith('/_kay/dev/footprint')) {
+        footprintQuery = url.slice(url.indexOf('?') + 1)
+
+        const params = new URLSearchParams(footprintQuery)
+
+        return Response.json({ ...figuresOf({ dom: Number(params.get('dom')), requests: Number(params.get('requests')), bytes: Number(params.get('bytes')) }), ecoindex: '5.10.0', swd: 4 })
+      }
 
       return new Response(files[new URL(url, 'http://localhost').pathname])
     }) as unknown as typeof window.fetch)
@@ -1611,16 +1629,37 @@ describe('the dev tool', () => {
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
       // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
-      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
+      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/footprint', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
       expect(weights().slice(1, -1)).toEqual([
         size(files['/_kay/_layout-1.css']!),
         size(files['/_kay/entry-abc12345.js']!),
         size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!),
         size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!),
+        '39.1 KB',
+        '19.5 KB',
       ])
+      expect(shadow().querySelector('#kay-dev-performance .weight')!.textContent).toContain('/img/hero-640.webp 39.1 KB')
       expect(weights()[0]).toMatch(/^\d+(\.\d)? (B|KB)$/)
       expect(weights().at(-1)).toMatch(/^\d+(\.\d)? (B|KB)$/)
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
+
+      // The footprint: the elements without the dev tool's own, the document, the seven scripts and styles and the three other files as requests, the bytes of every row, graded by the server's models.
+      const counted = new URLSearchParams(footprintQuery)
+      const rowBytes = [...shadow().querySelectorAll('#kay-dev-performance .weight > .v')].map(value => value.textContent)
+
+      expect(Number(counted.get('dom'))).toBe(document.querySelectorAll('html, html *:not(kay-dev, kay-dev *)').length)
+      expect(counted.get('requests')).toBe('11')
+      expect(Number(counted.get('bytes'))).toBeGreaterThan(40_000 + 20_000)
+      expect(rowBytes.at(-1)).toMatch(/KB$/)
+
+      const facts = shadow().querySelector('#kay-dev-performance .facts')!.textContent
+      const expected = figuresOf({ dom: Number(counted.get('dom')), requests: 11, bytes: Number(counted.get('bytes')) })
+
+      expect(facts).toContain(`${expected.grade}${expected.score} of 100`)
+      expect(facts).toContain(`${expected.co2.toFixed(expected.co2 < 0.1 ? 3 : 2)} gCO2e per view`)
+      expect(facts).toContain(`DOM elements${counted.get('dom')}`)
+      expect(facts).toContain('Requests11')
+      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('1 request of another site, of unknown weight, not counted. EcoIndex 5.10.0, Sustainable Web Design v4.')
 
       // The last build's sizes for the route, with their age, the estimate marked.
       const built = shadow().querySelector('#kay-dev-performance .build')!.textContent
@@ -1640,12 +1679,17 @@ describe('the dev tool', () => {
       expect(markdown).toContain('\n  - /_kay/counter-def45678.js ')
       expect(markdown).toMatch(/\n- Total: \d+(\.\d)? (B|KB)\n/)
 
-      // A link swaps in another page without a load: the vitals say which load they belong to.
+      expect(markdown).toContain('\n## Footprint of the page\n\n- EcoIndex: ')
+      expect(markdown).toContain('\n- Requests: 11\n')
+
+      // A link swaps in another page without a load: the vitals say which load they belong to, and the footprint is measured again.
+      footprintQuery = ''
       happyDOM.setURL('http://localhost/next')
       document.head.insertAdjacentHTML('beforeend', '<meta name="swapped">')
       await Bun.sleep(30)
 
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /, not on this page')
+      expect(footprintQuery).toContain('requests=11')
     }
     finally {
       fetching.mockRestore()
