@@ -42,6 +42,8 @@ export interface Sites {
   rows: Set<number>
   // A template `const`'s pattern, true when code that runs reads its names as memos.
   consts: Map<number, boolean>
+  // A template `snippet`'s name, a function read as it is written.
+  snippets: Set<number>
   // Each name destructured off the props object, a prop or a server value, with its index among the props, which names its default.
   props: Map<number, { binding: PropsBinding, index: number }>
   // The `return` ending `load`, which hands the server fence's names to the template.
@@ -184,6 +186,8 @@ class RewriteFinder {
       VariableDeclarator: (path) => {
         if (this.input.sites.consts.has(path.node.id.start!))
           this.templateConst(path, this.input.sites.consts.get(path.node.id.start!)!)
+        else if (this.input.sites.snippets.has(path.node.id.start!))
+          this.templateConst(path, false, 'snippet')
         else
           this.declaration(path)
       },
@@ -510,7 +514,7 @@ class RewriteFinder {
   }
 
   // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.
-  private templateConst(path: NodePath<t.VariableDeclarator>, accessor: boolean) {
+  private templateConst(path: NodePath<t.VariableDeclarator>, accessor: boolean, noun = 'template `const`') {
     for (const [name, identifier] of Object.entries(path.getBindingIdentifiers())) {
       const source = this.input.map.toSource(identifier.start!)
       const binding = path.scope.getBinding(name)
@@ -522,10 +526,10 @@ class RewriteFinder {
       if (hidden || name === this.input.component) {
         const declared = hidden && this.input.map.isExact(hidden.identifier.start!) ? this.input.map.toSource(hidden.identifier.start!) : undefined
 
-        this.diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: 'a template `const` would hide it from the lines after it', help: 'give the `const` a name of its own', related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
+        this.diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: `a ${noun} would hide it from the lines after it`, help: `give the ${noun} a name of its own`, related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
       }
 
-      const readOnly = { message: `\`${name}\` is a template \`const\`, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }
+      const readOnly = { message: `\`${name}\` is a ${noun}, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }
 
       if (!accessor || this.input.values)
         this.visitBinding(path.scope, name, reference => accessor && tagPosition(reference) === 'opening' ? {} : undefined, readOnly)

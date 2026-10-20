@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, SnippetNode, Span, TextNode, TryNode } from './ast'
 import { parseExpression } from '@babel/parser'
 import { scanClassName } from './class-name'
 import { Scanner } from './scanner'
@@ -25,6 +25,9 @@ const RESERVED_WORDS = new Set(['await', 'break', 'case', 'catch', 'class', 'con
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
+// `snippet feature(title: string)`: a block named for reuse in this file.
+const SNIPPET_NAME = /[A-Z_$][\w$]*/iy
+const SNIPPET_HELP = '`snippet feature(title: string, text: string)`, then its lines indented below it'
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const COMMENT_HEAD = /\/\//y
 // `| text`, or a line made of an expression, which is text as `| {expr}` is.
@@ -59,7 +62,7 @@ const PUG_HINTS: Record<string, string> = {
   include: 'kay reuses markup through a component: import a `.kay` file and use its tag',
   extends: 'a `_layout.kay` wraps the pages of its directory at its `slot`',
   block: 'a `_layout.kay` renders its page at `slot`, and a component takes markup as an `@name` block',
-  mixin: 'kay reuses markup through a component: import a `.kay` file and use its tag',
+  mixin: 'kay reuses markup through a component: import a `.kay` file and use its tag, or declare a `snippet` for markup used in one file',
   doctype: 'kay writes the doctype of every page itself',
 }
 // `then list` closing the `await` line, or a bare `then`.
@@ -276,6 +279,12 @@ class TemplateParser {
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
     [keyword('else[ \\t]+if|else'), 'e', (parser, indent, siblings, head) => parser.attachElse(indent, siblings.at(-1), head[0] !== 'else')],
     [PUG_KEYWORD, 'ewucibmd', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is pug syntax kay does not have`, help: PUG_HINTS[head[0]] })],
+    [keyword('snippet'), 's', (parser, indent, siblings) => {
+      const node = parser.parseSnippet(indent)
+
+      if (node)
+        siblings.push(node)
+    }],
     [NAMED_SLOT, 'sS', (parser, indent, siblings, head) => siblings.push(parser.parseOutlet(indent, head))],
   ]
 
@@ -360,6 +369,54 @@ class TemplateParser {
     const children = this.parseBlock(indent)
 
     return { kind: 'element', start, end: this.lastContentEnd(), tag: { start, end: start + 4 }, name: 'slot', component: false, classes: [], attributes: [], outlet: { name: { start: nameStart, end: nameEnd }, args }, children }
+  }
+
+  // `snippet feature(title: string)`, its parameters read as a function's, the lines below it the markup it returns.
+  private parseSnippet(indent: number): SnippetNode | undefined {
+    const start = this.pos
+
+    this.pos += 'snippet'.length
+    this.skipSpaces()
+    SNIPPET_NAME.lastIndex = this.pos
+    const match = SNIPPET_NAME.exec(this.src)
+
+    if (!match) {
+      this.error(start, this.scan.lineEnd(start), 'A snippet needs a name', { help: SNIPPET_HELP })
+      this.skipChildren(indent)
+
+      return undefined
+    }
+
+    const nameStart = this.pos
+    const nameEnd = nameStart + match[0].length
+    const name = { start: nameStart, end: nameEnd }
+    let params: Span
+
+    if (RESERVED_WORDS.has(match[0]))
+      this.error(nameStart, nameEnd, `\`${match[0]}\` is a reserved word, so it cannot name a snippet`, { help: SNIPPET_HELP })
+
+    this.pos = nameEnd
+
+    if (this.src[this.pos] === '(') {
+      const close = this.scan.balanced(this.pos)
+
+      params = { start: this.pos + 1, end: close - 1 }
+      this.pos = close
+    }
+    else {
+      params = { start: nameEnd, end: nameEnd }
+    }
+
+    this.expectLineEnd('Nothing may follow the parameters of a snippet on its line', { help: SNIPPET_HELP })
+    const children = this.parseBlock(indent)
+
+    if (children.length === 0) {
+      this.error(start, this.scan.lineEnd(start), 'A snippet needs lines below it', { help: SNIPPET_HELP })
+
+      return undefined
+    }
+
+    return { kind: 'snippet', start, end: this.lastContentEnd(), name, params, children }
   }
 
   private parseSlot(indent: number): SlotNode {

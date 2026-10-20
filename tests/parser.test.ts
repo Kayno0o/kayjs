@@ -65,6 +65,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
       case 'const':
         return { const: text(file, node.pattern), value: text(file, node.value) }
+      case 'snippet':
+        return { snippet: text(file, node.name), params: text(file, node.params), children: outline(file, node.children) }
       case 'error':
         return { error: node.name, ...(node.classes.length > 0 && { classes: node.classes.map(span => text(file, span)) }) }
     }
@@ -282,6 +284,25 @@ describe('error', () => {
 
   it('leaves an element named error-like alone', () => {
     expect(outline(parse('errors x'))).toEqual([{ tag: 'errors', children: [['x']] }])
+  })
+})
+
+describe('snippet', () => {
+  it('declares a name, its parameters and its lines among its siblings', () => {
+    const file = parse('for p of ps\n  snippet tag(label: string, n = 1)\n    b {label}\n  li {tag(p, 2)}\nsnippet rule\n  hr')
+
+    expect(file.diagnostics).toEqual([])
+    expect(outline(file)).toEqual([
+      { for: 'p', index: undefined, of: 'ps', key: undefined, fallback: undefined, children: [
+        { snippet: 'tag', params: 'label: string, n = 1', children: [{ tag: 'b', children: [['{label}']] }] },
+        { tag: 'li', children: [['{tag(p, 2)}']] },
+      ] },
+      { snippet: 'rule', params: '', children: [{ tag: 'hr' }] },
+    ])
+  })
+
+  it('points pug\'s mixin at the snippet', () => {
+    expect(parse('mixin a').diagnostics[0]?.help).toContain('snippet')
   })
 })
 

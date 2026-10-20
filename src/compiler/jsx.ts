@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
@@ -72,6 +72,10 @@ export class JsxTemplate {
           this.emitConst(node, nodes.slice(index + 1))
 
           return
+        case 'snippet':
+          this.emitSnippet(node, nodes.slice(index + 1))
+
+          return
         case 'element':
           this.emitElement(node)
 
@@ -140,6 +144,23 @@ export class JsxTemplate {
       this.sites.consts.set(b.code.length, !this.options.staticLoops)
 
       b.addSource(node.pattern).add(' = (').addSource(node.value).add(');')
+    })
+    b.add(' return ')
+    this.emitRoot(rest)
+    b.add(' })()}')
+  }
+
+  // The siblings after a `snippet` render inside a function declaring it, as after a `const`; its return type is spelled out so it can call itself.
+  private emitSnippet(node: SnippetNode, rest: Node[]) {
+    const { b } = this
+
+    b.add('{(() => { ')
+    b.wrap(node, () => {
+      b.add('const ')
+      this.sites.snippets.add(b.code.length)
+      b.addSource(node.name).add(' = (').addSource(node.params).add('): KayJSX.Element => (')
+      this.emitRoot(node.children)
+      b.add(');')
     })
     b.add(' return ')
     this.emitRoot(rest)

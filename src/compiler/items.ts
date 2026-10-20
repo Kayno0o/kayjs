@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, TextExpression, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
@@ -19,12 +19,20 @@ export type Item
     | { kind: 'await', node: AwaitNode }
     | { kind: 'try', node: TryNode }
     | { kind: 'const', node: ConstNode }
+    | { kind: 'snippet', node: SnippetNode }
     | { kind: 'error', node: ErrorNode }
 
-export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' | 'const' }>
+export type Declaration = Extract<Item, { kind: 'const' | 'snippet' }>
+
+export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' } | Declaration>
+
+// A `const` or a `snippet`, which renders nothing and names a value for the items after it.
+export function isDeclaration(item: Item): item is Declaration {
+  return item.kind === 'const' || item.kind === 'snippet'
+}
 
 export function isDynamic(item: Item): item is DynamicItem {
-  return item.kind !== 'text' && item.kind !== 'element' && item.kind !== 'const'
+  return item.kind !== 'text' && item.kind !== 'element' && !isDeclaration(item)
 }
 
 const pendingElements = new WeakMap<PendingNode, ElementNode>()
@@ -107,6 +115,10 @@ export function childItems(nodes: Node[]): Item[] {
         items.push({ kind: 'const', node })
 
         continue
+      case 'snippet':
+        items.push({ kind: 'snippet', node })
+
+        continue
       case 'slot':
         continue
     }
@@ -140,8 +152,8 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
   }
 }
 
-// The names a destructuring pattern declares, in order.
-function patternNames(pattern: string): string[] {
+// The names a destructuring pattern or a parameter list declares, in order.
+export function patternNames(pattern: string): string[] {
   const names: string[] = []
   const visit = (node: t.Node | null) => {
     if (node?.type === 'Identifier') {
@@ -166,8 +178,10 @@ function patternNames(pattern: string): string[] {
   try {
     const fn = parseExpression(`(${pattern}) => 0`, { plugins: ['typescript'] })
 
-    if (fn.type === 'ArrowFunctionExpression')
-      visit(fn.params[0]!)
+    if (fn.type === 'ArrowFunctionExpression') {
+      for (const param of fn.params)
+        visit(param)
+    }
   }
   catch {}
 
@@ -195,7 +209,7 @@ export function errorParagraphArguments(node: ErrorNode, src: string, id: string
 
 // A lone dynamic part of an element owns all of its content, so it needs no markers around it.
 export function soleDynamic(items: Item[]): boolean {
-  const rendered = items.filter(item => item.kind !== 'const')
+  const rendered = items.filter(item => !isDeclaration(item))
 
   return rendered.length === 1 && isDynamic(rendered[0]!)
 }

@@ -4,6 +4,7 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
 import { browserGlobals } from './globals'
+import { patternNames } from './items'
 import { importedFromKay, loadTraverse } from './rewrite'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
@@ -320,6 +321,9 @@ function templateNames(file: KayFile): string[] {
     }
     else if (node.kind === 'slot') {
       names.push(...words(node.params))
+    }
+    else if (node.kind === 'snippet') {
+      names.push(...words(node.name), ...patternNames(file.source.slice(node.params.start, node.params.end)))
     }
     else if (node.kind === 'const') {
       names.push(...words(node.pattern))

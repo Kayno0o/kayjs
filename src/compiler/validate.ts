@@ -236,6 +236,10 @@ class Validator {
             this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
 
           break
+        case 'snippet':
+          this.nodes(node.children)
+
+          break
         case 'const':
           break
       }

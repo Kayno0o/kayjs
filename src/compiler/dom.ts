@@ -1,10 +1,10 @@
-import type { AwaitNode, ConstNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
-import type { DynamicItem } from './items'
+import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
+import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
 import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
-import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
@@ -69,9 +69,9 @@ export class DomTemplate extends TemplateWriter {
     let blocks = 0
 
     for (const item of childItems(nodes)) {
-      if (item.kind === 'const') {
+      if (isDeclaration(item)) {
         b.add('{ ')
-        this.constDeclaration(item.node)
+        this.declaration(item)
         blocks++
       }
       else if (item.kind === 'text') {
@@ -158,8 +158,11 @@ export class DomTemplate extends TemplateWriter {
     }
   }
 
-  private constDeclaration(node: ConstNode): void {
-    this.b.wrap(node, () => constDeclaration(this.b, node, this.src, helperName('memo')))
+  private declaration(item: Declaration): void {
+    if (item.kind === 'snippet')
+      this.snippetDeclaration(item.node)
+    else
+      this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, helperName('memo')))
   }
 
   private if(node: IfNode, at: string): void {
@@ -511,12 +514,12 @@ export class DomTemplate extends TemplateWriter {
       let blocks = 0
 
       for (const item of items) {
-        if (item.kind === 'const') {
+        if (isDeclaration(item)) {
           blocks++
           bindings.push(() => {
             b.add('{ ')
             this.constBlocks++
-            this.constDeclaration(item.node)
+            this.declaration(item)
           })
         }
         else if (item.kind === 'text') {

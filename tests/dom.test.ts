@@ -1859,6 +1859,163 @@ describe('slots with parameters', () => {
   })
 })
 
+describe('snippets', () => {
+  const mountA = site({
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      '',
+      'const count = signal(0)',
+      'const label = signal(\'a\')',
+      ';(globalThis as { bump?: () => void }).bump = () => count.set(count() + 1)',
+      ';(globalThis as { relabel?: () => void }).relabel = () => label.set(\'z\')',
+      '---',
+      'snippet badge(text: string)',
+      '  b.badge {text} {count()}',
+      'p#still still',
+      '{badge(\'A\')}',
+      '{badge(label())}',
+      '',
+    ].join('\n'),
+  })
+
+  it('update in place when a signal they read changes, by closure or by argument, and rebuild nothing else', async () => {
+    const { root, dispose } = await mountA()
+
+    try {
+      const still = root.querySelector('#still')
+      const [first, second] = root.querySelectorAll('.badge')
+
+      expect([...root.querySelectorAll('.badge')].map(badge => badge.textContent)).toEqual(['A 0', 'a 0'])
+      ;(globalThis as unknown as { bump: () => void }).bump()
+      await settle()
+      expect([...root.querySelectorAll('.badge')].map(badge => badge.textContent)).toEqual(['A 1', 'a 1'])
+      expect(root.querySelector('#still')).toBe(still)
+      expect(root.querySelectorAll('.badge')[0]).toBe(first)
+      expect(root.querySelectorAll('.badge')[1]).toBe(second)
+      ;(globalThis as unknown as { relabel: () => void }).relabel()
+      await settle()
+      expect([...root.querySelectorAll('.badge')].map(badge => badge.textContent)).toEqual(['A 1', 'z 1'])
+      expect(root.querySelector('#still')).toBe(still)
+      expect(root.querySelectorAll('.badge')[0]).toBe(first)
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
+describe('snippets in loops and blocks', () => {
+  const mountB = site({
+    'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul.rows\n  for item, i of items key={i}\n    | {row(item, i)}\n',
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      'import Rows from \'./rows.kay\'',
+      '',
+      'interface Branch { name: string, children: Branch[] }',
+      '',
+      'const names = signal([\'a\', \'b\'])',
+      'const mode = signal(\'on\')',
+      'const clicks = signal(0)',
+      'const tree: Branch = { name: \'root\', children: [{ name: \'x\', children: [{ name: \'y\', children: [] }] }] }',
+      ';(globalThis as { setNames?: (next: string[]) => void }).setNames = next => names.set(next)',
+      ';(globalThis as { setMode?: (next: string) => void }).setMode = next => mode.set(next)',
+      '---',
+      'snippet branch(node: Branch)',
+      '  li {node.name}',
+      '    if node.children.length > 0',
+      '      ul',
+      '        for next of node.children',
+      '          {branch(next)}',
+      'snippet state(on: string)',
+      '  match on',
+      '    when \'on\'',
+      '      u on',
+      '    else',
+      '      u off',
+      'snippet item(name: string, i: number)',
+      '  li.row {i}: {name}',
+      'snippet counter()',
+      '  button#count(onClick={() => clicks.set(clicks() + 1)}) {clicks()}',
+      'ul#tree',
+      '  {branch(tree)}',
+      'p#state {state(mode())}',
+      '{counter()}',
+      'for name of names() key={name}',
+      '  snippet tag()',
+      '    b.tag {name}',
+      '  p.loop {tag()}',
+      'Rows(items={names()} row={item})',
+      '',
+    ].join('\n'),
+  })
+
+  it('render a tree through a snippet calling itself, a match, a handler, a loop-scoped snippet and a function prop, and follow the signals', async () => {
+    const { root, dispose } = await mountB()
+
+    try {
+      expect(root.querySelector('#tree')!.textContent).toBe('rootxy')
+      expect(root.querySelector('#state')!.textContent).toBe('on')
+      ;(globalThis as unknown as { setMode: (next: string) => void }).setMode('off')
+      await settle()
+      expect(root.querySelector('#state')!.textContent).toBe('off')
+
+      const button = root.querySelector<HTMLButtonElement>('#count')!
+
+      button.click()
+      await settle()
+      expect(root.querySelector('#count')).toBe(button)
+      expect(button.textContent).toBe('1')
+
+      const first = root.querySelector('.loop')
+
+      ;(globalThis as unknown as { setNames: (next: string[]) => void }).setNames(['a', 'b', 'c'])
+      await settle()
+      expect([...root.querySelectorAll('.tag')].map(tag => tag.textContent)).toEqual(['a', 'b', 'c'])
+      expect(root.querySelector('.loop')).toBe(first)
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['0: a', '1: b', '2: c'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  const mountC = site({
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      '',
+      'const ready = signal(true)',
+      ';(globalThis as { setReady?: (next: boolean) => void }).setReady = next => ready.set(next)',
+      '---',
+      'snippet later(value: Promise<string>, shown: boolean)',
+      '  if shown',
+      '    await value then text',
+      '      i.later {text}',
+      '  else',
+      '    i.later hidden',
+      '{later(Promise.resolve(\'done\'), ready())}',
+      '',
+    ].join('\n'),
+  })
+
+  it('hold an await and an if', async () => {
+    const { root, dispose } = await mountC()
+
+    try {
+      await settle()
+      expect(root.querySelector('.later')!.textContent).toBe('done')
+      ;(globalThis as unknown as { setReady: (next: boolean) => void }).setReady(false)
+      await settle()
+      expect(root.querySelector('.later')!.textContent).toBe('hidden')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('named slots', () => {
   const mount32 = site({
     'card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n',

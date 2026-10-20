@@ -106,6 +106,20 @@ for product of products
   li(title={price}) {price}
 ```
 
+### Repeat a block within one file
+
+A `snippet` names markup for the lines after it, and `{name(args)}` renders it, where a component would need a file of its own:
+
+```kay
+snippet feature(title: string, text: string)
+  article
+    h3 {title}
+    p {text}
+.grid
+  {feature('Fast', 'Built on Bun')}
+  {feature('Small', 'Under 10 KB')}
+```
+
 ### Put an element inside text
 
 `#[tag inline]` writes an element in the middle of a sentence, and `tag: child` nests one on the same line:
@@ -383,3 +397,15 @@ List(items={todos})
   @row(todo, i)
     li {i + 1}. {todo.title}
 ```
+
+### Snippets
+
+- `snippet name(parameters)` and the lines under it declare a function returning what they render, as a `@row(item)` block does; the parameters are a function's, types, destructuring, defaults and rest included, and the brackets may be left out for none.
+- `{name(args)}` renders it anywhere below, as a text line or in the text of an element, and `kay check` types the call as any call.
+- It reads the signals, script consts, template `const`s and loop variables around it, so it needs no parameter for them.
+- A signal read in the snippet updates there in place; one read in an argument, `{feature(title())}`, draws that call again.
+- It is scoped as a template `const` is: the lines after it at its indentation and their children see it, its own lines included, so it can call itself for a tree, and a later snippet can call an earlier one. Above its declaration or outside its block the name is unknown, and `kay check` reports it.
+- A name another snippet, an import, a script const, a prop or a loop variable already holds is reported at the snippet, and assigning one is refused.
+- It can hold components, a bare `slot` of the component declaring it, `if`, `for`, `await`, `match` and other snippets, and is a plain function, so `List(row={feature})` passes it where a prop takes a function, which the component renders with `slot row(item, i)`.
+- A static component passing one to an island renders as an island itself, as it does for a `@row(item)` block.
+- Markup used by several files is a component; a snippet is for one file.

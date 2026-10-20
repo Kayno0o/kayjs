@@ -122,6 +122,7 @@ describe('formatKay', () => {
     ['the parameters of a slot as written, shifting the lines they span', 'List\n    @row({ id }, i)\n        li {id}\n', 'List\n  @row({ id }, i)\n    li {id}\n'],
     ['the parameters of a slot spanning lines', 'List\n    @row(\n      todo,\n    )\n        li x\n', 'List\n  @row(\n    todo,\n  )\n    li x\n'],
     ['a named slot, its arguments, the lines under it and a line made of an expression', 'ul\n    slot row(\n      item,\n    )\n        li x\n    {label}\n    slot\n', 'ul\n  slot row(\n    item,\n  )\n    li x\n  {label}\n  slot\n'],
+    ['a snippet, its parameters as written and the lines under it re-indented', 'div\n    snippet feature(\n      title: string,\n    )\n        h3 {title}\n    {feature(\'a\')}\n', 'div\n  snippet feature(\n    title: string,\n  )\n    h3 {title}\n  {feature(\'a\')}\n'],
     ['an error line with its block', 'form\n    error.text-sm title\n    error\n', 'form\n  error.text-sm title\n  error\n'],
     ['a match, its when lines and their blocks, a subject over several lines moving along', 'div\n    match pick({\n      a: 1,\n    })\n        when 1,   2\n            p a\n        else\n            p b\n', 'div\n  match pick({\n    a: 1,\n  })\n    when 1,   2\n      p a\n    else\n      p b\n'],
     ['a try and its catch block', 'try\n    p {\n      a\n    }\ncatch error\n      p b\n', 'try\n  p {\n    a\n  }\ncatch error\n  p b\n'],

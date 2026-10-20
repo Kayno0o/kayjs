@@ -3,7 +3,7 @@ import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
-import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 
@@ -96,13 +96,18 @@ export class HtmlTemplate extends TemplateWriter {
 
   private items(items: Item[], markup: Markup, raw: boolean, markers: boolean): void {
     for (const [index, item] of items.entries()) {
-      if (item.kind === 'const') {
+      if (isDeclaration(item)) {
         // The items after it render inside a function declaring it, so its name reaches them alone.
         markup.dynamic(() => {
           const rest = new Markup(this.b)
 
           this.b.add('(() => { ')
-          this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? helperName('memo') : undefined))
+
+          if (item.kind === 'snippet')
+            this.snippetDeclaration(item.node)
+          else
+            this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? helperName('memo') : undefined))
+
           this.b.add('return (')
           this.items(items.slice(index + 1), rest, raw, markers)
           rest.end()

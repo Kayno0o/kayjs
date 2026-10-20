@@ -134,6 +134,15 @@ export interface SlotNode extends Span {
   children: Node[]
 }
 
+// `snippet feature(title: string, text: string)`: a function of its parameters returning the lines below it, declared for the lines after it at its indentation and their children, itself included.
+export interface SnippetNode extends Span {
+  kind: 'snippet'
+  name: Span
+  // Inside the brackets, as a function's parameters: empty when written without them.
+  params: Span
+  children: Node[]
+}
+
 export interface AwaitBranch extends Span {
   alias?: Span | undefined
   children: Node[]
@@ -180,7 +189,7 @@ export interface PendingNode extends Span {
   children: Node[]
 }
 
-export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode | PendingNode
+export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | SnippetNode | ConstNode | ErrorNode | PendingNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -448,6 +457,8 @@ export interface TemplateFacts {
   awaited: Set<string>
   slot: boolean
   childrenSlot: boolean
+  // The template declares a `snippet`.
+  snippet: boolean
   await: boolean
   try: boolean
   // The shorthand classes of elements and `error` lines, `.card`, as written.
@@ -494,6 +505,7 @@ export function childBlocks(node: Node): Node[][] {
   switch (node.kind) {
     case 'element':
     case 'slot':
+    case 'snippet':
       return [node.children]
     case 'text':
       return [node.parts.filter(part => part.kind === 'element')]
@@ -556,7 +568,7 @@ export function templateFacts(file: KayFile): TemplateFacts {
   if (file.facts)
     return file.facts
 
-  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, await: false, try: false, classes: [], forms: formTargets(file.template, file.source), functions: new Map() }
+  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], forms: formTargets(file.template, file.source), functions: new Map() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {
@@ -569,6 +581,9 @@ export function templateFacts(file: KayFile): TemplateFacts {
 
       if (mergesComponentClass(node, file.source))
         facts.helpers.add('componentClass')
+    }
+    else if (node.kind === 'snippet') {
+      facts.snippet = true
     }
     else if (node.kind === 'for') {
       facts.helpers.add('For')
@@ -650,6 +665,10 @@ export function expressionSpans(nodes: readonly Node[]): Span[] {
       case 'slot':
         if (node.params)
           spans.push(node.params)
+
+        break
+      case 'snippet':
+        spans.push(node.params)
 
         break
       case 'const':

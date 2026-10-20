@@ -23,7 +23,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Build a site](llms/site.md): one walkthrough of a small site: config and page titles, the layout and its nav, a Markdown collection and its pages, the 404 page, islands and shared state, a form checked on the server and in the browser
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`
 - [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, using one, and the extensions a library adds: pages, dev tool tabs, commands
-- [Template lines](llms/templates.md): the indented template syntax: elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots
+- [Template lines](llms/templates.md): the indented template syntax: elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots, snippets
 - [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards
 - [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): sitemap and robots.txt, favicon and web manifest, offline service worker, site search, self-hosted fonts
 - [Styles and assets](llms/styles-and-assets.md): component styles and Tailwind, `public/`, imported files, wasm and workers

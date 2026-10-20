@@ -64,7 +64,7 @@ interface IdUse {
 }
 
 // How the checks walk into each kind of node: the blocks of an `if`, `match`, `for`, `await` or `try` are alternatives, each rendering on its own.
-const WALKS: Record<Node['kind'], 'element' | 'within' | 'alternatives' | 'none'> = { element: 'element', text: 'within', slot: 'within', if: 'alternatives', match: 'alternatives', for: 'alternatives', await: 'alternatives', try: 'alternatives', pending: 'within', const: 'none', error: 'none' }
+const WALKS: Record<Node['kind'], 'element' | 'within' | 'alternatives' | 'none'> = { element: 'element', text: 'within', slot: 'within', if: 'alternatives', match: 'alternatives', for: 'alternatives', await: 'alternatives', try: 'alternatives', pending: 'within', snippet: 'within', const: 'none', error: 'none' }
 
 // What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
 export function accessibilityLints(file: KayFile): Diagnostic[] {
@@ -388,7 +388,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       }
       else if (walk === 'within') {
         for (const block of childBlocks(node))
-          visit(block, node.kind === 'slot' ? { ...context, component: true } : context)
+          visit(block, node.kind === 'slot' || node.kind === 'snippet' ? { ...context, component: true } : context)
       }
       else if (walk === 'alternatives') {
         const children = childBlocks(node)

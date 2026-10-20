@@ -416,6 +416,57 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types a snippet as a function, reporting at its line a wrong call, an unknown snippet, one used above its declaration or outside its block, and a name taken', async () => {
+    const root = await scratchProject({
+      'src/rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: string[], row: (item: string, index: number) => JSX.Element }>()\n---\nfor item, i of items\n  | {row(item, i)}\n',
+      'src/list.kay': [
+        '---',
+        'import Rows from \'./rows.kay\'',
+        '',
+        'const { names, on } = props<{ names: string[], on: boolean }>()',
+        '---',
+        '{early()}',
+        'snippet early()',
+        '  p early',
+        'snippet feature(title: string, count: number)',
+        '  p {title} {count}',
+        '{feature(\'a\')}',
+        '{feature(\'a\', \'b\')}',
+        '{feature(\'a\', 1)}',
+        '{missing(\'a\')}',
+        'if on',
+        '  snippet inner()',
+        '    p inner',
+        '  {inner()}',
+        '{inner()}',
+        'Rows(items={names} row={feature})',
+        'Rows(items={names} row={(item: number) => item})',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2304'], [7, 'unread-name'], [11, 'TS2554'], [12, 'TS2345'], [14, 'TS2304'], [19, 'TS2304'], [21, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a snippet named as another snippet, a script const or an import, and one reassigned', async () => {
+    const root = await scratchProject({
+      'src/other.ts': 'export const other = 1\n',
+      'src/list.kay': '---\nimport { other } from \'./other\'\n\nconst taken = 1\n---\nsnippet one()\n  p {taken}\nsnippet one()\n  p again\nsnippet taken()\n  p x\nsnippet other()\n  p x\nbutton(onClick={() => { one = 1 }}) {one()}{other()}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([[8, '`one` is already declared'], [10, '`taken` is already declared'], [12, '`other` is already declared'], [14, '`one` is a snippet, which cannot be reassigned']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports invalidatePage imported from kay/server, which no longer exports it', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

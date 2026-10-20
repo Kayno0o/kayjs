@@ -1,4 +1,4 @@
-import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode } from './ast'
+import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
@@ -237,6 +237,17 @@ export abstract class TemplateWriter {
 
     if (defaults.length > 0)
       this.b.add(`{ ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }, `)
+  }
+
+  // A snippet as a statement declaring a function of its parameters returning what its lines render, as a slot block taking parameters does.
+  protected snippetDeclaration(node: SnippetNode): void {
+    const { b } = this
+
+    b.wrap(node, () => {
+      b.add('const ').addSource(node.name).add(' = (').addSource(node.params).add(') => ')
+      this.childrenValue(node.children)
+      b.add('; ')
+    })
   }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.

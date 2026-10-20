@@ -111,6 +111,8 @@ describe('static slots', () => {
     expect(pageHtml).toContain(`<slot data-component="tests/fixtures/slots/toolbar.kay" data-props='[{"label":1},"Tool"]'><div class="toolbar"><button class="pick">`)
     expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/rows.kay" data-props="[{}]">')
     expect(pageHtml).toContain('<div class="counted"><slot data-component="tests/fixtures/slots/counter.kay"')
+    // A snippet is a function, so a component passing one on is an island as one passing a block taking parameters is.
+    expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/shelf.kay" data-props="[{}]">')
   })
 
   it('hydrates a promoted component, which runs the function, the block and the class instance it passes', async () => {
@@ -129,6 +131,13 @@ describe('static slots', () => {
     click(dot)
     await tick()
     expect(dot.textContent).toBe('Dot 3')
+
+    const shelf = document.querySelectorAll('ul.list')[1]!
+
+    expect([...shelf.querySelectorAll('i.snip')].map(item => item.textContent)).toEqual(['p', 'q'])
+    click(shelf)
+    await tick()
+    expect([...shelf.querySelectorAll('i.snip')].map(item => item.textContent)).toEqual(['q', 'p'])
   })
 
   it('still refuses a layout passing an island a function, naming the fix', async () => {

@@ -5,6 +5,7 @@ import Label from './label.kay'
 import Panel from './panel.kay'
 import Plot from './plot.kay'
 import Rows from './rows.kay'
+import Shelf from './shelf.kay'
 import Toolbar from './toolbar.kay'
 
 const name = 'Ada'
@@ -25,3 +26,4 @@ main
   Rows
   Counted
   Plot
+  Shelf

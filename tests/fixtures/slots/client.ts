@@ -8,6 +8,7 @@ const registry = {
   'tests/fixtures/slots/list.kay': () => import('./list.kay'),
   'tests/fixtures/slots/toolbar.kay': () => import('./toolbar.kay'),
   'tests/fixtures/slots/rows.kay': () => import('./rows.kay'),
+  'tests/fixtures/slots/shelf.kay': () => import('./shelf.kay'),
   'tests/fixtures/slots/dot.kay': () => import('./dot.kay'),
   'tests/fixtures/slots/plot.kay': () => import('./plot.kay'),
 }

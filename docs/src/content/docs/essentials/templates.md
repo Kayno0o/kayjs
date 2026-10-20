@@ -165,6 +165,41 @@ for product of products
       span.badge Only {stock} left
 ```
 
+## Reuse a block in one file
+
+A `snippet` names a block of markup for the file that declares it. Declare it with parameters, then call it in braces like a function.
+
+```kay
+snippet feature(title: string, text: string)
+  article
+    h3 {title}
+    p {text}
+.grid
+  {feature('Fast', 'Built on Bun')}
+  {feature('Small', 'Under 10 KB')}
+```
+
+The parameters are TypeScript parameters, so types, destructuring and defaults all work. `kay check` types each call like any other call.
+
+A snippet reads the signals, constants and loop variables around it, so it needs no parameter for them. It can also call itself, which suits a tree.
+
+Like a `const`, a snippet is seen by the lines below it. Use it above its declaration or outside the block that declares it, and `kay check` reports an unknown name.
+
+To hand a snippet to a component, pass it as a function prop. The component renders it with `slot row(item, i)`.
+
+```kay
+---
+import List from '../components/list.kay'
+---
+snippet item(name: string, i: number)
+  li {i + 1}. {name}
+List(items={['Milk', 'Eggs']} row={item})
+```
+
+A snippet is for markup used in one file. Markup used by several files is a component.
+
+<ReadMore href="/llms/templates#snippets">How a snippet is scoped, what a name clash reports, and what an argument that reads a signal redraws.</ReadMore>
+
 ## Events and bindings
 
 Handlers are camelCase attributes. A component with one becomes an [island](/essentials/islands).

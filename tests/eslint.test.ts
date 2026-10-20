@@ -261,6 +261,21 @@ section({...rest['a']})
     ])
   })
 
+  it('reports the parameters and the body of a snippet at their lines, and nothing at the code around them', async () => {
+    const { messages } = await lint(`---
+const { list } = props<{ list: Record<string, string> }>()
+---
+snippet row(key: string, fallback = list['x'])
+  p {list['b']} {key}
+{row('a')}
+`)
+
+    expect(messages.map(message => [message.ruleId, message.line])).toEqual([
+      ['dot-notation', 4],
+      ['dot-notation', 5],
+    ])
+  })
+
   it('reports an expression the compiler copies twice once', async () => {
     const { messages } = await lint('---\nconst values = { a: signal(\'\') }\n---\ninput(bind:value={values[\'a\']})\n')
 

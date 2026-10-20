@@ -203,6 +203,8 @@ function ownMultiLineSpans(node: Node): Span[] {
       return [node.pattern, node.value]
     case 'slot':
       return node.params ? [node.params] : []
+    case 'snippet':
+      return [node.params]
     case 'try':
     case 'error':
     case 'pending':

@@ -4,7 +4,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -142,7 +142,7 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 // The module around a template, alike for every output mode: its imports, the server fence's `load`, the component's signature, props and script, and its export; the template renders through the writer of the mode.
 class ModuleShell {
   private readonly b: CodeBuilder
-  private readonly sites: Sites = { rows: new Set(), consts: new Map(), props: new Map() }
+  private readonly sites: Sites = { rows: new Set(), consts: new Map(), snippets: new Set(), props: new Map() }
   // Whether the island types a prop as an action, so the server lets it be passed one.
   private takesActions = false
   private readonly src: string
@@ -280,7 +280,7 @@ class ModuleShell {
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    if (facts.childrenSlot)
+    if (facts.childrenSlot || facts.snippet)
       b.add(`import type { JSX as KayJSX } from 'kay'\n`)
 
     if (mode === 'html')
@@ -796,6 +796,11 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 export function promotionCause(file: KayFile, script: ScriptAnalysis): string | undefined {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
   let cause: string | undefined
+
+  visitNodes(file.template, (node) => {
+    if (node.kind === 'snippet')
+      names.add(file.source.slice(node.name.start, node.name.end))
+  })
 
   someNode(file.template, (node) => {
     if (node.kind !== 'element' || !node.component)

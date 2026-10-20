@@ -1,0 +1,6 @@
+---
+import List from './list.kay'
+---
+snippet tag(item: string)
+  i.snip {item}
+List(items={['p', 'q']} row={tag})
