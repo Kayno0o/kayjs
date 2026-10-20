@@ -1068,6 +1068,55 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('keeps what an enclosing if narrows in a for block\'s else fallback, an else if chain of aliases and a loop\'s index, a page\'s static loop included', async () => {
+    const template = [
+      'if dossier.latest',
+      '  for entry, index of entries key={entry.id}',
+      '    p {index.toFixed()}{dossier.latest.id}{entry.id}',
+      '  else',
+      '    p {dossier.latest.id}',
+      '  if entries[0] as first',
+      '    p {first.id}{dossier.latest.id}',
+      '  else if entries[1] as second',
+      '    p {second.id}{dossier.latest.id}',
+      '  else',
+      '    p {dossier.latest.id}',
+      'for entry, index of entries key={entry.id}',
+      '  p {index.length}{entry.id}',
+      'else',
+      '  p {dossier.latest.id}',
+      'if entries[0] as first',
+      '  p {first.id}',
+      'else if entries[1] as second',
+      '  p {second.id}{first.id}',
+      '',
+    ].join('\n')
+    const script = '---\ntype Stage = { id: string }\nconst { dossier, entries } = props<{ dossier: { latest: Stage | null }, entries: { id: string }[] }>()\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/routes/page.kay': `--- server\ntype Stage = { id: string }\nconst dossier: { latest: Stage | null } = { latest: null }\nconst entries: { id: string }[] = []\n---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      // Only the last three lines are wrong: a number's `length`, a path nothing narrows and an alias read out of its branch.
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)] as const).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1])).toEqual([
+        ['island.kay', 21, 'Property \'length\' does not exist on type \'number\'.'],
+        ['island.kay', 23, '\'__props.dossier.latest\' is possibly \'null\'.'],
+        ['island.kay', 27, 'Cannot find name \'first\'.'],
+        ['page.kay', 18, 'Property \'length\' does not exist on type \'number\'.'],
+        ['page.kay', 20, '\'__props.dossier.latest\' is possibly \'null\'.'],
+        ['page.kay', 24, 'Cannot find name \'first\'.'],
+        ['static.kay', 17, 'Property \'length\' does not exist on type \'number\'.'],
+        ['static.kay', 19, '\'__props.dossier.latest\' is possibly \'null\'.'],
+        ['static.kay', 23, 'Cannot find name \'first\'.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('type-checks the key of a page\'s loop, which its static loop does not use', async () => {
     const root = await scratchProject({ 'src/routes/page.kay': '--- server\nconst entries: { id: string }[] = []\n---\nfor entry of entries key={entry.idd}\n  p {entry.id}\n' })
 
