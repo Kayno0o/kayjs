@@ -179,10 +179,10 @@ export const slow: B[N4] = null as never
       void stopped.request('tools/call', { name: 'check', arguments: {} })
 
       // The checker itself, not a short `--showConfig` run that can end between two reads.
-      for (let waited = 0; processesIn(own, '--noEmit').length === 0 && waited < 60_000; waited += 20)
+      for (let waited = 0; processesIn(own, '--listFiles').length === 0 && waited < 60_000; waited += 20)
         await Bun.sleep(20)
 
-      expect(processesIn(own, '--noEmit').length).toBeGreaterThan(0)
+      expect(processesIn(own, '--listFiles').length).toBeGreaterThan(0)
       process.kill(stopped.pid, 'SIGTERM')
 
       for (let waited = 0; processesIn(own).length > 0 && waited < 5000; waited += 20)

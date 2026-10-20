@@ -823,6 +823,27 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('keeps the workflow lines bun check writes under GitHub Actions out of a message', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'export const a: number = \'a\'\n' })
+    const outer = { GITHUB_ACTIONS: process.env.GITHUB_ACTIONS, AGENT: process.env.AGENT }
+
+    try {
+      // `AGENT=0` stops Bun taking this run for an AI agent's, for which it writes no workflow lines.
+      Object.assign(process.env, { GITHUB_ACTIONS: 'true', AGENT: '0' })
+      expect((await check(root)).map(d => [basename(d.file), d.code, d.message])).toEqual([['a.ts', 'TS2322', 'Type \'string\' is not assignable to type \'number\'.']])
+    }
+    finally {
+      for (const [name, value] of Object.entries(outer)) {
+        if (value === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = value
+      }
+
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the files bun check lists out of the message of the error before them', async () => {
     const root = await scratchProject({ 'src/a.ts': 'declare function f(cb: (a: number) => void): void\n\nf((a: string) => {})\n' })
 
