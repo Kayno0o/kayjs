@@ -242,7 +242,7 @@ if open()
 
 A page with an island or a form swaps the next page in without a reload.
 
-An island marked `persist` lives on from page to page. `Player(persist)` in a layout keeps a song playing, and in a browser with `Element.moveBefore` an iframe in it stays loaded. What the next page renders again stays as it is, so a sidebar keeps its scroll.
+An island marked `persist` lives on from page to page. `Player(persist)` in a layout keeps a song playing, and in a browser with `Element.moveBefore` an iframe in it stays loaded. What the next page renders again stays as it is, so a sidebar keeps its scroll, and so does a scrolled panel inside the island, in every browser.
 
 Each swap moves focus to the new page's `autofocus` field, else its `h1`, else its `main`. It also announces the title to screen readers.
 
