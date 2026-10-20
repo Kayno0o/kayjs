@@ -40,7 +40,7 @@ export async function environmentWithoutDotenv(): Promise<Record<string, string 
 
 // The root directories the project itself ignores: a service writing its data into the repository, as a bind-mounted database does, must not restart the server on every write.
 // Only the plain names a `.gitignore` holds, which is what such a directory is listed as; a pattern reaching deeper or holding a glob is left to the walk.
-function gitIgnoredNames(root: string): Set<string> {
+export function gitIgnoredNames(root: string): Set<string> {
   const names = new Set<string>()
   let lines: string[]
 
@@ -65,15 +65,18 @@ function gitIgnoredNames(root: string): Set<string> {
 export async function serverSources(root: string): Promise<string[]> {
   const ignored = gitIgnoredNames(root)
 
-  return (await findProjectFiles(root, ANY_FILE, { project: true })).filter((file) => {
-    const path = relative(root, file)
-    const [top = path] = path.split(sep)
+  return (await findProjectFiles(root, ANY_FILE, { project: true })).filter(file => isSource(root, file, ignored, false) && !relative(root, file).startsWith('.env'))
+}
 
-    if (top === path)
-      return SERVER_ROOT_FILE.test(path) && !path.startsWith('.env') && !TEST_CONFIG.test(path)
+// Whether a file of the walk is one the project's server or build reads: a root file a server reads (and, with `rootNaming`, one only a stylesheet's pruning reads), or one below a directory `kay dev` watches. `ignored` is what `gitIgnoredNames` found.
+export function isSource(root: string, file: string, ignored: Set<string>, rootNaming: boolean): boolean {
+  const path = relative(root, file)
+  const [top = path] = path.split(sep)
 
-    return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(path)
-  })
+  if (top === path)
+    return (SERVER_ROOT_FILE.test(path) && !TEST_CONFIG.test(path)) || (rootNaming && ROOT_NAMING_FILE.test(path))
+
+  return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(path)
 }
 
 // A directory or file at the project root worth reacting to; dependencies, build output, tests and hidden entries, `.env` files apart, are not.

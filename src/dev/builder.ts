@@ -10,7 +10,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, writeAtomically } from '../build/files'
+import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
@@ -20,6 +20,7 @@ import { KayCompileError } from '../build/transform'
 import { withConfig } from '../config'
 import { clientOptionsOf } from '../project'
 import { BUILD_FAILURE, clientOptionsKey, MANIFEST } from '../server/client'
+import { BuildStamps, sourceFiles } from './fingerprint'
 import { tailwindClasses } from './tailwind'
 
 // `kay dev` asks for a build with the files changed since the last one, relative to the root, or null for a build of everything.
@@ -82,6 +83,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const mapKeys = new Map<string, string>()
   let mapWork: { stop: boolean, done: Promise<void> } | undefined
   const classesOf = async (built: Built) => built.classes ??= tailwindClasses(built.styleInputs)
+  const stamps = new BuildStamps(root, output, key)
+  let attempted = false
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
     if (!sameItems(previous.sources.pages, sources.pages) || (plugins && !sameItems(previous.sources.classes, sources.classes)))
@@ -214,12 +217,26 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       manifest: text,
     }
 
+    stamps.finish([...await sourceFiles(root), ...readSourcePaths(), ...graph.keys(), ...styleInputs, ...last.islandInputs], text, mapWork?.done)
+
     return { failed: false, styles: styles?.styles }
   }
 
   return async (changed) => {
     try {
-      return await inWalkScope(async () => inSignalsScope(async () => build(changed)))
+      return await inWalkScope(async () => inSignalsScope(async () => {
+        const first = !attempted
+
+        attempted = true
+
+        // The first build of a process, of everything: the output an earlier run left stays when nothing it read has changed.
+        if (first && changed === null && await stamps.fresh())
+          return { failed: false }
+
+        stamps.begin(changed)
+
+        return build(changed)
+      }))
     }
     catch (error) {
       last = undefined

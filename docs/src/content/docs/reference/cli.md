@@ -116,7 +116,7 @@ Before it writes anything, it checks that each file it changes is still what `ka
 kay dev --port 4000 --open
 ```
 
-`kay dev` runs `src/server.ts` with `NODE_ENV=development`. An edit to a template, island, loader or API route reloads in the same process. A change it cannot reload that way, such as the config or the entry, starts a new process.
+`kay dev` runs `src/server.ts` with `NODE_ENV=development`. An edit to a template, island, loader or API route reloads in the same process. A change it cannot reload that way, such as the config or the entry, starts a new process. A start finds the browser build an earlier run left and uses it as it is when none of the files it read, the options it was built with or the versions of kay and Bun have changed since, so a second `kay dev` of a project nothing changed in builds nothing.
 
 A change to a file at the project root, such as `.env` or `package.json`, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again. Set `KAY_DEV_RELOAD_GROWTH_MB` to change that number of MiB.
 

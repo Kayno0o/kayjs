@@ -73,6 +73,13 @@ export function fileStamp(file: string): string | undefined {
   }
 }
 
+// When the file of a `fileStamp` was last written, in milliseconds since the epoch.
+export function stampTime(stamp: string): number {
+  const from = stamp.indexOf('-') + 1
+
+  return Number(stamp.slice(from, stamp.indexOf('-', from)))
+}
+
 // Whether the file was written before `before`, in milliseconds since the epoch, with room for the timestamps' grain: undefined stamps and files written since are not.
 export function settledBefore(file: string, before: number): boolean {
   try {
@@ -115,6 +122,11 @@ export function keepSources(): void {
   }
 
   generation++
+}
+
+// The files read since the last `keepSources`, which a build's sources are.
+export function readSourcePaths(): string[] {
+  return [...reads.keys()]
 }
 
 // Forgets every file read, for a build of everything to start from the disk.
