@@ -1106,3 +1106,35 @@ describe('shorthand classes with a decimal', () => {
     expect(nested.tsx).toContain('<li')
   })
 })
+
+describe('image placeholder', () => {
+  const page = (img: string) => `---\nimport { image } from 'kay/image'\nimport hero from './hero.png'\n---\n${img}\n`
+  const compiled = (img: string, output: 'html' | 'dom') => compileKay(page(img), 'test.kay', { output })
+
+  it('turns the color off for an img src with `no-placeholder`, a style of its own or neither, in the server markup only, and never writes the attribute', () => {
+    for (const output of ['html', 'dom'] as const) {
+      for (const img of ['img(src={hero} alt="")', 'img(src={hero} no-placeholder alt="")', 'img(src={hero} style="border: 0" sizes="50vw" alt="")', 'img({...image(hero)} no-placeholder alt="")']) {
+        const result = compiled(img, output)
+
+        expect(result.diagnostics).toEqual([])
+        expect(result.tsx).not.toContain('no-placeholder')
+      }
+    }
+
+    expect(compiled('img(src={hero} alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false) +')
+    expect(compiled('img(src={hero} no-placeholder alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, undefined, false)')
+    expect(compiled('img(src={hero} no-placeholder sizes="50vw" alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, "50vw", false)')
+    expect(compiled('img(src={hero} style="border: 0" alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, undefined, false)')
+    // The browser keeps the server's attribute, so it is told nothing.
+    expect(compiled('img(src={hero} no-placeholder alt="")', 'dom').tsx).toContain('KayImage(KayN0_0, (hero), false)')
+  })
+
+  it('unsets the style a spread brings for `no-placeholder` after it', () => {
+    expect(compiled('img({...image(hero)} no-placeholder alt="")', 'html').tsx).toContain('{ "style": undefined, "alt": "" }')
+    expect(compiled('img({...image(hero)} alt="")', 'html').tsx).not.toContain('"style"')
+  })
+
+  it('type-checks the attribute as any hyphenated one', () => {
+    expect(errors(page('img(src={hero} no-placeholder alt="")'))).toEqual([])
+  })
+})

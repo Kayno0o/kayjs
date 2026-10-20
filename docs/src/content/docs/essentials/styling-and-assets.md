@@ -185,6 +185,23 @@ import hero from '../hero.jpg'
 img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
 ```
 
+### A color while an image loads
+
+An image is an empty box until it arrives. kay fills the box with the image's average color, so a slow connection shows a patch of the right color where the photo will be. Nothing to write: it is a `style` attribute of about 35 bytes on the `img`, and no script.
+
+kay reads the color once, when it builds. That covers imported images and the relative images of a collection's Markdown. For an image in `images.dirs` or on an `images.remote` host, it reads the color the first time the image route serves the file, so a page rendered before then has none.
+
+An image with any transparency gets no color, as it would show through. Neither do an SVG, an animated GIF, a stored file or an image looked up by `images.resolve`. Under `object-fit: contain` the color stays visible beside the picture, so turn it off there.
+
+```kay
+---
+import hero from '../hero.jpg'
+---
+img(src={hero} no-placeholder alt="The workshop")
+```
+
+`image(hero, { placeholder: false })` does the same for a spread, and an `img` with a `style` of its own keeps it. `images: { placeholder: false }` turns the colors off everywhere. A content security policy that does not allow inline styles turns them off too, since the browser would drop them.
+
 ### Density and shapes
 
 An image never loads at more than 2 pixels per CSS pixel, so a 3x phone gets what a 2x one does. It looks the same. `images.maxDensity` changes the cap, and `Infinity` leaves the choice to the browser.

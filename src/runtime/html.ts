@@ -437,17 +437,17 @@ export function selectOptions(value: unknown, markup: string, only = false): str
   })
 }
 
-// An `img` source, with the variants, `sizes` and size of an imported image.
-export function imageAttributes(src: unknown, sized: boolean, sizes?: unknown): string {
+// An `img` source, with the variants, `sizes`, size and placeholder color of an imported image.
+export function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: boolean): string {
   if (fieldMarks.marking !== undefined) {
     const mark = markedAttribute('src', src)
 
-    return withFieldMarks(undefined, () => imageAttributes(src, sized, sizes)) + mark
+    return withFieldMarks(undefined, () => imageAttributes(src, sized, sizes, placeholder)) + mark
   }
 
   let markup = ''
 
-  for (const [name, value] of Object.entries(imageSource(src, sized, sizes)))
+  for (const [name, value] of Object.entries(imageSource(src, sized, sizes, placeholder)))
     markup += attribute(name, value)
 
   return markup

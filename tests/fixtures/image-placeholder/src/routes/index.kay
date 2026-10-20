@@ -1,0 +1,22 @@
+---
+import { image } from 'kay/image'
+import clear from '../clear.png'
+import jpeg from '../photo.jpg'
+import photo from '../photo.png'
+import motion from '../motion.gif'
+import icon from '../icon.svg'
+---
+img.photo(src={photo} alt="Photo")
+img.spread({...image(photo)} alt="Spread")
+img.jpeg(src={jpeg} alt="Jpeg")
+img.clear(src={clear} alt="Clear")
+// kay-allow unsized-image
+img.motion(src={motion} alt="Motion")
+// kay-allow unsized-image
+img.icon(src={icon} alt="Icon")
+img.off(src={photo} no-placeholder alt="Off")
+img.styled(src={photo} style="border: 0" alt="Styled")
+img.optout({...image(photo, { placeholder: false })} alt="Optout")
+img.styledspread({...image(photo)} style="border: 0" alt="Styled spread")
+img.sized(src={photo} width="20" alt="Sized")
+img.upload({...image('/uploads/photo.png', { width: 64, height: 48 })} alt="Upload")

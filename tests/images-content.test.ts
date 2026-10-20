@@ -10,8 +10,10 @@ import { entries, registerCollections } from '../src/content/edit'
 import { sizedImages } from '../src/content/images'
 import { contentPlace, loadEntries, markdownOf, setContentMode, setContentPlace, setMarkdownDefaults } from '../src/content/load'
 import { compileMarkdown } from '../src/content/markdown'
-import { image, imageUrl, parseWidths, setImageWidths } from '../src/runtime/image'
+import { image, imageUrl, parseWidths, setImageWidths, setPlaceholders } from '../src/runtime/image'
+import { placeholderColour } from '../src/runtime/placeholder'
 import { pages } from '../src/server'
+import { encodePng } from '../src/server/png'
 import { fixtureCopy } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -569,7 +571,94 @@ describe('Markdown settings', () => {
   })
 })
 
+// An opaque PNG of one color.
+function opaque(red: number, green: number, blue: number): Blob {
+  const pixels = new Uint8Array(48 * 32 * 4)
+
+  for (let index = 0; index < 48 * 32; index++)
+    pixels.set([red, green, blue, 255], index * 4)
+
+  return new Blob([encodePng(pixels, 48, 32) as Uint8Array<ArrayBuffer>])
+}
+
+describe('Markdown images placeholder', () => {
+  afterAll(() => setPlaceholders(undefined))
+
+  it('marks a linked image without transparency with its color, shown as a style once rendered, never over the author\'s own style', async () => {
+    const { restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png) ![b](./ghost.png) <img src="./cat.png" style="border: 0" alt="c"> <img src="./cat.png" width="20" alt="d"> <img src="./cat.png" data-kay-placeholder="ff0000" alt="e">\n', 'posts/cat.png': opaque(200, 100, 50), 'posts/ghost.png': Bun.file(HERO) })
+
+    try {
+      setPlaceholders(placeholderColour)
+
+      const [entry] = await loadEntries('posts', { live: true })
+      const html = (entry!.segments as string[]).join('')
+      const [cat, ghost, styled, sized, forged] = [...sizedImages(html).matchAll(/<img[^>]*>/g)].map(match => match[0])
+
+      expect(html.match(/data-kay-placeholder="c86432"/g)).toHaveLength(3)
+      expect(html).not.toContain('ff0000')
+      expect(cat).toContain(' style="background-color:#c86432"')
+      expect(cat).not.toContain('data-kay')
+      expect(ghost).not.toContain('style=')
+      expect(styled).toContain('style="border: 0"')
+      expect(styled!.match(/style=/g)).toHaveLength(1)
+      expect(sized).not.toContain('style=')
+      expect(forged).toContain(' style="background-color:#c86432"')
+      expect(forged).not.toContain('ff0000')
+
+      setPlaceholders(undefined)
+      expect(sizedImages(html)).not.toContain('background-color')
+      expect(sizedImages(html)).not.toContain('data-kay-placeholder')
+    }
+    finally {
+      await restore()
+    }
+  })
+
+  it('links the color again when the image changes, though the Markdown is cached', async () => {
+    const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': opaque(200, 100, 50) })
+
+    try {
+      const colourOf = async () => (/data-kay-placeholder="(\w+)"/).exec(((await loadEntries('posts', { live: true }))[0]!.segments as string[]).join(''))?.[1]
+
+      expect(await colourOf()).toBe('c86432')
+      expect(await colourOf()).toBe('c86432')
+      await Bun.write(join(root, 'posts/cat.png'), opaque(10, 20, 30))
+      expect(await colourOf()).toBe('0a141e')
+    }
+    finally {
+      await restore()
+    }
+  })
+})
+
 describe('Markdown images in a static export', () => {
+  it('carry the color of an image without transparency under the base, and none for one with', async () => {
+    const root = await fixtureCopy('content')
+    const out = join(root, 'out')
+
+    try {
+      await Bun.write(join(root, 'src/content/posts/pic.md'), '---\ntitle: Pic\ndate: 2026-09-02\n---\n\n![A cat](./cat.png) ![A ghost](./ghost.png)\n')
+      await Bun.write(join(root, 'src/content/posts/cat.png'), opaque(200, 100, 50))
+      await Bun.write(join(root, 'src/content/posts/ghost.png'), Bun.file(HERO))
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', content: 'src/content.config.ts' })\n`)
+
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
+      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      expect(errors).toBe('')
+      expect(code).toBe(0)
+
+      const [cat, ghost] = [...(await Bun.file(join(out, 'blog/pic/index.html')).text()).matchAll(/<img[^>]*>/g)].map(match => match[0])
+
+      expect(cat).toContain('src="/repo/_kay/images/cat-')
+      expect(cat).toContain('style="background-color:#c86432"')
+      expect(ghost).not.toContain('style=')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it.each(['always', 'never'] as const)('are linked under the base and sized with the configured ladder only, trailingSlash %s', async (trailingSlash) => {
     const root = await fixtureCopy('content')
     const out = join(root, 'out')

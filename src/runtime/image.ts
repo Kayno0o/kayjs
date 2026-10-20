@@ -1,4 +1,7 @@
 import { kayLog } from './log'
+
+declare const KAY_BROWSER: true | undefined
+
 // The widths an image is resized to unless `images.widths` says otherwise, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560] as const
 // The most widths `images.widths` may list, and the widest of them.
@@ -46,6 +49,8 @@ export interface ImageProps {
   sizes?: string | undefined
   width?: number | undefined
   height?: number | undefined
+  // The color shown in the image's place until it loads, `background-color:#c86432`; on the server, for an image with a known color and without transparency.
+  style?: string | undefined
 }
 
 export interface ImageOptions {
@@ -58,6 +63,8 @@ export interface ImageOptions {
   aspect?: string | undefined
   // The WebP quality of this image's variants, 1 to 100, over `images.quality`, its AVIF one moving the same step from `images.avif`'s: `90` for a photograph that shows banding at the default. Each quality an image is asked for adds a file per width, so it is set where the default does not do.
   quality?: number | undefined
+  // `false` leaves out the color the image's box shows until it loads, which `images.placeholder` turns on for every image.
+  placeholder?: boolean | undefined
 }
 
 // One file an image is turned into: a width of the ladder, cut to an aspect ratio or not, at a quality of its own or not, or the share card.
@@ -89,6 +96,8 @@ let unlistedCheck: ((src: string, caller: string) => boolean) | undefined
 let serverVariantUrl: typeof recordedVariantUrl | undefined
 // Whether `images.resolve` looks sources up, which the browser reads off the page.
 let resolved: boolean | undefined
+// The color an image shows until it loads, set on the server: the browser keeps the box the server wrote.
+let placeholderOf: ((src: string) => string | undefined) | undefined
 
 // `images.maxDensity` on the server; the browser reads it off the page, where the server wrote it unless it is the default.
 export function setMaxDensity(density: number): void {
@@ -139,6 +148,10 @@ export function imageWidths(): readonly number[] {
 
 export function setResolvedImages(on: boolean): void {
   resolved = on
+}
+
+export function setPlaceholders(find: typeof placeholderOf): void {
+  placeholderOf = find
 }
 
 // Hosts already warned about, once each per process.
@@ -321,14 +334,23 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   const size = aspect ? croppedSize(own, aspect) : own
   const fixed = FIXED_SIZE.exec(options.sizes ?? '')
   const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : ladderFor(size.width)
-
-  return {
+  const props: ImageProps = {
     src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect, wanted),
     srcset: widths.map(width => `${imageUrl(src, width, aspect, wanted)} ${width}w`).join(', '),
     sizes: cappedSizes(options.sizes ?? '100vw', currentMaxDensity()),
     width: size.width,
     height: size.height,
   }
+
+  // The server's, which islands download without: see `KAY_BROWSER`.
+  if (typeof KAY_BROWSER === 'undefined' && options.placeholder !== false) {
+    const colour = placeholderOf?.(src)
+
+    if (colour !== undefined)
+      props.style = `background-color:#${colour}`
+  }
+
+  return props
 }
 
 // The widths an image drawn `drawn` pixels wide needs, from 1x to the densest screen it is loaded for, each the narrowest the route makes at or above it, none past the image's own.
@@ -464,12 +486,15 @@ function splitSizes(sizes: string): string[] {
   return entries.map(entry => entry.trim()).filter(entry => entry !== '')
 }
 
-// What `img(src={hero})` takes for an imported or stored image: its variants, its `sizes` capped, and its size unless the template gives one. Any other `src` goes as it is, `sizes` too.
-export function imageSource(src: unknown, sized: boolean, sizesAttribute?: unknown): ImageProps | { src: unknown, sizes?: unknown } {
+// What `img(src={hero})` takes for an imported or stored image: its variants, its `sizes` capped, its size unless the template gives one, and the color it shows until it loads unless `placeholder` is false. Any other `src` goes as it is, `sizes` too.
+export function imageSource(src: unknown, sized: boolean, sizesAttribute?: unknown, placeholder?: boolean): ImageProps | { src: unknown, sizes?: unknown } {
   if (typeof src !== 'string' || !(sizes.has(src) || storedSize(src)))
     return sizesAttribute == null ? { src } : { src, sizes: sizesAttribute }
 
   const props = image(src, sizesAttribute == null ? {} : { sizes: String(sizesAttribute) })
+
+  if (typeof KAY_BROWSER === 'undefined' && placeholder === false)
+    delete props.style
 
   if (sized) {
     delete props.width

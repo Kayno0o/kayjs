@@ -159,7 +159,7 @@ export default defineConfig({
 })
 ```
 
-Images with a relative path, `![A cat](./cat.png)`, work in the body too, when the file is inside the collection's folder. They load like an imported image, with a `srcset` of the widths in `images.widths`, `width`, `height` and lazy loading.
+Images with a relative path, `![A cat](./cat.png)`, work in the body too, when the file is inside the collection's folder. They load like an imported image, with a `srcset` of the widths in `images.widths`, `width`, `height`, lazy loading and their average color until they load ([Responsive images](/essentials/styling-and-assets#a-color-while-an-image-loads)).
 
 Their `sizes` is `100vw`, which `imageSizes` in `markdown` or on a collection changes, and a tag's own `sizes="..."` wins for that image. A tag that sets its own `width`, `height` or `srcset`, an SVG, an absolute path or a URL is left as written.
 

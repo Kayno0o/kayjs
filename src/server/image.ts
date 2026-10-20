@@ -12,11 +12,13 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setPlaceholders, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
+import { learnedVersion, learnPlaceholder, placeholderColour } from '../runtime/placeholder'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
+import { dominantColour } from './image-colour'
 import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
@@ -218,6 +220,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
+  // The color of a runtime image, by the version of its file.
+  const colours = new Map<string, Promise<string | undefined>>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
   const text = headerCopies(TEXT, options.security)
@@ -323,6 +327,9 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         keep(runtimeSizes, runtimeKey, own)
     }
 
+    if (runtimeKey !== undefined && source.private !== true && !src.startsWith(FILES_ROUTE))
+      void learnColour(src, runtimeKey, path, own)
+
     const variant = requestedVariant(url, own, allowed)
 
     if (typeof variant === 'string' && variant !== 'card')
@@ -417,6 +424,26 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
     return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs)))
   })
+
+  // The color of a runtime image shown until it loads, read once per version of the file in the background and kept by the `src` pages give `image()`. A private image, a stored one and an AVIF, which is costly to decode, get none.
+  async function learnColour(src: string, version: string, path: string, own: { animated: boolean, format: string }): Promise<void> {
+    if (own.animated || own.format === 'avif' || learnedVersion(src) === version)
+      return
+
+    let colour = colours.get(version)
+
+    if (!colour) {
+      colour = drawing(async () => dominantColour(Bun.file(path), MAX_UPLOAD_PIXELS))
+      keep(colours, version, colour)
+    }
+
+    try {
+      learnPlaceholder(src, version, await colour)
+    }
+    catch {
+      colours.delete(version)
+    }
+  }
 
   // The oldest entry goes when the map is full, where emptying it would drop every key kept warm.
   function keep<T>(map: Map<string, T>, key: string, value: T): void {
@@ -615,8 +642,8 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
   return undefined
 }
 
-// `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown, guard?: unknown } | undefined): number {
+// `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote`, `images.placeholder` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; `inlineStyles` is whether the site's CSP lets an element carry a `style` attribute. Returns the density.
+export function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guard?: unknown } | undefined, inlineStyles = true): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (images?.guard !== undefined && images.resolve === undefined)
@@ -632,6 +659,8 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, widt
   setAspects(images?.aspects ?? DEFAULT_ASPECTS)
   setRemoteImages(src => remoteAllowed(src, patterns))
   setResolvedImages(images?.resolve !== undefined)
+  // A color is a `style` attribute, which a policy refusing inline styles would drop.
+  setPlaceholders(images?.placeholder === false || !inlineStyles ? undefined : placeholderColour)
   recordVariants()
 
   return maxDensity

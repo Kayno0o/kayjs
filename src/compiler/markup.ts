@@ -17,6 +17,8 @@ const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '
 // The attributes naming URLs of the site, which a path from its root in goes under its base.
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
 // A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
+// The attribute of an `img` that leaves out the color it shows until it loads.
+const NO_PLACEHOLDER = 'no-placeholder'
 const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 // Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
@@ -75,7 +77,7 @@ export type PlannedAttribute
     | { kind: 'rooted', name: string, text: string }
     | { kind: 'class' | 'style', name: string, expression: Span }
   // An `img` source, which loads the size the image shows at.
-    | { kind: 'image', expression: Span, sized: boolean }
+    | { kind: 'image', expression: Span, sized: boolean, placeholder: boolean }
   // A `select`'s value, which picks its option.
     | { kind: 'selected', expression: Span }
     | { kind: 'bind', name: string, property: string, expression: Span }
@@ -151,6 +153,10 @@ export abstract class TemplateWriter {
 
       const attributeName = this.source(attribute.name)
 
+      // Read below with the image's source, and never written.
+      if (name === 'img' && attributeName === NO_PLACEHOLDER)
+        continue
+
       if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
         const property = attributeName.slice(5)
 
@@ -202,7 +208,7 @@ export abstract class TemplateWriter {
       }
       // An imported image loads the size it shows at, unless the template writes its own `srcset`.
       else if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
-        plan.attributes.push({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height') })
+        plan.attributes.push({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: !this.named(element, 'style') && !this.named(element, NO_PLACEHOLDER) })
       }
       else {
         plan.attributes.push({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
@@ -355,6 +361,13 @@ export abstract class TemplateWriter {
         continue
 
       const name = this.source(attribute.name)
+
+      // Takes the color a spread brings off the image, which the attributes after it cannot unset.
+      if (element.name === 'img' && name === NO_PLACEHOLDER) {
+        entry('style', () => b.add('undefined'), false)
+
+        continue
+      }
 
       if (this.skips(element, name))
         continue

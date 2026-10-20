@@ -27,6 +27,7 @@ import { dropOpenCache, privateDir } from './private-dir'
 import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
 import { routeMounts, styleChains } from './routes'
+import { allowsStyleAttributes } from './security'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
@@ -79,7 +80,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
 
   serveLocales(root, locales)
   const base = basePath(config.base)
-  const maxDensity = applyImageConfig(config.images)
+  const maxDensity = applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp))
   const site = config.site === undefined ? undefined : siteOrigin(config.site) + base
 
   // Holds copies of private files and their variants, so only this user may enter it.

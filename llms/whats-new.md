@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- An image shows its average color until it loads, as a `style` attribute of about 35 bytes with no script and no setting: an imported image, `image()`, a Markdown body's relative image, and an image of `images.dirs` or `images.remote` once the route has read it; one with transparency, an SVG and an animated GIF get none, and `no-placeholder` on an `img`, `image(src, { placeholder: false })` or `images: { placeholder: false }` turns it off ([Responsive images](images.md#responsive-images)).
 - The dev tool draws the page's tab order: a drawer head button numbers each element Tab reaches with lines between them, and flags a jump up the page, an element whose focus shows nothing and a possible focus trap as accessibility problems ([The dev tool](dev-tool.md)).
 - `presence(room, member)` from `kay` in an island lists who else has a room open with no route, socket or store line, `presence()` the tabs on the page: `others()` and `count()` follow joins and leaves on the page's live connection, the room and member covered by the page's signed proof, and `sqliteData(path)` now holds `rooms`, so replicas sharing it share presence ([Presence](api-from-islands.md#presence)).
 - kayjs-cms's entry screen lists who else has the entry open, by the names `cms({ author })` gives, else how many ([kayjs-cms](../packages/cms/llms/screens.md)).

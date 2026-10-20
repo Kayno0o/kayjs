@@ -341,6 +341,8 @@ export interface ImagesConfig {
   avif?: false | { quality?: number } | undefined
   // The most pixels per CSS pixel an image loads at on a denser screen, at least 1. Defaults to 2: a 3x phone loads what a 2x one does, which looks the same; `Infinity` leaves the browser's choice.
   maxDensity?: number | undefined
+  // `false` leaves out the color an image's box shows until it loads, which kay reads off each imported, Markdown, `dirs` and `remote` image without transparency; `image(src, { placeholder: false })` and `no-placeholder` on an `img` leave out one image's. Shown as a `style` attribute, so a CSP without `'unsafe-inline'` for styles drops it.
+  placeholder?: false | undefined
   // The aspect ratios `image(src, { aspect })` may cut to, each one adding a variant per width the route makes on request: `['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16']` by default.
   aspects?: string[] | undefined
   // How `shareCard()` draws a page's card.

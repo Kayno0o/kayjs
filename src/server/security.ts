@@ -249,6 +249,27 @@ function takeOwnHeaders(set: Context['set']): Record<string, string> | undefined
   return own
 }
 
+const HASH_OR_NONCE = /^'(?:nonce-|sha(?:256|384|512)-)/i
+
+// Whether the site's policy lets an element carry a `style` attribute: the first of `style-src-attr`, `style-src` and `default-src` it sets must allow `'unsafe-inline'`, which a nonce or a hash in it switches off.
+export function allowsStyleAttributes(csp: Record<string, string[] | false> | false | undefined): boolean {
+  if (csp === false)
+    return true
+
+  const directives: Record<string, string[] | false | undefined> = { ...DIRECTIVES, ...csp }
+
+  for (const name of ['style-src-attr', 'style-src', 'default-src']) {
+    const sources = directives[name]
+
+    if (sources === undefined || sources === false)
+      continue
+
+    return sources.includes(UNSAFE_INLINE) && !sources.some(source => HASH_OR_NONCE.test(source))
+  }
+
+  return true
+}
+
 // kay's directives, plus the sources its islands need, with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.
 // A hash switches `'unsafe-inline'` off, so a style directive allowing it gets none.
 // A page's sources are then added to what the site's directives hold.
