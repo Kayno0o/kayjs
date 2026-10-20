@@ -146,7 +146,7 @@ async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagn
     reported.push(...parseTscOutput(program.output, program.tsconfig, root).filter(diagnostic => diagnostic.file.startsWith(program.dir + sep)))
 
     if (program.code !== 0 && program.output.trim() === '' && program.errors.trim() === '')
-      diagnostics.push({ file: program.tsconfig, line: 1, column: 1, message: `tsgo exited with code ${program.code} and no diagnostics` })
+      diagnostics.push({ file: program.tsconfig, line: 1, column: 1, message: `bun check exited with code ${program.code} and no diagnostics` })
   }
 
   // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
@@ -179,7 +179,7 @@ async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagn
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && printed.length === 0 && errors.trim() === '')
-    diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
+    diagnostics.push({ file: config, line: 1, column: 1, message: `bun check exited with code ${code} and no diagnostics` })
 
   return diagnostics
 }

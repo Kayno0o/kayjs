@@ -104,9 +104,9 @@ kay lint --cache
 - Text the colour of its background counts under `color-contrast`, which axe-core alone leaves for a person to review; text hidden on purpose is clipped (`sr-only`), which the check skips.
 - Production pages never load it.
 - A test checks a page the same way with `page.a11y()` (see [Testing](testing.md#testing)).
-- `kay check` keeps TypeScript's incremental state, and what its last clean type check read, in `.kay/cache/check`, and its compiles of `.kay` files in `.kay/cache`.
+- `kay check` type-checks with Bun's `bun check` (all cores, no build info), in a process that runs it as a `check` script does, so a `check` script of the app's own is not run in its place, and keeps what its last clean type check read in `.kay/cache/check`, and its compiles of `.kay` files in `.kay/cache`.
 - When no file that check read has changed since, packages' own included, and no `.kay` file compiles differently, the type check is skipped: a second `kay check` or `kay build` takes a fraction of the first, and `kay build` little more than `kay build --no-check`.
-- A file written within a second before a check counts as changed, so the next check runs TypeScript again.
+- A file written within a second before a check counts as changed, so the next check runs the type check again.
 
 ### Linting
 

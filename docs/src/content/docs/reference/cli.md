@@ -343,6 +343,8 @@ kay check --watch
 
 The first path is the project when it is a directory holding a `kay.config.ts`, a `package.json` or a `tsconfig.json`. The other paths narrow the report, and `--fix`, to those files and directories. The project is still type-checked as a whole.
 
+The type check is Bun's own (`bun check`), on every core, and runs even when your `package.json` has a `check` script. When nothing the last clean check read has changed, the next one skips it. A file written within a second before a check counts as changed.
+
 | Option | Effect |
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |

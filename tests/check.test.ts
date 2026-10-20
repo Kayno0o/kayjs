@@ -19,32 +19,19 @@ import { limiter } from '../src/server/limit'
 import { NOT_FOUND_FILE } from '../src/server/not-found'
 import { addRuntimeRedirect } from '../src/server/runtime-redirect-api'
 import { alive } from './alive'
-import { kayCheck, keepBuildInfo, warmBuildInfo } from './check-helper'
+import { kayCheck } from './check-helper'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 // Inside the checkout too, but where `bun pm pack` never looks, so a folder a test holds unreadable there does not fail the pack of kay `kay new` runs beside it.
 const UNPACKED = join(import.meta.dir, '../node_modules/.cache')
-// Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
+// Tests on a scratch project of their own run together, but four checks at most at a time, as `bun check` is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
 const turn = limiter(4)
 
 setDefaultTimeout(90_000)
 
-// With no build info lent to the project, for a test that reads the build info as the proof tsgo ran.
-async function checkCold(root: string): ReturnType<typeof checkProject> {
-  return turn(async () => checkProject(root))
-}
-
 async function check(root: string, options?: CheckOptions): ReturnType<typeof checkProject> {
-  return turn(async () => {
-    await warmBuildInfo(root)
-
-    const diagnostics = await checkProject(root, options)
-
-    await keepBuildInfo(root)
-
-    return diagnostics
-  })
+  return turn(async () => checkProject(root, options))
 }
 
 // Runs the kay CLI as a user would, in its turn, answering its exit code, what it did on stdout and the problems it found on stderr.
@@ -237,15 +224,7 @@ const tsconfig = JSON.stringify({
 
 // `kay check` in this process, in its turn, for a test of what a check reports; `cliCheck` spawns the program for the few that are about it.
 async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
-  return turn(async () => {
-    await warmBuildInfo(root)
-
-    const run = await kayCheck([root, ...flags])
-
-    await keepBuildInfo(root)
-
-    return run
-  })
+  return turn(async () => kayCheck([root, ...flags]))
 }
 
 async function cliCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
@@ -293,6 +272,11 @@ async function scratchProject(files: Record<string, string>, unpacked = false): 
   await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
+}
+
+// When the project's last clean check began, which only a check that ran `bun check` rewrites.
+async function lastCleanStart(root: string): Promise<number> {
+  return ((await Bun.file(join(root, '.kay/cache/check/clean.json')).json()) as { value: { started: number } }).value.started
 }
 
 // Moves the start of the project's last clean check a second later by default, as a wait would: kay counts a file written within a second before a check as changed since.
@@ -766,27 +750,80 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('skips tsgo while nothing its last clean run read has changed, and runs it for a file added since', async () => {
+  it('skips bun check while nothing its last clean run read has changed, and runs it for a file added since', async () => {
     const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n', 'src/routes/index.kay': 'p hi\n' })
-    const buildInfo = join(root, '.kay/cache/check/tsbuildinfo')
 
     try {
-      expect(await checkCold(root)).toEqual([])
+      expect(await check(root)).toEqual([])
       // An hour, so a file of kay's sources or node_modules in the checkout, which another test file may touch meanwhile, never counts as changed.
       await startedLater(root, 3_600_000)
-      await rm(buildInfo)
-      expect(await checkCold(root)).toEqual([])
-      expect(await Bun.file(buildInfo).exists()).toBe(false)
+
+      const kept = await lastCleanStart(root)
+
+      expect(await check(root)).toEqual([])
+      expect(await lastCleanStart(root)).toBe(kept)
 
       await Bun.write(join(root, 'src/b.ts'), 'export const b: number = \'b\'\n')
-      expect((await checkCold(root)).map(d => [basename(d.file), d.code])).toEqual([['b.ts', 'TS2322']])
+      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['b.ts', 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('runs tsgo again when a package\'s types are replaced by an older file, as an install linking them from its cache does', async () => {
+  it('runs bun check again when a package.json appears above a file it read, or a lock file does', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n' })
+
+    try {
+      expect(await check(root)).toEqual([])
+      await startedLater(root, 3_600_000)
+
+      const kept = await lastCleanStart(root)
+
+      await Bun.write(join(root, 'src/package.json'), '{ "type": "module" }\n')
+      expect(await check(root)).toEqual([])
+
+      const afterManifest = await lastCleanStart(root)
+
+      expect(afterManifest).not.toBe(kept)
+      await startedLater(root, 3_600_000)
+      await Bun.write(join(root, 'bun.lock'), '{}\n')
+      expect(await check(root)).toEqual([])
+      expect(await lastCleanStart(root)).not.toBe(afterManifest + 3_600_000)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('has bun check type-check a project whose package.json has a check script of its own, as kay\'s own apps do', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'export const a: number = \'a\'\n', 'package.json': JSON.stringify({ scripts: { check: 'echo ran > ran.txt' } }) })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['a.ts', 'TS2322']])
+      expect(await Bun.file(join(root, 'ran.txt')).exists()).toBe(false)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the files bun check lists out of the message of the error before them', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'declare function f(cb: (a: number) => void): void\n\nf((a: string) => {})\n' })
+
+    try {
+      const [problem, ...rest] = await check(root)
+
+      expect(rest).toEqual([])
+      expect(problem!.message).toContain('Types of parameters')
+      expect(problem!.message).not.toMatch(/bundled:|node_modules|\.d\.ts/)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('runs bun check again when a package\'s types are replaced by an older file, as an install linking them from its cache does', async () => {
     const root = await scratchProject({
       'node_modules/dep/package.json': '{ "name": "dep", "types": "index.d.ts" }\n',
       'node_modules/dep/index.d.ts': 'export declare const value: number\n',

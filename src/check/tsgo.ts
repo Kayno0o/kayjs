@@ -1,7 +1,7 @@
-// The tsgo run `kay check` makes, skipped where its last run was clean and nothing it read has changed since, and what it prints read back as diagnostics.
+// The `bun check` run `kay check` makes, skipped where its last run was clean and nothing it read has changed since, and what it prints read back as diagnostics, with the helpers on tsgo that read a config and map its codes.
 import type { CheckDiagnostic } from '.'
 import type { TsgoDiagnostic } from './diagnose'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
@@ -16,12 +16,14 @@ const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 
 // The options that name a place, which do not change what a file's types are.
 const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'typeRoots', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'configFilePath', 'pathsBasePath'])
-// The longest one tsgo run may take, which a hung one would otherwise hold `kay check` for good.
-const TSGO_TIMEOUT = 5 * 60_000
+// The longest one `bun check` run may take, which a hung one would otherwise hold `kay check` for good.
+const CHECK_TIMEOUT = 5 * 60_000
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
 const CLOCK_SLACK = 1000
-// The declarations kay writes at the top of the shadow tree, which every file of the app is typed against.
-const APP_DECLARATIONS = /^kay-.*\.d\.ts$/
+// What `bun check` prints on stderr that is not a failure: the count of errors or the all-clear, the errors per file and line below it, and the notes explaining a stop the errors already show.
+const SUMMARY_LINE = /^(?:Found \d+ errors?\b|✓ No type errors |note: | +\d+ +\S.*:\d+$|$)/
+const INDENTED = /^\s/
+const LOCK_FILES = ['bun.lock', 'bun.lockb']
 
 // What tsgo printed, one diagnostic a line, the lines after one that start no other added to its message.
 export function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {
@@ -141,15 +143,14 @@ function extendedConfig(dir: string, name: string): string | undefined {
   return undefined
 }
 
-// Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
+// Runs `bun check`, or not at all when its last run was clean and nothing it read has changed since: a warm run is then a handful of `stat` calls.
 // `program` names the run among the several of one project, each keeping its own state.
-export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = '', timeout = TSGO_TIMEOUT): Promise<{ output: string, errors: string, code: number }> {
+export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = '', timeout = CHECK_TIMEOUT): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
   const state = join(cache, 'check', program)
-  const buildInfo = join(state, 'tsbuildinfo')
-  const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]
+  const args = ['check', '--no-pretty', '--all', '--noUnusedLocals', '--listFiles', '-p', tsconfig]
   // The resolved config lists the root files, so one added or removed changes it as an edited option does.
-  const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([(await Bun.file(nativeManifest()).json() as { version: string }).version, args, shown]) }
+  const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([Bun.revision, args, shown]) }
   const last = slot && await readCacheEntry<CleanRun>(slot)
 
   const checked = last && await stillClean(last, shadowDir)
@@ -157,64 +158,97 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   if (checked?.clean)
     return { output: '', errors: '', code: 0 }
 
-  await dropStaleBuildInfo(state, buildInfo, shadowDir)
-
+  const obsolete = dropObsoleteState(state)
   const generated = checked?.hashes ?? await contentHashes(shadowDir)
   const started = Date.now()
-  const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  // A project's own `check` script would run in the place of the type checker, which Bun skips for a process started as that script is.
+  const child = Bun.spawn([process.execPath, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, npm_lifecycle_event: 'check' } })
   let stopped = false
   // A timer of kay's own rather than the spawn's `timeout`, which a loaded parallel test run was seen to let pass.
   const timer = setTimeout(() => {
     stopped = true
     child.kill()
   }, timeout)
-  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, obsolete])
 
   clearTimeout(timer)
 
+  const { output, listed } = splitListing(stdout)
+  const errors = withoutSummary(stderr)
+
   if (stopped)
-    return { output, errors: `kay: tsgo did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
+    return { output, errors: `kay: bun check did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
 
-  const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined
-
-  if (slot && read)
-    await writeCacheEntry(slot, { started, ...read, files: read.files.filter(file => !Object.hasOwn(generated, file)), generated } satisfies CleanRun)
+  if (slot && code === 0 && output === '' && errors === '')
+    await writeCacheEntry(slot, { started, ...filesRead(root, listed.filter(file => !Object.hasOwn(generated, file))), generated } satisfies CleanRun)
 
   return { output, errors, code }
 }
 
-// tsgo's incremental mode does not re-check a file whose own text is unchanged when only a global declaration it reads changes, as the routes and redirects in `kay-env.d.ts` do: the build info goes when those declarations differ from the last run's.
-// A build info with no stamp beside it is kept, as one lent to a project is, so the first check after an upgrade from a kay without stamps can still show a stale result.
-async function dropStaleBuildInfo(state: string, buildInfo: string, shadowDir: string): Promise<void> {
-  const stampFile = Bun.file(join(state, 'declarations'))
-  const names = existsSync(shadowDir) ? readdirSync(shadowDir).filter(name => APP_DECLARATIONS.test(name)).sort() : []
-  const stamp = JSON.stringify(await Promise.all(names.map(async name => [name, Bun.hash(await Bun.file(join(shadowDir, name)).bytes()).toString(36)])))
+// Where kay kept tsgo's build info before it ran `bun check`, which has none.
+async function dropObsoleteState(state: string): Promise<void> {
+  await Promise.all(['tsbuildinfo', 'declarations'].map(async name => rm(join(state, name), { force: true })))
+}
 
-  if (await stampFile.exists() && await stampFile.text() !== stamp)
-    await rm(buildInfo, { force: true })
+// `--listFiles` prints the files after the diagnostics, one path to a line at the start of it, where a diagnostic's lines either match the pattern or continue one with an indent.
+function splitListing(stdout: string): { output: string, listed: string[] } {
+  const output: string[] = []
+  const listed: string[] = []
 
-  await Bun.write(stampFile, stamp)
+  for (const line of stdout.split('\n')) {
+    if (line === '' || INDENTED.test(line) || TSC_LINE.test(line) || TSC_GLOBAL_LINE.test(line))
+      output.push(line)
+    else if (!line.startsWith('bundled:'))
+      listed.push(line)
+  }
+
+  return { output: output.join('\n'), listed }
+}
+
+// What `bun check` says on stderr besides a failure to run: the count of errors or the all-clear, and the notes that explain a stop already visible in the errors.
+function withoutSummary(stderr: string): string {
+  return stderr.split('\n').filter(line => !SUMMARY_LINE.test(line)).join('\n').trim()
 }
 
 interface CleanRun {
   started: number
-  // Every file the run read, packages' own included, by its times, and the package.json files it looked for and did not find.
+  // Every file the run read, packages' own included, by its times, and the files that would change what it read were they to appear.
   files: string[]
   missing: string[]
   // What kay wrote to the shadow tree just before the run, by content: it rewrites a file there on every check that changes it, too close to the run for its times to tell.
   generated: Record<string, string>
 }
 
-// What a run read, off its build info: TypeScript's own libraries are named bare there, and change only with tsgo's version.
-async function filesRead(buildInfo: string): Promise<Pick<CleanRun, 'files' | 'missing'> | undefined> {
-  try {
-    const info = await Bun.file(buildInfo).json() as { fileNames: string[], packageJsons?: string[], missingPackageJsons?: string[] }
-    const dir = dirname(buildInfo)
-
-    return { files: [...info.fileNames.filter(name => name.includes('/')), ...info.packageJsons ?? []].map(name => resolve(dir, name)), missing: (info.missingPackageJsons ?? []).map(name => resolve(dir, name)) }
+// `bun check` lists the files it read but not the package.json files that decide how each is read, so the ones in the folders above them are added, with the lock files above the project, which an install changes.
+function filesRead(root: string, listed: string[]): Pick<CleanRun, 'files' | 'missing'> {
+  const files = new Set(listed)
+  const missing = new Set<string>()
+  const watch = (folders: Set<string>, names: string[]) => {
+    for (const folder of folders) {
+      for (const name of names)
+        (existsSync(join(folder, name)) ? files : missing).add(join(folder, name))
+    }
   }
-  catch {
-    return undefined
+  const above = new Set<string>()
+  const project = new Set<string>()
+
+  for (const file of listed)
+    foldersAbove(dirname(file), above)
+
+  foldersAbove(resolve(root), project)
+  watch(above, ['package.json'])
+  watch(project, ['package.json', ...LOCK_FILES])
+
+  return { files: [...files], missing: [...missing] }
+}
+
+// The folder and each one above it, stopping at one already in `folders`, whose own parents are then in it too.
+function foldersAbove(start: string, folders: Set<string>): void {
+  for (let folder = start; !folders.has(folder); folder = dirname(folder)) {
+    folders.add(folder)
+
+    if (dirname(folder) === folder)
+      break
   }
 }
 
