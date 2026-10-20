@@ -410,7 +410,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   it('renders a pending block hidden, with no style of its own and no wrapper taking a place in the layout', async () => {
     const { html } = await site.visit('/pending')
 
-    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click)<\/p><\/slot>/g)).toHaveLength(7)
+    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click|boxed)<\/p><\/slot>/g)).toHaveLength(8)
     expect(html).not.toContain('role="status"')
     expect(html).not.toContain('display:block')
   })
@@ -505,6 +505,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       expect((await shown(page, name))[name]).toBe(false)
     }
 
+    expect(page.errors).toEqual([])
+  })
+
+  it('announces from inside the modal dialog a form sits in, as the rest of the page is inert then', async () => {
+    const page = await site.open('/pending', { path })
+
+    await page.evaluate(() => document.querySelector<HTMLDialogElement>('dialog.box')!.showModal())
+    await page.click('dialog.box button')
+    await page.waitUntil(() => [...document.querySelectorAll('[aria-live=polite]')].some(region => region.textContent === 'Saving boxed' && region.parentElement === document.querySelector('dialog.box')))
     expect(page.errors).toEqual([])
   })
 

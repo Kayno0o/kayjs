@@ -43,3 +43,8 @@ form.late(action={leavesLate})
   pending
     p.saving Saving late
 Calling
+dialog.box
+  form.boxed(action={slow})
+    button Boxed
+    pending
+      p.saving Saving boxed

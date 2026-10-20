@@ -13,7 +13,9 @@ function announce(text: string, within: Element): void {
 
   region.setAttribute('aria-live', 'polite')
   region.style.cssText = OFFSCREEN
-  within.closest('dialog')?.append(region) ?? document.body.append(region)
+  const parent = within.closest('dialog') ?? document.body
+
+  parent.append(region)
   setTimeout(() => {
     region.textContent = text
     setTimeout(() => region.remove(), REMOVE_DELAY)
