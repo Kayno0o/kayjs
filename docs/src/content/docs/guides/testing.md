@@ -264,7 +264,7 @@ The page clicks and types as a user does.
 | Call | Does |
 | --- | --- |
 | `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']` |
-| `hover(selector)` | Scrolls to the element and moves the pointer onto its middle, where it stays |
+| `hover(selector)` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays |
 | `fill(selector, text)` | Replaces a field's text, as typing does |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
 | `text(selector)`, `value(selector)`, `count(selector)` | Read the page at once |

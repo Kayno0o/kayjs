@@ -472,6 +472,18 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     return [x, y]
   }, [selector, options.javaScript !== false, actionable]))
 
+  // Waits once for a loading page, before a click or hover scrolls, as the browser restoring a reload's scroll position until then would move the page away from the place a press is aimed at. A page that never finishes is acted on after the bound.
+  const untilLoaded = async () => {
+    try {
+      await within(inView(script(loaded, [LOAD_WAIT_MS])), LOAD_WAIT_MS + POLL_MS)
+    }
+    catch (error) {
+      // A page replaced while waiting is the next try's to find.
+      if (gone)
+        throw error
+    }
+  }
+
   const network = createNetwork({ view, cdp, origin: () => origin, errors, timeout })
   const page: TestPage = {
     view,
@@ -488,7 +500,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(run, args) })
     }),
     hover: async (selector, wait = {}) => serial(async () => {
-      await poll(script(scrolledTo, [selector, LOAD_WAIT_MS, true]), selector, wait.timeout)
+      await untilLoaded()
+      await poll(script(scrolledTo, [selector, true]), selector, wait.timeout)
 
       const [x, y] = await center(selector) as [number, number]
 
@@ -512,12 +525,14 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
     click: async (selector, { modifiers, ...wait } = {}) => serial(async () => {
+      await untilLoaded()
+
       const budget = wait.timeout ?? timeout
       const until = Date.now() + budget
 
       // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. Scrolled again between short waits, as a page restoring its scroll once loaded moves it away. An island not hydrated yet replays the click once it is.
       for (;;) {
-        await poll(script(scrolledTo, [selector, LOAD_WAIT_MS, false]), selector, Math.max(until - Date.now(), 1))
+        await poll(script(scrolledTo, [selector, false]), selector, Math.max(until - Date.now(), 1))
 
         const tried = Date.now()
 
@@ -934,17 +949,8 @@ async function axeSource(): Promise<string> {
   return axe
 }
 
-// A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
-// A function argument crosses as its source, so it must read nothing from its module.
-// Runs in the page: scrolls the element to the middle once the page loaded, as the browser restoring a reload's scroll position until then would move it away from the place a press is aimed at; whether it is there, and drawn when `drawn`.
-async function scrolledTo(target: string, loadWait: number, drawn: boolean): Promise<boolean> {
-  if (document.readyState !== 'complete') {
-    await new Promise((resolve) => {
-      addEventListener('load', resolve, { once: true })
-      setTimeout(resolve, loadWait)
-    })
-  }
-
+// Runs in the page: scrolls the element to the middle; whether it is there, and drawn when `drawn`.
+function scrolledTo(target: string, drawn: boolean): boolean {
   const element = document.querySelector(target)
 
   element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
@@ -952,6 +958,23 @@ async function scrolledTo(target: string, loadWait: number, drawn: boolean): Pro
   return element !== null && (!drawn || element.getClientRects().length > 0)
 }
 
+// Runs in the page: resolves once it loaded, or after `wait` ms.
+async function loaded(wait: number): Promise<void> {
+  if (document.readyState === 'complete')
+    return
+
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, wait)
+
+    addEventListener('load', () => {
+      clearTimeout(timer)
+      resolve(undefined)
+    }, { once: true })
+  })
+}
+
+// A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
+// A function argument crosses as its source, so it must read nothing from its module.
 function script(run: (...args: never[]) => unknown, args: unknown[]): string {
   return `(${run.toString()})(${args.map((arg) => {
     if (arg === undefined)

@@ -441,7 +441,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('scrolls to what it clicks only once the page loaded, as the browser restores a reload\'s scroll position until then', async () => {
     // The scroll the click makes is lost to the restoring one, so the press lands on whatever the page then shows at the place measured.
-    await page.initScript(() => {
+    const own = await site.open('/plain')
+
+    await own.initScript(() => {
       const scrolls: string[] = (window as unknown as { scrolls: string[] }).scrolls = []
       const scrollIntoView: (this: Element, ...args: Parameters<Element['scrollIntoView']>) => void = Reflect.get(Element.prototype, 'scrollIntoView')
 
@@ -450,26 +452,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
         scrollIntoView.apply(this, args)
       }
     })
-    await page.goto('/plain')
-    await page.route('/late.png', async (request) => {
+    await own.goto('/plain')
+    await own.route('/late.png', async (request) => {
       await Bun.sleep(500)
       await request.fulfill({ status: 200, headers: { 'content-type': 'image/gif' }, body: Uint8Array.fromBase64('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7') })
     })
 
     try {
-      // The page is replaced under the click: the first document has no such button.
-      await page.evaluate(() => {
+      await own.evaluate(() => {
         setTimeout(() => location.assign('/restoring'), 0)
       })
-      await page.click('button.late')
-      await page.waitFor('button.late', { text: 'Pressed 1' })
-      expect([...new Set(await page.evaluate(() => (window as unknown as { scrolls: string[] }).scrolls))]).toEqual(['complete'])
+      // Found in the new document, still loading its image.
+      await own.waitFor('h1', { text: 'Restoring' })
+      await own.click('button.late')
+      await own.waitFor('button.late', { text: 'Pressed 1' })
+      expect([...new Set(await own.evaluate(() => (window as unknown as { scrolls: string[] }).scrolls))]).toEqual(['complete'])
     }
     finally {
-      await page.unroute()
+      await own.unroute()
     }
 
-    expect(page.errors).toEqual([])
+    expect(own.errors).toEqual([])
   })
 
   it('checks a page with axe-core, the whole of it or what a selector matches, again after a navigation', async () => {

@@ -42,7 +42,7 @@ expect(await page.path()).toBe('/account')
 - `site.open(path)` loads a page in a headless Chrome over a server the site starts on a free port, resolving with a page once it loaded and its islands hydrating on load are done.
 - `browse(url, options)` from `kay/test` is the same for a server already running, such as one the test started itself, rather than one `testSite` serves.
 - The page clicks as a user does: `click(selector)` once the page finished loading (for up to a second) scrolls the element to the middle of the view, then waits for it to be visible, still and not covered (a click on an island not hydrated yet is replayed once it is).
-- `click(selector, { modifiers })` holds keys such as `['Alt']` for the click; `hover(selector)` scrolls the element to the middle and moves the pointer onto it, where it stays.
+- `click(selector, { modifiers })` holds keys such as `['Alt']` for the click; `hover(selector)`, once the page finished loading too, scrolls the element to the middle and moves the pointer onto it, where it stays.
 - `fill(selector, text)` replaces a field's text as typing does; `type(text)` and `press(key)` go to the focused element.
 - `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches.
 - `waitFor(selector, { text, gone })` and `waitUntil(fn)` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for.
