@@ -887,7 +887,6 @@ export class JsxTemplate {
     return element.name === 'link' && rel?.kind === 'static' && rel.text.split(WHITESPACE).includes('alternate')
   }
 
-  // Reports a function passed to an island, `0` standing for the prop.
   // The name of an attribute as written, which a bare `{name}` shares with its value, so the rewrites of that value leave it alone.
   private attributeName(attribute: NamedAttribute): CodeBuilder {
     if (attribute.kind === 'expression' && attribute.shorthand)
@@ -896,6 +895,7 @@ export class JsxTemplate {
     return this.b.addSource(attribute.name)
   }
 
+  // Reports a function passed to an island, `0` standing for the prop.
   private emitFunctionPropCheck(element: ElementNode, name: Span) {
     this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }

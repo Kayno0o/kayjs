@@ -859,6 +859,7 @@ export class KayLanguageServer {
       throw new Error('kay: this name runs through too much generated code to rename it safely')
 
     const byFile = new Map<string, Map<string, TextEdit>>()
+    const bare = new Map<string, Map<string, Span>>()
 
     for (const { spot, file, range } of found) {
       // Generated code repeats some of the user's names, each mapped back to where it came from: an edit is kept only where the source holds the text it replaces.
@@ -870,27 +871,37 @@ export class KayLanguageServer {
       if (!edits)
         byFile.set(file.uri, edits = new Map<string, TextEdit>())
 
-      edits.set(rangeKey(range), this.renamed(file, range, params.newName))
+      edits.set(rangeKey(range), this.renamed(file, range, params.newName, bare))
     }
 
     return { changes: Object.fromEntries([...byFile].map(([uri, edits]) => [uri, [...edits.values()]])) }
   }
 
   // The name a bare `{title}` attribute shares with its value is the variable's, so a rename keeps the attribute's own name: `title={heading}`.
-  private renamed(file: Target, range: Range, newName: string): TextEdit {
+  private renamed(file: Target, range: Range, newName: string, bare: Map<string, Map<string, Span>>): TextEdit {
     if (!file.shadow)
       return { range, newText: newName }
 
     const { source } = file.shadow
-    const start = toOffset(source, range.start)
-    const end = toOffset(source, range.end)
+    let shorthands = bare.get(file.uri)
 
-    for (const element of elementsIn(parseKay(source).template)) {
-      for (const attribute of element.attributes) {
-        if (attribute.kind === 'expression' && attribute.shorthand && attribute.name.start === start && attribute.name.end === end)
-          return { range: { start: toPosition(source, attribute.shorthand.start), end: toPosition(source, attribute.shorthand.end) }, newText: `${source.slice(start, end)}={${newName}}` }
+    if (!shorthands) {
+      bare.set(file.uri, shorthands = new Map<string, Span>())
+
+      for (const element of elementsIn(parseKay(source).template)) {
+        for (const attribute of element.attributes) {
+          if (attribute.kind === 'expression' && attribute.shorthand)
+            shorthands.set(`${attribute.name.start}-${attribute.name.end}`, attribute.shorthand)
+        }
       }
     }
+
+    const start = toOffset(source, range.start)
+    const end = toOffset(source, range.end)
+    const shorthand = shorthands.get(`${start}-${end}`)
+
+    if (shorthand)
+      return { range: { start: toPosition(source, shorthand.start), end: toPosition(source, shorthand.end) }, newText: `${source.slice(start, end)}={${newName}}` }
 
     return { range, newText: newName }
   }

@@ -225,7 +225,6 @@ export function compileKay(original: string, filename: string, options: CompileO
   }
 }
 
-// A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
 type Shorthand = Extract<Attribute, { kind: 'expression' }> & { shorthand: Span }
 
 // A fix editing the name a bare `{title}` shares with its value writes the attribute out, `title={title()}`, as the braces would otherwise hold more than a name.
@@ -251,6 +250,7 @@ function spelledOut(diagnostic: Diagnostic, shorthands: Shorthand[], source: str
   return { ...diagnostic, fixes }
 }
 
+// A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
 function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
   return diagnostics.map(diagnostic => diagnostic.code === undefined ? { ...diagnostic, code } : diagnostic)
 }

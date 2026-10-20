@@ -145,6 +145,12 @@ describe('a markdown block in the compiled code', () => {
     expect(new Set(classes)).toEqual(new Set(['own', 'task-list-item', 'task-list-item-checkbox', 'mark', 'more']))
   })
 
+  it('decodes any named entity in raw HTML and leaves an unknown one as written', () => {
+    const { tsx } = compileKay('markdown\n  <p>caf&eacute; &hearts; &copy; &bogus;</p>\n', 'src/p.kay', { output: 'html' })
+
+    expect(tsx).toContain('caf\u00E9 \u2665 \u00A9 &bogus;')
+  })
+
   it('renders on the server as the same strings', () => {
     const page = '---\nconst name = \'x\'\n---\nmarkdown\n  Hi **{name}**\n'
     const lowered = '---\nconst name = \'x\'\n---\np\n  | Hi #[strong {name}]\n'

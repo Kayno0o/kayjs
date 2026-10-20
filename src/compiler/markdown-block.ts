@@ -25,6 +25,7 @@ const CLASS_SPACES = /\s+/
 const CARRIAGE_RETURN = /\r$/
 const INDENT = /^ */
 const ENTITY = /&(#x[\da-f]+|#\d+|[a-z][a-z\d]*);/gi
+const PARAGRAPH = /^<p>(.*)<\/p>\n$/s
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0', copy: '\u00A9', reg: '\u00AE', trade: '\u2122', mdash: '\u2014', ndash: '\u2013', hellip: '\u2026', laquo: '\u00AB', raquo: '\u00BB', rarr: '\u2192', larr: '\u2190', times: '\u00D7' }
 const ATTRIBUTE_NAME = /^[A-Z_@:][\w\-:.@]*$/i
 const OPEN_TAG = /<([a-z][\w:-]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/iy
@@ -474,8 +475,18 @@ function decode(text: string): string {
       return code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : whole
     }
 
-    return ENTITIES[name.toLowerCase()] ?? whole
+    return ENTITIES[name.toLowerCase()] ?? markdownEntity(whole)
   })
+}
+
+// Markdown's parser knows the whole HTML5 table, so a raw-HTML entity outside the short one above is asked of it, and stays as written where there is no parser (the ESLint bundle) or no such entity.
+function markdownEntity(entity: string): string {
+  if (typeof Bun === 'undefined' || !('markdown' in Bun))
+    return entity
+
+  const decoded = PARAGRAPH.exec(Bun.markdown.html(entity))?.[1]
+
+  return decoded === undefined || decoded.startsWith('&amp;') ? entity : decoded
 }
 
 // Whether the node sits in a sentence: text, or an inline element holding only such nodes.
