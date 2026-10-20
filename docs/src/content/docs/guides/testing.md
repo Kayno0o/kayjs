@@ -204,32 +204,25 @@ A component that calls a route of an API module, your own, can be mounted too. T
 
 ## A database for each test file
 
-kay holds no database code. An app that keeps its data with `@kaynooo/pg-orm` gets a database for each test file from its `testDatabase()`. `kay new --template app` writes the setup.
+An app that keeps its data with `@kaynooo/pg-orm` and has a `pg-orm.config.ts` gets a database for each test file with nothing to declare. `kay/test/preload` copies the database your migrations build, points `DATABASE_URL` at the copy and drops it when the file is done. `kay new --template app` is set up this way.
+
+To start every file with some rows, export a function that adds them from `tests/seed.ts`.
 
 ```ts
-// tests/database.ts, listed in bunfig.toml after kay/test/preload
-import process from 'node:process'
-import { testDatabase } from '@kaynooo/pg-orm'
-import { afterAll } from 'bun:test'
+// tests/seed.ts
+import type { Database } from '@kaynooo/pg-orm'
 import { Member } from '../src/db/member'
 
-const database = await testDatabase({
-  url: process.env.DATABASE_URL!,
-  migrationsDir: 'migrations',
-  tables: [Member],
-  seed: async (db) => {
-    await db.repo(Member).write.insertOne({ name: 'Ada' })
-  },
-})
-
-process.env.DATABASE_URL = database.url
-
-afterAll(async () => {
-  await database.drop()
-})
+export default async function seed(db: Database): Promise<void> {
+  await db.repo(Member).write.insertOne({ name: 'Ada' })
+}
 ```
 
-Each file gets a copy of the database the migrations build, with what `seed` adds. It is dropped when the file is done. Run `bun test --isolate` so each file reads its own copy. Without it, every file shares one.
+Each file gets a copy of the database the migrations build, with what `seed` adds. Run `bun test --isolate` so each file reads its own copy. Without it, every file shares one.
+
+Keep `pg-orm.config.ts` to the tables and the config, and read the url from `DATABASE_URL`, so no module that connects loads before the copy is made.
+
+Sessions kept with `sqliteStore` stay in memory under `bun test`, so no test leaves a file or shares a session with another file, and the app writes no `NODE_ENV` check for it.
 
 The database in `.env.test` need not exist. A SQLite file is made on first use, and a Postgres user only needs `CREATEDB`.
 

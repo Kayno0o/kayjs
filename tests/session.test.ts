@@ -13,6 +13,7 @@ import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { sealWith } from '../src/server/seal'
+import { sqliteStoreAt } from '../src/server/session'
 import { scratchDir } from './scratch'
 
 const SECRET = 'a test secret that is long enough to seal'
@@ -507,7 +508,7 @@ describe('sessions', () => {
   it('erases no expired session and skips a row that does not parse, logged, in sqlite and in memory alike', async () => {
     const dir = await scratchDir('sessions-')
     const file = join(dir, 'sessions.sqlite')
-    const store = sqliteStore(file)
+    const store = sqliteStoreAt(file)
     const db = new Database(file)
 
     await store.set('a', { userId: 1 }, 60)
@@ -539,9 +540,9 @@ describe('sessions', () => {
     try {
       const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
 
-      const store = sqliteStore(file)
+      const store = sqliteStoreAt(file)
 
-      expect(store).toBe(sqliteStore(join(file, '..', 'sessions.sqlite')))
+      expect(store).toBe(sqliteStoreAt(join(file, '..', 'sessions.sqlite')))
       expect(sweeps).toHaveLength(0)
       await store.get('first')
       await store.get('second')
@@ -564,7 +565,7 @@ describe('sessions', () => {
 
     old.run('CREATE TABLE kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
     old.close()
-    await sqliteStore(file).get('any')
+    await sqliteStoreAt(file).get('any')
 
     const db = new Database(file)
 
@@ -574,12 +575,12 @@ describe('sessions', () => {
 
   it('opens a sqlite file afresh once deleted and recreated at the same path, when the config is read again', async () => {
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
-    const store = sqliteStore(file)
+    const store = sqliteStoreAt(file)
 
     await store.set('a', { userId: 1 }, 60)
     await deleteSqlite(file)
 
-    expect(sqliteStore(file)).toBe(store)
+    expect(sqliteStoreAt(file)).toBe(store)
     expect(await store.get('a')).toBeUndefined()
     await store.set('b', { userId: 2 }, 60)
     expect(readSessionIds(file)).toEqual(['b'])
@@ -588,7 +589,7 @@ describe('sessions', () => {
   it('opens a sqlite file afresh under a running server once deleted or replaced, looking at most every few seconds', async () => {
     const dir = await scratchDir('sessions-')
     const file = join(dir, 'sessions.sqlite')
-    const store = sqliteStore(file)
+    const store = sqliteStoreAt(file)
 
     try {
       setSystemTime(new Date())
@@ -753,3 +754,18 @@ function readSessionIds(file: string): string[] {
     db.close()
   }
 }
+
+describe('sqliteStore under bun test', () => {
+  it('keeps sessions in memory and creates no file, whatever path it is given', async () => {
+    const dir = await scratchDir('sessions-')
+    const file = join(dir, 'data', 'sessions.sqlite')
+    const store = sqliteStore(file)
+
+    await store.set('a', { userId: 1 }, 60)
+
+    expect(await store.get('a')).toEqual({ userId: 1 })
+    expect(await Bun.file(file).exists()).toBe(false)
+    expect(sqliteStore(file)).not.toBe(store)
+    expect(await sqliteStore(file).get('a')).toBeUndefined()
+  })
+})

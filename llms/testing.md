@@ -285,8 +285,8 @@ expect(jar.cookies.has('session')).toBe(true)
 
 ### Databases and setup
 
-- kay holds no database code: an app keeps its data with `@kaynooo/pg-orm`, as `kay new --template app` does, and its tests get a database each from pg-orm's `testDatabase()`.
-- A preload listed after `kay/test/preload` copies, for each test file, a database migrated from `migrations/` and seeded once, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`.
+- An app keeping its data with `@kaynooo/pg-orm`, as `kay new --template app` does, gets a database for each test file from `kay/test/preload` with no declaration: when the project has a `pg-orm.config.ts` and `DATABASE_URL` is set (`.env.test`), it copies a database migrated from the config's `migrationsDir` (`migrations` by default) with the config's tables, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`. Keep `pg-orm.config.ts` to the tables and the config, and read the url from `process.env.DATABASE_URL`, not from a module of the app's that connects.
+- What every file starts with on top of the migrations is the default export of `tests/seed.ts`, `export default async function seed(db: Database) { await db.repo(Member).write.insertOne({ name: 'Ada' }) }`, run once on the database the copies are made from; without the file the copies start empty. An app that wrote its own `tests/database.ts` with pg-orm's `testDatabase()` deletes it and its `bunfig.toml` line, moving its seed to `tests/seed.ts`.
 - `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy.
 - The test database in `.env.test` need not exist, a SQLite file is made on first use, and a Postgres server's user only needs `CREATEDB`.
 - Without `browser`, pages render their islands' markup without scripts.

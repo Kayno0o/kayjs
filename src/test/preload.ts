@@ -1,3 +1,4 @@
+import { copyTestDatabase } from './database'
 import { isolateEnv } from './env'
 import { testRoot } from './root'
 import './natives'
@@ -16,3 +17,5 @@ isolateEnv()
 const { registerLoader } = await import('../server/loader')
 
 await registerLoader(testRoot())
+
+await copyTestDatabase(testRoot())

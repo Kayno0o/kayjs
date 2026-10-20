@@ -5,5 +5,5 @@ import { Notice } from './notice'
 
 export const tables = [...authTables, Notice]
 
-// Connects on the first query; in a test, to the copy `tests/database.ts` made for the file.
+// Connects on the first query; in a test, to the copy `kay/test/preload` made for the file.
 export const db = new Database({ url: env.DATABASE_URL, tables })

@@ -1,0 +1,29 @@
+import type { Database, PgOrmConfig } from '@kaynooo/pg-orm'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import process from 'node:process'
+import { afterAll } from 'bun:test'
+
+type Seed = (db: Database) => Promise<void> | void
+
+// An app with a `pg-orm.config.ts` and a `DATABASE_URL` gets a database of its own for each test file: a copy of the one its migrations build, seeded by the default export of `tests/seed.ts` when there is one, with `DATABASE_URL` pointing at the copy and the copy dropped once the file is done.
+// Run before the app's modules, which read `DATABASE_URL` as they load, and importing only the config and the seed, which name the tables.
+export async function copyTestDatabase(root: string): Promise<void> {
+  const url = process.env.DATABASE_URL
+  const configFile = resolve(root, 'pg-orm.config.ts')
+
+  if (url === undefined || url === '' || !existsSync(configFile))
+    return
+
+  const { testDatabase } = await import('@kaynooo/pg-orm')
+  const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: PgOrmConfig }).default
+  const seedFile = resolve(root, 'tests', 'seed.ts')
+  const seed = existsSync(seedFile) ? (await import(seedFile) as { default: Seed }).default : undefined
+  const database = await testDatabase({ url, migrationsDir: resolve(root, migrationsDir), tables: [...db.getTablesRegistry().values()], ...seed && { seed } })
+
+  process.env.DATABASE_URL = database.url
+
+  afterAll(async () => {
+    await database.drop()
+  })
+}

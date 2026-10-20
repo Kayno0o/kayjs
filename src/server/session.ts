@@ -404,9 +404,14 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
   }
 }
 
-// Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
-// One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted or replaced at the same path is opened afresh, by a running server too.
+// Sessions in a SQLite file, surviving restarts and shared by the processes on one machine; under `bun test` they stay in memory, so a test leaves no file and shares no session with another test file.
 export function sqliteStore(path: string): SqliteSessionStore {
+  return sqliteStoreAt(process.env.NODE_ENV === 'test' ? ':memory:' : path)
+}
+
+// One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted or replaced at the same path is opened afresh, by a running server too.
+// Kay's own tests of the file call this, as `sqliteStore` would keep it in memory.
+export function sqliteStoreAt(path: string): SqliteSessionStore {
   if (path === ':memory:' || path === '') {
     const { store, close } = openSqliteStore(path)
 

@@ -646,7 +646,7 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'tests/database.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'tests/seed.ts']))
       expect(files.filter(file => file === 'compose.dev.yaml' || file.startsWith('db/'))).toEqual([])
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=sqlite:\/\/data\/app\.db\n$/)
@@ -701,7 +701,7 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/seed.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       expect((await Bun.file(join(dir, 'package.json')).json() as { scripts: { dev: string } }).scripts.dev).toBe('kay dev')
@@ -824,7 +824,7 @@ describe('kay new', () => {
           const dockerfile = contents.Dockerfile
           const compose = contents['compose.prod.yaml']
 
-          expect({ features, store: contents['src/session.ts']!.includes('store: sqliteStore(process.env.NODE_ENV === \'test\' ? \':memory:\' : \'data/sessions.sqlite\')'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: true, ignored: true })
+          expect({ features, store: contents['src/session.ts']!.includes('store: sqliteStore(\'data/sessions.sqlite\')'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: true, ignored: true })
 
           // The sessions file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {

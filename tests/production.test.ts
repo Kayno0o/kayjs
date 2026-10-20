@@ -23,7 +23,7 @@ import { invalidatePage, sqliteCache } from '../src/runtime/cache.server'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { solveWork } from '../src/runtime/work'
-import { inlineScriptHashes, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
+import { inlineScriptHashes, requestId, shutdown, sqliteJobs } from '../src/server'
 import { servePages } from '../src/server/app'
 import { readClient, readManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
@@ -32,6 +32,7 @@ import { answeringRequest, useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates, trustProxy } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
+import { sqliteStoreAt } from '../src/server/session'
 import { signStamp } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
@@ -1349,7 +1350,7 @@ describe('SQLite stores', () => {
     try {
       // The rates and session stores open their file on first use, so a config naming them creates nothing until then.
       await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', 60_000)
-      await sqliteStore(join(dir, 'sessions/sessions.sqlite')).get('a')
+      await sqliteStoreAt(join(dir, 'sessions/sessions.sqlite')).get('a')
       sqliteCache(join(dir, 'cache/cache.sqlite')).set('a', '["a"]', 0)
       // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.
       await sqliteJobs(join(dir, 'jobs/jobs.sqlite')).lock('report', 0)

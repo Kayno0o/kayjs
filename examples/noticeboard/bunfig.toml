@@ -1,5 +1,2 @@
 [test]
-preload = [
-  "kay/test/preload",
-  "./tests/database.ts",
-]
+preload = [ "kay/test/preload" ]

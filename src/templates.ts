@@ -757,7 +757,7 @@ import { Member } from './member'
 
 export const tables = [Member]
 
-// Connects on the first query; in a test, to the copy \`tests/database.ts\` made for the file.
+// Connects on the first query; in a test, to the copy \`kay/test/preload\` made for the file.
 export const db = new Database({ url: env.DATABASE_URL, tables })
 `,
     'pg-orm.config.ts': `import process from 'node:process'
@@ -821,12 +821,11 @@ volumes:
   db:
 `,
     },
-    'src/session.ts': `import process from 'node:process'
-import { session, sqliteStore } from 'kay/server'
+    'src/session.ts': `import { session, sqliteStore } from 'kay/server'
 import { env } from './env'
 
 // The data stays on the server, so signing out ends a session for good, and tests keep theirs in memory; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
-export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore(process.env.NODE_ENV === 'test' ? ':memory:' : 'data/sessions.sqlite') })
+export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('data/sessions.sqlite') })
 `,
     'src/server.ts': `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
@@ -902,33 +901,20 @@ function authTestFiles({ has }: Setup): Record<string, string> {
   return {
     // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
     '.env.test': `SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
-    'tests/database.ts': `import process from 'node:process'
-import { testDatabase } from '@kaynooo/pg-orm'
-import { afterAll } from 'bun:test'
+    // Read by `kay/test/preload`, which copies the migrated database for each test file and runs this on it once.
+    'tests/seed.ts': `import type { Database } from '@kaynooo/pg-orm'
 import { Member } from '../src/db/member'
 
-// Before each test file, run with \`bun test --isolate\`: a copy of the database the migrations build, with what the seed adds, dropped once the file is done.
-const database = await testDatabase({
-  url: process.env.DATABASE_URL!,
-  migrationsDir: 'migrations',
-  tables: [Member],
-  seed: async (db) => {
-    await db.repo(Member).write.insertOne({ name: 'Ada', joined_at: new Date('2024-01-01T12:00:00Z') })
-  },
-})
-
-// Read by src/env.ts, which the test file imports after this.
-process.env.DATABASE_URL = database.url
-
-afterAll(async () => {
-  await database.drop()
-})
+// What every test file starts with, on top of the migrations: \`kay/test/preload\` seeds one database with it and copies that for each file.
+export default async function seed(db: Database): Promise<void> {
+  await db.repo(Member).write.insertOne({ name: 'Ada', joined_at: new Date('2024-01-01T12:00:00Z') })
+}
 `,
     'tests/members.test.ts': `import { expect, it } from 'bun:test'
 import { db } from '../src/db'
 import { Member } from '../src/db/member'
 
-// Whatever another test file signed in, this one starts from the seed alone: tests/database.ts copies a database per file.
+// Whatever another test file signed in, this one starts from the seed alone: kay/test/preload copies a database per file.
 it('starts from the seed, with no member another test file added', async () => {
   await db.repo(Member).write.insertOne({ name: 'Linus' })
 
@@ -1045,8 +1031,8 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
     // Type-aware, .kay fences included, over the types `kay lint`, `kay check` and `kay dev` write.
     ...has('eslint') && { 'eslint.config.ts': 'import { defineConfig } from \'@kaynooo/eslint\'\n\nexport default defineConfig({ strict: true, kay: true })\n' },
     ...has('tests') && {
-      // `kay/test/preload` lets test files import pages and their actions; an app's `tests/database.ts` gives each test file a database of its own.
-      'bunfig.toml': has('auth') ? '[test]\npreload = [\n  "kay/test/preload",\n  "./tests/database.ts",\n]\n' : '[test]\npreload = [ "kay/test/preload" ]\n',
+      // `kay/test/preload` lets test files import pages and their actions, and gives each one a database of its own when the app has a pg-orm.config.ts.
+      'bunfig.toml': '[test]\npreload = [ "kay/test/preload" ]\n',
       'tests/home.test.ts': homeTest(setup),
     },
     ...has('ci') && { [`.${host}/workflows/${server ? 'test' : 'pages'}.yml`]: server ? testWorkflow(setup) : pagesWorkflow(setup) },

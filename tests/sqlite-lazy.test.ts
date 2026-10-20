@@ -2,8 +2,9 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { sqliteRates, sqliteRooms, sqliteStore } from '../src/server'
+import { sqliteRates, sqliteRooms } from '../src/server'
 import { disposeOwned } from '../src/server/reload'
+import { sqliteStoreAt } from '../src/server/session'
 import { scratchDir } from './scratch'
 
 afterEach(() => {
@@ -23,7 +24,7 @@ describe('a sqlite store given in a config', () => {
     const sessions = join(dir, 'data', 'sessions.sqlite')
     const ratesStore = sqliteRates(rates)
     const roomsStore = sqliteRooms(rooms)
-    const sessionStore = sqliteStore(sessions)
+    const sessionStore = sqliteStoreAt(sessions)
 
     expect(existsSync(join(dir, 'data'))).toBe(false)
 
