@@ -27,16 +27,18 @@ export function delayUntil(at: number, now: number): number {
 export interface Publishing {
   // Whether a date passed since the page was rendered, so it shows entries held back then.
   passed: (page: ServedPage) => boolean
+  // Settles once a read of the dates ended, the one that catches up what passed while no server ran; a start that did not wait for it, or a loader failing at boot, has pages to mark by then.
+  caughtUp: Promise<void>
   stop: () => void
   // Watches again after a `stop`, for an app that listens again.
   start: () => void
 }
 
 // What a server watching nothing holds, such as a static export or `kay dev`, which show every entry or are written once.
-export const NOT_PUBLISHING: Publishing = { passed: () => false, stop: () => undefined, start: () => undefined }
+export const NOT_PUBLISHING: Publishing = { passed: () => false, caughtUp: Promise.resolve(), stop: () => undefined, start: () => undefined }
 
 // Refreshes the pages that read a collection with a `publishAt` when one of its dates passes, in this process alone: every replica has its clock and its pages, so none needs a lock, a store or a message from another.
-// A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept, once a read of the dates ends, which the server's start waits for a second at most; a failed one is tried again.
+// A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept, once a read of the dates ends, which the server's start waits for a second at most before `caughtUp` settles; a failed one is tried again.
 export async function watchPublishing(collections: Collection<unknown>[]): Promise<Publishing> {
   const watched = collections.filter(collection => collection.options.publishAt !== undefined)
 
@@ -53,6 +55,7 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
   let owed = false
   // Whether a read of the dates ended yet, the first of which catches up what passed while no server ran.
   let caughtUp = false
+  const firstRead = Promise.withResolvers<void>()
 
   const report = (error: unknown) => kayLog('error', 'the publication dates of a collection could not be read', error)
   const read = async (): Promise<Map<Collection<unknown>, number[]>> => {
@@ -94,6 +97,7 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
 
     if (!caughtUp) {
       caughtUp = true
+      firstRead.resolve()
 
       for (const [collection, dates] of times) {
         const passed = dates.findLast(at => at <= Date.now())
@@ -149,6 +153,7 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
   clearTimeout(giveUp)
 
   return {
+    caughtUp: firstRead.promise,
     passed: page => (page.reads ?? []).some(read => read === ALL_READS ? Math.max(...latest.values(), 0) > page.renderedAt : (latest.get(read) ?? 0) > page.renderedAt),
     stop: () => {
       stopped = true

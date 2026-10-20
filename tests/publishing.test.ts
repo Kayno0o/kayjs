@@ -78,8 +78,17 @@ describe('watchPublishing at boot', () => {
     expect(logged.filter(entry => entry.level === 'error')).toHaveLength(1)
     expect(publishing.passed(page(NOW - 2 * HOUR, contentKey('talks')))).toBe(false)
 
+    let settled = false
+
+    void (async () => {
+      await publishing.caughtUp
+      settled = true
+    })()
+    await settle()
+    expect(settled).toBe(false)
     failing = false
     await advance(RETRY)
+    expect(settled).toBe(true)
     expect(publishing.passed(page(NOW - 2 * HOUR, contentKey('talks')))).toBe(true)
     expect(publishing.passed(page(NOW, contentKey('talks')))).toBe(false)
     expect(logged.filter(entry => entry.level === 'error')).toHaveLength(1)

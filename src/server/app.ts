@@ -74,7 +74,7 @@ import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
 import { setSiteFacts } from './site-facts'
 import { serveSitemap } from './sitemap'
-import { trackPrerendered } from './stale-pages'
+import { markPageStale, trackPrerendered } from './stale-pages'
 import { serveFiles } from './storage'
 import { answerUncaught } from './uncaught'
 import { serveViolationReports } from './violations'
@@ -203,6 +203,18 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
     kayLog('warn', `kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
   const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true || publishing.passed(page)))
+
+  // A catch-up that came after the start, a slow loader's or a retry's, finds the pages the check above did not.
+  void (async () => {
+    await publishing.caughtUp
+
+    for (const pages of prerendered.values()) {
+      for (const page of pages.values()) {
+        if (publishing.passed(page))
+          markPageStale(page)
+      }
+    }
+  })()
 
   app.onStart(() => {
     publishing.start()

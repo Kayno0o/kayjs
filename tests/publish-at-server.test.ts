@@ -62,6 +62,7 @@ afterEach(() => {
   schedule.items = []
   schedule.loads = 0
   schedule.afterRead = undefined
+  schedule.delay = undefined
   talks.invalidate()
   invalidate(() => true)
 })
@@ -133,6 +134,23 @@ describe('a prerendered site with a scheduled entry', () => {
       const app = await serve(scratch)
 
       expect((await visit(app, '/talks')).text).toContain('Edge')
+    })
+  })
+
+  it('renders a page again once a first read slower than the start ends, though the server answered before', async () => {
+    await build(async (scratch) => {
+      setSystemTime(NOW)
+      schedule.items = [{ slug: 'late', title: 'Late', at: '2026-10-19T13:00:00Z' }]
+      await scratch.prerender(OPTIONS)
+      setSystemTime(new Date('2026-10-19T14:00:00Z'))
+      schedule.delay = 1300
+      talks.invalidate()
+
+      const app = await serve(scratch)
+
+      schedule.delay = undefined
+      expect((await visit(app, '/talks')).text).not.toContain('Late')
+      expect(await until(app, '/talks', 'Late')).toContain('Late')
     })
   })
 

@@ -137,8 +137,12 @@ test('the scheduled badge of an entry screen names the time in the editor\'s zon
   mounted = await mountComponent('src/components/scheduled-entry.kay', { collection: TALKS, entry: talk(at.toISOString()) })
   await settle()
   expect(badge()).toMatch(new RegExp(`^Scheduled for ${inputValue(at.toISOString(), 'Europe/Paris').replace('T', ' ')} GMT\\+[12]$`))
-  await Bun.sleep(1400)
-  await settle()
+
+  for (let wait = 0; badge() !== undefined && wait < 60; wait++) {
+    await Bun.sleep(50)
+    await settle()
+  }
+
   expect(badge()).toBeUndefined()
 })
 

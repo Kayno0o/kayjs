@@ -6,7 +6,6 @@ const MINUTE = 16
 const DAY = 86_400_000
 const UTC = 'UTC'
 
-const editorZone = signal<string>()
 const formats = new Map<string, Intl.DateTimeFormat | undefined>()
 const labels = new Map<string, Intl.DateTimeFormat | undefined>()
 
@@ -58,11 +57,13 @@ export function browserZone(): string | undefined {
   }
 }
 
-// The zone the editor's browser runs in, undefined until the component calling it is mounted, as the server renders in UTC and the browser takes over from there; called in a component's script.
+// The zone the editor's browser runs in, undefined until the component calling it is mounted, as the server renders in UTC and the browser takes over from there; a signal of each call's own, so a component hydrating later in the same page starts on the UTC it was rendered in. Called in a component's script.
 export function useEditorZone(): () => string | undefined {
-  onMount(() => editorZone.set(browserZone()))
+  const zone = signal<string>()
 
-  return editorZone
+  onMount(() => zone.set(browserZone()))
+
+  return zone
 }
 
 // What a `datetime-local` input shows for a stored date: its minute on the wall clock of `zone`, UTC by default.
