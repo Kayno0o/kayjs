@@ -88,6 +88,33 @@ p Hello {user.name}, you have {messages.length} messages
 p Read #[a(href="/terms") the terms] first
 ```
 
+## Prose as Markdown
+
+A page with a lot of prose, such as an about page or legal text, is easier to write as Markdown than as one text line per paragraph. Put the lines under a `markdown` line:
+
+```kay
+---
+import Callout from '../components/callout.kay'
+
+const { name } = props<{ name: string }>()
+---
+article
+  markdown
+    # Hello {name}
+
+    Read the [terms](/terms) or **ask**.
+
+    <Callout type="warn">
+    Mind the gap.
+    </Callout>
+```
+
+kay turns the Markdown into the same elements you would have written, while it builds. Nothing parses Markdown in the browser or when a request comes in, and the block works the same in a page, a layout and an island.
+
+`{expr}` works as everywhere else. Its value is text, so Markdown or HTML characters in it are shown, not interpreted. Write `\{` for a literal brace.
+
+A link is a template link: `kay check` tests it, and it gets the `base` and the locale of the page. A component is written like in a collection's Markdown, with JSON props, and imported in the script. A problem is reported on the `markdown` line, except a problem inside a `{expr}`, which is reported where you wrote it. `kay fmt` leaves the lines as they are.
+
 ## Conditions and lists
 
 ```kay

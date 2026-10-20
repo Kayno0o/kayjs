@@ -32,6 +32,8 @@ export interface GenerateOptions {
   moduleId: string
   // Development: every element carries its source position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
+  // The file as written when the template was expanded from it, so the positions the inspector shows are the file's.
+  inspectSource?: { text: string, real: (offset: number) => number } | undefined
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
   check?: boolean | undefined
   // Type-checking a static component only islands render: the props it passes its children are not serialized, so they are not asserted.
@@ -370,7 +372,7 @@ class ModuleShell {
   private template(nodes: Node[], errors: ErrorMessages | undefined): void {
     const { b, src, mode } = this
     const visible = nodes.filter(node => node.kind !== 'slot')
-    const located = this.options.inspect === true ? sourceLocator(src, this.options.moduleId) : undefined
+    const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
       new HtmlTemplate(b, src, this.facts, { hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)

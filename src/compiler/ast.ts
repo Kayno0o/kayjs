@@ -59,6 +59,8 @@ export interface ElementNode extends Span {
   parens?: Span
   // `slot actions` or `slot row(item, i)`: the block prop it renders, and inside the brackets what it calls the block with.
   outlet?: { name: Span, args?: Span | undefined } | undefined
+  // A `markdown` block: its lines, from the end of the `markdown` line to the end of the last one, which only `expandMarkdown` reads; it has no children.
+  markdown?: Span | undefined
   children: Node[]
   // Attributes the compiler writes itself, as HTML starting with a space: the elements a `pending` block stands for.
   fixed?: string | undefined

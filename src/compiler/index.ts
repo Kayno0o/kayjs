@@ -12,8 +12,8 @@ import { generate, isInteractive, islandCause, islandMessages, promotionCause, t
 import { cssImportsWithoutText, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
+import { parseExpanded } from './markdown-block'
 import { SELF } from './names'
-import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer } from './script'
 import { ISLAND_TWIN } from './twin'
@@ -94,8 +94,9 @@ function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefine
 }
 
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
-export function rendersAsIsland(source: string, imported?: ImportedSignals): boolean {
-  const file = parseKay(source)
+export function rendersAsIsland(original: string, imported?: ImportedSignals): boolean {
+  const { file } = parseExpanded(original)
+  const source = file.source
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
@@ -103,8 +104,9 @@ export function rendersAsIsland(source: string, imported?: ImportedSignals): boo
 }
 
 // Whether a component is an island, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island; a page, a layout and a special page are neither.
-export function browserRole(source: string, filename: string, imported?: ImportedSignals): 'island' | 'promotable' | undefined {
-  const file = parseKay(source)
+export function browserRole(original: string, filename: string, imported?: ImportedSignals): 'island' | 'promotable' | undefined {
+  const { file } = parseExpanded(original)
+  const source = file.source
 
   if (file.server !== undefined || ROUTE_FILES.has(basename(filename)))
     return undefined
@@ -119,8 +121,9 @@ export function browserRole(source: string, filename: string, imported?: Importe
 }
 
 // The server-only imports in the script of a component the build promotes to an island, which only the project knows: compiling it alone cannot tell whether it is.
-export function promotedChecks(source: string): Diagnostic[] {
-  const file = parseKay(source)
+export function promotedChecks(original: string): Diagnostic[] {
+  const { file } = parseExpanded(original)
+  const source = file.source
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
@@ -128,8 +131,9 @@ export function promotedChecks(source: string): Diagnostic[] {
 }
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
-export function compileKay(source: string, filename: string, options: CompileOptions = {}): CompileResult {
-  const file = parseKay(source)
+export function compileKay(original: string, filename: string, options: CompileOptions = {}): CompileResult {
+  const { file, expansion, problems } = parseExpanded(original)
+  const source = file.source
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
@@ -145,7 +149,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
   const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
-  const generateOptions = { island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
@@ -197,7 +201,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
-  const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source)).sort((a, b) => a.start - b.start)
+  const classes = [...templateFacts(file).classes, ...expansion?.classes(file) ?? []]
+  const spelled = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source))
+  const reported = (expansion ? [...spelled.map(diagnostic => expansion.diagnostic(diagnostic)), ...coded(problems, 'template-syntax')] : spelled).sort((a, b) => a.start - b.start)
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island !== undefined) {
@@ -205,16 +211,16 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), island, why, classes, diagnostics: reported }
   }
 
   return {
     tsx: final.builder.code,
-    map: final.builder.map(),
+    map: expansion ? final.builder.map().expanded(expansion) : final.builder.map(),
     island,
     promote,
     why,
-    classes: templateFacts(file).classes,
+    classes,
     diagnostics: reported,
   }
 }

@@ -30,6 +30,7 @@ const COMMENT_HEAD = /\/\//y
 // `| text`, or a line made of an expression, which is text as `| {expr}` is.
 const TEXT_HEAD = /\| ?|(?=\{)/y
 const SLOT_HEAD = /(?=@)/y
+const MARKDOWN_HEAD = /markdown[ \t]*(?=\r?\n|$)/y
 // `- code`, which pug runs.
 const PUG_CODE = /-(?= |\r?\n|$)/y
 // What a condition naming its value holds, which may as well be a cast.
@@ -269,6 +270,7 @@ class TemplateParser {
     [keyword('await'), 'a', (parser, indent, siblings) => siblings.push(parser.parseAwait(indent))],
     [keyword('try'), 't', (parser, indent, siblings) => siblings.push(parser.parseTry(indent))],
     [keyword('pending'), 'p', (parser, indent, siblings) => siblings.push(parser.parsePending(indent))],
+    [MARKDOWN_HEAD, 'm', (parser, indent, siblings, head) => siblings.push(parser.parseMarkdown(indent, head[0].length))],
     [keyword('match'), 'm', (parser, indent, siblings) => siblings.push(parser.parseMatch(indent))],
     [keyword('when'), 'w', (parser, indent) => parser.skipLine(indent, { length: 4, message: '`when` sits in a `match` block', help: '`match status`, then one `when \'draft\'` line per case below it' })],
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
@@ -324,6 +326,20 @@ class TemplateParser {
 
     this.pos = end
     this.skipChildren(indent)
+  }
+
+  // The raw lines under `markdown`, which the compiler lowers to template lines before the template is read again.
+  private parseMarkdown(indent: number, length: number): ElementNode {
+    const start = this.pos
+    const lineEnd = this.scan.lineEnd(start)
+
+    this.pos = start + length
+    this.skipChildren(indent)
+
+    const end = this.lastContentEnd()
+    const markdown = { start: lineEnd, end: Math.max(end, lineEnd) }
+
+    return { kind: 'element', start, end: markdown.end, tag: { start, end: start + 8 }, name: 'markdown', component: false, classes: [], attributes: [], markdown, children: [] }
   }
 
   private parseOutlet(indent: number, match: RegExpExecArray): ElementNode {

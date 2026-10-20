@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `Static` and `InputOf` from `kay` type a value read off a schema or an action's input, so an island and a module read the schema the server validates with instead of writing its shape again ([Schemas](schemas.md)).
 - `elementSize()` from `kay` gives an island an element's width and height as reactive values, the `ResizeObserver` and its cleanup handled by kay ([Islands](islands.md#element-size)).
 - kay declares `sideEffects` in its package.json, so an app's bundles drop the runtime modules nothing reaches: the eager JS of the static fixture is 53 B lighter and the i18n fixture 133 B, with nothing to change in an app ([Build and start](build-and-start.md)).
+- A `markdown` line with indented lines renders them as Markdown at build time, `{expr}` holes and components included ([Templates](templates.md)).
 - A bare `{title}` in an attribute list is `title={title}`, on elements and components ([Templates](templates.md)).
 - kay's analytics notice and information line take the site's look: kayjs-ui's tokens when present, else the page's colors, and `--kay-notice-*` properties restyle them ([Privacy](privacy.md)).
 - A shorthand class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` reads `gap-1.5` and `p-0.5` where it split each in two, and `kay migrate astro` and `kay fmt` write such classes as shorthand ([Templates](templates.md)).

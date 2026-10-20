@@ -1,4 +1,5 @@
 import type { Span } from './ast'
+import type { Expansion } from './markdown-block'
 
 // A run of generated code copied character for character from the source.
 export interface Mapping {
@@ -183,6 +184,25 @@ export class SourceMap {
     const exact = findContaining(this.byGenerated, start, mapping => mapping.generated)
 
     return exact && end <= exact.generated + exact.length ? { start: exact.source + start - exact.generated, end: exact.source + end - exact.generated } : undefined
+  }
+
+  // The map of code generated from the expanded source of a file with `markdown` blocks, as if it were generated from the file: what the lowering made up stands for the block's keyword.
+  expanded(expansion: Expansion): SourceMap {
+    const mappings: Mapping[] = []
+    const ranges = this.ranges.map(range => ({ ...range, source: expansion.realSpan(range.source) }))
+
+    for (const mapping of this.byGenerated) {
+      for (const piece of expansion.split({ start: mapping.source, end: mapping.source + mapping.length })) {
+        const generated = mapping.generated + piece.start - mapping.source
+
+        if (piece.real === undefined)
+          ranges.push({ generated: { start: generated, end: generated + piece.end - piece.start }, source: expansion.keyword(piece.block!) })
+        else
+          mappings.push({ generated, source: piece.real, length: piece.end - piece.start })
+      }
+    }
+
+    return new SourceMap(mappings, ranges)
   }
 
   toGenerated(source: number): number | undefined {

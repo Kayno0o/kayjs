@@ -155,6 +155,33 @@ const { comment } = props<{ comment: string }>()
 div(innerHTML={sanitizeHtml(comment)})
 ```
 
+### Write prose as Markdown
+
+A `markdown` line with indented lines under it renders them as Markdown, at build time, so no Markdown parser reaches the browser or runs per request. `{expr}` holes keep their meaning and stay text, whatever Markdown or HTML characters they hold, and a link is checked and given its `base` and locale as a template link is:
+
+```kay
+---
+import Callout from '../components/callout.kay'
+
+const { name } = props<{ name: string }>()
+---
+article
+  markdown
+    # Hello {name}
+
+    Read the [terms](/terms) or **ask**.
+
+    <Callout type="warn">
+    Mind the gap.
+    </Callout>
+```
+
+- It stands for the template lines Markdown renders to (`h1`, `p` with `#[a ...]` inline, `ul`, `table`, `pre`), so it works in a page, a layout, an island and under `if` or `for`.
+- Components are written as in a collection's Markdown (`<Callout type="warn">`, JSON props) and must be imported in the script.
+- Raw HTML in it is the template's own: `<span class="x">` is an element, and its `class` reaches the page's inlined rules.
+- `\{` is a literal brace. A hole sits anywhere in the text, in a link's URL, or in a code block.
+- A problem inside it is reported on the `markdown` line, except a hole's own, which is reported where it is written. `kay fmt` leaves its lines as written, trailing spaces included.
+
 ### Write HTML and convert it
 
 HTML from Tailwind UI, Flowbite, a designer or an LLM becomes a template with `kay fmt --from-html page.html` (or stdin), which prints it formatted; paste the result in a `.kay` file and keep the dynamic parts to write by hand:

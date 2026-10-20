@@ -72,6 +72,7 @@ function formatTemplate(file: KayFile): string[] {
   const edits = attributeEdits(file)
   const wrappable = classWrapCandidates(file)
   const textEnds = trailingTextEnds(file.template)
+  const markdowns = [...elementsIn(file.template)].flatMap(element => element.markdown ? [element.markdown] : [])
   const levels: number[] = []
   const out: string[] = []
   let owner = { from: 0, to: 0 }
@@ -86,6 +87,15 @@ function formatTemplate(file: KayFile): string[] {
     const end = line.start + line.text.length
     const verbatimEnd = textEnds.has(end) || literals.some(span => span.start < end && span.end > end)
     const content = verbatimEnd ? line.text.slice(indent) : line.text.slice(indent).trimEnd()
+
+    // The lines of a `markdown` block are Markdown, where trailing spaces break a line: they move with the block and are kept as they are.
+    if (markdowns.some(span => line.start > span.start && line.start < span.end)) {
+      const shift = owner.to - owner.from
+
+      out.push(line.text.trim() === '' ? '' : ' '.repeat(Math.max(shift, 0)) + line.text.slice(Math.min(Math.max(-shift, 0), indent)))
+
+      continue
+    }
 
     if (literals.some(span => line.start > span.start && line.start < span.end)) {
       out.push(line.text)

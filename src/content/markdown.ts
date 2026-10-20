@@ -205,7 +205,7 @@ function* elements(html: string, open: RegExp, close: (match: RegExpExecArray) =
 
 // The body with each component tag outside code replaced by a placeholder, and the components in the order their tags open.
 // Tags are read per paragraph-like block, so one may spread its attributes over several lines; fenced and indented code blocks pass through.
-function extractComponents(body: string, bodyLine: number): { text: string, components: ExtractedComponent[] } {
+export function extractComponents(body: string, bodyLine: number): { text: string, components: ExtractedComponent[] } {
   const components: ExtractedComponent[] = []
   const open: { name: string, line: number }[] = []
   const out: string[] = []

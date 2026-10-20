@@ -1588,6 +1588,24 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('checks a markdown block like the template lines it stands for: a hole where it is written, a link on the block, and what follows it where it is', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nconst title = \'T\'\n---\nmain\n  markdown\n    Hi **{title}**, [fine](/) and [lost](/nowhere).\n\n    More {title.nope}\n  p {missing}\n',
+    })
+
+    try {
+      const found = (await check(root)).map(d => [d.line, firstLine(d.message)] as const)
+
+      expect(found.map(([line]) => line).toSorted((a, b) => a - b)).toEqual([5, 8, 9])
+      expect(found.find(([line]) => line === 8)![1]).toContain('nope')
+      expect(found.find(([line]) => line === 9)![1]).toContain('missing')
+      expect(found.find(([line]) => line === 5)![1]).toContain('/nowhere')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('accepts the directory of an app route ending in a wildcard with its trailing slash, as Elysia serves it', async () => {
     const root = await scratchProject({
       'src/app.ts': 'import { Elysia } from \'elysia\'\n\nexport const app = new Elysia().get(\'/files/*\', () => \'file\')\n\ndeclare module \'kay\' {\n  interface Register {\n    app: typeof app\n  }\n}\n',
