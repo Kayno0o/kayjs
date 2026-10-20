@@ -9,7 +9,7 @@ interface Compiler {
   build: (candidates: string[]) => string
 }
 
-const TAILWIND_IMPORT = /@import\s+(?:url\(\s*)?['"]tailwindcss['"]/
+export const TAILWIND_IMPORT = /@import\s+(?:url\(\s*)?['"]tailwindcss['"]/
 // A word cut out of an arbitrary value, which only the stylesheet build reads whole.
 const ARBITRARY = /[[\]\\]/
 // What separates the strings Tailwind reads a class from, coarser than the words: `py-1.5` or `bg-(--brand)` stays whole.
@@ -77,7 +77,7 @@ async function compiled(file: string, css: string): Promise<{ compiler: Compiler
 }
 
 // A stylesheet `@import` names: a relative path, or a package by its `style` entry.
-async function stylesheetPath(id: string, from: string): Promise<string> {
+export async function stylesheetPath(id: string, from: string): Promise<string> {
   if (id.startsWith('.'))
     return resolve(from, id)
 

@@ -57,7 +57,7 @@ The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a 
 
 ### Format the templates
 
-`kay fmt` formats `.kay` files, and `--check` lists the unformatted ones and fails. It moves the shorthand classes of an element past 120 characters into a `class` attribute over several lines (see [Elements](templates.md#elements)):
+`kay fmt` formats `.kay` files, and `--check` lists the unformatted ones and fails. In an app that imports Tailwind, it sorts the shorthand's classes in Tailwind's order. It moves the shorthand classes of an element past 120 characters into a `class` attribute over several lines (see [Elements](templates.md#elements)):
 
 ```sh
 kay fmt

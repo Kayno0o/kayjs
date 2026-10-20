@@ -4,6 +4,8 @@ import { stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { findKayFiles } from '../build/files'
 import { formatKay } from '../compiler/format'
+import { projectRootOf } from '../project'
+import { tailwindSorter } from './tailwind'
 
 export { formatKay } from '../compiler/format'
 
@@ -40,10 +42,17 @@ export async function formatFiles(paths: string[], options: { write: boolean }):
   }))).flat()
   const result: FormatFilesResult = { changed: [], errors: [] }
 
+  const sorters = new Map<string, ReturnType<typeof tailwindSorter>>()
+
   // Overlapping paths, such as `src src/page.kay`, name a file once.
   await Promise.all([...new Set(files)].map(async (file) => {
     const source = await Bun.file(file).text()
-    const { code, diagnostics } = formatKay(source)
+    const root = projectRootOf(file)
+    const sorter = sorters.get(root) ?? tailwindSorter(root)
+
+    sorters.set(root, sorter)
+
+    const { code, diagnostics } = formatKay(source, { sortClasses: await sorter })
 
     if (diagnostics.length > 0)
       result.errors.push({ file, source, diagnostics })

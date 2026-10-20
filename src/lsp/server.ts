@@ -28,6 +28,7 @@ import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { CONFIG_FILE, loadConfig } from '../config'
+import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { routeMounts } from '../server/routes'
 import { Connection } from './rpc'
@@ -152,7 +153,7 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams & { context?: unknown }>('textDocument/signatureHelp', async params => this.signatureHelp(params))
     client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => this.prepareRename(params))
     client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
-    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', ({ textDocument }) => this.format(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
@@ -710,9 +711,9 @@ export class KayLanguageServer {
     })]
   }
 
-  private format(uri: string): TextEdit[] {
+  private async format(uri: string): Promise<TextEdit[]> {
     const document = this.documents.get(uri)
-    const formatted = document && formatKay(document.source)
+    const formatted = document && formatKay(document.source, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })
 
     if (!document || !formatted || formatted.diagnostics.length > 0 || formatted.code === document.source)
       return []
