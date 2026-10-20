@@ -367,6 +367,39 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(await next.text('h1')).toBe('Network')
     next.close()
   })
+
+  it('lets a handler waiting on the server go quietly when its route is removed before the request reaches it', async () => {
+    const removing = await browse(`${origin}/`)
+    const { promise: fetching, resolve: fetched } = Promise.withResolvers<void>()
+    const { promise: handled, resolve } = Promise.withResolvers<unknown>()
+
+    await removing.route('/removed', async (request) => {
+      fetched()
+
+      try {
+        await request.fetch()
+      }
+      catch (error) {
+        resolve(error)
+
+        throw error
+      }
+    })
+    void (async () => {
+      try {
+        await removing.evaluate(async () => (await fetch('/removed')).status)
+      }
+      catch {}
+    })()
+    // The fetch is still on its way to the server when the route goes.
+    await fetching
+    await removing.unroute()
+
+    expect(String(await handled)).toContain('the route was removed')
+    await Bun.sleep(100)
+    expect(removing.errors).toEqual([])
+    removing.close()
+  })
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page under a mount point', () => {

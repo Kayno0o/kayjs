@@ -148,8 +148,8 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   const responses: PageResponse[] = []
   const inflight = new Map<string, Inflight>()
   const rules: Rule[] = []
-  // Requests a handler asked the answer of, resolved when their response pauses.
-  const awaited = new Map<string, PromiseWithResolvers<Paused>>()
+  // Requests a handler asked the answer of, resolved when their response pauses, or with the error that ends the wait: never rejected, as no handler may await it yet.
+  const awaited = new Map<string, PromiseWithResolvers<Paused | Error>>()
   const watchers = new Set<() => void>()
   const timers = new Set<Timer>()
   // Waiting on the Network domain to announce a request the Fetch domain paused first.
@@ -343,12 +343,27 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         if (settled)
           throw new Error('kay: the request was already answered')
 
-        const response = Promise.withResolvers<Paused>()
+        const response = Promise.withResolvers<Paused | Error>()
 
         awaited.set(requestId, response)
-        await send('Fetch.continueRequest', { requestId })
+
+        try {
+          await send('Fetch.continueRequest', { requestId })
+        }
+        catch (error) {
+          // Interception stopped while the request was let go.
+          if (awaited.get(requestId) !== response)
+            throw new RouteRemoved()
+
+          awaited.delete(requestId)
+
+          throw error
+        }
 
         const answer = await response.promise
+
+        if (answer instanceof Error)
+          throw answer
 
         if (answer.responseErrorReason !== undefined)
           throw new Error(`kay: the request to ${paused.request.url} failed: ${answer.responseErrorReason}`)
@@ -507,7 +522,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
 
         // Requests a handler waits the answer of get none once interception stops.
         for (const waiting of awaited.values())
-          waiting.reject(new RouteRemoved())
+          waiting.resolve(new RouteRemoved())
 
         awaited.clear()
         await send('Fetch.disable')
@@ -550,7 +565,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         clearTimeout(timer)
 
       for (const waiting of awaited.values())
-        waiting.reject(new Error('kay: the page closed'))
+        waiting.resolve(new Error('kay: the page closed'))
 
       awaited.clear()
     },
