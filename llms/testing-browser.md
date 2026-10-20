@@ -7,12 +7,10 @@
 `testSite({ browser: true })` builds the islands, and `site.open(path)` loads a page in a headless Chrome:
 
 ```ts
-import { afterAll, expect, it } from 'bun:test'
+import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 
 const site = await testSite({ browser: true })
-
-afterAll(async () => site.close())
 
 it('counts the clicks', async () => {
   const page = await site.open('/')

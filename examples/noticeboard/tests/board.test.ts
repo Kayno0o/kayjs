@@ -1,5 +1,5 @@
 import { outbox } from '@kaynooo/kayjs-mail'
-import { afterAll, expect, it } from 'bun:test'
+import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import board from '../src/api/board'
 import { auth } from '../src/auth'
@@ -8,10 +8,6 @@ import { } from './members'
 
 // The site takes the plugins of kay.config.ts's extensions, the mailer's queue included, which `runJobs()` also drains here and now.
 const site = await testSite()
-
-afterAll(async () => {
-  await site.close()
-})
 
 it('shows an empty board, and the button to pin a notice to members only', async () => {
   const home = await site.visit('/')

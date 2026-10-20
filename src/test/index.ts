@@ -45,6 +45,7 @@ import { cookieJar, withKept } from './cookies'
 import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
+import { closeAfterTests } from './sites'
 
 export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
@@ -644,7 +645,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     }
   }
 
-  return scoped(options.headers ?? {})
+  const site = scoped(options.headers ?? {})
+
+  closeAfterTests(site.close)
+
+  return site
 }
 
 function isStream(value: unknown): value is EventReader<unknown> & Settles {

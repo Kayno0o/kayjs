@@ -935,16 +935,12 @@ it('starts from the seed, with no member another test file added', async () => {
   expect((await db.repo(Member).read.findMany(q => q.orderBy('name', 'asc'))).map(member => member.name)).toEqual(['Ada', 'Linus'])
 })
 `,
-    'tests/account.test.ts': `import { afterAll, expect, it } from 'bun:test'
+    'tests/account.test.ts': `import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signIn } from '../src/routes/login.kay'
 import { sessions } from '../src/session'
 
 const site = await testSite({ use: [sessions] })
-
-afterAll(async () => {
-  await site.close()
-})
 
 it('sends a visitor to sign in, then into their account', async () => {
   expect((await site.visit('/account')).url).toBe('/login')
@@ -992,15 +988,11 @@ p${tw('.text-subtext1')} {live.status() === 'open' ? \`\${live.last()?.online ??
   }
 }
 
-const WS_TEST = `import { afterAll, expect, it } from 'bun:test'
+const WS_TEST = `import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import online from '../src/api/online'
 
 const site = await testSite()
-
-afterAll(async () => {
-  await site.close()
-})
 
 it('tells every visitor how many are online', async () => {
   const first = site.socket(online, '/')

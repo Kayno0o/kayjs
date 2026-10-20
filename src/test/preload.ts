@@ -3,6 +3,8 @@ import { testRoot } from './root'
 import './natives'
 // Closes the browser of the pages tests open once they ran.
 import './browser'
+// Closes the test sites a file left open once the tests ran.
+import './sites'
 // Every test and hook takes a timeout that holds on a busy machine.
 import './timeout'
 

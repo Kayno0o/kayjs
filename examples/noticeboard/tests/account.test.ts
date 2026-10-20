@@ -1,5 +1,5 @@
 import { outbox } from '@kaynooo/kayjs-mail'
-import { afterAll, beforeEach, expect, it } from 'bun:test'
+import { beforeEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { joinAs } from './members'
 import { magicLink, password, register, request, reset, signOut, spend, verify } from './pages'
@@ -8,10 +8,6 @@ const site = await testSite()
 
 beforeEach(() => {
   outbox.clear()
-})
-
-afterAll(async () => {
-  await site.close()
 })
 
 it('joins, signed in at once, and mails a link that confirms the address', async () => {

@@ -1,13 +1,9 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
 import { auth } from '../src/auth'
 import { post } from '../src/routes/index.kay'
 
 const site = await testSite({ browser: true })
-
-afterAll(async () => {
-  await site.close()
-})
 
 // CI installs Chromium; elsewhere the suite runs where one is found.
 describe.skipIf(browserPath() === undefined)('in a browser', () => {

@@ -88,7 +88,7 @@ expect(await room.next()).toEqual({ room: 'general', from: 'anonymous', text: 'h
 room.close()
 ```
 
-`received` holds every message so far. The first socket starts the site on a free port, and `site.close()` stops it.
+`received` holds every message so far. The first socket starts the site on a free port, and the site is closed once the tests ran, or by `site.close()` when a test wants it sooner.
 
 `site.stream(module, path, options)` reads an event stream the same way. `finished()` resolves with every value once the stream has ended.
 
@@ -282,12 +282,10 @@ The `kay/test/preload` in your bunfig.toml gives every test and hook 20 seconds,
 For what only a browser does, use `testSite({ browser: true })`. It serves the islands it builds, and `site.open(path)` loads the page in headless Chrome.
 
 ```ts
-import { afterAll, expect, it } from 'bun:test'
+import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 
 const site = await testSite({ browser: true })
-
-afterAll(async () => site.close())
 
 it('counts the clicks', async () => {
   const page = await site.open('/')
