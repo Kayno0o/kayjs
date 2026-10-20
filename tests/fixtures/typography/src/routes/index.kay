@@ -7,7 +7,6 @@ const { Content } = note
 export const page = { prerender: true }
 
 const later = Promise.resolve('Résultat : trois')
----
 --- script
 import Note from '../components/note.kay'
 ---
