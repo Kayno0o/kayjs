@@ -1,0 +1,5 @@
+nav
+  a.entry(href="/entry/1") Entry
+  a.same(href="/entry/1?as=Ann&n=2") Same room
+  a.crowd(href="/crowd") Crowd
+  a.plain(href="/plain") Plain

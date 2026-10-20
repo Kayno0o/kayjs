@@ -69,7 +69,7 @@ A page reading a live value is rendered for each request. `kay build` does not k
 
 A client holds at most 20 live connections, a few tabs, and opens at most 120 a minute. The next one is refused until another closes. `live: { connections: 50, perMinute: 240 }` in kay.config.ts changes both. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
 
-While a tab is hidden it holds no connection for live values, and it opens one again, with every value as it is then, when the tab is shown.
+While a tab is hidden it holds no connection for live values, and it opens one again, with every value as it is then, when the tab is shown. A tab following who else is here, below, keeps its connection.
 
 <ReadMore href="/llms/api-from-islands#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 
@@ -104,6 +104,32 @@ A collection follows when you add `live: true` to it. See [Showing edits in open
 A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. If that quiet request fails, the old value stays, so a route that now fails for good, such as a 404 after its row was deleted, keeps showing what it showed. You add nothing to the route or the island, and a route that reads no such value opens no connection.
 
 <ReadMore href="/llms/api-from-islands#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
+
+### Who else is here
+
+An island can show who else has a page open, or an entry being edited. Call `presence` with a room name and who the visitor is.
+
+```kay
+---
+import { presence } from 'kay'
+
+const { entry, me } = props<{ entry: { id: string }, me: { name: string } }>()
+const here = presence(`entry:${entry.id}`, me)
+---
+p(if={here.others().length > 0}) Also editing: {here.others().map(other => other.name).join(', ')}
+```
+
+`others()` lists the members other than the visitor, once each, so the visitor's own other tabs are left out. `count()` is how many other tabs have the room open. Both follow joins and leaves, and you write no route, socket or store.
+
+Hand the member to the island from the page's server fence, as a prop: `Editor(entry={entry} me={{ name: user.name }})`. What a visitor is listed as then comes from the server. The page signs the room and the member into the proof every live value uses, so a room or a member the page did not render for is refused.
+
+`presence()` with no arguments is the page itself, listing nobody by name: `count()` is the number of other tabs on it, for "3 others are reading this".
+
+A tab leaves when it closes, goes to a page without the room, or loses its connection. The others see it go after a few seconds, so a reconnect or a page swap never shows someone leaving and coming back. A hidden tab stays in the room.
+
+Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. A page with presence is rendered for each request, so a static export of it fails. The room and the member together take at most 256 characters as JSON.
+
+<ReadMore href="/llms/api-from-islands#presence">The proof, the timing of a leave and the limits are in the full API routes reference.</ReadMore>
 
 ## Reading a route in an island
 

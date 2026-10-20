@@ -1,0 +1,8 @@
+---
+import { presence } from 'kay'
+
+const { room, member } = props<{ room: string, member: { name: string } }>()
+const here = presence(room, member)
+---
+p.names {here.others().map(other => other.name).join(', ')}
+p.others {here.count()}

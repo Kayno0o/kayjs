@@ -1,0 +1,6 @@
+---
+import { presence } from 'kay'
+
+const here = presence()
+---
+p.crowd {here.count()}

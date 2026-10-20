@@ -1,11 +1,13 @@
 import type { RateStore } from '../runtime/action'
 import type { JobStore } from './queue'
+import type { RoomStore } from './rooms'
 
-// What the app keeps beyond one process: queued jobs and schedule locks in `jobs`, rate limit counts in `rates`.
-// Each is used by every queue, locked schedule and rate limit that names no store of its own.
+// What the app keeps beyond one process: queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`.
+// Each is used by every queue, locked schedule, rate limit and presence room that names no store of its own.
 export interface AppStore {
   jobs?: JobStore | undefined
   rates?: RateStore | undefined
+  rooms?: RoomStore | undefined
 }
 
 let current: AppStore | undefined

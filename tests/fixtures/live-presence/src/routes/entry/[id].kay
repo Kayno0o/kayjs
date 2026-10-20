@@ -1,0 +1,10 @@
+---
+import Nav from '../../components/nav.kay'
+import Who from '../../components/who.kay'
+--- server
+const { id } = ctx.params
+const name = ctx.url.searchParams.get('as') ?? ctx.request.headers.get('x-user') ?? 'anonymous'
+---
+Nav
+h1 Entry {id}
+Who(room={`entry:${id}`} member={{ name }})

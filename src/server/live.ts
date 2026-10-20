@@ -6,12 +6,14 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
+import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
 import { liveLimits } from './config-limits'
 import { readCapped } from './errors'
 import { eventStream, StreamRefused } from './event-stream'
+import { presenceEntry } from './presence'
 import { clientAddress, overLimit } from './protection'
 import { signedText, signText } from './stamp'
 
@@ -26,6 +28,7 @@ const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
+const MAX_TAB_LENGTH = 64
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
@@ -332,7 +335,7 @@ function release(client: string): void {
 // What a request asks for, or undefined when it is no request of this route.
 function readRequest(text: string): LiveRequest | undefined {
   try {
-    const { proofs, watch } = JSON.parse(text) as Partial<LiveRequest>
+    const { proofs, watch, tab } = JSON.parse(text) as Partial<LiveRequest>
 
     if (!Array.isArray(proofs) || !Array.isArray(watch) || watch.length > MAX_WATCHED)
       return undefined
@@ -343,7 +346,10 @@ function readRequest(text: string): LiveRequest | undefined {
     if (!watch.every(entry => Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string' && entry[1].length <= MAX_KEY_LENGTH))
       return undefined
 
-    return { proofs, watch }
+    if (tab !== undefined && (typeof tab !== 'string' || tab.length > MAX_TAB_LENGTH))
+      return undefined
+
+    return { proofs, watch, tab }
   }
   catch {
     return undefined
@@ -391,12 +397,23 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     const watched: Watched[] = []
     let oldest = Infinity
     let stale = false
+    // What names the tab in the rooms it joins: its own, or one for this connection alone.
+    const tab = asked.tab ?? crypto.randomUUID()
 
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
       const provenAt = proven.get(JSON.stringify([id, key]))
+      const here = id === PRESENCE_LIVE_ID && provenAt !== undefined ? presenceEntry(key, tab) : undefined
 
-      if (slot !== undefined && provenAt !== undefined && (slot.keyed || key === '')) {
+      if (here !== undefined) {
+        oldest = Math.min(oldest, provenAt!)
+        watched.push({ id, key, ...here })
+      }
+      // A room and member no page proves, or one whose proof is out of date: refused, so a tab does not join as a member its page never named.
+      else if (id === PRESENCE_LIVE_ID) {
+        stale = true
+      }
+      else if (slot !== undefined && provenAt !== undefined && (slot.keyed || key === '')) {
         oldest = Math.min(oldest, provenAt)
 
         // A process that did not render the page, or restarted since, still hears the invalidations of what its proof covers.

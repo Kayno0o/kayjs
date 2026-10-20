@@ -45,6 +45,8 @@ export type LiveUpdate = [id: string, key: string, value: unknown]
 export interface LiveRequest {
   proofs: { keys: [id: string, key: string][], at: number, sig: string }[]
   watch: [id: string, key: string][]
+  // Names the tab across its connections, which presence tells a tab that reconnected from one that came.
+  tab?: string | undefined
 }
 
 export const LIVE_ROUTE = '/_kay/live'
@@ -220,8 +222,11 @@ interface BrowserSlot {
 }
 
 const browserSlots = new Map<string, BrowserSlot>()
+
 // The keys the open connection carries, and the ones the islands read now.
-const wanted = new Map<string, number>()
+export const wanted = new Map<string, number>()
+// Set by `presence()`: whether the keys read now hold a connection open in a hidden tab, and what names the tab to the server.
+export const hold: { open?: () => boolean, tab?: string } = {}
 let current: { keys: Set<string>, reader: ReturnType<typeof readEvents<LiveUpdate[]>> } | undefined
 let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
@@ -402,7 +407,7 @@ function sync(): void {
 
   followVisibility()
 
-  if (document.hidden)
+  if (document.hidden && !hold.open?.())
     return
 
   if (current && current.keys.size === keys.size && [...keys].every(key => current!.keys.has(key)))
@@ -412,7 +417,7 @@ function sync(): void {
 
   const watched = [...keys].map(key => JSON.parse(key) as [string, string])
   // The proofs are read at each attempt, as a renewed page holds new ones.
-  const post = async (signal: AbortSignal) => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })), watch: watched } satisfies LiveRequest), signal })
+  const post = async (signal: AbortSignal) => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })), watch: watched, tab: hold.tab } satisfies LiveRequest), signal })
   const reader = readEvents<LiveUpdate[]>(async (signal) => {
     const response = await post(signal)
 
@@ -443,14 +448,14 @@ function sync(): void {
 
 let followingVisibility = false
 
-// A hidden tab holds no connection and renews no proof; shown again, it opens one that starts with every value as it is then. Installed by the first sync, so a bundle that never reads a live value keeps none of this module.
+// A hidden tab holds no connection and renews no proof, unless it follows a presence key; shown again, it opens one that starts with every value as it is then. Installed by the first sync, so a bundle that never reads a live value keeps none of this module.
 function followVisibility(): void {
   if (followingVisibility)
     return
 
   followingVisibility = true
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden)
+    if (document.hidden && !hold.open?.())
       release()
     else
       sync()

@@ -1,0 +1,7 @@
+---
+import Crowd from '../components/crowd.kay'
+import Nav from '../components/nav.kay'
+---
+Nav
+h1 Crowd
+Crowd

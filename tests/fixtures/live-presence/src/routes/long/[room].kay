@@ -1,0 +1,7 @@
+---
+import Who from '../../components/who.kay'
+--- server
+const { room } = ctx.params
+---
+h1 Long
+Who(room={room} member={{ name: 'Ada' }})
