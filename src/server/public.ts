@@ -129,7 +129,7 @@ export function matchesEtag(header: string | null, etag: string): boolean {
   return header !== null && header.split(',').some(item => item.trim() === '*' || item.trim().replace(WEAK_PREFIX, '') === tag)
 }
 
-// One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
+// One route per file found at boot: one stat of the file per request, and no path a request could steer outside the directory.
 // Files keep their names, so unless `cache` keeps it, a file is revalidated every time and answered with a 304 while it is unchanged.
 // The body, or a 304 when the browser already holds the version the ETag names, carrying the same headers.
 // `cache` replaces the header for a file that may be kept for a while before it is asked about again.
@@ -196,7 +196,7 @@ function keeper(path: string, held: { bytes: number }): (current: Stats | undefi
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
 // With `compressing`, a text file of up to 256 KB at boot is answered from its bytes kept in memory, 8 MB in all, which compression takes as they are; a range request, a conditional one and the rest stream the file.
 // A file deleted since boot is answered by `pageFor.unmatched`, set once the page routes exist, else by Elysia's 404.
-export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false, pageFor: { unmatched?: Unmatched | undefined } = {}): Promise<void> {
+export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false, pageFor: { unmatched?: Unmatched | undefined }): Promise<void> {
   const held = { bytes: 0 }
   // The URLs an HTML file is also served at share its bytes.
   const keepers = new Map<string, ReturnType<typeof keeper>>()
@@ -219,6 +219,7 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
       const current = statSync(path, { throwIfNoEntry: false })
 
       if (!current?.isFile()) {
+        // Releases what was kept of it.
         read?.(undefined)
 
         const page = pageFor.unmatched?.({ ...given })
