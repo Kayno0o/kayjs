@@ -30,6 +30,12 @@ export const away = action(t.Object({}), async (_input, ctx) => {
   ctx.redirect(process.env.KAY_PENDING_AWAY!)
 })
 
+// Where the `download` form's post redirects to, a file the browser saves rather than shows (the test's server answers it).
+export const attached = action(t.Object({}), async (_input, ctx) => {
+  await Bun.sleep(200)
+  ctx.redirect('/attachment')
+})
+
 await Bun.sleep(Number(process.env.KAY_PENDING_HOLD ?? 0))
 ---
 h1 Pending
@@ -50,6 +56,10 @@ form.external(action={away})
   button Away
   pending
     p.saving Saving external
+form.download(action={attached})
+  button Download
+  pending
+    p.saving Saving download
 form.reloads(action={slow})
   button Reload
   pending

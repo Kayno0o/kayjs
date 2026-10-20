@@ -29,7 +29,7 @@ const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser
   reported.push(params.state)
 
   return ''
-})] })
+}).get('/attachment', () => new Response('saved', { headers: { 'content-type': 'text/plain', 'content-disposition': 'attachment; filename="saved.txt"' } }))] })
 const { save, ping, busy, odd, enrol } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
   save: Action<Record<string, string | boolean>, unknown, 'website'>
   ping: Action<Record<string, never>, string>
@@ -416,7 +416,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   it('renders a pending block hidden, with no style of its own and no wrapper taking a place in the layout', async () => {
     const { html } = await site.visit('/pending')
 
-    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click|boxed|external|reloads|with)<\/p><\/slot>/g)).toHaveLength(11)
+    expect(html.match(/<slot data-kay-pending hidden><p class="saving">Saving (?:slow|refused|leaves|island|late|fire|click|boxed|external|download|reloads|with)<\/p><\/slot>/g)).toHaveLength(12)
     expect(html).not.toContain('role="status"')
     expect(html).not.toContain('display:block')
   })
@@ -553,6 +553,24 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       }
     })
 
+    expect(page.errors).toEqual([])
+  })
+
+  it('hides it again after the grace when the load it was kept shown for is a file the browser saves, not a page', async () => {
+    const page = await site.open('/pending', { path })
+
+    // The ten-second grace is cut to a moment for the test.
+    await page.evaluate(() => {
+      const original = window.setTimeout.bind(window)
+
+      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay === 10_000 ? 1500 : delay, ...rest)) as typeof window.setTimeout
+    })
+    await page.click('form.download button')
+    await page.waitFor('form.download[aria-busy]')
+    await page.waitFor('form.download[aria-busy]', { gone: true })
+    expect((await shown(page, 'download')).download).toBe(true)
+    await page.waitUntil(() => document.querySelector('form.download [data-kay-pending] > *')?.checkVisibility() === false)
+    expect(await page.text('h1')).toBe('Pending')
     expect(page.errors).toEqual([])
   })
 
