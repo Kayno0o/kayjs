@@ -13,7 +13,7 @@ export function closeAfterTests(close: () => Promise<void>): void {
   sites.add(close)
 }
 
-export async function closeSites(): Promise<void> {
+async function closeSites(): Promise<void> {
   const open = [...sites]
 
   sites.clear()

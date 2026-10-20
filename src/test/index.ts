@@ -143,7 +143,7 @@ export interface TestSite {
   // The site's content, which a test works on apart from the project's: a folder collection moves to a copy as the first save or delete reaches it, so a CMS's save never reaches the real `src/content`.
   content: TestContent
   handle: (request: Request) => Promise<Response>
-  // Closes the pages `open()` opened and stops the server it or `socket()` started, if any.
+  // Closes the pages `open()` opened, the sockets and streams left open, and stops the server `open()` or `socket()` started, if any. The site is closed once the tests ran anyway, so a test calls it only to close sooner; calling it twice is harmless.
   close: () => Promise<void>
 }
 

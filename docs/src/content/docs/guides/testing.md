@@ -10,7 +10,7 @@ It does build your islands for the browser, so a test fails when one cannot be b
 
 ## Rendering a page
 
-`testSite()` gives a site. `visit` GETs a page and follows redirects. It resolves with `{ url, status, headers, html }`.
+`testSite()` gives a site. `visit` GETs a page and follows redirects. It resolves with `{ url, status, headers, html }`. The site is closed once the tests ran, so a test file never closes it.
 
 ```ts
 import { expect, it } from 'bun:test'

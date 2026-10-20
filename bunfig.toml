@@ -1,10 +1,11 @@
 [test]
 root = "./tests"
-# One run at a time in a checkout, as its runs build into the same .kay and fixtures; the browser of kay/test pages closes once the tests ran, as kay/test/preload has it; a file that leaves a process of its own running fails, as tests/leaks.ts has it; every run takes the suite's timeout.
+# One run at a time in a checkout, as its runs build into the same .kay and fixtures; the browser and the sites of kay/test close once the tests ran, as kay/test/preload has it; a file that leaves a process of its own running fails, as tests/leaks.ts has it; every run takes the suite's timeout.
 preload = [
   "./tests/one-run.ts",
   "./tests/timeout.ts",
   "./src/test/browser.ts",
+  "./src/test/sites.ts",
   "./tests/leaks.ts"
 ]
 
