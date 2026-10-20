@@ -4,7 +4,7 @@ import process from 'node:process'
 import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
-import { projectPaths } from '../project'
+import { projectPaths, writesFrench } from '../project'
 import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
@@ -116,7 +116,7 @@ const sharedMarks: Bun.BunPlugin = {
   },
 }
 
-// Bundled from under the project's `.kay`, where `kay/dom` resolves to the kay it installed, with its libraries' settings applied.
+// Bundled from under the project's `.kay`, where `kay/dom` resolves to the kay it installed, with its libraries' settings applied and the French spaces of an island on a French site, the other client defines left out.
 async function bundle(root: string, file: string): Promise<string> {
   const work = await mkdtemp(join(await testDir(root), 'mount-'))
 
@@ -128,7 +128,7 @@ async function bundle(root: string, file: string): Promise<string> {
     let output: Bun.BuildArtifact
 
     try {
-      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [apiStubs(trees), kay({ root, settings: config.settings, api: trees }), sharedMarks] })).outputs[0]!
+      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', define: { KAY_FRENCH: writesFrench(config) ? 'true' : 'undefined' }, plugins: [apiStubs(trees), kay({ root, settings: config.settings, api: trees }), sharedMarks] })).outputs[0]!
     }
     catch (error) {
       // Bun throws on a failed build, its messages in `errors`.

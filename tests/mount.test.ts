@@ -204,6 +204,47 @@ describe('mount', () => {
     unmount()
   })
 
+  it('writes the French spaces a build for the browser writes, on a French site only', async () => {
+    const component = '---\nimport { signal } from \'kay\'\n\nconst label = signal(\'Reste : 1 !\')\n---\np.static Prix : 12 !\np.dynamic {label()}\ncode.code Prix : 12 !\n'
+    const saved = process.env.KAY_ROOT
+    const lang = document.documentElement.lang
+    const shown = async (config: string) => {
+      const project = await scratchDir('mount-french-')
+
+      try {
+        await Promise.all([Bun.write(join(project, 'kay.config.ts'), `export default ${config}\n`), Bun.write(join(project, 'src/box.kay'), component)])
+        process.env.KAY_ROOT = project
+
+        const { root, unmount } = await mountComponent(join(project, 'src/box.kay'))
+        const text = ['.static', '.dynamic', '.code'].map(selector => root.querySelector(selector)!.textContent.replaceAll('\u00A0', '~'))
+
+        unmount()
+
+        return text
+      }
+      finally {
+        await rm(project, { recursive: true, force: true })
+      }
+    }
+
+    document.documentElement.lang = 'fr'
+
+    try {
+      expect(await shown('{ lang: \'fr\' }')).toEqual(['Prix~: 12~!', 'Reste~: 1~!', 'Prix : 12 !'])
+      expect(await shown('{ i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }')).toEqual(['Prix~: 12~!', 'Reste~: 1~!', 'Prix : 12 !'])
+      expect(await shown('{ lang: \'fr\', typography: false }')).toEqual(['Prix : 12 !', 'Reste : 1 !', 'Prix : 12 !'])
+      expect(await shown('{ lang: \'en\' }')).toEqual(['Prix : 12 !', 'Reste : 1 !', 'Prix : 12 !'])
+    }
+    finally {
+      document.documentElement.lang = lang
+
+      if (saved === undefined)
+        delete process.env.KAY_ROOT
+      else
+        process.env.KAY_ROOT = saved
+    }
+  })
+
   it('reports a component that does not compile, and builds it again once fixed', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'broken.kay')

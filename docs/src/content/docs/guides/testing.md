@@ -177,6 +177,8 @@ it('opens its panel on a click', async () => {
 })
 ```
 
+On a French site, the component writes the same non-breaking spaces before `: ; ! ?` as it does in the browser, once the test sets `document.documentElement.lang` to `fr`.
+
 A component that calls a route of an API module, your own, can be mounted too. The call goes out as a `fetch`, so stub `fetch` in the test to answer it.
 
 ## A database for each test file

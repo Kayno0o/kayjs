@@ -241,6 +241,7 @@ it('shows why a todo was refused', async () => {
 
 - `mountComponent(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
 - `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
+- On a French site (a `lang` or locale of `fr`) it writes the non-breaking spaces an island does, once `document.documentElement.lang` is `fr`; the other client defines (`KAY_BROWSER`, `KAY_STATIC_EXPORT`) are left out.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.
 - A component may `call()` or `resource()` a route of an API module, the project's or an extension's: it is bundled as in the browser, knowing the module only by where it is served, so the call goes out as `fetch` (stub it in the test).

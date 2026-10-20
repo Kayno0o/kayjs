@@ -145,6 +145,11 @@ export function resolveProject<Config extends KayConfig>(root: string, config: C
   return { root: resolve(root), config, paths: projectPaths(root, config), mode }
 }
 
+// Whether the islands of an app write French spaces: a French `lang` or locale, and `typography` not off.
+export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'typography'>): boolean {
+  return config.typography !== false && (config.i18n ? config.i18n.locales.some(isFrench) : config.lang !== undefined && isFrench(config.lang))
+}
+
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.
 export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
   return {
@@ -155,7 +160,7 @@ export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | '
     api: config.api,
     navigation: config.navigation,
     i18n: config.i18n !== undefined,
-    french: config.typography !== false && (config.i18n ? config.i18n.locales.some(isFrench) : config.lang !== undefined && isFrench(config.lang)),
+    french: writesFrench(config),
     search: config.search,
     hydration: config.hydration,
     lateStyles: config.lateStyles,
