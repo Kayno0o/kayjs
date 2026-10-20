@@ -240,6 +240,32 @@ describe('positions in a file with markdown blocks', () => {
     expect(source.slice(expansion!.real(expanded.indexOf('{bad}')), expansion!.real(expanded.indexOf('{bad}') + 5))).toBe('{bad}')
   })
 
+  it('maps every hole and every element after it in a page of 200 blocks, and every line of one block of 2000', () => {
+    const many = `---\nconst n = 1\nconst h = (id: string) => id\n---\nmain\n${Array.from({ length: 200 }, (_, i) => `  markdown\n    # Heading ${i}\n\n    Some **bold** text and {n}.\n\n    - item {n} {h('hole_${i}')}\n  p after_${i}\n`).join('')}`
+    const long = `---\nconst n = 1\nconst h = (id: string) => id\n---\nmain\n  markdown\n${Array.from({ length: 2000 }, (_, i) => `    Line ${i} with **bold** and [a link](/x/${i}) and {n} {h('hole_${i}')}.\n`).join('\n')}  p after\n`
+    const wrong: string[] = []
+
+    for (const page of [many, long]) {
+      const { expansion } = parseExpanded(page)
+      const expanded = expansion!.source
+      const { tsx, map } = compileKay(page, 'src/p.kay', { check: true })
+
+      for (const name of page.match(/h\('hole_\d+'\)|after_\d+|after\b/g)!) {
+        const real = expansion!.real(expanded.indexOf(name))
+
+        if (page.slice(real, real + name.length) !== name)
+          wrong.push(`${name} at ${real}`)
+
+        const generated = tsx.indexOf(name)
+
+        if (generated !== -1 && map.toSource(generated) !== page.indexOf(name))
+          wrong.push(`${name} generated at ${generated}`)
+      }
+    }
+
+    expect(wrong).toEqual([])
+  })
+
   it('maps the generated code to the holes, and what the lowering made up to the keyword', () => {
     const { tsx, map } = compileKay(source, 'src/p.kay', { check: true })
     const at = tsx.indexOf('title.nope')

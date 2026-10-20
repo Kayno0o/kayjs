@@ -78,7 +78,18 @@ export interface Piece extends Span {
 }
 
 export class Expansion {
-  constructor(readonly source: string, private readonly regions: Region[]) {}
+  // How much longer the expanded source is than the file after each region, the regions before it included.
+  private readonly shifts: number[]
+
+  constructor(readonly source: string, private readonly regions: Region[]) {
+    let total = 0
+
+    this.shifts = regions.map((region) => {
+      total += region.end - region.start - (region.block.end - region.block.start)
+
+      return total
+    })
+  }
 
   // The offset in the file for an offset of the expanded source: one the lowering made up stands for the block's `markdown` keyword.
   real(offset: number): number {
@@ -89,9 +100,9 @@ export class Expansion {
       return offset
 
     if (offset >= region.end)
-      return offset - this.shift(index)
+      return offset - this.shifts[index]!
 
-    const copy = region.copies.find(candidate => offset >= candidate.start && offset <= candidate.end)
+    const copy = copyAt(region.copies, offset)
 
     return copy ? copy.real + offset - copy.start : region.block.start
   }
@@ -143,7 +154,7 @@ export class Expansion {
   private madeUpAt(offset: number): Region | undefined {
     const region = this.regions[this.regionBefore(offset)]
 
-    return region && offset < region.end && !region.copies.some(copy => offset >= copy.start && offset <= copy.end) ? region : undefined
+    return region && offset < region.end && !copyAt(region.copies, offset) ? region : undefined
   }
 
   // The pieces of a span of the expanded source, in order, outside the regions mapped to the file.
@@ -158,9 +169,8 @@ export class Expansion {
       cursor = Math.max(cursor, end)
     }
 
-    for (const region of this.regions) {
-      if (region.end <= cursor)
-        continue
+    for (let index = firstAfter(this.regions, region => region.end > cursor); index < this.regions.length; index++) {
+      const region = this.regions[index]!
 
       if (region.start >= span.end)
         break
@@ -169,9 +179,11 @@ export class Expansion {
 
       const limit = Math.min(span.end, region.end)
 
-      for (const copy of region.copies) {
-        if (copy.end <= cursor || copy.start >= limit)
-          continue
+      for (let at = firstAfter(region.copies, candidate => candidate.end > cursor); at < region.copies.length; at++) {
+        const copy = region.copies[at]!
+
+        if (copy.start >= limit)
+          break
 
         if (copy.start > cursor)
           pieces.push({ start: cursor, end: copy.start, block: region.block })
@@ -213,16 +225,30 @@ export class Expansion {
 
     return found
   }
+}
 
-  // How much longer the expanded source is than the file after the regions up to the index.
-  private shift(index: number): number {
-    let total = 0
+// The copy holding the offset, the end included so an offset just past a run still maps; the copies are in order, so the first ending at or after it is the only one that may.
+function copyAt(copies: Copy[], offset: number): Copy | undefined {
+  const copy = copies[firstAfter(copies, candidate => candidate.end >= offset)]
 
-    for (const region of this.regions.slice(0, index + 1))
-      total += region.end - region.start - (region.block.end - region.block.start)
+  return copy && copy.start <= offset ? copy : undefined
+}
 
-    return total
+// The index of the first item the test holds for, or the length when it holds for none; the test must hold for every item after the first it holds for.
+function firstAfter<Item>(items: Item[], test: (item: Item) => boolean): number {
+  let low = 0
+  let high = items.length
+
+  while (low < high) {
+    const middle = (low + high) >> 1
+
+    if (test(items[middle]!))
+      high = middle
+    else
+      low = middle + 1
   }
+
+  return low
 }
 
 // The file parsed with each `markdown` block lowered to template lines first, so everything reading its template sees them; its spans index the expanded source, `file.source`, which the expansion maps back to the file.
