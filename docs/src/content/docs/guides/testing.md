@@ -204,7 +204,7 @@ A component that calls a route of an API module, your own, can be mounted too. T
 
 ## A database for each test file
 
-An app that keeps its data with `@kaynooo/pg-orm` and has a `pg-orm.config.ts` gets a database for each test file with nothing to declare. `kay/test/preload` copies the database your migrations build, points `DATABASE_URL` at the copy and drops it when the file is done. `kay new --template app` is set up this way.
+An app that keeps its data with `@kaynooo/pg-orm` and has a `pg-orm.config.ts` and a `DATABASE_URL` (in `.env.test`) gets a database for each test file with nothing to declare. `kay/test/preload` copies the database your migrations build, points `DATABASE_URL` at the copy and drops it when the file is done. `kay new --template app` is set up this way.
 
 To start every file with some rows, export a function that adds them from `tests/seed.ts`.
 

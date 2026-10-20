@@ -110,4 +110,15 @@ describe('kay/test/preload\'s database for each test file', () => {
 
     expect(code).toBe(0)
   }, 60_000)
+
+  it('fails loudly on a tests/seed.ts with no default export', async () => {
+    const dir = await project(false)
+
+    await Bun.write(join(dir, 'tests', 'seed.ts'), 'export function seed() {}\n')
+
+    const { code, report } = await run(dir, ['--isolate'])
+
+    expect(report).toContain('tests/seed.ts must export default a function')
+    expect(code).not.toBe(0)
+  }, 60_000)
 })

@@ -16,9 +16,17 @@ export async function copyTestDatabase(root: string): Promise<void> {
     return
 
   const { testDatabase } = await import('@kaynooo/pg-orm')
-  const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: PgOrmConfig }).default
+  const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: Partial<PgOrmConfig> | undefined }).default ?? {}
+
+  if (db === undefined)
+    throw new Error('kay: pg-orm.config.ts must export default defineConfig({ db, migrationsDir }), which kay/test/preload reads the tables from')
+
   const seedFile = resolve(root, 'tests', 'seed.ts')
-  const seed = existsSync(seedFile) ? (await import(seedFile) as { default: Seed }).default : undefined
+  const seed = existsSync(seedFile) ? (await import(seedFile) as { default?: Seed }).default : undefined
+
+  if (existsSync(seedFile) && typeof seed !== 'function')
+    throw new Error('kay: tests/seed.ts must export default a function taking the database')
+
   const database = await testDatabase({ url, migrationsDir: resolve(root, migrationsDir), tables: [...db.getTablesRegistry().values()], ...seed && { seed } })
 
   process.env.DATABASE_URL = database.url
