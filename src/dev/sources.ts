@@ -16,9 +16,10 @@ const GLOB_OR_DEEPER = /[*?[\]/]/
 const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|toml|ya?ml|kay|css|txt|html|sql|graphql|gql|wasm|node)$/
 // The root files no server reads but a stylesheet's pruning does: a class named in a README is kept.
 const ROOT_NAMING_FILE = /\.(?:mdx?|htm)$/
-// Tests, which no server imports.
-const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
-const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
+// Tests, which no server imports: a root directory such as `tests`, `e2e`, `tests-e2e` or `e2e_tests`, a `.test`, `.spec` or `.e2e` file, and a test runner's own root config.
+const TEST_DIR = /^(?:__tests__|(?:.+[-_.])?(?:tests?|e2e)(?:[-_.].+)?)$/
+const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec|e2e)\.[cm]?[jt]sx?$/
+const TEST_CONFIG = /^(?:playwright|vitest|jest|cypress)\.config\.[cm]?[jt]s$/
 // The files editors write beside a source while saving it, its backup, swap or temporary copy, Vim's `4913` and Emacs' `.#` lock included.
 const EDITOR_SCRATCH = /(?:~|\.sw[opx]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
 const ANY_FILE = /^/
@@ -69,7 +70,7 @@ export async function serverSources(root: string): Promise<string[]> {
     const [top = path] = path.split(sep)
 
     if (top === path)
-      return SERVER_ROOT_FILE.test(path) && !path.startsWith('.env')
+      return SERVER_ROOT_FILE.test(path) && !path.startsWith('.env') && !TEST_CONFIG.test(path)
 
     return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(path)
   })
@@ -77,7 +78,7 @@ export async function serverSources(root: string): Promise<string[]> {
 
 // A directory or file at the project root worth reacting to; dependencies, build output, tests and hidden entries, `.env` files apart, are not.
 function watchedName(name: string): boolean {
-  return !IGNORED_DIRS.has(name) && !TEST_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
+  return !IGNORED_DIRS.has(name) && !TEST_DIR.test(name) && (!name.startsWith('.') || name.startsWith('.env'))
 }
 
 // A change that needs no restart, only the stylesheets built again: a stylesheet, or a root file only the pruning of a library's classes reads. Nested paths are never one of the latter, as a Markdown entry below the root is content.
@@ -98,7 +99,7 @@ function isDirectory(path: string): boolean {
 // `onChange` gets the changed path relative to the root, and `onScratch` hears of the files editors write beside a source instead; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them, and `rootNaming` the root files only a stylesheet's pruning reads, as `kay dev` rebuilds them.
 export function watchProject(root: string, onChange: (file: string) => void, { tests = false, onScratch, rootNaming = false }: { tests?: boolean, onScratch?: () => void, rootNaming?: boolean } = {}): () => void {
   const ignored = gitIgnoredNames(root)
-  const watched = (name: string) => (watchedName(name) || (tests && TEST_DIRS.has(name))) && !ignored.has(name)
+  const watched = (name: string) => (watchedName(name) || (tests && TEST_DIR.test(name))) && !ignored.has(name)
   const directories = new Map<string, FSWatcher>()
   const watchDirectory = (name: string) => {
     directories.get(name)?.close()
@@ -138,7 +139,7 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
 
     watchDirectory(name)
 
-    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name) || (rootNaming && ROOT_NAMING_FILE.test(name)))
+    if (directory || isDirectory(join(root, name)) || (SERVER_ROOT_FILE.test(name) && (tests || !TEST_CONFIG.test(name))) || (rootNaming && ROOT_NAMING_FILE.test(name)))
       onChange(name)
   })
 
