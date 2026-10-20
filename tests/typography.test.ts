@@ -298,6 +298,14 @@ describe('a French page served', () => {
     expectPlain((await get(french, '/en')).html)
   })
 
+  it('follows the locale of the page for a server island fetched on an English site', async () => {
+    const served = await site({ lang: undefined, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
+    const header = { [ISLAND_HEADER]: '1' }
+
+    expect((await get(served, '/fr/island?kay_island=1', header)).html).toContain(`<p class="prop">Île${N}: différée</p>`)
+    expect((await get(served, '/island?kay_island=1', header)).html).toContain('<p class="prop">Île : différée</p>')
+  })
+
   it('writes the spaces into a page prerendered at build time, served from its file', async () => {
     const build = await scratchBuild()
 

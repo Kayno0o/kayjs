@@ -342,6 +342,7 @@ function offlinePage(options: ServiceWorkerOptions): string {
   const { title, text } = options.locales === undefined ? words() : runInLocale(stateFor(options.locales, lang, '/', new Request('http://localhost/')), words)
 
   const polish = typographyFor(lang, options.typography) ?? ((html: string) => html)
+  const heading = polish(title)
 
-  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${polish(title)}</title></head><body><h1>${polish(title)}</h1><p>${polish(text)}</p></body></html>`
+  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${heading}</title></head><body><h1>${heading}</h1><p>${polish(text)}</p></body></html>`
 }

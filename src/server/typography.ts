@@ -1,9 +1,9 @@
 const NBSP = '\u00A0'
 const FRENCH = /^fr(?:-|$)/i
-// A plain space before the marks French sets apart or after an opening guillemet, which leaves a non-breaking or narrow space the author typed.
-// The space before a mark, with the mark; and the space after an opening guillemet, with it.
+// The plain space before a mark, with the mark, and the plain space after an opening guillemet.
 const BEFORE_MARK = / ([:;!?»])/g
 const AFTER_OPENING = /« /g
+// The same two, searched for where the next one to change is.
 const MARK = / [:;!?»]/g
 const OPENING = /« /g
 const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|[^\s"'=<>`]+))?/g
