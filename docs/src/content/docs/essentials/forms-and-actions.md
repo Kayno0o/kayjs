@@ -149,7 +149,7 @@ form(action={add})
 
 The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in. A screen reader reads its text once it shows.
 
-In an island, the form shows it as well while a call of its action is in flight, however the handler or a button made it, and while its `onSubmit` waits for a promise.
+In an island, the form shows it as well while a call of its action is in flight, however the handler or a button made it, and while its `onSubmit` waits for a promise. It follows every call of the action, so the forms of a list sharing one action all show it while one of them is saved.
 
 The block adds no element of its own to the layout: what it holds sits in the form as if written there. No style is involved, so a strict `style-src` leaves it working. Outside a form that posts to an action, `pending` is an error.
 
@@ -403,7 +403,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it.
 
-To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws.
+To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects stays running while the page goes away, unless a leave guard keeps the visitor on it.
 
 ```kay
 ---

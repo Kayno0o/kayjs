@@ -38,10 +38,15 @@ function setBusy(form: HTMLFormElement, busy: boolean): void {
   }
 }
 
-// Loaded only for a form with a `pending` block, so the entry carries none of it; calls made in a row run in a row.
+// Loaded only for a form with a `pending` block, so the entry carries none of it; the block is cosmetic, so a chunk that fails to load leaves it as it is.
 async function showPending(form: HTMLFormElement, on: boolean): Promise<void> {
-  if (form.querySelector('[data-kay-pending]'))
+  if (!form.querySelector('[data-kay-pending]'))
+    return
+
+  try {
     (await import('./pending')).pendingBlocks(form, 'hold', on)
+  }
+  catch {}
 }
 
 async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promise<void> {

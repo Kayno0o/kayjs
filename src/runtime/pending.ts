@@ -3,23 +3,25 @@
 export type PendingSource = 'post' | 'hold' | 'call'
 
 const waiting = /* @__PURE__ */ new WeakMap<Element, Set<PendingSource>>()
+const OFFSCREEN = 'position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)'
+const WRITE_DELAY = 50
+const REMOVE_DELAY = 1000
 
-// A region is created before its text is written, as screen readers announce a change to one they already know; it sits outside the form, whose `aria-busy` may hold back what changes inside it.
-function announce(text: string): void {
+// A region is created before its text is written, as screen readers announce a change to one they already know; it sits outside the form, whose `aria-busy` may hold back what changes inside it, and inside a modal dialog when the form is in one, as the rest of the page is inert then.
+function announce(text: string, within: Element): void {
   const region = document.createElement('div')
 
   region.setAttribute('aria-live', 'polite')
-  region.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)'
-  document.body.append(region)
+  region.style.cssText = OFFSCREEN
+  within.closest('dialog')?.append(region) ?? document.body.append(region)
   setTimeout(() => {
     region.textContent = text
-    setTimeout(() => region.remove(), 1000)
-  }, 50)
+    setTimeout(() => region.remove(), REMOVE_DELAY)
+  }, WRITE_DELAY)
 }
 
 export function pendingBlock(block: Element, source: PendingSource, on: boolean): void {
   let sources = waiting.get(block)
-  const shown = sources !== undefined && sources.size > 0
 
   if (!sources)
     waiting.set(block, sources = new Set())
@@ -31,7 +33,8 @@ export function pendingBlock(block: Element, source: PendingSource, on: boolean)
 
   const showing = sources.size > 0
 
-  if (showing === shown)
+  // Judged by the attribute, as a page swap may have put it back on a block that is still waited on.
+  if (showing === !block.hasAttribute('hidden'))
     return
 
   block.toggleAttribute('hidden', !showing)
@@ -40,7 +43,7 @@ export function pendingBlock(block: Element, source: PendingSource, on: boolean)
     const text = block.textContent.trim()
 
     if (text !== '')
-      announce(text)
+      announce(text, block)
   }
 }
 
