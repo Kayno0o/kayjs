@@ -6,6 +6,7 @@ const WHITESPACE = /\s/
 // A token made of digits that no letter follows, `5/6` or `1.5`, which only the middle of a class can hold.
 const NUMBER_START = /^\d+\b/
 const DIGIT = /\d/
+const ALPHANUMERIC = /[A-Z0-9]/i
 const CLOSERS: Record<string, string> = { '[': ']', '(': ')' }
 
 export interface ClassScan {
@@ -79,8 +80,8 @@ function groupEnd(src: string, open: number): number {
     if (WHITESPACE.test(char))
       return -1
 
-    // A bracket inside a quoted value, `content-['[']`, closes nothing.
-    if (char === '\'' || char === '"') {
+    // A bracket inside a quoted value, `content-['[']`, closes nothing; a quote right after a letter or digit is an apostrophe, `x-[it's]`, which pairs with none across a `]`.
+    if ((char === '\'' || char === '"') && !ALPHANUMERIC.test(src[i - 1]!)) {
       const quoted = quotedEnd(src, i)
 
       if (quoted !== -1) {

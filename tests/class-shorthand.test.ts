@@ -228,6 +228,12 @@ describe('the edges of the grammar', () => {
     expect(classesOf('div.p-1.5em x\n')).toEqual(['p-1', '5em'])
   })
 
+  it('reads a quote after a letter or digit as an apostrophe, which pairs with nothing across the group', () => {
+    expect(classesOf('div.x-[a\'].y-[b\'] z\n')).toEqual(['x-[a\']', 'y-[b\']'])
+    expect(classesOf('div.content-[\'a_b\'].[&_[data-x=\'y\']]:p-2 z\n')).toEqual(['content-[\'a_b\']', '[&_[data-x=\'y\']]:p-2'])
+    expect(classesOf('div.bg-[url(\'/a.png\')].font-[_"x"] z\n')).toEqual(['bg-[url(\'/a.png\')]', 'font-[_"x"]'])
+  })
+
   it('keeps a bracket inside quotes in the group, and renders the quotes', async () => {
     expect(classesOf('div.content-[\'[\'].content-["]"] x\n')).toEqual(['content-[\'[\']', 'content-["]"]'])
     expect(await render('div.[&_svg:not([class*=\'size-\'])]:p-1.content-["a"] x\n')).toBe('<div class="[&amp;_svg:not([class*=\'size-\'])]:p-1 content-[&quot;a&quot;]">x</div>')
