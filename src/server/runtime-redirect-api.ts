@@ -78,9 +78,23 @@ function slashed(location: string, trailingSlash: TrailingSlash | undefined): st
   return trailingSlash === 'ignore' ? location : location.replace(TRAILING_SLASHES, '')
 }
 
+export interface MissingRedirector {
+  // A page answering 404, such as a dynamic one finding no entry or `_404.kay`.
+  pages: <App extends Elysia>(app: App) => App
+  // A path no route takes, which Elysia answers with its own 404.
+  unrouted: <App extends Elysia>(app: App) => App
+}
+
 // Answers a page request that found nothing with the redirect an editor added for its path, if there is one.
 // Every other response costs one comparison of its status.
 export function redirectMissing<App extends Elysia>(app: App, options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): App {
+  const redirector = missingRedirector(options)
+
+  return redirector.unrouted(redirector.pages(app))
+}
+
+// The two hooks of `redirectMissing` apart, as a `mapResponse` ahead of the compression is the only one that sees a compressed 404 page first, and the `onError` of a hook reaches the routes added after it.
+export function missingRedirector(options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): MissingRedirector {
   const file = storeFile(options.file)
   let told = false
 
@@ -123,19 +137,24 @@ export function redirectMissing<App extends Elysia>(app: App, options: { file?: 
     }
   }
 
-  // A page answering 404, such as a dynamic one finding no entry or `_404.kay`.
-  app.mapResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
-    const answered = responseValue instanceof Response ? responseValue : undefined
-    const status = answered ? answered.status : set.status
+  return {
+    pages(app) {
+      app.mapResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
+        const answered = responseValue instanceof Response ? responseValue : undefined
+        const status = answered ? answered.status : set.status
 
-    if (status !== NOT_FOUND || (route && !isPageRequest(request)) || answered?.headers.get('content-type')?.includes('json') === true)
-      return undefined
+        if (status !== NOT_FOUND || (route && !isPageRequest(request)) || answered?.headers.get('content-type')?.includes('json') === true)
+          return undefined
 
-    return answer(request)
-  })
+        return answer(request)
+      })
 
-  // A path no route takes, which Elysia answers with its own 404.
-  app.onError({ as: 'global' }, ({ code, request }) => code === 'NOT_FOUND' ? answer(request) : undefined)
+      return app
+    },
+    unrouted(app) {
+      app.onError({ as: 'global' }, ({ code, request }) => code === 'NOT_FOUND' ? answer(request) : undefined)
 
-  return app
+      return app
+    },
+  }
 }

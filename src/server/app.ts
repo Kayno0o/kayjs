@@ -64,7 +64,7 @@ import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
-import { knowRuntimeRules, redirectMissing } from './runtime-redirect-api'
+import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { securityHeaders, setSecurityHeaders } from './security'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
@@ -238,6 +238,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)
+
+  const redirector = exported ? undefined : missingRedirector({ trailingSlash: options.trailingSlash, base })
+
+  // Before compression, whose `mapResponse` would answer a compressed 404 page first.
+  redirector?.pages(app)
 
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'
 
@@ -433,18 +438,19 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Read in development too, so a duration that is none stops it there rather than in production.
   const publicCache = publicCacheRules(options.publicCache)
 
-  // The page for a path none serves is built after the public routes, which a file deleted since boot answers with.
+  // The page for a path none serves is built with the page routes, after the public ones, which a file deleted since boot answers with.
   const pageFor: { unmatched?: Unmatched | undefined } = {}
 
-  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
   serveRedirects(app, redirects, mode.dev)
 
   // Before the page routes, which a hook registered after them does not reach.
-  if (!exported)
-    redirectMissing(app, { trailingSlash: options.trailingSlash, base })
+  redirector?.unrouted(app)
 
   if (!mode.dev && !exported)
     countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: options.trailingSlash })
+
+  // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
+  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 

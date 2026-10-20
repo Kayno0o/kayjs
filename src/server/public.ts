@@ -9,6 +9,7 @@ import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { wholeSeconds } from '../runtime/duration'
 import { COMPRESSIBLE_TYPE, readResponse } from './compress'
+import { pageRequested } from './not-found'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -195,6 +196,7 @@ function keeper(path: string, held: { bytes: number }): (current: Stats | undefi
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
 // With `compressing`, a text file of up to 256 KB at boot is answered from its bytes kept in memory, 8 MB in all, which compression takes as they are; a range request, a conditional one and the rest stream the file.
 // A file deleted since boot is answered by `pageFor.unmatched`, set once the page routes exist, else by Elysia's 404.
+// One deleted between the stat and Bun opening it to stream it fails in Bun, after the route returned: the lazy open of a file body cannot be caught, and reading it first would cost the streaming.
 export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE, compressing = false, pageFor: { unmatched?: Unmatched | undefined }): Promise<void> {
   const held = { bytes: 0 }
   // The URLs an HTML file is also served at share its bytes.
@@ -212,27 +214,44 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
       keepers.set(path, read)
     }
 
+    // The answer for a path nothing serves any more, a page request as any other: a redirect an editor added for it answers, and the visit is counted.
+    const gone = async (given: Parameters<Unmatched>[0]) => {
+      // Releases what was kept of it.
+      read?.(undefined)
+      pageRequested(given.request)
+
+      const page = await pageFor.unmatched?.(given)
+
+      // An app with no page for a path nothing serves answers Elysia's own 404, imported here so kay check, which reads this module, loads no Elysia.
+      if (!page)
+        throw new (await import('elysia')).NotFoundError()
+
+      return page
+    }
+
+    // The context is handed over as a copy, as Elysia would parse the cookies, query and headers of every request if the route passed it as it is.
     app.get(url, async (given) => {
       const { request } = given
       // Looked at on every request: a file deleted or replaced under the running server is answered as it now stands.
       const current = statSync(path, { throwIfNoEntry: false })
 
-      if (!current?.isFile()) {
-        // Releases what was kept of it.
-        read?.(undefined)
-
-        const page = pageFor.unmatched?.({ ...given })
-
-        // An app with no page for a path nothing serves answers Elysia's own 404, imported here so kay check, which reads this module, loads no Elysia.
-        if (!page)
-          throw new (await import('elysia')).NotFoundError()
-
-        return page
-      }
+      if (!current?.isFile())
+        return gone({ ...given })
 
       const etag = etagOf(current)
       // A range or a matching tag is answered from the file itself, so the kept bytes only ever back a 200.
-      const bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.(current)
+      let bytes: Uint8Array<ArrayBuffer> | undefined
+
+      try {
+        bytes = request.headers.has('range') || matchesEtag(request.headers.get('if-none-match'), etag) ? undefined : read?.(current)
+      }
+      catch (error) {
+        // Deleted since the stat above.
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+          throw error
+
+        return gone({ ...given })
+      }
 
       if (!bytes)
         return revalidated(request, etag, () => Bun.file(path), {}, cache)

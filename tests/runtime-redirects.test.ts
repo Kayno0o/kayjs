@@ -186,6 +186,23 @@ describe('a served app', () => {
     expect((await served.handle(new Request('http://localhost/rt-gone'))).status).toBe(404)
   })
 
+  it('answers a missing path with the redirect to a client taking compression, whatever the 404 page weighs', async () => {
+    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, compress: true }))
+
+    addRuntimeRedirect('/rt-zipped', '/about')
+
+    try {
+      for (const accept of ['gzip', 'br', 'zstd, br, gzip', 'identity']) {
+        const response = await served.handle(new Request('http://localhost/rt-zipped', { headers: { 'accept-encoding': accept } }))
+
+        expect([response.status, response.headers.get('location')], accept).toEqual([307, '/about'])
+      }
+    }
+    finally {
+      removeRuntimeRedirect('/rt-zipped')
+    }
+  })
+
   it('writes a target with a slash under trailingSlash always, and not a file\'s', async () => {
     const served = await app({ trailingSlash: 'always' })
 

@@ -1,9 +1,12 @@
+import * as fs from 'node:fs'
 import { chmod, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
+import { addRuntimeRedirect, removeRuntimeRedirect } from '../src/server/library'
+import { missingPaths } from '../src/server/not-found'
 import { scratchDir } from './scratch'
 
 // Public text files are compressed on the fly: what a client gets, in every encoding, must not depend on how the server keeps them between requests.
@@ -415,5 +418,185 @@ describe('a public file changed under a running server', () => {
 
       expect((await get(app, `/${name}`, { 'if-none-match': etag })).status, name).toBe(304)
     }
+  })
+})
+
+describe('a deleted public file is a path nothing serves', () => {
+  const MESSAGES = 'tests/fixtures/i18n/src/messages'
+
+  async function served(name: string, content: string | Uint8Array, options: Parameters<typeof serve>[0] = {}) {
+    const path = join(dir, 'public', name)
+
+    await writeFile(path, content)
+
+    const app = await serve(options)
+
+    expect((await get(app, `/${name}`, { 'accept-encoding': 'gzip' })).status, name).toBe(200)
+    await rm(path)
+
+    return app
+  }
+
+  async function counted(path: string) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const found = missingPaths().find(row => row.path === path)
+
+      if (found)
+        return found
+
+      await Bun.sleep(10)
+    }
+
+    throw new Error(`${path} was never counted`)
+  }
+
+  it('answers a redirect added for its path while the server runs', async () => {
+    const app = await served('moved.json', MEDIUM)
+
+    expect((await get(app, '/moved.json')).status).toBe(404)
+    addRuntimeRedirect('/moved.json', '/about', { status: 301 })
+
+    try {
+      for (const headers of [{}, { 'accept-encoding': 'gzip' }, { accept: 'text/html' }]) {
+        const response = await get(app, '/moved.json?utm=a', headers)
+
+        expect([response.status, response.headers.get('location')], JSON.stringify(headers)).toEqual([301, '/about?utm=a'])
+      }
+
+      const head = await get(app, '/moved.json', {}, 'HEAD')
+
+      expect(head.status).toBe(301)
+    }
+    finally {
+      removeRuntimeRedirect('/moved.json')
+    }
+
+    expect((await get(app, '/moved.json')).status).toBe(404)
+  })
+
+  it('answers the redirect under a base', async () => {
+    const app = await served('moved-base.json', MEDIUM, { base: '/docs' })
+
+    addRuntimeRedirect('/moved-base.json', '/about')
+
+    try {
+      const response = await get(app, '/moved-base.json')
+
+      expect([response.status, response.headers.get('location')]).toEqual([307, '/docs/about'])
+    }
+    finally {
+      removeRuntimeRedirect('/moved-base.json')
+    }
+  })
+
+  it('counts the visit like one to any path nothing serves', async () => {
+    const app = await served('counted.json', MEDIUM)
+
+    await get(app, '/counted.json', { referer: 'https://elsewhere.example/page' })
+    expect((await counted('/counted.json')).referrers).toEqual([{ host: 'elsewhere.example', hits: 1 }])
+  })
+
+  it('is answered with the 404 page an unknown path gets, with locales', async () => {
+    const path = join(dir, 'public/locale.json')
+
+    await writeFile(path, MEDIUM)
+
+    const app = await pages({ routes: 'tests/fixtures/i18n/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: MESSAGES } })
+
+    expect((await get(app, '/locale.json')).status).toBe(200)
+    await rm(path)
+
+    for (const language of ['en', 'fr']) {
+      const unknown = await get(app, '/never-there.json', { 'accept-language': language })
+      const response = await get(app, '/locale.json', { 'accept-language': language })
+      const html = await response.text()
+
+      expect(response.status, language).toBe(404)
+      expect(html, language).toContain('class="missing"')
+      expect(html, language).toBe((await unknown.text()).replaceAll('never-there.json', 'locale.json'))
+      expect(response.headers.get('vary'), language).toBe(unknown.headers.get('vary'))
+    }
+  })
+
+  it('is answered with the 404 page of a locale named by its prefix', async () => {
+    const app = await pages({ routes: 'tests/fixtures/i18n/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: MESSAGES } })
+    const response = await get(app, '/en/never-there.json')
+
+    expect(response.status).toBe(404)
+    expect(await response.text()).toContain('Home')
+  })
+
+  it('is answered with the error page of an app that has only an _error.kay', async () => {
+    const root = await scratchDir('public-gone-error-')
+
+    await Bun.write(join(root, 'src/routes/index.kay'), 'main Home\n')
+    await Bun.write(join(root, 'src/routes/_error.kay'), await Bun.file('tests/fixtures/layout-query/src/routes/_error.kay').text())
+    await Bun.write(join(root, 'public/only-error.json'), MEDIUM)
+
+    try {
+      const app = await pages({ routes: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false })
+      const errors: unknown[] = []
+
+      expect((await get(app, '/only-error.json')).status).toBe(200)
+      await rm(join(root, 'public/only-error.json'))
+
+      const unknown = await get(app, '/never-there.json', { accept: 'text/html' })
+      const response = await get(app, '/only-error.json', { 'accept': 'text/html', 'accept-encoding': 'identity' })
+
+      expect(unknown.status).toBe(404)
+      expect(response.status).toBe(404)
+      expect(await response.text()).toBe(await unknown.text())
+      expect(errors).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  describe('while it is read', () => {
+    // The file is gone by the time it is read, as when a deploy replaces `public/` between the request's stat and its read.
+    function goneAtRead(path: string) {
+      const stat = fs.statSync
+      const watching = spyOn(fs, 'statSync').mockImplementation(((target: string, options: Parameters<typeof fs.statSync>[1]) => {
+        const result = stat(target, options)
+
+        if (target === path) {
+          watching.mockRestore()
+          fs.rmSync(path)
+        }
+
+        return result
+      }) as typeof fs.statSync)
+
+      return watching
+    }
+
+    it('answers 404, not a 500, for a file kept in memory', async () => {
+      const path = join(dir, 'public/read-kept.json')
+
+      await writeFile(path, MEDIUM)
+
+      const errors: unknown[] = []
+      const app = await serve({ onError: error => errors.push(error) })
+
+      expect((await get(app, '/read-kept.json')).status).toBe(200)
+      // Changed since it was kept, so the next request reads it again.
+      await writeFile(path, `${MEDIUM} `)
+
+      const watching = goneAtRead(path)
+
+      try {
+        const response = await get(app, '/read-kept.json', { 'accept-encoding': 'gzip' })
+
+        expect(response.status).toBe(404)
+        await response.arrayBuffer()
+      }
+      finally {
+        watching.mockRestore()
+      }
+
+      expect((await get(app, '/read-kept.json')).status).toBe(404)
+      expect(errors).toEqual([])
+    })
   })
 })
