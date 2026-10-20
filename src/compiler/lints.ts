@@ -359,6 +359,14 @@ export const LINTS = {
     wrong: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true, tool: true } })',
     right: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true } })',
   },
+  'untyped-socket': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'An API route `.ws()` with a `body` and no `response`, written with an object literal of options and no spread: an island\'s `socket()` receives its messages as `unknown`, so `last()` and `on()` need a cast. Add `response: chats.response` when it sends through `rooms()`, or a `response` schema; a route only other clients read can allow the lint.',
+    wrong: 'export default api().ws(\'/\', { body: s.Object({ text: s.String() }), message(ws, { text }) { chats.publish(\'main\', { text }) } })',
+    right: 'export default api().ws(\'/\', { body: s.Object({ text: s.String() }), response: chats.response, message(ws, { text }) { chats.publish(\'main\', { text }) } })',
+  },
   'unsized-image': {
     level: 'warn',
     group: 'performance',

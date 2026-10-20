@@ -38,6 +38,7 @@ import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
+import { untypedSockets } from './socket-routes'
 import { typingOptions } from './tsgo'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
@@ -123,7 +124,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await analyticsInfo(root, options))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await analyticsInfo(root, options), ...await untypedSockets(options, served))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

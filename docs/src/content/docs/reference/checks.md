@@ -86,6 +86,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
+| `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height` |
 | `large-public-image` | warn | performance | An `img` using a public image over 256 KiB |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |

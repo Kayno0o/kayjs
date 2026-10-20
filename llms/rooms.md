@@ -21,8 +21,10 @@ export default api()
     },
     message(ws, { text }) {
       const room = ws.data.params.room
+      const from = chats.memberOf(ws, room)
 
-      chats.publish(room, { from: chats.memberOf(ws, room)!, text })
+      if (from !== undefined)
+        chats.publish(room, { from, text })
     },
     close(ws) {
       chats.leave(ws)
@@ -112,7 +114,7 @@ export default api()
 - A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text, else `rooms({ state })` throws.
 - `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
 - It goes out as Elysia sends one, a string as it is and anything else as JSON, not checked against the route's `response`.
-- `response: chats.response` on the ws route types the messages an island's `socket()` receives (`last()`, `on()`) as the rooms' `Message`, so the union is written once, in `rooms<Message>()`; it accepts any message and checks nothing. A ws route with a `body` and no `response` types them `unknown`, which a cast then papers over.
+- `response: chats.response` on the ws route types the messages an island's `socket()` receives (`last()`, `on()`) as the rooms' `Message`, so the union is written once, in `rooms<Message>()`; it accepts any message and checks nothing. A ws route with a `body` and no `response` types them `unknown`, which a cast then papers over, and `kay check` warns about it (`untyped-socket`).
 - `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait`, a duration, `'50ms'` by default: a burst of moves sends the board once, as it stands.
 - `dispatch(message, handlers)` from `kay` calls the handler a message's `type` names with the message, typed to that variant, and gives what it returns.
 - The handlers cover every type, as the compiler checks, and a type none names, such as one a newer server sends, throws.

@@ -226,7 +226,7 @@ export default api().ws('/:room', {
 })
 ```
 
-An island opens it with `socket()`. `send` takes the route's `body`, and `last()` reads the last message reactively.
+An island opens it with `socket()`. `send` takes the route's `body`, and `last()` reads the last message reactively. `last()` and `on()` are typed from the route's `response`; a route with a `body` and no `response` gives them as `unknown`, and `kay check` warns about it (`untyped-socket`).
 
 ```kay
 ---
@@ -267,8 +267,10 @@ export default api()
     },
     message(ws, { text }) {
       const room = ws.data.params.room
+      const from = chats.memberOf(ws, room)
 
-      chats.publish(room, { from: chats.memberOf(ws, room)!, text })
+      if (from !== undefined)
+        chats.publish(room, { from, text })
     },
     close(ws) {
       chats.leave(ws)
@@ -276,7 +278,7 @@ export default api()
   })
 ```
 
-`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. `leave(ws)` takes it out of every room, as `close` does. `members(room)` lists who is in a room, and `memberOf(ws, room)` gives the member one connection joined as, so a handler knows who sent a message.
+`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. `leave(ws)` takes it out of every room, as `close` does. `members(room)` lists who is in a room, and `memberOf(ws, room)` gives the member one connection joined as, so a handler knows who sent a message. It gives `undefined` for a connection that is not in the room, so the handler checks for it.
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
