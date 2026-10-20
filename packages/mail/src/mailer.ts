@@ -393,9 +393,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const realDelivery = transport === outbox && underKayDev() ? relay(options) : undefined
 
   const relayed = async (mail: Mail): Promise<Relayed | undefined> => {
+    if (realDelivery === undefined)
+      return undefined
+
     const to = await deliveryAddress()
 
-    if (to === undefined || realDelivery === undefined)
+    if (to === undefined)
       return undefined
 
     try {

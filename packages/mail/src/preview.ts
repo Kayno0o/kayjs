@@ -337,7 +337,8 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
     })
     .get(`${PREVIEW_PATH}/delivery`, async () => deliveryState(relay))
     .post(`${PREVIEW_PATH}/delivery`, async ({ request, body }) => {
-      const refused = crossSite(request, 'the switch is turned from the Mail tab')
+      // Unlike a send, it stays on for every mail after, so a request naming no origin at all, such as curl's, is refused too.
+      const refused = request.headers.has('sec-fetch-site') ? crossSite(request, 'the switch is turned from the Mail tab') : new Response('Refused: the switch is turned from the Mail tab', { status: 403 })
 
       if (refused)
         return refused

@@ -69,7 +69,7 @@ export default function mailDevTool(tool: DevTool): void {
     switchBox.replaceChildren()
     templates.replaceChildren()
   }
-  const heading = (text: string) => tool.make('div', 'heading', text)
+  const heading = (text: string) => tool.make('h3', 'heading', text)
   const row = (mail: SentMail) => {
     const item = tool.make('div', 'row')
     const head = tool.make('div', '', '')
@@ -131,6 +131,7 @@ export default function mailDevTool(tool: DevTool): void {
     live ??= new EventSource(EVENTS_URL)
     live.onmessage = () => void refresh()
     void refresh()
+    void loadDelivery()
     void loadTemplates()
   }
 
@@ -179,7 +180,9 @@ export default function mailDevTool(tool: DevTool): void {
     list.replaceChildren(heading('Mails'), ...mails.toReversed().map(row))
   }
 
-  async function post(to: string): Promise<void> {
+  async function post(to: string, button: HTMLButtonElement): Promise<void> {
+    button.disabled = true
+
     try {
       const response = await fetch(DELIVERY_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to }) })
 
@@ -220,7 +223,7 @@ export default function mailDevTool(tool: DevTool): void {
       const off = tool.make('button', 'tool', 'Turn off')
 
       off.type = 'button'
-      off.addEventListener('click', () => void post(''))
+      off.addEventListener('click', () => void post('', off))
       box.append(say('', `Every mail sent now is also delivered to ${state.to} over ${state.server}, never to its own recipients, with no cc or bcc.`), off)
     }
     else {
@@ -239,7 +242,7 @@ export default function mailDevTool(tool: DevTool): void {
       search.append(tool.icon('mail'), input)
       form.addEventListener('submit', (event) => {
         event.preventDefault()
-        void post(input.value.trim())
+        void post(input.value.trim(), on)
       })
       form.append(search, on)
       box.append(say('note', `Every mail sent from then on is delivered to this one address over ${state.server}, never to its own recipients, and stays in the outbox.`), form)

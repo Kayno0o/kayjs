@@ -3,13 +3,10 @@ import type { Mail } from './types'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { underKayDev } from 'kay/library'
+import { KAY_DIR, underKayDev } from 'kay/library'
 
 // One address, as the send form takes: a comma or a name would add a recipient.
 export const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
-
-// Where kay keeps what it generates, under the project root.
-const KAY_DIR = '.kay'
 
 // Where `kay dev` keeps the "Send for real" switch for this checkout, beside what it generates and out of git, so the server restarting keeps it.
 const SWITCH_FILE = 'mail-delivery.json'

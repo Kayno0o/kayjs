@@ -79,7 +79,7 @@ function createOutbox(): Outbox {
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     send: async (mail, relayed): Promise<Delivery> => {
       const id = crypto.randomUUID()
-      const sent: SentMail = { ...mail, id, sentAt: new Date(), relayed }
+      const sent: SentMail = { ...mail, id, sentAt: new Date(), ...relayed === undefined ? {} : { relayed } }
 
       mails.push(sent)
 

@@ -109,6 +109,17 @@ describe('the "Send for real" switch', () => {
     expect(listed[0]!.relayed).toEqual({ to: 'me@example.com' })
   })
 
+  it('delivers a mail carrying its own To, Cc and Bcc headers to the typed address alone', async () => {
+    const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
+
+    await toggle(app, 'me@example.com')
+
+    const received = server.received.length
+
+    await app.send({ ...mail('Hostile'), headers: { To: 'victim@example.com', Cc: 'victim@example.com', Bcc: 'victim@example.com' } })
+    expect(server.received.slice(received).map(each => each.to)).toEqual([['<me@example.com>']])
+  })
+
   it('keeps the mail in the outbox with the SMTP error when the server cannot be reached, and sends no error to the caller', async () => {
     process.env.SMTP_PORT = String(closed.port)
 
@@ -172,6 +183,7 @@ describe('the "Send for real" switch', () => {
 
     expect((await toggle(app, 'me@example.com', 'cross-site')).status).toBe(403)
     expect((await toggle(app, 'me@example.com', 'same-site')).status).toBe(403)
+    expect((await request(app, '/_kay/mail/delivery', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to: 'me@example.com' }) })).status).toBe(403)
     expect(existsSync(SWITCH)).toBe(false)
     expect((await toggle(app, 'not an address')).status).toBe(400)
     expect((await toggle(app, 'me@example.com, you@example.com')).status).toBe(400)
