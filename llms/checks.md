@@ -85,7 +85,7 @@ kay lint --cache
   - No `autofocus` outside a `dialog` or an element with `tabindex="-1"` (`autofocus`).
   - No `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one (`link-as-button`).
   - No control inside a link or a button (`nested-control`).
-  - No id two elements of a template share, elements in different branches of an `if` or a `match` or blocks of an `await` excepted, nor one written out inside a `for` (`duplicate-id`).
+  - No id two elements of a template share, elements in different branches of an `if` or a `match` or blocks of an `await` excepted, nor one written out inside a `for`, or inside a `snippet` called more than once (`duplicate-id`).
   - A `label(for="...")` pointing at an id of the template, unless a spread or an expression may set one (`dangling-label`).
   - An `aria-labelledby` or `aria-describedby` listing ids of the template, on the same terms (`dangling-aria`).
   - A `data-tooltip` on an element the keyboard reaches, or whose `aria-label` (not on a role-less `span` or `div`, which screen readers ignore it on), `aria-labelledby` or `aria-describedby` says it, or whose only content is the tooltip's own text (`unreachable-tooltip`).

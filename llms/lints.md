@@ -95,7 +95,7 @@ kay check --only seo
 | `positive-tabindex` | deny | a11y | A `tabindex` above 0. |
 | `link-as-button` | deny | a11y | An `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one. |
 | `nested-control` | deny | a11y | A link, button or field inside a link or a button. |
-| `duplicate-id` | deny | a11y | An id two elements of a template share, or one written out inside a `for`. |
+| `duplicate-id` | deny | a11y | An id two elements of a template share, or one written out inside a `for` or a `snippet` called more than once. |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define. |
 | `unbounded-string` | deny | forms | A string field of an action's schema with no `maxLength`. |
 | `positional-key` | warn | islands | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |

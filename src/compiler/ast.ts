@@ -624,63 +624,70 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
 export function expressionSpans(nodes: readonly Node[]): Span[] {
   const spans: Span[] = []
 
-  visitNodes(nodes, (node) => {
-    switch (node.kind) {
-      case 'element':
-        for (const attribute of node.attributes) {
-          if (attribute.kind === 'expression' || attribute.kind === 'spread')
-            spans.push(attribute.expression)
-        }
+  visitNodes(nodes, node => spans.push(...nodeExpressions(node)))
 
-        if (node.outlet?.args)
-          spans.push(node.outlet.args)
+  return spans
+}
 
-        break
-      case 'text':
-        for (const part of node.parts) {
-          if (part.kind === 'expression')
-            spans.push(part.expression)
-        }
+// The spans of a node's own heads and values in JavaScript, those of its children left out.
+export function nodeExpressions(node: Node): Span[] {
+  const spans: Span[] = []
 
-        break
-      case 'if':
-        spans.push(...node.branches.map(branch => branch.test))
+  switch (node.kind) {
+    case 'element':
+      for (const attribute of node.attributes) {
+        if (attribute.kind === 'expression' || attribute.kind === 'spread')
+          spans.push(attribute.expression)
+      }
 
-        break
-      case 'match':
-        spans.push(node.subject, ...node.cases.flatMap(branch => branch.values))
+      if (node.outlet?.args)
+        spans.push(node.outlet.args)
 
-        break
-      case 'for':
-        spans.push(node.each)
+      break
+    case 'text':
+      for (const part of node.parts) {
+        if (part.kind === 'expression')
+          spans.push(part.expression)
+      }
 
-        if (node.key)
-          spans.push(node.key)
+      break
+    case 'if':
+      spans.push(...node.branches.map(branch => branch.test))
 
-        break
-      case 'await':
-        spans.push(node.value)
+      break
+    case 'match':
+      spans.push(node.subject, ...node.cases.flatMap(branch => branch.values))
 
-        break
-      case 'slot':
-        if (node.params)
-          spans.push(node.params)
+      break
+    case 'for':
+      spans.push(node.each)
 
-        break
-      case 'snippet':
+      if (node.key)
+        spans.push(node.key)
+
+      break
+    case 'await':
+      spans.push(node.value)
+
+      break
+    case 'slot':
+      if (node.params)
         spans.push(node.params)
 
-        break
-      case 'const':
-        spans.push(node.pattern, node.value)
+      break
+    case 'snippet':
+      spans.push(node.params)
 
-        break
-      case 'try':
-      case 'error':
-      case 'pending':
-        break
-    }
-  })
+      break
+    case 'const':
+      spans.push(node.pattern, node.value)
+
+      break
+    case 'try':
+    case 'error':
+    case 'pending':
+      break
+  }
 
   return spans
 }

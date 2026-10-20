@@ -439,6 +439,31 @@ describe('a11y lints', () => {
     expect(a11y('if open\n  p#note a\nelse\n  p#note b\nawait data\n  p#state Loading\nthen value\n  p#state {value}\ncatch\n  p#state Failed\np#main x\np(id="main") y\nfor item of items\n  span#row {item}\n')).toEqual(['duplicate-id p', 'duplicate-id span'])
   })
 
+  it('reports an id written out in a snippet called more than once, but not in one called once or only passed to a component', () => {
+    const snippet = (calls: string) => `snippet card()\n  article#card Hi\n${calls}`
+
+    expect(a11y(snippet('{card()}\n{card()}\n'))).toEqual(['duplicate-id article'])
+    expect(a11y(snippet('{card()}\n'))).toEqual([])
+    expect(a11y(snippet('List(row={card})\n'))).toEqual([])
+    expect(a11y(snippet('p {card()}\nli {card()}\n'))).toEqual(['duplicate-id article'])
+    expect(a11y(snippet('for item of items\n  {card()}\n'))).toEqual(['duplicate-id article'])
+    expect(a11y(snippet('p(title={card()}) x\n{obj.card()}\n'))).toEqual([])
+    expect(a11y(snippet('if open\n  {card()}\nelse\n  {card()}\n'))).toEqual([])
+    expect(a11y(snippet('if open\n  {card()}\n{card()}\n'))).toEqual(['duplicate-id article'])
+    expect(a11y('snippet card(key: string)\n  article(id={`card-${key}`}) Hi\n{card("a")}\n{card("b")}\n')).toEqual([])
+  })
+
+  it('reports an id of a snippet that another element of the page already has, called once', () => {
+    expect(a11y('snippet card()\n  article#card Hi\n{card()}\np#card x\n')).toEqual(['duplicate-id p'])
+  })
+
+  it('counts a snippet called through another snippet, or by itself, as called more than once', () => {
+    expect(a11y('snippet card()\n  article#card Hi\nsnippet pair()\n  {card()}\n  {card()}\n{pair()}\n')).toEqual(['duplicate-id article'])
+    expect(a11y('snippet card()\n  article#card Hi\nsnippet pair()\n  {card()}\n{pair()}\n')).toEqual([])
+    expect(a11y('snippet card()\n  article#card Hi\nsnippet pair()\n  {card()}\n{pair()}\n{pair()}\n')).toEqual(['duplicate-id article'])
+    expect(a11y('snippet node(item)\n  li#node\n    for child of item.children\n      {node(child)}\n{node(root)}\n')).toEqual(['duplicate-id li'])
+  })
+
   it('reports a label pointing at no id of the template, unless an id may come from an expression or a spread', () => {
     expect(a11y('label(for="email") Email\ninput#mail(name="email")\nlabel(for="card") Card\nCardField(id="card")\n')).toEqual(['dangling-label for'])
     expect(a11y('label(for="email") Email\ninput(id={field} name="email")\n')).toEqual([])

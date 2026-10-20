@@ -52,7 +52,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `positive-tabindex` | deny | a11y | A `tabindex` above 0 |
 | `link-as-button` | deny | a11y | An `a` with `onClick` and no `href` |
 | `nested-control` | deny | a11y | A link, button or field inside a link or a button |
-| `duplicate-id` | deny | a11y | An id two elements share |
+| `duplicate-id` | deny | a11y | An id two elements share, or one written out in a `for` or a `snippet` called more than once |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define |
 | `unbounded-string` | deny | forms | A string field of an action with no `maxLength` |
 | `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |

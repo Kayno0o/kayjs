@@ -1,6 +1,6 @@
-import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node } from './ast'
+import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
-import { childBlocks } from './ast'
+import { childBlocks, nodeExpressions, visitNodes } from './ast'
 
 // Controls a person fills in, which a screen reader announces by their label.
 const LABELLED = new Set(['input', 'select', 'textarea'])
@@ -54,11 +54,30 @@ interface Context {
   branches: ReadonlyMap<number, number>
   // Inside a `for`'s rows, so rendered once per row.
   repeated: boolean
+  // The innermost `snippet` declaring the element, rendered wherever it is called.
+  snippet?: SnippetNode | undefined
 }
 
 interface IdUse {
   id: string
   element: ElementNode
+  branches: ReadonlyMap<number, number>
+  repeated: boolean
+  snippet?: SnippetNode | undefined
+  // Repeated only because the snippet holding it is rendered more than once.
+  byCalls?: boolean
+}
+
+// Where a snippet is called: in which alternatives, whether once per row of a `for`, and from which snippet.
+interface CallSite {
+  name: string
+  branches: ReadonlyMap<number, number>
+  repeated: boolean
+  snippet: SnippetNode | undefined
+}
+
+// One render of a snippet's lines on the page.
+interface Render {
   branches: ReadonlyMap<number, number>
   repeated: boolean
 }
@@ -76,6 +95,9 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   const references: { attribute: NamedAttribute, id: string }[] = []
   const radios = new Map<string, ElementNode[]>()
   const ids: IdUse[] = []
+  // Each `snippet` of the template, and the places calling one by name.
+  const snippets = new Map<string, SnippetNode>()
+  const calls: CallSite[] = []
   // A spread or an id written as an expression may hold any id, so no label pointing at one is reported.
   let dynamicIds = false
   let blocks = 0
@@ -201,7 +223,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       dynamicIds = true
 
     if (id !== undefined)
-      ids.push({ id, element, branches: context.branches, repeated: context.repeated })
+      ids.push({ id, element, branches: context.branches, repeated: context.repeated, snippet: context.snippet })
   }
 
   const checkAria = (element: ElementNode) => {
@@ -370,6 +392,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     control: context.control ?? (!element.component && (element.name === 'button' || (element.name === 'a' && has(element, 'href'))) ? element : undefined),
     branches: context.branches,
     repeated: context.repeated,
+    snippet: context.snippet,
   })
   // Each alternative of a block renders on its own, so what one holds never meets what another does.
   const alternatives = (context: Context, count: number, visitOne: (index: number, branch: Context) => void) => {
@@ -378,9 +401,27 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     for (let index = 0; index < count; index++)
       visitOne(index, { ...context, branches: new Map([...context.branches, [block, index]]) })
   }
+
+  visitNodes(file.template, (node) => {
+    if (node.kind === 'snippet')
+      snippets.set(text(node.name), node)
+  })
+
+  // A snippet is called as `name(`, which a member of an object of the same name is not.
+  const callable = snippets.size > 0 ? new RegExp(`(?<![\\w$.])(${[...snippets.keys()].map(name => RegExp.escape(name)).join('|')})\\s*\\(`, 'g') : undefined
+  const collectCalls = (node: Node, context: Context) => {
+    for (const span of nodeExpressions(node)) {
+      for (const match of text(span).matchAll(callable!))
+        calls.push({ name: match[1]!, branches: context.branches, repeated: context.repeated, snippet: context.snippet })
+    }
+  }
+
   const visit = (nodes: Node[], context: Context) => {
     for (const node of nodes) {
       const walk = WALKS[node.kind]
+
+      if (callable)
+        collectCalls(node, context)
 
       if (node.kind === 'element') {
         checkElement(node, context)
@@ -388,7 +429,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       }
       else if (walk === 'within') {
         for (const block of childBlocks(node))
-          visit(block, node.kind === 'slot' || node.kind === 'snippet' ? { ...context, component: true } : context)
+          visit(block, node.kind === 'slot' || node.kind === 'snippet' ? { ...context, component: true, snippet: node.kind === 'snippet' ? node : context.snippet } : context)
       }
       else if (walk === 'alternatives') {
         const children = childBlocks(node)
@@ -435,16 +476,62 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       lint(group[0]!, 'ungrouped-radios', `The radios named \`${name}\` sit in no \`fieldset\``, { note: 'a screen reader reads each radio by its own label, never the question they answer', help: 'wrap them in a `fieldset` whose `legend` asks it, or an element with `role="radiogroup"` and `aria-label`' })
   }
 
-  checkIds(ids)
+  checkIds(rendered(ids))
 
   return found
 
+  // The ids of the page, a snippet's once for each place rendering it.
+  function rendered(uses: IdUse[]): IdUse[] {
+    const memo = new Map<SnippetNode, Render[]>()
+    const pending = new Set<SnippetNode>()
+    const rendersOf = (snippet: SnippetNode): Render[] => {
+      const known = memo.get(snippet)
+
+      if (known)
+        return known
+
+      // A snippet calling itself renders once more for each level it goes down.
+      if (pending.has(snippet))
+        return [{ branches: new Map(), repeated: true }]
+
+      pending.add(snippet)
+
+      const renders = calls.filter(call => snippets.get(call.name) === snippet).flatMap((call): Render[] => call.snippet ? rendersOf(call.snippet).map(render => ({ branches: new Map([...call.branches, ...render.branches]), repeated: call.repeated || render.repeated })) : [call])
+
+      pending.delete(snippet)
+      memo.set(snippet, renders)
+
+      return renders
+    }
+
+    return uses.flatMap((use) => {
+      const renders = use.snippet ? rendersOf(use.snippet) : []
+
+      // A snippet never called, or only passed to a component, renders where its component says.
+      if (renders.length === 0)
+        return [use]
+
+      return renders.map(render => ({ ...use, branches: new Map([...render.branches, ...use.branches]), repeated: use.repeated || render.repeated, byCalls: !use.repeated && render.repeated }))
+    })
+  }
+
   function checkIds(uses: IdUse[]) {
     const first = new Map<string, IdUse[]>()
+    const reported = new Set<ElementNode>()
+    const perCall = (use: IdUse) => {
+      reported.add(use.element)
+      lint(use.element, 'duplicate-id', `The id \`${use.id}\` repeats on every call of its snippet \`${text(use.snippet!.name)}\``, { note: 'an id names one element of the page: a label, a link or a script reaching it gets only the first call\'s', help: `make it unique per call, built from a parameter: \`id={\`${use.id}-\${...}\`}\`` })
+    }
 
     for (const use of uses) {
-      if (use.element.component)
+      if (use.element.component || reported.has(use.element))
         continue
+
+      if (use.byCalls) {
+        perCall(use)
+
+        continue
+      }
 
       if (use.repeated) {
         lint(use.element, 'duplicate-id', `The id \`${use.id}\` repeats on every row of its \`for\``, { note: 'an id names one element of the page: a label, a link or a script reaching it gets only the first row\'s', help: `make it unique per row, \`id={\`${use.id}-\${...}\`}\`` })
@@ -455,7 +542,9 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       const before = first.get(use.id) ?? []
       const clash = before.find(other => !exclusive(other.branches, use.branches))
 
-      if (clash)
+      if (clash?.element === use.element)
+        perCall(use)
+      else if (clash)
         lint(use.element, 'duplicate-id', `The id \`${use.id}\` is already used`, { related: [{ ...at(clash.element), label: 'first used here' }], note: 'an id names one element of the page: a label, a link or a script reaching it gets only the first', help: 'give each element an id of its own' })
 
       first.set(use.id, [...before, use])
