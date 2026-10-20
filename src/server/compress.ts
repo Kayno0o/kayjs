@@ -634,9 +634,14 @@ const wholeSizes = new WeakMap<Response, number>()
 // The pieces a page's body was put together from, for the responses made with them.
 const wholePieces = new WeakMap<Response, BodyPieces>()
 
+// The size compression judges a body by: its bytes, or for a body in pieces the fixed texts alone once they reach `MIN_SIZE`, as it only asks whether the body is small, and counting the bytes of every piece was a visible part of a page rendered per request.
+// The exact size of the pieces is counted where a kept copy is looked for.
 function sizeOf(body: string | Uint8Array<ArrayBuffer>, pieces: BodyPieces | undefined): number {
-  if (pieces)
-    return piecesSize(pieces)
+  if (pieces) {
+    const fixed = pieces.texts.reduce((total, text) => total + text.bytes.length, 0)
+
+    return fixed >= MIN_SIZE ? fixed : piecesSize(pieces)
+  }
 
   return typeof body === 'string' ? Buffer.byteLength(body) : body.length
 }
@@ -699,7 +704,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
 
   const pieces = splice ? wholePieces.get(response) : undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: wholeSizes.get(response)! })
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: piecesSize(pieces) })
 }
 
 function advertise(headers: Headers, { link }: ServedDictionary): void {

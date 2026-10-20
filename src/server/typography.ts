@@ -4,7 +4,8 @@ import { isFrench, spaced } from '../runtime/french'
 const MARK = / [:;!?»]/g
 const OPENING = /« /g
 const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|[^\s"'=<>`]+))?/g
-const TAG_END = /(?:[^>"']|"[^"]*"|'[^']*')*>/y
+// A tag's end: runs of characters that are neither a `>` nor a quote, and quoted values, alternating, so a run is one step of the regex and not one per character.
+const TAG_END = /[^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>/y
 const TAG_NAME = /^<([a-z][^\s/>]*)/i
 const WRITTEN_SPACING = /\s(?:alt|title|aria-label|content)\s*=\s*(?:"[^"]*|'[^']*)(?: [:;!?»]|« )/i
 const OPENING_SIGN = '«'
@@ -26,7 +27,30 @@ const LETTER_T = 116
 
 // What a page rendered in this language runs its markup through, or nothing when it is not French or the app turned `typography` off.
 export function typographyFor(lang: string, typography: boolean | undefined): ((html: string) => string) | undefined {
-  return typography !== false && isFrench(lang) ? frenchSpaces : undefined
+  return typography !== false && isFrench(lang) ? remembered : undefined
+}
+
+// The last few markups the pass read and what it made of them: a page rendered per request, as a not-found page, writes the same markup again, which is found for the price of comparing it, not of reading its tags again.
+const REMEMBERED = 4
+// A longer markup is left out, so what is held stays within a few hundred KB.
+const REMEMBERED_LENGTH = 65_536
+const recent: ({ html: string, spaced: string } | undefined)[] = Array.from({ length: REMEMBERED })
+let oldest = 0
+
+function remembered(html: string): string {
+  for (const seen of recent) {
+    if (seen?.html === html)
+      return seen.spaced
+  }
+
+  const spaced = frenchSpaces(html)
+
+  if (html.length <= REMEMBERED_LENGTH) {
+    recent[oldest] = { html, spaced }
+    oldest = (oldest + 1) % REMEMBERED
+  }
+
+  return spaced
 }
 
 // Whether `name` (lower case) starts at `from` as a whole tag name, in any case.

@@ -2103,6 +2103,24 @@ describe('compression', () => {
     expect(new TextDecoder().decode(Bun.gunzipSync(await (await compressResponse(new Request('http://localhost/', accept), other, fixed))!.bytes()))).toBe(`<head>${a}</head>${words('cafe')}`)
   })
 
+  it('judges a page in pieces by its size whether its fixed texts are large or small, and leaves a small one alone', async () => {
+    const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
+    const accept = { headers: { 'accept-encoding': 'gzip' } }
+    const send = async (strings: string[], texts: ReturnType<typeof fixedTexts>) => {
+      const page = strings.flatMap((string, index) => [string, texts[index]?.bytes.toString() ?? '']).join('')
+
+      return compressResponse(new Request('http://localhost/', accept), wholeResponse(page, { headers: { 'content-type': 'text/html' } }, { strings, texts }), texts)
+    }
+    const small = fixedTexts(['<style>a{}</style>'])
+    const large = fixedTexts([`<style>${'.x{margin:0}'.repeat(40)}</style>`])
+    const words = `<p>${'mot '.repeat(120)}</p>`
+
+    // A page whose pieces all together are small is left alone, one with a large text or large pieces is compressed.
+    expect(await send(['<p>Hi</p>', ''], small)).toBeUndefined()
+    expect((await send(['', words], large))!.headers.get('content-encoding')).toBe('gzip')
+    expect((await send([words, ''], small))!.headers.get('content-encoding')).toBe('gzip')
+  })
+
   it('never serves a kept gzip for a text made after a reload, as the ids of texts are not reused', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     // The same length and place, another rule.

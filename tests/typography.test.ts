@@ -7,7 +7,7 @@ import { Elysia } from 'elysia'
 import { isFrench } from '../src/runtime/french'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { pages } from '../src/server'
-import { frenchSpaces } from '../src/server/typography'
+import { frenchSpaces, typographyFor } from '../src/server/typography'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 
@@ -25,7 +25,40 @@ describe('which pages get the French spaces', () => {
   })
 })
 
+describe('what a page is run through', () => {
+  it('is the pass for a French page and nothing for another language or `typography: false`', () => {
+    expect(typographyFor('fr-CA', undefined)).toBeFunction()
+    expect(typographyFor('fr', true)).toBeFunction()
+    expect(typographyFor('fr', false)).toBeUndefined()
+    expect(typographyFor('en', undefined)).toBeUndefined()
+  })
+
+  it('gives the pass\'s result for a markup it saw before, the markups after it, and a long one', () => {
+    const polish = typographyFor('fr', undefined)!
+    const markups = Array.from({ length: 20 }, (_, index) => `<p title="n${index} : x">Texte ${index} : fin !</p>${index % 2 === 0 ? '<code>a : b</code>' : ''}`)
+    const long = `<p>${'mot '.repeat(20_000)}: fin</p>`
+
+    for (let round = 0; round < 3; round++) {
+      for (const markup of [...markups, long, markups[3]!, markups[3]!, long]) {
+        const out = polish(markup)
+
+        expect(out).toBe(frenchSpaces(markup))
+        expect(out).not.toBe(markup)
+      }
+    }
+
+    expect(polish('<p>rien à changer</p>')).toBe('<p>rien à changer</p>')
+    expect(polish('<p>rien à changer</p>')).toBe('<p>rien à changer</p>')
+  })
+})
+
 describe('French spaces in a page\'s markup', () => {
+  it('reads a tag with quoted values of both kinds, holding a > or not, to its end', () => {
+    const html = '<a title=\'x > y\' alt="p : q" data-z="1 > \'2\'" href=/z class=\'a "b" c\'>a : b</a><img alt=\'d : e\'><b>f : g</b>'
+
+    expect(frenchSpaces(html)).toBe(`<a title='x > y' alt="p${N}: q" data-z="1 > '2'" href=/z class='a "b" c'>a${N}: b</a><img alt='d${N}: e'><b>f${N}: g</b>`)
+  })
+
   it('turns the space before : ; ! ? and inside « » into a non-breaking one', () => {
     expect(frenchSpaces('<p>Bonjour : le monde ! Vraiment ? Oui ; non</p>')).toBe(`<p>Bonjour${N}: le monde${N}! Vraiment${N}? Oui${N}; non</p>`)
     expect(frenchSpaces('<p>« Bonjour »</p>')).toBe(`<p>«${N}Bonjour${N}»</p>`)
