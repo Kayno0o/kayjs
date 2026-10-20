@@ -1,11 +1,9 @@
 import type { TestPage } from '../src/test'
-import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { requestIdHeader } from '../src/server/protection'
 import { headerCopies, ownHeaders } from '../src/server/security'
@@ -14,7 +12,7 @@ import { fixtureCopy } from './scratch'
 import { askServerIslands, loadDroppedChunk, ready } from './skew-page'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 const ENTRY = /<script type="module"[^>]* src="([^"]+)"/
 const BUILD = /<meta name="kay-build" content="([^"]+)">/
 

@@ -1,10 +1,8 @@
 import type { LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { liveId } from '../src/build/live-ids'
 import { browserPath, testSite } from '../src/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
@@ -15,7 +13,7 @@ const VISITORS = idOf('visitors')
 const SECRET = idOf('secret')
 // A keyed value another fixture declares: the proof of a page here does not cover it.
 const ROOM = idOf('room')
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 
 type Values = typeof import('./fixtures/live-late/src/live')
 

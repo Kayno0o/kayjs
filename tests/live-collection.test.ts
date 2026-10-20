@@ -1,10 +1,8 @@
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { removeEntry, saveEntry } from '../src/content'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { browserPath, testSite } from '../src/test'
@@ -144,7 +142,7 @@ describe('a page following a collection', () => {
   })
 })
 
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a collection a page follows, in a browser', () => {
   let site: TestSite

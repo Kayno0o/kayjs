@@ -1,11 +1,9 @@
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browse, browserPath, testSite } from '../src/test'
 import { cookiePairs } from '../src/test/browser'
 
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 describe('cookiePairs', () => {
   it('splits a Cookie header, trimming and skipping empty or nameless pieces', () => {

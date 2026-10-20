@@ -1,11 +1,9 @@
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
 
 // A file of its own, as one process serves one project and the fixture is a project of its own.
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 // Once every result of the workers fixture is in.
 function labDone(): boolean {

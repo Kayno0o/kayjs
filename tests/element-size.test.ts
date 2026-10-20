@@ -1,11 +1,9 @@
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/element-size/src/routes', browser: true })
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 afterAll(async () => site.close())
 

@@ -1,10 +1,8 @@
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { invalidate } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { decodeServerValue } from '../src/runtime/wire'
@@ -189,7 +187,7 @@ describe('a route a resource reads, following cached values', () => {
   })
 })
 
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resource following a route, in a browser', () => {
   let site: TestSite

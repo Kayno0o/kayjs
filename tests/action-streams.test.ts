@@ -1,10 +1,8 @@
 import type { Action, ActionStream } from '../src/runtime'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
-import { chromium } from 'playwright-core'
 import { action, ActionRedirect, encodeCall, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
@@ -39,7 +37,7 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
 const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number, pages: { slow: number, await: number, slowServed: number }, slowGate: PromiseWithResolvers<void> } }
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 afterAll(async () => {
   await Promise.all([site.close(), mounted.close(), localized.close()])

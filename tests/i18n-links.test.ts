@@ -1,16 +1,14 @@
 import type { I18nConfig } from '../src/config'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
 import { expectEagerJsWithin } from './eager-js'
 import { fixtureCopy } from './scratch'
 
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 // What a page of an app with locales, its one small island importing nothing of kay/i18n, loads up front, gzipped, a little above what it is: the links an island sets go in the page's locale from the start, the messages and formatters wait for an island using them.
 // About 1% above it, as the hashed chunk names alone move it by a dozen bytes from one project path to the next.
 // This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.

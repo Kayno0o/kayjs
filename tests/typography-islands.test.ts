@@ -1,15 +1,13 @@
 import type { TestPage, TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { clientOptionsOf, PRODUCTION } from '../src/project'
 import { LEFT_ALONE, spaced } from '../src/runtime/french'
 import { frenchSpaces } from '../src/server/typography'
 import { browserPath, testSite } from '../src/test'
 import { eagerJs } from './eager-js'
 
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 const routes = 'tests/fixtures/french-islands/src/routes'
 const messages = 'tests/fixtures/french-islands/src/messages'
 const N = '\u00A0'

@@ -1,11 +1,9 @@
 import type { FileStore } from '../src/server'
-import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setSystemTime } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { testWorker } from '../src/build/assets'
 import { cacheDir } from '../src/project'
 import { image } from '../src/runtime/image'
@@ -19,7 +17,7 @@ const ROUTES = 'tests/fixtures/storage/src/routes'
 const STATIC_FIXTURE = 'tests/fixtures/storage-static'
 const hero = async (name = 'Hero.PNG') => new File([await Bun.file(HERO).arrayBuffer()], name, { type: 'image/png' })
 const dir = await mkdtemp(join(tmpdir(), 'kay-storage-'))
-const browser = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const browser = browserPath()
 
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true })

@@ -1,14 +1,12 @@
-import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browse, browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
 // A file of its own, as a process serves one project and this one serves a copy of the i18n fixture.
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('route() in an island', () => {
   it('sets in the browser the href the server rendered, under a base and a locale with translated paths', async () => {

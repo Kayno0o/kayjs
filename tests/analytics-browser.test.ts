@@ -1,9 +1,7 @@
 import type { TestPage, TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { analytics } from '../src/server/analytics'
 import { NOTICE_SCRIPT } from '../src/server/analytics-script'
 import { browserPath, testSite } from '../src/test'
@@ -16,7 +14,7 @@ function restoreEnvironment(value: string | undefined): void {
     process.env.NODE_ENV = value
 }
 
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 interface Received { body: { url: string, referrer: string } }
 

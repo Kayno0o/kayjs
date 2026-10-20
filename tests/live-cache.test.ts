@@ -1,12 +1,10 @@
 import type { CacheStore } from '../src/runtime/cache'
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { cached, invalidate, trackStore, untrackStore } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { IDLE_MS } from '../src/runtime/live-cache'
@@ -286,7 +284,7 @@ async function waitFor(condition: () => boolean): Promise<void> {
   expect(condition()).toBe(true)
 }
 
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached value a page follows, in a browser', () => {
   let site: TestSite

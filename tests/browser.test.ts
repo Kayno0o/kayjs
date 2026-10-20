@@ -6,14 +6,12 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
-import { chromium } from 'playwright-core'
 import { previewUrl } from '../src/server'
 import { browse, browserPath, testSite } from '../src/test'
 import { chromeTree, killAll, removeFetcherDirs } from '../src/test/browser'
 import { scratchDir } from './scratch'
 
-// Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 let site: TestSite
 let page: TestPage

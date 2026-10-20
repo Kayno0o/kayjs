@@ -1,10 +1,8 @@
 import type { Action } from '../src/runtime'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
-import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
 import { action, actionStub, formDescribed, formMarked } from '../src/runtime/action'
 import { markInvalid } from '../src/runtime/invalid'
@@ -37,7 +35,7 @@ const { save, ping, busy, odd, enrol } = await import(join(import.meta.dir, 'fix
   odd: Action<Record<string, never>, unknown>
   enrol: Action<Record<string, string>, unknown>
 }
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 const REFUSED = { name: 'A', password: 'hunter2', bio: 'Hi <b>', plan: 'pro', size: 'l', news: 'on', website: '' }
 
 describe('a form posting to an action', () => {

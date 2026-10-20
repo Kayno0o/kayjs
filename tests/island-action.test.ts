@@ -1,9 +1,7 @@
 import type { Action } from '../src/runtime'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { actionStub, reviveActions } from '../src/runtime/action'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
@@ -19,7 +17,7 @@ const fixture = join(import.meta.dir, 'fixtures/island-action/src')
 const { greet } = await import(join(fixture, 'routes/index.kay')) as { greet: Action<{ name: string }, string> }
 const { shout } = await import(join(fixture, 'routes/other.kay')) as { shout: Action<{ name: string }, string> }
 const { hello } = await import(join(fixture, 'routes/promoted.kay')) as { hello: Action<{ name: string }, string> }
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 afterAll(async () => {
   await Promise.all([site.close(), mounted.close(), localized.close(), developed.close()])

@@ -1,14 +1,12 @@
 import type { I18nConfig, KayConfig } from '../src/config'
 import type { LocaleSettings } from '../src/runtime/i18n'
 import type { ScratchBuild } from './prerendered'
-import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
-import { chromium } from 'playwright-core'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
@@ -30,8 +28,7 @@ const routes = `${FIXTURE}/src/routes`
 const messages = `${FIXTURE}/src/messages`
 const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
 const SITE = 'https://x.example'
-// Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the browser tests.
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 const app = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n }))
 
 // Built by the first test reading it, then shared by the others, as building the fixture's pages again for each would only cost time.

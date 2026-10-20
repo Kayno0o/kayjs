@@ -1,9 +1,7 @@
 import type { TestPage } from '../src/test'
-import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { browse, browserPath } from '../src/test'
 import { takeDocsBuild } from './docs-build'
 
@@ -12,8 +10,7 @@ const CLI = resolve('src/cli.ts')
 const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/ui/app-header', '/structure/app-css']
 const SCHEMES = ['light', 'dark'] as const
 
-// Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 async function reachable(url: string): Promise<boolean> {
   try {

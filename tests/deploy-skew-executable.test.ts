@@ -1,10 +1,8 @@
 import type { TestPage } from '../src/test'
-import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
-import { chromium } from 'playwright-core'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { browse, browserPath } from '../src/test'
 import { fixtureCopy } from './scratch'
@@ -13,7 +11,7 @@ import { ready } from './skew-page'
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const LISTENING = /listening (\d+)/
 const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
-const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const path = browserPath()
 
 interface Running {
   origin: string

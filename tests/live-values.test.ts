@@ -1,11 +1,9 @@
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
 import { liveId, liveIds } from '../src/build/live-ids'
 import { compileKay } from '../src/compiler'
@@ -518,7 +516,7 @@ describe('writing a live value in a browser', () => {
   })
 })
 
-const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
+const chrome = browserPath()
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live values in a browser', () => {
