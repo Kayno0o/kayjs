@@ -206,4 +206,14 @@ Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Set `prox
 
 Have the proxy pass `X-Forwarded-Proto`, or set `site` in kay.config.ts to the https address. Kay's cookies then stay `Secure`. Production warns once when it cannot tell.
 
+## Pages that send only their difference
+
+A server build uses its 404 page as a dictionary. Every page carries a `Link` header naming it, so a browser downloads it once, when it is idle, and keeps it as long as the build lives.
+
+After that the browser sends `Available-Dictionary` with each request for a page, and kay answers with `Content-Encoding: dcz`: the page as its difference from the dictionary. The shared header, navigation and styles cost nothing the second time. On kay's own docs a 41 KB page that is 9 KB with brotli goes in 4.4 KB.
+
+Nothing is to set up. A browser without the feature, or one holding the dictionary of an earlier build, gets brotli, zstd or gzip as before. `kay build` writes the `dcz` copy of every prerendered page, and a page rendered per request is compressed as it is sent.
+
+It needs a secure context (https, or localhost) and a proxy that passes `Accept-Encoding`, `Available-Dictionary` and `Content-Encoding` through. A CSP without `'self'` in `connect-src` stops the browser from fetching the dictionary. Development and `kay build --static` have no dictionary.
+
 <ReadMore href="/llms/production">Log entries for your own sink, span attributes, security headers and compression are in the full production reference.</ReadMore>

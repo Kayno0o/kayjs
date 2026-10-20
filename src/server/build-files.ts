@@ -8,6 +8,7 @@ import { NOTICES_FILE } from '../build/licenses'
 import { mapBundleToKay } from '../build/sourcemap'
 import { SEARCH_MANIFEST } from '../runtime/search'
 import { encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
+import { useAsDictionary } from './dictionary'
 import { decodePath } from './routes'
 import { headerCopies, ownHeaders } from './security'
 
@@ -33,7 +34,7 @@ function encodedName(dir: string, path: string): string {
 }
 
 // Serves the browser build under `/_kay/`, each file with its compressed copy when the browser takes it, and gives the path of each, whose responses carry the security headers themselves.
-export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, security }: { dev: boolean, security: Record<string, string> | undefined }): Promise<string[]> {
+export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, security, base = '' }: { dev: boolean, security: Record<string, string> | undefined, base?: string }): Promise<string[]> {
   const clientFiles = await filesUnder(client.dir)
   const assetCopies = encodedCopies(clientFiles)
   const immutable = { 'cache-control': 'public, max-age=31536000, immutable' }
@@ -42,14 +43,20 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
   const searchManifest = resolve(client.dir, SEARCH_MANIFEST.slice(ASSET_PREFIX.length))
   // The notices file keeps its name from one build to the next, as the search manifest does.
   const notices = resolve(client.dir, NOTICES_FILE)
+  // Kept by a browser to compress its other pages against, for as long as it is fresh.
+  const dictionaryFile = client.dictionary === undefined || dev ? undefined : resolve(client.dir, client.dictionary.file)
   // Outside development the build's files never change, so each is looked up once, by the name the request spells it with, and its headers built once: a lookup costs more than sending the file, in an executable most of all.
   // Only a name spelled as the build writes it or lists its URL is kept, so requests cannot grow the map past the build's files.
   const served = new Map<string, ServedAsset>()
 
+  function assetCache(path: string) {
+    return path === dictionaryFile ? { ...immutable, 'use-as-dictionary': useAsDictionary(base) } : immutable
+  }
+
   function prepare(path: string, file: Bun.BunFile): ServedAsset {
     const copies = assetCopies.get(path)
     const manifest = path === searchManifest || path === notices
-    const cache = manifest ? { 'cache-control': 'no-cache' } : immutable
+    const cache = manifest ? { 'cache-control': 'no-cache' } : assetCache(path)
 
     return {
       path,

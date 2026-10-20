@@ -1,7 +1,9 @@
+import type { LoadedDictionary, ServedDictionary } from './dictionary'
 import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeZlib } from './builtins'
+import { dictionaryAsked, dictionaryBody, dictionaryBodySync } from './dictionary'
 import { limiter } from './limit'
 
 export type Encoding = 'zstd' | 'br' | 'gzip'
@@ -37,6 +39,7 @@ const acceptedWeights = new Map<string, Record<Encoding, number>>()
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 6
 const ZSTD_LEVEL = 3
+const VARY_DICTIONARY = /\bavailable-dictionary\b/i
 
 // Response types worth compressing: text, the structured data and scripts sent as text, and the fonts that carry no compression of their own.
 export const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm|(?:x-)?ndjson)|font\/(?:ttf|otf)|image\/svg\+xml)/i
@@ -44,6 +47,9 @@ export const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml
 const BODILESS = new Set([101, 204, 205, 206, 304])
 const NO_TRANSFORM = /\bno-transform\b/i
 const VARY_ENCODING = /\baccept-encoding\b/i
+
+// What a body is compressed with: an encoding, or a dictionary.
+type Compressor = Encoding | { dictionary: LoadedDictionary, id: string }
 
 // One body through brotli or gzip, off the main thread.
 async function compressBrotli(bytes: Uint8Array, params: Record<number, number>): Promise<Uint8Array<ArrayBuffer>> {
@@ -149,8 +155,11 @@ async function shrunk(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Promi
 const compressing = limiter(4)
 
 // One body compressed whole, off the main thread, at the levels of the request path. Brotli's window is cut to the body, since a larger one only costs memory: 4 MB at its default.
-async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uint8Array<ArrayBuffer>> {
+async function compressBytes(bytes: Uint8Array, encoding: Compressor): Promise<Uint8Array<ArrayBuffer>> {
   return compressing(async () => {
+    if (typeof encoding === 'object')
+      return dictionaryBody(encoding.dictionary, bytes, ZSTD_LEVEL)
+
     if (encoding === 'zstd')
       return new Uint8Array(await Bun.zstdCompress(bytes, { level: ZSTD_LEVEL }))
 
@@ -172,7 +181,10 @@ function brotliWindow(length: number): number {
 // Up to this size a body compresses on the main thread, within its request's tick: it costs about a quarter less CPU than on zlib's threads, gzip needs no node:zlib loaded, and its reply goes out corked with a length. Past it, the main thread would stall for more than about half a millisecond on a typical page.
 const COMPRESS_HERE_BYTES = 128 * 1024
 
-function compressBytesHere(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Uint8Array<ArrayBuffer> {
+function compressBytesHere(bytes: Uint8Array<ArrayBuffer>, encoding: Compressor): Uint8Array<ArrayBuffer> {
+  if (typeof encoding === 'object')
+    return dictionaryBodySync(encoding.dictionary, bytes, ZSTD_LEVEL)
+
   if (encoding === 'zstd')
     return new Uint8Array(Bun.zstdCompressSync(bytes, { level: ZSTD_LEVEL }))
 
@@ -193,8 +205,8 @@ const keptCopies = new Map<string, { check: bigint, copy: Uint8Array<ArrayBuffer
 const seenOnce = new Map<string, bigint>()
 let keptBytes = 0
 
-function copyKey(bytes: Uint8Array, encoding: Encoding): { key: string, check: bigint } {
-  return { key: `${encoding}${bytes.length}:${Bun.hash.xxHash3(bytes, HASH_SEED)}`, check: BigInt(Bun.hash.wyhash(bytes, HASH_SEED)) }
+function copyKey(bytes: Uint8Array, encoding: Compressor): { key: string, check: bigint } {
+  return { key: `${typeof encoding === 'object' ? encoding.id : encoding}${bytes.length}:${Bun.hash.xxHash3(bytes, HASH_SEED)}`, check: BigInt(Bun.hash.wyhash(bytes, HASH_SEED)) }
 }
 
 function keptCopy(key: string, check: bigint): Uint8Array<ArrayBuffer> | undefined {
@@ -239,7 +251,7 @@ function keepCopy(key: string, check: bigint, copy: Uint8Array<ArrayBuffer>): vo
 }
 
 // A whole body compressed at the levels of the request path, from the copies kept or within the tick when small, and whether it may go out past a macrotask: a kept copy may, as its page may have waited on I/O.
-async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Promise<{ copy: Uint8Array<ArrayBuffer>, late: boolean }> {
+async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Compressor): Promise<{ copy: Uint8Array<ArrayBuffer>, late: boolean }> {
   const { key, check } = copyKey(bytes, encoding)
   const kept = keptCopy(key, check)
 
@@ -645,15 +657,22 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless it waited on zlib's threads and goes out at 15 KB or more, compressed or not (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 // A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives zstd or brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
-export function compressResponse(request: Request, response: Response, fixed?: FixedText[], report?: (error: Error) => void): Response | undefined | Promise<Response> {
+// A page of a build with a dictionary names it in a `Link` header, and goes out as the difference from it to a browser holding it, in place of the other encodings; a streamed one goes as it did.
+export function compressResponse(request: Request, response: Response, fixed?: FixedText[], report?: (error: Error) => void, dictionary?: ServedDictionary): Response | undefined | Promise<Response> {
   const { headers, status } = response
+  const html = dictionary !== undefined && !BODILESS.has(status) && HTML_TYPE.test(headers.get('content-type') ?? '')
+
+  if (html)
+    advertise(headers, dictionary)
+
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
 
   if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
-  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
+  const dictionaryAsk = html && dictionaryAsked(request, dictionary.ref) ? dictionary : undefined
+  const encoding = dictionaryAsk ? 'dcz' : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
   const read = readBodies.get(response)
 
   // A streamed body is sent once: a route returning it again gets an error naming it, rather than an empty or broken reply.
@@ -671,17 +690,25 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   }
 
   if (read)
-    return compressBody(response, read, encoding, request.headers.get('accept-encoding'))
+    return compressBody(response, read, encoding, request.headers.get('accept-encoding'), dictionaryAsk)
 
   // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
   if (!response.body)
     return undefined
 
-  const splice = fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
+  const splice = encoding !== 'dcz' && fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 
   const pieces = splice ? wholePieces.get(response) : undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: wholeSizes.get(response)! })
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), dictionaryAsk, splice, pieces && { pieces, size: wholeSizes.get(response)! })
+}
+
+function advertise(headers: Headers, { link }: ServedDictionary): void {
+  headers.append('link', link)
+  varyOnEncoding(headers)
+
+  if (!VARY_DICTIONARY.test(headers.get('vary') ?? ''))
+    headers.append('vary', 'available-dictionary')
 }
 
 function varyOnEncoding(headers: Headers): void {
@@ -689,7 +716,7 @@ function varyOnEncoding(headers: Headers): void {
     headers.append('vary', 'accept-encoding')
 }
 
-function compressedHeaders(headers: Headers, used: Encoding): Headers {
+function compressedHeaders(headers: Headers, used: Encoding | 'dcz'): Headers {
   const compressed = new Headers(headers)
   const etag = compressed.get('etag')
 
@@ -703,7 +730,7 @@ function compressedHeaders(headers: Headers, used: Encoding): Headers {
   return compressed
 }
 
-async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding, accept: string | null, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
+async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding | 'dcz', accept: string | null, dictionary: ServedDictionary | undefined, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
   const { headers, status, statusText } = response
 
   // A page whose render knows its pieces and whose gzip is kept is answered without reading its body.
@@ -738,7 +765,7 @@ async function compressBody(response: Response, source: Response | ReadableStrea
   }
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
-  const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, encoding)
+  const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, dictionary && encoding === 'dcz' ? { dictionary: await dictionary.load(), id: `dcz:${dictionary.ref.hash}:` } : encoding as Encoding)
   const reply = (bytes: Uint8Array<ArrayBuffer>) => late ? lateBody(bytes) : bytes
 
   return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(headers, spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })

@@ -35,6 +35,7 @@ import { compressResponse, fixedTexts } from './compress'
 import { remoteLimits } from './config-limits'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
+import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
@@ -125,14 +126,17 @@ function inlinePageStyles(client: ClientBuild): string[] {
 }
 
 // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
-function compress(app: App, client: ClientBuild, base: string, onError: KayConfig['onError']) {
+function compress(app: App, client: ClientBuild, base: string, mode: Mode, onError: KayConfig['onError']) {
   // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
   const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values(), ...inlinePageStyles(client)].map(css => `<style>${rebaseCss(css, base)}</style>`))
 
   client.fixedStyles = base === '' ? fixed : undefined
 
+  // Development builds none, so its pages are served as they are.
+  const dictionary = mode.dev ? undefined : servedDictionary(client, base)
+
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
-  app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError)) : undefined)
+  app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError), dictionary) : undefined)
 }
 
 function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string, extensions: KayExtension[] | undefined) {
@@ -247,7 +251,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'
 
   if (compressing)
-    compress(app, client, base, options.onError)
+    compress(app, client, base, mode, options.onError)
 
   // kay's own messages go out whether requests are logged or not.
   useLogger(typeof log === 'boolean' || log)
@@ -308,7 +312,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     mountedByExtensions.push(...app.routes.filter(route => route.method === 'GET' && !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, path: route.path })))
   }
 
-  for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
+  for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security, base }))
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards, cors: options.cors }

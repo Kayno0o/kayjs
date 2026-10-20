@@ -43,6 +43,7 @@ import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT } from './dev'
 import { noteRedirect } from './dev-notes'
+import { dictionaryAsked } from './dictionary'
 import { FLASH_COOKIE, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
@@ -119,6 +120,8 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   html: string | Bun.BunFile
   // The compressed copies `kay build` wrote, or a revalidation made.
   encoded: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>
+  // The page against the build's dictionary, for a browser that holds it.
+  dcz?: Bun.BunFile | undefined
   headers: [string, string][]
   // Set on the first request needing it: when to render the page again, and the parts its server islands cut it into.
   revalidation?: Revalidation | undefined
@@ -541,14 +544,15 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
   }
 
   const { names: encodings, available } = storedEncodings(page.encoded)
-  const encoding = preferredEncoding(context.request.headers.get('accept-encoding'), available)
+  const dictionary = page.dcz !== undefined && client.dictionary !== undefined && dictionaryAsked(context.request, client.dictionary)
+  const encoding = dictionary ? 'dcz' : preferredEncoding(context.request.headers.get('accept-encoding'), available)
   // Each encoding is a representation of its own, with its own tag.
   const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag
 
   headers.set('etag', etag)
 
   // Added to what a guard varies on, such as the cookie it reads.
-  if (encodings.length > 0)
+  if (encodings.length > 0 || page.dcz !== undefined)
     headers.append('vary', 'accept-encoding')
 
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
@@ -569,7 +573,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
 
   headers.set('content-encoding', encoding)
 
-  return respond(rendering, new Rebased(page.encoded[encoding]!))
+  return respond(rendering, new Rebased(encoding === 'dcz' ? page.dcz! : page.encoded[encoding]!))
 }
 
 export interface RenderedServerIslands {

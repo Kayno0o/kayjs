@@ -25,6 +25,7 @@ import { writeCards } from '../server/card'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { remoteLimits } from '../server/config-limits'
+import { writeDictionaryCopies } from '../server/dictionary'
 import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
 import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
@@ -448,6 +449,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const copies = cachedCopies(cacheDir(root, 'compressed'))
 
   await Promise.all([compressFiles(client.dir, copies), compressFiles(join(paths.output, PRERENDERED_DIR), copies)])
+  await writeDictionaryCopies(join(paths.output, PRERENDERED_DIR), client)
 
   // A static export compresses its own pages next, which can share content with these, so it prunes once it has.
   if (!exported)

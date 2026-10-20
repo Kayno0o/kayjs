@@ -4,6 +4,7 @@ import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
 import type { FixedText } from './compress'
+import type { DictionaryRef } from './dictionary'
 import { rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { version } from '../../package.json'
@@ -35,6 +36,8 @@ export interface ClientManifest {
   pages?: Record<string, PrerenderedPage>
   // The site they were rendered for, its origin and base: a server running for another renders them again.
   site?: string | undefined
+  // The dictionary the pages are served against to a browser holding it: the build's 404 page, by file name in the build and the hash it is named by.
+  dictionary?: DictionaryRef | undefined
   // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
   navigation?: boolean
   // In development, the source files each chunk of an island holds, by chunk URL and relative to the root: an edited island swaps in everywhere its code runs.

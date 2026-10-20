@@ -18,6 +18,7 @@ import { overHttps } from './actions'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, filesUnder } from './compress'
 import { noteRedirect } from './dev-notes'
+import { DCZ_SUFFIX } from './dictionary'
 import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { stillKept } from './kept-pages'
@@ -57,20 +58,24 @@ export interface ResponderOptions {
 export async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
   const dir = join(client.dir, '..', PRERENDERED_DIR)
-  const copies = encodedCopies(await filesUnder(dir))
+  const files = await filesUnder(dir)
+  const copies = encodedCopies(files)
+  const dictionaryCopies = new Set(files.filter(file => file.endsWith(DCZ_SUFFIX)))
 
   const loaded = await Promise.all([...client.pages.values()].map(async (page) => {
     const file = join(dir, page.file)
     const encodings = copies.get(file)
     const encoded: ServedPage['encoded'] = {}
+    // Written against this build's dictionary alone, so a build without one serves none.
+    const dcz = client.dictionary !== undefined && dictionaryCopies.has(`${file}${DCZ_SUFFIX}`) ? Bun.file(`${file}${DCZ_SUFFIX}`) : undefined
 
     if (!encodings)
-      return { html: await Bun.file(file).text(), encoded }
+      return { html: await Bun.file(file).text(), encoded, dcz }
 
     for (const encoding of encodings)
       encoded[encoding] = encoding === 'br' ? await Bun.file(encodedPath(file, encoding)).bytes() : Bun.file(encodedPath(file, encoding))
 
-    return { html: Bun.file(file), encoded }
+    return { html: Bun.file(file), encoded, dcz }
   }))
 
   for (const [index, [path, page]] of [...client.pages].entries()) {

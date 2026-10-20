@@ -20,6 +20,7 @@ import { standInReads } from '../runtime/site'
 import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
 import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
+import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK } from './live'
@@ -28,7 +29,7 @@ import { chainSetting, pageSetting } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
-import { renderPage } from './render'
+import { renderPage, renderUnmatched } from './render'
 import { routeChain, scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
@@ -87,7 +88,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     throw new KayError('export-no-client-build', 'kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(output, PRERENDERED_DIR)
-  const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
+  const { source, mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   options.routes?.push(...routes)
 
@@ -264,6 +265,19 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     return pending
   }
 
+  // The page a path no route serves is answered with, in the default locale, as every other prerendered page is drawn.
+  const renderedMissing = async (): Promise<string> => {
+    const request = new Request('http://localhost/_kay-dictionary')
+    const token = pageToken('/_kay-dictionary', tokens)
+    const render = async () => withPageToken(token, async () => {
+      const response = await renderUnmatched(source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: undefined, prerendering: true })
+
+      return response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
+    })
+
+    return runInLocale(stateFor(locales, locales.settings.defaultLocale, '/', request), render)
+  }
+
   // What keeps a page from a static export, each named, so one build reports them all.
   const problems: ExportProblem[] = []
 
@@ -333,8 +347,13 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (restyled)
     await dropOrphanCopies(client, dir, pages)
 
-  await writeManifest(root, { ...manifest, pages, site, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
+  // A static host cannot answer by what the browser holds, so only a server build has a dictionary.
+  const dictionary = options.exportAll ? undefined : await writeDictionary(client.dir, await renderedMissing())
+
+  delete manifest.dictionary
+  await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))
+  client.dictionary = dictionary
 
   return Object.keys(pages).length
 }
