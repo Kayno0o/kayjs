@@ -92,6 +92,8 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     const facts = merge(chain.map(entry => entry.facts))
     const at = { file: route.file, line: 1, column: 1 }
     const title = facts.title === undefined ? siteName : facts.title.text
+    // A page kept out of search results has no snippet to cut or to tell from another.
+    const indexed = noindex !== 'true' && !(facts.robots?.text !== undefined && NOINDEX.test(facts.robots.text))
 
     if (facts.title === undefined && siteName === undefined) {
       report('untitled-page', { ...at, message: `\`${route.pattern}\` has no title`, help: 'set one with `title` in a `head` block, or `seo.name` for every page' })
@@ -104,8 +106,8 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       else
         report('duplicate-title', { ...at, message: `\`${route.pattern}\` has the title of \`${first}\`, "${title}"`, help: 'name what sets this page apart in its title' })
 
-      if (facts.title !== undefined && title.length > TITLE_LENGTH)
-        report('long-title', { ...at, message: `The title of \`${route.pattern}\` runs ${title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page, and leave the site\'s name to `seo.titleTemplate`' })
+      if (indexed && facts.title !== undefined && title.length > TITLE_LENGTH)
+        report('long-title', { ...at, message: `The title of \`${route.pattern}\` runs ${title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page' })
     }
 
     const description = facts.description?.text
@@ -116,9 +118,9 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     else if (description !== undefined && !siteDescriptions.includes(description)) {
       const first = descriptions.get(description)
 
-      if (first === undefined)
+      if (indexed && first === undefined)
         descriptions.set(description, route.pattern)
-      else
+      else if (indexed)
         report('duplicate-description', { ...at, message: `\`${route.pattern}\` has the description of \`${first}\`, "${description}"`, help: 'say what sets this page apart in its description' })
 
       if (description.length > DESCRIPTION_LENGTH)

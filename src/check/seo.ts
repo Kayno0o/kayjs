@@ -36,7 +36,7 @@ export interface RenderedPage {
   sitemap: boolean
   // What its words weigh in the search index; false when it is left out, by a guard covering it, `noindex` or `search: false`.
   search: number | false
-  // Whether the sitemap lists it; unknown when left out. A page with params counts as listed unless its `sitemap` is false, as the list is not read back.
+  // Whether the sitemap lists it, left out when the build does not say. A page with params counts as listed unless its `sitemap` is false, as the list is not read back.
   listed?: boolean | undefined
   // Whether a guard covers it, so no crawler reaches it.
   guarded?: boolean | undefined
@@ -50,7 +50,7 @@ export interface OtherPage extends Pick<RenderedPage, 'file' | 'html' | 'host'> 
   location?: string | undefined
 }
 
-export interface Head {
+interface Head {
   title?: string | undefined
   description?: string | undefined
   image?: string | undefined
@@ -109,6 +109,8 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
   for (const page of pages) {
     const head = headOf(page)
     const at = { file: page.file, line: 1, column: 1 }
+    // A page kept out of search results has no snippet to cut or to tell from another.
+    const indexed = !head.noindex && !page.noindex
 
     if (head.title === undefined) {
       report('untitled-page', { ...at, message: `\`${page.path}\` has no title`, help: 'set one with `title` in a `head` block, or `seo.name` for every page' })
@@ -122,8 +124,8 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
       else
         report('duplicate-title', { ...at, message: `\`${page.path}\` has the title of \`${first}\`, "${head.title}"`, help: 'name what sets this page apart in its title' })
 
-      if (head.title.length > TITLE_LENGTH)
-        report('long-title', { ...at, message: `The title of \`${page.path}\` runs ${head.title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page, and leave the site\'s name to `seo.titleTemplate`' })
+      if (indexed && head.title.length > TITLE_LENGTH)
+        report('long-title', { ...at, message: `The title of \`${page.path}\` runs ${head.title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}, \`seo.titleTemplate\` included`, help: 'shorten it to what names the page' })
     }
 
     if (head.description === undefined) {
@@ -134,10 +136,13 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
       const key = `${page.locale ?? ''}\n${head.description}`
       const first = descriptions.get(key)
 
-      if (first === undefined)
+      if (!indexed || first !== undefined) {
+        if (indexed)
+          report('duplicate-description', { ...at, message: `\`${page.path}\` has the description of \`${first}\`, "${head.description}"`, help: 'say what sets this page apart in its description' })
+      }
+      else {
         descriptions.set(key, page.path)
-      else
-        report('duplicate-description', { ...at, message: `\`${page.path}\` has the description of \`${first}\`, "${head.description}"`, help: 'say what sets this page apart in its description' })
+      }
 
       if (head.description.length > DESCRIPTION_LENGTH)
         report('long-description', { ...at, message: `The description of \`${page.path}\` runs ${head.description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })

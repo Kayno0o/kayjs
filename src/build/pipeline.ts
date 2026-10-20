@@ -414,8 +414,12 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // Every page ran, so the compiled files of components since deleted can go.
   await pruneCompileCache(cacheDir(root))
 
+  const configFile = join(root, CONFIG_FILE)
+  // Read to point a redirect's lint at its line, only when there is one to point at.
+  const configSource = checking && config.redirects !== undefined && await Bun.file(configFile).exists() ? await Bun.file(configFile).text() : undefined
+
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile: join(root, CONFIG_FILE), exported, unseen: hasUnseenPages(routes, rendered, others) }), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
+  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported) }), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
@@ -461,11 +465,11 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   return { prerendered, entries, linted, routes: sizes, stages }
 }
 
-// Whether a page without a guard was not rendered, which a server renders per request: its links are ones the build never saw.
-function hasUnseenPages(routes: Route[], rendered: Pick<RenderedPage, 'file'>[], others: Pick<OtherPage, 'file'>[]): boolean {
+// Whether a page without a guard may render per request, which the build never saw the links of: a route with no page rendered, or in a server build one with params, whose `prerender` may list some of its pages only.
+function hasUnseenPages(routes: Route[], rendered: Pick<RenderedPage, 'file'>[], others: Pick<OtherPage, 'file'>[], exported: boolean): boolean {
   const seen = new Set([...rendered, ...others].map(page => page.file))
 
-  return routes.some(route => route.guards.length === 0 && !seen.has(route.file))
+  return routes.some(route => route.guards.length === 0 && (!seen.has(route.file) || (!exported && route.params.length > 0)))
 }
 
 function imageProgress(report: Report): (done: number, total: number) => void {

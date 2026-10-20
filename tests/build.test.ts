@@ -990,6 +990,31 @@ describe('kay build checks the project first', () => {
     expect(await Promise.all(alternates.map(async file => (await Bun.file(join(root, file)).text()).includes('hreflang="fr"')))).toEqual([true, true])
   }, 60_000)
 
+  it('reads the links of a site under a base with trailing slashes, and leaves the orphan lint to a site whose param pages it cannot all see', async () => {
+    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
+    const files = {
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
+      'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
+      'src/routes/blog/index.kay': page('Blog', 'a(href="post") Post\n'),
+      'src/routes/blog/post.kay': page('Post', 'p Post\n', true),
+      'src/routes/lost.kay': page('Lost', 'p Lost\n', true),
+    }
+    const root = await scratchProject(files)
+
+    const warned = await build(root)
+
+    expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual(['warning[orphan-page]: `/lost` has no link to it and is not in the sitemap'])
+
+    // A page with params may be rendered for values the build does not list, and link to anything.
+    await Bun.write(join(root, 'src/routes/[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: \'one\' }] }\n---\nhead\n  title One\n  meta(name="description" content="One page")\np One\n')
+
+    const params = await build(root)
+
+    expect(params.report.match(/^\w+\[[\w-]+\]: .*/gm)).toBeNull()
+    expect(params.code).toBe(0)
+  }, 60_000)
+
   describe('--format json and github', () => {
     it('prints what the check found before what the prerendered pages log, and gives the problems found so far, though their code ends the process', async () => {
       const root = await scratchProject({

@@ -51,7 +51,7 @@ function other(path: string, status: number, location?: string): OtherPage {
   return { path, file: `/app/src/routes${path}.kay`, html: '', status, location }
 }
 
-const config: SiteSeo & { base?: string, redirects?: Record<string, string> } = { site: SITE, favicon: false }
+const config: SiteSeo & { base?: string, redirects?: Record<string, string>, trailingSlash?: 'never' | 'always' | 'ignore' } = { site: SITE, favicon: false }
 
 function lint(pages: RenderedPage[], others: OtherPage[] = [], over: Partial<typeof config> & { exported?: boolean, unseen?: boolean } = {}) {
   const { exported, unseen, ...rest } = over
@@ -84,6 +84,13 @@ describe('the head lints a page reads off the site', () => {
 
     expect(found(fits)).toEqual([])
     expect(summary(found(`${fits}b`))).toEqual([['long-title', 'a.kay', `The title of \`/a\` runs ${TITLE_LENGTH + 1} characters`]])
+  })
+
+  it('leaves a noindex page out of the description and title lints, as it has no snippet', () => {
+    const long = 'a'.repeat(TITLE_LENGTH + 1)
+    const pages = [page('/a', { description: 'Same' }), page('/b', { description: 'Same', noindex: true }), page('/c', { description: 'Same', headNoindex: true }), page('/d', { title: long, noindex: true }), page('/e', { title: long, headNoindex: true })]
+
+    expect(pageSeoLints(config, pages).filter(d => d.code === 'duplicate-description' || d.code === 'long-title')).toEqual([])
   })
 
   it('sets the new lints with lints, and says nothing of a site that is not public', () => {
@@ -123,6 +130,22 @@ describe('orphan-page', () => {
     expect(orphans(links('blog/post', 'team'))).toEqual([])
     // Another site's page of the same path is no link to this one.
     expect(orphans(links('https://other.example/blog/post', 'mailto:a@b.c', '#team', 'tel:123'))).toEqual(['`/blog/post` has no link to it and is not in the sitemap', '`/team` has no link to it and is not in the sitemap'])
+  })
+
+  it('reads a relative link from the URL the browser holds the page at, which trailingSlash spells', () => {
+    const pages = [page('/blog', { links: ['post'] }), unlisted('/blog/post'), unlisted('/post')]
+
+    expect(orphans(pages, [], { trailingSlash: 'always' })).toEqual(['`/post` has no link to it and is not in the sitemap'])
+    expect(orphans(pages, [], { trailingSlash: 'never' })).toEqual(['`/blog/post` has no link to it and is not in the sitemap'])
+  })
+
+  it('reads the link as the HTML spells it: entities, quotes, case, percent escapes, and leaves alone what is no address', () => {
+    const raw = (html: string, ...paths: string[]) => [{ ...page('/'), html: `<html><head><title>Home</title></head><body>${html}</body></html>` }, ...paths.map(path => unlisted(path))]
+
+    expect(orphans(raw('<a class="x" href="/a?x=1&amp;y=2">a</a><a href=\'/b\'>b</a><A HREF=/c>c</A>', '/a', '/b', '/c'))).toEqual([])
+    expect(orphans(raw('<a href="/caf%c3%a9">a</a>', '/café'))).toEqual([])
+    expect(orphans(raw('<a href="/caf%C3%A9">a</a>', '/café'))).toEqual([])
+    expect(orphans(raw('<a href="http://[bad">a</a><a href="javascript:void(0)">b</a><a data-href="/a">c</a><link href="/a">', '/a'))).toEqual(['`/a` has no link to it and is not in the sitemap'])
   })
 
   it('leaves alone the entry points, noindex, guarded pages, a site without sitemap and a site with pages the build did not see', () => {
@@ -245,9 +268,12 @@ describe('redirect-chain', () => {
   })
 
   it('reads params and a catch-all', () => {
-    expect(chains({ '/blog/:slug': '/posts/:slug', '/posts/:id': '/articles/:id' }).map(d => d.message)).toEqual(['The redirect from `/blog/:slug` goes to `/posts/:slug`, which redirects to `/articles/:id`'])
+    expect(chains({ '/blog/:slug': '/posts/:slug', '/posts/:id': '/articles/:id' }).map(d => d.message)).toEqual(['The redirect from `/blog/:slug` goes to `/posts/:slug`, which redirects to `/articles/:slug`'])
     expect(chains({ '/old/*': '/docs/*', '/docs/legacy': '/docs/guide' }).map(d => d.message)).toEqual([])
-    expect(chains({ '/old/*': '/docs/legacy', '/docs/*': '/guide/*' }).map(d => d.message)).toEqual(['The redirect from `/old/*` goes to `/docs/legacy`, which redirects to `/guide/*`'])
+    expect(chains({ '/old/*': '/docs/legacy', '/docs/*': '/guide/*' }).map(d => d.message)).toEqual(['The redirect from `/old/*` goes to `/docs/legacy`, which redirects to `/guide/legacy`'])
+    // A catch-all covers what follows its directory, not the directory.
+    expect(chains({ '/x': '/docs', '/docs/*': '/guide/*' })).toEqual([])
+    expect(chains({ '/blog/:slug': '/posts/:slug', '/posts/:id': '/articles/:id' }).map(d => d.help)).toEqual(['send `/blog/:slug` to `/articles/:slug` directly'])
   })
 
   it('reads a target with a query, a hash or a trailing slash, and leaves another site\'s alone', () => {
@@ -265,6 +291,13 @@ describe('redirect-chain', () => {
     expect(chains({ '/b': '/c' }, [], [other('/a', 308, '/b')]).map(d => d.message)).toEqual(['The redirect from `/a` goes to `/b`, which redirects to `/c`'])
     expect(chains({}, [page('/b')], [other('/a', 308, '/b')])).toEqual([])
     expect(chains({}, [], [other('/a', 404), other('/b', 308, '/a')])).toEqual([])
+  })
+
+  it('points at the line of the redirect in kay.config.ts', () => {
+    const configSource = 'export default {\n  redirects: {\n    \'/a\': \'/b\',\n    \'/b\': \'/c\',\n  },\n}\n'
+    const found = siteSeoLints({ ...config, redirects: { '/a': '/b', '/b': '/c' } }, [], [], { configFile: CONFIG, configSource })
+
+    expect(found.map(d => [d.code, d.line])).toEqual([['redirect-chain', 3]])
   })
 
   it('reads the redirects without the base the pages are served under', () => {

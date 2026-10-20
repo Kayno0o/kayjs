@@ -1,24 +1,30 @@
+import type { TrailingSlash } from '../config'
 import type { Redirects } from '../server/redirects'
 import type { CheckDiagnostic } from './index'
 import type { OtherPage, RenderedPage, SiteSeo } from './seo'
 import { basePath } from '../server/base'
 import { fillTarget } from '../server/redirects'
+import { slashedPath } from '../server/routes'
+import { configLocator } from './config-keys'
 import { decode, headOf, lintReporter } from './seo'
 
 // The host of a site that names none, so the pages and the links between them are compared on the same one.
 const NO_HOST = 'kay.invalid'
-const ANCHOR_HREF = /<a(?=\s)[^>]*?\shref=(?:"([^"]*)"|'([^']*)')/g
+const ANCHOR_HREF = /<a(?=\s)[^>]*?\shref=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi
+const PERCENT_ESCAPE = /%[0-9a-f]{2}/gi
 const QUERY_OR_HASH = /[?#].*$/
 const TRAILING_SLASH = /\/+$/
 
 export interface SiteSeoConfig extends SiteSeo {
   base?: string | undefined
   redirects?: Redirects | undefined
+  trailingSlash?: TrailingSlash | undefined
 }
 
 export interface SiteSeoOptions {
-  // The file the redirects of the config are in.
+  // The file the redirects of the config are in, and its source to find each redirect's line.
   configFile: string
+  configSource?: string | undefined
   exported?: boolean | undefined
   // Whether a page of the site renders per request, whose links the build never saw.
   unseen?: boolean | undefined
@@ -64,7 +70,8 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
     let place: Place | undefined
 
     try {
-      const url = new URL(href, `https://${hostOfPage(from)}${from.path}`)
+      // A relative link is read from the URL the browser holds the page at, which `trailingSlash` spells.
+      const url = new URL(href, `https://${hostOfPage(from)}${slashedPath(from.path, config.trailingSlash)}`)
 
       if (url.protocol === 'https:' || url.protocol === 'http:')
         place = { host: url.host, path: plainPath(withoutBase(url.pathname, base)) }
@@ -160,12 +167,13 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
 
       if (!targetHead.alternates.some(back => resolve(back.href, target) === pageKey(page))) {
         told.add(pair)
-        report('one-way-hreflang', { file: target.file, line: 1, column: 1, message: `\`${label(target)}\` has no alternate pointing back at \`${label(page)}\`, which lists it as its \`${alternate.hreflang}\` alternate`, note: 'search engines ignore alternates that are not confirmed from both pages', help: `list \`${label(page)}\` as an alternate of \`${label(target)}\` too, with \`link(rel="alternate" hreflang="${page.locale ?? alternate.hreflang}" href=...)\`` })
+        report('one-way-hreflang', { file: target.file, line: 1, column: 1, message: `\`${label(target)}\` has no alternate pointing back at \`${label(page)}\`, which lists it as its \`${alternate.hreflang}\` alternate`, note: 'search engines ignore alternates that are not confirmed from both pages', help: `list \`${label(page)}\` as an alternate of \`${label(target)}\` too, in its head` })
       }
     }
   }
 
-  const chain = (from: string, file: string, to: string, host: string) => {
+  const locateConfig = configLocator(options.configSource)
+  const chain = (from: string, file: string, to: string, host: string, at = { line: 1, column: 1 }) => {
     if (!to.startsWith('/') || to.startsWith('//'))
       return
 
@@ -173,11 +181,11 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
     const next = redirectAt(host, plainPath(path))
 
     if (next !== undefined)
-      report('redirect-chain', { file, line: 1, column: 1, message: `The redirect from \`${from}\` goes to \`${path}\`, which redirects to \`${next.to}\``, note: 'every hop costs a request, and crawlers give up on a long chain', help: `send \`${from}\` to \`${next.to}\` directly` })
+      report('redirect-chain', { file, ...at, message: `The redirect from \`${from}\` goes to \`${path}\`, which redirects to \`${next.filled}\``, note: 'every hop costs a request, and crawlers give up on a long chain', help: `send \`${from}\` to \`${next.filled}\` directly` })
   }
 
   for (const [from, target] of Object.entries(config.redirects ?? {}))
-    chain(from, options.configFile, typeof target === 'string' ? target : target.to, siteHost)
+    chain(from, options.configFile, typeof target === 'string' ? target : target.to, siteHost, locateConfig(['redirects', from]))
 
   for (const page of others) {
     const place = page.status >= 300 && page.status < 400 && page.location !== undefined ? locate(page.location, page) : undefined
@@ -186,47 +194,31 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
       chain(label(page), page.file, place.path, place.host)
   }
 
-  orphanLints(config, pages, options, { pageKey, resolve, label, report })
-
-  return found
-}
-
-interface Reach {
-  pageKey: (page: Pick<RenderedPage, 'host' | 'path'>) => string
-  resolve: (href: string, from: Pick<RenderedPage, 'host' | 'path'>) => string | undefined
-  label: (page: Pick<RenderedPage, 'host' | 'path'>) => string
-  report: ReturnType<typeof lintReporter>
-}
-
-// The indexed pages that neither the sitemap lists nor another page links to.
-function orphanLints(config: SiteSeoConfig, pages: RenderedPage[], options: SiteSeoOptions, { pageKey, resolve, label, report }: Reach): void {
   // Without a `site` there is no sitemap to know of, a server reading its origin when it boots; a page rendered per request may link to anything.
-  if (config.site === undefined || options.unseen === true)
-    return
+  const lost = config.site === undefined || options.unseen === true ? [] : pages.filter(page => page.listed === false && page.guarded !== true && !page.noindex && !isEntry(page) && !headOf(page).noindex)
 
-  const lost = pages.filter(page => page.listed === false && page.guarded !== true && !page.noindex && !isEntry(page) && !headOf(page).noindex)
+  if (lost.length > 0) {
+    const linked = new Set<string>()
 
-  if (lost.length === 0)
-    return
+    for (const page of pages) {
+      const own = pageKey(page)
 
-  const linked = new Set<string>()
+      for (const match of page.html.matchAll(ANCHOR_HREF)) {
+        const href = match[1] ?? match[2] ?? match[3]!
+        const key = resolve(href.includes('&') ? decode(href) : href, page)
 
-  for (const page of pages) {
-    const own = pageKey(page)
+        if (key !== undefined && key !== own)
+          linked.add(key)
+      }
+    }
 
-    for (const match of page.html.matchAll(ANCHOR_HREF)) {
-      const href = match[1] ?? match[2]!
-      const key = resolve(href.includes('&') ? decode(href) : href, page)
-
-      if (key !== undefined && key !== own)
-        linked.add(key)
+    for (const page of lost) {
+      if (!linked.has(pageKey(page)))
+        report('orphan-page', { file: page.file, line: 1, column: 1, message: `\`${label(page)}\` has no link to it and is not in the sitemap`, note: 'a crawler finds a page by a link or the sitemap', help: 'link it from a page that is indexed, or list it with `sitemap` in its `page`' })
     }
   }
 
-  for (const page of lost) {
-    if (!linked.has(pageKey(page)))
-      report('orphan-page', { file: page.file, line: 1, column: 1, message: `\`${label(page)}\` has no link to it and is not in the sitemap`, note: 'a crawler finds a page by a link or the sitemap', help: 'link it from a page that is indexed, or list it with `sitemap` in its `page`' })
-  }
+  return found
 }
 
 // A page a crawler starts from: the site's root, or a locale's.
@@ -260,7 +252,9 @@ function plainPath(path: string): string {
   }
   catch {}
 
-  return spelled.length > 1 ? spelled.replace(TRAILING_SLASH, '') || '/' : spelled
+  const upper = spelled.replace(PERCENT_ESCAPE, escape => escape.toUpperCase())
+
+  return upper.length > 1 ? upper.replace(TRAILING_SLASH, '') || '/' : upper
 }
 
 function redirectsOf(redirects: Redirects | undefined): Redirect[] {
@@ -285,7 +279,9 @@ function matchRedirect(redirects: Redirect[], path: string): Match | undefined {
     for (const [index, part] of from.entries()) {
       const seen = segments[index]
 
+      // A catch-all covers what follows its directory, never the directory alone.
       if (part === '*' && index === from.length - 1) {
+        covers = seen !== undefined
         rest = segments.slice(index).join('/')
 
         break
