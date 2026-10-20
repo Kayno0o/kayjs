@@ -3824,12 +3824,20 @@ function deepActive(doc: Document): HTMLElement | null {
   return active
 }
 
-// The stops whose focus shows nothing: focused, neither they nor the elements around them change how they look. Only elements the browser would show a focus ring on count, as it shows none on a button after a click; focus moves from stop to stop and returns to where it was. Nothing is checked, and undefined returned, while focus is inside a closed shadow root, which the tool cannot give focus back to.
+// The elements that may hold a shadow root besides a custom element.
+const SHADOW_HOSTS = new Set(['article', 'aside', 'blockquote', 'body', 'div', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'main', 'nav', 'p', 'section', 'span'])
+
+// Whether the element focus is on may be a host whose closed shadow root holds it: the page reports the host either way, and a host given a tabindex looks as focusable as an element holding focus itself.
+function maybeClosedHost(element: HTMLElement): boolean {
+  return element.shadowRoot === null && (element.localName.includes('-') || SHADOW_HOSTS.has(element.localName))
+}
+
+// The stops whose focus shows nothing: focused, neither they nor the elements around them change how they look. Only elements the browser would show a focus ring on count, as it shows none on a button after a click; focus moves from stop to stop and returns to where it was. Nothing is checked, and undefined returned, while focus may be inside a closed shadow root, which the tool cannot give focus back to.
 function hiddenFocus(doc: Document, stops: HTMLElement[], roots: ShadowRoot[]): HTMLElement[] | undefined {
   const win = doc.defaultView!
   const before = deepActive(doc)
 
-  if (before !== null && before !== doc.body && before !== doc.documentElement && !before.matches(FOCUSABLE))
+  if (before !== null && before !== doc.body && before !== doc.documentElement && (!before.matches(FOCUSABLE) || maybeClosedHost(before)))
     return undefined
 
   const still = new win.CSSStyleSheet()

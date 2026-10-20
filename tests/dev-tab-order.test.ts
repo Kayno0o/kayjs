@@ -146,6 +146,24 @@ describe.skipIf(path === undefined)('the tab order overlay of the dev tool', () 
     expect(scroll.queries).toBe(0)
   }, 60_000)
 
+  it('still checks the focus ring around a button holding focus, and gives it focus back', async () => {
+    const page = await dev.open('/other', { strict: false })
+
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('button.two')!
+
+      button.style.setProperty('outline', 'none')
+      button.focus()
+    })
+    await page.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.head button[title="Show the tab order"]')!.click())
+    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.tab-badge.hidden-focus').length === 1)
+
+    const active = await page.evaluate(() => document.activeElement?.className)
+
+    page.close()
+    expect(active).toBe('two')
+  }, 60_000)
+
   it('numbers focusable elements inside open shadow roots and leaves focus in a closed one', async () => {
     const page = await dev.open('/other', { strict: false })
 
@@ -178,5 +196,31 @@ describe.skipIf(path === undefined)('the tab order overlay of the dev tool', () 
     // A change inside an open root is read too.
     await page.evaluate(() => document.querySelector('.open')!.shadowRoot!.append(Object.assign(document.createElement('button'), { textContent: 'More' })))
     await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.tab-badge').length === 6)
+  }, 60_000)
+
+  // A host with a tabindex is the page's active element whether it holds focus itself or an element of its closed root does, so the check cannot tell and leaves focus alone.
+  it.each([['delegating focus', true], ['without delegating focus', false]])('leaves focus where it was in the closed root of a focusable host %s', async (_name, delegatesFocus) => {
+    const page = await dev.open('/other', { strict: false })
+
+    await page.evaluate((delegates) => {
+      const host = document.createElement('div')
+      const root = host.attachShadow({ mode: 'closed', delegatesFocus: delegates })
+
+      host.tabIndex = 0
+      host.className = 'host'
+      root.innerHTML = '<input class="first"><input class="second">'
+      Object.assign(window, { hostRoot: root })
+      document.querySelector('main')!.append(host)
+      root.querySelector<HTMLInputElement>('.second')!.focus()
+    }, delegatesFocus)
+    await page.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.head button[title="Show the tab order"]')!.click())
+    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.tab-badge').length >= 2)
+    // Nothing else moves focus, so the check had its turn once the overlay drew.
+    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.tab-order path').length >= 1)
+
+    const active = await page.evaluate(() => [document.activeElement?.className, (window as unknown as { hostRoot: ShadowRoot }).hostRoot.activeElement?.className])
+
+    page.close()
+    expect(active).toEqual(['host', 'second'])
   }, 60_000)
 })
