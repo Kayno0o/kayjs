@@ -241,6 +241,16 @@ describe('the outbox helpers', () => {
     await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('"Second" to ada@example.com')
   })
 
+  it('waits without a site for a mail its predicate accepts', async () => {
+    const waiting = outbox.waitFor('ada@example.com', { find: each => each.subject === 'Wanted' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Other', text: 'Hi' })
+    await mail.send({ to: 'ada@example.com', subject: 'Wanted', text: 'Hi' })
+
+    expect((await waiting).subject).toBe('Wanted')
+    await expect(outbox.waitFor('ada@example.com', { find: () => false, timeout: 0.05 })).rejects.toThrow('no mail to ada@example.com matching `find` reached')
+  })
+
   it('reads a link and its token from a mail', async () => {
     await mail.send({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
 

@@ -205,7 +205,7 @@ export function createOutbox(file?: string): Outbox {
       const { find = () => true, site } = options
       const lookup = () => mails.findLast(mail => sentTo(mail, wanted) && find(mail))
       const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout', 'kayjs-mail') * 1000
-      const fail = () => new Error(`kayjs-mail: no mail to ${address} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
+      const fail = () => new Error(`kayjs-mail: no mail to ${address}${options.find ? ' matching `find`' : ''} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
       let found = lookup()
 
       if (found)
@@ -214,7 +214,7 @@ export function createOutbox(file?: string): Outbox {
       if (site) {
         const deadline = Date.now() + wait
 
-        while (Date.now() < deadline) {
+        do {
           await site.runJobs()
           found = lookup()
 
@@ -222,7 +222,7 @@ export function createOutbox(file?: string): Outbox {
             return found
 
           await Bun.sleep(POLL_MS)
-        }
+        } while (Date.now() < deadline)
 
         throw fail()
       }

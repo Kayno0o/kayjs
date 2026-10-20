@@ -345,7 +345,7 @@ it('welcomes a new account', async () => {
 })
 ```
 
-`outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next.
+`outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next. `outbox.waitFor(address, { site, find })` runs the test site's queues until the mail is delivered, for a mail an action enqueues, and `outbox.token(mail, path)` reads the token of the link that opens `path`. See [Waiting for a mail](/guides/testing#waiting-for-a-mail).
 
 ## With kayjs-auth
 
