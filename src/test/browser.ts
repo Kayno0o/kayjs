@@ -435,20 +435,40 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await cdp('Page.handleJavaScriptDialog', { accept: answer !== false, ...typeof answer === 'string' ? { promptText: answer } : {} })
     }
     catch (error) {
+      // A dialog left open stops the page, so a handler that failed dismisses it.
+      try {
+        await cdp('Page.handleJavaScriptDialog', { accept: false })
+      }
+      catch {}
+
       if (!gone && !closed)
         errors.push(`kay: answering a dialog failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  // The middle of the element, two frames on when scripts run, once a scroll or a transition settled.
-  const center = async (selector: string) => inView<[number, number]>(script(async (target: string, frames: boolean) => {
+  // The middle of the element, two frames on when scripts run, once a scroll or a transition settled. With `actionable`, what keeps a click from reaching it (nothing drawn, another element over its middle) comes back as a reason instead.
+  const center = async (selector: string, actionable = false) => inView<[number, number] | string>(script(async (target: string, frames: boolean, check: boolean) => {
     if (frames)
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
-    const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
+    const element = document.querySelector(target)!
 
-    return [left + width / 2, top + height / 2]
-  }, [selector, options.javaScript !== false]))
+    if (check && element.getClientRects().length === 0)
+      return 'not visible'
+
+    const { left, top, width, height } = element.getBoundingClientRect()
+    const x = left + width / 2
+    const y = top + height / 2
+
+    if (check) {
+      const over = document.elementFromPoint(x, y)
+
+      if (over === null || !element.contains(over))
+        return 'covered by another element'
+    }
+
+    return [x, y]
+  }, [selector, options.javaScript !== false, actionable]))
 
   const network = createNetwork({ view, cdp, origin: () => origin, errors, timeout })
   const page: TestPage = {
@@ -474,7 +494,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         return element !== null && element.getClientRects().length > 0
       }, [selector]), selector, wait.timeout)
 
-      const [x, y] = await center(selector)
+      const [x, y] = await center(selector) as [number, number]
 
       await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
     }),
@@ -514,9 +534,15 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         try {
           // Bun's click waits for the element with a script of its own, which a page with JavaScript off does not run.
           if (options.javaScript === false) {
-            const [x, y] = await center(selector)
+            const at = await center(selector, true)
 
-            await live(async () => view.click(x, y, modifiers === undefined ? {} : { modifiers }))
+            if (typeof at === 'string') {
+              await Bun.sleep(POLL_MS)
+
+              throw new Error(`kay: ${selector} is ${at}, waiting for it to be actionable`)
+            }
+
+            await live(async () => view.click(at[0], at[1], modifiers === undefined ? {} : { modifiers }))
           }
           else {
             await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
@@ -542,14 +568,23 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await live(async () => text === '' ? view.press('Delete') : view.type(text))
     }),
     upload: async (selector, files) => serial(async () => {
+      const paths = (Array.isArray(files) ? files : [files]).map(file => resolvePath(file))
+
+      for (const file of paths) {
+        if (!existsSync(file))
+          throw new Error(`kay: no file at ${file} to upload`)
+      }
+
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
 
-      const { result } = await cdp<{ result: { objectId?: string } }>('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` })
+      const { result } = await cdp<{ result: { objectId: string } }>('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` })
 
-      if (result.objectId === undefined)
-        throw new Error(`kay: ${selector} is not an element to upload to`)
-
-      await cdp('DOM.setFileInputFiles', { objectId: result.objectId, files: (Array.isArray(files) ? files : [files]).map(file => resolvePath(file)) })
+      try {
+        await cdp('DOM.setFileInputFiles', { objectId: result.objectId, files: paths })
+      }
+      finally {
+        await cdp('Runtime.releaseObject', { objectId: result.objectId })
+      }
     }),
     onDialog: async handler => serial(async () => {
       dialogs = handler
@@ -557,13 +592,13 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       if (dialogsOn)
         return
 
+      await cdp('Page.enable')
       dialogsOn = true
       view.addEventListener('Page.javascriptDialogOpening', (event) => {
         const { type, message, defaultPrompt } = (event as MessageEvent<{ type: PageDialog['type'], message: string, defaultPrompt?: string }>).data
 
         void answerDialog({ type, message, defaultPrompt: defaultPrompt ?? '' })
       })
-      await cdp('Page.enable')
     }),
     type: async text => serial(async () => live(async () => view.type(text))),
     press: async (key, keyOptions) => serial(async () => live(async () => view.press(key, keyOptions))),

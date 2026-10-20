@@ -300,7 +300,7 @@ await plain.click('form button')
 await plain.waitFor('.notice', { text: 'Check your inbox' })
 ```
 
-A dialog stays open until it is answered, and the page waits on it. `page.onDialog(handler)` answers each one: the handler gets its `type`, `message` and `defaultPrompt`, and returns `true` to accept, `false` to dismiss, or a string to answer a prompt.
+A dialog stays open until it is answered, and the page waits on it. `page.onDialog(handler)` answers each one: the handler gets its `type`, `message` and `defaultPrompt`, and returns `true` to accept, `false` to dismiss, or a string to answer a prompt. Register it before the action that opens the dialog, as a dialog nobody answers stays open and stops the page. A handler that throws dismisses the dialog and records the error in `page.errors`.
 
 ```ts
 await page.onDialog(dialog => dialog.message.startsWith('Delete'))
@@ -351,7 +351,7 @@ await page.waitFor('.banner', { text: 'You are offline' })
 await page.online()
 ```
 
-While a route exists the browser's cache is off, as a response it served from its cache would never reach the route.
+While a route exists the browser's cache is off, as a response it served from its cache would never reach the route. That also means no cache hit or 304 happens while a route exists. The cache is on again after the last `unroute`.
 
 The view runs one DevTools command at a time, so use `page.cdp(method, params)` where `page.view.cdp()` would be called: it queues behind the page's own commands and a route's.
 

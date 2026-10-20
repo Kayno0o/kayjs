@@ -281,6 +281,39 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }
   })
 
+  it('dismisses a dialog whose handler throws, so the page goes on, and records the failure', async () => {
+    const failing = await site.open('/')
+
+    try {
+      await failing.onDialog(() => {
+        throw new Error('handler broke')
+      })
+
+      // eslint-disable-next-line no-alert -- the test opens the dialog it answers
+      expect(await failing.evaluate(() => confirm('sure?'))).toBe(false)
+      expect(failing.errors).toEqual(['kay: answering a dialog failed: handler broke'])
+    }
+    finally {
+      failing.close()
+    }
+  })
+
+  it('clicks a page with JavaScript off only where a click would reach the element', async () => {
+    const plain = await site.open('/', { javaScript: false, timeout: 500 })
+
+    try {
+      await plain.evaluate(() => {
+        document.body.insertAdjacentHTML('afterbegin', '<a id="hidden" href="/second" style="display:none">hidden</a><a id="under" href="/second">under</a><div style="position:fixed;inset:0;background:#fff"></div>')
+      })
+      await expect(plain.click('#hidden')).rejects.toThrow('to be actionable')
+      await expect(plain.click('#under')).rejects.toThrow('to be actionable')
+      expect(await plain.path()).toBe('/')
+    }
+    finally {
+      plain.close()
+    }
+  })
+
   it('collects the warnings of the page beside its errors', async () => {
     const warned = await site.open('/')
 
@@ -319,10 +352,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
         return [selected!.name, selected!.size, (window as { changes?: string[] }).changes]
       })).toEqual(['note.txt', 5, ['note.txt']])
-      await expect(uploading.upload('nothing-here', file)).rejects.toThrow('timed out')
+      await expect(uploading.upload('form.upload input', join(tmpdir(), 'kay-no-such-file'))).rejects.toThrow('no file at')
     }
     finally {
       uploading.close()
+    }
+
+    const quick = await site.open('/posted', { timeout: 300 })
+
+    try {
+      await expect(quick.upload('nothing-here', file)).rejects.toThrow('timed out')
+    }
+    finally {
+      quick.close()
     }
   })
 
