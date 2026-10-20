@@ -34,7 +34,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL`, else `ORIGIN`, when left out. See [Head and SEO](/essentials/head-and-seo) |
-| `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
+| `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `imageAlt`, `locale` (`og:locale`), `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
 | `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
@@ -71,13 +71,13 @@ Every option is optional. The tables give each option's default. The full refere
 | `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `store` | Where jobs, schedule locks and rate limit counts live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, or `{ jobs, rates }` of your own. See [Background jobs](/guides/background-jobs) |
-| `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
+| `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale, and `messages`, the folder of the message files (`src/messages` by default). See [Internationalization](/guides/i18n) |
 
 ## Assets and build
 
 | Option | Effect |
 | --- | --- |
-| `images` | `quality`, `widths`, `webp`, `avif`, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
+| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`) and CSS (`css`) one page may load, compressed, as `'20kb'`. `kay build` warns with `over-budget` for a page over it. Both are off until set. See [Set a budget](/guides/performance#set-a-budget) |
@@ -105,7 +105,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `requireGuards` | `true` makes every page, action, endpoint and API module answer 403 unless a guard covers it or it sets `guards: false`. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
 | `cors` | The origins every API module accepts that sets no `cors` of its own, as `api({ cors })` takes them. `api({ cors: false })` opts a module out. See [Calls from other sites](/guides/api-routes#calls-from-other-sites) |
 | `mcp` | `true` serves an MCP endpoint at `/mcp`, or at `{ path }`, for AI agents, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
-| `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them. See [API routes](/guides/api-routes#openapi) |
+| `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
 | `requestIdHeader` | The header a request's id goes out on and a trusted proxy's comes in on, `x-request-id` by default. See [Deployment](/guides/deployment) |
 | `live` | `{ connections, perMinute }`: how many live connections one client address holds at once (20) and opens a minute (120). See [Live values and realtime](/guides/live-and-realtime) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |

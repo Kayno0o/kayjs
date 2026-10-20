@@ -96,7 +96,9 @@ KAY_EDITOR="tmux new-window nvim" bun run dev
 
 With no editor found, the page says so and the terminal prints the position. Tests, `pages({ dev: true })` and production builds carry no inspector.
 
-<ReadMore href="/llms/dev-server">Editors reached over SSH, how the position is passed to each editor and the other dev tool tabs in full.</ReadMore>
+<ReadMore href="/llms/dev-server">Editors reached over SSH and how the position is passed to each editor.</ReadMore>
+
+<ReadMore href="/llms/dev-tool">The other dev tool tabs in full.</ReadMore>
 
 ## The error page
 

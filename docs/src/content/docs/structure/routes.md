@@ -18,7 +18,7 @@ src/routes/
   [llms.txt.ts](/structure/endpoint)  /llms.txt
 " />
 
-A file starting with `_` is not a route. [`_layout.kay`](/structure/layout), [`_404.kay`](/structure/not-found), [`_error.kay`](/structure/error) and [`_guard.ts`](/structure/guard) apply to the folder they sit in and below. Any other file starting with `_` is not a route either.
+A file starting with `_` is not a route. [`_layout.kay`](/structure/layout), [`_404.kay`](/structure/not-found), [`_error.kay`](/structure/error), [`_guard.ts`](/structure/guard) and [`_actions.kay`](/essentials/forms-and-actions#actions-shared-by-pages-and-components) apply to the folder they sit in and below. Any other file starting with `_` is not a route either.
 
 A `.ts` file whose name keeps an extension before `.ts` is an [endpoint](/structure/endpoint). Any other `.ts` file stays a helper, as do `.test.ts` and `.d.ts` files.
 

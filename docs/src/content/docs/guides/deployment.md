@@ -218,4 +218,6 @@ Nothing is to set up. A browser without the feature, or one holding the dictiona
 
 It needs a secure context (https, or localhost) and a proxy that passes `Accept-Encoding`, `Available-Dictionary` and `Content-Encoding` through. The browser fetches the dictionary under `connect-src`, so kay adds `'self'` to yours. A `connect-src` of `'none'` stops the fetch, and pages go out as before. Development and `kay build --static` have no dictionary.
 
-<ReadMore href="/llms/production">Log entries for your own sink, span attributes, security headers and compression are in the full production reference.</ReadMore>
+<ReadMore href="/llms/production">Log entries for your own sink and span attributes are in the full production reference.</ReadMore>
+
+<ReadMore href="/llms/proxy-and-security#compression">Compression and the dictionary are in the full proxy and compression reference.</ReadMore>

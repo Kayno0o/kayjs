@@ -148,7 +148,7 @@ export const theme = persisted('theme', 'light')
 | --- | --- |
 | `params` in a page | `ctx.params`, typed from the file name |
 | `searchParams` in a page | `ctx.query`, typed by a `query` schema in `page` |
-| `cookies()`, `headers()` | `ctx.cookies`, `ctx.headers` |
+| `cookies()`, `headers()` | `ctx.cookies`, `ctx.request.headers` (`ctx.headers` sets the response's) |
 | `redirect('/login')` | `ctx.redirect('/login')` |
 | `notFound()` | `ctx.notFound()` |
 | `generateStaticParams` | `prerender: [{ slug: 'a' }]` in `page`, or a content collection |

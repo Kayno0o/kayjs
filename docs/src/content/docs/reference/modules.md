@@ -94,6 +94,8 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
 | `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
+| `kay/analytics` | `analytics`, the extension counting visits through your own origin, and `consent`, the visitor's answer to its notice. See [Privacy](/guides/privacy#counting-visits) |
+| `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
 | `kay/test` | `testSite`, `mountComponent`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `persistedCookie`, `cookieJar`, `overrideEnv`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |

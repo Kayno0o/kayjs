@@ -32,7 +32,7 @@ In production, a page with small styles writes them into its head, so the browse
 
 The size counts a page's styles together with its layouts'. Two pages of one app can differ. `kay dev` always links them.
 
-When a page's styles are over that size, kay still inlines what the page uses. It writes into the head only the rules for the classes its components write, Tailwind's included, if they fit under the same size. A page never loads the whole stylesheet after it paints, so a light page stays light.
+When a page's styles are over that size, kay still inlines what the page uses. It writes into the head only the rules for the classes its components write, Tailwind's included, if they fit under the same size. A star variant such as `*:p-2` counts like any other class. A page never loads the whole stylesheet after it paints, so a light page stays light.
 
 The classes your islands set after load count too. kay reads them from the island's script and template, from the props a parent passes, and from the components of a library it renders. A name built in a template string, such as `` `btn-${kind}` ``, keeps the rules of every class that starts or ends with its fixed part.
 

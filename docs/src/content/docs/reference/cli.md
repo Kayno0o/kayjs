@@ -52,6 +52,7 @@ kay new my-app --template app --without docker
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works for now, with a warning |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
+| `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the registry's kay at the same minor |
 | `-y` | Takes the `server` preset without asking |
 | `--quiet` | Prints the summary line only |
 
@@ -192,7 +193,9 @@ Under `--format json`, each line is one JSON object on stdout with an `event` an
 
 `--quiet` leaves out the `restart` and `styles` events as it leaves out their lines.
 
-<ReadMore href="/llms/dev-server">What `kay dev` closes after an edit, how islands swap in place, the keys in a terminal and the dev tool's tabs.</ReadMore>
+<ReadMore href="/llms/dev-server">What `kay dev` closes after an edit, how islands swap in place and the keys in a terminal.</ReadMore>
+
+<ReadMore href="/llms/dev-tool">The dev tool's tabs.</ReadMore>
 
 ### Errors without a browser
 
@@ -246,13 +249,13 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--verify` | With `--compile`, starts the executable and runs its health check, failing the build with the server's output |
 | `--verify-load` | With `--compile`, only loads the modules of the executable, with no database or secret, for a container build stage; not with `--verify` |
 | `--entry <file>` | The server entry to compile, and to type the check against |
-| `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export) |
-| `--outdir <dir>` | Where `--static` writes, `dist` by default |
+| `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export); not with `--compile` |
+| `--outdir <dir>` | Where `--static` writes, `dist` by default; only with `--static` |
 | `--no-check` | Skips the check |
 | `--no-cache` | Empties `.kay/cache` first, so everything is compiled, encoded and fetched again; the chunks kept for open tabs stay |
 | `--analyze` | Lists the modules weighing most in the entry and each island, see [Performance](/guides/performance#find-the-heavy-modules) |
 | `--deny-warnings` | Fails the build on a warning of the check or of a lint too, such as `over-budget` |
-| `-p <tsconfig>` | Names another tsconfig |
+| `-p <tsconfig>` | Names another tsconfig for the check; not with `--no-check` |
 | `--format text\|github\|json` | `github` annotates problems on the diff, `json` prints the whole build as one document, see [Output for tools](#output-for-tools) |
 | `--quiet` | Leaves out the size report |
 
@@ -579,7 +582,7 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 ## Quiet and plain output
 
-`kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`. They print the problems and one summary line, without the size report or the files one by one. Every other command refuses it.
+`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate`, `kay new` and `kay types` take `--quiet`. They print the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all. Every other command refuses it.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files
@@ -589,7 +592,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
