@@ -268,19 +268,31 @@ export async function servePublic(app: Elysia, served: ServedPaths, files: Claim
   answerVanished(app, paths)
 }
 
+// The public files of each app that listens, which its server's error handler answers for.
+const vanishable = new WeakMap<object, Set<string>>()
+
 // The open of a public file's body, by Bun streaming it or by compression reading it, happens once the route returned, so a file deleted before it fails there with no request left: the server answers a plain 404, as Elysia does for an unknown path.
 // It costs a request nothing, as the handler only runs for the failure.
-function answerVanished(app: Elysia, paths: ReadonlySet<string>): void {
+function answerVanished(app: Elysia, served: ReadonlySet<string>): void {
   app.onStart((root) => {
-    const { server } = root
-    const own = root.config.serve?.error
+    // Two `pages()` on one app share the server's one handler.
+    const paths = vanishable.get(root) ?? new Set<string>()
+
+    vanishable.set(root, paths)
+
+    for (const path of served)
+      paths.add(path)
+
+    // An app's own `serve.error` is laid over this one by Elysia's reload, so it answers these failures itself.
+    if (root.config.serve?.error)
+      return
 
     // Bun drops a table of static routes when only its error handler is reloaded; Elysia lays its own back as the modules it waits on resolve, a microtask after it starts listening.
-    server?.reload({
-      async error(error: Error) {
+    root.server?.reload({
+      error(error: Error) {
         const { code, path } = error as NodeJS.ErrnoException
 
-        return code === 'ENOENT' && path !== undefined && paths.has(path) ? new Response('NOT_FOUND', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } }) : own?.call(server, error)
+        return code === 'ENOENT' && path !== undefined && paths.has(path) ? new Response('NOT_FOUND', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } }) : undefined
       },
     } as Parameters<Server<unknown>['reload']>[0])
   })

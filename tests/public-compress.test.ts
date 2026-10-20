@@ -670,5 +670,25 @@ describe('a deleted public file is a path nothing serves', () => {
 
       expect(errors).toEqual([])
     })
+
+    it('leaves the failure to the app\'s own serve.error when it has one', async () => {
+      const name = 'own-error.txt'
+
+      await writeFile(join(dir, 'public', name), LARGE)
+
+      const app = await serve()
+      const server = new Elysia({ serve: { error: () => new Response('mine', { status: 418 }) } }).use(app).listen({ port: 0, hostname: '127.0.0.1' })
+      const watching = goneAtRead(join(dir, 'public', name))
+
+      try {
+        const response = await fetch(`http://127.0.0.1:${server.server!.port}/${name}`, { headers: { 'accept-encoding': 'identity' } })
+
+        expect([response.status, await response.text()]).toEqual([418, 'mine'])
+      }
+      finally {
+        watching.mockRestore()
+        await server.stop(true)
+      }
+    })
   })
 })
