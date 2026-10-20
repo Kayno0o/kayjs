@@ -193,7 +193,7 @@ export default defineMessages({
 - A library whose package.json declares `"kay": { "messages": "./src/messages" }`, kayjs-ui for one, gives its catalogs to every app that installs it with no line in `kay.config.ts`; a regional locale such as `fr-CA` reads its language's catalog when the library has none for the region, and a locale it has no catalog for reads the default locale's texts, which `kay check` does not ask the app to translate. The app's file, then an extension of the same name, win over it.
 - A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` each in the directory its `messages` names (see [Extensions](component-libraries.md#extensions)).
 - Every locale reads the library's messages with the app's laid over them key by key, so `auth: { title: 'Connexion' }` in `src/messages/fr.ts` replaces that one text of the library and keeps the rest.
-- `t()` types the keys of both, and `kay check` holds each locale to the default one's keys, the library's included, so a locale the library does not translate is the app's to fill.
+- `t()` types the keys of both, and `kay check` holds each locale to the default one's keys, a library's included where it ships a catalog for the locale, so a key that catalog leaves out is the app's to fill.
 - The app needs no file of its own for a locale the library translates.
 - Without `i18n`, a site is in its one language, its `lang` (`en` without one): `t()` reads its libraries' catalogs for it, with the app's `src/messages/<lang>.ts` laid over them when it has one, and `kay check` types the keys of both.
 - Without `i18n`, `locale()` is that language, `localize()` gives a path back as written, and no page gets `hreflang` links, so a library's pages read their texts in any app.
