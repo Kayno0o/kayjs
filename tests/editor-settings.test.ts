@@ -22,6 +22,13 @@ describe('the starter app\'s Tailwind IntelliSense setting', () => {
     expect(classesIn('p Some #[b.font-bold bold] text\n')).toEqual(['font-bold'])
   })
 
+  it('reads the classes after an id, with or without a tag', () => {
+    expect(classesIn('input#x.peer.sr-only(type="checkbox")\n')).toEqual(['peer', 'sr-only'])
+    expect(classesIn('  #main.container.mx-auto\n')).toEqual(['container', 'mx-auto'])
+    expect(classesIn('p See #[a#top.underline.font-bold link] here\n')).toEqual(['underline', 'font-bold'])
+    expect(classesIn('div#a\n')).toEqual([])
+  })
+
   it('keeps a decimal, a bracket group and a variable group whole', () => {
     expect(classesIn('div.p-1.5.w-1/2.hover:bg-red-500\n')).toEqual(['p-1.5', 'w-1/2', 'hover:bg-red-500'])
     expect(classesIn('div.w-[calc(100%-2rem)].[&>svg]:size-4.bg-(--brand)/50\n')).toEqual(['w-[calc(100%-2rem)]', '[&>svg]:size-4', 'bg-(--brand)/50'])

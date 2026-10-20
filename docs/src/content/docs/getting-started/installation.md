@@ -71,7 +71,7 @@ The extension runs the language server of the kay the workspace installed. It al
 | `kay.server.path` | The kay CLI to run, absolute or relative to the workspace, when it is not the workspace's own |
 | `kay.routes` | The pages directory, so route params and links are typed. By default the one `kay.config.ts` names, else `src/routes` |
 
-A project made with Tailwind also gets a `.vscode/settings.json` for the Tailwind CSS IntelliSense extension: it reads `.kay` files as HTML and finds the classes of the `.class` shorthand and of `class="..."`, so completion and hover work in both.
+A project made with Tailwind also gets a `.vscode/settings.json` for the Tailwind CSS IntelliSense extension: it reads `.kay` files as HTML and finds the classes of the `.class` shorthand and of `class="..."`, so completion and hover work in both. The extension matches by pattern, so a line of a script fence such as `console.log(` can show Tailwind hovers too.
 
 Any editor that speaks the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server. Start `bunx kay lsp --stdio` in the project root for `.kay` files.
 

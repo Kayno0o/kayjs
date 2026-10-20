@@ -61,10 +61,11 @@ const VIEW_TRANSITION = `@media (prefers-reduced-motion: no-preference) {
 // A class of the `.class` shorthand: a balanced `[...]`, a `(...)` after a `-`, a decimal, or any other character that is no space, `.`, `#` or `(`.
 const SHORTHAND_CLASS = String.raw`(?:\[[^\]\s]*\]|(?<=-)\([^)\s]*\)|\d\.\d+(?!\w)|[^\s.#(\[\]])+`
 
-// Tailwind IntelliSense's `classRegex`: a `class="..."` value, and the classes after the tag of a line or of a `#[tag]`, each `.class` apart.
+// Tailwind IntelliSense's `classRegex`: a `class="..."` value, and the classes after the tag and the `#id` of a line or of a `#[tag]`, each `.class` apart.
+// A regex cannot tell a fence from the template, so a script line such as `console.log(` reads as a tag with a class too.
 export const TAILWIND_CLASS_REGEX: (string | [string, string])[] = [
   String.raw`class\s*=\s*"([^"]*)"`,
-  [String.raw`(?:^|\n|#\[)[ \t]*(?:[A-Za-z][\w-]*)?((?:\.${SHORTHAND_CLASS})+)`, String.raw`\.(${SHORTHAND_CLASS})`],
+  [String.raw`(?:^|\n|#\[)[ \t]*(?:[A-Za-z][\w-]*)?(?:#[^\s.#(\[\]]+)?((?:\.${SHORTHAND_CLASS})+)`, String.raw`\.(${SHORTHAND_CLASS})`],
 ]
 
 // `.vscode/settings.json`: the ESLint extension lints only the languages it lists, which replaces its default ones, and Tailwind IntelliSense reads `.kay` as HTML.
