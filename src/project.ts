@@ -129,8 +129,8 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 }
 
 // How every page renders, served or prerendered alike.
-export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, fontCss?: string | undefined, islandChunks?: RenderOptions['islandChunks'] }): RenderOptions {
-  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, fontCss: config.saveData === false ? undefined : built.fontCss, islandChunks: config.saveData === false ? undefined : built.islandChunks, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
+export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
+  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

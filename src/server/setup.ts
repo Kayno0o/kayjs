@@ -125,5 +125,5 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandChunks: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
 }

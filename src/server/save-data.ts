@@ -17,17 +17,17 @@ export function savesData(request: Request): boolean {
 }
 
 // Whether this request gets the lighter page: it asks for less data, and the pages vary on it.
-export function savesLess(request: Request, options: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandChunks'>): boolean {
+export function savesLess(request: Request, options: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandPreloads'>): boolean {
   return pagesVary(options) && savesData(request)
 }
 
 // Whether pages differ for a visitor saving data: they carry something to leave out, and the `saveData` config key leaves the behavior on.
-export function pagesVary({ saveData, prefetch, fontCss, islandChunks }: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandChunks'>): boolean {
-  return saveData !== false && (prefetch !== false || fontCss !== undefined || (islandChunks?.drop.size ?? 0) > 0)
+export function pagesVary({ saveData, prefetch, fontCss, islandPreloads }: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandPreloads'>): boolean {
+  return saveData !== false && (prefetch !== false || fontCss !== undefined || (islandPreloads?.drop.size ?? 0) > 0)
 }
 
 // The chunks a page preloads for its eager islands and for nothing else: not the entry's, nor the code waiting for the viewport.
-export function islandOnlyChunks({ islands, entryImports, hydrateWhen }: Pick<ClientBuild, 'islands' | 'entryImports' | 'hydrateWhen'>): NonNullable<RenderOptions['islandChunks']> {
+export function islandOnlyChunks({ islands, entryImports, hydrateWhen }: Pick<ClientBuild, 'islands' | 'entryImports' | 'hydrateWhen'>): NonNullable<RenderOptions['islandPreloads']> {
   const kept = new Set([...entryImports, ...hydrateWhen ?? []])
 
   return { drop: new Set(Object.values(islands).flat().filter(chunk => !kept.has(chunk))), wait: hydrateWhen ?? [] }
@@ -47,7 +47,7 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   // The chunks as the page names them, under the mount point.
   const base = options.base ?? ''
-  const chunks = options.islandChunks && { drop: new Set([...options.islandChunks.drop].map(chunk => joinBase(base, chunk))), wait: options.islandChunks.wait.map(chunk => joinBase(base, chunk)) }
+  const chunks = options.islandPreloads && { drop: new Set([...options.islandPreloads.drop].map(chunk => joinBase(base, chunk))), wait: options.islandPreloads.wait.map(chunk => joinBase(base, chunk)) }
   const lighter = (head: string) => {
     let lightened = withoutIslandPreloads(head.replace(FONT_PRELOAD, ''), chunks)
 
@@ -78,7 +78,7 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
 }
 
 // The head without the preloads of the chunks only islands need, the code waiting for the viewport preloaded in the first one's place when the page did not already.
-function withoutIslandPreloads(head: string, chunks: RenderOptions['islandChunks']): string {
+function withoutIslandPreloads(head: string, chunks: RenderOptions['islandPreloads']): string {
   if (chunks === undefined || chunks.drop.size === 0)
     return head
 

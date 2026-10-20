@@ -4,7 +4,7 @@ import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
 import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
-import { savesData } from './save-data'
+import { savesDataInBrowser } from './save-data'
 import { freshPrefix, withIds } from './uid'
 import { decodeServerValue } from './wire'
 
@@ -91,7 +91,7 @@ async function followCaches(): Promise<void> {
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
   let saving: boolean | undefined
-  const asksLess = () => saving ??= savesData()
+  const asksLess = () => saving ??= savesDataInBrowser()
 
   if (following || document.querySelector(CACHE_SCRIPT))
     void followCaches()

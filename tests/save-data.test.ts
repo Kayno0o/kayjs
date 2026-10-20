@@ -337,8 +337,8 @@ describe('the page wrapper', () => {
     expect(withSavedData(respond, { prefetch: false })).toBe(respond)
     expect(withSavedData(respond, { saveData: false })).toBe(respond)
     expect(withSavedData(respond, { prefetch: false, fontCss: '@font-face{}' })).not.toBe(respond)
-    expect(withSavedData(respond, { prefetch: false, islandChunks: { drop: new Set(), wait: [] } })).toBe(respond)
-    expect(withSavedData(respond, { prefetch: false, islandChunks: { drop: new Set(['/_kay/a.js']), wait: [] } })).not.toBe(respond)
+    expect(withSavedData(respond, { prefetch: false, islandPreloads: { drop: new Set(), wait: [] } })).toBe(respond)
+    expect(withSavedData(respond, { prefetch: false, islandPreloads: { drop: new Set(['/_kay/a.js']), wait: [] } })).not.toBe(respond)
   })
 })
 

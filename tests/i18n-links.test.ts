@@ -10,7 +10,8 @@ import { fixtureCopy } from './scratch'
 
 const chrome = browserPath()
 // What a page of an app with locales, its one small island importing nothing of kay/i18n, loads up front, gzipped, a little above what it is: the links an island sets go in the page's locale from the start, the messages and formatters wait for an island using them.
-// About 1% above it, as the hashed chunk names alone move it by a dozen bytes from one project path to the next.
+// A few bytes above it, as the hashed chunk names alone move it by a dozen bytes from one project path to the next.
+// The check for a visitor asking to save data, which islands with no `hydrate` wait on, costs about 105 to 140 bytes here, read before the first island hydrates so it cannot wait in a chunk.
 // This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.
 const EAGER_JS_BUDGET = 15_404
 

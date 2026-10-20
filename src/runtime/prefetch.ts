@@ -1,5 +1,5 @@
 import { followable, linkOf, loadSwap } from './navigate'
-import { savesData } from './save-data'
+import { savesDataInBrowser } from './save-data'
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
@@ -12,7 +12,7 @@ const handlers: Record<string, (event: Event) => void> = {}
 
 // Prefetches the links the way the server's speculation rules say, which the swap follows; none for a visitor asking for less data, whom a page the server or a cache gave in full reaches here too.
 export function startPrefetch(rules: string | null): void {
-  eagerness = savesData() ? false : eagernessOf(rules)
+  eagerness = savesDataInBrowser() ? false : eagernessOf(rules)
 
   if (eagerness === 'conservative')
     handlers.pointerdown = onPrefetchHint

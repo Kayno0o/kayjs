@@ -113,7 +113,7 @@ Comments(postId={post.id} hydrate="visible")
 
 A click on an island that is still loading is replayed once it hydrates, so the visitor loses nothing.
 
-A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) gets islands that wait by themselves. One with no `hydrate` hydrates at once when it is in view, and once it scrolls near when it is not. Write `hydrate="load"` on an island that must work at once. `hydrate="idle"`, `hydrate="visible"` and `hydrate="client"` go as written. A deferred server island is fetched only when it nears the viewport. `saveData: false` in the config turns this off.
+A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) gets islands that wait by themselves. One with no `hydrate` hydrates at once when it is in view, and once it scrolls near when it is not. Write `hydrate="load"` on an island that must work at once, a form included. `hydrate="idle"`, `hydrate="visible"` and `hydrate="client"` go as written. A deferred server island is fetched only when it nears the viewport. `saveData: false` in the config turns this off.
 
 <ReadMore href="/llms/islands">How many events an island keeps while it loads, and when it drops them.</ReadMore>
 

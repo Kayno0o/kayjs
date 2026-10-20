@@ -163,7 +163,7 @@ export interface RenderOptions {
   // The stylesheet declaring the fonts, which a visitor asking for less data gets with each face shown only when cached.
   fontCss?: string | undefined
   // The chunks only islands need, which a page preloads for its eager islands and a visitor asking for less data does not, their islands waiting for the viewport; `wait` is the code waiting for it, which that visitor's page preloads in their place.
-  islandChunks?: { drop: ReadonlySet<string>, wait: readonly string[] } | undefined
+  islandPreloads?: { drop: ReadonlySet<string>, wait: readonly string[] } | undefined
   // A page rendered without its guards, as a prerender does, still being one a guard covers.
   guarded?: boolean | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
