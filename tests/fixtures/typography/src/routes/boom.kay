@@ -1,0 +1,4 @@
+--- server
+throw new Error('boom')
+---
+h1 Jamais

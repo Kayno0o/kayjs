@@ -98,6 +98,7 @@ export default defineConfig({
 
 - `minify` is on for `kay build` unless set to `false`, and off for `kay dev` and a server bundling at boot unless set to `true`.
 - `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
+- `typography: false` leaves a French page's spaces before `: ; ! ?` and inside `« »` as typed instead of making them non-breaking ([Locales](locales.md#french-typography)).
 
 - Every page carries speculation rules, which the swap replaces on pages shipping its script (see [Navigation](navigation.md#navigation)): Chromium prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`.
 - Links under `/_kay/` or `/api/`, with `download` or with `rel="nofollow"` are never prefetched; any other link that changes something on GET, such as a logout, takes `data-no-prefetch`.

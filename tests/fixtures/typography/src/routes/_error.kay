@@ -1,0 +1,4 @@
+--- server
+const { status } = ctx.error
+---
+h1 Erreur {status} : désolé !

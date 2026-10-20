@@ -252,6 +252,13 @@ export default defineMessages({
 - With `site`, every page links its copy in each locale, `<link rel="alternate" hreflang>`, `x-default` being the default locale's, its canonical URL is its own locale's, and the sitemap lists every copy with the others as `xhtml:link` alternates.
 - `kay build` prerenders a page once per locale.
 
+### French typography
+
+- A page whose `lang` starts with `fr` (the site's `lang`, or the locale of a French page under `i18n`) is written with a non-breaking space (U+00A0) in place of the plain one before `:`, `;`, `!`, `?` and `»`, and after `«`, so a mark never wraps to the next line alone. Nothing is typed: `Voulez-vous continuer ?` in a template, a prop, a `.ts` constant or a Markdown collection comes out right.
+- It runs once over the page's markup on the server, so the shell, the blocks of an `await` as they stream, the pages `kay build` prerenders and exports, the server islands, the error and not-found pages and the offline page all have it, and a page in any other language costs nothing. It rewrites the text and the `alt`, `title`, `aria-label` and the `content` of a description or title meta (`description`, `og:description`, `og:title`, `twitter:description`).
+- It leaves the text of `code`, `pre`, `kbd`, `samp`, `script`, `style`, `textarea`, comments, other attributes, URLs and times such as `12:30` as they are, works within one text node, so a colon right after a tag stays, and keeps any U+00A0 or U+202F already typed. Markup it cannot read ends the pass at that point, the rest going out as it was.
+- `typography: false` in `kay.config.ts` turns it off. An island hydrating over the markup writes its own text, plain spaces included, so the spaces of its static text are the ones typed.
+
 ### Messages holding markup
 
 - `T` from `kay/i18n` renders a message whose tags are filled by the blocks of their names, `intro: 'Read <about>our story</about>, {name}.'` through:

@@ -38,6 +38,8 @@ export interface Shipped {
   locale?: boolean
   // Whether `kay dev` reads the rules again each time.
   dev?: boolean | undefined
+  // What a block's markup goes through before it is sent, as the shell's did.
+  polish?: ((html: string) => string) | undefined
 }
 
 // A static render, as pages and layouts are: only islands carry the markers hydration claims.
@@ -138,7 +140,8 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           shipped = true
         }
 
-        const html = more ? `<!--kay-await:${id}-->${rendered.html}<!--/kay-await:${id}-->` : rendered.html
+        const markup = sent.polish ? sent.polish(rendered.html) : rendered.html
+        const html = more ? `<!--kay-await:${id}-->${markup}<!--/kay-await:${id}-->` : markup
 
         controller.enqueue(encoder.encode(`<template data-kay-await="${id}">${html}</template>${scripts}<script>${SWAP_CALL}</script>`))
       }

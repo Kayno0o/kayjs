@@ -65,6 +65,7 @@ import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
 import { formChecks, renderBlock, renderStatic, settle, streamDocument } from './stream'
 import { traced } from './trace'
+import { typographyFor } from './typography'
 import { workScript } from './work'
 
 interface PageModule {
@@ -151,6 +152,8 @@ export interface RenderOptions {
   offline?: boolean | undefined
   // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
   lateStyles?: boolean | undefined
+  // `false` leaves a French page's spaces as they were typed.
+  typography?: boolean | undefined
   // A page rendered without its guards, as a prerender does, still being one a guard covers.
   guarded?: boolean | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
@@ -604,6 +607,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view, undefined, chunks)))
       // The prerendered page holds the checks of the forms it rendered, not of those in a block that settles per request.
       const posts = client.entry !== undefined && client.navigation === true
+      const polish = typographyFor(localeState()?.locale ?? options.lang ?? DEFAULT_LANG, options.typography)
       const settled = await Promise.all(islands.html.map(async (html) => {
         const forms = new Set<Action<never, unknown>>()
         const markup = await settleBlocks(html, deferred, within, (rendered) => {
@@ -611,8 +615,10 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
             forms.add(form)
         }, report)
 
+        const written = polish ? polish(markup) : markup
+
         // After the island's own markup, so no sibling selector meets them.
-        return posts ? markup + inScope(() => formChecks(forms, options.dev, client.entry)) : markup
+        return posts ? written + inScope(() => formChecks(forms, options.dev, client.entry)) : written
       }))
       const base = options.base ?? ''
       const html = base === '' ? settled : await Promise.all(settled.map(async markup => rebaseHtml(new Response(markup, { headers: { 'content-type': 'text/html' } }), base, true).text()))
@@ -945,7 +951,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shown = marks === undefined || editor === undefined ? view : () => html(child(view()) + child(editor.default({ entries: noted(rendering.ctx.request, [...marks.entries.values()]), persist: true })))
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
+  const { result: { result: { html: markup, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
@@ -959,12 +965,15 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const checked = posts ? formsScript(forms, options.dev) : ''
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers) + checked + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
+  const polish = typographyFor(lang, options.typography)
+  const body = polish ? polish(markup) : markup
+  const headHtml = polish ? polish(head.html) : head.html
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
@@ -975,7 +984,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   }
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev })
+  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
 }
 
 function htmlOpen(lang: string, attributes: string): string {

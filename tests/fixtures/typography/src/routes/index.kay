@@ -1,0 +1,38 @@
+--- server
+import { lead, typed } from '../words'
+import { notes } from '../content.config'
+
+const note = await notes.get('un') ?? ctx.notFound()
+const { Content } = note
+export const page = { prerender: true }
+
+const later = Promise.resolve('Résultat : trois')
+---
+--- script
+import Note from '../components/note.kay'
+---
+head
+  title Accueil : kay
+  meta(name="description" content="Un site : simple")
+  meta(name="keywords" content="a : b")
+h1 Bienvenue !
+p.plain Voulez-vous continuer ? Oui : non ; peut-être
+p.guillemets Il dit « bonjour » à tous
+p.time Rendez-vous à 12:30 sur https://example.fr/a?b=1
+p.after
+  b Note
+  | : fin
+p.constant {lead}
+p.typed {typed}
+p.entity Déjà&nbsp;: tapé
+Note(text="Une prop : ici")
+img(src="/x.png" alt="Vue : mer" title="Titre ! ici")
+pre.block
+  | a : b ?
+code.inline a : b
+Content
+// kay-allow uncaught-await
+await later
+  p.pending En cours
+then value
+  p.settled {value}

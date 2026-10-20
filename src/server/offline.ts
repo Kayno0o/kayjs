@@ -17,6 +17,7 @@ import { PUBLIC_ENV_PATH } from './env-state'
 import { builtFonts } from './fonts'
 import { DEFAULT_LANG, stateFor } from './i18n'
 import { slashedPath } from './routes'
+import { typographyFor } from './typography'
 import { kayWord } from './words'
 
 export const SERVICE_WORKER = '/sw.js'
@@ -204,6 +205,8 @@ export interface ServiceWorkerOptions {
   // How the site writes a page's path, which the pages are kept under.
   trailingSlash?: TrailingSlash | undefined
   lang?: string | undefined
+  // `typography: false`, which leaves the offline page's French spaces as typed.
+  typography?: boolean | undefined
   // The site's locales, whose default one words the page a visitor offline gets in place of one that was not kept.
   locales?: I18n | undefined
   // The prerendered pages of routes no guard covers, which every visitor gets alike, by path.
@@ -338,5 +341,7 @@ function offlinePage(options: ServiceWorkerOptions): string {
   const words = () => ({ title: escape(kayWord('kay.offline.title')), text: escape(kayWord('kay.offline.text')) })
   const { title, text } = options.locales === undefined ? words() : runInLocale(stateFor(options.locales, lang, '/', new Request('http://localhost/')), words)
 
-  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body><h1>${title}</h1><p>${text}</p></body></html>`
+  const polish = typographyFor(lang, options.typography) ?? ((html: string) => html)
+
+  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${polish(title)}</title></head><body><h1>${polish(title)}</h1><p>${polish(text)}</p></body></html>`
 }

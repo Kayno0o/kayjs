@@ -1,0 +1,8 @@
+--- server
+export const page = { prerender: true }
+--- script
+import Note from '../components/note.kay'
+---
+h1 Îles !
+Note(server text="Île : serveur")
+Note(server="defer" text="Île : différée")
