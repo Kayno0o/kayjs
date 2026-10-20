@@ -90,7 +90,7 @@ On an `api()` chain, a message failing a `.ws()` route's `body` is dropped: the 
 
 ### analytics refuses an `info` object where nothing shows it
 
-- `analytics()` throws at start for `info: { ... }` when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` to show the line; `info: false` stays valid. `deprecated-analytics-info` finds it and `kay upgrade` removes it.
+- `analytics()` throws at start for `info: { ... }` when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` to show the line; `info: false` stays valid.
 
 ### kayjs-auth runs `onSignUp` after the response under `requireVerified`
 

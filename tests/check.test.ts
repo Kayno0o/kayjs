@@ -2965,45 +2965,6 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports an analytics info object while consent asks, and --fix removes it', async () => {
-    const root = await scratchProject({
-      'src/a.ts': [
-        'import { analytics } from \'kay/analytics\'',
-        '',
-        'const held = { provider: \'cloudflare\', token: \'tok\', consent: true, info: { text: \'Counting\' } }',
-        '',
-        'export const a = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })',
-        'export const b = analytics({ provider: \'plausible\', consent: true, info: { text: \'Counting\' }, policyUrl: \'/p\' })',
-        'export const c = analytics({ info: { text: \'Counting\' } as const, provider: \'ga4\', consent: false })',
-        'export const d = analytics({ provider: \'plausible\', info: { text: \'Counting\' } })',
-        'export const e = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: false })',
-        'export const f = analytics(held)',
-        'export const g = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' }, })',
-        '',
-      ].join('\n'),
-    })
-
-    try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-analytics-info/g)).toHaveLength(3)
-      await runCheck(root, '--fix')
-
-      const fixed = await Bun.file(join(root, 'src/a.ts')).text()
-
-      expect(fixed).toContain('analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', })')
-      expect(fixed).toContain('analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })')
-      expect(fixed).toContain('analytics({ provider: \'plausible\', consent: true, policyUrl: \'/p\' })')
-      expect(fixed).toContain('info: { text: \'Counting\' } as const, provider: \'ga4\'')
-      expect(fixed).toContain('const held = { provider: \'cloudflare\', token: \'tok\', consent: true }')
-      expect(fixed).toContain('analytics({ provider: \'plausible\', info: { text: \'Counting\' } })')
-      expect((await runCheck(root)).output).not.toContain('deprecated-analytics-info')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('applies the safe fixes in the paths named alone with --fix', async () => {
     const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
     const root = await scratchProject({ 'src/a.kay': button, 'src/b.kay': button })

@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The `deprecated-analytics-info` lint is gone, three minors after 1.56 made `analytics()` refuse an `info` object while `consent` asks, which it still does at start ([Privacy](privacy.md), [Lints](lints.md)).
 - A runtime redirect (`kay not-found --redirect /old --runtime`) answers a missing page whatever the 404 page weighs for a client taking gzip, brotli or zstd ([Routing](routing-endpoints-and-base.md)).
 - A page's head leaves out the rules of the star variants (`*:p-2`, `**:p-2`, `*:hover:p-2`) it does not use, as it does any other class ([Styles and assets](styles-and-assets.md)).
 - `kay fmt` in an app with Tailwind sorts the shorthand and a `class` attribute as one list when it moves the classes into the attribute, and a Tailwind fix deleting a class from a `class="..."` over lines takes its line or its space with it ([Tools](check-and-tools.md#format-the-templates)).

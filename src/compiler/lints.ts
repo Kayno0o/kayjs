@@ -326,15 +326,6 @@ export const LINTS = {
     wrong: '---\n// src/components/caller.kay\nconst { run } = props<{ run: (input: { name: string }) => Promise<string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
     right: '---\n// src/components/caller.kay\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
   },
-  'deprecated-analytics-info': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.56',
-    site: true,
-    summary: '`analytics({ info: { ... } })` while `consent` asks (`ga4`, `fathom`, `cloudflare` and `custom` ask unless `consent: false`), where the notice is worded by `consent` and no information line is shown. It did nothing and `analytics()` refuses it at start since 1.56: the fix removes it, and `consent: false` is what shows the line. Found in the project\'s `.ts` files importing `kay/analytics`, for a call with an object literal and no spread.',
-    wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' } })',
-    right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
-  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',
