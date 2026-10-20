@@ -4185,12 +4185,14 @@ const CONTROLS = new Set(['button', 'tab', 'menuitem', 'menuitemcheckbox', 'menu
 const FIELDS = new Set(['textbox', 'searchbox', 'checkbox', 'radio', 'combobox', 'listbox', 'slider', 'spinbutton', 'switch'])
 // The roles whose name comes from their content.
 const NAMED_BY_CONTENT = new Set(['button', 'link', 'heading', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'checkbox', 'radio', 'switch', 'cell', 'gridcell', 'columnheader', 'rowheader', 'treeitem', 'tooltip'])
+// The roles whose value is their name inside another element's label.
+const VALUED = new Set(['textbox', 'searchbox', 'combobox', 'listbox', 'slider', 'spinbutton'])
 const BUTTON_DEFAULTS: Record<string, string> = { submit: 'Submit', reset: 'Reset' }
 const BUTTON_INPUTS = new Set(['button', 'submit', 'reset', 'image', 'file', 'color'])
 const TEXT_INPUTS = new Set(['', 'text', 'email', 'tel', 'url', 'password'])
 const SECTIONING = 'article, aside, main, nav, section, [role=article], [role=complementary], [role=main], [role=navigation], [role=region]'
 const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress'])
-const READING_OBSERVED = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-description', 'aria-required', 'aria-level', 'aria-hidden', 'role', 'alt', 'title', 'href', 'for', 'id', 'required', 'value', 'placeholder', 'type', 'inert', 'hidden', 'class', 'style', 'aria-busy'] }
+const READING_OBSERVED = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-description', 'aria-required', 'aria-level', 'aria-hidden', 'role', 'alt', 'title', 'href', 'for', 'id', 'required', 'value', 'placeholder', 'type', 'multiple', 'size', 'list', 'open', 'inert', 'hidden', 'class', 'style', 'aria-busy'] }
 
 export type ReadingKind = 'landmark' | 'heading' | 'link' | 'control' | 'field'
 
@@ -4286,6 +4288,10 @@ function isRendered(element: Element): boolean {
     return true
 
   const parent = parentOf(element)
+
+  // An image map's area has no box of its own.
+  if (element instanceof HTMLAreaElement)
+    return parent !== null && isRendered(parent)
 
   return getComputedStyle(element).display === 'contents' && parent !== null && isRendered(parent)
 }
@@ -4398,7 +4404,7 @@ function referenced(element: Element, attribute: string): Element[] {
 }
 
 // The element's accessible name, by the steps of the accessible name computation: `aria-labelledby`, `aria-label`, what the element is (`alt`, a `label`, a button's `value`), its content when its role is named by it, and `title`. It approximates the browser's: the text a CSS `::before` or `::after` adds is not read.
-export function accessibleName(element: Element): string {
+function accessibleName(element: Element): string {
   return squeezed(nameFrom(element, { labelled: false, direct: false, nested: false, seen: new Set() }))
 }
 
@@ -4410,7 +4416,12 @@ function nameFrom(element: Element, context: NameContext): string {
 
   try {
     if (!context.labelled) {
-      const named = referenced(element, 'aria-labelledby').map(other => squeezed(nameFrom(other, { ...context, labelled: true, direct: true, nested: false }))).join(' ').trim()
+      // An element naming itself gives its own `aria-label` and content.
+      const alone = new Set(context.seen)
+
+      alone.delete(element)
+
+      const named = referenced(element, 'aria-labelledby').map(other => squeezed(nameFrom(other, { labelled: true, direct: true, nested: false, seen: other === element ? alone : context.seen }))).join(' ').trim()
 
       if (named !== '')
         return named
@@ -4422,11 +4433,12 @@ function nameFrom(element: Element, context: NameContext): string {
       return label
 
     // A field inside another's label gives its value.
-    if (context.nested && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement))
-      return element.value
+    if (context.nested && VALUED.has(roleOf(element, false))) {
+      if (element instanceof HTMLSelectElement)
+        return [...element.selectedOptions].map(option => option.text).join(' ')
 
-    if (context.nested && element instanceof HTMLSelectElement)
-      return [...element.selectedOptions].map(option => option.text).join(' ')
+      return (element as HTMLInputElement).value ?? ''
+    }
 
     const native = nativeName(element, context)
 
@@ -4464,7 +4476,8 @@ function nativeName(element: Element, context: NameContext): string | undefined 
     return element.type === 'image' ? element.alt || element.value : element.value || fallback
   }
 
-  if (!LABELABLE.has(element.localName) || !('labels' in element))
+  // Inside another label, a field is read for its own content, as its own label would hold the text around it again.
+  if (context.nested || !LABELABLE.has(element.localName) || !('labels' in element))
     return undefined
 
   const labels = [...(element.labels as NodeListOf<HTMLLabelElement> | null) ?? []]
@@ -4521,6 +4534,13 @@ function isRequired(element: Element): boolean {
   return (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) && element.required
 }
 
+function levelOf(element: Element): number {
+  const tag = HEADING_TAG.exec(element.localName)?.[1]
+  const level = Number.parseInt(tag ?? element.getAttribute('aria-level') ?? '', 10)
+
+  return level > 0 ? level : 2
+}
+
 function readingItem(element: Element): ReadingItem | undefined {
   const role = roleOf(element)
   const kind = kindOf(role)
@@ -4532,7 +4552,7 @@ function readingItem(element: Element): ReadingItem | undefined {
   const item: ReadingItem = { element, kind, role, name }
 
   if (kind === 'heading')
-    item.level = Number(HEADING_TAG.exec(element.localName)?.[1] ?? element.getAttribute('aria-level') ?? 2)
+    item.level = levelOf(element)
 
   if (kind === 'link')
     item.target = typeof (element as Partial<HTMLAnchorElement>).href === 'string' ? (element as HTMLAnchorElement).href : element.getAttribute('href') ?? ''
@@ -4546,7 +4566,7 @@ function readingItem(element: Element): ReadingItem | undefined {
 }
 
 // Every stop of the page a screen reader reads, in the order it reads them, and the open shadow roots met on the way.
-export function readPage(doc: Document): { items: ReadingItem[], roots: ShadowRoot[] } {
+function readPage(doc: Document): { items: ReadingItem[], roots: ShadowRoot[] } {
   const items: ReadingItem[] = []
   const roots = walkComposed(doc, (element) => {
     if (element.localName === HOST || element.localName === 'head' || element.hasAttribute('hidden') || element.hasAttribute('inert') || element.getAttribute('aria-hidden') === 'true')
@@ -4597,7 +4617,9 @@ function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const tab = tool.tab({ id: 'screen-reader', label: 'Screen reader', icon: 'ear', shown: () => draw(), hidden: () => tool.hideOutline() })
   const content = tool.make('div', 'stack')
   const bar = toolbar(tool, 'Filter by role, name or problem', () => bar.apply(content), true)
-  let read: { items: ReadingItem[], flags: ReadingFlags } | undefined
+  let read: { items: ReadingItem[], flags: ReadingFlags, key: string } | undefined
+  // Whether the rows show what was read last.
+  let drawn = false
   let timer = 0
   // A page that changes all the time is read at most this often, slower the longer a read takes.
   let wait = READING_WAIT
@@ -4612,7 +4634,7 @@ function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   changes.observe(doc.documentElement, READING_OBSERVED)
   schedule()
 
-  // After the page stops changing for a moment.
+  // The first change waits, the rest until the read it ordered, so a page that never stops changing is still read.
   function schedule(): void {
     if (timer === 0)
       timer = win.setTimeout(scan, wait)
@@ -4637,8 +4659,17 @@ function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const flags = readingFlags(page.items)
     const flagged = flags.page.length + flags.items.size
 
-    read = { items: page.items, flags }
+    const key = JSON.stringify([flags.page.map(issue => issue.text), page.items.map(item => [item.role, item.name, item.level, item.target, item.required, item.description, flags.items.get(item), sourceOf(item.element)])])
+    const same = read !== undefined && read.key === key && read.items.every((item, index) => item.element === page.items[index]!.element)
+
     tab.count(flagged, flagged > 0 ? 'warn' : undefined)
+
+    // Rows rebuilt for nothing would drop the focus and the outline a person is on.
+    if (!same) {
+      read = { items: page.items, flags, key }
+      drawn = false
+    }
+
     draw()
     wait = Math.max(READING_WAIT, (win.performance.now() - started) * READING_SLACK)
   }
@@ -4664,11 +4695,19 @@ function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       if (elements[0] !== undefined && !(event.target as Element).closest('button'))
         reveal(elements[0], text)
     }
+    row.onkeydown = (event) => {
+      if ((event.key === 'Enter' || event.key === ' ') && event.target === row && elements[0] !== undefined) {
+        event.preventDefault()
+        reveal(elements[0], text)
+      }
+    }
   }
 
   function draw(): void {
-    if (read === undefined || tab.panel.hidden === true)
+    if (read === undefined || drawn || tab.panel.hidden === true)
       return
+
+    drawn = true
 
     tool.hideOutline()
 

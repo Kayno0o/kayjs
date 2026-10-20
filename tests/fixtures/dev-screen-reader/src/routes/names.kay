@@ -33,3 +33,11 @@ main
       h2 Inner
   form(aria-label="Search form")
     p Form text
+  button#self(aria-label="Delete" aria-labelledby="self item")
+  span#item Item
+  label
+    span Agree
+    input(type="checkbox")
+  details
+    summary Toggle
+    a(href="/inside") Inside

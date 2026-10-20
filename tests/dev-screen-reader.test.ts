@@ -41,6 +41,9 @@ const NAMES = [
   ['region', 'Related'],
   ['heading 2', 'Inner'],
   ['form', 'Search form'],
+  ['button', 'Delete Item'],
+  ['checkbox', 'Agree'],
+  ['button', 'Toggle'],
 ]
 const SAME = 'Same name as 1 other link that goes elsewhere'
 const NO_NAME = 'No accessible name'
@@ -153,9 +156,35 @@ describe.skipIf(path === undefined)('the screen reader tab of the dev tool', () 
     const page = await open('/names')
 
     await page.evaluate(openTab)
-    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-screen-reader .entry').length >= 15)
+    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-screen-reader .entry').length >= 18)
 
     expect((await page.evaluate(reading)).map(row => [row[0], row[1]])).toEqual(NAMES)
+
+    // An element a person opens adds what it holds.
+    await page.evaluate(() => document.querySelector('details')!.setAttribute('open', ''))
+    await page.waitUntil(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-screen-reader .accname')].some(name => name.textContent === 'Inside'))
+  }, 60_000)
+
+  it('leaves the rows alone, and the focus on one, when the page changes without changing what is read', async () => {
+    const page = await open('/')
+
+    await page.evaluate(openTab)
+    await page.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-screen-reader .entry').length >= 20)
+
+    const rows = async () => page.evaluate(() => {
+      const root = document.querySelector('kay-dev')!.shadowRoot!
+      const row = root.querySelector<HTMLElement>('#kay-dev-screen-reader .entry')!
+
+      row.focus()
+      Object.assign(window, { row })
+      document.querySelector('footer p')!.textContent = 'Changed text'
+
+      return root.activeElement === row
+    })
+
+    expect(await rows()).toBe(true)
+    await page.evaluate(async () => new Promise(done => setTimeout(done, 700)))
+    expect(await page.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.activeElement === (window as unknown as { row: Element }).row)).toBe(true)
   }, 60_000)
 
   it('reads the contents of open shadow roots and follows a change inside one', async () => {
