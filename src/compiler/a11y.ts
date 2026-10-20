@@ -19,6 +19,7 @@ const INTERACTIVE = new Set(['button', 'select', 'textarea', 'details', 'iframe'
 const REDUNDANT_ALT = /\b(?:image|picture|photo)\s+of\b/i
 const FILENAME_ALT = /^[\w-]+\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const WHITESPACE = /\s+/
+const NOT_LINE_BREAK = /[^\n]/g
 // What a screen reader reads a tooltip's text from on an element the keyboard never reaches.
 const DESCRIBING = ['aria-label', 'aria-labelledby', 'aria-describedby']
 // The roles that leave an element as bare as having none.
@@ -84,6 +85,81 @@ interface Render {
 
 // How the checks walk into each kind of node: the blocks of an `if`, `match`, `for`, `await` or `try` are alternatives, each rendering on its own.
 const WALKS: Record<Node['kind'], 'element' | 'within' | 'alternatives' | 'none'> = { element: 'element', text: 'within', slot: 'within', if: 'alternatives', match: 'alternatives', for: 'alternatives', await: 'alternatives', try: 'alternatives', pending: 'within', snippet: 'within', const: 'none', error: 'none' }
+
+// The code with the inside of its strings, template text and comments blanked, as a name in one is no call; a `${ }` of a template stays code.
+function maskLiterals(code: string): string {
+  const blank = (part: string) => part.replace(NOT_LINE_BREAK, ' ')
+  // The brace depth each open `${ }` was entered at, to know which `}` closes it.
+  const holes: number[] = []
+  let result = ''
+  let depth = 0
+  let template = false
+
+  for (let at = 0; at < code.length; at++) {
+    const char = code[at]!
+    const next = code[at + 1]
+
+    if (template) {
+      if (char === '\\') {
+        result += blank(code.slice(at, at + 2))
+        at++
+      }
+      else if (char === '$' && next === '{') {
+        result += '${'
+        at++
+        holes.push(depth++)
+        template = false
+      }
+      else {
+        result += char === '`' ? char : blank(char)
+        template = char !== '`'
+      }
+    }
+    else if (char === '`') {
+      result += char
+      template = true
+    }
+    else if (char === '"' || char === '\'') {
+      let end = at + 1
+
+      for (; end < code.length && code[end] !== char && code[end] !== '\n'; end++) {
+        if (code[end] === '\\')
+          end++
+      }
+
+      result += char + blank(code.slice(at + 1, end)) + (code[end] === char ? char : '')
+      at = end
+    }
+    else if (char === '/' && (next === '/' || next === '*')) {
+      const line = next === '/'
+      const found = line ? code.indexOf('\n', at) : code.indexOf('*/', at + 2)
+      let end = code.length
+
+      if (found !== -1)
+        end = line ? found : found + 2
+
+      result += blank(code.slice(at, end))
+      at = end - 1
+    }
+    else {
+      if (char === '{') {
+        depth++
+      }
+      else if (char === '}') {
+        depth--
+
+        if (holes.at(-1) === depth) {
+          holes.pop()
+          template = true
+        }
+      }
+
+      result += char
+    }
+  }
+
+  return result
+}
 
 // What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
 export function accessibilityLints(file: KayFile): Diagnostic[] {
@@ -411,7 +487,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   const callable = snippets.size > 0 ? new RegExp(`(?<![\\w$.])(${[...snippets.keys()].map(name => RegExp.escape(name)).join('|')})\\s*\\(`, 'g') : undefined
   const collectCalls = (node: Node, context: Context) => {
     for (const span of nodeExpressions(node)) {
-      for (const match of text(span).matchAll(callable!))
+      for (const match of maskLiterals(text(span)).matchAll(callable!))
         calls.push({ name: match[1]!, branches: context.branches, repeated: context.repeated, snippet: context.snippet })
     }
   }
@@ -447,6 +523,12 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   }
 
   visit(file.template, { label: false, component: false, hidden: false, removed: false, ariaHidden: false, dialog: false, grouped: false, branches: new Map(), repeated: false })
+
+  // A call made by the script block runs wherever the component does, which no alternative or row narrows.
+  if (callable && file.script) {
+    for (const match of maskLiterals(text(file.script)).matchAll(callable))
+      calls.push({ name: match[1]!, branches: new Map(), repeated: false, snippet: undefined })
+  }
 
   for (const control of controls) {
     const id = control.id ? text(control.id) : staticValue(control, 'id')
@@ -484,6 +566,8 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   function rendered(uses: IdUse[]): IdUse[] {
     const memo = new Map<SnippetNode, Render[]>()
     const pending = new Set<SnippetNode>()
+    // The pending snippets a list under construction was cut short at: it is complete only once none is left.
+    let cuts = new Set<SnippetNode>()
     const rendersOf = (snippet: SnippetNode): Render[] => {
       const known = memo.get(snippet)
 
@@ -491,15 +575,31 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
         return known
 
       // A snippet calling itself renders once more for each level it goes down.
-      if (pending.has(snippet))
+      if (pending.has(snippet)) {
+        cuts.add(snippet)
+
         return [{ branches: new Map(), repeated: true }]
+      }
 
       pending.add(snippet)
+
+      const outer = cuts
+
+      cuts = new Set()
 
       const renders = calls.filter(call => snippets.get(call.name) === snippet).flatMap((call): Render[] => call.snippet ? rendersOf(call.snippet).map(render => ({ branches: new Map([...call.branches, ...render.branches]), repeated: call.repeated || render.repeated })) : [call])
 
       pending.delete(snippet)
-      memo.set(snippet, renders)
+      cuts.delete(snippet)
+
+      // A list cut short at a snippet still pending would differ from the one met first, so it is worked out again where it is needed.
+      if (cuts.size === 0)
+        memo.set(snippet, renders)
+
+      for (const cut of cuts)
+        outer.add(cut)
+
+      cuts = outer
 
       return renders
     }

@@ -464,6 +464,27 @@ describe('a11y lints', () => {
     expect(a11y('snippet node(item)\n  li#node\n    for child of item.children\n      {node(child)}\n{node(root)}\n')).toEqual(['duplicate-id li'])
   })
 
+  it('counts only the calls of a snippet that run: not a name inside a string, but one inside a template literal\'s `${ }` or the script block', () => {
+    const snippet = (calls: string) => `snippet card()\n  article#card Hi\n${calls}`
+
+    expect(a11y(snippet('{card()}\np {\'card(x)\'}\n'))).toEqual([])
+    expect(a11y(snippet('{card()}\np {"see card() here"}\n'))).toEqual([])
+    expect(a11y(snippet('{card()}\np {`see card() ${label}`}\n'))).toEqual([])
+    expect(a11y(snippet('{card()}\np {`${card()}`}\n'))).toEqual(['duplicate-id article'])
+    expect(a11y(`---\nconst html = card()\n---\nsnippet card()\n  article#card Hi\n{card()}\n`)).toEqual(['duplicate-id article'])
+    expect(a11y(`---\nconst html = "card()"\n---\nsnippet card()\n  article#card Hi\n{card()}\n`)).toEqual([])
+  })
+
+  it('finds the same renders of snippets calling each other, whichever is met first', () => {
+    const a = 'snippet a()\n  p#za x\n  {b()}\n'
+    const b = 'snippet b()\n  {c()}\n  {a()}\n'
+    const c = 'snippet c()\n  p#y x\n'
+    const page = (snippets: string) => `{a()}\n${snippets}p#y z\n`
+
+    expect(a11y(page(a + b + c)).sort()).toEqual(a11y(page(c + a + b)).sort())
+    expect(a11y(page(a + b + c))).toHaveLength(3)
+  })
+
   it('reports a label pointing at no id of the template, unless an id may come from an expression or a spread', () => {
     expect(a11y('label(for="email") Email\ninput#mail(name="email")\nlabel(for="card") Card\nCardField(id="card")\n')).toEqual(['dangling-label for'])
     expect(a11y('label(for="email") Email\ninput(id={field} name="email")\n')).toEqual([])
