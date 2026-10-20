@@ -9,6 +9,7 @@ import { learnedVersion, learnPlaceholder, placeholderColor, registerPlaceholder
 import { pages } from '../src/server'
 import { dominantColor, dominantColorOf } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
+import { allowsStyleAttributes } from '../src/server/security'
 import { gif } from './gif'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -109,6 +110,34 @@ describe('dominantColorOf', () => {
     expect((await Bun.file(join(cache, slot)).json() as { value: unknown }).value).toBeNull()
     await Bun.write(file, flat(10, 20, 30, { width: 32, height: 32 }))
     expect(await dominantColorOf(file, cache)).toBe('0a141e')
+  })
+})
+
+describe('allowsStyleAttributes', () => {
+  const self = '\'self\''
+  const inline = '\'unsafe-inline\''
+
+  it('allows them by default and where style-src, style-src-attr or default-src keeps unsafe-inline', () => {
+    expect(allowsStyleAttributes(undefined)).toBe(true)
+    expect(allowsStyleAttributes(false)).toBe(true)
+    expect(allowsStyleAttributes({ 'style-src': [self, inline, 'https://fonts.example'] })).toBe(true)
+    expect(allowsStyleAttributes({ 'style-src-attr': [inline], 'style-src': [self] })).toBe(true)
+    expect(allowsStyleAttributes({ 'default-src': [self, inline], 'style-src': false })).toBe(true)
+  })
+
+  it('refuses them where the first style directive set lacks unsafe-inline or carries a nonce or a hash', () => {
+    expect(allowsStyleAttributes({ 'style-src': [self] })).toBe(false)
+    expect(allowsStyleAttributes({ 'style-src-attr': ['\'none\''] })).toBe(false)
+    expect(allowsStyleAttributes({ 'style-src': [self, '\'nonce-abc\'', inline] })).toBe(false)
+    expect(allowsStyleAttributes({ 'style-src': [self, inline, '\'sha256-abc\''] })).toBe(false)
+    expect(allowsStyleAttributes({ 'default-src': [self], 'style-src': false })).toBe(false)
+  })
+
+  it('reads the report-only policy too, over the enforced one or over kay\'s defaults', () => {
+    expect(allowsStyleAttributes(undefined, { 'style-src': [self] })).toBe(false)
+    expect(allowsStyleAttributes(false, { 'style-src-attr': ['\'none\''] })).toBe(false)
+    expect(allowsStyleAttributes(false, { 'img-src': [self] })).toBe(true)
+    expect(allowsStyleAttributes({ 'style-src': [self, inline] }, { 'img-src': [self] })).toBe(true)
   })
 })
 
@@ -214,21 +243,20 @@ describe('placeholder on a page', () => {
     expect(off).not.toContain('background-color')
   })
 
-  it('writes the same under a base path, and none where the CSP refuses inline styles', async () => {
+  it('writes the same under a base path', async () => {
     const mounted = await render(new Elysia().use(await open({ base: '/docs' })))
 
     expect(img(mounted, 'photo')).toContain('style="background-color:#c86432"')
     expect(img(mounted, 'photo')).toContain('src="/docs/_kay/image?')
-    expect(img(await render(await open({ security: { csp: { 'style-src': ['\'self\'', '\'unsafe-inline\'', 'https://fonts.example'] } } })), 'photo')).toContain('background-color')
+  })
 
-    for (const csp of [{ 'style-src': ['\'self\''] }, { 'style-src-attr': ['\'none\''] }, { 'style-src': ['\'self\'', '\'nonce-abc\'', '\'unsafe-inline\''] }, { 'default-src': ['\'self\''], 'style-src': false }])
-      expect(await render(await open({ security: { csp } }))).not.toContain('background-color')
-
-    expect(await render(await open({ security: { csp: false } }))).toContain('background-color')
+  it('leaves the color out where the site CSP refuses inline styles', async () => {
+    expect(await render(await open({ security: { csp: { 'style-src': ['\'self\''] } } }))).not.toContain('background-color')
     expect(await render(await open({ security: { reportOnly: { 'style-src': ['\'self\''] } } }))).not.toContain('background-color')
-    expect(await render(await open({ security: { csp: false, reportOnly: { 'style-src-attr': ['\'none\''] } } }))).not.toContain('background-color')
+  })
+
+  it('writes the color in development', async () => {
     expect(await render(await open({ dev: true }))).toContain('background-color:#c86432')
-    expect(await render(await open({ security: { csp: { 'style-src-attr': ['\'unsafe-inline\''], 'style-src': ['\'self\''] } } }))).toContain('background-color')
   })
 
   it('gives an image added at runtime its color once the route has read it, and again when the file changes', async () => {
