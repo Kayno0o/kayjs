@@ -1131,6 +1131,11 @@ describe('preview mode', () => {
       expect(props.at).toBeInstanceOf(Date)
       expect(Object.isFrozen(props.frozen)).toBe(true)
       expect(placeFieldMarks(html, marks)).toBe('<h3 data-kay-field="crew:a:name">Delphine</h3><span data-kay-field="crew:a:age">38</span> ans<p data-kay-field="crew:a:members.0.role">Pilot</p><b data-kay-field="crew:a:members.0.ratings.0.label">Speed</b><u data-kay-field="crew:a:members.0.ratings.0.value">4</u><i>F2</i><s data-kay-field="crew:a:bare.word">Bare</s>')
+      // A component may write to a prop outside edit mode, so it may in it.
+      expect(() => {
+        props.name = 'Franck'
+      }).not.toThrow()
+      expect(entry.data.name).toBe('Franck')
     }, true)
   })
 

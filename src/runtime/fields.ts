@@ -243,14 +243,14 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
     return known
 
   const ref = () => refIndex(marks, fieldPath(name, path))
-  const proxy = new Proxy(value, {
+  const proxy: object = new Proxy(value, {
     get(target, key, receiver) {
       if (key === FIELD_REF)
         return ref()
 
       const read = Reflect.get(target, key, receiver) as unknown
 
-      if (typeof key === 'symbol' || !Object.hasOwn(target, key) || !configurable(target, key) || (key === 'length' && Array.isArray(target))) {
+      if (!tracked(target, key)) {
         // Any other read comes between a number and its render, the number then no longer told apart from one computed.
         if (typeof key === 'string')
           marks.numbers.length = 0
@@ -282,16 +282,22 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
     getOwnPropertyDescriptor(target, key) {
       const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
 
-      if (descriptor === undefined || typeof key === 'symbol' || !descriptor.configurable || !('value' in descriptor) || (key === 'length' && Array.isArray(target)))
+      if (descriptor === undefined || !descriptor.configurable || !('value' in descriptor) || !tracked(target, key))
         return descriptor
 
-      return { get: () => proxy[key as keyof typeof proxy], enumerable: descriptor.enumerable ?? false, configurable: true }
+      // A write goes to the entry itself, as it does outside edit mode.
+      return { get: () => Reflect.get(proxy, key) as unknown, set: (next: unknown) => Reflect.set(target, key, next), enumerable: descriptor.enumerable === true, configurable: true }
     },
   })
 
   marks.wrapped.set(value, proxy)
 
   return proxy
+}
+
+// Whether a read of `key` is one of a field's.
+function tracked(target: object, key: string | symbol): key is string {
+  return typeof key === 'string' && Object.hasOwn(target, key) && configurable(target, key) && !(key === 'length' && Array.isArray(target))
 }
 
 function fieldPath(name: string, path: string[]): string {
