@@ -118,7 +118,9 @@ kay dev --port 4000 --open
 
 `kay dev` runs `src/server.ts` with `NODE_ENV=development`. An edit to a template, island, loader or API route reloads in the same process. A change it cannot reload that way, such as the config or the entry, starts a new process. A start finds the browser build an earlier run left and uses it as it is when none of the files it read, the options it was built with or the versions of kay and Bun have changed since, so a second `kay dev` of a project nothing changed in builds nothing.
 
-A change to a file at the project root, such as `.env` or `package.json`, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again. Set `KAY_DEV_RELOAD_GROWTH_MB` to change that number of MiB.
+Editing the scripts or version in `package.json` restarts nothing, and a `kay.config.ts` edit starts the new server without waiting for the editor types.
+
+A change to a file at the project root, such as `.env` or a `package.json` field Bun resolves, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again. Set `KAY_DEV_RELOAD_GROWTH_MB` to change that number of MiB.
 
 These changes reload nothing: tests (a root `tests/`, `test/`, `e2e/` or a name joining them such as `tests-e2e/`, `__tests__/`, `*.test.*`, `*.spec.*` and `*.e2e.*` files anywhere, and a root Playwright, Vitest, Jest or Cypress config), root files no server reads such as a README or a LICENSE, and the backup and temporary files an editor writes beside a source. A save that touches `.css` files alone restarts nothing and swaps the stylesheets in the open pages.
 

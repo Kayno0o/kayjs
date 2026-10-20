@@ -24,6 +24,11 @@ export class TypesProcess {
 
   constructor(private root: string, private entry: string | undefined) {}
 
+  // The project modules the last answer reported, undefined before the first.
+  loadedModules(): string[] | undefined {
+    return this.modules === undefined ? undefined : [...this.modules]
+  }
+
   // Whether a change to the file, relative to the root, is one the running process loaded, which needs a new one: the config and the project's modules it imported, or any file when it has not reported them.
   loaded(file: string): boolean {
     return this.child === undefined || this.modules === undefined || file === CONFIG_FILE || this.modules.has(join(realpathSync(this.root), file))

@@ -573,19 +573,18 @@ describe.concurrent('kay dev', () => {
     }
   }, 40_000)
 
-  it('starts the client builder at once only when an earlier run left a client build', async () => {
+  it('starts the client builder at once for a project with pages or an earlier client build, and for no server that cannot ask', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const said = spyOn(console, 'error').mockImplementation(() => undefined)
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
-    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
 
     const real = realpathSync(root)
     const running: (() => Promise<void>)[] = []
 
     try {
-      // No build before: the server never asks for the client, so no builder starts.
+      // No pages and no build before: the server never asks for the client, so no builder starts.
       const first = await dev(root)
 
       running.push(first)
@@ -593,6 +592,15 @@ describe.concurrent('kay dev', () => {
       await Bun.sleep(1500)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
       await first()
+
+      // Pages, and still no build: the builder starts with the first server rather than when it asks.
+      await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+
+      const cold = await dev(root)
+
+      running.push(cold)
+      await until(() => childrenRunning(real, 'builder.ts').length === 1, 20_000)
+      await cold()
 
       await Bun.write(join(root, `.kay/dev${testWorker()}/manifest.json`), '{}')
 

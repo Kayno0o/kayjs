@@ -13,6 +13,7 @@ import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { removeDevAddress, writeDevAddress } from './address'
 import { startClientBuilder } from './client'
+import { readConfigRecord, writeConfigRecord } from './config-record'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
@@ -60,13 +61,14 @@ const RELOAD_TIMEOUT_MS = 5000
 const MAX_RELOADS = 200
 // How long stopping waits for the types being written before it kills the process writing them.
 const TYPES_GRACE_MS = 2000
-// How long a restart for an edited config waits for the types to say its entry, a config that does not load being none to wait for.
-const ENTRY_WAIT_MS = 3000
 // How long the first tree waits for the first server to listen before it is written anyway, as for a server that never does.
 const FIRST_TREE_WAIT_MS = 3000
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
+const PACKAGE_FILE = 'package.json'
+// The fields of package.json that no module resolves with or loads differently for: an edit of only these changes nothing a process or the client build reads.
+const INERT_PACKAGE_FIELDS = new Set(['scripts', 'version', 'description', 'keywords', 'author', 'contributors', 'license', 'homepage', 'repository', 'bugs', 'funding', 'private', 'files', 'engines', 'packageManager', 'publishConfig'])
 // The code files, which the process writing the types keeps running through an edit it did not load.
 const CODE_FILE = /\.[cm]?[jt]sx?$/
 // The files no type reads the contents of: a stylesheet, a markdown entry of a collection, an image, a font or any media an import takes the URL of.
@@ -96,6 +98,8 @@ const ANSI_STYLE = /\x1B\[[\d;]*m/g
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
+  // Where the client build of `kay dev` and what it keeps of the config are written.
+  const devDir = join(root, KAY_DIR, `dev${testWorker()}`)
   let child: Subprocess<'pipe'> | undefined
   // Spawned ahead of its start line, which it loads kay while it waits for: the first server when the config is to be checked first.
   let waiting: Subprocess<'pipe'> | undefined
@@ -540,7 +544,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       reloadAnswer = undefined
     }
   }
-  // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten; an edited config is the exception, as the types tell its entry.
+  // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
   // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
   const restart = async () => {
     const files = [...touched]
@@ -567,8 +571,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     restartAsked = asked && files.length === 0
     building = wantsClient ? buildClient() : undefined
 
-    // The entry is the config's, which the types read: they are written first for an edited config, so the process starts on the entry just saved rather than the one before.
-    // A config that never loads must not hold the restart, so the wait is bounded, and a write ending later with another entry restarts again.
+    // The entry is the config's, which the types read: the new process starts on the one known, and another process follows once the types tell the config now names another.
     const configEdited = files.includes(CONFIG_FILE)
     let entryWrite: Promise<void> | undefined
 
@@ -578,11 +581,6 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
       typesFresh = true
       entryWrite = writeTypes()
-      const gave = Promise.withResolvers<void>()
-      const giveUp = setTimeout(gave.resolve, ENTRY_WAIT_MS)
-
-      await Promise.race([entryWrite, gave.promise])
-      clearTimeout(giveUp)
     }
 
     const previous = child
@@ -622,7 +620,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     if (!configEdited && typesRead(files)) {
       // A code file the process did not load is read from disk by the write, so only the others need a new process.
-      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || typesProcess.loaded(file)))
+      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && ((!CODE_FILE.test(file) && file !== PACKAGE_FILE) || typesProcess.loaded(file)))
 
       // A write in flight may load a module this edit touched, which its answer reports: checked once it ends.
       if (typesWriting !== undefined)
@@ -663,12 +661,26 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     changed = true
     restarting ??= drain()
   }
+  // What package.json says of the modules a process resolves, as of the last edit seen: an edit of its scripts or version leaves it as it is.
+  let packageSeen = packageSignature(join(root, PACKAGE_FILE))
+  const packageResolves = () => {
+    const signature = packageSignature(join(root, PACKAGE_FILE))
+    const resolves = signature !== packageSeen
+
+    packageSeen = signature
+
+    return resolves
+  }
   const stopWatching = watchProject(root, (file) => {
     if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
       return
 
+    if (file === PACKAGE_FILE && !packageResolves())
+      return
+
     startupChanged ||= STARTUP_FILE.test(file)
 
+    // The process building the client resolves modules the way Bun cached package.json for it, so an edit of what package.json resolves with starts a new one; the one writing the types reads it afresh on each write and is kept.
     if (STARTUP_FILE.test(file) || file === CONFIG_FILE || builder?.loaded(file) === true) {
       builderStale = true
       ownClient = false
@@ -775,8 +787,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await inspector?.stop()
   }
 
-  // An earlier run left a client build: its builder starts beside the first types and server instead of once the server asks, and stays quiet until the types settle.
-  if (building === undefined && existsSync(join(root, KAY_DIR, `dev${testWorker()}`, 'manifest.json'))) {
+  // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks, and keeps it quiet until the types settle.
+  // A server that never asks, as one with no pages, starts none.
+  if (building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes))) {
     wantsClient = true
 
     const early = buildClient()
@@ -791,9 +804,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     })()
   }
 
+  // A config that loaded, with every file it read as it is now, has told the entry already: the first server need not wait for the types to read it again.
+  // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends as it does without this.
+  const recorded = options.config === undefined && options.entry === undefined ? await readConfigRecord(devDir, root) : undefined
+
+  if (recorded !== undefined)
+    typesProcess.configuredEntry = recorded
+
   // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
   // The same holds while the config is still to be read for its `entry`, which the types do.
-  if (options.refuseConfig === true || (options.config === undefined && options.entry === undefined))
+  if (recorded === undefined && (options.refuseConfig === true || (options.config === undefined && options.entry === undefined)))
     spawnWaiting()
   else
     start()
@@ -803,9 +823,23 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
   try {
     if (deferred) {
+      const loadedAt = Date.now()
+
       configRefused = await typesProcess.write(false, options.refuseConfig === true ? REFUSE : '', LOAD) === CONFIG_REFUSED
       typesFresh = false
       startedTypes = true
+
+      if (!configRefused) {
+        const modules = typesProcess.loadedModules()
+
+        if (typesProcess.configuredEntry !== undefined && modules !== undefined)
+          void writeConfigRecord(devDir, root, typesProcess.configuredEntry, modules, loadedAt)
+
+        // The first server started on the entry the last run's config named.
+        if (booted && child !== undefined && entryToRun() !== runningEntry)
+          restartNow()
+      }
+
       writeFirstTree = () => {
         writeFirstTree = undefined
         clearTimeout(treeTimer)
@@ -845,6 +879,27 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   return stop
+}
+
+// The fields of a package.json that decide what a process resolves and loads, as text; a file that is missing or does not parse is a signature of its own.
+function packageSignature(path: string): string {
+  let text: string
+
+  try {
+    text = readFileSync(path, 'utf8')
+  }
+  catch {
+    return 'missing'
+  }
+
+  try {
+    const fields = Object.entries(JSON.parse(text) as Record<string, unknown>).filter(([name]) => !INERT_PACKAGE_FIELDS.has(name)).toSorted(([a], [b]) => a < b ? -1 : 1)
+
+    return JSON.stringify(fields)
+  }
+  catch {
+    return `invalid ${Bun.hash(text)}`
+  }
 }
 
 // The hash of a file's content, or none for a file that is missing or a directory.
