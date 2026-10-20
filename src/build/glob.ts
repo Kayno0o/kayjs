@@ -102,6 +102,7 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
   const ast = parse(code, { sourceType: 'module', attachComment: false, plugins: loader === 'tsx' || loader === 'jsx' ? ['typescript', 'jsx'] : ['typescript'], errorRecovery: true })
 
   loadTraverse()(ast, {
+    noScope: true,
     CallExpression(path) {
       const { callee, arguments: args } = path.node
 
