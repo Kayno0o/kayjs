@@ -66,7 +66,7 @@ async function save(): Promise<void> {
   }
 }
 
-saveShortcut(() => void save())
+saveShortcut(save)
 ---
 section.kcms-entry(aria-busy={saving()} ref={element => box = element})
   header.kcms-entry-head

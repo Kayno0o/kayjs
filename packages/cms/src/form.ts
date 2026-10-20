@@ -176,9 +176,9 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
       drafts.set(ref, field, before)
   }
 
-  saveShortcut(() => {
+  saveShortcut(async () => {
     if (canSave())
-      void save()
+      await save()
   })
 
   return {

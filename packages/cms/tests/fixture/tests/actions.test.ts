@@ -118,7 +118,9 @@ describe('the save shortcut', () => {
     const target = new EventTarget()
     let saved = 0
 
-    saveShortcut(() => saved++, target)
+    saveShortcut(() => {
+      saved++
+    }, target)
     await Bun.sleep(5)
 
     const event = Object.assign(new Event('keydown', { cancelable: true }), { key: 's', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false })

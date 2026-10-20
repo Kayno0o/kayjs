@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.61.0
 
+### kayjs-cms's delete confirmation names the entry
+
+`cms.entry.deleteMessage` and `cms.table.deleteMessage` are replaced by `cms.entry.deleteNamed` (`Delete {title}? This cannot be undone.`) and `cms.entry.deletePage`, used on the entry screen and in the list alike. A catalog that worded either old key reads the English until it words the new ones ([texts](../packages/cms/llms/words.md)).
+
 ### Images carry their average color as a `style`
 
 An `img` kay resizes now carries `style="background-color:#c86432"` until it loads, so a test or snapshot reading the markup of an image, a selector on `img[style]`, or a content security policy set outside kay (a proxy's header) that refuses inline styles meets it. Set `images: { placeholder: false }` in `kay.config.ts` to keep the markup as it was, or `no-placeholder` on one `img`; a `security.csp` or `security.reportOnly` set in kay that lacks `'unsafe-inline'` for styles already leaves the color out. No lint can see it, as it is a rendering change ([Responsive images](images.md#responsive-images)).
