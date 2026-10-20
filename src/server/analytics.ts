@@ -6,7 +6,7 @@ import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
-export { vitals } from './vitals'
+export { vitals, vitalsReport } from './vitals'
 export type { LazyGuard, VitalsOptions } from './vitals'
 export type { RouteVitals, VitalsStore, VitalSummary } from './vitals'
 

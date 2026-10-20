@@ -218,6 +218,20 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
   })
 }
 
+// Parameters count one each and a catch-all weighs more than any number of them.
+function labelWeight(label: string): number {
+  let weight = 0
+
+  for (const segment of label.split('/')) {
+    if (segment.endsWith('*'))
+      weight += 1000
+    else if (segment.startsWith(':'))
+      weight += 1
+  }
+
+  return weight
+}
+
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>) {
   return (await pagesApp(project, loadClient)).app
@@ -234,15 +248,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const pageMatch = routeMatch(table, matchers, options.trailingSlash)
 
-  setSiteFacts(app, {
-    pageRoute: (path) => {
-      for (const route of routes) {
-        if (pageMatch.posted(route, path))
-          return pageMatch.served(route)
-      }
+  // The route a request reaches is the most specific that matches: static before a parameter, a parameter before a catch-all, as the router prefers them.
+  const bySpecificity = routes.map(route => ({ route, label: pageMatch.served(route) })).toSorted((a, b) => labelWeight(a.label) - labelWeight(b.label))
 
-      return undefined
-    },
+  setSiteFacts(app, {
+    pageRoute: path => bySpecificity.find(({ route }) => pageMatch.posted(route, path))?.label,
     base,
     asksConsent: options.extensions?.some(extension => extension.asksConsent === true) ?? false,
   })

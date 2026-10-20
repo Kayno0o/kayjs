@@ -33,8 +33,8 @@ interface Report {
 export function vitalsServer(options: VitalsOptions): AnyElysia {
   warnWithoutStore()
 
-  // The visitor's yes is awaited when the app says so or its analytics notice asks for it.
-  const asking = (app: Elysia): boolean => options.consent === true || siteFacts(app)?.asksConsent === true
+  // The visitor's yes is awaited when the app says so, else when its analytics notice asks for it.
+  const asking = (app: Elysia): boolean => options.consent ?? siteFacts(app)?.asksConsent === true
   const plugin = (app: Elysia) => app
     .get(VITALS_SCRIPT_PATH, () => new Response(vitalsScript(asking(app)), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
     .post(VITALS_PATH, async ({ request, server }) => {
@@ -64,7 +64,7 @@ export function vitalsServer(options: VitalsOptions): AnyElysia {
         const route = facts?.pageRoute(routerPath(report.path, facts.base))
 
         if (route !== undefined)
-          await vitalsStore().add(route, report.readings, Math.floor(Date.now() / DAY_MS))
+          await keep(route, report.readings)
       }
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
@@ -100,13 +100,24 @@ function readReport(text: string): Report | undefined {
     if (value === undefined || value === null)
       continue
 
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > MAXIMUM[vital])
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
       return undefined
 
-    readings.push({ vital, bucket: bucketOf(vital === 'cls' ? value * 1000 : value) })
+    // A view slower than a page can be rated is counted at the limit, as the worst of its kind rather than a refusal that would lower the percentile.
+    readings.push({ vital, bucket: bucketOf(Math.min(value, MAXIMUM[vital]) * (vital === 'cls' ? 1000 : 1)) })
   }
 
   return readings.length === 0 ? undefined : { path: p, readings }
+}
+
+// A store that fails loses a view, not the beacon's answer.
+async function keep(route: string, readings: VitalReading[]): Promise<void> {
+  try {
+    await vitalsStore().add(route, readings, Math.floor(Date.now() / DAY_MS))
+  }
+  catch (error) {
+    kayLog('warn', `vitals: the store did not keep a view: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 let warned = false

@@ -71,7 +71,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `retryLater`, `memoryJobs`, `sqliteJobs`, `pgJobs`, `createJobTables`, `jobTables` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
-| `sqliteData` | One SQLite file for the `store` of `kay.config.ts`: jobs, schedule locks, rate limit counts and presence members. See [Background jobs](/guides/background-jobs) |
+| `sqliteData` | One SQLite file for the `store` of `kay.config.ts`: jobs, schedule locks, rate limit counts, presence members and Web Vitals. See [Background jobs](/guides/background-jobs) |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
 | `editedEntry` | Whether a page rendered in edit mode for a request's cookie read an entry |
@@ -101,7 +101,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
 | `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
-| `kay/analytics` | `analytics`, the extension counting visits through your own origin, and `consent`, the visitor's answer to its notice. See [Privacy](/guides/privacy#counting-visits) |
+| `kay/analytics` | `analytics`, the extension counting visits through your own origin, `consent`, the visitor's answer to its notice, and `vitals` with `vitalsReport`, the real visitors' Web Vitals. See [Privacy](/guides/privacy#counting-visits) |
 | `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |

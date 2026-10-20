@@ -213,7 +213,7 @@ else
   button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
 ```
 
-`consent` works only with the `consent` option on `analytics()`.
+`consent` reads and writes the cookie on its own, so it works for `vitals({ consent: true })` too; kay's notice, though, comes only with the `consent` option on `analytics()`.
 
 A page that calls `consent()` is rendered for each visitor, so read it in the island that needs it rather than in a layout every page shares, which a CDN could no longer cache.
 
@@ -237,11 +237,11 @@ export default defineConfig({
 })
 ```
 
-That is all the app writes. kay adds a script of about 700 bytes to every page, loaded after the page itself. It sends one report when the visitor leaves or hides the tab, and a page swap counts as a new view. Nothing is sent while the page loads.
+That is all the app writes. kay adds a script of about 700 bytes to every page, loaded after the page itself. It sends one report when the visitor leaves or hides the tab, and a page swap counts as a new view. Nothing is sent while the page loads, and a view is sent once. A route shows as the first path it is served at, so a page in a locale reads `/fr/about`, every locale counted together.
 
 The numbers are on `/vitals`, or the `prefix` you pick, for whoever your `guard` lets in. Each route shows its three values against the good limits: 2.5 s, 0.1 and 200 ms. Without a `guard` the page answers 403, and the numbers are still collected.
 
-The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own.
+The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. With nothing else set, the numbers are counted at once, with no notice, as they hold nothing about the visitor. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own, then your own banner must set the `kay_analytics=yes` cookie with `consent.set('yes')`.
 
 Reports are checked like visits: a post from another site, a large or malformed body and more than 300 a minute from one address are refused. The screen needs a server, so a static export refuses `vitals()`.
 

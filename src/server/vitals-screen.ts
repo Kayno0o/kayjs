@@ -1,5 +1,6 @@
 import type { Rating, Vital, VitalSummary } from './vitals-store'
 import { wording } from '../runtime/words.server'
+import { GOOD } from './vitals-store'
 
 export const RATING_LABELS: Record<Rating, () => string> = {
   'good': () => wording('kay.vitals.good', 'Good'),
@@ -15,8 +16,9 @@ export function shown(vital: Vital, summary: VitalSummary): string {
   return vital === 'lcp' ? `${(summary.value / 1000).toFixed(1)} s` : `${Math.round(summary.value)} ms`
 }
 
-const GOOD_TEXT: Record<Vital, string> = { lcp: '2.5 s', cls: '0.1', inp: '200 ms' }
-
 export function limitText(vital: Vital): string {
-  return GOOD_TEXT[vital]
+  if (vital === 'cls')
+    return String(GOOD.cls / 1000)
+
+  return vital === 'lcp' ? `${GOOD.lcp / 1000} s` : `${GOOD.inp} ms`
 }

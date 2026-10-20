@@ -80,7 +80,7 @@ export function vitalsScript(asks: boolean): string {
   let script = scripts.get(asks)
 
   if (script === undefined) {
-    script = new Bun.Transpiler({ minifyWhitespace: true }).transformSync(source(asks ? '!/kay_analytics=yes/.test(document.cookie)' : '/kay_analytics=no/.test(document.cookie)'))
+    script = new Bun.Transpiler({ minifyWhitespace: true }).transformSync(source(asks ? '!/(^|; )kay_analytics=yes(;|$)/.test(document.cookie)' : '/(^|; )kay_analytics=no(;|$)/.test(document.cookie)'))
     scripts.set(asks, script)
   }
 

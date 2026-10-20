@@ -105,7 +105,7 @@ describe('the script and the page', () => {
     expect(text).toContain('kay:navigate')
     expect(gzipSync(text).length).toBeLessThan(800)
     expect(home).toMatch(/<script[^>]*src="\/_kay\/vitals\.js"[^>]*>/)
-    expect(home.match(/<script[^>]*src="\/_kay\/vitals\.js"[^>]*>/)![0]).toContain('async')
+    expect(home.match(/<script[^>]*src="\/_kay\/vitals\.js"[^>]*>/)![0]).toContain('defer')
     expect(vitalsScript(false)).toBe(text)
   })
 
@@ -128,6 +128,15 @@ describe('the script and the page', () => {
     expect(VITALS_SCRIPT).not.toContain('fetch(')
     expect(VITALS_SCRIPT).not.toMatch(/document\.cookie\s*=[^=]/)
     expect(VITALS_SCRIPT).not.toContain('localStorage')
+  })
+
+  it('reads the visitor\'s answer as the whole cookie, not a name that ends in it or a value that starts with it', () => {
+    const gate = new RegExp((/\/(.*)\/\.test/).exec(vitalsScript(true))![1]!)
+
+    expect(gate.test('kay_analytics=yes')).toBe(true)
+    expect(gate.test('a=b; kay_analytics=yes; c=d')).toBe(true)
+    expect(gate.test('x_kay_analytics=yes')).toBe(false)
+    expect(gate.test('kay_analytics=yesterday')).toBe(false)
   })
 
   it('bakes the visitor\'s yes into the script when a notice asks, and only their no otherwise', () => {
@@ -291,6 +300,15 @@ describe('the consent gate', () => {
     }
   })
 
+  it('counts at once with consent: false though analytics asks, and serves the script that does not wait', async () => {
+    const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', consent: true }
+    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(asked), vitals({ consent: false })], proxy: { hops: 1 }, store: { vitals: store } })
+
+    expect(await (await app.handle(new Request('http://localhost/_kay/vitals.js'))).text()).toBe(vitalsScript(false))
+    await report(app, view({ p: '/' }), visit())
+    expect((await vitalsReport())[0]!.lcp!.views).toBe(1)
+  })
+
   it('does not wait for a yes an analytics counter that asks no one never asked', async () => {
     const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: 'http://localhost:9' }), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
 
@@ -326,8 +344,6 @@ describe('a forged or oversized report', () => {
     ['no metric', JSON.stringify({ p: '/' })],
     ['a string metric', JSON.stringify(view({ l: '1800' }))],
     ['a negative metric', JSON.stringify(view({ l: -1 }))],
-    ['a metric past what a page can take', JSON.stringify(view({ i: 61_000 }))],
-    ['a CLS past 10', JSON.stringify(view({ c: 10.01 }))],
     ['an infinite metric', '{"p":"/","s":"","l":1e999}'],
     ['a path that is no string', JSON.stringify(view({ p: 4 }))],
     ['a path that is no path', JSON.stringify(view({ p: 'https://evil.example/' }))],
@@ -340,6 +356,19 @@ describe('a forged or oversized report', () => {
 
     expect([400, 413]).toContain(answer.status)
     expect(await vitalsReport()).toEqual([])
+  })
+
+  it('counts a metric past what a page can take at the limit, so a very slow view still weighs on the percentile', async () => {
+    const app = await site()
+
+    expect((await report(app, view({ l: 900_000, c: 99, i: 61_000 }))).status).toBe(204)
+
+    const entry = (await routes())['/blog/:slug']!
+
+    within(entry.lcp!.value, 60_000)
+    within(entry.inp!.value, 60_000)
+    expect(entry.cls!.value).toBeGreaterThan(9)
+    expect(entry.cls!.value).toBeLessThan(10.6)
   })
 
   it('refuses a body past its limit before reading it, by its length or by its stream', async () => {
@@ -560,6 +589,30 @@ describe('under a base', () => {
     }
     finally {
       await mounted.close()
+    }
+  })
+})
+
+describe('the route a view is counted at', () => {
+  it('is the most specific page that serves the path: a static page beside a parameter, a parameter beside a catch-all', async () => {
+    const own = await scratchDir('vitals-routes-')
+
+    try {
+      await Bun.write(join(own, 'routes/index.kay'), 'h1 Home\n')
+      await Bun.write(join(own, 'routes/about.kay'), 'h1 About\n')
+      await Bun.write(join(own, 'routes/[slug].kay'), 'h1 Page\n')
+      await Bun.write(join(own, 'routes/docs/[...rest].kay'), 'h1 Docs\n')
+      await Bun.write(join(own, 'routes/docs/intro.kay'), 'h1 Intro\n')
+
+      const app = await pages({ routes: join(own, 'routes'), prebuilt: false, extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+
+      for (const path of ['/about', '/zzz', '/docs/intro', '/docs/a/b'])
+        await report(app, view({ p: path }))
+
+      expect((await vitalsReport()).map(entry => [entry.route, entry.lcp!.views])).toEqual([['/about', 1], ['/docs/*', 1], ['/docs/intro', 1], ['/:slug', 1]].toSorted(([a], [b]) => a! < b! ? -1 : 1))
+    }
+    finally {
+      await rm(own, { recursive: true, force: true })
     }
   })
 })

@@ -4,7 +4,7 @@ import { KayError } from '../compiler/errors'
 import { BASE_PATH } from './base'
 
 export type { RouteVitals, VitalSummary } from './vitals-store'
-export { memoryVitals, sqliteVitals, vitalsReport } from './vitals-store'
+export { vitalsReport } from './vitals-store'
 export type { VitalsStore } from './vitals-store'
 
 // A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) }`.
@@ -17,7 +17,7 @@ export interface VitalsOptions {
   prefix?: string | undefined
   // Who may open the screen, such as kayjs-auth's `auth.guard({ require: 'admin' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. Without one the screen stays closed, though the numbers are still collected.
   guard?: Guard | LazyGuard | undefined
-  // Waits for the visitor's yes on the `kay_analytics` cookie before a view is reported. Left out, the numbers follow `analytics({ consent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
+  // `true` waits for the visitor's yes on the `kay_analytics` cookie before a view is reported and `false` never waits. Left out, the numbers follow `analytics({ consent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
   consent?: boolean | undefined
 }
 
@@ -62,7 +62,7 @@ export function vitals(options: VitalsOptions = {}): KayExtension {
     needsServer: true,
     server: async () => (await import('./vitals-server')).vitalsServer(options),
     routes: { dir: `${import.meta.dir}/vitals-routes`, prefix },
-    config: { head: [{ tag: 'script', props: { src: VITALS_SCRIPT_PATH, async: true } }] },
+    config: { head: [{ tag: 'script', props: { src: VITALS_SCRIPT_PATH, defer: true } }] },
   }
 }
 

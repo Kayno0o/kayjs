@@ -186,7 +186,7 @@ A claim and its hold use the database's clock, so replicas need not keep their c
 
 `sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
 
-To put the jobs, the schedule locks, the rate limit counts and the members of presence rooms of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms }` with a `JobStore`, a `RateStore` and a `RoomStore` of your own. A queue, a schedule or a limit naming its own `store` keeps it.
+To put the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms, vitals }` with a `JobStore`, a `RateStore`, a `RoomStore` and a `VitalsStore` of your own. A queue, a schedule or a limit naming its own `store` keeps it.
 
 | Method | Does |
 | --- | --- |
