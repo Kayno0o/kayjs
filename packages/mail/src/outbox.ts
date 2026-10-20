@@ -8,16 +8,25 @@ export const PREVIEW_PATH = '/_kay/mail'
 
 // Each route the dev pages answer, by method: the mailer registers these ahead of loading them, and a test holds the list to the pages' own.
 export const PREVIEW_ROUTES = {
-  get: [PREVIEW_PATH, `${PREVIEW_PATH}.json`, `${PREVIEW_PATH}/samples`, `${PREVIEW_PATH}/samples/html`, `${PREVIEW_PATH}/events`, `${PREVIEW_PATH}/:id`, `${PREVIEW_PATH}/:id/eml`, `${PREVIEW_PATH}/:id/html`],
-  post: [`${PREVIEW_PATH}/samples/send`, `${PREVIEW_PATH}/clear`, `${PREVIEW_PATH}/:id/send`],
+  get: [PREVIEW_PATH, `${PREVIEW_PATH}.json`, `${PREVIEW_PATH}/delivery`, `${PREVIEW_PATH}/samples`, `${PREVIEW_PATH}/samples.json`, `${PREVIEW_PATH}/samples/html`, `${PREVIEW_PATH}/events`, `${PREVIEW_PATH}/:id`, `${PREVIEW_PATH}/:id/eml`, `${PREVIEW_PATH}/:id/html`],
+  post: [`${PREVIEW_PATH}/delivery`, `${PREVIEW_PATH}/samples/send`, `${PREVIEW_PATH}/clear`, `${PREVIEW_PATH}/:id/send`],
 } as const
+
+// How the "Send for real" switch delivered a mail kept in the outbox: to this address alone, or with the SMTP error.
+export interface Relayed {
+  to: string
+  error?: string | undefined
+}
 
 export interface SentMail extends Mail {
   id: string
   sentAt: Date
+  relayed?: Relayed | undefined
 }
 
 export interface Outbox extends Transport {
+  // Keeps the mail, noting how the switch delivered it when `relayed` is given.
+  send: (mail: Mail, relayed?: Relayed) => Promise<Delivery>
   // Oldest first.
   readonly mails: readonly SentMail[]
   last: () => SentMail | undefined
@@ -68,9 +77,9 @@ function createOutbox(): Outbox {
   return {
     mails,
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
-    send: async (mail): Promise<Delivery> => {
+    send: async (mail, relayed): Promise<Delivery> => {
       const id = crypto.randomUUID()
-      const sent = { ...mail, id, sentAt: new Date() }
+      const sent: SentMail = { ...mail, id, sentAt: new Date(), relayed }
 
       mails.push(sent)
 

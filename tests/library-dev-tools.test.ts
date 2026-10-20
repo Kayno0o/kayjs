@@ -114,6 +114,135 @@ describe('the libraries\' dev tool tabs', () => {
     fetching.mockRestore()
   })
 
+  it('turns the "Send for real" switch on for one typed address and off again, the bar saying so from any tab even with no mail', async () => {
+    let state: object = { on: false, missing: [], server: 'localhost:1025', offered: 'me@example.com' }
+    const posted: unknown[] = []
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/_kay/mail/delivery') {
+        const { to } = JSON.parse(String(init.body)) as { to: string }
+
+        posted.push({ url, to, type: (init.headers as Record<string, string>)['content-type'] })
+        state = to === '' ? { on: false, missing: [], server: 'localhost:1025' } : { on: true, to, missing: [], server: 'localhost:1025' }
+
+        return Response.json(state)
+      }
+
+      if (url === '/_kay/mail.json')
+        return Response.json([])
+
+      return url === '/_kay/mail/delivery' ? Response.json(state) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+    const badges = () => [...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')].map(badge => `${badge.className} ${badge.textContent}`)
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+
+    const input = () => panel('mail').querySelector<HTMLInputElement>('input[name=to]')!
+
+    expect(input().value).toBe('me@example.com')
+    expect(panel('mail').textContent).toContain('delivered to this one address over localhost:1025, never to its own recipients')
+    expect(badges()).toEqual([])
+
+    input().value = ' you@example.com '
+    panel('mail').querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+    await Bun.sleep(5)
+    expect(posted).toEqual([{ url: '/_kay/mail/delivery', to: 'you@example.com', type: 'application/json' }])
+    expect(panel('mail').textContent).toContain('delivered to you@example.com over localhost:1025, never to its own recipients, with no cc or bcc')
+    expect(panel('mail').querySelector('input')).toBeNull()
+
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-problems')!.click()
+    expect(badges()).toEqual(['pill warn 0 mails, delivered to you@example.com'])
+
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    ;[...panel('mail').querySelectorAll('button')].find(button => button.textContent === 'Turn off')!.click()
+    await Bun.sleep(5)
+    expect(posted.at(-1)).toMatchObject({ to: '' })
+    expect(panel('mail').querySelector('input')).not.toBeNull()
+    expect(badges()).toEqual([])
+    fetching.mockRestore()
+  })
+
+  it('names the SMTP variables the switch lacks, and draws no switch where the route is not there', async () => {
+    let answer: () => Response = () => Response.json({ on: false, missing: ['SMTP_HOST', 'SMTP_FROM'] })
+    const fetching = answering({
+      'GET /_kay/mail.json': () => Response.json([]),
+      'GET /_kay/mail/delivery': () => answer(),
+    })
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+    expect(panel('mail').textContent).toContain('Set SMTP_HOST and SMTP_FROM to deliver mails over SMTP')
+    expect(panel('mail').querySelector('input')).toBeNull()
+
+    answer = () => new Response(null, { status: 404 })
+    tool.stop()
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+    expect(panel('mail').textContent).not.toContain('Send for real')
+    expect(panel('mail').textContent).toContain('No mail has been sent')
+    fetching.mockRestore()
+  })
+
+  it('says why the server refused the switch, and keeps the form', async () => {
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/_kay/mail/delivery')
+        return new Response('Refused: type one address to deliver to', { status: 400 })
+
+      if (url === '/_kay/mail.json')
+        return Response.json([])
+
+      return url === '/_kay/mail/delivery' ? Response.json({ on: false, missing: [], server: 'localhost:1025' }) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+    panel('mail').querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+    await Bun.sleep(5)
+    expect(panel('mail').textContent).toContain('type one address to deliver to')
+    expect(panel('mail').querySelector('input')).not.toBeNull()
+    fetching.mockRestore()
+  })
+
+  it('lists the app\'s mail templates, each opening its sample, and notes a mail delivered for real or not', async () => {
+    const mails = [
+      { id: 'a', sentAt: '2026-10-16T10:00:00Z', to: ['ada@example.com'], subject: 'Sent', text: 'Hi', relayed: { to: 'me@example.com' } },
+      { id: 'b', sentAt: '2026-10-16T10:05:00Z', to: ['bob@example.com'], subject: 'Failed', text: 'Hi', relayed: { to: 'me@example.com', error: 'connect ECONNREFUSED' } },
+    ]
+    const fetching = answering({
+      'GET /_kay/mail.json': () => Response.json(mails),
+      'GET /_kay/mail/samples.json': () => Response.json(['welcome.kay', 'auth/reset password.kay']),
+    })
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    await Bun.sleep(5)
+
+    const links = [...panel('mail').querySelectorAll<HTMLAnchorElement>('a.link')].filter(link => link.getAttribute('href')!.startsWith('/_kay/mail/samples'))
+
+    expect(links.map(link => [link.textContent, link.getAttribute('href'), link.target])).toEqual([
+      ['welcome.kay', '/_kay/mail/samples?mail=welcome.kay', '_blank'],
+      ['auth/reset password.kay', '/_kay/mail/samples?mail=auth%2Freset%20password.kay', '_blank'],
+    ])
+    expect(panel('mail').textContent).toContain('Templates')
+    expect(panel('mail').textContent).toContain('Delivered to me@example.com')
+    expect(panel('mail').textContent).toContain('Not delivered to me@example.com: connect ECONNREFUSED')
+    fetching.mockRestore()
+  })
+
   it('holds the mail event stream open only while the tab is shown', async () => {
     const fetching = answering({ 'GET /_kay/mail.json': () => Response.json([]) })
     const streams = () => Stream.open

@@ -1,9 +1,13 @@
 import type { DevTool } from 'kay/dev-tool'
 
-// The dev tool's Mail tab, a browser module kay loads on dev pages: the mails sent to the outbox, each previewed in place or opened on its page.
+// The dev tool's Mail tab, a browser module kay loads on dev pages: the mails sent to the outbox, each previewed in place or opened on its page, the "Send for real" switch and the app's mail templates.
 const PAGE = '/_kay/mail'
 const LIST_URL = `${PAGE}.json`
 const EVENTS_URL = `${PAGE}/events`
+const DELIVERY_URL = `${PAGE}/delivery`
+const TEMPLATES_URL = `${PAGE}/samples.json`
+const TEMPLATE_PAGE = `${PAGE}/samples`
+const REFUSED = /^Refused: /
 
 type Address = string | { name?: string | undefined, address: string }
 
@@ -14,6 +18,17 @@ interface SentMail {
   subject: string
   html?: string | undefined
   text: string
+  relayed?: { to: string, error?: string } | undefined
+}
+
+// What the server says of the "Send for real" switch.
+interface Delivery {
+  on: boolean
+  to?: string
+  server?: string
+  offered?: string
+  missing: string[]
+  error?: string
 }
 
 function shown(address: Address): string {
@@ -24,11 +39,37 @@ export default function mailDevTool(tool: DevTool): void {
   const tab = tool.tab({ id: 'mail', label: 'Mail', icon: 'mail', summary: count => `${count} mail${count === 1 ? '' : 's'}`, shown: show, hidden: hide })
   let asked = 0
   let live: EventSource | undefined
+  let mailCount = 0
+  let delivering: string | undefined
+  let known: Delivery | undefined
   const previewed = new Set<string>()
-  const empty = (text: string) => {
-    tab.count(0)
-    tab.panel.replaceChildren(tool.make('div', 'empty', text))
+  const sections = tool.make('div', 'stack')
+  const switchBox = tool.make('div', 'stack')
+  const list = tool.make('div')
+  const templates = tool.make('div')
+
+  sections.append(switchBox, list, templates)
+  tab.panel.append(sections)
+
+  // The count is the mails kept, toned and noted while the switch delivers them for real, so it shows from any tab.
+  const counted = (count: number) => {
+    mailCount = count
+
+    if (delivering === undefined)
+      tab.count(count)
+    else
+      tab.count(count, 'warn', `${count} mail${count === 1 ? '' : 's'}, delivered to ${delivering}`)
   }
+  // The outbox is not there, so neither are the switch nor the templates.
+  const gone = (text: string) => {
+    known = undefined
+    delivering = undefined
+    counted(0)
+    list.replaceChildren(tool.make('div', 'empty', text))
+    switchBox.replaceChildren()
+    templates.replaceChildren()
+  }
+  const heading = (text: string) => tool.make('div', 'heading', text)
   const row = (mail: SentMail) => {
     const item = tool.make('div', 'row')
     const head = tool.make('div', '', '')
@@ -36,6 +77,7 @@ export default function mailDevTool(tool: DevTool): void {
     const open = tool.make('a', 'link', 'Open')
     const to = tool.make('div', 'note', `${new Date(mail.sentAt).toLocaleTimeString('en-GB')} to ${mail.to.map(shown).join(', ')}`)
     const preview = tool.make('div')
+    const relayed = mail.relayed === undefined ? undefined : tool.make('div', mail.relayed.error === undefined ? 'note' : 'error', mail.relayed.error === undefined ? `Delivered to ${mail.relayed.to}` : `Not delivered to ${mail.relayed.to}: ${mail.relayed.error}`)
 
     toggle.type = 'button'
     toggle.setAttribute('aria-expanded', String(previewed.has(mail.id)))
@@ -80,7 +122,7 @@ export default function mailDevTool(tool: DevTool): void {
         previewed.delete(mail.id)
     })
     head.append(toggle, open)
-    item.append(head, to, preview)
+    item.append(head, to, ...relayed === undefined ? [] : [relayed], preview)
 
     return item
   }
@@ -89,6 +131,7 @@ export default function mailDevTool(tool: DevTool): void {
     live ??= new EventSource(EVENTS_URL)
     live.onmessage = () => void refresh()
     void refresh()
+    void loadTemplates()
   }
 
   function hide(): void {
@@ -105,7 +148,7 @@ export default function mailDevTool(tool: DevTool): void {
 
       if (response.status === 404) {
         if (ask === asked)
-          empty('kayjs-mail keeps the outbox under `kay dev` alone, when the mailer sends to it.')
+          gone('kayjs-mail keeps the outbox under `kay dev` alone, when the mailer sends to it.')
 
         return
       }
@@ -117,7 +160,7 @@ export default function mailDevTool(tool: DevTool): void {
     }
     catch (error) {
       if (ask === asked)
-        empty(`Could not read the outbox: ${error instanceof Error ? error.message : String(error)}`)
+        gone(`Could not read the outbox: ${error instanceof Error ? error.message : String(error)}`)
 
       return
     }
@@ -125,15 +168,143 @@ export default function mailDevTool(tool: DevTool): void {
     if (ask !== asked)
       return
 
+    counted(mails.length)
+
     if (mails.length === 0) {
-      empty('No mail has been sent since the server started.')
+      list.replaceChildren(heading('Mails'), tool.make('div', 'empty', 'No mail has been sent since the server started.'))
 
       return
     }
 
-    tab.count(mails.length)
-    tab.panel.replaceChildren(...mails.toReversed().map(row))
+    list.replaceChildren(heading('Mails'), ...mails.toReversed().map(row))
+  }
+
+  async function post(to: string): Promise<void> {
+    try {
+      const response = await fetch(DELIVERY_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to }) })
+
+      if (!response.ok) {
+        if (known !== undefined)
+          drawSwitch(known, (await response.text()).replace(REFUSED, ''))
+
+        return
+      }
+
+      drawSwitch(await response.json() as Delivery)
+    }
+    catch (error) {
+      if (known !== undefined)
+        drawSwitch(known, error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  function drawSwitch(state: Delivery, failure?: string): void {
+    const box = tool.make('div', 'stack')
+    const say = (className: string, text: string) => tool.make('div', className, text)
+
+    known = state
+    delivering = state.on ? state.to : undefined
+    counted(mailCount)
+    box.append(heading('Send for real'))
+
+    if (failure !== undefined)
+      box.append(say('error', failure))
+
+    if (state.error !== undefined) {
+      box.append(say('error', state.error))
+    }
+    else if (state.missing.length > 0) {
+      box.append(say('note', `Set ${state.missing.join(' and ')} to deliver mails over SMTP, a relay's or a local mailpit's. Until then every mail stays in the outbox.`))
+    }
+    else if (state.on) {
+      const off = tool.make('button', 'tool', 'Turn off')
+
+      off.type = 'button'
+      off.addEventListener('click', () => void post(''))
+      box.append(say('', `Every mail sent now is also delivered to ${state.to} over ${state.server}, never to its own recipients, with no cc or bcc.`), off)
+    }
+    else {
+      const form = tool.make('form', 'actions')
+      const search = tool.make('div', 'search')
+      const input = tool.make('input')
+      const on = tool.make('button', 'tool', 'Turn on')
+
+      input.type = 'email'
+      input.required = true
+      input.name = 'to'
+      input.value = state.offered ?? ''
+      input.setAttribute('aria-label', `Address to deliver every mail to over ${state.server}`)
+      input.placeholder = 'you@example.com'
+      on.type = 'submit'
+      search.append(tool.icon('mail'), input)
+      form.addEventListener('submit', (event) => {
+        event.preventDefault()
+        void post(input.value.trim())
+      })
+      form.append(search, on)
+      box.append(say('note', `Every mail sent from then on is delivered to this one address over ${state.server}, never to its own recipients, and stays in the outbox.`), form)
+    }
+
+    switchBox.replaceChildren(box)
+  }
+
+  // The server answers no switch, so none is drawn and no mail is noted as delivered.
+  function absent(): void {
+    known = undefined
+    delivering = undefined
+    counted(mailCount)
+    switchBox.replaceChildren()
+  }
+
+  async function loadDelivery(): Promise<void> {
+    try {
+      const response = await fetch(DELIVERY_URL, { cache: 'no-store' })
+
+      if (response.ok)
+        drawSwitch(await response.json() as Delivery)
+      else
+        absent()
+    }
+    catch {
+      absent()
+    }
+  }
+
+  async function loadTemplates(): Promise<void> {
+    let files: string[]
+
+    try {
+      const response = await fetch(TEMPLATES_URL, { cache: 'no-store' })
+
+      if (!response.ok) {
+        templates.replaceChildren()
+
+        return
+      }
+
+      files = await response.json() as string[]
+    }
+    catch {
+      templates.replaceChildren()
+
+      return
+    }
+
+    const rows = files.map((file) => {
+      const item = tool.make('div', 'row')
+      const open = tool.make('a', 'link', file)
+
+      open.href = `${TEMPLATE_PAGE}?mail=${encodeURIComponent(file)}`
+      open.target = '_blank'
+      open.rel = 'noopener'
+      item.append(open)
+
+      return item
+    })
+
+    templates.replaceChildren(heading('Templates'), ...rows.length === 0 ? [tool.make('div', 'empty', 'No .kay mail under src/mails.')] : rows)
   }
 
   void refresh()
+  void loadDelivery()
 }

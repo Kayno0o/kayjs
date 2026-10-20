@@ -703,6 +703,12 @@ describe('the dev tool', () => {
 
     expect(badges).toContain('pill warn 2 plain')
     expect(badges).toContain('pill error 1 named')
+
+    plain.count(0, 'warn', 'armed')
+    expect([...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')].map(badge => `${badge.className} ${badge.textContent}`)).toContain('pill warn armed')
+    expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-plain .count')!.hidden).toBe(true)
+    plain.count(0)
+    expect([...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')].map(badge => badge.textContent)).not.toContain('armed')
   })
 
   it('shows the page\'s path in the head, and follows a swap', async () => {

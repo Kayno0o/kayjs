@@ -295,6 +295,16 @@ Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at deskto
 
 `/_kay/mail/samples` renders every mail under `src/mails` without sending it. It takes the props a `.preview.ts` beside the mail default-exports.
 
+The Mail tab of the dev tool lists the same mails under Templates, each opening its preview.
+
+### Sending for real
+
+A mail's page and a sample's page each have a form that sends that one mail for real. It goes over the SMTP your environment names, to the address you type, and nowhere else. A local Mailpit works, and so does a real relay when you want to see the mail in Gmail or Outlook.
+
+To get every mail that way, turn on Send for real in the Mail tab and type an address. From then on each mail your app sends is delivered to that address alone, never to the person it was written for, with its `cc` and `bcc` dropped. The mail still lands in the outbox, marked as delivered or with the SMTP error.
+
+The switch is kept in `.kay` for your checkout, so it stays on when `kay dev` restarts the server. It works under `kay dev` only, never in production or in tests. Without `SMTP_HOST` and a sender, the tab names what is missing and the switch stays off.
+
 ```ts
 // src/mails/welcome.preview.ts
 import type Welcome from './welcome.kay'

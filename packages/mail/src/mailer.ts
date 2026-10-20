@@ -1,4 +1,5 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
+import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
 import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
@@ -8,6 +9,7 @@ import { s } from 'kay'
 import { escapeHtml as escape, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
+import { attempt, deliveryAddress } from './delivery'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, smtp } from './smtp'
@@ -387,9 +389,34 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }
   }
 
+  // Where `kay dev`'s "Send for real" switch sends every mail, once the environment can: the mail then also leaves over SMTP to that address alone, and the outbox keeps how it went.
+  const realDelivery = transport === outbox && underKayDev() ? relay(options) : undefined
+
+  const relayed = async (mail: Mail): Promise<Relayed | undefined> => {
+    const to = await deliveryAddress()
+
+    if (to === undefined || realDelivery === undefined)
+      return undefined
+
+    try {
+      if (realDelivery.missing().length > 0)
+        return undefined
+    }
+    catch {
+      return undefined
+    }
+
+    const error = await attempt(realDelivery, mail, to)
+
+    if (error !== undefined)
+      log.warn(`${quoted(mail.subject)} was not delivered to ${to}: ${error}`)
+
+    return { to, error }
+  }
+
   const deliver = async (mail: Mail): Promise<Delivery> => {
     if (transport === outbox) {
-      const delivery = await outbox.send(mail)
+      const delivery = await outbox.send(mail, await relayed(mail))
 
       if (underKayDev())
         log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)
@@ -437,8 +464,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   // The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
-  if (transport === outbox && underKayDev())
-    mountPreview(plugin, render, relay(options))
+  if (realDelivery !== undefined)
+    mountPreview(plugin, render, realDelivery)
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {

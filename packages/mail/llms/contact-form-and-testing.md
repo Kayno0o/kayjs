@@ -55,6 +55,8 @@ Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged wit
 
 A mail in the outbox and a sample can each be sent for real from its page, to an address typed in its form, over the SMTP the environment names: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `mailer({ from })` gives the sender, read on the first send. It goes to that address alone, its `cc` and `bcc` dropped, and nothing else leaves the outbox. `SMTP_HOST` naming a local mailpit puts it there; a real relay puts it in a real inbox, to see what Gmail or Outlook make of it. Without them the page names the variables missing instead of the form, and a post from another site is refused.
 
+The dev tool's Mail tab has a Send for real switch: turned on with an address typed beside it, every mail sent or queued from then on is also delivered to that one address over the same SMTP, never to its own recipients and with its `cc` and `bcc` dropped, and still lands in the outbox, noted there as delivered to the address or with the SMTP error (a send that cannot reach the server does not throw). The switch and its address are kept in `.kay/mail-delivery.json` for the checkout, so they survive `kay dev` restarting the server, until turned off. Only the server `kay dev` runs reads it, never one with `NODE_ENV=production` or `test`. The tab's bar badge shows it is on from any tab; without the SMTP variables the switch is off and the tab names the ones missing, and a post from another site is refused. The tab also lists the app's templates, the `.kay` files `/_kay/mail/samples` renders, each opening its preview.
+
 ```ts
 // src/mails/welcome.preview.ts
 import type Welcome from './welcome.kay'

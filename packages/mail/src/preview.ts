@@ -1,5 +1,5 @@
 import type { AuthKind } from './auth'
-import type { SentMail } from './outbox'
+import type { Relayed, SentMail } from './outbox'
 import type { Address, Attachment, Delivery, Mail, Message, ViewContent } from './types'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -7,6 +7,7 @@ import { Elysia } from 'elysia'
 import { escapeHtml as escape, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
+import { attempt, deliveryAddress, messageOf, ONE_ADDRESS, setDeliveryAddress, switchRead } from './delivery'
 import { outbox, PREVIEW_PATH } from './outbox'
 import { nodemailerMessage } from './smtp'
 
@@ -21,8 +22,6 @@ const KAY_EXTENSION = /\.kay$/
 // An app's own view of a kayjs-auth kind, `auth/reset-password.kay`.
 const AUTH_VIEW = /^auth\/([\w-]+)\.kay$/
 const SAMPLE_ADDRESS = 'sample@localhost'
-// One address, as the send form takes: a comma or a name would add a recipient.
-const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
 
 // The environment's SMTP as the development pages send over it, read when first asked.
 export interface Relay {
@@ -124,8 +123,6 @@ function rendered(mail: Mail, view: (phone: boolean) => string, frame: string, p
   return `${html}<h2>Text</h2><pre>${escape(mail.text)}</pre>`
 }
 
-const messageOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
-
 // The form sending the mail for real over the environment's SMTP, with how the last send went, or what the environment lacks for it.
 function sendForm(relay: Relay, action: string, outcome: Outcome | undefined): string {
   let missing: string[]
@@ -154,18 +151,6 @@ function outcomeNote(outcome: Outcome, server: string): string {
   return `<p class="warning">Not sent: ${escape(outcome.error)}</p>`
 }
 
-// Sends it over the relay, answering what went wrong, or nothing once the server took it.
-async function attempt(relay: Relay, mail: Mail, to: string): Promise<string | undefined> {
-  try {
-    const { rejected, response } = await relay.send(mail, to)
-
-    return rejected.length > 0 ? `the server refused ${rejected.join(', ')}${response === undefined || response === '' ? '' : `: ${response}`}` : undefined
-  }
-  catch (error) {
-    return messageOf(error)
-  }
-}
-
 // The address a send form posted, when it is one.
 function postedAddress(body: unknown): string | undefined {
   const to = typeof body === 'object' && body !== null && 'to' in body && typeof body.to === 'string' ? body.to.trim() : undefined
@@ -180,6 +165,11 @@ function crossSite(request: Request, refusal: string): Response | undefined {
   return site !== null && site !== 'same-origin' ? new Response(`Refused: ${refusal}`, { status: 403 }) : undefined
 }
 
+// How the "Send for real" switch delivered a mail.
+function relayedNote({ to, error }: Relayed): string {
+  return error === undefined ? `for real, to ${escape(to)} alone` : `<span class="warning">not delivered to ${escape(to)}: ${escape(error)}</span>`
+}
+
 function mailPage(mail: SentMail, phone: boolean, relay: Relay, outcome?: Outcome, status = 200): Response {
   const headers: [string, string][] = [
     ['From', shown(mail.from)],
@@ -189,6 +179,7 @@ function mailPage(mail: SentMail, phone: boolean, relay: Relay, outcome?: Outcom
     ...mail.replyTo === undefined ? [] : [['Reply-To', shown(mail.replyTo)] as [string, string]],
     ['Subject', escape(mail.subject)],
     ['Sent', escape(mail.sentAt.toISOString())],
+    ...mail.relayed === undefined ? [] : [['Delivered', relayedNote(mail.relayed)] as [string, string]],
     ['Size', sizeOf(mail)],
     ...Object.entries(mail.headers).map(([name, value]) => [escape(name), escape(value)] as [string, string]),
     ...mail.attachments.map(attachment => ['Attachment', escape(`${attachment.filename} (${attachment.contentType ?? 'unknown type'}, ${typeof attachment.content === 'string' ? attachment.content.length : attachment.content.byteLength} bytes)`)] as [string, string]),
@@ -303,6 +294,33 @@ function mailHtml(html: string): Response {
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': MAIL_POLICY } })
 }
 
+// What the Mail tab draws its "Send for real" switch from: whether it is on, the SMTP variables it lacks, and the server and address it would use.
+async function deliveryState(relay: Relay): Promise<Response> {
+  const state = { on: false, to: undefined as string | undefined, server: undefined as string | undefined, offered: undefined as string | undefined, missing: [] as string[], error: undefined as string | undefined }
+
+  if (!switchRead())
+    return Response.json({ ...state, error: 'The switch works under kay dev with NODE_ENV=development alone.' })
+
+  try {
+    state.missing = relay.missing()
+
+    if (state.missing.length === 0) {
+      const to = await deliveryAddress()
+      const offered = relay.to()
+
+      state.server = relay.server()
+      state.offered = offered !== undefined && ONE_ADDRESS.test(offered) ? offered : undefined
+      state.on = to !== undefined
+      state.to = to
+    }
+  }
+  catch (error) {
+    state.error = messageOf(error)
+  }
+
+  return Response.json(state, { headers: { 'cache-control': 'no-store' } })
+}
+
 const sentTo = (to: string | undefined): Outcome | undefined => to === undefined ? undefined : { to }
 
 // The development server's view of the outbox, every mail sent since it started, newest first, each with its headers, html and text, and of the app's mails rendered with sample props, through `render`.
@@ -316,6 +334,45 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
         return samplesPage(files)
 
       return files.includes(query.mail) ? samplePage(query.mail, query.view === 'phone', render, relay, sentTo(query.sent)) : notSample()
+    })
+    .get(`${PREVIEW_PATH}/delivery`, async () => deliveryState(relay))
+    .post(`${PREVIEW_PATH}/delivery`, async ({ request, body }) => {
+      const refused = crossSite(request, 'the switch is turned from the Mail tab')
+
+      if (refused)
+        return refused
+
+      if (!switchRead())
+        return new Response('Refused: the switch works under kay dev with NODE_ENV=development alone', { status: 409 })
+
+      const typed = typeof body === 'object' && body !== null && 'to' in body && typeof body.to === 'string' ? body.to.trim() : undefined
+
+      if (typed === '') {
+        await setDeliveryAddress(undefined)
+
+        return deliveryState(relay)
+      }
+
+      const to = postedAddress(body)
+
+      if (to === undefined)
+        return new Response('Refused: type one address to deliver to', { status: 400 })
+
+      let missing: string[]
+
+      try {
+        missing = relay.missing()
+      }
+      catch (error) {
+        return new Response(`Refused: ${messageOf(error)}`, { status: 409 })
+      }
+
+      if (missing.length > 0)
+        return new Response(`Refused: set ${missing.join(' and ')} to send over SMTP`, { status: 409 })
+
+      await setDeliveryAddress(to)
+
+      return deliveryState(relay)
     })
     .post(`${SAMPLES_PATH}/send`, async ({ query, request, body }) => {
       const refused = crossSite(request, 'a sample is sent from its own page')
@@ -335,6 +392,7 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
 
       return error === undefined ? Response.redirect(`${SAMPLES_PATH}?mail=${encodeURIComponent(query.mail)}&sent=${encodeURIComponent(to)}`, 303) : samplePage(query.mail, false, render, relay, { to, error }, 502)
     })
+    .get(`${SAMPLES_PATH}.json`, async () => Response.json(await mailFiles(), { headers: { 'cache-control': 'no-store' } }))
     .get(`${SAMPLES_PATH}/html`, async ({ query }) => {
       if (query.mail === undefined || !(await mailFiles()).includes(query.mail))
         return notSample()

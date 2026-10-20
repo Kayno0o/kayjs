@@ -658,8 +658,8 @@ export interface DevTabOptions {
 
 export interface DevTab {
   panel: HTMLElement
-  // The count beside the tab's name and on the bar, `error` or `warn` coloring both.
-  count: (count: number, tone?: 'error' | 'warn') => void
+  // The count beside the tab's name and on the bar, `error` or `warn` coloring both; `note` is what the bar says instead of `summary`'s, and shows even at zero.
+  count: (count: number, tone?: 'error' | 'warn', note?: string) => void
 }
 
 export interface DevTool {
@@ -972,17 +972,17 @@ export function startDevTool(doc: Document = document): DevTool {
 
     return {
       panel,
-      count: (value, tone) => {
-        const text = options.summary?.(value) ?? ''
+      count: (value, tone, note) => {
+        const text = note ?? options.summary?.(value) ?? ''
 
         count.hidden = value === 0
         count.textContent = String(value)
         count.className = tone === undefined ? 'count pill' : `count pill ${tone}`
-        badge.hidden = value === 0 || options.summary === undefined
+        badge.hidden = note === undefined && (value === 0 || options.summary === undefined)
         badge.replaceChildren(pill({ make, icon: name => iconOf(doc, name) }, text, tone, tone === undefined ? undefined : TONE_ICONS[tone]))
 
         if (options.announce === true)
-          status.textContent = value === 0 ? '' : text
+          status.textContent = value === 0 && note === undefined ? '' : text
       },
     }
   }
