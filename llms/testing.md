@@ -66,7 +66,7 @@ const asAdmin = site.as(await auth.sessionCookie(admin.id))
 expect((await asAdmin.visit('/admin')).status).toBe(200)
 ```
 
-A test site is signed in as a member with kayjs-auth's `await auth.signInAs(site, { email, username })`, which makes the member when none exists and sets the session cookie in the site's jar with no form round trip; `auth.signOut(site)` signs it out, and a second `signInAs` switches member (see [kayjs-auth](../packages/auth/llms/hardening-and-testing.md)).
+kayjs-auth's `await auth.signInAs(site, { email, username })` signs a test site in as a member, made when none exists, with no form round trip; `auth.signOut(site)` signs it out, and a second `signInAs` switches member (see [kayjs-auth](../packages/auth/llms/hardening-and-testing.md)).
 
 ### Check a page's metadata
 
@@ -114,7 +114,7 @@ await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/'
 expect(await site.runJobs()).toBe(1)
 ```
 
-A mail an action enqueues, and the jobs it enqueues in turn, are waited for by kayjs-mail's `outbox`, which runs the site's queues until the mail is there: `await outbox.waitFor(address, { site })` resolves with the newest mail to that address, and `outbox.token(mail, '/auth/verify-email')` reads the token of its link ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing)).
+A mail an action enqueues is waited for by kayjs-mail's `outbox`, which runs the site's queues until it is there: `await outbox.waitFor(address, { site })` resolves with the newest mail to that address, and `outbox.token(mail, '/auth/verify-email')` reads the token of its link ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing)).
 
 ### Test a websocket route
 

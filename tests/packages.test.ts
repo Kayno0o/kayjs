@@ -42,7 +42,7 @@ describe('kay\'s libraries', () => {
     expect([...ranges].filter(([, named]) => named.size > 1).map(([name, named]) => [name, [...named]])).toEqual([])
   })
 
-  // `kay/pg-orm` is the one module reaching pg-orm, so an app without it installs, builds and runs; the app template only writes the import into the files of a new app.
+  // `kay/pg-orm` is the one module reaching pg-orm, so an app without it installs, builds and runs; the app template only writes the import into the files of a new app, and `kay/test/preload` imports it only for a project with a `pg-orm.config.ts`.
   it('asks for pg-orm as an optional peer, imported by kay/pg-orm alone', async () => {
     expect(root.peerDependencies?.['@kaynooo/pg-orm']).toBeDefined()
     expect((root as Manifest & { peerDependenciesMeta: Record<string, unknown> }).peerDependenciesMeta['@kaynooo/pg-orm']).toEqual({ optional: true })
@@ -55,7 +55,7 @@ describe('kay\'s libraries', () => {
         importers.push(file)
     }
 
-    expect(importers).toEqual(['src/server/pg-orm.ts'])
+    expect(importers.sort()).toEqual(['src/server/pg-orm.ts', 'src/test/database.ts'])
   })
 
   it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
