@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const more = signal(false)
+---
+button.grow(onClick={() => more.set(true)}) Grow
+if more()
+  button.grown Grown

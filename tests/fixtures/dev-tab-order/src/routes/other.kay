@@ -1,0 +1,5 @@
+head
+  title Other
+main(style="display: grid; justify-items: start; gap: 20px")
+  button.one One
+  button.two Two

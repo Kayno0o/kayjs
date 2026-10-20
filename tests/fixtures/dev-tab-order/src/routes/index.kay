@@ -1,0 +1,15 @@
+---
+import Grow from '../components/grow.kay'
+---
+head
+  title Tab order
+main(style="display: grid; justify-items: start; gap: 20px")
+  Grow
+  a.top(href="/other") Top
+  button.plain Plain
+  button.bare(style="outline: none") Bare
+  button.late(tabindex="1") Late
+  div.fake(role="dialog" aria-modal="true")
+    button.inside Inside
+  div.frozen(inert)
+    button.stuck Stuck

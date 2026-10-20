@@ -383,7 +383,7 @@ describe('the dev tool', () => {
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
     expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'not-found', 'other'].map(id => `kay-dev-tab-${id}`))
-    expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
+    expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Show the tab order', 'Show the tab order', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
     key({ key: 'ArrowDown' }, shadow().activeElement!)
@@ -396,7 +396,7 @@ describe('the dev tool', () => {
 
     shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Fill the window"]')!.click()
     expect(shadow().querySelector('.ui.max')).not.toBeNull()
-    expect(icons()[4]).toEqual(['Restore the size', 'Restore the size', ''])
+    expect(icons()[5]).toEqual(['Restore the size', 'Restore the size', ''])
     tool.stop()
 
     tool = startDevTool()

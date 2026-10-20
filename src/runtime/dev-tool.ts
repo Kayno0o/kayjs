@@ -278,6 +278,14 @@ td .copy { margin-left: 4px; }
 .signals td:first-child { color: var(--sub); width: 2.5rem; }
 .signals td:last-child { color: var(--sub); text-align: right; padding-left: 10px; }
 .outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 3px; background: var(--accent-soft); }
+.tab-order { position: fixed; inset: 0; z-index: 2147483645; pointer-events: none; }
+.tab-order svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tab-order path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-opacity: .7; }
+.tab-order path.jump { stroke: var(--error); stroke-dasharray: 6 4; stroke-opacity: 1; }
+.tab-badge { position: absolute; min-width: 20px; padding: 1px 5px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; white-space: nowrap; box-shadow: 0 0 0 2px var(--surface); }
+.tab-badge.jump { background: var(--error); }
+.tab-badge.hidden-focus { background: var(--warn); color: var(--surface); }
+.tab-trap { position: absolute; border: 2px dashed var(--error); border-radius: 3px; background: var(--error-soft); }
 .label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 7px; border-radius: 5px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
 @media (prefers-reduced-motion: no-preference) {
   .tabs button, .bar > button, .icon { transition: background-color .12s, color .12s; }
@@ -298,6 +306,7 @@ const ICONS = {
   'circle-x': 'circle~cx~12~cy~12~r~10|path~d~m15 9-6 6|path~d~m9 9 6 6',
   'triangle-alert': 'path~d~m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3|path~d~M12 9v4|path~d~M12 17h.01',
   'server': 'rect~width~20~height~8~x~2~y~2~rx~2~ry~2|rect~width~20~height~8~x~2~y~14~rx~2~ry~2|line~x1~6~x2~6.01~y1~6~y2~6|line~x1~6~x2~6.01~y1~18~y2~18',
+  'list-ordered': 'path~d~M10 12h11|path~d~M10 18h11|path~d~M10 6h11|path~d~M4 10h2|path~d~M4 6h1v4|path~d~M6 18H4c0-1 2-2 2-3s-1-1.5-2-1',
   'scan-search': 'path~d~M3 7V5a2 2 0 0 1 2-2h2|path~d~M17 3h2a2 2 0 0 1 2 2v2|path~d~M21 17v2a2 2 0 0 1-2 2h-2|path~d~M7 21H5a2 2 0 0 1-2-2v-2|circle~cx~12~cy~12~r~3|path~d~m16 16-1.9-1.9',
   'key-round': 'path~d~M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z|circle~cx~16.5~cy~7.5~r~.5~fill~currentColor',
   'image': 'rect~width~18~height~18~x~3~y~3~rx~2~ry~2|circle~cx~9~cy~9~r~2|path~d~m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21',
@@ -608,6 +617,7 @@ interface DevLayout {
   right: number
 }
 
+const SHOW_TAB_ORDER = 'Show the tab order'
 const DOCKS = [['float', 'Float', 'app-window'], ['bottom', 'Dock to the bottom', 'panel-bottom'], ['right', 'Dock to the right', 'panel-right']] as const
 const CORNERS = new Set<string>(['bottom-left', 'bottom-right', 'top-left', 'top-right'])
 // The edges and corners that resize the drawer.
@@ -739,6 +749,7 @@ export function startDevTool(doc: Document = document): DevTool {
   })
   const size = make('button', 'icon size')
   const copyTab = make('button', 'icon')
+  const order = make('button', 'icon')
   const close = make('button', 'icon')
   const grips = GRIPS.map((edge) => {
     const grip = make('div', `grip ${edge}`)
@@ -780,7 +791,10 @@ export function startDevTool(doc: Document = document): DevTool {
   setIcon(close, 'Close', 'x')
   setIcon(copyTab, COPY_TAB, 'clipboard-copy')
   copyTab.type = 'button'
-  head.append(title, where, copyTab, dock, size, close)
+  setIcon(order, SHOW_TAB_ORDER, 'list-ordered')
+  order.type = 'button'
+  order.setAttribute('aria-pressed', 'false')
+  head.append(title, where, copyTab, order, dock, size, close)
   body.append(tabList, content)
   drawer.append(head, body, ...grips)
   bar.append(mark, status)
@@ -1181,6 +1195,15 @@ export function startDevTool(doc: Document = document): DevTool {
       box.hidden = true
   }
 
+  const tabOrder = startTabOrder(doc, root, make)
+
+  order.onclick = () => {
+    const shown = order.getAttribute('aria-pressed') !== 'true'
+
+    order.setAttribute('aria-pressed', String(shown))
+    tabOrder.show(shown)
+  }
+
   // The buttons kay's error pages carry need a script and have no other.
   const listening = new AbortController()
   // A page swap marks the document busy until the new page is in, and a back or forward step moves without one.
@@ -1211,6 +1234,7 @@ export function startDevTool(doc: Document = document): DevTool {
     stop: () => {
       problems?.stop()
       request?.stop()
+      tabOrder.stop()
       win.removeEventListener('keydown', onKeyDown, true)
       listening.abort()
       doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter(other => other !== pageSheet)
@@ -3672,6 +3696,322 @@ function follow(event: PointerEvent, element: HTMLElement, move: (dx: number, dy
       moving.abort()
       done()
     }, { signal: moving.signal })
+  }
+}
+
+const FOCUSABLE = 'a[href], area[href], button, input:not([type=hidden]), select, textarea, details > summary:first-of-type, iframe, audio[controls], video[controls], [contenteditable]:not([contenteditable=false]), [tabindex]'
+// Re-reading the page waits for the mutations to settle, and the focus check, which moves focus, for the list of stops to change.
+const TAB_ORDER_WAIT = 150
+const TAB_ORDER_MAX_REPORTED = 5
+const FOCUS_ANCESTORS = 4
+const WCAG = 'https://www.w3.org/WAI/WCAG22/Understanding'
+
+// What a focus ring or a focus style would change on an element: its outline, shadow, borders, colours and decoration.
+const FOCUS_STYLES = ['outlineStyle', 'outlineWidth', 'outlineColor', 'boxShadow', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'borderTopWidth', 'backgroundColor', 'color', 'textDecorationLine', 'textDecorationColor', 'filter'] as const
+
+// A problem the tab order overlay found, worded as an accessibility rule so the Problems tab lists it and hovering it outlines its elements.
+export interface TabOrderIssue {
+  id: string
+  help: string
+  helpUrl: string
+  elements: Element[]
+}
+
+// The elements the keyboard reaches, in the order Tab walks them: a positive `tabindex` first, smallest first, then the rest as the document has them. What is not rendered, disabled, inert, or out of the order with `tabindex="-1"` is left out, as is all but one radio of a group.
+export function tabStops(doc: Document): HTMLElement[] {
+  const found = [...doc.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((element) => {
+    if (element.tabIndex < 0 || element.matches(':disabled') || element.closest('[inert]') !== null)
+      return false
+
+    // Not rendered: display none, or a hidden ancestor.
+    if (typeof element.checkVisibility === 'function' && !element.checkVisibility({ visibilityProperty: true }))
+      return false
+
+    return !(element instanceof HTMLInputElement) || element.type !== 'radio' || element.name === '' || element === radioStop(element)
+  })
+  const positive = found.filter(element => element.tabIndex > 0).sort((a, b) => a.tabIndex - b.tabIndex)
+
+  return [...positive, ...found.filter(element => element.tabIndex === 0)]
+}
+
+// The one radio of a group the keyboard stops at: the checked one, else the first.
+function radioStop(radio: HTMLInputElement): HTMLInputElement | undefined {
+  const group = [...(radio.form ?? radio.ownerDocument).querySelectorAll<HTMLInputElement>('input[type=radio]')].filter(other => other.name === radio.name && other.form === radio.form)
+
+  return group.find(other => other.checked) ?? group[0]
+}
+
+// Where the keyboard moves up the page: a stop drawn entirely above the one Tab leaves.
+export function tabJumps(stops: HTMLElement[], rects: DOMRect[]): number[] {
+  const jumps: number[] = []
+
+  for (let index = 1; index < stops.length; index++) {
+    if (rects[index]!.bottom <= rects[index - 1]!.top)
+      jumps.push(index)
+  }
+
+  return jumps
+}
+
+// What a style would show of the element and of the few elements around it that can carry its focus style.
+function focusLook(element: HTMLElement): string {
+  const looks: string[] = []
+
+  for (let node: Element | null = element, depth = 0; node !== null && depth <= FOCUS_ANCESTORS; node = node.parentElement, depth++) {
+    const style = getComputedStyle(node)
+
+    looks.push(FOCUS_STYLES.map(property => style[property]).join('|'))
+  }
+
+  return looks.join('||')
+}
+
+// The stops whose focus shows nothing: focused, neither they nor the elements around them change how they look. Only elements the browser would show a focus ring on count, as it shows none on a button after a click; focus moves from stop to stop and returns to where it was.
+function hiddenFocus(doc: Document, stops: HTMLElement[]): HTMLElement[] {
+  const win = doc.defaultView!
+  const before = doc.activeElement as HTMLElement | null
+  const inner = before?.shadowRoot?.activeElement as HTMLElement | null | undefined
+  const still = new win.CSSStyleSheet()
+  const hidden: HTMLElement[] = []
+
+  // A transition would leave the look unchanged for a moment.
+  still.replaceSync('*, *::before, *::after { transition: none !important; animation: none !important; }')
+  doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, still]
+
+  try {
+    for (const stop of stops) {
+      const look = focusLook(stop)
+
+      stop.focus({ preventScroll: true })
+
+      if (doc.activeElement === stop && stop.matches(':focus-visible') && focusLook(stop) === look)
+        hidden.push(stop)
+
+      stop.blur()
+    }
+  }
+  finally {
+    doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter(sheet => sheet !== still)
+    ;(inner ?? before)?.focus({ preventScroll: true })
+
+    if (before === null || before === doc.body)
+      (doc.activeElement as HTMLElement | null)?.blur()
+  }
+
+  return hidden
+}
+
+// Where the keyboard may not leave: an `inert` part of the page holding focusable elements while no modal dialog is open, and a modal that is not a `dialog` element, which only a script keeps focus in.
+function trapSuspects(doc: Document): { inert: Element[], modals: Element[] } {
+  let dialog = false
+
+  try {
+    dialog = doc.querySelector('dialog:modal') !== null
+  }
+  catch {}
+
+  const rendered = (element: Element) => typeof element.checkVisibility !== 'function' || element.checkVisibility()
+  const inert = dialog ? [] : [...doc.querySelectorAll('[inert]')].filter(element => element.parentElement?.closest('[inert]') == null && (element.matches(FOCUSABLE) || element.querySelector(FOCUSABLE) !== null))
+  const modals = [...doc.querySelectorAll('[aria-modal="true"]')].filter(element => !(element instanceof HTMLDialogElement) && rendered(element))
+
+  return { inert: inert.filter(rendered), modals }
+}
+
+// A selector reaching the element: by its id, or by its tag and place from the nearest id or the page.
+function selectorOf(element: Element): string {
+  const parts: string[] = []
+
+  for (let node: Element | null = element; node !== null && node !== node.ownerDocument.documentElement; node = node.parentElement) {
+    if (node.id !== '') {
+      parts.unshift(`#${CSS.escape(node.id)}`)
+
+      break
+    }
+
+    const same = [...node.parentElement?.children ?? []].filter(sibling => sibling.localName === node.localName)
+
+    parts.unshift(same.length > 1 ? `${node.localName}:nth-of-type(${same.indexOf(node) + 1})` : node.localName)
+  }
+
+  return parts.join(' > ')
+}
+
+// The warning an issue logs, in the shape of the accessibility check's: the rule and what it asks, then the elements, a few at most, and where it explains.
+export function tabOrderProblem(issue: TabOrderIssue): string {
+  const shown = issue.elements.slice(0, TAB_ORDER_MAX_REPORTED).map(element => `  ${selectorOf(element)}`)
+  const more = issue.elements.length > TAB_ORDER_MAX_REPORTED ? [`  and ${issue.elements.length - TAB_ORDER_MAX_REPORTED} more`] : []
+
+  return [`[kay] a11y ${issue.id}: ${issue.help}`, ...shown, ...more, issue.helpUrl].join('\n')
+}
+
+export interface TabOrder {
+  show: (on: boolean) => void
+  stop: () => void
+}
+
+// The overlay of the tab order: a numbered badge on each stop and a line between them, a jump up the page dashed in red, what it finds logged as accessibility problems. It reads the page again as it scrolls, resizes, swaps or changes, and does nothing while hidden.
+function startTabOrder(doc: Document, root: ShadowRoot, make: DevTool['make']): TabOrder {
+  const win = doc.defaultView!
+  const layer = make('div', 'tab-order')
+  const svg = doc.createElementNS(SVG, 'svg')
+  const logged = new Set<string>()
+  // The stops the focus check ran on, which it runs on again only when they change.
+  let checked: HTMLElement[] = []
+  let hidden = new Set<HTMLElement>()
+  let on = false
+  let frame = 0
+  let timer = 0
+  const changes = new MutationObserver(() => {
+    // A page swap drops the old page's problems with it.
+    if (doc.documentElement.hasAttribute('aria-busy')) {
+      logged.clear()
+      checked = []
+    }
+
+    schedule(true)
+  })
+  const move = () => schedule(false)
+  const sameStops = (stops: HTMLElement[]) => stops.length === checked.length && stops.every((stop, index) => stop === checked[index])
+
+  svg.setAttribute('aria-hidden', 'true')
+  layer.hidden = true
+  layer.append(svg)
+  root.append(layer)
+
+  // The next frame draws, and after the page stops changing for a moment its issues are read.
+  function schedule(changed: boolean): void {
+    if (!on)
+      return
+
+    if (frame === 0)
+      frame = win.requestAnimationFrame(draw)
+
+    if (changed) {
+      win.clearTimeout(timer)
+      timer = win.setTimeout(analyse, TAB_ORDER_WAIT)
+    }
+  }
+
+  function report(issues: TabOrderIssue[]): void {
+    for (const issue of issues) {
+      const text = tabOrderProblem(issue)
+
+      if (issue.elements.length > 0 && !logged.has(text)) {
+        logged.add(text)
+        console.warn(text)
+      }
+    }
+  }
+
+  function analyse(): void {
+    timer = 0
+
+    if (!on || doc.documentElement.hasAttribute('aria-busy'))
+      return
+
+    const stops = tabStops(doc)
+
+    if (!sameStops(stops)) {
+      checked = stops
+      hidden = new Set(hiddenFocus(doc, stops))
+      // Moving focus may have changed the page, which is not a change to read again.
+      changes.takeRecords()
+    }
+
+    const { inert, modals } = trapSuspects(doc)
+    const jumps = tabJumps(stops, stops.map(stop => stop.getBoundingClientRect()))
+
+    report([
+      { id: 'tab-order-jump', help: 'The keyboard moves up the page from the previous element, because of a positive tabindex or a visual order unlike the DOM\'s', helpUrl: `${WCAG}/focus-order.html`, elements: jumps.map(index => stops[index]!) },
+      { id: 'focus-not-visible', help: 'Focus shows nothing on this element, give it an outline or a ring', helpUrl: `${WCAG}/focus-visible.html`, elements: [...hidden] },
+      { id: 'keyboard-trap', help: 'Part of the page the keyboard cannot reach while no dialog is open', helpUrl: `${WCAG}/no-keyboard-trap.html`, elements: inert },
+      { id: 'keyboard-trap', help: 'A modal that is not an open dialog element, which only a script keeps focus in: check Tab and Escape leave it', helpUrl: `${WCAG}/no-keyboard-trap.html`, elements: modals },
+    ])
+    draw()
+  }
+
+  function draw(): void {
+    frame = 0
+    svg.replaceChildren()
+    layer.replaceChildren(svg)
+
+    if (!on || doc.documentElement.hasAttribute('aria-busy'))
+      return
+
+    const stops = tabStops(doc)
+    const rects = stops.map(stop => stop.getBoundingClientRect())
+    const jumps = new Set(tabJumps(stops, rects))
+    const { inert, modals } = trapSuspects(doc)
+    const width = win.innerWidth
+    const height = win.innerHeight
+
+    for (const trap of [...inert, ...modals]) {
+      const box = boundsOf(trap)
+      const element = make('div', 'tab-trap')
+
+      element.style.left = `${box.left}px`
+      element.style.top = `${box.top}px`
+      element.style.width = `${box.width}px`
+      element.style.height = `${box.height}px`
+      layer.append(element)
+    }
+
+    for (let index = 1; index < stops.length; index++) {
+      const from = rects[index - 1]!
+      const to = rects[index]!
+      const path = doc.createElementNS(SVG, 'path')
+
+      path.setAttribute('d', `M${from.left + from.width / 2} ${from.top + from.height / 2}L${to.left + to.width / 2} ${to.top + to.height / 2}`)
+
+      if (jumps.has(index))
+        path.setAttribute('class', 'jump')
+
+      svg.append(path)
+    }
+
+    for (const [index, stop] of stops.entries()) {
+      const rect = rects[index]!
+
+      if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height)
+        continue
+
+      const flags = [jumps.has(index) ? 'jump' : '', hidden.has(stop) ? 'hidden-focus' : ''].filter(flag => flag !== '')
+      const badge = make('div', `tab-badge ${flags.join(' ')}`, `${index + 1}${flags.length > 0 ? ' !' : ''}`)
+
+      badge.style.left = `${Math.max(0, rect.left - 6)}px`
+      badge.style.top = `${Math.max(0, rect.top - 9)}px`
+      layer.append(badge)
+    }
+  }
+
+  function show(value: boolean): void {
+    on = value
+    layer.hidden = !on
+    win.clearTimeout(timer)
+    win.cancelAnimationFrame(frame)
+    frame = 0
+    logged.clear()
+    checked = []
+    hidden = new Set()
+    changes.disconnect()
+
+    if (!on) {
+      win.removeEventListener('scroll', move, true)
+      win.removeEventListener('resize', move)
+      layer.replaceChildren(svg)
+
+      return
+    }
+
+    win.addEventListener('scroll', move, { capture: true, passive: true })
+    win.addEventListener('resize', move)
+    changes.observe(doc.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['tabindex', 'disabled', 'hidden', 'inert', 'open', 'href', 'class', 'style', 'aria-modal', 'aria-busy'] })
+    schedule(true)
+  }
+
+  return {
+    show,
+    stop: () => show(false),
   }
 }
 
