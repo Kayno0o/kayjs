@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import type { Field } from '../src/fields'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
+import type { EntryRow } from '../src/listing'
 import process from 'node:process'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
@@ -163,4 +164,49 @@ test('the badge comes back for a date typed ahead and goes for a date typed in t
   expect(badge()).toBe('Scheduled for 2999-10-19 12:01 UTC')
   await type('2020-10-19T11:00')
   expect(badge()).toBeUndefined()
+})
+
+const rowOf = (slug: string, at: string | undefined) => ({ slug, title: slug, draft: false, ...at !== undefined && Date.parse(at) > Date.now() && { scheduledAt: Date.parse(at) } }) as EntryRow
+const statusOf = (slug: string) => mounted!.root.querySelector(`tr:has(a[href$="/${slug}"]) .kui-badge`)?.textContent?.trim()
+
+test('the list names a scheduled time in the editor\'s zone, as the entry screen does, and says Published for an entry with none or one that passed', async () => {
+  process.env.TZ = 'Europe/Paris'
+
+  const ahead = new Date(Date.now() + 3_600_000).toISOString()
+
+  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [rowOf('later', ahead), rowOf('live', '2020-01-01'), rowOf('plain', undefined)] })
+  await settle()
+  expect(statusOf('later')).toMatch(new RegExp(`^Scheduled for ${inputValue(ahead, 'Europe/Paris').replace('T', ' ')} GMT\\+[12]$`))
+  expect([statusOf('live'), statusOf('plain')]).toEqual(['Published', 'Published'])
+})
+
+test('the list names a time in UTC for an editor in UTC and the offset of a half hour zone', async () => {
+  const ahead = '2999-10-19T06:00:00Z'
+
+  process.env.TZ = 'UTC'
+  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  await settle()
+  expect(statusOf('later')).toBe('Scheduled for 2999-10-19 06:00 UTC')
+  mounted.unmount()
+  process.env.TZ = 'Asia/Kolkata'
+  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  await settle()
+  expect(statusOf('later')).toBe('Scheduled for 2999-10-19 11:30 GMT+5:30')
+})
+
+test('the list\'s badge turns to Published when its date passes, with no reload', async () => {
+  process.env.TZ = 'Europe/Paris'
+
+  const at = Date.now() + 1200
+
+  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: at }] })
+  await settle()
+  expect(statusOf('later')).toStartWith('Scheduled for ')
+
+  for (let wait = 0; statusOf('later') !== 'Published' && wait < 60; wait++) {
+    await Bun.sleep(50)
+    await settle()
+  }
+
+  expect(statusOf('later')).toBe('Published')
 })

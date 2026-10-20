@@ -56,7 +56,7 @@ describe('rowsOf', () => {
       { slug: 'plain', data: { title: 'Plain' }, draft: false },
     ], NOW)
 
-    expect(rows.map(row => [row.slug, row.scheduled])).toEqual([['later', '2026-10-20 08:00 UTC'], ['drafted', undefined], ['live', undefined], ['plain', undefined]])
+    expect(rows.map(row => [row.slug, row.scheduledAt])).toEqual([['later', Date.parse('2026-10-20T08:00:00Z')], ['drafted', undefined], ['live', undefined], ['plain', undefined]])
   })
 })
 

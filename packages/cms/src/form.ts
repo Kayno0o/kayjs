@@ -1,16 +1,13 @@
 import type { Signal } from 'kay'
 import type { Drafts } from './drafts'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
-import { effect, guardLeave, navigate, onCleanup, signal } from 'kay'
+import { guardLeave, navigate, signal } from 'kay'
 import { wording } from 'kay/words'
-import { goesLive, publishTime, useEditorZone } from './datetime'
+import { publishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
 import { deleteSaved, saveDraft } from './editor/save'
 import { shipWords } from './editor/words'
 import { collectionPath, entryPath, entryTitle } from './listing'
-
-// The longest wait a timer holds, 2^31 - 1 milliseconds, beyond which it fires at once.
-const MAX_TIMER_MS = 2_147_483_647
 
 // What the parts of an entry's form read: the drafts, the entry they edit, its collection, and which fields the screen renders.
 export interface FormScope {
@@ -116,25 +113,8 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
 
   const isDraft = () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true
 
-  const zone = useEditorZone()
-  // Moves on each time a timer woke the badge, which reads it.
-  const woken = signal(0)
   const goesLiveAt = () => !isDraft() && collection.publishField !== undefined ? publishTime(collection, { [collection.publishField]: drafts.value(ref, collection.publishField) }) : undefined
-
-  // Wakes the badge as the date passes; a timer holds 24 days at most, and one waking early finds the date still ahead and waits again.
-  effect(() => {
-    woken()
-
-    const at = goesLiveAt()
-    const wait = at === undefined ? 0 : at - Date.now()
-
-    if (wait <= 0)
-      return
-
-    const timer = setTimeout(() => woken.set(woken() + 1), Math.min(wait, MAX_TIMER_MS))
-
-    onCleanup(() => clearTimeout(timer))
-  })
+  const scheduled = useGoesLive(goesLiveAt)
 
   async function save(): Promise<void> {
     saving.set(true)
@@ -175,13 +155,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
       return stored()
     },
     isDraft,
-    scheduled: () => {
-      woken()
-
-      const at = goesLiveAt()
-
-      return at === undefined ? undefined : goesLive(at, Date.now(), zone())
-    },
+    scheduled,
     save,
     async publish() {
       if (collection.draftField === undefined)

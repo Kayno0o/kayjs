@@ -1,10 +1,12 @@
 import type { CollectionInfo } from './kay/contract'
-import { onMount, signal } from 'kay'
+import { effect, onCleanup, onMount, signal } from 'kay'
 
 const LOCAL_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 const MINUTE = 16
 const DAY = 86_400_000
 const UTC = 'UTC'
+// The longest wait a timer holds, 2^31 - 1 milliseconds, beyond which it fires at once.
+const MAX_TIMER_MS = 2_147_483_647
 
 const formats = new Map<string, Intl.DateTimeFormat | undefined>()
 const labels = new Map<string, Intl.DateTimeFormat | undefined>()
@@ -117,4 +119,34 @@ export function scheduledFor(collection: Pick<CollectionInfo, 'publishField'>, d
   const time = publishTime(collection, data)
 
   return time === undefined ? undefined : goesLive(time, now, zone)
+}
+
+// Says when the date `at` returns goes live, in the editor's zone (UTC until the browser says it), and nothing once it has passed or while `at` has none, with no reload: a timer wakes it as the date passes. Called in a component's script.
+export function useGoesLive(at: () => number | undefined): () => string | undefined {
+  const zone = useEditorZone()
+  // Moves on each time a timer woke the reader.
+  const woken = signal(0)
+
+  // A timer holds 24 days at most, and one waking early finds the date still ahead and waits again.
+  effect(() => {
+    woken()
+
+    const time = at()
+    const wait = time === undefined ? 0 : time - Date.now()
+
+    if (wait <= 0)
+      return
+
+    const timer = setTimeout(() => woken.set(woken() + 1), Math.min(wait, MAX_TIMER_MS))
+
+    onCleanup(() => clearTimeout(timer))
+  })
+
+  return () => {
+    woken()
+
+    const time = at()
+
+    return time === undefined ? undefined : goesLive(time, Date.now(), zone())
+  }
 }

@@ -1,0 +1,8 @@
+---
+import type { EntryRow, ScreenCollection } from '@kaynooo/kayjs-cms'
+import EntryTable from '@kaynooo/kayjs-cms/entry-table.kay'
+
+// The list of a collection with a publish date, mounted with `mountComponent`.
+const { collection, rows } = props<{ collection: ScreenCollection, rows: EntryRow[] }>()
+---
+EntryTable(prefix="/admin" collection={collection} rows={rows} searched={false})

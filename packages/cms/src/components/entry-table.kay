@@ -10,6 +10,7 @@ import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
 import { wording } from 'kay/words'
 import { deleteSaved, moveSaved, publishSaved } from '../editor/save'
+import EntryStatus from './entry-status.kay'
 import { shipWords } from '../editor/words'
 import { fieldsOf } from '../fields'
 import { listColumns, rowActions } from '../layout'
@@ -69,10 +70,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
-      else if row.scheduled as at
-        Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at })})
       else
-        Badge(tone="success" label={wording('cms.table.published', 'Published')})
+        EntryStatus(at={row.scheduledAt})
     else
       .kcms-row-actions
         if actions.has('move')

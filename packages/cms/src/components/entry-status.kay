@@ -1,0 +1,14 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import { wording } from 'kay/words'
+import { useGoesLive } from '../datetime'
+
+// The Status of a published entry in the list: Scheduled for its date while that is ahead, in the editor's zone once the browser says it (UTC before), and Published once it passes, with no reload.
+const { at } = props<{ at: number | undefined }>()
+
+const scheduled = useGoesLive(() => at)
+---
+if scheduled() as when
+  Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at: when })})
+else
+  Badge(tone="success" label={wording('cms.table.published', 'Published')})
