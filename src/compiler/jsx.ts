@@ -255,7 +255,8 @@ export class JsxTemplate {
   private emitCheckedAlias(node: IfNode, index: number, branch: IfBranch) {
     const { b } = this
 
-    b.add('(').addSource(branch.test).add(') ? ((')
+    // The condition is written twice and only the second is mapped to the source: a rule about a condition, such as strict-boolean-expressions on a nullable string, was never run on an aliased `if`, whose condition the browser build reads as a value.
+    b.add('(').addUnmapped(branch.test).add(') ? ((')
     this.sites.rows.add(b.code.length)
     b.addSource(branch.alias!).add(') => ')
     this.emitRoot(branch.children)

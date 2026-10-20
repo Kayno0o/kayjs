@@ -231,7 +231,8 @@ describe('the edges of the grammar', () => {
   it('reads a quote after a letter or digit as an apostrophe, which pairs with nothing across the group', () => {
     expect(classesOf('div.x-[a\'].y-[b\'] z\n')).toEqual(['x-[a\']', 'y-[b\']'])
     expect(classesOf('div.content-[\'a_b\'].[&_[data-x=\'y\']]:p-2 z\n')).toEqual(['content-[\'a_b\']', '[&_[data-x=\'y\']]:p-2'])
-    expect(classesOf('div.bg-[url(\'/a.png\')].font-[_"x"] z\n')).toEqual(['bg-[url(\'/a.png\')]', 'font-[_"x"]'])
+    // The data URL keeps Tailwind, which scans this file for classes, from writing a url() Bun's CSS bundler would try to resolve.
+    expect(classesOf(`div.bg-[url('data:,x')].font-[_"x"] z\n`)).toEqual([`bg-[url('data:,x')]`, 'font-[_"x"]'])
   })
 
   it('keeps a bracket inside quotes in the group, and renders the quotes', async () => {

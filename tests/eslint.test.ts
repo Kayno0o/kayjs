@@ -267,6 +267,12 @@ section({...rest['a']})
     expect(messages.map(message => [message.ruleId, message.line, message.column])).toEqual([['dot-notation', 4, 26]])
   })
 
+  it('reports the condition of an aliased if once, as the plain one is reported', async () => {
+    const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\nif n == 1 as one\n  p {one}\n')
+
+    expect(messages.map(message => [message.ruleId, message.line, message.column])).toEqual([['eqeqeq', 4, 6]])
+  })
+
   it('drops a fix adding a line break to a template expression, and keeps one in a fence', () => {
     const [block] = processor.preprocess(`---\nlet count = 1\n---\np {count == 1}\n`, FILE)
     const tsx = block!.text

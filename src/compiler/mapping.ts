@@ -43,6 +43,18 @@ export class CodeBuilder {
     return this
   }
 
+  // The same code as `addSource`, mapped to nothing: for a copy of a span whose messages the mapped copy already carries.
+  addUnmapped(span: Span): this {
+    const mappings = this.mappings.length
+    const ranges = this.ranges.length
+
+    this.addSource(span)
+    this.mappings.length = mappings
+    this.ranges.length = ranges
+
+    return this
+  }
+
   // Copies a source span verbatim and maps it, applying any rewrite anchored inside it.
   addSource(span: Span): this {
     let cursor = span.start
