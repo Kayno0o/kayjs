@@ -397,6 +397,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     })
 
     describe('scrolled panels of the persistent island', () => {
+      // Each as [top, left].
       const SCROLLS = { outer: [300, 40], inner: [120, 25] }
 
       // A panel scrolled both ways with another scrolled in it, and a field in the inner one holding the focus.

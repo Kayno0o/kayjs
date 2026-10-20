@@ -635,21 +635,27 @@ function swapBody(next: Document, policy: Policy): void {
   const focused = heldFocus()
 
   const kept = new Set<Element>()
-  // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore` and in one that has it when no layout runs between its two moves.
+  // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and a restore puts back for the ones the swap kept.
   const scrolls = new Map<Element, readonly [left: number, top: number]>()
+
+  // Read before the first move, and only when the next page has an island to keep, so every read shares one layout instead of forcing one after each move.
+  const candidates = policy.islands === 'unchanged' ? `${PERSISTENT},${ISLAND}` : PERSISTENT
+
+  for (const root of body.querySelector(candidates) ? old.querySelectorAll(candidates) : []) {
+    for (const element of [root, ...root.querySelectorAll('*')]) {
+      const { scrollLeft, scrollTop } = element
+
+      if (scrollLeft !== 0 || scrollTop !== 0)
+        scrolls.set(element, [scrollLeft, scrollTop])
+    }
+  }
+
   // With `moveBefore`, an island kept waits in a connected element while the morph runs, so each move keeps its state, and the next body holds its placeholder, emptied, in its stead; elsewhere a move resets the state either way, so it goes straight into the next body.
   const standIns = new Map<Element, Element>()
   let parking: HTMLElement | undefined
 
   const keep = (placeholder: Element, live: Element) => {
     kept.add(live)
-
-    for (const element of [live, ...live.querySelectorAll('*')]) {
-      const { scrollLeft, scrollTop } = element
-
-      if (scrollLeft !== 0 || scrollTop !== 0)
-        scrolls.set(element, [scrollLeft, scrollTop])
-    }
 
     if (!moves) {
       placeholder.replaceWith(live)
