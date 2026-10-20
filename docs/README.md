@@ -27,17 +27,14 @@ The server reads `docs/.env`, which git ignores, with `bun run docs:start` and i
 
 ## Visit counts
 
-The docs count visits with [Umami](https://umami.is), self-hosted by `docs/compose.yaml` as the services `umami` and `umami-db` (Postgres, its data on the `umami-data` volume), with the tags pinned. The visitor's browser never talks to Umami: `analytics({ provider: 'umami' })` in `kay.config.ts` serves a small script from the docs' own origin, and the docs server forwards each visit to Umami over the compose network.
+The docs count visits with [Umami](https://umami.is), the instance other apps share, run by its own stack in `/opt/web/apps/umami` (container `umami`). `docs/compose.yaml` joins that stack's external `umami` network. The visitor's browser never talks to Umami: `analytics({ provider: 'umami' })` in `kay.config.ts` serves a small script from the docs' own origin, and the docs server forwards each visit to `http://umami:3000` over that network.
 
 Umami's dashboard listens on `127.0.0.1:37888` only. Reach it through an SSH tunnel or a proxy of your own.
 
-First run:
+To count the docs:
 
-1. Set `UMAMI_DB_PASSWORD` and `UMAMI_APP_SECRET` in `docs/.env` (`openssl rand -hex 32` for each). Compose refuses to start without them.
-2. Start the stack with `docker compose -f docs/compose.yaml up -d --build`, and open the dashboard on port 37888.
-3. Sign in as `admin` with the password `umami`, and change the password at once.
-4. Add a website named `kayjs.kaynooo.fr` with that domain, and copy its id.
-5. Set `UMAMI_WEBSITE_ID` to the id in `docs/.env` and run the same compose command again. The id is part of the prerendered pages, so the image must be rebuilt.
+1. In Umami's dashboard, add a website named `kayjs.kaynooo.fr` with that domain, and copy its id.
+2. Set `UMAMI_WEBSITE_ID` to the id in `docs/.env` and run `docker compose -f docs/compose.yaml up -d --build`. The id is part of the prerendered pages, so the image must be rebuilt.
 
 While `UMAMI_WEBSITE_ID` is empty, the docs count nothing and serve as before. `UMAMI_HOST` is only for running the docs outside Docker. What the docs tell visitors about all this is the page `/legal`.
 
