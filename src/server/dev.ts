@@ -7,6 +7,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { MountedApi } from './openapi'
+import type { Plumbing } from './plumbing'
 import type { Endpoint } from './routes'
 import type { Claim } from './served-paths'
 import { readFileSync, statSync } from 'node:fs'
@@ -667,13 +668,15 @@ export interface DevHead {
 
 // One line of the dev tool's Routes tab.
 export interface DevRoute {
-  kind: 'page' | 'endpoint' | 'api' | 'kay'
+  kind: 'page' | 'endpoint' | 'api' | 'kay' | 'plumbing'
   method: string
   path: string
   // The file serving it, from the project's root; empty for what kay or a library serves.
   file: string
-  // What serves a `kay` path: the sitemap, a collection's feed, the extension mounting it.
+  // What serves a `kay` path: the sitemap, a collection's feed, the extension mounting it; for kay's plumbing, what it is for.
   owner?: string | undefined
+  // Where kay's plumbing is documented, a path of the docs site.
+  docs?: string | undefined
   locale?: string | undefined
   // Where the tab links to, for a GET path no request fills in, served on this host.
   href?: string | undefined
@@ -685,10 +688,11 @@ export interface DevRoutes {
   notes: string[]
 }
 
-// What serves itself besides the app's files: the claims of kind `kay` the server still holds, the GET routes the extensions mounted, and what to tell of what is missing.
+// What serves itself besides the app's files: the claims of kind `kay` the server still holds, the routes the extensions mounted, kay's plumbing the app serves, and what to tell of what is missing.
 export interface OwnRoutes {
   claims: Claim[]
-  extensions: { owner: string, path: string }[]
+  extensions: { owner: string, method: string, path: string }[]
+  plumbing: Plumbing[]
   notes: string[]
 }
 
@@ -718,10 +722,12 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
   }
 
   const seen = new Set<string>()
+  // The plumbing lists what a claim or an extension also served, once and with its purpose.
+  const plumbed = new Set(own.plumbing.map(({ method, path }) => `${method} ${path}`))
   const itself = [
     ...own.claims.map(claim => ({ method: claim.method ?? 'GET', path: claim.path, owner: claim.owner })),
-    ...own.extensions.map(({ owner, path }) => ({ method: 'GET', path, owner: `the extension ${owner}` })),
-  ]
+    ...own.extensions.filter(({ method }) => method === 'GET').map(({ owner, path }) => ({ method: 'GET', path, owner: `the extension ${owner}` })),
+  ].filter(({ method, path }) => !plumbed.has(`${method} ${path}`))
 
   for (const { method, path, owner } of itself) {
     // A scoped claim, a locale's copy of a feed, names the same path.
@@ -730,6 +736,9 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
       listed.push({ kind: 'kay', method: method.toUpperCase(), path, file: '', owner, href: method.toUpperCase() === 'GET' ? href(path) : undefined })
     }
   }
+
+  for (const { method, path, purpose, docs } of own.plumbing)
+    listed.push({ kind: 'plumbing', method, path, file: '', owner: purpose, docs, href: method === 'GET' ? href(path) : undefined })
 
   return { routes: listed, notes: own.notes }
 }

@@ -57,6 +57,7 @@ import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './open
 import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
+import { plumbing } from './plumbing'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
 import { claimPublic, publicCacheRules, servePublic } from './public'
@@ -357,7 +358,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
 
     app.use(server)
-    mountedByExtensions.push(...app.routes.filter(route => route.method === 'GET' && !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, path: route.path })))
+    mountedByExtensions.push(...app.routes.filter(route => !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, method: route.method, path: route.path })))
   }
 
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security, base }))
@@ -385,7 +386,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
     app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
     app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
-    app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
+    app.get(DEV_ROUTES, () => {
+      const own = { actions: actionLimits.size > 0, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: mountedByExtensions }
+
+      return Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, plumbing: plumbing(own, (path, method) => served.heldByApp(path, method)), notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] }))
+    })
   }
 
   // Claimed before kay's own files, which give way to them; registered last, before the pages.

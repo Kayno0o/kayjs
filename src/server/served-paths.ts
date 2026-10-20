@@ -95,6 +95,11 @@ export class ServedPaths {
     return [...this.#claims.values()].flat().filter(claim => claim.kind === 'kay')
   }
 
+  // Whether a file or setting of the app holds the path for the method, rather than kay itself.
+  heldByApp(path: string, method = 'GET'): boolean {
+    return this.#claims.get(routerKey(path))?.some(claim => claim.kind !== 'kay' && overlap({ path, owner: '', kind: 'kay', method }, claim)) === true
+  }
+
   // Every path claimed so far, as the router reads them.
   paths(): string[] {
     return [...this.#claims.values()].flat().map(claim => claim.path)

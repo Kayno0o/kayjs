@@ -33,7 +33,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Network | What the page fetched since its load and over the last page swaps, with each request's kind, status, size and time |
 | Head | The search result, canonical and hreflang links, social tags and JSON-LD |
 | Screen reader | The page's landmarks, headings, links, controls and form fields in reading order, with the names a screen reader speaks |
-| Routes | Every page, endpoint and API route the server serves |
+| Routes | Every page, endpoint and API route the server serves, and the endpoints of kay's own |
 | Env | The variables `publicEnv` sends to the browser |
 | Images | Each image's variant, format, size and what it is drawn at |
 | Performance | The Web Vitals of the load and the weight of the page |
@@ -79,6 +79,14 @@ The names follow the steps browsers use: `aria-labelledby`, `aria-label`, `label
 The Request tab shows what served the page: the route it matched, its layouts, params and locale, and how long each load took. It lists the guards that ran and what each did, and the redirects the request went through.
 
 The Head tab shows the head as a search result: the title and description with their length, the canonical link, the social card preview and each JSON-LD block. What `kay check` would flag in the head of a built page shows as a problem.
+
+## Routes
+
+The Routes tab lists every page, endpoint and API route the server serves, each locale's copy of a page on its own line. Type in the filter box to match a path, a file or what a route is for. A path with nothing to fill in links to itself.
+
+Under "Served by kay" come the sitemap, robots.txt, feeds, favicons, the service worker and the health check. Beneath them, "kay's plumbing" lists the endpoints you meet in the network panel or in a proxy or firewall rule: `/_kay/live`, `/_kay/action/<file>/<name>`, `/_kay/image`, `/_kay/files/`, `/_kay/error` and the rest. Each has one line on what it is for and a link to where the docs describe it.
+
+The tab lists only what the running server serves. The CSP reports route shows with `security.reports`, the preview and draft routes with `preview`, the analytics routes with `analytics()`, the search files once the site builds a search index, and so on. If one of your own files serves a path, the tab shows it as yours.
 
 ## Images
 

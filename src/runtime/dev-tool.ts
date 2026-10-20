@@ -3102,9 +3102,10 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
   renderVitals()
 }
 
-const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
+const ROUTE_KINDS: Record<Exclude<DevRoute['kind'], 'plumbing'>, string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
+const DOCS_ORIGIN = 'https://kayjs.kaynooo.fr'
 
-// Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
+// Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves. What kay serves itself holds the pages one visits, then kay's plumbing under a heading of its own.
 function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   const body = tool.make('div', 'list')
@@ -3113,24 +3114,28 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   // A restart while a fetch is out asks again; the latest answer wins.
   let asked = 0
   let render: () => void = () => undefined
-  const bar = toolbar(tool, 'Filter by path or file', () => render())
+  const bar = toolbar(tool, 'Filter by path, file or purpose', () => render())
 
   render = () => {
-    const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
-      const ofKind = routes.filter(route => route.kind === kind)
-
-      if (ofKind.length === 0)
-        return []
-
+    const group = (label: string, rows: DevRoute[], tag: 'h3' | 'h4', before: HTMLElement[] = []) => {
       const section = tool.make('section', 'group')
-      const heading = tool.make('h3', 'heading', label)
+      const heading = tool.make(tag, 'heading', label)
       const list = tool.make('div')
 
-      list.append(...ofKind.map(route => filterable(routeRow(tool, route, win.location), `${route.path} ${route.file} ${route.owner ?? ''}`)))
-      heading.append(pill(tool, String(ofKind.length)))
-      section.append(heading, list)
+      list.append(...rows.map(route => filterable(routeRow(tool, route, win.location), `${route.path} ${route.file} ${route.owner ?? ''}`)))
+      heading.append(pill(tool, String(rows.length + before.reduce((count, element) => count + element.querySelectorAll('[data-filter]').length, 0))))
+      section.append(heading, ...rows.length > 0 ? [list] : [], ...before)
 
-      return [section]
+      return section
+    }
+    const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
+      const ofKind = routes.filter(route => route.kind === kind)
+      const plumbing = kind === 'kay' ? routes.filter(route => route.kind === 'plumbing') : []
+
+      if (ofKind.length === 0 && plumbing.length === 0)
+        return []
+
+      return [group(label, ofKind, 'h3', plumbing.length === 0 ? [] : [group('kay\'s plumbing', plumbing, 'h4')])]
     })
 
     body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', 'No routes.')], bar.empty, ...notes.map(note => tool.make('div', 'note', note)))
@@ -3267,7 +3272,7 @@ function routeRow(tool: DevTool, route: DevRoute, here: Location): HTMLElement {
   const name = route.href === undefined ? tool.make('span', 'name', route.path) : Object.assign(tool.make('a', 'name', route.path), { href: route.href })
   const row = entry(tool, 'route', {
     name,
-    after: [...route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)], ...route.href === undefined ? [] : [copyButton(tool, 'the URL', new URL(route.href, here.href).href)]],
+    after: [...route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)], ...route.href === undefined ? [] : [copyButton(tool, 'the URL', new URL(route.href, here.href).href)], ...route.docs === undefined ? [] : [docsLink(tool, { ...route, docs: route.docs })]],
     chips: [route.owner === undefined ? positionButton(tool, route.file) : route.owner],
   })
 
@@ -3277,6 +3282,18 @@ function routeRow(tool: DevTool, route: DevRoute, here: Location): HTMLElement {
     row.setAttribute('aria-current', 'page')
 
   return row
+}
+
+// A link to where the docs site says what a route of kay's is for.
+function docsLink(tool: DevTool, route: DevRoute & { docs: string }): HTMLAnchorElement {
+  const link = tool.make('a', 'chip', 'docs')
+
+  link.href = DOCS_ORIGIN + route.docs
+  link.setAttribute('aria-label', `Docs for ${route.path}`)
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+
+  return link
 }
 
 function formatMs(ms: number): string {

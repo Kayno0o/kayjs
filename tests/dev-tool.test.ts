@@ -919,12 +919,14 @@ describe('the dev tool', () => {
         { kind: 'page', method: 'GET', path: '/fr/a-propos', file: 'src/routes/about.kay', locale: 'fr', href: '/fr/a-propos' },
         { kind: 'api', method: 'POST', path: '/api/stock/:id', file: 'src/api/stock.ts' },
         { kind: 'kay', method: 'GET', path: '/manifest.webmanifest', file: '', owner: 'the web app manifest', href: '/manifest.webmanifest' },
+        { kind: 'plumbing', method: 'GET', path: '/_kay/image', file: '', owner: 'resized images, by width and crop', docs: '/llms/images', href: '/_kay/image' },
+        { kind: 'plumbing', method: 'POST', path: '/_kay/csp', file: '', owner: 'what the Content-Security-Policy blocked', docs: '/llms/proxy-and-security' },
       ] }), { status })
     }) as unknown as typeof window.fetch)
 
     const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
     const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
-    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
+    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector(':scope > .heading')!.firstChild!.textContent} (${group.querySelector(':scope > .heading .pill')!.textContent})`)
 
     try {
       tool = startDevTool()
@@ -932,9 +934,10 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
-      expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (1)'])
-      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest'])
+      expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (3)', 'kay\'s plumbing (2)'])
+      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest', 'GET | /_kay/image | docs | resized images, by width and crop', 'POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/image', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/image', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
       expect(shadow().querySelector('#kay-dev-routes > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
       expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .name')?.textContent).toBe('/broken')
 
@@ -943,6 +946,14 @@ describe('the dev tool', () => {
       expect(rows()).toEqual(['GET | /fr/a-propos | fr | src/routes/about.kay'])
       expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes .route:not([hidden]) .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
       expect(await copiedBy()).toContain('\n- GET /fr/a-propos')
+      // The filter matches kay's plumbing by path and by purpose, its group and the section holding it following the rows shown.
+      filter().value = 'content-security'
+      filter().dispatchEvent(new Event('input'))
+      expect(rows()).toEqual(['POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
+      expect(sections()).toEqual(['Served by kay (1)', 'kay\'s plumbing (1)'])
+      filter().value = '/_kay/im'
+      filter().dispatchEvent(new Event('input'))
+      expect(rows()).toEqual(['GET | /_kay/image | docs | resized images, by width and crop'])
       filter().value = 'nothing'
       filter().dispatchEvent(new Event('input'))
       expect(shadow().querySelector<HTMLElement>('#kay-dev-routes .empty:not([hidden])')?.textContent).toBe('Nothing matches the filter.')
