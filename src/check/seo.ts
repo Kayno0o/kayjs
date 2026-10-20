@@ -133,15 +133,14 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
     }
     // The site's own description is told once, in kay.config.ts, not at every page that inherits it.
     else if (!inherited.includes(head.description)) {
-      const key = `${page.locale ?? ''}\n${head.description}`
-      const first = descriptions.get(key)
+      if (indexed) {
+        const key = `${page.locale ?? ''}\n${head.description}`
+        const first = descriptions.get(key)
 
-      if (!indexed || first !== undefined) {
-        if (indexed)
+        if (first === undefined)
+          descriptions.set(key, page.path)
+        else
           report('duplicate-description', { ...at, message: `\`${page.path}\` has the description of \`${first}\`, "${head.description}"`, help: 'say what sets this page apart in its description' })
-      }
-      else {
-        descriptions.set(key, page.path)
       }
 
       if (head.description.length > DESCRIPTION_LENGTH)

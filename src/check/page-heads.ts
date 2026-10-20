@@ -16,7 +16,8 @@ interface Given {
 
 // What the head blocks of a page and its layouts give, read as written, the innermost first.
 interface HeadFacts {
-  title?: Given | undefined
+  // `wrapped` is false for a title the `seo.titleTemplate` is not known to wrap: marked `raw`, or with attributes that may mark it.
+  title?: (Given & { wrapped: boolean }) | undefined
   description?: Given | undefined
   image?: Given | undefined
   imageWidth: boolean
@@ -44,6 +45,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
   // A source read gives no locale, so a per-locale default reads the default locale's text.
   const defaultLocale = options.i18n?.defaultLocale
   const siteName = localizedText(options.seo?.name, undefined, defaultLocale)
+  const titleTemplate = localizedText(options.seo?.titleTemplate, undefined, defaultLocale)
   const siteImage = localizedText(options.seo?.image, undefined, defaultLocale)
   const siteDescriptions = localizedTexts(options.seo?.description)
   const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: string | undefined, sitemap: boolean }>()
@@ -106,8 +108,11 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       else
         report('duplicate-title', { ...at, message: `\`${route.pattern}\` has the title of \`${first}\`, "${title}"`, help: 'name what sets this page apart in its title' })
 
-      if (indexed && facts.title !== undefined && title.length > TITLE_LENGTH)
-        report('long-title', { ...at, message: `The title of \`${route.pattern}\` runs ${title.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}`, help: 'shorten it to what names the page' })
+      // The title the browser shows is the page's in the site's template, as `kay build` measures it.
+      const shown = facts.title !== undefined && facts.title.wrapped && titleTemplate !== undefined && titleTemplate !== '' ? titleTemplate.replaceAll('%s', () => title) : title
+
+      if (indexed && facts.title !== undefined && shown.length > TITLE_LENGTH)
+        report('long-title', { ...at, message: `The title of \`${route.pattern}\` runs ${shown.length} characters`, note: `search results cut it after about ${TITLE_LENGTH}${shown === title ? '' : ', `seo.titleTemplate` included'}`, help: 'shorten it to what names the page' })
     }
 
     const description = facts.description?.text
@@ -116,12 +121,14 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       report('undescribed-page', { ...at, message: `\`${route.pattern}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
     }
     else if (description !== undefined && !siteDescriptions.includes(description)) {
-      const first = descriptions.get(description)
+      if (indexed) {
+        const first = descriptions.get(description)
 
-      if (indexed && first === undefined)
-        descriptions.set(description, route.pattern)
-      else if (indexed)
-        report('duplicate-description', { ...at, message: `\`${route.pattern}\` has the description of \`${first}\`, "${description}"`, help: 'say what sets this page apart in its description' })
+        if (first === undefined)
+          descriptions.set(description, route.pattern)
+        else
+          report('duplicate-description', { ...at, message: `\`${route.pattern}\` has the description of \`${first}\`, "${description}"`, help: 'say what sets this page apart in its description' })
+      }
 
       if (description.length > DESCRIPTION_LENGTH)
         report('long-description', { ...at, message: `The description of \`${route.pattern}\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
@@ -160,7 +167,7 @@ function headFacts(file: KayFile): HeadFacts {
   const visit = (nodes: readonly Node[], conditional: boolean) => {
     for (const node of nodes) {
       if (node.kind === 'element' && node.name === 'title' && !node.component)
-        facts.title ??= { text: conditional ? undefined : titleText(node) }
+        facts.title ??= { text: conditional ? undefined : titleText(node), wrapped: !node.attributes.some(entry => entry.kind === 'spread' || file.source.slice(entry.name.start, entry.name.end) === 'raw') }
       else if (node.kind === 'element' && node.name === 'meta' && !node.component)
         readMeta(node, file.source, facts, conditional)
 

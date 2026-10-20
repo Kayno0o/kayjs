@@ -2718,6 +2718,63 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('measures a literal title in the seo.titleTemplate as the build does, unless it is raw', async () => {
+    const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
+    const description = 'meta(name="description" content="Fine")'
+    const wrapped = ' | A Site Of Twenty-One'
+    const room = TITLE_LENGTH - wrapped.length
+    const root = await scratchProject({
+      'src/routes/short.kay': head(['title Short', description]),
+      'src/routes/exact.kay': head([`title ${'b'.repeat(room)}`, description]),
+      'src/routes/over.kay': head([`title ${'a'.repeat(room + 1)}`, description]),
+      'src/routes/raw.kay': head([`title(raw) ${'c'.repeat(room + 1)}`, description]),
+      'src/routes/spread.kay': head([`title({...attrs}) ${'d'.repeat(room + 1)}`, description]).replace('---\nhead', 'const attrs = {}\n---\nhead'),
+      'src/routes/hidden.kay': head([`title ${'e'.repeat(room + 1)}`, description, 'meta(name="robots" content="noindex")']),
+    })
+    const options = { site: 'https://example.com', favicon: false as const, lints: { 'unsized-share-image': 'allow', 'duplicate-title': 'allow' } as const }
+    const found = async (titleTemplate: string | Record<string, string> | undefined, over: Partial<CheckOptions> = {}) => (await check(root, { ...options, ...over, seo: { description: 'The site', image: '/og.png', titleTemplate } })).filter(d => d.code === 'long-title').map(d => basename(d.file))
+
+    try {
+      // Without a template the literal alone is measured, and a `raw` title or one that may be marked so is never wrapped.
+      expect(await found(undefined)).toEqual([])
+      expect(await found('')).toEqual([])
+      expect(await found(`%s${wrapped}`)).toEqual(['over.kay'])
+      expect(await found(`%s${wrapped}!`)).toEqual(['exact.kay', 'over.kay'])
+      // A template without `%s` replaces the title: its own length counts.
+      expect(await found('x'.repeat(TITLE_LENGTH + 1))).toEqual(['exact.kay', 'over.kay', 'short.kay'])
+      // A record reads the default locale's.
+      const i18n = (defaultLocale: string) => ({ i18n: { locales: ['en', 'fr'], defaultLocale } })
+
+      expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('en'))).toEqual(['over.kay'])
+      expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('fr'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a chain among the redirects of the config, at its line, without a build', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'h1 Hi\n', 'kay.config.ts': 'export default {\n  redirects: {\n    \'/old\': \'/mid/\',\n    \'/mid\': \'/new\',\n  },\n}\n' })
+
+    try {
+      const options = { site: 'https://example.com', favicon: false as const, redirects: { '/old': '/mid/', '/mid': '/new' } }
+      const chain = async (over: Partial<CheckOptions> = {}) => (await check(root, { ...options, ...over })).filter(d => d.code === 'redirect-chain').map(d => [basename(d.file), d.line, d.severity, d.message])
+      const message = 'The redirect from `/old` goes to `/mid`, which redirects to `/new`'
+
+      expect(await chain()).toEqual([['kay.config.ts', 3, 'warning', message.replace('`/mid`,', '`/mid/`,')]])
+      // Under a base, a trailing slash policy and locales, and as the build asks for its lints.
+      expect(await chain({ base: '/docs', i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })).toHaveLength(1)
+      expect(await chain({ launch: true })).toHaveLength(1)
+      expect(await chain({ lints: { 'redirect-chain': 'deny' } })).toEqual([['kay.config.ts', 3, 'error', message.replace('`/mid`,', '`/mid/`,')]])
+      expect(await chain({ lints: { 'redirect-chain': 'allow' } })).toEqual([])
+      // A site that is not public is told nothing.
+      expect(await chain({ site: undefined })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('does not tell a page under a layout saying noindex that the sitemap lists it', async () => {
     const root = await scratchProject({
       'src/routes/hidden/_layout.kay': '--- server\nexport const page = { noindex: true }\n---\nslot\n',

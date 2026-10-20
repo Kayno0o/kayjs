@@ -955,8 +955,8 @@ describe('kay build checks the project first', () => {
     const warned = await build(root)
 
     expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual([
-      'warning[broken-canonical]: The canonical link of `/about` points at `/mid`, which redirects to `/about`',
       'warning[redirect-chain]: The redirect from `/old` goes to `/mid`, which redirects to `/about`',
+      'warning[broken-canonical]: The canonical link of `/about` points at `/mid`, which redirects to `/about`',
       'warning[orphan-page]: `/lost` has no link to it and is not in the sitemap',
     ])
     expect(warned.code).toBe(0)
@@ -965,8 +965,12 @@ describe('kay build checks the project first', () => {
 
     const refused = await build(root)
 
-    expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[broken-canonical]', 'error[redirect-chain]'])
+    // The chain is the check's, which stops the build before the pages are rendered and their canonical links read.
+    expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[redirect-chain]'])
     expect(refused.code).toBe(1)
+
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'redirect-chain\': \'allow\', \'missing-share-image\': \'allow\' }'))
+    expect((await build(root)).report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[broken-canonical]'])
   }, 60_000)
 
   it('has the hreflang alternates and canonical links of a localized site point at each other', async () => {
@@ -1013,6 +1017,26 @@ describe('kay build checks the project first', () => {
 
     expect(params.report.match(/^\w+\[[\w-]+\]: .*/gm)).toBeNull()
     expect(params.code).toBe(0)
+  }, 60_000)
+
+  it('keeps the orphan lint on a site mounting a library with pages rendered per request, which link within the library alone', async () => {
+    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
+    const files = {
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',
+      'lib/routes/sign-in.kay': 'head\n  title Sign in\n  meta(name="description" content="Sign in")\nform(method="post")\n  button Sign in\n',
+      'lib/routes/account/[id].kay': 'head\n  title Account\n  meta(name="description" content="Account")\np Account\n',
+      'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
+      'src/routes/blog/index.kay': page('Blog', 'p Blog\n'),
+      'src/routes/lost.kay': page('Lost', 'p Lost\n', true),
+    }
+    const root = await scratchProject(files)
+
+    expect((await build(root)).report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual(['warning[orphan-page]: `/lost` has no link to it and is not in the sitemap'])
+
+    // The app's own page rendered per request still hides its links.
+    await Bun.write(join(root, 'src/routes/live.kay'), 'head\n  title Live\n  meta(name="description" content="Live page")\np Live\n')
+    expect((await build(root)).report.match(/^\w+\[[\w-]+\]: .*/gm)).toBeNull()
   }, 60_000)
 
   describe('--format json and github', () => {

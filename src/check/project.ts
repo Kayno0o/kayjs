@@ -23,6 +23,7 @@ import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { fromCompile } from './shadow-types'
+import { redirectChainLints } from './site-seo'
 
 // The project's own scripts, which `kay check` reads for what only it reports in them; a declaration file holds no code.
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
@@ -80,7 +81,8 @@ function readConfigSource(root: string): string | undefined {
 
 // What the shadow tree's write and the config tell, reported ahead of the type errors.
 export function configProblems(root: string, options: CheckOptions, types: ShadowTypes): CheckDiagnostic[] {
-  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true, readConfigSource(root))
+  const source = readConfigSource(root)
+  const seo = [...configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true, source), ...redirectChainLints(options, { configFile: join(root, CONFIG_FILE), configSource: source, exported: options.exported })]
 
   return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
 }

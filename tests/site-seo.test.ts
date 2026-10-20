@@ -1,7 +1,8 @@
 import type { OtherPage, RenderedPage, SiteSeo } from '../src/check/seo'
+import type { Route } from '../src/server/routes'
 import { describe, expect, it } from 'bun:test'
 import { pageSeoLints, TITLE_LENGTH } from '../src/check/seo'
-import { siteSeoLints } from '../src/check/site-seo'
+import { hasUnseenPages, redirectChainLints, siteSeoLints } from '../src/check/site-seo'
 
 const SITE = 'https://example.com'
 const CONFIG = '/app/kay.config.ts'
@@ -157,6 +158,27 @@ describe('orphan-page', () => {
     expect(orphans([page('/'), unlisted('/lost')], [], { unseen: true })).toEqual([])
   })
 
+  it('counts the unguarded pages of the app alone as unseen, not those a library mounts', () => {
+    const route = (file: string, over: Partial<Route> = {}): Route => ({ pattern: file, file, params: [], layouts: [], special: {}, guards: [], ...over })
+    const dir = '/app/src/routes'
+    const app = route(`${dir}/live.kay`)
+    const library = route('/app/node_modules/kayjs-auth/src/pages/routes/sign-in.kay', { open: true })
+    const seen = [{ file: `${dir}/index.kay` }, { file: `${dir}/[id].kay` }]
+    const unseen = (routes: Route[], exported = false) => hasUnseenPages(routes, seen, [], exported, dir)
+
+    expect(unseen([route(`${dir}/index.kay`)])).toBe(false)
+    expect(unseen([route(`${dir}/index.kay`), app])).toBe(true)
+    // The library's login, and a library page with params in a server build, hide no link to a page of the app.
+    expect(unseen([route(`${dir}/index.kay`), library, { ...library, params: ['id'], file: '/app/lib/[id].kay' }])).toBe(false)
+    expect(unseen([route(`${dir}/index.kay`), library, app])).toBe(true)
+    // The app's page with params, or a guarded one, as before.
+    expect(unseen([route(`${dir}/[id].kay`, { params: ['id'] }), route(`${dir}/index.kay`)])).toBe(true)
+    expect(unseen([route(`${dir}/[id].kay`, { params: ['id'] }), route(`${dir}/index.kay`)], true)).toBe(false)
+    expect(unseen([route(`${dir}/live.kay`, { guards: [{} as Route['guards'][number]] })])).toBe(false)
+    // A routes folder whose name starts like another is not it.
+    expect(hasUnseenPages([route('/app/src/routes-more/x.kay')], [], [], false, dir)).toBe(false)
+  })
+
   it('compares copies by host when locales go by domain, where they share a path', () => {
     const fr = unlisted('/about', { host: 'fr.example.com', locale: 'fr' })
 
@@ -303,6 +325,25 @@ describe('redirect-chain', () => {
   it('reads the redirects without the base the pages are served under', () => {
     expect(chains({ '/a': '/b', '/b': '/c' }, [], [], { base: '/docs' })).toHaveLength(1)
     expect(chains({}, [], [other('/a', 308, '/docs/b'), other('/b', 308, '/c')], { base: '/docs' })).toHaveLength(1)
+  })
+
+  it('tells the chains of the config alone without a build, and leaves one through a rendered redirect to the build', () => {
+    const configSource = 'export default {\n  redirects: {\n    \'/a\': \'/b\',\n    \'/b\': \'/c\',\n  },\n}\n'
+    const alone = (over: Partial<typeof config> = {}) => redirectChainLints({ ...config, redirects: { '/a': '/b', '/b': '/c' }, ...over }, { configFile: CONFIG, configSource })
+
+    expect(alone().map(d => [d.code, d.line, d.message])).toEqual([['redirect-chain', 3, 'The redirect from `/a` goes to `/b`, which redirects to `/c`']])
+    expect(alone({ base: '/docs', trailingSlash: 'always' })).toHaveLength(1)
+    expect(alone({ redirects: { '/a': '/b/', '/b': '/c' } })).toHaveLength(1)
+    expect(redirectChainLints(config, { configFile: CONFIG })).toEqual([])
+    expect(alone({ site: undefined })).toEqual([])
+    expect(alone({ lints: { 'redirect-chain': 'deny' } }).map(d => d.severity)).toEqual(['error'])
+
+    // The build skips what `kay check` told, and keeps the chains through the pages it rendered.
+    const built = (redirects: Record<string, string>, others: OtherPage[]) => siteSeoLints({ ...config, redirects }, [], others, { configFile: CONFIG, skipConfigChains: true }).map(d => d.message)
+
+    expect(built({ '/a': '/b', '/b': '/c' }, [])).toEqual([])
+    expect(built({ '/a': '/b' }, [other('/b', 308, '/c')])).toEqual(['The redirect from `/a` goes to `/b`, which redirects to `/c`'])
+    expect(built({ '/b': '/c' }, [other('/a', 308, '/b')])).toEqual(['The redirect from `/a` goes to `/b`, which redirects to `/c`'])
   })
 
   it('follows lints, and a site that is not public is told nothing', () => {

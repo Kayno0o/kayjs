@@ -1,7 +1,9 @@
 import type { TrailingSlash } from '../config'
 import type { Redirects } from '../server/redirects'
+import type { Route } from '../server/routes'
 import type { CheckDiagnostic } from './index'
 import type { OtherPage, RenderedPage, SiteSeo } from './seo'
+import { sep } from 'node:path'
 import { basePath } from '../server/base'
 import { fillTarget } from '../server/redirects'
 import { slashedPath } from '../server/routes'
@@ -28,6 +30,8 @@ export interface SiteSeoOptions {
   exported?: boolean | undefined
   // Whether a page of the site renders per request, whose links the build never saw.
   unseen?: boolean | undefined
+  // Whether to leave a chain through the config's redirects alone, which `kay check` reads without the pages.
+  skipConfigChains?: boolean | undefined
 }
 
 interface Redirect {
@@ -43,6 +47,8 @@ interface Place {
 
 interface Match {
   to: string
+  // The target is a page the build rendered as a redirect, not one of the config.
+  rendered?: boolean | undefined
   // The target with what the path gave filled in.
   filled: string
 }
@@ -97,7 +103,7 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
     const page = elsewhere.get(keyOf(host, path))
 
     if (page !== undefined && page.status >= 300 && page.status < 400 && page.location !== undefined)
-      return { to: page.location, filled: page.location }
+      return { to: page.location, filled: page.location, rendered: true }
 
     return matchRedirect(redirects, path)
   }
@@ -173,19 +179,20 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
   }
 
   const locateConfig = configLocator(options.configSource)
-  const chain = (from: string, file: string, to: string, host: string, at = { line: 1, column: 1 }) => {
+  const chain = (from: string, file: string, to: string, host: string, at = { line: 1, column: 1 }, told = false) => {
     if (!to.startsWith('/') || to.startsWith('//'))
       return
 
     const path = to.replace(QUERY_OR_HASH, '')
     const next = redirectAt(host, plainPath(path))
 
-    if (next !== undefined)
+    // A chain the config alone makes is `kay check`'s to tell; one through a page the build rendered as a redirect is the build's.
+    if (next !== undefined && !(told && !next.rendered))
       report('redirect-chain', { file, ...at, message: `The redirect from \`${from}\` goes to \`${path}\`, which redirects to \`${next.filled}\``, note: 'every hop costs a request, and crawlers give up on a long chain', help: `send \`${from}\` to \`${next.filled}\` directly` })
   }
 
   for (const [from, target] of Object.entries(config.redirects ?? {}))
-    chain(from, options.configFile, typeof target === 'string' ? target : target.to, siteHost, locateConfig(['redirects', from]))
+    chain(from, options.configFile, typeof target === 'string' ? target : target.to, siteHost, locateConfig(['redirects', from]), options.skipConfigChains)
 
   for (const page of others) {
     const place = page.status >= 300 && page.status < 400 && page.location !== undefined ? locate(page.location, page) : undefined
@@ -219,6 +226,28 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
   }
 
   return found
+}
+
+// The redirect chains the config makes alone, which `kay check` tells without a build: `redirects` is all they need.
+export function redirectChainLints(config: SiteSeoConfig, options: Pick<SiteSeoOptions, 'configFile' | 'configSource' | 'exported'>): CheckDiagnostic[] {
+  if (config.redirects === undefined)
+    return []
+
+  // A base or a redirect the server refuses is reported at the boot checks, and the chains need neither the base nor a redirect that parses.
+  try {
+    return siteSeoLints({ ...config, base: undefined }, [], [], options)
+  }
+  catch {
+    return []
+  }
+}
+
+// Whether a page of the app without a guard may render per request, which the build never saw the links of: a route with no page rendered, or in a server build one with params, whose `prerender` may list some of its pages only.
+// A page a library mounts is left out, as those link within the library's own prefix and never to a page of the app, so none of them hides a link to a page of the app.
+export function hasUnseenPages(routes: Route[], rendered: Pick<RenderedPage, 'file'>[], others: Pick<OtherPage, 'file'>[], exported: boolean, routesDir: string): boolean {
+  const seen = new Set([...rendered, ...others].map(page => page.file))
+
+  return routes.some(route => route.file.startsWith(routesDir + sep) && route.guards.length === 0 && (!seen.has(route.file) || (!exported && route.params.length > 0)))
 }
 
 // A page a crawler starts from: the site's root, or a locale's.
