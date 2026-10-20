@@ -59,7 +59,7 @@ A line that moves up the page is dashed red and its badge ends in "!". It comes 
 
 A badge in amber means that element shows nothing when it has focus, no outline or ring. To check that, the tool moves focus through the elements and puts it back, so an `onfocus` handler on your page runs. It checks again when a class or style changes, and only checks elements the browser would draw a focus ring on, so a button you clicked with the mouse may be skipped until you use the keyboard.
 
-Nothing is checked while focus is inside a closed shadow root, as the tool could not give focus back. The page reports the host in that case, so the check also waits while focus is on a custom element or a `div` with a `tabindex`, and runs at the next change to the page once focus has moved on.
+Nothing is checked while focus is inside a closed shadow root, as the tool could not give focus back. The page reports the host in that case, so the check also waits while focus is on a custom element or a block element such as a `div` with a `tabindex`, and runs at the next change to the page once focus has moved on.
 
 A dashed red box marks a place the keyboard may get stuck: a part of the page marked `inert` while no dialog is open, or a modal that is not an open `dialog` element, which only a script can keep focus in. That second one is a hint, not proof, so press Tab and Escape inside it. Each finding also shows under Problems, with the elements it names outlined on hover.
 
