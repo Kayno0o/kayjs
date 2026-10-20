@@ -996,6 +996,23 @@ describe('preview mode', () => {
     expect(plain).toBe((await get('/marks/launch')).html)
   })
 
+  it('hands the editor the entries in the order the page shows their first marked field, whatever the order they were read in', async () => {
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const listed = (html: string): string[] => [...((/<ul class="edited">(.*?)<\/ul>/).exec(html)?.[1]?.replaceAll(HYDRATION_MARK, '').matchAll(/[^<>]+(?=<\/li>)/g) ?? [])].map(match => match[0])
+    const post = async (path: string, entries: unknown[]) => listed(await (await app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { 'cookie': edit, 'content-type': 'application/json' }, body: JSON.stringify({ path, entries }) }))).text())
+    // The page reads pages:home, pages:about and news:launch at once and its layout pages:contact before, then shows them launch, about, home, with the layout's last.
+    const page = ['news:launch', 'pages:about', 'pages:home', 'pages:contact']
+    const launch = { collection: 'news', slug: 'launch', data: { title: 'Draft title', published: true, tags: [] } }
+
+    expect(listed((await get('/order/all', edit)).html)).toEqual(page)
+    // A draft of the slowest entry to decode keeps every form in place, as does one typed again.
+    expect(await post('/order/all', [launch])).toEqual(page)
+    expect(await post('/order/all', [{ ...launch, data: { ...launch.data, title: 'Draft titles' } }])).toEqual(page)
+    // A new entry shows where the page shows it, and one the page no longer reads is gone from the list.
+    expect(await post('/order/all', [launch, { collection: 'news', slug: 'fresh', data: { title: 'Fresh', published: true, tags: [] } }])).toEqual(['news:fresh', ...page])
+    expect(listed((await get('/order/less', edit)).html)).toEqual(['news:launch', 'pages:about', 'pages:contact'])
+  })
+
   it('renders the extension\'s editor last in edit mode alone, kept alive across pages, given each entry the page read', async () => {
     const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const preview = await previewCookie(previewUrl('/news'))

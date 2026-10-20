@@ -1,0 +1,8 @@
+--- server
+import { pages } from '../../content.config'
+
+const contact = await pages.get('contact')
+---
+main
+  slot
+footer {contact?.data.title}

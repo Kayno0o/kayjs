@@ -1,0 +1,12 @@
+--- server
+import { news, pages } from '../../content.config'
+
+// Read in parallel and in an order that is not the page's: the draft decode of a news entry resolves later than a folder entry.
+const [home, about, launch, fresh] = await Promise.all([ctx.params.mode === 'less' ? undefined : pages.get('home'), pages.get('about'), news.get('launch'), news.get('fresh')])
+---
+if fresh
+  h2 {fresh.data.title}
+h1 {launch?.data.title}
+p.about {about?.data.title}
+if home
+  p.home {home.data.title}

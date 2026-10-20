@@ -45,7 +45,7 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 ## Edit mode
 
-In edit mode, kay renders the editor at the end of every page, with the entries the page read. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
+In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
 
 An edit cookie or link is tied to no user, so it reads only the entries the pages it showed in edit mode read, never a customer or order collection the page does not render. A signed-in editor the guard admits reads any entry. The list of those entries lives in the server's memory, so after a restart, or on another replica, load the page again.
 

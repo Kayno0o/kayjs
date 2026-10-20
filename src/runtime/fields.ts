@@ -376,3 +376,29 @@ function rawTextTracker(html: string): (index: number) => boolean {
     return inside
   }
 }
+
+// The entries read, in the order the markup shows each one's first marked field, so the editor lists them as the page does whatever the order the reads resolved in; an entry with nothing marked in the markup comes after, by name.
+export function entriesInPageOrder(marks: FieldMarks, markup: string): EntryRef[] {
+  const seen = new Set<string>()
+  const checked = new Set<number>()
+
+  for (const match of markup.matchAll(marks.fence)) {
+    const index = Number(match[2])
+
+    // A closing fence has no index.
+    if (match[2] === undefined || checked.has(index))
+      continue
+
+    checked.add(index)
+
+    const ref = marks.refs[index]!
+    const name = [...marks.entries.keys()].find(key => ref === key || ref.startsWith(`${key}:`))
+
+    if (name !== undefined)
+      seen.add(name)
+  }
+
+  const rest = [...marks.entries.keys()].filter(name => !seen.has(name)).sort()
+
+  return [...seen, ...rest].map(name => marks.entries.get(name)!)
+}
