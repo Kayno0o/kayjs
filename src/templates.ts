@@ -58,6 +58,23 @@ const VIEW_TRANSITION = `@media (prefers-reduced-motion: no-preference) {
   }
 }`
 
+// A class of the `.class` shorthand: a balanced `[...]`, a `(...)` after a `-`, a decimal, or any other character that is no space, `.`, `#` or `(`.
+const SHORTHAND_CLASS = String.raw`(?:\[[^\]\s]*\]|(?<=-)\([^)\s]*\)|\d\.\d+(?!\w)|[^\s.#(\[\]])+`
+
+// Tailwind IntelliSense's `classRegex`: a `class="..."` value, and the classes after the tag of a line or of a `#[tag]`, each `.class` apart.
+export const TAILWIND_CLASS_REGEX: (string | [string, string])[] = [
+  String.raw`class\s*=\s*"([^"]*)"`,
+  [String.raw`(?:^|\n|#\[)[ \t]*(?:[A-Za-z][\w-]*)?((?:\.${SHORTHAND_CLASS})+)`, String.raw`\.(${SHORTHAND_CLASS})`],
+]
+
+// `.vscode/settings.json`: the ESLint extension lints only the languages it lists, which replaces its default ones, and Tailwind IntelliSense reads `.kay` as HTML.
+function editorSettings({ has }: Setup): Record<string, unknown> {
+  return {
+    ...has('eslint') && { 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] },
+    ...has('tailwind') && { 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX },
+  }
+}
+
 // astro-template's look: Tailwind over the Catppuccin Mocha palette, the accent one of its colours, which the picker in the header changes.
 function tailwindCss({ has }: Setup): string {
   return blocks(
@@ -1031,8 +1048,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
     ...has('starter') && starterFiles(setup),
     ...has('accents') && ACCENT_FILES,
     ...server && { 'src/server.ts': SERVER_ENTRY },
-    // The ESLint extension lints only the languages it lists, which replaces its default ones.
-    ...has('eslint') && { '.vscode/settings.json': `${JSON.stringify({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] }, null, 2)}\n` },
+    ...(has('eslint') || has('tailwind')) && { '.vscode/settings.json': `${JSON.stringify(editorSettings(setup), null, 2)}\n` },
     // Type-aware, .kay fences included, over the types `kay lint`, `kay check` and `kay dev` write.
     ...has('eslint') && { 'eslint.config.ts': 'import { defineConfig } from \'@kaynooo/eslint\'\n\nexport default defineConfig({ strict: true, kay: true })\n' },
     ...has('tests') && {

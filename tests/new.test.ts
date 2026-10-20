@@ -15,6 +15,7 @@ import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
+import { TAILWIND_CLASS_REGEX } from '../src/templates'
 import { lintInProcess } from './scaffold-lint'
 
 const repo = join(import.meta.dir, '..')
@@ -521,7 +522,7 @@ describe('kay new', () => {
     // A warning is shown, and fails CI only where the app adds `--deny-warnings`.
     expect(manifest.scripts.check).toBe('kay check')
     expect(manifest.scripts.lint).toBe('kay lint --cache')
-    expect(await Bun.file(join(dir, '.vscode/settings.json')).json()).toEqual({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] })
+    expect(await Bun.file(join(dir, '.vscode/settings.json')).json()).toEqual({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'], 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX })
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
