@@ -5,8 +5,10 @@ import { COMMENTS } from './supports'
 const CONDITIONAL = /^@(?:media|container|supports|layer|scope|starting-style|document)\b/i
 const NAMED_LAYER = /^@layer\s+[^\s{]/i
 const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
-// What may follow a rule's opening :is() for the classes inside it to stay required: pseudo-classes and -elements with one level of arguments, and attributes.
-const SUFFIX = /^(?:::?[\w-]+(?:\([^()]*\))?|\[[^\]]*\])*$/
+// What may follow a rule's opening :is() for the classes inside it to stay required: pseudo-classes and -elements with one level of arguments, attributes and classes.
+const SUFFIX = /^(?:::?[\w-]+(?:\([^()]*\))?|\[[^\]]*\]|\.(?:\\[\s\S]|[\w\u0080-\uFFFF-])+)*$/
+// How many :is() inside one another count, so a hostile selector costs a bounded number of passes.
+const MAX_NESTING = 8
 const HEX_ESCAPE = /^\\[\da-f]{1,6}[ \t\n\r\f]?/i
 
 // How many UTF-16 units the escape starting at `at` takes: a hex escape and the one space ending it, or the backslash and the character after, a surrogate pair included.
@@ -23,18 +25,32 @@ export interface Selector {
 }
 
 // A rule's prelude split at its top-level commas, comments, strings and escapes read past whole.
-// A selector that opens with one `:is(...)` holding a single selector, as Tailwind writes a `*:` variant's `:is(.\*\:p-2 > *)` and its `:hover` or `[data-x]` after it, has the classes of what that holds.
+// A selector that opens with one `:is(...)` holding a single selector, as Tailwind writes a `*:` variant's `:is(.\*\:p-2 > *)` and its `:hover`, `[data-x]` or `.x` after it, has the classes of what that holds, and of a `:is(...)` opening that in turn, as `*:*:p-2` makes.
 export function selectors(prelude: string): Selector[] {
   return scan(prelude).map((selector) => {
-    const inner = leadingIs(selector.text)
-    const held = inner === undefined ? [] : scan(inner)
+    const held = heldClasses(selector.text, 0)
 
-    return held.length === 1 ? { text: selector.text, classes: held[0]!.classes } : selector
+    return held === undefined ? selector : { text: selector.text, classes: [...held, ...selector.classes] }
   })
 }
 
-// What a selector's opening `:is(...)` holds, when only pseudo-classes, pseudo-elements and attributes follow it.
-function leadingIs(selector: string): string | undefined {
+// The classes of the single selector a selector's opening `:is(...)` holds, and of those its own opening `:is(...)` holds, down to `MAX_NESTING`.
+function heldClasses(selector: string, level: number): string[] | undefined {
+  const inner = leadingIs(selector, level > 0)
+
+  if (inner === undefined)
+    return undefined
+
+  const held = scan(inner)
+
+  if (held.length !== 1)
+    return undefined
+
+  return [...held[0]!.classes, ...(level < MAX_NESTING ? heldClasses(held[0]!.text, level + 1) ?? [] : [])]
+}
+
+// What a selector's opening `:is(...)` holds, when only pseudo-classes, pseudo-elements, attributes and classes follow it, or anything does inside another `:is(...)`.
+function leadingIs(selector: string, anyRest: boolean): string | undefined {
   const text = selector.trim()
 
   if (!text.startsWith(':is('))
@@ -54,7 +70,7 @@ function leadingIs(selector: string): string | undefined {
     else if (char === '(' || char === '[')
       depth++
     else if ((char === ')' || char === ']') && --depth === 0)
-      return SUFFIX.test(text.slice(at + 1)) ? text.slice(4, at) : undefined
+      return anyRest || SUFFIX.test(text.slice(at + 1)) ? text.slice(4, at) : undefined
   }
 
   return undefined

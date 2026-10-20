@@ -68,6 +68,26 @@ describe('pruneNodes', () => {
     expect(print(pruneUnescaped(parse(css), new Set(['*:hover:p-2'])))).not.toContain('hover')
   })
 
+  it('reads the classes of a star variant stacked on another, and of one followed by a class', () => {
+    const css = ':is(:is(.\\*\\:\\*\\:p-2 > *) > *){a:b}:is(:is(.\\*\\*\\:\\*\\:p-2 *) > *){a:b}:is(:is(.\\*\\:hover\\:\\*\\:p-2 > *):hover > *){a:b}:is(.\\*\\:\\[\\&\\.x\\]\\:p-2 > *).x{a:b}'
+
+    expect(selectors(':is(:is(.\\*\\:\\*\\:p-2 > *) > *)').map(each => each.classes)).toEqual([['\\*\\:\\*\\:p-2']])
+    expect(selectors(':is(.\\*\\:\\[\\&\\.x\\]\\:p-2 > *).x').map(each => each.classes)).toEqual([['\\*\\:\\[\\&\\.x\\]\\:p-2', 'x']])
+    expect(styledClassNames(parse(css))).toEqual(new Set(['*:*:p-2', '**:*:p-2', '*:hover:*:p-2', '*:[&.x]:p-2', 'x']))
+    expect(print(pruneUnescaped(parse(css), new Set(['*:*:p-2', '*:[&.x]:p-2'])))).toBe(':is(:is(.\\*\\*\\:\\*\\:p-2 *) > *){a:b}:is(:is(.\\*\\:hover\\:\\*\\:p-2 > *):hover > *){a:b}')
+    expect(print(pruneUnescaped(parse(css), new Set(['x'])))).toBe(':is(:is(.\\*\\:\\*\\:p-2 > *) > *){a:b}:is(:is(.\\*\\*\\:\\*\\:p-2 *) > *){a:b}:is(:is(.\\*\\:hover\\:\\*\\:p-2 > *):hover > *){a:b}')
+  })
+
+  it('reads nested :is() in bounded passes and keeps a rule it cannot read', () => {
+    const deep = `${':is('.repeat(5000)}.gone${')'.repeat(5000)}`
+    const kept = [':is(:is(.gone, .kept) > *){a:b}', ':is(:is(.gone > *), .kept){a:b}', ':is(:is(".gone) > *) > *){a:b}', ':is(:is(.gone\\) > *) > *){a:b}', ':is(:is(/* x */.gone > *) > *){a:b}', ':is(:is(.gone > *) > *'].join('')
+
+    expect(selectors(deep).map(each => each.classes)).toEqual([[]])
+    expect(pruneClasses(`${deep}{a:b}`, unused)).toBe(`${deep}{a:b}`)
+    expect(pruneClasses(kept, unused)).toBe(kept)
+    expect(pruneClasses(':is(:is(.gone > *) > *){a:b}.kept{c:d}', unused)).toBe('.kept{c:d}')
+  })
+
   it('keeps an :is() that is not the whole selector, or holds a list', () => {
     const css = ':is(.gone > *) .kept{a:b}.kept:is(.gone > *){a:b}:is(.gone, .kept > *){a:b}:is(.kept):is(.gone){a:b}'
 
