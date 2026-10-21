@@ -73,6 +73,9 @@ import { userDataRules } from './userData'
 export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
 const STATE = Symbol('kayjs-auth.state')
+
+// The readable cookie telling a script of the site that a person is signed in, so a library's script (kayjs-cms's Edit this page link) asks the server only for a browser that may get an answer.
+export const SIGNED_IN_HINT = 'kay_user'
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
@@ -207,6 +210,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private linked = new WeakMap<UserRecord, Promise<User['providers']>>()
 
   private readonly session: Session<AuthSessionData>
+  // Set-Cookie lines this request's sign-in or sign-out adds to its response, which the plugin sends.
+  private readonly cookies: string[] = []
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
     const bearer = bearerRequest(request)
@@ -247,6 +252,24 @@ export class Auth<Scope extends string = string, Role extends string = string, O
         this.resolving = Promise.resolve(record)
       },
     }
+  }
+
+  // Marks this browser as signed in, or not, with a readable cookie any script of the site may look for before asking the server: a hint only, never trusted, new at each sign-in so a script can tell one from the next.
+  private markBrowser(signedIn: boolean): void {
+    const header = this.request.headers.get('cookie') ?? ''
+
+    if (!signedIn && !header.includes(`${SIGNED_IN_HINT}=`))
+      return
+
+    const url = new URL(this.request.url)
+    const secure = url.protocol === 'https:' || this.request.headers.get('x-forwarded-proto') === 'https'
+
+    this.cookies.push(new Bun.Cookie(SIGNED_IN_HINT, signedIn ? crypto.randomUUID() : '', { path: '/', sameSite: 'lax', secure, ...!signedIn && { maxAge: 0 } }).serialize())
+  }
+
+  // The cookies the response must carry, handed over once.
+  takeCookies(): string[] {
+    return this.cookies.splice(0)
   }
 
   private get resolving(): Promise<UserRecord | null> | undefined {
@@ -417,6 +440,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.session.regenerate()
     this.source = null
     this.resolving = Promise.resolve(null)
+    this.markBrowser(false)
   }
 
   // Signs the user out of every session they hold and revokes their bearer tokens, this session kept only with `keepThisOne`, as after a password change.
@@ -1019,6 +1043,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
+    this.markBrowser(!record.guest)
     await noteSignIn(this[STATE], record)
     await report(this[STATE], record, 'signed-in', method)
   }
@@ -1056,8 +1081,10 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     }
 
     // Deleted, signed out everywhere since, banned, or its session ended.
-    if (signedIn)
+    if (signedIn) {
       await this.session.unset('auth')
+      this.markBrowser(false)
+    }
 
     const owner = await bearerUser(this.core, this.request)
 
@@ -1114,6 +1141,24 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       })
 
       return { auth }
+    })
+    // The cookies a sign-in or a sign-out adds, on the response the route built or on Elysia's own, as the session plugin's cookie is.
+    .onAfterHandle({ as: 'global' }, (context) => {
+      const cookies = (context as unknown as { auth?: Auth }).auth?.takeCookies() ?? []
+
+      if (cookies.length === 0)
+        return
+
+      const response = (context as { responseValue?: unknown }).responseValue
+
+      if (response instanceof Response) {
+        for (const cookie of cookies)
+          response.headers.append('set-cookie', cookie)
+
+        return
+      }
+
+      context.set.headers['set-cookie'] = [context.set.headers['set-cookie'] ?? []].flat().concat(cookies)
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')

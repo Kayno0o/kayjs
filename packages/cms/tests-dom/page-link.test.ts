@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { settle } from 'kay/test'
-import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink } from '../src/page-link'
+import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, SIGNED_IN_COOKIE } from '../src/page-link'
 
 const ANSWER = { label: 'Edit this page', href: '/admin/page' }
 const BUTTON = 'html > a'
@@ -10,7 +10,7 @@ function answering(status: number, body: unknown = ANSWER) {
 }
 
 async function run(): Promise<void> {
-  pageLink(HINT_COOKIE, PAGE_LINK_ATTRIBUTE, CHECK_PATH)
+  pageLink(HINT_COOKIE, PAGE_LINK_ATTRIBUTE, CHECK_PATH, SIGNED_IN_COOKIE)
   await settle()
 }
 
@@ -33,6 +33,8 @@ beforeEach(() => {
 afterEach(() => {
   document.querySelector(BUTTON)?.remove()
   document.cookie = `${HINT_COOKIE}=; path=/; max-age=0`
+  document.cookie = `${SIGNED_IN_COOKIE}=; path=/; max-age=0`
+  sessionStorage.clear()
   mock.restore()
 })
 
@@ -124,4 +126,67 @@ test('fills a link of the app\'s own in place of its button, and keeps it hidden
   answering(403)
   await run()
   expect(document.querySelector<HTMLAnchorElement>(`[${PAGE_LINK_ATTRIBUTE}]`)!.hidden).toBeTrue()
+})
+
+test('the loader looks for the hint or kayjs-auth\'s signed-in cookie, and for nothing else', () => {
+  expect(SIGNED_IN_COOKIE).toBe('kay_user')
+
+  const cue = new RegExp((/^\/(.*)\/\.test\(document\.cookie\)/).exec(pageLinkLoader())![1]!)
+
+  expect([`${HINT_COOKIE}=1`, `a=1; ${SIGNED_IN_COOKIE}=x`, `${SIGNED_IN_COOKIE}=`].map(cookie => cue.test(cookie))).toEqual([true, true, true])
+  expect(['', 'session=1', 'kay_users=1'].map(cookie => cue.test(cookie))).toEqual([false, false, false])
+})
+
+test('a browser signed in with no hint asks the guard, and shows the link when it lets the user in', async () => {
+  document.cookie = `${HINT_COOKIE}=; path=/; max-age=0`
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+
+  const fetched = answering(200)
+
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(1)
+  expect(document.querySelector(BUTTON)?.textContent).toBe('Edit this page')
+})
+
+test('a sign-in the guard refused is not asked again in the tab, a new sign-in is', async () => {
+  document.cookie = `${HINT_COOKIE}=; path=/; max-age=0`
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+
+  const fetched = answering(403)
+
+  await run()
+  await run()
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(1)
+  expect(document.querySelector(BUTTON)).toBeNull()
+
+  document.cookie = `${SIGNED_IN_COOKIE}=two; path=/`
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(2)
+})
+
+test('asks every page when the tab keeps nothing, and a hint without a sign-in cookie is always verified', async () => {
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+
+  const kept = Object.getOwnPropertyDescriptor(window, 'sessionStorage') ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'sessionStorage')!
+
+  Object.defineProperty(window, 'sessionStorage', { configurable: true, get: () => {
+    throw new Error('blocked')
+  } })
+
+  const fetched = answering(403)
+
+  await run()
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(2)
+  Object.defineProperty(window, 'sessionStorage', kept)
+  mock.restore()
+  document.cookie = `${SIGNED_IN_COOKIE}=; path=/; max-age=0`
+  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+  document.cookie = `${HINT_COOKIE}=1; path=/`
+
+  const hinted = answering(200)
+
+  await run()
+  expect(hinted).toHaveBeenCalledTimes(1)
 })

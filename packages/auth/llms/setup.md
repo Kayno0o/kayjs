@@ -110,6 +110,7 @@ Each sign-in is kept on the user's list of sessions in the store, whatever holds
 - Through a bearer token, `sessions()` is empty and `endSession` ends nothing: the list belongs to the browsers.
 - `sessionsPage`, such as `/account/sessions`, is where the app lists them: `new-sign-in` mails link to it, so a user who does not know the sign-in can end it.
 - A sign-in from before the list existed goes on it at its next request.
+- Every sign-in of a person (a guest excepted) sets the readable cookie `kay_user`, `Path=/`, `SameSite=Lax`, `Secure` over https, a new random value each time and no `Max-Age`; a sign-out, or a session found over, clears it. It is a hint for a script of the site, never read by the server and never a permission: kayjs-cms's script asks its guard when it sees it, so an editor sees the Edit this page link at once. Set on the response of the sign-in or sign-out, a route's own `Response` included.
 
 ## Guards and gates
 

@@ -53,9 +53,11 @@ An entry has such a link when a page shows it. That is the page listing its coll
 
 A signed-in editor reading the site finds an "Edit this page" button in the bottom left corner of every page, which opens edit mode on it. There is nothing to add to the app, and the pages stay static.
 
-Opening any screen of the admin marks the browser with a `kay_editor` cookie, readable by the page. Every page carries one short script that looks for that cookie, so a visitor without it loads nothing more. With it, the page asks the guard whether the editor is still signed in. If so, the button shows. If not, the cookie is deleted and the button never shows. The button does not show on the admin screens or in edit mode.
+Opening any screen of the admin marks the browser with a `kay_editor` cookie, readable by the page. So does signing in with [kayjs-auth](/libraries/kayjs-auth), which sets its own `kay_user` cookie that the script treats the same way, so an editor sees the button on the first page after signing in.
 
-An editor who signed in without ever opening the admin sees no button until they open it once.
+Every page carries one short script that looks for either cookie, so a visitor without them loads nothing more. With one, the page asks the guard whether the editor is still signed in. If so, the button shows. If not, the cookie is deleted and the button never shows. The button does not show on the admin screens or in edit mode.
+
+With another way of signing in, an editor who never opened the admin sees no button until they open it once.
 
 To place the link yourself, write an `a(data-cms-edit-page hidden)` in your layout. The cms fills in its address, shows it, and writes its text when it is empty, instead of drawing its own button. `cms({ pageLink: false })` turns the button off.
 

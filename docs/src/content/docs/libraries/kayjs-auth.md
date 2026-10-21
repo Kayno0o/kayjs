@@ -240,6 +240,10 @@ Only the first five characters of the password's SHA-1 leave the server. A check
 
 A function `(password) => boolean` checks against a list of your own instead.
 
+## Telling a script the user is signed in
+
+Each sign-in of a person sets a `kay_user` cookie that a script of your site can read, and a sign-out clears it. A guest does not set it. The server never reads it and it grants nothing: it only tells a script that asking the server may be worth it. kayjs-cms uses it to show an editor the Edit this page button right after signing in.
+
 ## Account changes
 
 Changing what protects the account takes a `proof`. That covers `changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.

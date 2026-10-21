@@ -1,5 +1,7 @@
 // The cookie hinting a browser is an editor's, which the loader on every page looks for: a hint only, the guard still decides.
 export const HINT_COOKIE = 'kay_editor'
+// The cookie kayjs-auth sets while a person is signed in, with a value new at each sign-in: a browser holding it asks the guard even before the first visit to a screen. The name is all the two libraries share.
+export const SIGNED_IN_COOKIE = 'kay_user'
 // The attribute of a link the app renders itself, which the module fills in and shows in place of its own button.
 export const PAGE_LINK_ATTRIBUTE = 'data-cms-edit-page'
 // Where the guarded check and the public module are served, under the app's base.
@@ -10,13 +12,25 @@ const HINT_AGE = 90 * 24 * 60 * 60
 // What the browser runs on a page read by a signed-in editor: asks the guard whether the editor is still signed in, then shows the "Edit this page" link.
 // It is stringified and served as a module, so it uses nothing of this file's scope: `hint` and `attribute` come in as arguments.
 // It runs wherever a page reads it, so it stays free of imports and of anything the server alone has.
-export function pageLink(hint: string, attribute: string, endpoint: string): void {
+export function pageLink(hint: string, attribute: string, endpoint: string, signedIn: string): void {
   const base = document.querySelector<HTMLMetaElement>('meta[name=kay-base]')?.content ?? ''
   let verified: Promise<{ label: string, href: string } | undefined> | undefined
   let button: HTMLAnchorElement | undefined
 
+  // The sign-in this browser holds, which the guard refused once already: the answer is kept for the tab, so a signed-in visitor who is no editor costs one request, not one per page.
+  const signIn = new RegExp(`(?:^|; )${signedIn}=([^;]*)`).exec(document.cookie)?.[1]
+  const refusedKey = `${hint}-refused`
+
   // The guard answers: the hint outlives the session or dies before it, so the session decides, both ways.
   const verify = async () => {
+    try {
+      if (signIn !== undefined && sessionStorage.getItem(refusedKey) === signIn)
+        return undefined
+    }
+    catch {
+      // Storage is blocked: the guard is asked, as for a browser that never asked.
+    }
+
     try {
       const response = await fetch(`${base}${endpoint}`, { headers: { accept: 'application/json' }, redirect: 'manual' })
 
@@ -24,8 +38,12 @@ export function pageLink(hint: string, attribute: string, endpoint: string): voi
         return await response.json() as { label: string, href: string }
 
       // Refused, or redirected to a sign-in: the session is over, so the hint goes.
-      if (response.status === 0 || response.status === 401 || response.status === 403)
+      if (response.status === 0 || response.status === 401 || response.status === 403) {
         document.cookie = `${hint}=; path=/; max-age=0`
+
+        if (signIn !== undefined)
+          sessionStorage.setItem(refusedKey, signIn)
+      }
     }
     catch {
       // Offline or down: the hint stays, and the next page asks again.
@@ -86,13 +104,13 @@ export function pageLink(hint: string, attribute: string, endpoint: string): voi
 
 // The module an editor's browser loads: the function above, called with the names this file holds.
 export function pageLinkModule(): string {
-  return `(${pageLink.toString()})(${JSON.stringify(HINT_COOKIE)},${JSON.stringify(PAGE_LINK_ATTRIBUTE)},${JSON.stringify(CHECK_PATH)})`
+  return `(${pageLink.toString()})(${JSON.stringify(HINT_COOKIE)},${JSON.stringify(PAGE_LINK_ATTRIBUTE)},${JSON.stringify(CHECK_PATH)},${JSON.stringify(SIGNED_IN_COOKIE)})`
 }
 
-// What the head of every page carries: one line that loads the module for a browser holding the hint, and costs any other nothing.
+// What the head of every page carries: one line that loads the module for a browser holding the hint or signed in, and costs any other nothing.
 // It waits for the document, as the meta naming the base comes after the head's scripts.
 export function pageLinkLoader(): string {
-  return `document.cookie.includes("${HINT_COOKIE}=")&&addEventListener("DOMContentLoaded",()=>import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))`
+  return `/${HINT_COOKIE}=|${SIGNED_IN_COOKIE}=/.test(document.cookie)&&addEventListener("DOMContentLoaded",()=>import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))`
 }
 
 // The cookie that marks the browser as an editor's, slid forward each time the guard lets the editor through.
