@@ -2868,6 +2868,26 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports bodyLimit as maxSize in the config, an action and an api module, and --fix renames it, a shorthand included', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {\n  bodyLimit: "4mb",\n}\n',
+      'src/api/up.ts': 'const bodyLimit = 1024\n\nexport default api({ bodyLimit }).post("/", () => 1, { detail: { bodyLimit: "4kb" } })\n',
+      'src/routes/index.kay': '--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", bodyLimit: "20mb", messages: { bodyLimit: bytes => String(bytes) } })\n---\np bodyLimit in prose\n',
+    })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-body-limit/g)).toHaveLength(5)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  maxSize: "4mb",\n}\n')
+      expect(await Bun.file(join(root, 'src/api/up.ts')).text()).toBe('const bodyLimit = 1024\n\nexport default api({ maxSize: bodyLimit }).post("/", () => 1, { detail: { maxSize: "4kb" } })\n')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", maxSize: "20mb", messages: { maxSize: bytes => String(bytes) } })\n---\np bodyLimit in prose\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-body-limit')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({

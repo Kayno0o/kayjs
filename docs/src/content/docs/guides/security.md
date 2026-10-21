@@ -15,7 +15,7 @@ export default defineConfig({
     headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains' },
   },
   proxy: true,
-  bodyLimit: '4mb',
+  maxSize: '4mb',
 })
 ```
 
@@ -249,13 +249,13 @@ An action or an API route accepts 1 MB at most. A limit is a size, `'4mb'`, `'51
 
 ```ts
 export default defineConfig({
-  bodyLimit: '4mb',
+  maxSize: '4mb',
 })
 ```
 
-Raise it for one action in its third argument, `{ bodyLimit: '20mb' }`, for an API module with `api({ bodyLimit })`, or for one route with `detail: { bodyLimit }`. A form that takes files usually needs this.
+Raise it for one action in its third argument, `{ maxSize: '20mb' }`, for an API module with `api({ maxSize })`, or for one route with `detail: { maxSize }`. A form that takes files usually needs this.
 
-A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `bodyLimit`.
+A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `maxSize`.
 
 <ReadMore href="/llms/action-protection#body-limit">The refusal message in your own words, and the cap on routes that are not actions or API routes.</ReadMore>
 

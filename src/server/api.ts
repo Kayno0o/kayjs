@@ -38,7 +38,7 @@ import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
 const STREAMED = ['next', 'then', 'toResponse']
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
-// Where `api({ bodyLimit })` keeps its limit on the instance it makes.
+// Where `api({ maxSize })` keeps its limit on the instance it makes.
 const BODY_LIMIT = Symbol.for('kay.bodyLimit')
 // Where `api({ cors })` keeps the origins it lets in, or `false` for a module that lets none in.
 const CORS = Symbol.for('kay.cors')
@@ -96,12 +96,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
     // What a route sets for itself in its `detail`, by the method and path it answers.
     for (const route of instance.routes) {
-      const detail = (route.hooks as { detail?: { bodyLimit?: ByteSize, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
+      const detail = (route.hooks as { detail?: { maxSize?: ByteSize, bodyLimit?: ByteSize, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
       const method = route.method.toUpperCase()
       const path = withoutSlash(apiRoutePath(module.mount, route.path))
 
       // Every route is listed, so a static sibling of a route with a limit of its own is not taken for it.
-      routeLimits.push({ method, path, limit: detail?.bodyLimit === undefined ? undefined : { bytes: detail.bodyLimit, refuse } })
+      routeLimits.push({ method, path, limit: (detail?.maxSize ?? detail?.bodyLimit) === undefined ? undefined : { bytes: detail?.maxSize ?? detail?.bodyLimit, refuse } })
 
       if (detail?.rateLimit !== undefined)
         routeRates.set(`${method} ${path}`, rateLimitsOf(detail.rateLimit, `${method} ${path}`))
@@ -576,7 +576,9 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
 declare module 'elysia' {
   interface DocumentDecoration {
-    // The most a request to this route may send, bytes or a size such as `'20mb'`, in place of the module's and the app's `bodyLimit`; a bigger one answers 413 before it is read.
+    // The most a request to this route may send, bytes or a size such as `'20mb'`, in place of the module's and the app's `maxSize`; a bigger one answers 413 before it is read.
+    maxSize?: ByteSize | undefined
+    // The old name of `maxSize`, kept three minors.
     bodyLimit?: ByteSize | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
     rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
@@ -590,7 +592,9 @@ type ApiLocals = { [Key in keyof Locals]: Locals[Key] }
 type Empty = Record<never, never>
 
 export interface ApiOptions {
-  // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `bodyLimit`; a function is read once the server mounts the module, after the config's extensions ran.
+  // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a function is read once the server mounts the module, after the config's extensions ran.
+  maxSize?: ByteSize | (() => ByteSize) | undefined
+  // The old name of `maxSize`, kept three minors.
   bodyLimit?: ByteSize | (() => ByteSize) | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
   cors?: CorsOptions | false | undefined
@@ -604,8 +608,10 @@ export interface ApiOptions {
 export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }> {
   const instance = new Elysia()
 
-  if (options.bodyLimit !== undefined)
-    Object.defineProperty(instance, BODY_LIMIT, { value: options.bodyLimit })
+  const maxSize = options.maxSize ?? options.bodyLimit
+
+  if (maxSize !== undefined)
+    Object.defineProperty(instance, BODY_LIMIT, { value: maxSize })
 
   if (options.cors !== undefined)
     Object.defineProperty(instance, CORS, { value: options.cors === false ? false : corsRule(options.cors) })

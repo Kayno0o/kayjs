@@ -497,7 +497,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     }
   }
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), api.limits, api.routeLimits)
+  limitBodies(app, options.maxSize ?? options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), api.limits, api.routeLimits)
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined

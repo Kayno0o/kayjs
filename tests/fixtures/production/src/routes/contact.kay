@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const send = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { rateLimit: { max: 2, window: '1m' }, honeypot: 'website' })
 // Refused in the site's own language.
-export const write = action(t.Object({ message: t.String({ maxLength: 2000 }) }), ({ message }) => message.length, { rateLimit: { max: 1, window: '1m' }, honeypot: 'website', bodyLimit: '1kb', messages: { honeypot: 'Laissez ce champ vide', rateLimit: wait => `Réessayez dans ${wait} s`, bodyLimit: bytes => `${bytes} octets au plus` } })
+export const write = action(t.Object({ message: t.String({ maxLength: 2000 }) }), ({ message }) => message.length, { rateLimit: { max: 1, window: '1m' }, honeypot: 'website', maxSize: '1kb', messages: { honeypot: 'Laissez ce champ vide', rateLimit: wait => `Réessayez dans ${wait} s`, maxSize: bytes => `${bytes} octets au plus` } })
 
 const failure = ctx.failed(send)
 const sent = ctx.succeeded(send)

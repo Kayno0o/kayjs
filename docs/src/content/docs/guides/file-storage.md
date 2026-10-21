@@ -16,7 +16,7 @@ import { photos } from '../photos'
 
 export const upload = action(s.Object({ photo: s.File({ type: 'image/jpeg' }) }), async ({ photo }) => {
   photos.push(await files.put(photo, { folder: 'photos' }))
-}, { bodyLimit: '20mb' })
+}, { maxSize: '20mb' })
 ---
 form(action={upload})
   input(type="file" name="photo" aria-label="Photo")

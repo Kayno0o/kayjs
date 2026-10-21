@@ -3,7 +3,7 @@ import { files, memoryFiles } from 'kay/server'
 import { setupStorage } from '../../../src/server/storage'
 import { configure } from '../src/settings'
 import { emptyFile, sizeOfPath, tooLarge, typeName } from '../src/upload-text'
-import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
+import { uploadMaxSize, uploadRefusal, uploadRules } from '../src/uploads'
 
 const PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1]
 const JPEG = [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46]
@@ -95,7 +95,7 @@ test('takes the types an app lists, exact or by family', async () => {
 test('offers the picker the types uploads takes, an image field the image ones among them, with the size limit', () => {
   configure({})
 
-  expect(uploadRules()).toEqual({ accept: 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf', images: 'image/png,image/jpeg,image/webp,image/gif,image/avif', maxBytes: 20 * 1024 * 1024 })
+  expect(uploadRules()).toEqual({ accept: 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf', images: 'image/png,image/jpeg,image/webp,image/gif,image/avif', maxSize: 20 * 1024 * 1024 })
 
   configure({ uploads: ['image/*', 'text/csv'] })
   expect(uploadRules()).toMatchObject({ accept: 'image/*,text/csv', images: 'image/*' })
@@ -108,27 +108,27 @@ test('reads uploads as a list of types, or as types and maxSize, each part optio
   const defaults = 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf'
 
   configure({ uploads: ['application/pdf'] })
-  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxBytes: 20 * 1024 * 1024 })
+  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxSize: 20 * 1024 * 1024 })
 
   configure({ uploads: { types: ['application/pdf'] } })
-  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxBytes: 20 * 1024 * 1024 })
+  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxSize: 20 * 1024 * 1024 })
 
   configure({ uploads: { maxSize: '50mb' } })
-  expect(uploadRules()).toMatchObject({ accept: defaults, maxBytes: 50 * 1024 * 1024 })
+  expect(uploadRules()).toMatchObject({ accept: defaults, maxSize: 50 * 1024 * 1024 })
 
   configure({ uploads: { types: ['video/*'], maxSize: 1500 } })
-  expect(uploadRules()).toMatchObject({ accept: 'video/*', maxBytes: 1500 })
+  expect(uploadRules()).toMatchObject({ accept: 'video/*', maxSize: 1500 })
 
   configure({ uploads: {} })
-  expect(uploadRules()).toMatchObject({ accept: defaults, maxBytes: 20 * 1024 * 1024 })
+  expect(uploadRules()).toMatchObject({ accept: defaults, maxSize: 20 * 1024 * 1024 })
 
   configure({ uploads: { maxSize: '1.5mb' } })
-  expect(uploadRules().maxBytes).toBe(1.5 * 1024 * 1024)
+  expect(uploadRules().maxSize).toBe(1.5 * 1024 * 1024)
 })
 
 test('the upload route reads the limit and its envelope, so a file at the limit gets in', () => {
   configure({ uploads: { maxSize: '50mb' } })
-  expect(uploadBodyLimit()).toBe(50 * 1024 * 1024 + 64 * 1024)
+  expect(uploadMaxSize()).toBe(50 * 1024 * 1024 + 64 * 1024)
 })
 
 test('lists 50 entries a page unless pageSize says otherwise, and refuses one that is no positive whole number', () => {
@@ -161,7 +161,7 @@ test('refuses a maxSize the server would not take, Bun refusing a request body o
   const most = 128 * 1024 * 1024 - 64 * 1024
 
   configure({ uploads: { maxSize: most } })
-  expect(uploadBodyLimit()).toBe(128 * 1024 * 1024)
+  expect(uploadMaxSize()).toBe(128 * 1024 * 1024)
 
   for (const maxSize of [most + 1, '128mb', '200mb', 1e12])
     expect(() => configure({ uploads: { maxSize } as never })).toThrow(/maxSize.*at most/)

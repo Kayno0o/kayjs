@@ -182,7 +182,7 @@ describe('invalid route settings', () => {
   }
 
   it('refuse a body limit that is no whole number of bytes', async () => {
-    await expect(boot('bodyLimit: 0')).rejects.toThrow('the bodyLimit of GET /api/bad')
+    await expect(boot('maxSize: 0')).rejects.toThrow('the maxSize of GET /api/bad')
   })
 
   it('refuse a rate limit with no whole max or a window that is no duration', async () => {

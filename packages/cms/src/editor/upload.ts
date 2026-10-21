@@ -9,7 +9,7 @@ import { isSignedOut, setSessionEnded } from './session'
 export interface UploadRules {
   accept: string
   images: string
-  maxBytes: number
+  maxSize: number
 }
 
 // What an image or file field asks of its uploads beyond the server's rules.
@@ -144,10 +144,10 @@ export async function uploadFile(collection: string, file: File, { progress, sig
       throw refused(400, emptyFile(file.name))
 
     const limits = await uploadRules()
-    const maxBytes = Math.min(own?.maxSize ?? Infinity, limits?.maxBytes ?? Infinity)
+    const maxSize = Math.min(own?.maxSize ?? Infinity, limits?.maxSize ?? Infinity)
 
-    if (file.size > maxBytes)
-      throw refused(413, tooLarge(file.name, file.size, maxBytes))
+    if (file.size > maxSize)
+      throw refused(413, tooLarge(file.name, file.size, maxSize))
 
     if (own?.minWidth !== undefined || own?.minHeight !== undefined) {
       const pixels = await pixelsOf(file)

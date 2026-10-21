@@ -111,7 +111,7 @@ import { s } from 'kay'
 export const upload = action(
   s.Object({ avatar: s.File({ type: 'image/png' }) }),
   async ({ avatar }) => avatar.size,
-  { bodyLimit: '10mb' },
+  { maxSize: '10mb' },
 )
 ---
 form(action={upload})

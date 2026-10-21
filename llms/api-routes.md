@@ -161,7 +161,7 @@ export default api()
 - Its requests, websocket upgrades included, go through the guards and are not refused, their answers naming the origin, with `expose: [...]` the response headers the page may read.
 - `credentials: true` takes the user's cookies as well; without it a request from another site carrying cookies is refused.
 - `credentials: true` with `origins: '*'` is a type error `kay check` reports.
-- Its answers carry the grant, a body its schema refuses, one that does not parse, or one over its `bodyLimit` included, so the calling page reads why.
+- Its answers carry the grant, a body its schema refuses, one that does not parse, or one over its `maxSize` included, so the calling page reads why.
 - The answers of a module listing origins carry `Vary: Origin`, added to any Vary the route sets.
 - An origin is a scheme and a host, a port if any, `capacitor://localhost` for an app's web view included.
 - The module's rule alone grants: `Access-Control-Allow-Origin`, `-Allow-Credentials` and `-Expose-Headers` a route sets itself, on `set.headers` or on a `Response` it returns, a `fetch()` result passed on included, are replaced by the rule's, or dropped for an origin it does not list. A route needing another rule goes in a module of its own.
@@ -171,11 +171,11 @@ export default api()
 ### Limits
 
 - `api({ rateLimit: { max: 60, window: '1m' } })` lets one client send `max` requests to the module's routes every `window`, then answers 429 with `Retry-After` and `Too many requests; try again in N s`.
-- A route sets its own in its `detail`, `.post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, bodyLimit: '4kb' } })`: counted apart from the module's, which also applies, one limit for every value of a param, a wildcard and an optional segment, and for a route answering every method, `all`, whichever one.
+- A route sets its own in its `detail`, `.post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, maxSize: '4kb' } })`: counted apart from the module's, which also applies, one limit for every value of a param, a wildcard and an optional segment, and for a route answering every method, `all`, whichever one.
 - `rateLimit` takes a list, `key`, `store` and `window` as an action's does (see [Rate limits](rate-limits.md)).
 - It counts after the module's guards, so a caller they refuse costs no allowance and `key: ctx => ctx.locals.user?.id` reads what they and `derive` set; `ctx` also holds `request`, `locale`, `cookies` and `client`.
 - A refusal carries the module's `cors` grant, so the calling page reads it.
-- `bodyLimit` in a route's `detail` is the most it may be sent, a size or bytes, in place of the module's and the app's; a bigger request answers 413 before it is read.
+- `maxSize` in a route's `detail` is the most it may be sent, a size or bytes, in place of the module's and the app's; a bigger request answers 413 before it is read.
 - A body limit that is no size of a whole number of bytes from 1, or a `max` that is no whole number from 1, stops the server.
 
 ### OpenAPI
@@ -202,7 +202,7 @@ export default api()
 ### MCP
 
 - `mcp: true` serves Streamable HTTP at `/mcp`, or at `mcp: { path: '/tools' }` under the same rules as the OpenAPI paths, its sign-in metadata then at `/.well-known/oauth-protected-resource/tools`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
-- A message that is no JSON-RPC request answers 400, a body over `bodyLimit` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
+- A message that is no JSON-RPC request answers 400, a body over `maxSize` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
 - A tool per action that sets `tool` and per API route whose `detail` sets `tool`, even with `openapi` off; a route that does not is in the OpenAPI document and no tool: absent from `tools/list`, and a `tools/call` naming it is refused as any unknown name is. Before 1.51 every route not hidden was a tool.
 - A route's `detail.tool` is `true`, a description, or `{ name, description }`, as an action's. Its tool is named by `tool.name` else its `operationId` (a route setting only `tool.name` takes it as its `operationId`), made a safe name (`users.list` is `users_list`, a clash `_2`), described by `tool`'s description else its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.
 - Left out: `detail: { hide: true }` routes, `tool` or not (`hidden-tool` in `kay check`), websockets, a route whose body is files, text or bytes, an action holding a file, an action in a file whose pages have route params (a post from no page cannot name one), and `in: header` parameters. `tools/list` is served behind the API directory's `_guard.ts` as the document is, and with `requireGuards` it is refused (403) unless the guards cover every module; `initialize` and `ping` stay open, and a call runs the guards of its own route.

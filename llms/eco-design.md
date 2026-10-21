@@ -76,7 +76,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 | 4.8 Few downloaded fonts | App | `fonts` self-hosts font files, each family gets a metric-matched fallback, and a font of several subsets loads only the files the page's text needs; how many families the app declares is its choice | [Fonts](sitemap-search-fonts.md#fonts) |
 | 4.9 Few server requests while typing | App | `debounced` gives a value once typing has paused | [Components](components.md#react-to-a-change-or-to-typing-once-it-pauses) |
 | 4.10 Input format shown, no useless requests on submit | Met | `field` renders the constraints the schema gives (`required`, lengths) so the browser checks them with no request, and kay's script checks the form against the schema in the browser with the schema's messages | [Forms](actions.md#forms) |
-| 4.11 File size and format shown before upload | App | An action refuses a post over `bodyLimit` (1 MB by default) with a message naming the most it may send; showing the limit before the transfer is the app's | [Body limit](action-protection.md#body-limit) |
+| 4.11 File size and format shown before upload | App | An action refuses a post over `maxSize` (1 MB by default) with a message naming the most it may send; showing the limit before the transfer is the app's | [Body limit](action-protection.md#body-limit) |
 
 ### Contents
 

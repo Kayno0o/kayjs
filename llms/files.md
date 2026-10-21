@@ -18,7 +18,7 @@ import { photos } from '../photos'
 
 export const upload = action(s.Object({ photo: s.File({ type: 'image/jpeg' }) }), async ({ photo }) => {
   photos.push(await files.put(photo, { folder: 'photos' }))
-}, { bodyLimit: '20mb' })
+}, { maxSize: '20mb' })
 ---
 form(action={upload})
   input(type="file" name="photo" aria-label="Photo")
@@ -184,4 +184,4 @@ if upload.progress() !== undefined
 - On a top-level field, `s.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type.
 - A file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set.
 - A nested file is checked against the type it declares only.
-- A post sends 1 MB at most unless the action raises its `bodyLimit` (see [Protecting actions](action-protection.md)), which a form taking files usually does.
+- A post sends 1 MB at most unless the action raises its `maxSize` (see [Protecting actions](action-protection.md)), which a form taking files usually does.

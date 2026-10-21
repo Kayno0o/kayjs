@@ -677,12 +677,12 @@ test('the icons route pages through the set an icon field registered, caps a pag
 })
 
 test('the editor is told the types and the size an upload may have', async () => {
-  const rules = await (await site.fetch('/api/cms/files/rules')).json() as { accept: string, images: string, maxBytes: number }
+  const rules = await (await site.fetch('/api/cms/files/rules')).json() as { accept: string, images: string, maxSize: number }
 
   expect(rules.accept.split(',')).toContain('application/pdf')
   expect(rules.images.split(',')).not.toContain('application/pdf')
   expect(rules.images).not.toContain('svg')
-  expect(rules.maxBytes).toBe(64 * 1024)
+  expect(rules.maxSize).toBe(64 * 1024)
 })
 
 test('an upload whose bytes are not its name\'s type is refused 415 and stored nowhere, in any case of the name', async () => {

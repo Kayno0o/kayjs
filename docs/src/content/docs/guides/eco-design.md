@@ -60,7 +60,7 @@ Islands wait too: one hydrates once it scrolls near, and the page preloads none 
 | 4.5 Native components | App | A form field is a native `input`, `textarea` or `select`. Whether you replace them is up to you. |
 | 4.9 Few requests while typing | App | `debounced` gives a value once typing has paused. |
 | 4.10 Input format shown, no useless request | Met | A field shows the rules its schema gives, and the browser checks them with no request. Kay's script checks the form against the schema too. |
-| 4.11 File size shown before upload | App | An action refuses a post over `bodyLimit`, 1 MB by default, and says the most it may send. Showing the limit before the transfer is yours. |
+| 4.11 File size shown before upload | App | An action refuses a post over `maxSize`, 1 MB by default, and says the most it may send. Showing the limit before the transfer is yours. |
 | 2.3 Slow connection or offline | App | `offline: true` turns on a service worker that keeps the site's files and the pages you choose. |
 
 See [Forms and actions](/essentials/forms-and-actions) and [Islands](/essentials/islands).

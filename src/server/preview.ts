@@ -43,7 +43,7 @@ const PROBE_HEADER = 'x-kay-probe'
 const PROBE_MAX_AGE = 60
 const POSTED_HEADERS = ['content-type', 'content-length']
 
-// `/_kay/draft` takes no more than the app's `bodyLimit`, as an action does.
+// `/_kay/draft` takes no more than the app's `maxSize`, as an action does.
 export const DRAFT_BODY_LIMIT: BodyLimit = { refuse: () => new Response('Request body too large', { status: 413, headers: TEXT }) }
 
 interface PreviewSettings {

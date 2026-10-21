@@ -15,7 +15,7 @@ function frozen(): Response {
   return response
 }
 
-export default api({ cors: { origins: ['https://app.example.com', 'https://*.partner.example', 'capacitor://localhost'], credentials: true, expose: ['x-total'] }, bodyLimit: 256 })
+export default api({ cors: { origins: ['https://app.example.com', 'https://*.partner.example', 'capacitor://localhost'], credentials: true, expose: ['x-total'] }, maxSize: 256 })
   .get('/items', ({ set }) => {
     set.headers['x-total'] = '1'
 

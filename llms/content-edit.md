@@ -24,4 +24,4 @@
 - Each entry is `{ collection, slug, locale?, data, body? }`, `collection` the config's export name and `body` Markdown.
 - It resolves `{}` once shown, or `{ issues: [{ collection, slug, locale?, path, message }] }` with the entry left out of the render (the others still show) when its data fails the schema, `path` dotted (`tags.0`), `''` with `body: true` for a body that does not compile or uses a component the collection does not name, `''` with `key: 'locale'` for a locale missing from an entry of a localized collection, given to another's or not served by the site, `key: 'slug'` for a slug naming another folder, and a plain `''` for the data as a whole.
 - A newer call cancels an older one, and going to another page cancels it too; either resolves `{}`.
-- It throws outside edit mode (403), on a body over `bodyLimit` (413) and when the page fails to render (500).
+- It throws outside edit mode (403), on a body over `maxSize` (413) and when the page fails to render (500).

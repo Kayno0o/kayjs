@@ -1,3 +1,3 @@
 import { api } from 'kay/server'
 
-export default api({ bodyLimit: '4mb' }).post('/', ({ body }) => String(body).length)
+export default api({ maxSize: '4mb' }).post('/', ({ body }) => String(body).length)

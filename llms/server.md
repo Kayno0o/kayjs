@@ -233,7 +233,7 @@ export default defineConfig({ requireGuards: true })
 - For a module under `src/api/`, they are those of the route the request matched, as its handler reads them.
 - Checks on one record still belong in the load and the action.
 - An action's guards run once its input is valid, when the app's `resolve` values are there.
-- A cross-site post, a refusal of the action's protection (`rateLimit`, `honeypot`, `minTime`, `proofOfWork`), a body over `bodyLimit`, one that does not parse, and an action posted from no page of its file answer before any guard runs.
+- A cross-site post, a refusal of the action's protection (`rateLimit`, `honeypot`, `minTime`, `proofOfWork`), a body over `maxSize`, one that does not parse, and an action posted from no page of its file answer before any guard runs.
 - Input the schema refuses, or a file of the wrong type, meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
 - On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so read the user from what the app derives, such as the session `session()` derives. A guard throwing there answers 500 and is reported, as on valid input, never with the field errors.
 - A refused form post gets the redirect, or the denial as plain text.

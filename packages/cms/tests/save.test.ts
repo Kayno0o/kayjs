@@ -234,7 +234,7 @@ describe('an upload on its way', () => {
   const PNG = () => new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' })
 
   // The files API taking an upload only once `land` is called, or failing when its request is aborted.
-  function slowFiles(rules = { accept: 'image/png', images: 'image/png', maxBytes: 1000 }) {
+  function slowFiles(rules = { accept: 'image/png', images: 'image/png', maxSize: 1000 }) {
     const control = { land: () => undefined as void, posts: 0 }
 
     spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request, init?: RequestInit) => {
@@ -289,13 +289,13 @@ describe('an upload on its way', () => {
   })
 
   it('stops counting once the server refused it', async () => {
-    spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request) => String(input).endsWith('/rules') ? Response.json({ accept: 'image/png', images: 'image/png', maxBytes: 1000 }) : new Response('nope', { status: 415 })) as typeof fetch)
+    spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request) => String(input).endsWith('/rules') ? Response.json({ accept: 'image/png', images: 'image/png', maxSize: 1000 }) : new Response('nope', { status: 415 })) as typeof fetch)
     await expect(uploadFile('posts', PNG())).rejects.toThrow('nope')
     expect(uploading()).toBe(false)
   })
 
   it('refuses a file over the field\'s own size before sending it, the smaller of that and the server\'s', async () => {
-    const files = slowFiles({ accept: 'image/png', images: 'image/png', maxBytes: 1000 })
+    const files = slowFiles({ accept: 'image/png', images: 'image/png', maxSize: 1000 })
 
     await expect(uploadFile('posts', PNG(), { limits: { maxSize: 2 } })).rejects.toThrow('a.png is 3 bytes, over the 2 bytes an upload may be')
     expect(files.posts).toBe(0)
@@ -309,7 +309,7 @@ describe('an upload on its way', () => {
     Object.assign(globalThis, { createImageBitmap: decoded })
 
     try {
-      spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ accept: 'image/png', images: 'image/png', maxBytes: 1000 })) as unknown as typeof fetch)
+      spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ accept: 'image/png', images: 'image/png', maxSize: 1000 })) as unknown as typeof fetch)
       await expect(uploadFile('posts', PNG(), { limits: { minWidth: 4000 } })).rejects.toThrow('3000 by 4000')
       expect(decoded.mock.calls[0]![1]).toEqual({ imageOrientation: 'from-image' })
     }

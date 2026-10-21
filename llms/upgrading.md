@@ -23,6 +23,9 @@ kay's `HydrationMismatch` of `kay/dom`, `ActionRedirect` from `kay`, `CspViolati
 ### Boot config errors of the libraries are `KayError`s
 
 A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a bad argument to `ask()`, throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
+### Size limits are `maxSize`
+
+`bodyLimit` in `kay.config.ts`, an action's options and its `messages`, `api({ ... })` and a route's `detail` is `maxSize`, as kayjs-cms's `uploads: { maxSize }` is. The old name works three minors, and `kay upgrade` renames it (the `deprecated-body-limit` lint). The `kay.action.bodyLimit` catalog key keeps its name.
 
 ## 1.69.0
 

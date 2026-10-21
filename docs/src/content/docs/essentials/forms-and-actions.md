@@ -447,7 +447,7 @@ An island passes a `File` or `Blob` anywhere in its input: `await upload({ avata
 
 `s.File({ type: 'image/png' })` checks the file's bytes, not its name or the type the browser declared. That holds for a top-level field only. A nested file is checked against the type it declares.
 
-A post carries 1 MB at most. Raise `bodyLimit` in the third argument of `action`. See [File storage](/guides/file-storage).
+A post carries 1 MB at most. Raise `maxSize` in the third argument of `action`. See [File storage](/guides/file-storage).
 
 ## A post from another site
 
@@ -484,7 +484,7 @@ export const contact = action(schema, send, {
   rateLimit: { max: 5, window: '1m' },
   honeypot: 'website',
   minTime: '3s',
-  bodyLimit: '5mb',
+  maxSize: '5mb',
 })
 ---
 ```

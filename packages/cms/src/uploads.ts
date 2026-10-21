@@ -8,8 +8,8 @@ const TYPE_PARAMETERS = /;.*$/
 // A storage folder takes letters, digits, `-` and `_`, and a collection's export name may hold `$`.
 const NOT_FOLDER = /[^\w-]/g
 
-// The most bytes the upload route reads, in place of the app's `bodyLimit`, which a 20 MB photo would exceed; the file's own size is checked against `uploads.maxSize` after it.
-export function uploadBodyLimit(): number {
+// The most bytes the upload route reads, in place of the app's `maxSize`, which a 20 MB photo would exceed; the file's own size is checked against `uploads.maxSize` after it.
+export function uploadMaxSize(): number {
   return settings().maxSize + ENVELOPE
 }
 
@@ -36,9 +36,9 @@ export async function uploadRefusal(file: File): Promise<string | undefined> {
 }
 
 // What the pickers offer, as `accept` attributes: every type `uploads` takes, and for an image field the image ones, else all.
-export function uploadRules(): { accept: string, images: string, maxBytes: number } {
+export function uploadRules(): { accept: string, images: string, maxSize: number } {
   const { uploads } = settings()
   const images = uploads.filter(type => type.startsWith('image/'))
 
-  return { accept: uploads.join(','), images: (images.length > 0 ? images : uploads).join(','), maxBytes: settings().maxSize }
+  return { accept: uploads.join(','), images: (images.length > 0 ? images : uploads).join(','), maxSize: settings().maxSize }
 }

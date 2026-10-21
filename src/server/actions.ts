@@ -183,7 +183,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
-      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
+      limits.set(value.url, { bytes: value.protection?.maxSize ?? value.protection?.bodyLimit, refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) })))
@@ -280,7 +280,7 @@ async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request
   if (isCrossSite(request))
     return crossSiteRefusal(request)
 
-  const message = action.protection?.messages?.bodyLimit ?? (most => kayWord('kay.action.bodyLimit', { size: sizeText(most, pageLocale()) }))
+  const message = action.protection?.messages?.maxSize ?? action.protection?.messages?.bodyLimit ?? (most => kayWord('kay.action.bodyLimit', { size: sizeText(most, pageLocale()) }))
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': typeof message === 'string' ? message : message(bytes) } }, server, back)
 }

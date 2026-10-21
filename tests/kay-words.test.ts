@@ -13,7 +13,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/kay-words'
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
-const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n, bodyLimit: 1024 * 1024 })
+const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n, maxSize: 1024 * 1024 })
 const { check, listed, guarded, owned, boom } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
   listed: Action<Record<string, string | string[]>, unknown>

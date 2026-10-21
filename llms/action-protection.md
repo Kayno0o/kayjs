@@ -75,11 +75,11 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 #### Refusal messages
 
-- The refusals of these limits, and the one for a post over `bodyLimit`, read in English unless the site words them once for every action under `kay.protection.*` and `kay.action.*` in its catalogs ([Locales](locales.md#texts-from-kay-and-its-libraries)), or `messages` gives an action's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, bodyLimit: bytes => `${bytes} octets au plus` } ``.
+- The refusals of these limits, and the one for a post over `maxSize`, read in English unless the site words them once for every action under `kay.protection.*` and `kay.action.*` in its catalogs ([Locales](locales.md#texts-from-kay-and-its-libraries)), or `messages` gives an action's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, maxSize: bytes => `${bytes} octets au plus` } ``.
 - `rateLimit` is given the seconds to wait.
 - `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `maxAge`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.
-- `bodyLimit` is given the most bytes a post may send, as a number whatever size `bodyLimit` was written as.
+- `maxSize` is given the most bytes a post may send, as a number whatever size `maxSize` was written as.
 - Each is a string or a function; `serverError` is given the error and the action's `ctx` (see [Refused posts](actions.md#refused-posts)). A function runs in the request's locale, so it may word the refusal with `t()`; `serverError` may be async.
 
 #### Proof of work
@@ -106,8 +106,8 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 ### Body limit
 
-- A request to an action or an API route sends at most `bodyLimit`, 1 MB unless kay.config.ts sets another: `bodyLimit: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
-- An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: '20mb' })`, and an API module for its routes, `api({ bodyLimit })`, a size or a function kay reads when it mounts the module (a library reading its own settings).
+- A request to an action or an API route sends at most `maxSize`, 1 MB unless kay.config.ts sets another: `maxSize: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
+- An action raises or lowers it for itself, `action(schema, handler, { maxSize: '20mb' })`, and an API module for its routes, `api({ maxSize })`, a size or a function kay reads when it mounts the module (a library reading its own settings).
 - A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit.
 - A plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413.
-- Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `bodyLimit` says, and it alone limits the app's own routes.
+- Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `maxSize` says, and it alone limits the app's own routes.

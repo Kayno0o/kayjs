@@ -3,7 +3,7 @@ import { ActionError, ApiError } from 'kay'
 import { uploadFailure } from '../src/editor/upload'
 import { tooLarge, tooLargeForServer } from '../src/upload-text'
 
-const rules = { accept: 'image/png', images: 'image/png', maxBytes: 64 * 1024 }
+const rules = { accept: 'image/png', images: 'image/png', maxSize: 64 * 1024 }
 const big = new File([new Uint8Array(32 * 1024)], 'photo.png')
 
 test('a 413 past the editor\'s own size check is kay\'s body limit, whatever the message says', () => {

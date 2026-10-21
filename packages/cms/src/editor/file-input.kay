@@ -29,7 +29,7 @@ const unshown = signal<string>()
 const accept = signal<string>()
 
 // The most an upload may weigh here: the field's own limit, else the server's.
-const maxBytes = signal<number>()
+const maxSize = signal<number>()
 
 // Why the signed-in person's role may not upload, when it may not; the zone is then disabled with this as its tooltip.
 const denied = uploadRefusal()
@@ -46,7 +46,7 @@ async function offer(): Promise<void> {
   const rules = await uploadRules()
 
   accept = upload.accept?.join(',') ?? (rules === undefined ? undefined : image ? rules.images : rules.accept)
-  maxBytes = Math.min(upload.maxSize ?? Infinity, rules?.maxBytes ?? Infinity)
+  maxSize = Math.min(upload.maxSize ?? Infinity, rules?.maxSize ?? Infinity)
 }
 
 void offer()
@@ -67,7 +67,7 @@ function fileName(): string {
 // What the field takes, said once for the editor: the types, the most it may weigh and the pixels an image needs.
 function rules(): string {
   const types = accept()?.split(',').map(typeName)
-  const limit = maxBytes()
+  const limit = maxSize()
   const sentences = [
     types === undefined ? undefined : wording('cms.file.takes', 'Accepts {types}.', { types: types.join(', ') }),
     limit === undefined || limit === Infinity ? undefined : wording('cms.file.upTo', 'Up to {size}.', { size: sizeText(limit) }),

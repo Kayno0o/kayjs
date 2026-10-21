@@ -561,6 +561,15 @@ export const LINTS = {
     wrong: 'import { MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfigured) retry()',
     right: 'import { MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfiguredError) retry()',
   },
+  'deprecated-body-limit': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: '`bodyLimit` in `kay.config.ts`, an action\'s options, `api()` or a route\'s `detail`, now `maxSize` like every size limit of kay and its libraries; the old name works three minors. The fix renames the key, and writes a shorthand `{ bodyLimit }` as `maxSize: bodyLimit`.',
+    wrong: 'action(schema, handler, { bodyLimit: \'20mb\' })',
+    right: 'action(schema, handler, { maxSize: \'20mb\' })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -1372,7 +1372,7 @@ describe('request body limits', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NOTES = './fixtures/production/src/routes/notes.kay'
   const MB = 1024 * 1024
-  const serve = async (bodyLimit?: ByteSize) => pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, bodyLimit })
+  const serve = async (maxSize?: ByteSize) => pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, maxSize })
   // Sent in chunks, with no Content-Length to go by.
   const chunked = (size: number) => new ReadableStream<Uint8Array>({
     start(controller) {
@@ -1402,7 +1402,7 @@ describe('request body limits', () => {
   })
 
   it('sends a plain form post over the limit back to its page with the error, counting a body sent without Content-Length', async () => {
-    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, bodyLimit: 64 * 1024 })
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, maxSize: 64 * 1024 })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('<p class="error">413 Too large to send; 64 KB at most</p>')
@@ -1436,7 +1436,7 @@ describe('request body limits', () => {
   it('reads the limit as a size, in the config, an action and an API module', async () => {
     const app = await serve('1mb')
     const post = async (size: number) => app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: chunked(size) }))
-    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, bodyLimit: '64kb' })
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, maxSize: '64kb' })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await post(2 * MB)).status).toBe(413)
@@ -1445,8 +1445,15 @@ describe('request body limits', () => {
     expect((await site.submit(note, { text: 'hello' }, { from: '/notes' })).html).toContain('<p class="sent">Sent 5</p>')
   })
 
-  it.each([0, -1, 1.5, '0kb', '-1kb', '1.5b', '1gb', 'big', ''])('refuses a limit of %p, as the server boots', async (bodyLimit) => {
-    await expect(serve(bodyLimit as ByteSize)).rejects.toThrow('kay: bodyLimit')
+  it('still takes the config\'s bodyLimit, the old name of maxSize', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, bodyLimit: '64kb' })
+    const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
+
+    expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('413 Too large to send; 64 KB at most')
+  })
+
+  it.each([0, -1, 1.5, '0kb', '-1kb', '1.5b', '1gb', 'big', ''])('refuses a limit of %p, as the server boots', async (maxSize) => {
+    await expect(serve(maxSize as ByteSize)).rejects.toThrow('kay: maxSize')
   })
 })
 

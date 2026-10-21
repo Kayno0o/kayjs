@@ -8,7 +8,7 @@ import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollectionError } from '../store'
 import { emptyFile, sizeOfPath, tooLarge } from '../upload-text'
-import { uploadBodyLimit, uploadFolder, uploadFolders, uploadRefusal, uploadRules } from '../uploads'
+import { uploadFolder, uploadFolders, uploadMaxSize, uploadRefusal, uploadRules } from '../uploads'
 
 // The most uploads a picker lists, the newest first.
 const PICKABLE = 200
@@ -19,7 +19,7 @@ async function ownFolders(): Promise<Set<string>> {
 
 // Stores an upload public, in the folder every collection shares and named by its hash, and answers the path a page renders it from, which the field keeps, and the size of an image.
 // Read when kay mounts the route, as `cms()` has run by then and an import before it does not throw.
-export default api({ bodyLimit: uploadBodyLimit })
+export default api({ maxSize: uploadMaxSize })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
   .get('/rules', () => uploadRules())
