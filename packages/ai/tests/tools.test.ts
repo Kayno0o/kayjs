@@ -164,7 +164,7 @@ describe('what the model gets back when a call goes wrong', () => {
     expect(JSON.parse(outcome.calls[0]!.result!)).toMatchObject({ status: 409, data: { reason: 'full' } })
     expect(outcome.calls[1]!.result).toBe('The call ended in a redirect to /, where a page would carry on')
     expect(JSON.stringify(outcome)).not.toContain('boom secret')
-    expect(lastResults().map(result => result.failed)).toEqual([true, true, true])
+    expect(lastResults().map(result => result.ok)).toEqual([false, false, false])
   })
 
   it('runs a guarded action as the visitor: refused for an anonymous one, done for a signed in one', async () => {

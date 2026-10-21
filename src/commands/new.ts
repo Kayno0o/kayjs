@@ -3,7 +3,7 @@ import type { Command, Parsed } from './command'
 import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
-import { count, done, failureProblem, formatOption, printDocument, shellQuote } from './command'
+import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 import { USAGES } from './usages'
 
 export const scaffold: Command = {
@@ -24,7 +24,7 @@ export const scaffold: Command = {
       const dryRun = values['dry-run'] === true
 
       if (template !== undefined && !PRESET_NAMES.includes(template as Preset)) {
-        console.error(`kay new: --template is ${String(template)}, which is none of ${PRESET_NAMES.join(', ')}`)
+        reportFailure(`kay new: --template is ${String(template)}, which is none of ${PRESET_NAMES.join(', ')}`, format)
 
         return 1
       }
@@ -36,7 +36,7 @@ export const scaffold: Command = {
       const forge = values.forge ?? values.host
 
       if (forge !== undefined && !HOSTS.includes(forge as Host)) {
-        console.error(`kay new: --${values.forge === undefined ? 'host' : 'forge'} is ${String(forge)}, which is none of ${HOSTS.join(', ')}`)
+        reportFailure(`kay new: --${values.forge === undefined ? 'host' : 'forge'} is ${String(forge)}, which is none of ${HOSTS.join(', ')}`, format)
 
         return 1
       }
@@ -45,7 +45,7 @@ export const scaffold: Command = {
       const unknown = [...listed(added), ...listed(removed)].find(name => !FEATURE_NAMES.includes(name as Feature))
 
       if (unknown !== undefined) {
-        console.error(`kay new: ${unknown} is none of the features ${FEATURE_NAMES.join(', ')}`)
+        reportFailure(`kay new: ${unknown} is none of the features ${FEATURE_NAMES.join(', ')}`, format)
 
         return 1
       }
@@ -53,7 +53,7 @@ export const scaffold: Command = {
       const both = listed(added).find(name => listed(removed).includes(name))
 
       if (both !== undefined) {
-        console.error(`kay new: ${both} is in both --with and --without`)
+        reportFailure(`kay new: ${both} is in both --with and --without`, format)
 
         return 1
       }
@@ -73,7 +73,7 @@ export const scaffold: Command = {
       const features = ask ? await pickFeatures() : [...chosen]
 
       if (features === undefined) {
-        console.error('kay new: cancelled, nothing written')
+        reportFailure('kay new: cancelled, nothing written', format)
 
         return 1
       }
@@ -104,10 +104,7 @@ export const scaffold: Command = {
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      console.error(message)
-
-      if (format === 'json')
-        printDocument({ errors: 1, warnings: 0, problems: [failureProblem(message, format)] })
+      reportFailure(message, format)
 
       return 1
     }

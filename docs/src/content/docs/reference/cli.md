@@ -25,7 +25,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay screenshot <path> [dir]` | Shoot a page of the running `kay dev` in a headless Chrome |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
-| `kay upgrade [dir] [--dry-run]` | Move kay and its libraries to the latest version and rewrite the old forms |
+| `kay upgrade [dir] [--dry-run] [--quiet]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay not-found [dir]` | List the old URLs visitors hit and found nothing at, and turn one into a redirect |
 | `kay doctor [dir]` | Check Bun, versions, config, environment, port and build, and say how to fix each failure |
@@ -109,6 +109,8 @@ Before it writes anything, it checks that each file it changes is still what `ka
 | Option | Effect |
 | --- | --- |
 | `--no-install` | Writes the files without running `bun install` |
+| `--dry-run` | Lists the files it would write and writes none. A library has to be installed already for its files to be listed |
+| `--format text\|json` | `json` prints one document: the features, the files, whether it installed, and the notes |
 | `--quiet` | Prints the summary line only |
 
 ## kay types
@@ -363,6 +365,7 @@ The type check is Bun's own (`bun check`), on every core, and runs even when you
 | `--deny-warnings` | Fails on warnings too, not only on errors |
 | `--watch` | Checks again on every change to the project |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left. With `env` in `kay.config.ts` it also declares raw `process.env` reads |
+| `--dry-run` | Counts the fixes `--fix` would apply and writes nothing |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `--since <minor>` | Reports, and with `--fix` fixes, the `deprecated` lints that came in that minor, such as `1.46` |
 | `--format text\|github\|json` | `github` prints each problem as a workflow command, `json` as one document on stdout |
@@ -616,9 +619,17 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 ## Quiet and plain output
 
-Every command that prints takes `--quiet`, and the commands that write take `--dry-run`. `--quiet` prints the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all. `kay start` leaves out its warnings about a stale build, `kay render` its status line and `kay routes` the note about the routes the server adds when it starts.
+`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate`, `kay new`, `kay render`, `kay routes`, `kay start`, `kay types` and `kay upgrade` take `--quiet`; every other command refuses it.
 
-`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay migrate`, `kay i18n accept` and `kay upgrade`. `kay fmt --check` stays the verify-only form: it fails when a file is not formatted. `kay types`, `kay build` and `kay dev` write only generated output under `.kay` and `dist`, never a file of yours, so they take none.
+`--quiet` prints the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all.
+
+`kay start` leaves out its warnings about a stale build, `kay render` its status line and `kay routes` the note about the routes the server adds when it starts.
+
+`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay migrate`, `kay i18n accept`, `kay not-found --redirect` and `kay upgrade`.
+
+`kay fmt` refuses `--check` and `--dry-run` together. `kay fmt --check` stays the verify-only form: it fails when a file is not formatted.
+
+`kay types`, `kay build` and `kay dev` write only generated output under `.kay` and `dist`, never a file of yours, so they take none.
 
 `kay add`, `kay new` and `kay types` also take `--format json`.
 
@@ -630,7 +641,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay add`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
@@ -642,7 +653,11 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay env` | `{ variables, unread }` (and `findings` when it compares files), each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }` |
-| `kay migrate` | `{ written, kept, copied, notes }` |
+| `kay migrate astro` | `{ dryRun, written, kept, copied, notes }` |
+| `kay migrate content` | `{ rewritten, failed, dryRun }` |
+| `kay add` | `{ features, written, installed, notes, dryRun }` |
+| `kay new` | `{ dir, features, files, dryRun }` |
+| `kay types` | `{ files, dir }` |
 
 A command that cannot run, such as on a directory that does not exist, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
 

@@ -51,6 +51,9 @@ export const PRESETS: Record<Preset, { description: string, features: readonly F
 
 export const PRESET_NAMES = Object.keys(PRESETS) as Preset[]
 
+// The `kay` dependency a dry run lists files with, so it never packs a checkout of kay into `vendor`.
+export const DRY_RUN_KAY = 'dry-run'
+
 export interface NewOptions {
   // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
   kay?: string | undefined
@@ -156,7 +159,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   await refuseTarget(target)
 
-  const files = await projectFiles(dir, features, options.kay ?? (options.dryRun === true ? 'dry-run' : undefined), {}, options.host, options.runner)
+  const files = await projectFiles(dir, features, options.kay ?? (options.dryRun === true ? DRY_RUN_KAY : undefined), {}, options.host, options.runner)
 
   if (options.dryRun === true)
     return Object.keys(files).sort()

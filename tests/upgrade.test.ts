@@ -167,6 +167,22 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('announces no step and passes --quiet on to its checks with --quiet', async () => {
+    const root = await project()
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }, ['1.44'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(root, deps, { quiet: true })).toBe(0)
+      expect(log.mock.calls.map(call => String(call[0])).join('\n')).not.toMatch(/moved|rewriting|checking/)
+      expect(calls.kay.slice(1)).toEqual([['check', '--fix', '--since', '1.44', '--quiet'], ['check', '--fix', '--quiet']])
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('fails, as the last check does, while something is left for the app', async () => {
     const root = await project()
 

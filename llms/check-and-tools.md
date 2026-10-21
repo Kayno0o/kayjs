@@ -98,7 +98,7 @@ kay fmt --check
   - Each action, endpoint, API module route with its method, `WS` and `OPTIONS` included, and a library's with the guards of its own directory (API modules are imported, as only they know their routes, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, and one that fails to load or calls `process.exit()` is listed by its mount with why), the routes of an extension's `server` given as an Elysia instance, each redirect and collection feed;
   - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
-- `kay not-found [dir] [--redirect <path> [--to <target>] [--runtime]] [--format text|json]`:
+- `kay not-found [dir] [--redirect <path> [--to <target>] [--runtime] [--dry-run]] [--format text|json]`:
   - Lists the paths visitors asked for with a GET and found nothing at, most hit first, from `data/not-found.sqlite` (or `--file`), with the hosts they came from and a suggested target; those a `redirects` entry answers already are left out ([Redirects](routing-endpoints-and-base.md#redirects));
   - `--redirect <path>` adds the redirect to `redirects` in kay.config.ts, to `--to` or to the suggested target, and drops the path from the list; a config with no object literal to add it to prints the line to add by hand;
   - `--runtime` writes it to the file instead, which the running site reads with no deploy and no change to kay.config.ts; the rules are those of [Redirects](routing-endpoints-and-base.md#redirects), and `kay check` reports such a target nothing serves.
@@ -119,7 +119,7 @@ kay fmt --check
 - `kay explain [lint|error|group] [--format text|json]`:
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
 - `kay fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet]`:
-  - Format `.kay` files; `--check` lists unformatted files and fails.
+  - Format `.kay` files; `--check` lists unformatted files and fails, `--dry-run` lists them and succeeds (not both).
 - `kay fmt --from-html [file] [--format text|json]`:
   - Print the HTML in `file`, or on stdin (`-` too), as a formatted `.kay` template, through the translation `kay migrate astro` uses: tag shorthand, static classes as `.class` and the id as `#id`, `class="..."` kept for a class the shorthand cannot hold (an unclosed `[`), the space a line break makes between inline siblings (`#[b a] #[i b]`), attributes in parentheses, text on its element's line with inline elements as `#[tag text]`, `<script>` and `<style>` as their text, an HTML comment as a `//` comment (not rendered), a document's `head` children in a `head` block.
   - What the template cannot hold is listed on stderr as `line N: ...` and left out: an attribute JSX cannot name (`@click`, `:class`), a `lang` on `html` (set it in `kay.config.ts`), the attributes of `body` and a web component's `<slot>` (kept as a comment, as kay's `slot` renders a wrapper's children). HTML that needs an end tag it lacks (an unclosed `<p>` or `<li>`) fails with exit 1.

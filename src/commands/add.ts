@@ -1,7 +1,7 @@
 import type { Command } from './command'
 import { resolve } from 'node:path'
 import { addFeatures } from '../add'
-import { count, done, failureProblem, formatOption, printDocument } from './command'
+import { count, done, formatOption, printDocument, reportFailure } from './command'
 import { USAGES } from './usages'
 
 export const add: Command = {
@@ -44,10 +44,7 @@ export const add: Command = {
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      console.error(message)
-
-      if (format === 'json')
-        printDocument({ errors: 1, warnings: 0, problems: [failureProblem(message, format)] })
+      reportFailure(message, format)
 
       return 1
     }

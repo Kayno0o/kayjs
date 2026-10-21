@@ -16,7 +16,7 @@ const REFERRER_LIMIT = 3
 // `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy, answering 307.
 export const notFound: Command = {
   usage: USAGES['not-found'],
-  options: { format: { type: 'string' }, redirect: { type: 'string' }, to: { type: 'string' }, file: { type: 'string' }, runtime: { type: 'boolean' } },
+  options: { 'format': { type: 'string' }, 'redirect': { type: 'string' }, 'to': { type: 'string' }, 'file': { type: 'string' }, 'runtime': { type: 'boolean' }, 'dry-run': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
     const format = formatOption('not-found', values.format)
@@ -36,6 +36,10 @@ export const notFound: Command = {
       return refuse('--to goes with --redirect')
 
     const runtime = values.runtime === true
+    const dryRun = values['dry-run'] === true
+
+    if (dryRun && redirect === undefined)
+      return refuse('--dry-run goes with --redirect')
 
     if (runtime && redirect === undefined)
       return refuse('--runtime goes with --redirect')
@@ -61,6 +65,17 @@ export const notFound: Command = {
 
           if (target === undefined)
             throw new Error(`${redirect} has no suggested target: name one with --to <path>`)
+
+          if (dryRun) {
+            checkRedirect(redirect, target, redirected)
+
+            if (format === 'json')
+              printDocument({ redirect: { from: redirect, to: target, ...runtime && { runtime }, dryRun } })
+            else
+              console.log(`Would add ${runtime ? 'to the store' : 'to kay.config.ts'}: ${redirectEntry(redirect, target)}`)
+
+            return 0
+          }
 
           if (runtime) {
             // Loaded here: the type checker's modules are heavy, and only this path needs them.

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { Glob } from 'bun'
-import { projectFiles } from '../new'
+import { DRY_RUN_KAY, projectFiles } from '../new'
 import { migrateAstro } from './astro'
 import { migrateContentConfig } from './content'
 
@@ -322,7 +322,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
   }
 
   if (scaffold) {
-    const project = await projectFiles(out, new Set(featuresOf(root, config, dependencies)), options.kay ?? (options.dryRun === true ? 'dry-run' : undefined), settings)
+    const project = await projectFiles(out, new Set(featuresOf(root, config, dependencies)), options.kay ?? (options.dryRun === true ? DRY_RUN_KAY : undefined), settings)
 
     const carried = withPackages(project['package.json']!, astro)
     const own = JSON.parse(project['package.json']!) as PackageJson

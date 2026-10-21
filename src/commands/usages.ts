@@ -10,7 +10,7 @@ export const USAGES = {
   'check': 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--dry-run] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   'upgrade': 'upgrade [dir] [--dry-run] [--quiet]',
   'routes': 'routes [dir] [--format text|json] [--quiet]',
-  'not-found': 'not-found [dir] [--redirect <path> [--to <target>] [--runtime]] [--file <database>] [--format text|json]',
+  'not-found': 'not-found [dir] [--redirect <path> [--to <target>] [--runtime] [--dry-run]] [--file <database>] [--format text|json]',
   'env': 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]',
   'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',

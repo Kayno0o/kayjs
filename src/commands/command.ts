@@ -273,6 +273,14 @@ export function printFailure(command: string, failure: unknown, format: ProblemF
     console.log(workflowCommand(failureProblem(failure, format, code), command))
 }
 
+// A failure whose message already names its command, as text on stderr and, with `--format json`, the document of a command that could not run.
+export function reportFailure(message: string, format: ProblemFormat): void {
+  console.error(message)
+
+  if (format === 'json')
+    printDocument({ errors: 1, warnings: 0, problems: [failureProblem(message, format)] })
+}
+
 // What stopped a command as a problem, with the code of the error kay raised if it did, placed where Bun's error for a module that does not parse tells.
 export function failureProblem(failure: unknown, format: ProblemFormat, code: string | null = failureCode(failure)): FailureProblem {
   const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }

@@ -45,8 +45,12 @@ export const fmt: Command = {
   usage: USAGES.fmt,
   options: { 'check': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'from-html': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
-  run: async ({ values, positionals: paths }) => {
+  run: async ({ values, positionals: paths }, refuse) => {
     const verify = values.check === true
+
+    if (verify && values['dry-run'] === true)
+      return refuse('--check fails on an unformatted file and --dry-run lists them and succeeds: take one')
+
     const write = !verify && values['dry-run'] !== true
     const format = formatOption('fmt', values.format)
     let result: Awaited<ReturnType<typeof formatFiles>>
