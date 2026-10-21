@@ -33,8 +33,8 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   tests: { description: 'kay test through kay/test, with a first test', needs: [] },
   ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
-  auth: { description: 'sessions, a sign-in, members in SQLite through pg-orm and a guarded /account', needs: ['server'] },
-  postgres: { description: 'the members in Postgres instead of SQLite: a compose stack for development, roles and migrations as an owner', needs: ['auth'] },
+  auth: { description: 'kayjs-auth: sign-in, register and account pages on kay sessions, every page behind a signed-in user, its users in a SQLite file', needs: ['server', 'tailwind'] },
+  postgres: { description: 'kayjs-auth\'s users in Postgres instead of SQLite: a compose stack for development, roles and migrations as an owner', needs: ['auth'] },
   ws: { description: 'an API module over a websocket, with an island counting the visitors online', needs: ['server'] },
 }
 
@@ -46,7 +46,7 @@ export const PRESETS: Record<Preset, { description: string, features: readonly F
   blank: { description: 'one bare page and nothing else', features: [] },
   server: { description: 'an Elysia server run as one executable, styled, linted, tested and containerised', features: ['server', ...SITE] },
   site: { description: 'the same as a static site, published to Pages or served by nginx', features: SITE },
-  app: { description: 'the server, plus sessions, members in SQLite and a websocket island', features: ['server', ...SITE, 'auth', 'ws'] },
+  app: { description: 'the server, plus kayjs-auth sign-in and a websocket island', features: ['server', ...SITE, 'auth', 'ws'] },
 }
 
 export const PRESET_NAMES = Object.keys(PRESETS) as Preset[]
@@ -142,6 +142,9 @@ export async function refuseTarget(target: string): Promise<void> {
     throw new Error(`kay: ${target} is not empty`)
 }
 
+const NAME_TAIL = /[^a-z0-9]+/i
+const SCOPE = /^@[^/]+\//
+
 // Scaffolds a project that \`kay dev\` runs and \`kay check\` passes as it is; refuses a directory that already holds files.
 export async function createProject(target: string, options: NewOptions = {}): Promise<string[]> {
   const dir = resolve(target)
@@ -164,7 +167,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
   if (options.dryRun === true)
     return Object.keys(files).sort()
 
-  // The session secret in .env is for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
+  // The database credentials in .env are for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
   await mkdir(dir, { recursive: true })
   await Promise.all(Object.entries(files).map(async ([path, content]) => path === '.env' ? writeFile(join(dir, path), content, { mode: 0o600 }) : Bun.write(join(dir, path), content)))
 
@@ -179,17 +182,16 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   // A kay minor may break, so the project takes its patches only.
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   const scripts = {
-    // The members' SQLite file is migrated before the server starts, so a fresh app needs nothing else.
-    dev: has('auth') && !has('postgres') ? 'pg-orm apply && kay dev' : 'kay dev',
+    dev: 'kay dev',
     ...has('server') ? { build: 'kay build', compile: 'kay build --compile server', start: 'kay start' } : { build: 'kay build --static' },
     check: 'kay check',
     ...has('eslint') && { 'lint': 'kay lint --cache', 'lint:fix': 'kay lint --fix --cache' },
     fmt: 'kay fmt',
     ...has('tests') && { test: 'kay test' },
-    ...has('auth') && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' },
+    ...has('postgres') && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' },
   }
   const devDependencies = [
-    (has('starter') || has('accents')) && '@iconify-json/tabler',
+    (has('starter') || has('accents') || has('auth')) && '@iconify-json/tabler',
     has('eslint') && '@kaynooo/eslint',
     '@types/bun',
     ...has('tailwind') ? ['bun-plugin-tailwind', 'tailwindcss'] : [],
@@ -202,20 +204,22 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
       type: 'module',
       private: true,
       scripts,
-      dependencies: { ...has('auth') && { '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency },
+      dependencies: { ...has('auth') && { '@kaynooo/kayjs-auth': `~${kay.version}`, '@kaynooo/kayjs-ui': `~${kay.version}`, '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies: Object.fromEntries(devDependencies.map(dev => [dev, kay.devDependencies[dev]!])),
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }
 
   // The development database, never committed. With Postgres the app connects as app_rw, which cannot change the schema, and the migrations as the owner; COMPOSE_FILE makes a bare `docker compose` start that database.
-  if (has('auth')) {
-    files['.env'] = has('postgres')
-      ? `DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
-      : `DATABASE_URL=sqlite://data/app.db\n`
-  }
+  if (has('postgres'))
+    files['.env'] = `DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
 
-  return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name)]))
+  return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name).replaceAll('__SITE__', siteName(name))]))
+}
+
+// The site's name for mails and authenticator apps, as kayjs-auth's `kay add` words it: the package name in capitals.
+function siteName(name: string): string {
+  return name.replace(SCOPE, '').split(NAME_TAIL).filter(word => word !== '').map(word => word[0]!.toUpperCase() + word.slice(1)).join(' ') || 'My site'
 }
 
 // What a directory name becomes as a package name, which is also safe to write into a template: lower case letters, digits and `-._~`.

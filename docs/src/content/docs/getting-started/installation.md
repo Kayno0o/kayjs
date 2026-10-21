@@ -35,7 +35,7 @@ Run in a terminal, `kay new` asks for a preset, then for each [feature](/referen
 | `blank` | One layout and one bare page, built as a static site |
 | `server` | An Elysia server, a layout, a header, Tailwind and a counter island (the default) |
 | `site` | A static site: `bun run build` writes plain files for any host |
-| `app` | The server plus sessions, a demo sign-in action (refused in production unless `DEMO_SIGN_IN=true`), members in SQLite and a websocket island |
+| `app` | The server plus kayjs-auth sign-in, register and account pages (its users in SQLite) and a websocket island |
 
 `--with` and `--without` change a preset's features. The accent picker needs Tailwind, so drop both together: `--without tailwind,accents`.
 

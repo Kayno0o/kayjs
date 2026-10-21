@@ -49,7 +49,7 @@ kay new my-app --template app --without docker
 
 | Option | Effect |
 | --- | --- |
-| `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in SQLite |
+| `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works until 1.73, with a warning |
@@ -80,8 +80,8 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `tests` | `kay test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site as an unprivileged user on port 8080 | server, site, app |
-| `auth` | Sessions, a sign-in, members in SQLite through pg-orm and a guarded `/account`; needs `server` | app |
-| `postgres` | The members in Postgres instead of SQLite, with a compose stack for development; `kay add` plans the members it needs | none |
+| `auth` | kayjs-auth, as `kay add auth` writes it: sign-in, register and account pages behind a guard on every page, its users in a SQLite file; needs `server` and `tailwind` | app |
+| `postgres` | kayjs-auth's users in Postgres instead of SQLite, with a compose stack for development; run `bun run db:generate init` for the first migration; `kay add` plans kayjs-auth too | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
 
 `blank` has none of them. In the terminal, checking a feature checks what it needs. With options, a feature missing what it needs is refused with the flag to add:

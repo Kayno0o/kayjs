@@ -34,7 +34,7 @@ export default function auth(project: Project) {
 
   const database = ownDatabase
     ? ''
-    : '\n// A SQLite file of its own, created below; point `url` at Postgres, or add `...authTables` to the tables of the app\'s own `Database`, for the app\'s database.\nexport const db = new Database({ url: \'sqlite://data/auth.db\', tables: authTables })\n\nawait db.sync()\n'
+    : '\n// A SQLite file of its own, created below; point `url` at Postgres, or add `...authTables` to the tables of the app\'s own `Database`, for the app\'s database.\nexport const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })\n\nawait db.sync()\n'
 
   const source = `${imports.join('\n')}\n${database}
 export const auth = createAuth({
@@ -56,7 +56,7 @@ export const auth = createAuth({
       : [],
     example: ['KAY_SECRET', 'SITE_URL'],
     ignore: ownDatabase ? [] : ['data'],
-    extension: { import: 'import { authPages } from \'@kaynooo/kayjs-auth\'', expression: 'authPages({ auth: () => import(\'./src/auth\') })' },
+    extension: { import: 'import { authPages } from \'@kaynooo/kayjs-auth\'', expression: 'authPages({ auth: async () => import(\'./src/auth\') })' },
     notes: [
       ownDatabase ? 'Run your migration generator (bun run db:generate) for the auth_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.db: point the Database in src/auth.ts at Postgres before production.',
       ...mailed ? [] : ['Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail` and pass `email: { mailer: { send: mail.enqueue } }` to createAuth.'],

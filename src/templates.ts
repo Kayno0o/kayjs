@@ -201,7 +201,7 @@ details.relative
 }
 
 function header({ has, tw }: Setup): string {
-  const links = has('auth') ? '[{ href: \'/\', label: \'Home\' }, { href: \'/account\', label: \'Account\' }]' : '[{ href: \'/\', label: \'Home\' }]'
+  const links = has('auth') ? '[{ href: \'/\', label: \'Home\' }, { href: \'/auth/account\', label: \'Account\' }]' : '[{ href: \'/\', label: \'Home\' }]'
 
   return lines(
     '---',
@@ -235,7 +235,7 @@ function home({ has, tw }: Setup): string {
       'head',
       '  title Home',
       `h1${tw('.text-3xl.font-bold')} __NAME__`,
-      has('auth') && 'a(href="/account") Account',
+      has('auth') && 'a(href="/auth/account") Account',
       has('ws') && 'Online',
     )
   }
@@ -276,6 +276,22 @@ function notFoundPage(setup: Setup): string {
 }
 
 function homeTest({ has }: Setup): string {
+  // kayjs-auth guards every page, so a visitor with no session lands on its sign-in page.
+  if (has('auth')) {
+    return `import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+
+const site = await testSite()
+
+it('sends a visitor to sign in', async () => {
+  const home = await site.visit('/')
+
+  expect(home.status).toBe(200)
+  expect(home.url).toStartWith('/auth/sign-in')
+})
+`
+  }
+
   return `import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 
@@ -295,12 +311,15 @@ function config({ has, settings }: Setup): string {
   const base = settings.base === undefined ? undefined : quote(settings.base)
 
   return lines(
+    has('auth') && 'import { authPages } from \'@kaynooo/kayjs-auth\'',
+    has('auth') && 'import { ui } from \'@kaynooo/kayjs-ui/extension\'',
     !server && 'import process from \'node:process\'',
     has('tailwind') && 'import tailwind from \'bun-plugin-tailwind\'',
     'import { defineConfig } from \'kay/server\'',
     '',
     !server && '// Set when building, as the Pages workflow does: the path the site is published under; kay reads the host it is published on from SITE_URL.',
     'export default defineConfig({',
+    has('auth') && '  extensions: [authPages({ auth: async () => import(\'./src/auth\') }), ui()],',
     `  lang: ${quote(settings.lang ?? 'en')},`,
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
@@ -308,8 +327,6 @@ function config({ has, settings }: Setup): string {
     settings.fonts !== undefined && settings.fonts.length > 0 && `  fonts: [${settings.fonts.map(font => `{ fontsource: ${quote(font.fontsource)}${font.weights ? `, weights: [${font.weights.join(', ')}]` : ''}${font.styles ? `, styles: [${font.styles.map(quote).join(', ')}]` : ''}${font.subsets ? `, subsets: [${font.subsets.map(quote).join(', ')}]` : ''} }`).join(', ')}],`,
     server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s. It trusts private-range peers, so a dev server bound to 0.0.0.0 believes a LAN client\'s X-Forwarded-For.',
     server && has('docker') && '  proxy: true,',
-    server && has('docker') && has('auth') && '  // `kay check` compares the variables src/env.ts declares with what production sets.',
-    server && has('docker') && has('auth') && '  env: { compose: \'compose.prod.yaml\', example: \'.env.example\' },',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )
@@ -558,33 +575,18 @@ const APP_COMPOSE = `services:
       # At least 32 characters, kept out of the repository: it seals the sessions.
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
-      # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
-      DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
-    volumes:
-      - data:/app/data
+      # The public origin of the site, which the mailed links and the OAuth callbacks start from.
+      SITE_URL: \${SITE_URL:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
 
 volumes:
   db:
-  data:
 `
 
-// An app on SQLite: the file lives on a volume, which a one-shot service migrates before the app starts.
-// The migration runs as root, so it hands the file to `nobody`, the user the image runs the app as.
+// An app on SQLite: kayjs-auth's file lives on a volume, which the app creates its tables in when it starts.
 const SQLITE_COMPOSE = `services:
-  # Applies the pending migrations before the app starts, from the build stage, which holds them and the pg-orm command.
-  migrate:
-    build:
-      context: .
-      target: build
-    command: [sh, -c, bun run db:migrate && chown -R nobody data]
-    environment:
-      DATABASE_URL: sqlite://data/app.db
-    volumes:
-      - data:/app/data
-
   app:
     build: .
     restart: unless-stopped
@@ -594,14 +596,10 @@ const SQLITE_COMPOSE = `services:
     environment:
       # At least 32 characters, kept out of the repository: it seals the sessions.
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
-      DATABASE_URL: sqlite://data/app.db
-      # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
-      DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
+      # The public origin of the site, which the mailed links and the OAuth callbacks start from.
+      SITE_URL: \${SITE_URL:-}
     volumes:
       - data:/app/data
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
 volumes:
   data:
@@ -613,8 +611,8 @@ function databaseCompose(postgres: boolean): string {
 
 // The binary `kay build --compile` makes carries the pages, their assets and the browser build, so the image holds it alone.
 function serverContainerFiles({ has }: Setup): Record<string, string> {
-  // The members' SQLite file with SQLite, and the sessions' with either, are written under `data`, which the image holds for the volume compose mounts there.
-  const data = has('auth')
+  // kayjs-auth's SQLite file is written under `data`, which the image holds for the volume compose mounts there.
+  const data = has('auth') && !has('postgres')
 
   return {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
@@ -719,85 +717,75 @@ EXPOSE 8080
   }
 }
 
-// Sessions, a sign-in, members kept in SQLite (Postgres with the `postgres` feature) through pg-orm and a guarded section.
-function authFiles({ has, tw }: Setup): Record<string, string> {
+// kayjs-auth, the files `kay add auth` writes: sign-in, register and account pages on kay sessions, every page behind a signed-in visitor. Its users live in a SQLite file of its own, or in the app's Postgres with `postgres`.
+function authFiles({ has }: Setup): Record<string, string> {
   const postgres = has('postgres')
 
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
-    'src/env.ts': `import process from 'node:process'
-import { defineEnv, s } from 'kay/server'
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\nSITE_URL=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}`,
+    'src/auth.ts': authModule(postgres),
+    'src/routes/_guard.ts': `import { auth } from '../auth'
 
-// Read once as the server boots; \`kay new\` wrote the development database to .env, and production sets its own. The sessions' secret is kay's, KAY_SECRET, which development and tests derive.
-export const env = defineEnv(s.Object({
-  DATABASE_URL: s.String(),
-  PORT: s.Integer({ default: 3000 }),
-  HOST: s.Optional(s.String()),
-  DEMO_SIGN_IN: s.Optional(s.Boolean()),
-}))
-
-// The demo sign-in lets anyone in under any name, so production refuses it unless DEMO_SIGN_IN=true says the site is a demo.
-export const demoSignIn = process.env.NODE_ENV !== 'production' || env.DEMO_SIGN_IN === true
+// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.
+export default auth.guard()
 `,
-    'src/db/member.ts': `import type { InferEntity } from '@kaynooo/pg-orm'
-import { defineTable } from '@kaynooo/pg-orm'
+    ...postgres && postgresFiles(),
+  }
+}
 
-// Who signed in, and since when. A change here goes to the database as a migration: \`bun run db:generate\`, then \`bun run db:migrate\`.
-export const Member = defineTable('member', f => ({
-  id: f.serial().primaryKey(),
-  name: f.varchar(40).unique(),
-  joined_at: f.timestamptz().defaultRaw('now()'),
-}))
+// What `kay add auth` writes as src/auth.ts, over the app's own database with `postgres` and a SQLite file of its own without.
+function authModule(postgres: boolean): string {
+  const imports = [
+    'import type { AuthSessionData } from \'@kaynooo/kayjs-auth\'',
+    'import { createAuth } from \'@kaynooo/kayjs-auth\'',
+    postgres ? 'import { pgStore } from \'@kaynooo/kayjs-auth/pg\'' : 'import { authTables, pgStore } from \'@kaynooo/kayjs-auth/pg\'',
+    ...postgres ? [] : ['import { Database } from \'@kaynooo/pg-orm\''],
+    'import { session } from \'kay/server\'',
+    ...postgres ? ['import { db } from \'./db\''] : [],
+  ]
+  const database = postgres
+    ? ''
+    : '\n// A SQLite file of its own, created below; point `url` at Postgres, or add `...authTables` to the tables of the app\'s own `Database`, for the app\'s database.\nexport const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })\n\nawait db.sync()\n'
 
-export type MemberInterface = InferEntity<typeof Member>
-`,
-    'src/db/index.ts': `import { Database } from '@kaynooo/pg-orm'
-import { env } from '../env'
-import { Member } from './member'
+  return `${imports.join('\n')}\n${database}
+export const auth = createAuth({
+  sessions: session<AuthSessionData>(),
+  store: pgStore(db),
+  site: '__SITE__',
+  pages: true,
+})
+`
+}
 
-export const tables = [Member]
+// kayjs-auth's tables in a Postgres of the app's own, which a migration creates: the owner changes the schema, the app connects as app_rw.
+function postgresFiles(): Record<string, string> {
+  return {
+    'src/db/index.ts': `import process from 'node:process'
+import { authTables } from '@kaynooo/kayjs-auth/pg'
+import { Database } from '@kaynooo/pg-orm'
+
+// Add the app's own tables beside kayjs-auth's; a change goes to the database as a migration: \`bun run db:generate\`, then \`bun run db:migrate\`.
+export const tables = [...authTables]
 
 // Connects on the first query; in a test, to the copy \`kay/test/preload\` made for the file.
-export const db = new Database({ url: env.DATABASE_URL, tables })
+export const db = new Database({ url: process.env.DATABASE_URL!, tables })
 `,
     'pg-orm.config.ts': `import process from 'node:process'
 import { Database, defineConfig } from '@kaynooo/pg-orm'
-import { Member } from './src/db/member'
+import { tables } from './src/db'
 
-// For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones${postgres ? '' : '; `bun run dev` applies them first'}.
-export default defineConfig({${postgres ? '\n  // The owner, which changes the schema; the app itself connects as app_rw through DATABASE_URL.' : ''}
-  db: new Database({ url: process.env.${postgres ? 'MIGRATE_DATABASE_URL ?? process.env.' : ''}DATABASE_URL, tables: [Member] }),
+// For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones.
+export default defineConfig({
+  // The owner, which changes the schema; the app itself connects as app_rw through DATABASE_URL.
+  db: new Database({ url: process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL, tables }),
   migrationsDir: 'migrations',
 })
 `,
-    // The SQLite one is what \`pg-orm generate\` writes for the table.
-    'migrations/0001_member.sql': postgres
-      ? `-- migrate:up
-CREATE TABLE "member" (
-  "id" serial,
-  "name" varchar(40) NOT NULL,
-  "joined_at" timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY ("id"),
-  UNIQUE ("name")
-);
-
--- migrate:down
-DROP TABLE IF EXISTS "member";
-`
-      : `-- migrate:up
-CREATE TABLE "member" (
-  "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  "name" TEXT NOT NULL UNIQUE,
-  "joined_at" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-);
-
--- migrate:down
-DROP TABLE IF EXISTS "member";
-`,
-    ...postgres && {
-      'db/roles.sh': APP_ROLES_SCRIPT,
-      'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
+    // `bun run db:generate` writes the first migration, for kayjs-auth's tables as the installed version declares them.
+    'migrations/.gitkeep': '',
+    'db/roles.sh': APP_ROLES_SCRIPT,
+    'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
     image: postgres:18-alpine
@@ -821,123 +809,12 @@ services:
 volumes:
   db:
 `,
-    },
-    'src/session.ts': `import { session, sqliteStore } from 'kay/server'
-
-// The data stays on the server, so signing out ends a session for good, and tests keep theirs in memory; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
-export const sessions = session<{ name: string }>({ store: sqliteStore('data/sessions.sqlite') })
-`,
-    'src/server.ts': `import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-import { env } from './env'
-import { sessions } from './session'
-
-// Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
-export const app = new Elysia().use(sessions).use(await pages()).listen({ port: env.PORT, ...env.HOST !== undefined && { hostname: env.HOST } })
-`,
-    'src/routes/login.kay': `--- server
-import { s } from 'kay'
-import { db } from '../db'
-import { Member } from '../db/member'
-import { demoSignIn } from '../env'
-
-// Anyone may sign in under any name, which makes them a member the first time: swap in real credentials, such as @kaynooo/kayjs-auth's.
-export const signIn = action(s.Object({ name: s.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
-  if (!demoSignIn)
-    return ctx.fail(403, 'This demo sign-in is off in production: swap in real credentials, or set DEMO_SIGN_IN=true for a demo site')
-
-  await db.repo(Member).write.findOrCreate({ name: name.trim() }, ['name'])
-  await ctx.locals.session.regenerate()
-  await ctx.locals.session.set('name', name.trim())
-  ctx.redirect('/account')
-})
----
-head
-  title Sign in
-h1${tw('.text-2xl.font-bold')} Sign in
-p${tw('.text-subtext1')} A demo: any name signs in. Replace it with real credentials before going live.
-form${tw('.mt-4.flex.flex-col.items-start.gap-2')}(action={signIn})
-  label(for="name") Name
-  input#name(name="name" autocomplete="username")
-  if signIn.error('name') as error
-    p${tw('.text-error')} {error}
-  if signIn.error() as error
-    p${tw('.text-error')} {error}
-  button(type="submit") Sign in
-`,
-    'src/routes/account/_guard.ts': `import { guard } from 'kay'
-
-// Everything under /account is for signed-in visitors.
-export default guard(async ({ locals, redirect }) => {
-  if (await locals.session.get('name') === undefined)
-    redirect('/login')
-})
-`,
-    'src/routes/account/index.kay': `--- server
-import { db } from '../../db'
-import { Member } from '../../db/member'
-
-export const signOut = action(async ctx => {
-  await ctx.locals.session.destroy()
-  ctx.redirect('/')
-})
-
-const name = await ctx.locals.session.get('name')
-const member = name === undefined ? null : await db.repo(Member).read.findOne({ name })
----
-head
-  title Account
-h1${tw('.text-2xl.font-bold')} Signed in as {name}
-if member
-  p${tw('.text-subtext1')} Member since {member.joined_at.toLocaleDateString('en', { dateStyle: 'long' })}
-form${tw('.mt-4')}(action={signOut})
-  button(type="submit") Sign out
-`,
   }
 }
 
-// The tests of the members' database: SQLite files under `data` by default, a Postgres the tests may create databases on with `postgres`.
+// Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. With `postgres`, each test file gets a copy of the database.
 function authTestFiles({ has }: Setup): Record<string, string> {
-  return {
-    // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
-    '.env.test': `DATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
-    // Read by `kay/test/preload`, which copies the migrated database for each test file and runs this on it once.
-    'tests/seed.ts': `import type { Database } from '@kaynooo/pg-orm'
-import { Member } from '../src/db/member'
-
-// What every test file starts with, on top of the migrations: \`kay/test/preload\` seeds one database with it and copies that for each file.
-export default async function seed(db: Database): Promise<void> {
-  await db.repo(Member).write.insertOne({ name: 'Ada', joined_at: new Date('2024-01-01T12:00:00Z') })
-}
-`,
-    'tests/members.test.ts': `import { expect, it } from 'bun:test'
-import { db } from '../src/db'
-import { Member } from '../src/db/member'
-
-// Whatever another test file signed in, this one starts from the seed alone: kay/test/preload copies a database per file.
-it('starts from the seed, with no member another test file added', async () => {
-  await db.repo(Member).write.insertOne({ name: 'Linus' })
-
-  expect((await db.repo(Member).read.findMany(q => q.orderBy('name', 'asc'))).map(member => member.name)).toEqual(['Ada', 'Linus'])
-})
-`,
-    'tests/account.test.ts': `import { expect, it } from 'bun:test'
-import { testSite } from 'kay/test'
-import { signIn } from '../src/routes/login.kay'
-import { sessions } from '../src/session'
-
-const site = await testSite({ use: [sessions] })
-
-it('sends a visitor to sign in, then into their account', async () => {
-  expect((await site.visit('/account')).url).toBe('/login')
-  expect((await site.submit(signIn, { name: 'Grace' }, { from: '/login' })).html).toContain('Signed in as Grace')
-})
-
-it('knows a member from the seed, and since when', async () => {
-  expect((await site.submit(signIn, { name: 'Ada' }, { from: '/login' })).html).toContain('Member since January 1, 2024')
-})
-`,
-  }
+  return has('postgres') ? { '.env.test': 'DATABASE_URL=postgres://app:app@127.0.0.1:5433/app_test\n' } : {}
 }
 
 // An API module and a live island over its websocket.
@@ -1018,7 +895,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   return {
     // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
     '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
+    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && !has('postgres') && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),

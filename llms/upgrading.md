@@ -97,6 +97,9 @@ Use `--outdir` for `kay migrate astro`, `--forge` for `kay new`, and `ok` for a 
 ### kayjs-cms's `logo` moves to its settings module
 
 Give the admin logo in a settings module instead of `cms({ logo })`: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` in `kay.config.ts`, and `export default { ...defaults, logo: { src: '/logo.svg', alt: 'Acme' } }` there (`defaults` from `@kaynooo/kayjs-cms`). `cms({ logo })` works until 1.73, with an empty `alt`. No lint can recognise it, as the fix writes a module the app owns.
+### `kay new --with auth` writes kayjs-auth, not a demo sign-in
+
+An app made before keeps its `login.kay`, `Member` table and `src/session.ts`, and works as it did; `kay add` no longer reads it as holding `auth` (that is `src/auth.ts` beside a root guard), so `kay add postgres` on it plans kayjs-auth's files too. To move to kayjs-auth, run `kay add auth` and delete the demo files.
 
 ## 1.69.0
 

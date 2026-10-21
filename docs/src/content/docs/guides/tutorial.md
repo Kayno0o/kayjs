@@ -237,4 +237,4 @@ bun run start   # the production server
 
 From here, read [Routing](/essentials/routing), [Forms and actions](/essentials/forms-and-actions), [Islands](/essentials/islands) and [Testing](/guides/testing).
 
-`kay new --template app` scaffolds an app with sessions, a sign-in form and a guarded account page. This site, in `docs/` in kay's repository, is itself built with kay from content collections.
+`kay new --template app` scaffolds an app with kayjs-auth: sign-in, register and account pages behind a guard. This site, in `docs/` in kay's repository, is itself built with kay from content collections.

@@ -119,8 +119,7 @@ describe('HOST', () => {
     const cwd = join(await scratchDir('host-'), 'app')
 
     await createProject(cwd, { kay: '^1.0.0', features: PRESETS.app.features })
-    expect(await Bun.file(join(cwd, 'src/env.ts')).text()).toContain('HOST: s.Optional(s.String()),')
-    expect(await Bun.file(join(cwd, 'src/server.ts')).text()).toContain('.listen({ port: env.PORT, ...env.HOST !== undefined && { hostname: env.HOST } })')
+    expect(await Bun.file(join(cwd, 'src/server.ts')).text()).toContain('...process.env.HOST !== undefined && { hostname: process.env.HOST }')
   })
 
   it('probes the health route where HOST says the server listens', async () => {

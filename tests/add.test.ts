@@ -120,7 +120,9 @@ it('does not swap an app on SQLite for Postgres behind its back', async () => {
 
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
-    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('.env: DATABASE_URL=sqlite://data/app.db is not what the feature uses: set DATABASE_URL=postgres://')
+    await mkdir(join(dir, 'data'))
+    await Bun.write(join(dir, 'data/auth.db'), '')
+    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('data/auth.db holds the users postgres would leave behind')
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
@@ -652,14 +654,14 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui ext
 
     const source = await Bun.file(join(dir, 'src/auth.ts')).text()
 
-    expect(source).toContain('export const db = new Database({ url: \'sqlite://data/auth.db\', tables: authTables })')
-    expect(source).toContain('site: "My Shop"')
+    expect(source).toContain('export const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })')
+    expect(source).toContain('site: \'My Shop\'')
     expect(source).not.toContain('mail.')
     expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default auth.guard()')
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('authPages({ auth: () => import(\'./src/auth\') })')
+    expect(config).toContain('authPages({ auth: async () => import(\'./src/auth\') })')
     expect(config).toContain('ui()')
     expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
     expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)

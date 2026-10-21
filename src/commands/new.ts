@@ -95,9 +95,9 @@ export const scaffold: Command = {
         return 0
       }
 
-      // With Postgres, the database runs in the container its compose.dev.yaml describes, migrated before the first start; SQLite is a file, which `bun run dev` migrates.
+      // With Postgres, the database runs in the container its compose.dev.yaml describes, with kayjs-auth's first migration generated and applied before the first start; SQLite is a file kayjs-auth creates itself.
       if (values.quiet !== true)
-        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('postgres') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
+        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('postgres') ? 'docker compose up -d --wait && bun run db:generate init && bun run db:migrate && ' : ''}bun run dev`)}`)
 
       return 0
     }

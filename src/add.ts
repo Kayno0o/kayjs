@@ -120,7 +120,7 @@ export async function detectFeatures(dir: string): Promise<Set<Feature>> {
     ['tests', at('bunfig.toml')],
     ['ci', ['.forgejo', '.github'].some(host => at(`${host}/workflows/test.yml`) || at(`${host}/workflows/pages.yml`))],
     ['docker', at('Dockerfile')],
-    ['auth', at('src/routes/login.kay') && at('src/db/member.ts')],
+    ['auth', at('src/auth.ts') && at('src/routes/_guard.ts')],
     ['postgres', at('compose.dev.yaml')],
     ['ws', at('src/api/online.ts')],
   ]
@@ -284,11 +284,8 @@ function mergeEnv(disk: string | undefined, content: string, { writes, conflicts
 }
 
 // What adding the core features changes: the files to write, and the files that are not in the shape `kay new` writes.
-// The files of the demo sign-in, which kayjs-auth replaces when both are added.
-const DEMO_AUTH_PAGES = new Set(['src/routes/login.kay', 'src/routes/account/_guard.ts', 'src/routes/account/index.kay', 'src/session.ts', 'src/server.ts', 'tests/members.test.ts', 'tests/account.test.ts'])
-
-// `postgres` keeps its members in the demo auth's database, so adding it to a project without them plans them too; with `libraryAuth`, kayjs-auth is added beside, so only the database files of the demo are kept and kayjs-auth uses that database.
-async function planCore(dir: string, core: readonly Feature[], libraryAuth = false): Promise<Plan> {
+// `postgres` keeps kayjs-auth's users, so adding it to a project without kayjs-auth plans its files too, and `kay add auth,postgres` writes them in one run.
+async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
   const { text, manifest } = await readManifest(dir)
   const kay = manifest.dependencies?.kay
 
@@ -327,17 +324,16 @@ async function planCore(dir: string, core: readonly Feature[], libraryAuth = fal
   const named = join(dirname(dir), manifest.name ?? basename(dir))
   const host = await hostOf(dir)
   const runner = await runnerOf(dir, host)
-  // With kayjs-auth beside, the demo's pages are the files the project would have without its auth.
-  const bare = libraryAuth && implied ? new Set([...wanted].filter(feature => feature !== 'auth')) : undefined
-  const [old, next, without] = await Promise.all([projectFiles(named, current, kay, {}, host, runner), projectFiles(named, wanted, kay, {}, host, runner), bare && projectFiles(named, bare, kay, {}, host, runner)])
 
-  for (const [path, planned] of Object.entries(next)) {
+  // kayjs-auth's SQLite file holds users that Postgres would leave behind.
+  if (core.includes('postgres') && current.has('auth') && existsSync(join(dir, 'data/auth.db')))
+    conflicts.push('data/auth.db holds the users postgres would leave behind: move them to Postgres, or delete the file to start with none, then run this again')
+
+  const [old, next] = await Promise.all([projectFiles(named, current, kay, {}, host, runner), projectFiles(named, wanted, kay, {}, host, runner)])
+
+  for (const [path, content] of Object.entries(next)) {
     const disk = await read(join(dir, path))
     const was = old[path]
-    const content = without !== undefined && DEMO_AUTH_PAGES.has(path) ? without[path] : planned
-
-    if (content === undefined)
-      continue
 
     if (path === 'package.json') {
       const merged = mergeManifest(manifest, JSON.parse(was!) as Manifest, JSON.parse(content) as Manifest, conflicts)
@@ -627,7 +623,7 @@ async function addLibraries(dir: string, core: readonly Feature[], libraries: re
       await installPackages(dir, missing, options.bun ?? process.execPath)
 
       // The package.json changed on disk, so the merge starts over from it.
-      next = await planCore(dir, core, libraries.includes('auth'))
+      next = await planCore(dir, core)
       failIfConflicts(next)
     }
 
@@ -706,7 +702,7 @@ export async function addFeatures(dir: string, names: readonly string[], options
   // A library's name wins over a core feature's: `auth` is kayjs-auth.
   const core = names.filter((name): name is Feature => FEATURE_NAMES.includes(name as Feature) && !Object.hasOwn(LIBRARIES, name))
   const libraries = withBrought(names.filter(name => Object.hasOwn(LIBRARIES, name)))
-  let plan = await planCore(dir, core, libraries.includes('auth'))
+  let plan = await planCore(dir, core)
 
   failIfConflicts(plan)
   await requireFeatures(dir, core, libraries)
