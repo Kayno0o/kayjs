@@ -46,6 +46,8 @@ export interface CmsSettings {
   pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
+  // Whether editors' browsers get the hint cookie and the "Edit this page" link.
+  pageLink: boolean
   layouts: ReadonlyMap<string, CollectionLayout>
 }
 
@@ -67,7 +69,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections, pageLink }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -76,7 +78,7 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, layouts: checkLayouts(collections) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, pageLink: pageLink !== false, layouts: checkLayouts(collections) }
 
   return current
 }

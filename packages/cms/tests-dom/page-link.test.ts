@@ -43,7 +43,9 @@ afterEach(() => {
   for (const [type, listener] of listeners.splice(0))
     document.removeEventListener(type, listener)
 
-  document.querySelector(BUTTON)?.remove()
+  for (const button of document.querySelectorAll(BUTTON))
+    button.remove()
+
   document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   document.cookie = `${SIGNED_IN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   sessionStorage.clear()
@@ -138,6 +140,15 @@ test('fills a link of the app\'s own in place of its button, and keeps it hidden
   answering(403)
   await run()
   expect(document.querySelector<HTMLAnchorElement>(`[${PAGE_LINK_ATTRIBUTE}]`)!.hidden).toBeTrue()
+})
+
+test('moves the link to the page a swap lands on', async () => {
+  answering(200)
+  await run()
+  goTo('https://site.test/contact')
+  document.dispatchEvent(new Event('kay:navigate'))
+  await settle()
+  expect(document.querySelector(BUTTON)?.getAttribute('href')).toBe(`/admin/page?path=${encodeURIComponent('/contact')}`)
 })
 
 test('the loader looks for the hint or kayjs-auth\'s signed-in cookie, and for nothing else', () => {

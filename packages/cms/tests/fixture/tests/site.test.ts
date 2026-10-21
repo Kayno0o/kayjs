@@ -1110,6 +1110,11 @@ test('the check answers an editor the guard admits with the link\'s words in the
   expect(refused.headers.get('set-cookie')).toBeNull()
 })
 
+test('the check refreshes the hint Secure behind a TLS-terminating proxy', async () => {
+  expect((await site.fetch('/api/cms/editor', { headers: { 'x-forwarded-proto': 'https' } })).headers.get('set-cookie')).toContain('Secure')
+  expect((await site.fetch('/api/cms/editor')).headers.get('set-cookie')).not.toContain('Secure')
+})
+
 test('the module an editor\'s browser loads is open to every request, holding nothing private', async () => {
   const module = await site.fetch('/api/cms/editor/module.js', { headers: { 'x-deny': '1' } })
   const text = await module.text()

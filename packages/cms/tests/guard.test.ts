@@ -199,6 +199,24 @@ describe('the screens\' guard', () => {
     expect(admitted.cookies.toSetCookieHeaders()[0]).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
   })
 
+  test('sets the hint Secure behind a TLS-terminating proxy, and leaves it out with pageLink: false', async () => {
+    configure({ guard: () => undefined })
+
+    const proxied = screen('/admin', { 'x-forwarded-proto': 'https' })
+    const plain = screen('/admin')
+
+    await screenGuard(proxied)
+    await screenGuard(plain)
+    expect(proxied.cookies.toSetCookieHeaders()[0]).toContain('Secure')
+    expect(plain.cookies.toSetCookieHeaders()[0]).not.toContain('Secure')
+    configure({ guard: () => undefined, pageLink: false })
+
+    const left = screen('/admin')
+
+    await screenGuard(left)
+    expect(left.cookies.has('kay_editor')).toBe(false)
+  })
+
   test('keeps every screen closed, the missing pages included, while the app gives no guard', async () => {
     configure({})
 

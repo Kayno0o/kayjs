@@ -36,6 +36,11 @@ describe('cms()', () => {
     expect(cms().routes?.prefix).toBe('/admin')
   })
 
+  test('puts the page link loader in the head of every page, and leaves it out with pageLink: false', () => {
+    expect(JSON.stringify(cms().config)).toContain('kay_editor=')
+    expect(cms({ pageLink: false }).config).toBeUndefined()
+  })
+
   test('refuses to boot a production server that would save to the working tree by default', () => {
     process.env.NODE_ENV = 'production'
 
