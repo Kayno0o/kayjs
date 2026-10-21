@@ -2064,6 +2064,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     }, 60_000)
   }
 
+  it('keeps the caret at the end of a text the server shortened, and a long text scrolled to the caret', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/caret-field/src/routes', browser: { path } })
+
+    try {
+      const page = await site.open('/trimmed')
+
+      await page.click('.field')
+      await page.type('ab ')
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'ab' && document.querySelector<HTMLInputElement>('.field')!.value === 'ab')
+
+      expect(await page.evaluate(() => [document.activeElement === document.querySelector('.field'), document.querySelector<HTMLInputElement>('.field')!.selectionStart])).toEqual([true, 2])
+
+      const long = 'x'.repeat(120)
+
+      await page.fill('.field', '')
+      await page.type(long)
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent.length === 120 && document.querySelector<HTMLInputElement>('.field')!.value.length === 120)
+
+      expect(await page.evaluate(() => {
+        const f = document.querySelector<HTMLInputElement>('.field')!
+
+        return [f.selectionStart, f.scrollLeft > 0]
+      })).toEqual([120, true])
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   it('keeps it under a trailing slash', async () => {
     const site = await testSite({ routes: 'tests/fixtures/caret-field/src/routes', trailingSlash: 'always', browser: { path } })
 

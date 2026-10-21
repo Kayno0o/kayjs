@@ -1,0 +1,14 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const q = (ctx.query.q ?? '').trim()
+--- script
+import SearchField from '../components/search-field.kay'
+---
+head
+  title Caret trimmed
+h1 Caret
+p.searched {q}
+SearchField(value={q} area={false})

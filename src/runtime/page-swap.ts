@@ -1017,12 +1017,12 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   announce(document.title)
 }
 
-// A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. Where the text is not the same, a caret that was at the end stays at the end and any other is kept within the new text.
+// A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. When the new text differs, a caret that was at the end stays at the end and any other is kept within it. A caret at the end scrolls the field to its end, which the browser does not do for a field just hydrated.
 function carryCaret(from: Element | null, to: HTMLElement): void {
   if (!(from instanceof HTMLInputElement || from instanceof HTMLTextAreaElement) || !(to instanceof HTMLInputElement || to instanceof HTMLTextAreaElement))
     return
 
-  const { selectionStart, selectionEnd, selectionDirection, scrollLeft, scrollTop, value } = from
+  const { selectionStart, selectionEnd, selectionDirection, value } = from
 
   if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
     return
@@ -1035,9 +1035,14 @@ function carryCaret(from: Element | null, to: HTMLElement): void {
     return offset >= value.length ? length : Math.min(offset, length)
   }
 
-  to.setSelectionRange(place(selectionStart), place(selectionEnd), selectionDirection ?? undefined)
-  to.scrollLeft = scrollLeft
-  to.scrollTop = scrollTop
+  const end = place(selectionEnd)
+
+  to.setSelectionRange(place(selectionStart), end, selectionDirection ?? undefined)
+
+  if (end === length) {
+    to.scrollLeft = to.scrollWidth
+    to.scrollTop = to.scrollHeight
+  }
 }
 
 // The form is read before the chunk loads, which a navigation may outlast. A chunk a deploy replaced fails to load: the focus then goes the way a page without a refusal takes.
