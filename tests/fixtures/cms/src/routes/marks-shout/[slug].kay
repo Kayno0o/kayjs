@@ -1,0 +1,7 @@
+--- server
+import { news } from '../../content.config'
+
+const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {entry.data.title.toUpperCase()}
+p {entry.data.tags[0]}

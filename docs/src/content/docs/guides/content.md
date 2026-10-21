@@ -372,7 +372,9 @@ Edit mode is preview mode for a CMS that edits content on the page. Enter it wit
 
 In edit mode the page marks the markup each field and body renders, so the CMS can find them. That holds in a component the entry was handed down to as well as in the page itself. An extension names its editor island with `editor`, and `showDraft(entries)` from `kay/edit` shows the page with the entries the editor has not saved. An entry that fails its schema is left out and shows its saved text, so one bad field does not stop the preview of the others.
 
-<ReadMore href="/llms/content-cms#preview-mode">The signed link, which fields get marked and which do not, the editor island and what each special page renders are in the full content reference.</ReadMore>
+A field the page shows changed (`toUpperCase()`, a joined list), in an island or in a frozen object has nothing to click, so the editor is given them as `unclickable` and kayjs-cms names them above the entry's form.
+
+<ReadMore href="/llms/content-edit#edit-mode">The signed link, which fields get marked and which do not, the editor island and what each special page renders are in the full content reference.</ReadMore>
 
 ## A CMS editing the collections
 

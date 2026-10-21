@@ -19,10 +19,24 @@ export interface FieldMarks {
   numbers: (Read & { value: number })[]
   renders: number
   entries: Map<string, EntryRef>
+  // Every field of text or a number the page read, island props and slots included, and the ones of a frozen object (or the object itself, when it holds more) which no read can tell apart: by marker, for what tells which were marked.
+  read: Map<string, Where>
+  frozen: Map<string, Where>
   wrapped: WeakMap<object, object>
   // Set apart from any text an entry holds, which may use these private-use characters too, an icon font's glyphs say.
   nonce: string
   fence: RegExp
+}
+
+interface Where {
+  name: string
+  path: string[]
+}
+
+// A field of the page that nothing marks, so a click on the page cannot reach it: `frozen` when it sits in an object that was frozen, which no read can be told from.
+export interface Unclickable extends EntryRef {
+  path: string
+  frozen?: true
 }
 
 // A field's read, with the renders there were when it was read.
@@ -80,7 +94,7 @@ export function editMarks(): FieldMarks | undefined {
   if (!state.marks) {
     const nonce = crypto.randomUUID().slice(0, 8)
 
-    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
+    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), read: new Map(), frozen: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
   }
 
   return state.marks
@@ -294,9 +308,15 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
 
       const read = Reflect.get(target, key, receiver) as unknown
 
+      if (typeof key === 'string' && Object.hasOwn(target, key) && !configurable(target, key) && !(key === 'length' && Array.isArray(target)) && ((typeof read === 'string' && !BLANK.test(read)) || typeof read === 'number' || (typeof read === 'object' && read !== null)))
+        note(marks.frozen, name, [...path, key])
+
       if (fieldMarks.unmarked) {
         if (!tracked(target, key))
           return read
+
+        if ((typeof read === 'string' && !BLANK.test(read)) || typeof read === 'number')
+          note(marks.read, name, [...path, key])
 
         return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
       }
@@ -312,6 +332,8 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
       if (typeof read === 'number') {
         const field = refIndex(marks, fieldPath(name, [...path, key]))
 
+        note(marks.read, name, [...path, key])
+
         marks.numbers = marks.numbers.filter(each => each.ref !== field)
         marks.numbers.push({ value: read, ref: field, epoch: marks.renders })
       }
@@ -319,6 +341,9 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
       // A blank text tells nothing apart: `''` is what any empty branch renders.
       if (typeof read === 'string' && !BLANK.test(read)) {
         const field = refIndex(marks, fieldPath(name, [...path, key]))
+
+        note(marks.read, name, [...path, key])
+
         const waiting = marks.unrendered.get(read)
 
         if (!waiting) {
@@ -352,6 +377,13 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
   marks.wrapped.set(value, proxy)
 
   return proxy
+}
+
+function note(into: Map<string, Where>, name: string, path: string[]): void {
+  const ref = fieldPath(name, path)
+
+  if (!into.has(ref))
+    into.set(ref, { name, path })
 }
 
 // Whether a read of `key` is one of a field's.
@@ -434,6 +466,29 @@ function rawTextTracker(html: string): (index: number) => boolean {
 
     return inside
   }
+}
+
+const PLACED_MARK = /data-kay-(?:field|list)(?:-[\w-]+)?="([^"]+)"|<!--kay-field ([^>]*?)-->/g
+
+// The fields the page read that its placed markup does not mark, neither themselves nor a field holding them (a list around its rows), so a click on the page cannot reach them; those of a frozen object follow, flagged.
+export function unclickableFields(marks: FieldMarks, placed: string): Unclickable[] {
+  const marked = new Set<string>()
+
+  for (const match of placed.matchAll(PLACED_MARK))
+    marked.add((match[1] ?? match[2])!)
+
+  const covered = ({ name, path }: Where) => {
+    for (let length = path.length; length > 0; length--) {
+      if (marked.has(fieldPath(name, path.slice(0, length))))
+        return true
+    }
+
+    return false
+  }
+
+  const list = (from: Map<string, Where>, frozen: boolean): Unclickable[] => [...from.values()].filter(where => !covered(where) && marks.entries.has(where.name)).map(({ name, path }) => ({ ...marks.entries.get(name)!, path: path.join('.'), ...frozen && { frozen: true as const } }))
+
+  return [...list(marks.read, false), ...list(marks.frozen, true)]
 }
 
 const ATTRIBUTE_MARK = /data-kay-field-[\w-]+="([^"]+)"/g

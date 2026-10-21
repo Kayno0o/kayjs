@@ -30,12 +30,13 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Images and icons](llms/images.md): imported images, responsive images and their variants, share cards, resizing stored or remote images, Iconify icons
 - [Islands](llms/islands.md): what runs in the browser: islands, props, hydration, shared and persisted state, transitions, error fallbacks, context, unique ids
 - [Browser-only code](llms/browser-only.md): components that render in the browser only, browser globals on the server, server globals in the browser
-- [Navigation and pages kay does not serve](llms/navigation.md): in-place page navigation, islands kept across pages, forms posting in place, going to a page from code, `.kay` components on a page kay does not serve
+- [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages, forms posting in place, going to a page from code, `.kay` components on a page kay does not serve
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`
 - [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `llms.txt.ts` exporting `GET`, `redirects`, `rewrite`, `base`
 - [Prerendering and static export](llms/prerendering.md): prerendered pages and their params, revalidation, server islands, static export
 - [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, entries as pages, pagination, feeds
-- [Loaded collections, preview mode and the CMS editor](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, the edit mode of kayjs-cms
+- [Loaded collections and preview mode](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, a CMS editing collections
+- [Edit mode and the CMS editor](llms/content-edit.md): edit mode's markers on a page, the editor island, `showDraft`
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
 - [Actions](llms/actions.md): form posts that work without JavaScript, typed by a schema: validation errors, files, redirects
@@ -56,9 +57,9 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` (a page's output, no server), `kay screenshot <path>`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html`), `kay lsp`, `kay mcp` (tools and guides for an agent), `kay/compiler`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>`, `kay screenshot <path>`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html`), `kay lsp`, `kay mcp`, `kay/compiler`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
-- [Queues](llms/queues.md): jobs surviving a restart: stores, retries
+- [Queues](llms/queues.md): jobs surviving a restart
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.56

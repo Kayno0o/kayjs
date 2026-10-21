@@ -87,7 +87,7 @@ export const ERRORS = {
   'inert-editor': {
     group: 'build',
     summary: 'An editor component running nothing in the browser, where an editor edits the page.',
-    fix: { file: 'llms/content-cms.md', heading: 'The editor' },
+    fix: { file: 'llms/content-edit.md', heading: 'The editor' },
   },
   'worker-build': {
     group: 'build',

@@ -28,7 +28,7 @@ const left = (fetched: ReturnType<typeof server>) => fetched.mock.calls.some(([u
 
 // Opens the editor on the entry and types into its title, which leaves it with edits not saved.
 async function typed(): Promise<ParentNode> {
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY] })
+  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -52,7 +52,7 @@ const labels = (root: ParentNode) => [...root.querySelectorAll('button')].map(bu
 test('Stop editing with nothing unsaved leaves at once', async () => {
   const fetched = server()
 
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY] })
+  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
   stop(mounted.root).click()
@@ -136,7 +136,7 @@ test('a reload brings the typed edits back, and Reset drops them for good', asyn
   mounted!.unmount()
   mounted = undefined
 
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY] })
+  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -169,4 +169,19 @@ test('closing or reloading the tab with edits not saved gets the browser prompt,
   await settle()
 
   expect(unload()).toBe(false)
+})
+
+test('names the fields of an entry the page does not let the editor click, and those of a frozen object', async () => {
+  server()
+  mounted = await mountComponent(EDITOR, { entries: [ENTRY, { collection: 'posts', slug: 'other' }], unclickable: [{ ...ENTRY, path: 'title' }, { ...ENTRY, path: 'seo.title', frozen: true }, { collection: 'posts', slug: 'other', path: 'elsewhere' }] })
+  await settle()
+  await Bun.sleep(50)
+
+  const hints = [...mounted.root.querySelectorAll('.kcms-entry-hint')].map(hint => hint.textContent)
+
+  expect(hints).toEqual([
+    'A click on the page cannot reach title, which it shows changed or not at all: edit it here.',
+    'A click on the page cannot reach seo.title, held by a frozen object: edit it here.',
+    'A click on the page cannot reach elsewhere, which it shows changed or not at all: edit it here.',
+  ])
 })

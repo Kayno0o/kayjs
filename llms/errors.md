@@ -26,7 +26,7 @@
 | `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](lints.md#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node built-in, which a browser does not have. | [Browser-only components](browser-only.md#browser-only-components) |
 | `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, or an island importing the server's `s` schema builder, so the island dies as it loads. | [Browser globals on the server](browser-only.md#browser-globals-on-the-server) |
-| `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](content-cms.md#the-editor) |
+| `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](content-edit.md#the-editor) |
 | `worker-build` | build | A worker that fails to build, or starts itself again through other workers. | [Wasm and workers](styles-and-assets.md#wasm-and-workers) |
 | `glob-import` | build | An `import.meta.glob` the build cannot read before the module runs. | [Glob imports](components.md#glob-imports) |
 | `icon-unresolved` | build | An icon of a set that is not installed, or a name the set does not have. | [Icons](images.md#icons) |

@@ -102,6 +102,11 @@ html.kcms-dock-side .kcms-editor-open {
   gap: 0.5rem;
 }
 
+.kcms-entry-hint {
+  margin: 0;
+  color: var(--color-kui-subtext0);
+}
+
 .kcms-editor-empty,
 .kcms-entry-loading {
   margin: 1rem;

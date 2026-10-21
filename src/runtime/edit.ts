@@ -1,4 +1,4 @@
-import type { EntryRef } from './fields'
+import type { EntryRef, Unclickable } from './fields'
 import { withBase, withoutBase } from './base'
 import { navigation } from './navigation'
 import { DRAFT_ROUTE, NAVIGATE_HEADER } from './swap'
@@ -24,11 +24,13 @@ export interface DraftIssue {
   message: string
 }
 
-export type { EntryRef }
+export type { EntryRef, Unclickable }
 
 // What an extension's `editor` is given: each entry the page read, by the name the content config exports its collection under, those its head and attributes read included.
 export interface EditorProps {
   entries: EntryRef[]
+  // The fields the page read that a click on it cannot reach, as a value it transforms or shows in an island, its head or a frozen object leaves nothing to mark: `path` dotted, `frozen` for one inside a frozen object.
+  unclickable: Unclickable[]
 }
 
 let latest: AbortController | undefined

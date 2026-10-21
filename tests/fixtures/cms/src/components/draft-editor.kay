@@ -5,7 +5,7 @@ import { showDraft } from 'kay/edit'
 import './draft-editor.css'
 
 // The editor the test extension gives, which every page renders in edit mode.
-const { entries } = props<EditorProps>()
+const { entries, unclickable } = props<EditorProps>()
 
 const clicks = signal(0)
 const issues = signal('')
@@ -19,6 +19,9 @@ button.mixed(onClick={async () => show([{ collection: 'news', slug: 'roadmap', d
 button.slow(onClick={async () => draft({ title: 'Slow draft', published: true, tags: [] })}) Slow
 p.issues {issues()}
 input.title(aria-label="Title" onInput={async kayEvent => draft({ title: kayEvent.currentTarget.value, published: true, tags: [] })})
+ul.unclickable
+  for field of unclickable
+    li {field.collection}:{field.slug}:{field.path}{field.frozen ? ' (frozen)' : ''}
 ul.edited
   for entry of entries
     li {entry.collection}:{entry.slug}{entry.locale === undefined ? '' : `@${entry.locale}`}

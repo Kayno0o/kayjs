@@ -24,7 +24,7 @@ import process from 'node:process'
 import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
-import { editMarks, entriesInPageOrder, placeFieldMarks, withFieldMarks } from '../runtime/fields'
+import { editMarks, entriesInPageOrder, placeFieldMarks, unclickableFields, withFieldMarks } from '../runtime/fields'
 import { collectHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
@@ -970,8 +970,11 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     ? view
     : () => {
       const page = child(view())
+      const entries = noted(rendering.ctx.request, entriesInPageOrder(marks, page))
+      // Placed here for the editor to be told what the markers left out; the page is placed again with the head, finding nothing more to place in this part.
+      const placed = placeFieldMarks(page, marks)
 
-      return html(page + child(editor.default({ entries: noted(rendering.ctx.request, entriesInPageOrder(marks, page)), persist: true })))
+      return html(placed + child(editor.default({ entries, unclickable: unclickableFields(marks, placed), persist: true })))
     }
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]

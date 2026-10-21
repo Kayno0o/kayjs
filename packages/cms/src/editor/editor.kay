@@ -26,7 +26,7 @@ const PROBES = [0.25, 0.5, 0.75]
 const PINNED = new Set(['fixed', 'sticky'])
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
-const { entries } = props<EditorProps>()
+const { entries, unclickable } = props<EditorProps>()
 
 // Looks up what the editor reads only once the page has loaded, so the page sends it.
 shipWords()
@@ -357,7 +357,7 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
       if drafts.failure() as failure
         p.kcms-editor-failure(role="alert") {wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })}
       for entry of entries key={entryKey(entry)}
-        EntryForm(entry={entry} focus={focusIn(entry)})
+        EntryForm(entry={entry} focus={focusIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
       else
         p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 Toaster

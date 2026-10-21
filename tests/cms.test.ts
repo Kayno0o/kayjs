@@ -16,7 +16,7 @@ import * as validate from '../src/content/validate'
 import { ContentError } from '../src/content/validate'
 import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
-import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
+import { editableEntry, editMarks, placeFieldMarks, unclickableFields, withFieldMarks } from '../src/runtime/fields'
 import { child, loop } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { logSink, setLogSink } from '../src/runtime/log'
@@ -1370,6 +1370,30 @@ describe('preview mode', () => {
         props.name = 'Franck'
       }).not.toThrow()
       expect(entry.data.name).toBe('Franck')
+    }, true)
+  })
+
+  it('tells the editor which fields the page read that a click cannot reach', async () => {
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const unclickable = (html: string) => [...html.replace(HYDRATION_MARK, '').matchAll(/<li>([^<]*)<\/li>/g)].map(match => match[1]!).filter(text => text.split(':').length === 3)
+
+    // A transformed text is read and not marked; the tag is marked.
+    expect(unclickable((await get('/marks-shout/launch', edit)).html)).toEqual(['news:launch:title'])
+    // Every field rendered as itself, the island's props and slots included, is clickable somewhere.
+    expect(unclickable((await get('/marks/launch', edit)).html)).toEqual([])
+  })
+
+  it('names the fields of a frozen object and of the head, and none a marked list covers', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', locale: 'fr', data: { name: 'Delphine', tags: ['a', 'b'], seo: Object.freeze({ title: 'Seo' }), age: 38 }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => `<ul>${loop(entry.data.tags, tag => `<li>${child((tag as string).toUpperCase())}</li>`)}</ul><p>${child(entry.data.name)}</p><p>${child(entry.data.seo.title)}</p>${child(entry.data.age + 1)}`)
+      const placed = placeFieldMarks(html, marks)
+
+      expect(unclickableFields(marks, placed)).toEqual([
+        { collection: 'crew', slug: 'a', locale: 'fr', path: 'age' },
+        { collection: 'crew', slug: 'a', locale: 'fr', path: 'seo.title', frozen: true },
+      ])
     }, true)
   })
 

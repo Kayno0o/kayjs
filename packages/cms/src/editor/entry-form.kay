@@ -1,4 +1,5 @@
 ---
+import type { Unclickable } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
@@ -17,7 +18,11 @@ import { entryRoom } from '../room'
 import { saveDraft, showRefusal } from './save'
 import { saveShortcut } from './shortcut'
 
-const { entry, focus } = props<{ entry: EntryRef, focus?: FieldPath | undefined }>()
+const { entry, focus, unclickable = [] } = props<{ entry: EntryRef, focus?: FieldPath | undefined, unclickable?: Unclickable[] }>()
+
+// Named by what the page cannot mark: a value it transforms or shows in an island, and the fields of a frozen object.
+const unmarked = () => unclickable.filter(field => field.frozen !== true).map(field => field.path).join(', ')
+const frozen = () => unclickable.filter(field => field.frozen === true).map(field => field.path).join(', ')
 
 const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },
@@ -102,6 +107,10 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
   else if source.value() as answer
     if answer.entry.problem as problem
       p.kcms-entry-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
+    if unmarked() !== ''
+      p.kcms-entry-hint {wording('cms.entry.unclickable', 'A click on the page cannot reach {fields}, which it shows changed or not at all: edit it here.', { fields: unmarked() })}
+    if frozen() !== ''
+      p.kcms-entry-hint {wording('cms.entry.frozen', 'A click on the page cannot reach {fields}, held by a frozen object: edit it here.', { fields: frozen() })}
     fieldset.kcms-entry-fields(disabled={saving()})
       EntryFields(form={scope()!})
   else
