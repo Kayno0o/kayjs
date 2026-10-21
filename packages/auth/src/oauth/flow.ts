@@ -112,7 +112,7 @@ async function leave(state: RequestState, provider: string, redirect: string | u
 
 // Where to send the browser once the provider sent it back with `query`: the flow is spent by the callback carrying its `state`, so a callback URL replayed later finds none.
 // A callback whose `state` is wrong or missing leaves the flow in place, so a page on another site loading the callback URL cannot kill a sign-in in flight.
-export async function finishOAuth(state: RequestState, provider: string, query: Record<string, string | undefined>): Promise<{ redirect: string } | { error: OAuthFailure }> {
+export async function finishOAuth(state: RequestState, provider: string, query: Record<string, string | undefined>): Promise<{ redirect: string } | { error: OAuthFailure, redirect?: string }> {
   const { core } = state
   const flow = await state.session.get('authOAuth')
 
@@ -124,10 +124,10 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   const entry = core.oauth.get(provider)
 
   if (!entry || flow.provider !== provider || flow.expires < Date.now())
-    return { error: 'oauth' }
+    return { error: 'oauth', redirect: flow.redirect }
 
   if (query.error !== undefined || query.code === undefined || query.code === '')
-    return { error: query.error === 'access_denied' ? 'cancelled' : 'oauth' }
+    return { error: query.error === 'access_denied' ? 'cancelled' : 'oauth', redirect: flow.redirect }
 
   let tokens: OAuthTokens
   let profile: Profile
@@ -140,7 +140,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     if (error instanceof OAuthExchangeError) {
       log.warn(`the ${provider} sign-in failed: ${error.message}`)
 
-      return { error: error.status >= 500 ? 'unavailable' : 'oauth' }
+      return { error: error.status >= 500 ? 'unavailable' : 'oauth', redirect: flow.redirect }
     }
 
     throw error
@@ -148,10 +148,10 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
   // A provider answering without an id would put every such sign-in in one shared account.
   if (typeof profile.providerId !== 'string' || profile.providerId === '')
-    return { error: 'oauth' }
+    return { error: 'oauth', redirect: flow.redirect }
 
   if (core.allow && !(await core.allow(profile)))
-    return { error: 'refused' }
+    return { error: 'refused', redirect: flow.redirect }
 
   const identity = await core.store.identities.find(provider, profile.providerId)
 
@@ -160,12 +160,12 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
     // The provider joins the account that asked for it, never one signed in since in the same browser.
     if (current?.id !== flow.link)
-      return { error: 'signed-out' }
+      return { error: 'signed-out', redirect: flow.redirect }
 
     if (identity && identity.userId !== current.id) {
       await report(state, current, 'sign-in-failed', 'oauth')
 
-      return { error: 'taken' }
+      return { error: 'taken', redirect: flow.redirect }
     }
 
     await saveIdentity(core, identity, current.id, profile, tokens)
@@ -192,7 +192,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
     // Refused as `allow` refuses, before any user or identity is kept.
     if (!core.signUp)
-      return { error: 'refused' }
+      return { error: 'refused', redirect: flow.redirect }
 
     record = await signUp(core, profile, state.languages[0] ?? null, guest)
     // An identity left by a deleted user is replaced.
@@ -209,7 +209,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   if (!done.ok)
     await report(state, record, 'sign-in-failed', 'oauth')
 
-  return done.ok ? { redirect: done.redirect } : { error: done.error }
+  return done.ok ? { redirect: done.redirect } : { error: done.error, redirect: flow.redirect }
 }
 
 // What else the provider came back with, such as Apple's `user` naming the user on their first sign-in.

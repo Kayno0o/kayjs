@@ -1,8 +1,8 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
-import { failure, schemas } from '../forms'
+import { failure, localized, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
 // Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
@@ -16,7 +16,7 @@ export const spend = action(schemas.token, async ({ token }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 const token = ctx.url.searchParams.get('token') ?? ctx.failed(spend)?.values.token

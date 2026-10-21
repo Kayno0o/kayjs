@@ -41,7 +41,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { banned, homeOf, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked } from './core'
+import { backOf, banned, guardPageOf, homeOf, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack, withQuery } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
@@ -309,7 +309,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const { redirect, deny } = stoppers(this.request)
 
     if (!user) {
-      const signIn = options.redirect === undefined || options.redirect === '' ? this.core.pages && this.core.signInPage : options.redirect
+      const signIn = options.redirect === undefined || options.redirect === '' ? guardPageOf(this.core) : options.redirect
 
       if (signIn !== undefined && READ_METHODS.has(this.request.method))
         redirect(this.signInLink(signIn))
@@ -328,7 +328,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private signInLink(page: string, back?: string): string {
     const here = new URL(this.request.url)
 
-    return withQuery(page, `redirect=${encodeURIComponent(safeRedirect(back ?? here.pathname + here.search))}`)
+    return withBack(page, safeRedirect(back ?? here.pathname + here.search))
   }
 
   // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
@@ -435,6 +435,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.session.unset('auth')
     await this.session.unset('authRegistered')
     await this.session.unset('authHeld')
+    await this.session.unset('authBack')
     await this.session.regenerate()
     this.source = null
     this.resolving = Promise.resolve(null)
@@ -486,10 +487,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
-  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha'>): Promise<RegisterResult> {
+  // With `redirect`, the mail verifying the address leads on to that page.
+  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<RegisterResult> {
     await chooseRemember(this[STATE], options?.remember)
 
-    return register(this[STATE], input, options?.captcha)
+    return register(this[STATE], input, options)
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
@@ -509,9 +511,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return verifyEmail(this[STATE], token, password)
   }
 
-  // Mails a reset link to that address when an account has it; answers alike when none does.
-  async requestPasswordReset(email: string, options: { captcha?: string | undefined } = {}): Promise<MailRequestResult> {
-    return requestPasswordReset(this[STATE], email, options.captcha)
+  // Mails a reset link to that address when an account has it; answers alike when none does. The reset signs in to `redirect` when given.
+  async requestPasswordReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<MailRequestResult> {
+    return requestPasswordReset(this[STATE], email, options.captcha, options.redirect)
   }
 
   // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
@@ -1114,7 +1116,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<BareUser, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
-  const failed = (error: OAuthFailure) => options.failurePage ?? withQuery(core.signInPage, `error=${error}`)
+  // The sign-in page keeps the page the visitor asked for, so they come back to it once they sign in another way.
+  const failed = (error: OAuthFailure, redirect?: string | null) => {
+    const back = backOf(core, redirect)
+
+    return options.failurePage ?? (back === null ? withQuery(core.signInPage, `error=${error}`) : withBack(withQuery(core.signInPage, `error=${error}`), back))
+  }
 
   const plugin = new Elysia({ name: 'kayjs-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
@@ -1194,12 +1201,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       if (started === undefined)
         return status(404, 'Not Found')
 
-      return redirect(typeof started === 'string' ? started : failed(started.error), 303)
+      return redirect(typeof started === 'string' ? started : failed(started.error, text(query.redirect)), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
       const outcome = await finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
 
-      return redirect('error' in outcome ? failed(outcome.error) : outcome.redirect, 303)
+      return redirect('error' in outcome ? failed(outcome.error, outcome.redirect) : outcome.redirect, 303)
     })
     // Apple, or any provider asked for `response_mode=form_post`, comes back with a cross-site POST, which a SameSite=Lax session cookie does not ride on: the GET it is turned into does.
     .post(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, ({ params, body, redirect, status }) => {
@@ -1363,7 +1370,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A `_guard.ts` default export. An anonymous visitor goes to `redirect`, the prebuilt sign-in page with `pages`, with where they were going as `?redirect=`, or gets a 401 without one, as does any post; a user who does not meet `require` gets a 403.
     // A scoped bearer token passes only with one of `scope`.
     guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
-      const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? core.pages && core.signInPage : guardOptions.redirect
+      const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? guardPageOf(core) : guardOptions.redirect
 
       return async (ctx) => {
         const user = await authOf(ctx.locals).bareUser()
@@ -1371,7 +1378,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         if (!user) {
           if (redirect !== undefined && reading)
-            ctx.redirect(withQuery(redirect, `redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`))
+            ctx.redirect(withBack(redirect, ctx.url.pathname + ctx.url.search))
 
           ctx.deny(401, 'Sign in to continue')
         }
@@ -1476,6 +1483,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     url,
     prefix,
     signInPage: options.signInPage ?? paths?.signIn ?? '/',
+    ownSignInPage: options.signInPage,
     twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
     pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
@@ -1581,10 +1589,6 @@ function emailLinks(links: Partial<Record<LinkType, string>> | undefined, pages:
     throw new Error(`kayjs-auth: email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
 
   return merged as Record<LinkType, string>
-}
-
-function withQuery(path: string, query: string): string {
-  return `${path}${path.includes('?') ? '&' : '?'}${query}`
 }
 
 function authOf(ctx: object): Auth {

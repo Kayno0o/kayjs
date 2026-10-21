@@ -1,8 +1,8 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
-import { failure, schemas } from '../forms'
+import { failure, localized, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -17,7 +17,7 @@ export const verify = action(schemas.verify, async ({ token, password }, ctx) =>
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 export const code = action(schemas.emailCode, async ({ code }, ctx) => {
@@ -26,7 +26,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 export const resend = action(async (ctx) => {

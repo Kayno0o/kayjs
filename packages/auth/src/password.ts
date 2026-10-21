@@ -7,7 +7,7 @@ import { hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
 import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
-import { homeOf, newUserRecord, publicUser, unlinked } from './core'
+import { backOf, homeOf, newUserRecord, publicUser, unlinked } from './core'
 import { warnHolder, welcome } from './email'
 import { eraseUser } from './erase'
 import { afterResponse, report } from './events'
@@ -60,13 +60,13 @@ export interface PasswordSignInInput {
 export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
 
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
-export async function register(state: RequestState, input: RegisterInput, captcha?: string): Promise<RegisterResult> {
+export async function register(state: RequestState, input: RegisterInput, options: Pick<SignInOptions, 'redirect' | 'captcha'> = {}): Promise<RegisterResult> {
   const { store } = state.core
 
   if (!state.core.signUp)
     return { ok: false, error: 'closed' }
 
-  const refused = await admit(state, 'register', captcha)
+  const refused = await admit(state, 'register', options.captcha)
 
   if (refused)
     return { ok: false, error: refused }
@@ -145,7 +145,8 @@ export async function register(state: RequestState, input: RegisterInput, captch
   // This browser may verify the address without signing in, as with `requireVerified` it cannot.
   await state.session.set('authRegistered', record.id)
   await state.session.unset('authHeld')
-  await welcome(state, record)
+  await keepBack(state, options.redirect)
+  await welcome(state, record, backOf(state.core, options.redirect))
 
   // A guest stays signed in: the account was theirs already.
   if (requireVerified && !guest)
@@ -249,6 +250,16 @@ async function answerHeld(state: RequestState, holder: UserRecord, password: str
   return { ok: true, signedIn: false }
 }
 
+// Parks the page a visitor asked for beside the account they may have verified, for the mail a resend sends.
+async function keepBack(state: RequestState, redirect: string | undefined): Promise<void> {
+  const back = backOf(state.core, redirect)
+
+  if (back === null)
+    await state.session.unset('authBack')
+  else
+    await state.session.set('authBack', back)
+}
+
 export async function signInWithPassword(state: RequestState, input: PasswordSignInInput, options: Pick<SignInOptions, 'redirect' | 'captcha'>): Promise<PasswordSignInResult> {
   const { store } = state.core
   const byEmail = input.identifier.includes('@')
@@ -283,6 +294,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (state.core.email?.requireVerified && record!.emailVerifiedAt === null) {
     // The password is proven: this browser may have the verification link resent, and confirm it, as the one that registered.
     await state.session.set('authRegistered', record!.id)
+    await keepBack(state, options.redirect)
 
     return { ok: false, error: 'unverified' }
   }

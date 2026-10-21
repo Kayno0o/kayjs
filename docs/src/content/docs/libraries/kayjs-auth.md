@@ -68,7 +68,7 @@ A magic link carries the choice of the browser that asked for it, so opened in a
 createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
 ```
 
-To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page. List `authExtension(() => import('./src/auth'))` instead of `authPages`.
+To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page, which `auth.guard()` and `requireUser()` then send visitors to, with `?redirect=` back. List `authExtension(() => import('./src/auth'))` instead of `authPages`.
 
 ### Postgres
 
@@ -194,7 +194,9 @@ form(action={signIn})
 
 `register({ email, password, username })` creates an account the same way, answering `errors` by field.
 
-Every way of signing in takes what is not a credential in one trailing options object: `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
+Every way of signing in takes what is not a credential in one trailing options object: `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { redirect, remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })`, `requestPasswordReset(email, { redirect, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
+
+The page a visitor asked for survives registering, the mailed verification and reset links, a failed OAuth sign-in and the second factor, so signing in always brings them back to it.
 
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 

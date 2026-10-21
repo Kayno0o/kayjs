@@ -339,6 +339,37 @@ describe('guard', () => {
     expect(await run(auth.guard({ redirect: '' }), guardContext({ locals: anonymous }))).toBe('deny 401')
   })
 
+  test('with a `signInPage` of its own and no prebuilt pages, a guard sends an anonymous visitor reading there, with where they were going', async () => {
+    const { auth } = testApp({ signInPage: '/login' })
+    const anonymous = await contextOf(auth.plugin)
+
+    expect(await run(auth.guard(), guardContext({ locals: anonymous, path: '/admin/posts?page=2' }))).toBe('redirect /login?redirect=%2Fadmin%2Fposts%3Fpage%3D2')
+    expect(await run(auth.guard({ require: 'editor' }), guardContext({ locals: anonymous, path: '/admin' }))).toBe('redirect /login?redirect=%2Fadmin')
+    expect(await run(auth.guard({ redirect: '' }), guardContext({ locals: anonymous }))).toBe('redirect /login?redirect=%2F')
+    expect(await run(auth.guard({ redirect: '/elsewhere' }), guardContext({ locals: anonymous }))).toBe('redirect /elsewhere?redirect=%2F')
+    expect(await run(auth.guard(), guardContext({ locals: anonymous, method: 'POST' }))).toBe('deny 401')
+  })
+
+  test('requireUser sends an anonymous visitor the same way', async () => {
+    const withPage = testApp({ signInPage: '/login' })
+    const without = testApp()
+    const ask = async (setup: typeof withPage) => {
+      const { auth } = (await contextOf(setup.auth.plugin)) as { auth: Auth }
+
+      try {
+        await auth.requireUser()
+      }
+      catch (outcome) {
+        return outcome instanceof Error ? outcome.message : (outcome as { location?: string, status?: number }).location ?? (outcome as { status?: number }).status
+      }
+
+      return 'passed'
+    }
+
+    expect(await ask(withPage)).toBe('/login?redirect=%2F')
+    expect(await ask(without)).toBe(401)
+  })
+
   test('lets a signed-in user through, and denies one without the role asked', async () => {
     const { auth, browser } = await seeded()
     const ada = browser()

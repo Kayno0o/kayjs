@@ -16,6 +16,7 @@ import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
 import type { UserDataRules } from './userData'
+import { localPath } from 'kay'
 
 // A visit or a token use is recorded at most this often, so a busy browser or device does not write on every request.
 export const TOUCH_EVERY_MS = 5 * 60 * 1000
@@ -33,6 +34,8 @@ export interface AuthSessionData {
   authRegistered?: string
   // The address this browser registered while another account held it, for the resend button to answer as it does a new account's, mailing no one.
   authHeld?: string
+  // The page the visitor who registered, or signed in unverified, asked for: the verification mail a resend sends leads back to it.
+  authBack?: string
 }
 
 export interface SignedIn {
@@ -91,6 +94,8 @@ export interface Core {
   url?: string | undefined
   prefix: string
   signInPage: string
+  // The `signInPage` the app gave, which a guard sends visitors to even without the prebuilt pages.
+  ownSignInPage?: string | undefined
   twoFactorPage: string
   // The prebuilt pages' prefix and home, with the `pages` option.
   pages?: { prefix: string, home: string, remember: RememberMode, profile?: ProfileOptions | undefined } | undefined
@@ -213,6 +218,28 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
 // Where a flow lands when nothing asked for another page: the prebuilt pages' `home`, else `/`.
 export function homeOf(core: Pick<Core, 'pages'>): string {
   return core.pages?.home ?? '/'
+}
+
+export function withQuery(path: string, query: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}${query}`
+}
+
+// The sign-in page, or any page, with where to come back to once the visitor is in: `?redirect=`.
+export function withBack(path: string, back: string): string {
+  return withQuery(path, `redirect=${encodeURIComponent(back)}`)
+}
+
+// The page a link or a form was given to lead back to: a path of the site other than the pages' home, which a bare link leads to anyway; null for none.
+export function backOf(core: Pick<Core, 'pages'>, redirect: string | null | undefined): string | null {
+  const home = homeOf(core)
+  const path = localPath(redirect, home)
+
+  return path === home ? null : path
+}
+
+// Where a guard sends an anonymous visitor: the prebuilt sign-in page, else the app's own `signInPage`, else nowhere and the visitor gets a 401.
+export function guardPageOf(core: Pick<Core, 'pages' | 'signInPage' | 'ownSignInPage'>): string | undefined {
+  return core.pages ? core.signInPage : core.ownSignInPage
 }
 
 // Whether an admin bars `record` from signing in at this moment.

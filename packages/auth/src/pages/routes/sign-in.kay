@@ -7,7 +7,7 @@ import Panel from '../components/panel.kay'
 import PasskeySignIn from '../components/passkey-sign-in.kay'
 import ProviderButtons from '../components/provider-buttons.kay'
 import Separator from '../components/separator.kay'
-import { captchaFor, captchaOf, failure, guarded, oauthFailure, refusal, refusedFor, remembered, rememberOf, schemas } from '../forms'
+import { captchaFor, captchaOf, failure, guarded, localized, oauthFailure, refusal, refusedFor, remembered, rememberOf, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -20,7 +20,7 @@ export const password = action(schemas.signIn, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 }, guarded)
 
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
@@ -35,7 +35,7 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignInOptions())
@@ -43,7 +43,7 @@ export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignI
 export const passkey = action(schemas.passkey, async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPasskey(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
 
-  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localize(result.redirect))
+  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localized(result.redirect))
 })
 
 const auth = ctx.locals.auth
@@ -99,7 +99,7 @@ Panel(title={t('auth.signIn.title')})
       Message(text={signInError})
     Button(type="submit" tone="accent" label={t('auth.signIn.submit')})
     if features.email
-      a(href={localize(`${prefix}/reset-password`)}) {t('auth.signIn.forgot')}
+      a(href={localize(`${prefix}/reset-password?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.forgot')}
   if features.passkeys
     PasskeySignIn(redirect={redirect} label={t('auth.signIn.passkey')} failed={failure('invalid')})
   if features.email

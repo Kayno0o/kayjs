@@ -244,7 +244,7 @@ describe('the prebuilt pages', () => {
 
     const visitor = await browser()
 
-    expect(await visitor.submit(password, { identifier: 'totp@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })).toMatchObject({ url: '/auth/two-factor', status: 200 })
+    expect(await visitor.submit(password, { identifier: 'totp@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })).toMatchObject({ url: '/auth/two-factor?redirect=%2Fauth%2Faccount', status: 200 })
     expect(text(await visitor.submit(verify, { code: '000000' }, { from: '/auth/two-factor' }), '[role="alert"]')).toBe('Wrong code.')
 
     const account = await visitor.submit(verify, { code: await totpCode(secret, totpStep() + 1) }, { from: '/auth/two-factor' })

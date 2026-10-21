@@ -3,7 +3,7 @@ import type { Core } from './core'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
-import { banned } from './core'
+import { backOf, banned, withBack } from './core'
 import { report } from './events'
 import { mailLockout } from './guesses'
 import { deriveKeys, digest } from './keys'
@@ -68,7 +68,10 @@ export async function completeSignIn(state: RequestState, record: UserRecord, re
 
   await state.session.set('authChallenge', { user: record.id, version: record.sessionVersion, redirect, method, expires: Date.now() + CHALLENGE_MAX_AGE_MS })
 
-  return { ok: true, redirect: state.core.twoFactorPage }
+  // The code page carries the page asked for too, for the link back to sign-in when the challenge is gone by the time the code is typed.
+  const back = backOf(state.core, redirect)
+
+  return { ok: true, redirect: back === null ? state.core.twoFactorPage : withBack(state.core.twoFactorPage, back) }
 }
 
 // Whether this session holds a sign-in waiting for its second factor.

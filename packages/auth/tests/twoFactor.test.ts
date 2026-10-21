@@ -80,7 +80,7 @@ describe('signing in with a second factor', () => {
     const { browser, code } = await enrolled()
     const visitor = browser()
 
-    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/account' })).toEqual({ ok: true, redirect: '/two-factor' })
+    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/account' })).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Faccount' })
     expect(await visitor.json('/me')).toBe('anonymous')
     expect(await visitor.call('twoFactorPending')).toBe(true)
 
@@ -147,7 +147,7 @@ describe('signing in with a second factor', () => {
     await visitor.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
     const token = new URL(mails.at(-1)!.url!).searchParams.get('token')!
 
-    expect(await visitor.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/two-factor' })
+    expect(await visitor.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Faccount' })
     expect(await visitor.json('/me')).toBe('anonymous')
     expect(await visitor.call('verifyTwoFactor', await totpCode(setup.secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/account' })
   })

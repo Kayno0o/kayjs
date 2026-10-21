@@ -10,7 +10,7 @@ import { localPath } from 'kay'
 import { durationSeconds } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
-import { banned, homeOf } from './core'
+import { backOf, banned, homeOf, withBack } from './core'
 import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
@@ -134,12 +134,13 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
     return refused
 
   const nonce = await bindCode(state, 'verify-email', email)
+  const back = await state.session.get('authBack') ?? null
 
   // The signed-in user's own address tells nothing, so a failing mailer fails the call.
   if (current)
-    await issue(state, current, 'verify-email', email, null, nonce)
+    await issue(state, current, 'verify-email', email, back, nonce)
   else if (record)
-    void issueQuietly(state, record, 'verify-email', email, null, nonce)
+    void issueQuietly(state, record, 'verify-email', email, back, nonce)
 
   return { ok: true }
 }
@@ -168,7 +169,18 @@ export async function verifyEmail(state: RequestState, token: string, password?:
 
   await state.core.store.users.update(record.id, { emailVerifiedAt: new Date() })
 
-  return { ok: true, redirect: current?.id === record.id ? homeOf(state.core) : state.core.signInPage }
+  return { ok: true, redirect: afterVerifying(state, current?.id === record.id, spent.token.redirect) }
+}
+
+// Where the browser goes once an address is verified: on to the page the visitor asked for when signed in, else to sign in and then to it.
+function afterVerifying(state: RequestState, signedIn: boolean, back: string | null): string {
+  const home = homeOf(state.core)
+  const page = backOf(state.core, back)
+
+  if (signedIn)
+    return page ?? home
+
+  return page === null ? state.core.signInPage : withBack(state.core.signInPage, page)
 }
 
 // Counted as a sign-in attempt on the account, since it is one.
@@ -193,8 +205,8 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
   return true
 }
 
-export async function requestPasswordReset(state: RequestState, email: string, captcha?: string): Promise<MailRequestResult> {
-  return mailByAddress(state, email, 'reset-password', null, captcha)
+export async function requestPasswordReset(state: RequestState, email: string, captcha?: string, redirect?: string): Promise<MailRequestResult> {
+  return mailByAddress(state, email, 'reset-password', backOf(state.core, redirect), captcha)
 }
 
 // Sets the password the link was sent for and ends every other session the user held.
@@ -232,7 +244,7 @@ export async function resetPassword(state: RequestState, token: string, password
   await revokeBearerTokens(state.core, record.id)
   await notify(state, record, 'password-changed')
 
-  return state.complete(record, homeOf(state.core), 'reset-password')
+  return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'reset-password')
 }
 
 export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
@@ -304,9 +316,9 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 }
 
 // On registering: the verification mail, when the app sends mail.
-export async function welcome(state: RequestState, record: UserRecord): Promise<void> {
+export async function welcome(state: RequestState, record: UserRecord, back: string | null): Promise<void> {
   if (state.core.email && record.email !== null && record.email !== '')
-    void issueQuietly(state, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
+    void issueQuietly(state, record, 'verify-email', record.email, back, await bindCode(state, 'verify-email', record.email))
 }
 
 // A registration for an address an account holds already, where registering signs no one in: this session is left as a new account's would be, and the holder is told, off the response's path and at most a few times an hour.
@@ -352,7 +364,7 @@ export async function verifyEmailCode(state: RequestState, code: string): Promis
 
   await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() })
 
-  return { ok: true, redirect: (await state.current())?.id === spent.record.id ? homeOf(state.core) : state.core.signInPage }
+  return { ok: true, redirect: afterVerifying(state, (await state.current())?.id === spent.record.id, spent.token.redirect) }
 }
 
 // The code this session waits for, for the page that asks for it.

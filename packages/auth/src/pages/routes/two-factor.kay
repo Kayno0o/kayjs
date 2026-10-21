@@ -1,9 +1,10 @@
 --- server
+import { localPath } from 'kay'
 import { localize, t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import PasskeyTwoFactor from '../components/passkey-two-factor.kay'
-import { failure, schemas } from '../forms'
+import { failure, localized, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -16,7 +17,7 @@ export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 export const passkeyOptions = action(async (ctx) => {
@@ -31,12 +32,13 @@ export const passkey = action(schemas.passkey, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localize(result.redirect))
+  return ctx.redirect(localized(result.redirect))
 })
 
 const auth = ctx.locals.auth
 const features = auth.features()
 const pending = await auth.twoFactorPending()
+const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const error = ctx.failed(verify)?.data?.error
 ---
 head
@@ -54,4 +56,4 @@ Panel(title={t('auth.twoFactor.title')})
       PasskeyTwoFactor(label={t('auth.twoFactor.passkey')} failed={failure('invalid')})
   else
     p {t('auth.twoFactor.nothing')}
-    a(href={localize(features.signInPage)}) {t('auth.signIn.title')}
+    a(href={localize(`${features.signInPage}?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.title')}
