@@ -71,13 +71,14 @@ export async function* recorded(pieces: AsyncIterable<Piece>, about: { provider:
     throw thrown
   }
   finally {
-    const { records } = slot()
+    const kept = slot()
+    const { records } = kept
 
     if (outcome === 'ok' && signal.aborted)
       outcome = 'stopped'
 
     records.push({
-      id: slot().next++,
+      id: kept.next++,
       at: new Date().toISOString(),
       provider: about.provider,
       model: about.model,
