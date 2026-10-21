@@ -62,7 +62,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 | 2.3 Usable over a slow connection or offline | App | `offline: true` turns on a service worker keeping the site's files and chosen pages, with a fallback page | [Offline](sitemap-search-fonts.md#offline) |
 | 2.6 Design and code reviews with environmental goals | App | `kay check` and `kay build` report the criteria marked `Checked` below, so a review can lean on them | [Checks](checks.md#what-kay-check-verifies) |
 | 2.9 Impact of ready-made UI components | App | `kay build` prints what each island and each route weighs, whole, in requests and in carbon, and `--analyze` names the modules weighing most | [Build](build-and-start.md#build-and-start-commands) |
-| 2.10 Impact of third-party services | App | `analytics()` forwards visits from the server so the CSP needs no third-party host; the app chooses which other services it loads | [Privacy](privacy.md#count-visits-through-your-own-origin) |
+| 2.10 Impact of third-party services | App | `analytics()` forwards visits from the server so the CSP needs no third-party host; the app chooses which other services it loads | [Privacy](analytics.md#count-visits-through-your-own-origin) |
 
 ### Architecture and UX
 

@@ -20,7 +20,7 @@
 
 To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form. The topic files below cover what it leaves out: open one when a task needs more. Each opens with its common tasks, one sentence and one example apiece, which answer most tasks; the exact rules follow under Reference, one per bullet, to search for an edge case.
 
-- [Build a site](llms/site.md): one walkthrough of a small site: config and page titles, the layout and its nav, a Markdown collection and its pages, the 404 page, islands and shared state, a form checked on the server and in the browser
+- [Build a site](llms/site.md): one walkthrough of a small site: config, layout and nav, a Markdown collection, the 404 page, islands and shared state, a form checked on both sides
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`
 - [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, using one, and the extensions a library adds: pages, dev tool tabs, commands
 - [Template lines](llms/templates.md): the indented template syntax: elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots, snippets
@@ -57,7 +57,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>`, `kay screenshot <path>`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html`), `kay lsp`, `kay mcp`, `kay/compiler`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `render`, `screenshot`, `routes`, `env`, `doctor`, `upgrade`, `explain`, `fmt` (`--from-html`), `lsp`, `mcp`, `kay/compiler`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
 - [Queues](llms/queues.md): jobs surviving a restart
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression
@@ -65,5 +65,6 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.56
 - [What's new](llms/whats-new.md): what each recent release adds, newest first
 - [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.62
-- [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person, analytics and Web Vitals through your origin
+- [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person
+- [Analytics and Web Vitals](llms/analytics.md): visits and real load times through your origin, consent
 - [Eco-design](llms/eco-design.md): the RGESN criteria kay meets, checks or leaves to the app
