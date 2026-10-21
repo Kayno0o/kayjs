@@ -266,6 +266,7 @@ export default defineConfig({
 - A weight, style or subset the package lacks stops the build, naming the ones it has.
 - A face to preload is written as a file entry.
 - `src` is a `.woff2`, `.woff`, `.ttf` or `.otf` file relative to the root, or a file of an installed package.
+- A stylesheet importing a font file, `import '@fontsource/inter/400.css'`, links each file it names as a content-named asset instead of inlining it; `fonts` still serves a family in less CSS.
 - `weight` defaults to 400, or takes a range for a variable font; `style` to `normal`; `display` to `swap`; `unicodeRange` is passed through.
 - A stylesheet names the family as it would any other: `font-family: Inter, system-ui, sans-serif`. With Tailwind, `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 - A face loads once the page uses it, its text showing in the fallback font until then (`display: swap`).

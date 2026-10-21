@@ -334,6 +334,8 @@ The fallback is Arial or Roboto, Times New Roman or Noto Serif, or Courier New, 
 
 <Callout type="note">
 
+A stylesheet importing a font file, such as `import '@fontsource/inter/400.css'`, links each file it names as an asset, never inlined into the CSS, though `fonts` keeps the page's CSS smaller.
+
 Faces load once the page uses them. `preload: true` fetches one with the page, on a Fontsource entry too, but can hold back the first paint on a slow phone.
 
 </Callout>
