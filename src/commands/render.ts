@@ -86,7 +86,7 @@ export const render: Command = {
     const dir = await mkdtemp(join(tmpdir(), `kay-render-${process.pid}-`))
     const socket = join(dir, 'server.sock')
     const output = join(root, KAY_DIR, `render-${process.pid}`)
-    const env = await environmentWithoutDotenv()
+    const env = await environmentWithoutDotenv(root)
     let serving: (value: true) => void
     const served = new Promise<true>((resolve) => {
       serving = resolve

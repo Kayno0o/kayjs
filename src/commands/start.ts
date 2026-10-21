@@ -43,7 +43,7 @@ export const start: Command = {
     await warnStale(root, built.mtimeMs)
 
     const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs)
-    const env = await environmentWithoutDotenv()
+    const env = await environmentWithoutDotenv(root)
     const forwarded = new Set<string>()
     let server: Bun.Subprocess | undefined
 

@@ -4,8 +4,10 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { environmentWithoutDotenv } from '../src/dev/sources'
 import { scratchDir } from './scratch'
 
+const CWD = process.cwd()
 const CLI = join(import.meta.dir, '../src/cli.ts')
 
 async function until(condition: () => boolean | Promise<boolean>, timeout = 20_000) {
@@ -208,4 +210,60 @@ describe.concurrent('kay dev .env values', () => {
       await project.cleanup()
     }
   }, 60_000)
+})
+
+// The variables `environmentWithoutDotenv` leaves out, for a project whose `.env` holds `file` and a shell holding `shell`.
+async function leftOut(file: string, shell: Record<string, string>, from?: string): Promise<string[]> {
+  const root = await scratchDir('dev-env-probe-')
+  const saved = { ...process.env }
+  const keys = ['A', 'B', 'C']
+
+  await Bun.write(join(root, '.env'), file)
+
+  try {
+    for (const key of keys)
+      delete process.env[key]
+
+    Object.assign(process.env, shell)
+    process.chdir(from ?? root)
+
+    const env = await environmentWithoutDotenv(root)
+
+    return Object.keys(shell).filter(key => env[key] === undefined)
+  }
+  finally {
+    process.chdir(CWD)
+
+    for (const key of keys)
+      delete process.env[key]
+
+    Object.assign(process.env, saved)
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+describe('environmentWithoutDotenv', () => {
+  it('leaves out a shell variable equal to the file\'s value, and keeps one that differs', async () => {
+    expect(await leftOut('A=same\nB=file\n', { A: 'same', B: 'shell' })).toEqual(['A'])
+  })
+
+  it('leaves out a shell variable equal to the file\'s value after expansion', async () => {
+    expect(await leftOut('A=${HOME}/x\n', { A: `${process.env.HOME}/x` })).toEqual(['A'])
+  })
+
+  it('keeps the shell\'s value of a key an expansion of the file names, the documented limit', async () => {
+    expect(await leftOut('A=file\nB=${A}-b\n', { A: 'shell' })).toEqual([])
+  })
+
+  it('reads the .env of the project root, not of the directory it was called from', async () => {
+    const elsewhere = await scratchDir('dev-env-elsewhere-')
+
+    try {
+      await Bun.write(join(elsewhere, '.env'), 'B=other\n')
+      expect(await leftOut('A=same\n', { A: 'same', B: 'other' }, elsewhere)).toEqual(['A'])
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
 })

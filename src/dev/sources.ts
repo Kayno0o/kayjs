@@ -24,19 +24,22 @@ const TEST_CONFIG = /^(?:playwright|vitest|jest|cypress)\.config\.[cm]?[jt]s$/
 const EDITOR_SCRATCH = /(?:~|\.sw[opx]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
 const ANY_FILE = /^/
 
-// What Bun loaded from the `.env` files of the directory this process started in, as it read them then: the child loads them again, but never over a variable already set.
+// What Bun loaded from the `.env` files of the project's directory, as it reads them there: the child loads them again, but never over a variable already set.
 // A variable the shell set to the very value its `.env` holds cannot be told from one the file set, and follows the file.
-// The probe runs twice: the first, on no variables, names the keys the files hold; the second keeps the shell's others, so a value expanding `$HOME` or another key resolves as it does for the real process and follows the file rather than looking set by the shell.
-export async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
+// The probe runs twice when a value holds a `$`: the first, on no variables, names the keys the files hold; the second keeps the shell's others, so a value expanding `$HOME` or another key resolves as it does for the real process and follows the file rather than looking set by the shell.
+// A shell variable naming a key the files also hold keeps its value.
+export async function environmentWithoutDotenv(root: string): Promise<Record<string, string | undefined>> {
   const base: Record<string, string> = process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }
-  const first = await dotenvProbe(base)
+  const first = await dotenvProbe(root, base)
 
   if (first === undefined)
     return process.env
 
   const named = new Set(Object.keys(first))
+  // The first probe expanded every `$`, so the files themselves say whether a second could differ.
+  const expands = dotenvExpands(root)
   const shell = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && !named.has(entry[0])))
-  const loaded = await dotenvProbe({ ...shell, ...base })
+  const loaded = expands ? await dotenvProbe(root, { ...shell, ...base }) : first
 
   if (loaded === undefined)
     return process.env
@@ -44,9 +47,19 @@ export async function environmentWithoutDotenv(): Promise<Record<string, string 
   return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => !named.has(key) || loaded[key] !== value))
 }
 
+// Whether a `.env` file at the root of the project holds a `$`, which Bun expands; one that cannot be read counts as holding it.
+function dotenvExpands(root: string): boolean {
+  try {
+    return readdirSync(root).some(name => name.startsWith('.env') && readFileSync(join(root, name), 'utf8').includes('$'))
+  }
+  catch {
+    return true
+  }
+}
+
 // The environment a process started on `env` in this directory ends up with, or undefined when it could not be read.
-async function dotenvProbe(env: Record<string, string>): Promise<Record<string, string> | undefined> {
-  const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: process.cwd(), env, stdout: 'pipe', stderr: 'ignore' })
+async function dotenvProbe(root: string, env: Record<string, string>): Promise<Record<string, string> | undefined> {
+  const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: root, env, stdout: 'pipe', stderr: 'ignore' })
   const [output, code] = await Promise.all([new Response(probe.stdout).text(), probe.exited])
 
   return code === 0 ? JSON.parse(output) as Record<string, string> : undefined
