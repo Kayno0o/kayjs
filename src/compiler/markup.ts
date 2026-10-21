@@ -396,7 +396,7 @@ export abstract class TemplateWriter {
     const boundEntry = (attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string) => {
       const passedOn = bindsOwnProp(this.facts, this.source(attribute.expression))
       const target = () => b.add('(').addSource(attribute.expression).add(')')
-      const read = () => passedOn ? target() : target().add('()')
+      const read = () => passedOn === undefined ? target().add('()') : target()
 
       if (!getters) {
         entry(name, read, false)
@@ -408,10 +408,10 @@ export abstract class TemplateWriter {
       separate()
       b.add(`set ${JSON.stringify(name)}(kayValue) { `)
 
-      if (passedOn)
-        target().add(' = kayValue')
-      else
+      if (passedOn === undefined)
         target().add('.set(kayValue)')
+      else
+        b.add(`${PROPS}[${JSON.stringify(passedOn)}] = kayValue`)
 
       b.add(' }')
     }

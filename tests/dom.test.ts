@@ -3064,6 +3064,10 @@ describe('bind: on a component in the browser', () => {
     'main.kay': '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(open={open()})\np.out {open() ? \'yes\' : \'no\'}\n',
     'Toggle.kay': toggle,
   })
+  const mountFollow = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst flag = signal(false)\n---\nToggle(open={flag()})\nbutton.flip(onClick={() => flag.set(!flag())}) flip\n',
+    'Toggle.kay': toggle,
+  })
   const mountDeep = site({
     'main.kay': '---\nimport { signal } from \'kay\'\nimport Middle from \'./Middle.kay\'\nconst open = signal(false)\n---\nMiddle(bind:open={open})\np.out {open() ? \'yes\' : \'no\'}\n',
     'Middle.kay': middle,
@@ -3092,6 +3096,25 @@ describe('bind: on a component in the browser', () => {
 
   it('keeps the write in the child when the parent passes a plain value', async () => {
     expect(await pressed(mountPlain)).toEqual({ before: ['off', 'no'], after: ['on', 'no'] })
+  })
+
+  it('follows the parent again once it changes the value after a local write', async () => {
+    const { root, dispose } = await mountFollow()
+
+    try {
+      root.querySelector('button')!.click()
+      await settle()
+      expect(root.querySelector('button')!.textContent).toBe('on')
+      root.querySelector<HTMLElement>('.flip')!.click()
+      await settle()
+      expect(root.querySelector('button')!.textContent).toBe('on')
+      root.querySelector<HTMLElement>('.flip')!.click()
+      await settle()
+      expect(root.querySelector('button')!.textContent).toBe('off')
+    }
+    finally {
+      await dispose()
+    }
   })
 
   it('passes the binding through two levels', async () => {

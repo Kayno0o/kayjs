@@ -1382,7 +1382,10 @@ function signalProps(type: t.TSType | undefined, body: t.Statement[]): { signals
     if (key !== undefined && kind)
       found.set(key, kind)
 
-    if (key !== undefined && written?.type === 'TSTypeReference' && written.typeName.type === 'Identifier' && bindableNames.has(written.typeName.name))
+    // `Bindable<T> | undefined` is as bindable as `Bindable<T>`.
+    const options = written?.type === 'TSUnionType' ? written.types : [written]
+
+    if (key !== undefined && options.some(option => option?.type === 'TSTypeReference' && option.typeName.type === 'Identifier' && bindableNames.has(option.typeName.name)))
       bindable.add(key)
   }
 

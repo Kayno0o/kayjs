@@ -6,6 +6,7 @@ import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
+import { PROPS } from './names'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -950,13 +951,13 @@ export class JsxTemplate {
     const passedOn = bindsOwnProp(this.facts, this.text(attribute.expression))
 
     b.wrap(attribute.name, () => b.add(prop))
-    b.add('={KayBound(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add(JSON.stringify(prop))).add(', (').addSource(attribute.expression).add(passedOn ? ')' : ')()')
+    b.add('={KayBound(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add(JSON.stringify(prop))).add(', (').addSource(attribute.expression).add(passedOn === undefined ? ')()' : ')')
     b.add(', (kayValue) => ')
 
-    if (passedOn)
-      b.add('{ (').addSource(attribute.expression).add(') = kayValue })}')
-    else
+    if (passedOn === undefined)
       b.add('(').addSource(attribute.expression).add(').set(kayValue))}')
+    else
+      b.add(`{ ${PROPS}[${JSON.stringify(passedOn)}] = kayValue })}`)
   }
 
   private emitText(node: TextNode) {

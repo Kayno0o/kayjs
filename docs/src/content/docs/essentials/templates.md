@@ -224,6 +224,8 @@ button(onClick={() => name.set('')}) Clear
 
 `bind:value` and `bind:checked` read and write a signal both ways.
 
+On a component, `bind:open={open}` binds a prop typed `Bindable<boolean>` to a signal: see [Components](/essentials/components).
+
 ### Open a popover or a dialog with no script
 
 A button can open a popover or a dialog on its own, so the component stays static and ships no JavaScript. `popovertarget` toggles a popover, and `commandfor` with `command` also opens a dialog.

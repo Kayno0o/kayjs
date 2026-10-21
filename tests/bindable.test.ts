@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { signal } from '../src/runtime/core'
 import { bindable } from '../src/runtime/internal'
+import { flush, renderEffect, root } from '../src/runtime/reactive'
 
 const PARENT = '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(bind:open={open})\n'
 const CHILD = '---\nimport { type Bindable } from \'kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) go\n'
@@ -26,7 +27,20 @@ describe('bind: on a component', () => {
   it('passes a Bindable prop of the parent on by name, through two levels', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nToggle(bind:open={open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return (__props.open) }, set "open"(kayValue) { (__props.open) = kayValue } }')
+    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return (__props.open) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+  })
+
+  it('hands on the default of an optional Bindable prop, and writes the props object', () => {
+    const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open = false } = props<{ open?: Bindable<boolean> | undefined }>()\n---\nToggle(bind:open={open})\n'
+
+    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return ((__props.open !== undefined ? __props.open : __default_0())) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+    expect(compile(middle, 'html').tsx).toContain('{ "open": ((__props.open !== undefined ? __props.open : __default_0())) }')
+  })
+
+  it('passes on the prop through the name of the props object', () => {
+    const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst p = props<{ open: Bindable<boolean> }>()\n---\nToggle(bind:open={p.open})\n'
+
+    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return (p.open) }, set "open"(kayValue) { __props["open"] = kayValue } }')
   })
 
   it('reads and assigns the prop as a plain name, wrapping the props only where a prop is Bindable', () => {
@@ -63,6 +77,23 @@ describe('the props of a component with a Bindable prop', () => {
     plain.open = true
     expect(plain.open).toBe(true)
     expect(open()).toBe(true)
+  })
+
+  it('follows the parent again once its value changes after a local write', () => {
+    const flag = signal(false)
+    const parent: { open: boolean } = Object.defineProperty({ open: false }, 'open', { get: () => flag() })
+    const props = bindable(parent, ['open'])
+
+    const seen: boolean[] = []
+
+    root(() => renderEffect(() => void seen.push(props.open)))
+    props.open = true
+    flush()
+    flag.set(true)
+    flush()
+    flag.set(false)
+    flush()
+    expect(seen).toEqual([false, true, true, false])
   })
 
   it('leaves the other props to the target', () => {

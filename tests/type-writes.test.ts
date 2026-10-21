@@ -224,7 +224,7 @@ describe('the runtime helpers', () => {
   })
 
   it('write a logical assignment only when it changes the value', () => {
-    const frozen = Object.freeze({ a: 1, b: 0 })
+    const frozen = Object.freeze({ a: 1, b: Number('0') })
 
     expect(updateTo(frozen, 'a', current => current || 2, 'logical')).toBe(1)
     expect(() => updateTo(frozen, 'b', current => current || 2, 'logical')).toThrow(TypeError)

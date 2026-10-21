@@ -1,5 +1,5 @@
 import type { Signal } from './core'
-import { createSignal, isSignal, untrack } from './reactive'
+import { createSignal, isSignal, unrecorded, untrack } from './reactive'
 
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions, reviveActions } from './action'
@@ -98,41 +98,56 @@ export function updateBack<Current, Next>(current: Current, update: (current: Wr
   return (typeof next === 'function' ? next : current) as Kept<Current, Next>
 }
 
-// The props of a component with `Bindable` props: a write goes through the parent's setter when it bound the prop with `bind:`, else it is kept here and read back in place of the parent's value.
+// The props of a component with `Bindable` props: a write goes through the parent's setter when it bound the prop with `bind:`, else it is kept here, read back in place of the parent's value until that value changes.
 export function bindable<Props extends object>(props: Props, keys: readonly string[]): Props {
-  const local = new Map<PropertyKey, [read: () => { value: unknown } | undefined, write: (next: { value: unknown } | undefined) => void]>()
-  const cell = (key: PropertyKey) => {
-    let held = local.get(key)
+  const names = new Set<PropertyKey>(keys)
+  const local = new Map<PropertyKey, Local>()
+  const held = (key: PropertyKey) => {
+    let kept = local.get(key)
 
-    if (!held) {
-      held = createSignal<{ value: unknown } | undefined>(undefined)
-      local.set(key, held)
+    if (!kept) {
+      const [version, bump] = unrecorded(() => createSignal(0))
+
+      kept = { version, bump, override: undefined }
+      local.set(key, kept)
     }
 
-    return held
+    return kept
   }
 
   return new Proxy(props, {
     get(target, key, receiver) {
-      if (keys.includes(key as string)) {
-        const override = cell(key)[0]()
+      const parent = Reflect.get(target, key, receiver)
 
-        if (override)
-          return override.value
-      }
+      if (!names.has(key))
+        return parent
 
-      return Reflect.get(target, key, receiver)
+      const kept = held(key)
+
+      kept.version()
+
+      if (kept.override && !Object.is(parent, kept.override.from))
+        kept.override = undefined
+
+      return kept.override ? kept.override.value : parent
     },
     set(target, key, value) {
-      if (!keys.includes(key as string))
+      if (!names.has(key) || Object.getOwnPropertyDescriptor(target, key)?.set)
         return Reflect.set(target, key, value)
 
-      if (Object.getOwnPropertyDescriptor(target, key)?.set)
-        return Reflect.set(target, key, value)
+      const kept = held(key)
 
-      cell(key)[1]({ value })
+      kept.override = { value, from: untrack(() => Reflect.get(target, key)) }
+      kept.bump(kept.version() + 1)
 
       return true
     },
   })
+}
+
+// What a child wrote to a prop, with the value the parent held then, and the version readers track for the writes.
+interface Local {
+  version: () => number
+  bump: (next: number) => void
+  override: { value: unknown, from: unknown } | undefined
 }

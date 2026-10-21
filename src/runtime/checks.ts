@@ -22,8 +22,11 @@ export type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
 
 type PropsOfComponent<Tag> = Tag extends (props: infer Props) => unknown ? Props : never
 
+// Whether a type carries the mark, which `unknown`, `object` and `any` do not.
+type Marked<T> = 0 extends 1 & T ? false : [T] extends [never] ? false : typeof BINDABLE extends keyof T ? true : false
+
 // The props of a component typed `Bindable`, which `bind:` takes.
-export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: [NonNullable<PropsOfComponent<Tag>[Key]>] extends [never] ? never : NonNullable<PropsOfComponent<Tag>[Key]> extends BindableMark ? Key : never }[keyof PropsOfComponent<Tag>]
+export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: Marked<NonNullable<PropsOfComponent<Tag>[Key]>> extends true ? Key : never }[keyof PropsOfComponent<Tag>]
 
 // What `bind:name` demands of the prop it names.
 export type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }

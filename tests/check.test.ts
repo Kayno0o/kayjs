@@ -919,6 +919,7 @@ describe.concurrent('kay check, edge cases', () => {
       '---',
       'import { memo, signal } from \'kay\'',
       'import Plain from \'../Plain.kay\'',
+      'import Loose from \'../Loose.kay\'',
       'import Toggle from \'../Toggle.kay\'',
       '',
       'const open = signal(false)',
@@ -933,13 +934,15 @@ describe.concurrent('kay check, edge cases', () => {
       'Toggle(bind:open={fixed})',
       'Plain(bind:open={open})',
       'Toggle(bind:missing={open})',
+      'Toggle(open={false})',
+      'Loose(bind:open={open})',
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/Toggle.kay': toggle, 'src/Plain.kay': plain, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/Toggle.kay': toggle, 'src/Plain.kay': plain, 'src/Loose.kay': '---\nconst { open } = props<{ open: unknown }>()\n---\nspan {String(open)}\n', 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[13, 'TS2322'], [13, 'TS2345'], [14, 'TS2322'], [14, 'TS2339'], [15, 'TS2349'], [15, 'TS2339'], [16, 'TS2345'], [17, 'TS2322'], [17, 'TS2345']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[14, 'TS2322'], [14, 'TS2345'], [15, 'TS2322'], [15, 'TS2339'], [16, 'TS2349'], [16, 'TS2339'], [17, 'TS2345'], [18, 'TS2322'], [18, 'TS2345'], [20, 'TS2345'], [20, 'TS2345']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

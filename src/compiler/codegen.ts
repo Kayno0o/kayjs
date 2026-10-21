@@ -146,13 +146,13 @@ function islandKind(options: GenerateOptions): IslandKind {
 }
 
 // The ways the template names a prop typed `Bindable<T>`: its destructured name, or the props name and its key.
-function bindableNames(source: string, props: PropsDeclaration | undefined): Set<string> {
+function bindableNames(source: string, props: PropsDeclaration | undefined): Map<string, string> {
   const text = (span: Span) => source.slice(span.start, span.end)
   const alias = props?.name && text(props.name)
 
-  return new Set([
-    ...props?.bindings.filter(binding => binding.bindable === true).map(binding => text(binding.local)) ?? [],
-    ...alias === undefined ? [] : props!.bindable.map(key => `${alias}.${key}`),
+  return new Map([
+    ...props?.bindings.filter(binding => binding.bindable === true).map((binding): [string, string] => [text(binding.local), binding.key]) ?? [],
+    ...alias === undefined ? [] : props!.bindable.map((key): [string, string] => [`${alias}.${key}`, key]),
   ])
 }
 

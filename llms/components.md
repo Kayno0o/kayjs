@@ -71,7 +71,7 @@ if open()
 
 ### Bind a prop to the parent's signal
 
-A prop typed `Bindable<T>` from `kay` is read and assigned as a plain name, with no call. The parent binds it to a signal with `bind:`, and an assignment in the child writes that signal; with a plain value, `Toggle(open={false})`, the assignment stays in the child:
+A prop typed `Bindable<T>` from `kay` is read and assigned as a plain name, with no call. The parent binds it to a signal with `bind:`, and an assignment in the child writes that signal; with a plain value, `Toggle(open={false})`, the assignment stays in the child until the parent's value changes:
 
 ```kay
 ---
