@@ -54,7 +54,7 @@ const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
     fullWidth: true,
     showArea: true,
     showPoint: false,
-    ...stacked ? { low: Math.min(0, ...heights().flat().map(height => height ?? 0)) } : {},
+    ...stacked ? { low: heights().flat().reduce<number>((lowest, height) => Math.min(lowest, height ?? 0), 0) } : {},
     ...options,
     chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
     axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
