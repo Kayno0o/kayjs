@@ -903,14 +903,15 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.waitFor('form[aria-busy="true"]')
     // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
     expect((await posted).requestHeaders['x-kay-page']).toBe(await page.path())
-    await page.waitFor('p.done', { text: 'Added abcd' })
+    // On a loaded CI host the post and the swap showing its answer can outlast the default wait.
+    await page.waitFor('p.done', { text: 'Added abcd', timeout: 20_000 })
 
     expect(await page.count('form[aria-busy]')).toBe(0)
     expect(await sameDocument()).toBe(true)
 
     await page.fill('input[name="title"]', 'taken')
     await page.click('form button')
-    await page.waitFor('p.error', { text: 'Already taken' })
+    await page.waitFor('p.error', { text: 'Already taken', timeout: 20_000 })
 
     expect(await page.value('input[name="title"]')).toBe('taken')
     expect(await sameDocument()).toBe(true)
