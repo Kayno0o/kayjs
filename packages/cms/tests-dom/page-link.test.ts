@@ -223,6 +223,7 @@ test('the loader imports the module once, on the page swap that brings the cooki
 
   Object.assign(globalThis, { loaded: (url: string) => imported.push(url) })
   // `import()` is syntax, so the loader's call is swapped for a function that records the address.
+  // eslint-disable-next-line no-new-func, ts/no-unsafe-call -- the loader is the page's inline script, which only evaluating it runs
   new Function(pageLinkLoader().replace('import(', 'globalThis.loaded('))()
   document.dispatchEvent(new Event('kay:navigate'))
   expect(imported).toEqual([])

@@ -119,7 +119,7 @@ export function pageLinkModule(): string {
 // What the head of every page carries: one line that loads the module for a browser holding the hint or signed in, and costs any other nothing.
 // It waits for the document, as the meta naming the base comes after the head's scripts, and looks again after a page swap, as a sign-in ending in one leaves this script in place.
 export function pageLinkLoader(): string {
-  return `(()=>{let l;const go=()=>{!l&&/(?:^|; )(?:${HINT_COOKIE}|${SIGNED_IN_COOKIE})=/.test(document.cookie)&&(l=1,import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
+  return `(()=>{let l;const go=()=>{!l&&/(?:^|; )(?:${HINT_COOKIE}=|${SIGNED_IN_COOKIE}=)/.test(document.cookie)&&(l=1,import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
 }
 
 // The cookie that marks the browser as an editor's, slid forward each time the guard lets the editor through.
