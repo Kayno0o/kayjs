@@ -637,7 +637,7 @@ function swapBody(next: Document, policy: Policy): void {
   const focused = heldFocus()
 
   const kept = new Set<Element>()
-  // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and a restore puts back for the ones the swap kept.
+  // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and Chrome's swap loses with it too (a bare pair of moves keeps it, the swap's does not), so a restore puts back the ones the swap kept either way.
   const scrolls = new Map<Element, readonly [left: number, top: number]>()
 
   // Read before the first move, and only when the next page has an island to keep, so every read shares one layout instead of forcing one after each move.

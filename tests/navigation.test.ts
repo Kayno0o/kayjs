@@ -288,9 +288,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     const SCROLLS = { outer: [300, 40], inner: [120, 25] }
 
     // A panel scrolled both ways with another scrolled in it, and a field in the inner one holding the focus.
-    async function scrolledInIsland(on: TestPage, smooth = false): Promise<void> {
-      await on.evaluate(([scrolls, behavior]: [typeof SCROLLS, string]) => {
-        const island = document.querySelector('slot[data-persist]')!
+    async function scrolledInIsland(on: TestPage, smooth = false, host = 'slot[data-persist]'): Promise<void> {
+      await on.evaluate(([scrolls, behavior, where]: [typeof SCROLLS, string, string]) => {
+        const island = document.querySelector(where)!
         const outer = document.createElement('div')
         const inner = document.createElement('div')
         const input = document.createElement('input')
@@ -311,7 +311,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         island.append(outer)
         outer.scrollTo(scrolls.outer[1]!, scrolls.outer[0]!)
         inner.scrollTo(scrolls.inner[1]!, scrolls.inner[0]!)
-      }, [SCROLLS, smooth ? 'smooth' : 'auto'] as [typeof SCROLLS, string])
+      }, [SCROLLS, smooth ? 'smooth' : 'auto', host] as [typeof SCROLLS, string, string])
       // A smooth scroll to its place takes a moment.
       await on.waitUntil((expected: typeof SCROLLS) => {
         const outer = document.querySelector('.outer')!
@@ -389,6 +389,59 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
           await refreshed(fresh)
 
           expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: true })
+        })
+
+        it('keeps the scroll of a panel in an island kept only because its props did not change', async () => {
+          const box = 'slot[data-component$="box.kay"]'
+
+          await fresh.evaluate((selector: string) => {
+            (document.querySelector(selector) as HTMLElement & { kayMark?: string }).kayMark = 'kept'
+          }, box)
+          await scrolledInIsland(fresh, false, box)
+          await refreshed(fresh)
+
+          expect(await fresh.evaluate((selector: string) => (document.querySelector(selector) as HTMLElement & { kayMark?: string }).kayMark, box)).toBe('kept')
+          expect(await fresh.count('slot[data-persist] .outer')).toBe(0)
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+          expect(fresh.errors).toEqual([])
+        })
+
+        it('keeps them when the next page puts the island in a wrapper of its own', async () => {
+          await scrolledInIsland(fresh)
+          await fresh.evaluate(() => {
+            const link = Object.assign(document.createElement('a'), { href: '/wrapped', className: 'wrapped', textContent: 'Wrapped' })
+
+            document.querySelector('nav')!.append(link)
+            link.click()
+          })
+          await fresh.waitFor('h1', { text: 'Wrapped' })
+
+          expect(await fresh.count('section.wrapper > slot[data-persist] .outer')).toBe(1)
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+          expect(fresh.errors).toEqual([])
+        })
+
+        it('keeps the inner scroll of a long field nothing focuses', async () => {
+          await fresh.evaluate(() => {
+            const island = document.querySelector('slot[data-persist]')!
+            const line = Object.assign(document.createElement('input'), { className: 'line', value: 'x'.repeat(400) })
+            const area = Object.assign(document.createElement('textarea'), { className: 'area', rows: 3, cols: 20, value: Array.from({ length: 60 }, (_, row) => `row ${row}`).join('\n') })
+
+            line.setAttribute('aria-label', 'line')
+            area.setAttribute('aria-label', 'area')
+            island.append(line, area)
+            line.scrollLeft = 150
+            area.scrollTop = 200
+          })
+
+          const fields = async () => fresh.evaluate(() => ({ line: document.querySelector<HTMLInputElement>('input.line')!.scrollLeft, area: document.querySelector<HTMLTextAreaElement>('textarea.area')!.scrollTop, focused: document.activeElement === document.body }))
+          const before = await fields()
+
+          expect(before.line).toBeGreaterThan(0)
+          expect(before.area).toBeGreaterThan(0)
+          await refreshed(fresh)
+          expect(await fields()).toEqual(before)
+          expect(fresh.errors).toEqual([])
         })
 
         it('reads no scroll from the page when the next page keeps no island', async () => {
