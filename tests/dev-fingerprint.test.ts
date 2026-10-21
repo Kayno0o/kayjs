@@ -1,12 +1,12 @@
 import type { ClientOptions } from '../src/build/client'
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, rm, symlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
 import { devBuilder } from '../src/dev/builder'
-import { FINGERPRINT } from '../src/dev/fingerprint'
+import { FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
 import { BUILD_FAILURE } from '../src/server/client'
 import { scratchDir } from './scratch'
 
@@ -258,5 +258,20 @@ describe('the build an earlier kay dev left', () => {
     await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}%`\n')
     expect(await buildsAgain()).toBe(true)
     expect(bundle()).toContain('}%')
+  })
+})
+
+describe('mentionsPackage', () => {
+  it('finds a source naming package.json and none otherwise', async () => {
+    await write({ ...FILES })
+    expect(await mentionsPackage(project)).toBe(false)
+    await write({ 'src/version.ts': 'import { version } from \'../package.json\'\nexport default version\n' })
+    expect(await mentionsPackage(project)).toBe(true)
+  })
+
+  it('counts a source it cannot read as naming it', async () => {
+    await write({ ...FILES })
+    await symlink(join(project, 'src/gone.ts'), join(project, 'src/dangling.ts'))
+    expect(await mentionsPackage(project)).toBe(true)
   })
 })

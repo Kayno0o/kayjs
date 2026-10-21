@@ -700,6 +700,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     clearTimeout(timer)
     timer = setTimeout(settle, DEBOUNCE_MS)
   }
+  let packageScan: Promise<void> | undefined
+  let packageScanAgain = false
   const stopWatching = watchProject(root, (file) => {
     if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
       return
@@ -710,10 +712,23 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return
     }
 
-    void (async () => {
-      if (await mentionsPackage(root))
-        changedFile(file, true)
-    })()
+    // A burst of edits is answered by one scan, and one more once it ends when an edit came in meanwhile.
+    if (packageScan !== undefined) {
+      packageScanAgain = true
+
+      return
+    }
+
+    packageScan = (async () => {
+      do {
+        packageScanAgain = false
+
+        if (await mentionsPackage(root))
+          changedFile(file, true)
+      } while (packageScanAgain)
+    })().finally(() => {
+      packageScan = undefined
+    })
   }, {
     rootNaming: true,
     onScratch: () => {

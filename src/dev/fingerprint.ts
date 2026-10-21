@@ -47,10 +47,19 @@ const CODE_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 const PACKAGE_MENTION = /package\.json/
 
 // Whether any source of the project names package.json, as `import { version } from '../package.json'` does: an edit of its scripts or version then changes what that module gives.
+// It stops at the first source that does, and a source it cannot read, as one deleted mid-scan, counts as naming it, so the edit is passed on rather than lost.
 export async function mentionsPackage(root: string): Promise<boolean> {
-  const files = (await sourceFiles(root)).filter(file => CODE_OR_KAY.test(file))
+  try {
+    for (const file of (await sourceFiles(root)).filter(file => CODE_OR_KAY.test(file))) {
+      if (PACKAGE_MENTION.test(await Bun.file(file).text()))
+        return true
+    }
 
-  return (await Promise.all(files.map(async file => PACKAGE_MENTION.test(await Bun.file(file).text())))).includes(true)
+    return false
+  }
+  catch {
+    return true
+  }
 }
 
 async function outputsOf(root: string): Promise<Record<string, number>> {
