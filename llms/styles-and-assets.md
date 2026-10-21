@@ -59,6 +59,38 @@ section.rounded.border
 - `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. `...rest` leaves `class` out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 
+### Give a component variants
+
+`recipe({ parts, variants, defaults })` from `kay`, declared as `const card = recipe(...)` in the script, holds the component's classes. `parts` is the base, a string for the root or one string per part, and each variant value is a string for the root or one string per part. The variants become props of the component, typed from the recipe, with nothing declared beside it:
+
+```kay
+---
+import { recipe } from 'kay'
+
+const card = recipe({
+  parts: { root: 'rounded border', head: 'p-4 font-bold', body: 'p-4' },
+  variants: {
+    tone: { plain: 'bg-white', danger: { root: 'border-red-500', head: 'bg-red-50' } },
+    compact: { true: { head: 'p-2', body: 'p-2' } },
+  },
+  defaults: { tone: 'plain' },
+})
+const { title } = props<{ title: string }>()
+---
+section
+  header(part="head") {title}
+  div(part="body")
+    slot
+```
+
+`Card(title="Hi" tone="danger" compact)` renders the danger classes on the root and the head, and the compact ones on the head and the body. A variant with only `true` and `false` values is a boolean prop.
+
+- Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6` ([Override a class a component sets](#override-a-class-a-component-sets)).
+- The recipe reaches the same parts `class` does: `part="head"` elements, the root, and a part that is a component, which takes its entry as a string. The variant props never reach `...rest`.
+- In an island, a variant changed at runtime swaps its classes. `kay check` reports a value no variant has at the call, `Card(tone="nope")`.
+- A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props or signals. As with parts, it also declares no `class` prop.
+- `recipe(...)` is a function too: `card({ tone: 'danger' }, 'head')` returns the classes of a part, `root` when none is named.
+
 ### Serve a file at a fixed path
 
 A file in `public/` is served at its path as it is, `public/robots.txt` at `/robots.txt`, and `kay check` accepts links to it:

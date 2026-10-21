@@ -156,7 +156,7 @@ class ModuleShell {
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
   private jsxTemplate: JsxTemplate | undefined
-  private typedParts: { type?: string, helper: boolean } | undefined
+  private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -164,7 +164,7 @@ class ModuleShell {
     this.mode = outputMode(options)
     this.kind = islandKind(options)
     this.fence = options.includeServer === false ? undefined : server
-    const facts = templateFacts(file)
+    const facts = templateFacts(file, script.recipe)
 
     this.facts = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
     this.deferred = deferredData(this.facts, this.fence)
@@ -312,6 +312,9 @@ class ModuleShell {
     if (this.partsType().helper)
       b.add('import type { PartClass as KayPartOf } from \'kay\'\n')
 
+    if (this.partsType().recipe)
+      b.add('import type { RecipeProps as KayRecipeProps } from \'kay\'\n')
+
     if (this.kind === 'island' && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
@@ -341,15 +344,15 @@ class ModuleShell {
   }
 
   // The `class` prop the template's parts give a component, typed from them so the app declares nothing: a string for the root, when there is one, or an object of a string per part, and of the called component's own `class` for a part that is one.
-  private partsType(): { type?: string, helper: boolean } {
+  private partsType(): { type?: string, helper: boolean, recipe: boolean } {
     return this.typedParts ??= this.buildPartsType()
   }
 
-  private buildPartsType(): { type?: string, helper: boolean } {
+  private buildPartsType(): { type?: string, helper: boolean, recipe: boolean } {
     const parts = this.facts.parts
 
     if (!parts?.merges)
-      return { helper: false }
+      return { helper: false, recipe: false }
 
     const imported = new Set(this.script.imports.map(binding => binding.local))
     let helper = false
@@ -367,7 +370,11 @@ class ModuleShell {
     })
     const object = `{ ${entries.join('; ')} }`
 
-    return { type: `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} }`, helper }
+    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} }`
+    const recipe = this.facts.recipe
+
+    // The variants of the recipe, typed off it, so the component declares them once.
+    return { type: recipe === undefined ? type : `${type} & KayRecipeProps<typeof ${recipe}>`, helper, recipe: recipe !== undefined }
   }
 
   // The component function's head: its type parameters and props, read off `__props`.
@@ -620,6 +627,9 @@ class ModuleShell {
 
     if (!propsDone)
       this.emitProps()
+
+    if (this.mode === 'check' && this.facts.recipe !== undefined)
+      this.b.add(`${this.facts.recipe};\n`)
   }
 
   // A statement that did not parse is written in the final pass only, as the analysis pass has to parse.
@@ -650,7 +660,7 @@ class ModuleShell {
     }
 
     if (props.rest)
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.map(binding => binding.key), ...this.facts.parts?.merges ? ['class'] : []].map(key => JSON.stringify(key)).join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.map(binding => binding.key), ...this.facts.parts?.merges ? ['class'] : []].map(key => JSON.stringify(key)).concat(this.facts.parts?.merges && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : []).join(', ')});\n`)
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.
     if (!this.options.rewrites && props.bindings.length > 0) {

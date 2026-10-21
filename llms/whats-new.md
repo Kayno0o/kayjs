@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `part="head"` on an element or a component call lets the caller style it: the component's `class` is typed from its parts, `Card(class={{ root: 'mt-4', head: 'p-6' }})`, each entry merged onto its part and `data-part` rendered ([Style a part of a component](styles-and-assets.md#style-a-part-of-a-component)).
+- `recipe({ parts, variants, defaults })` holds a component's classes by part and variant, and its variants become typed props with nothing declared twice, `Card(tone="danger" compact)` ([Give a component variants](styles-and-assets.md#give-a-component-variants)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).

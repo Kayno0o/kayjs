@@ -29,6 +29,10 @@ li(class={size})
 
 `part="head"` on an element, or a component call, lets the caller style it by name: `Card(class={{ root: 'mt-4', head: 'p-6' }})`, or a string for the root. The component declares nothing, see [Style a part of a component](styles-and-assets.md#style-a-part-of-a-component).
 
+### Give a component variants
+
+`const card = recipe({ parts, variants, defaults })` from `kay` holds the classes by part and variant, and the variants become typed props with no declaration: see [Give a component variants](styles-and-assets.md#give-a-component-variants).
+
 ### Keep state that changes
 
 A signal holds it, read by calling it and written by assigning it, in the template as in the script; a memo derives a value from it:

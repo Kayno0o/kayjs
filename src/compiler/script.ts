@@ -19,7 +19,7 @@ const FIRST_TOKEN = /^[\w$]*/
 // A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
 const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 // What `kay` exports that reads nothing reactive: a script using only these stays a static component.
-const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage'])
+const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage', 'recipe'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
@@ -71,6 +71,8 @@ export interface ScriptAnalysis {
   implicit: string[]
   body: Span[]
   props?: PropsDeclaration
+  // The name of the `const card = recipe({ ... })` of the script, which moves to module level so the props type can take its type: the component takes its variant props from it.
+  recipe?: string | undefined
   // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
   functions: string[]
   diagnostics: Diagnostic[]
@@ -134,6 +136,10 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   }
 
   analysis.body.push(...split.tail)
+  analysis.recipe = split.recipes[0]?.name
+
+  for (const extra of split.recipes.slice(1))
+    analysis.diagnostics.push({ ...extra.span, message: 'A component has one recipe', help: 'put its variants in the first `recipe({ ... })`' })
 
   reportMisplacedProps(ast, analysis, shift)
 
@@ -176,7 +182,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
 
 // Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = []): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
+function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = []): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span }[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -188,6 +194,8 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
   const statements: FenceStatement[] = []
+  const recipes: { name: string, span: Span }[] = []
+  const recipeCalls = recipeNames(ast.program.body)
   let cursor = fence.start
   // Broken statements written before a statement that leaves the body, kept for the next one that stays.
   let carried: Span[] = []
@@ -206,7 +214,12 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
 
-    if (isHoisted(statement, local)) {
+    const recipe = recipeDeclaration(statement, recipeCalls)
+
+    if (recipe !== undefined)
+      recipes.push({ name: recipe, span })
+
+    if (recipe !== undefined || isHoisted(statement, local)) {
       analysis.hoisted.push(span)
       analysis.imports.push(...importBindings(statement, shift))
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
@@ -220,7 +233,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
     cursor = span.end
   }
 
-  return { ...parsed, statements, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
+  return { ...parsed, statements, recipes, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
@@ -1044,6 +1057,33 @@ function typeDeclaration(statement: t.Statement): t.TSTypeAliasDeclaration | t.T
   const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
   return declaration?.type === 'TSTypeAliasDeclaration' || declaration?.type === 'TSInterfaceDeclaration' ? declaration : undefined
+}
+
+// The names `recipe` goes by in the fence: imported from `kay`, as it is no global of a script.
+function recipeNames(body: t.Statement[]): Set<string> {
+  const names = new Set<string>()
+
+  for (const statement of body) {
+    if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay' || statement.importKind === 'type')
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && importedName(specifier) === 'recipe')
+        names.add(specifier.local.name)
+    }
+  }
+
+  return names
+}
+
+// The name a statement `const card = recipe({ ... })` declares: a recipe is configuration, so it moves to module level, built once, where the component's props type can name its type.
+function recipeDeclaration(statement: t.Statement, calls: ReadonlySet<string>): string | undefined {
+  if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const' || statement.declarations.length !== 1)
+    return undefined
+
+  const { id, init } = statement.declarations[0]!
+
+  return id.type === 'Identifier' && init?.type === 'CallExpression' && init.callee.type === 'Identifier' && calls.has(init.callee.name) ? id.name : undefined
 }
 
 function isHoisted(statement: t.Statement, local: ReadonlySet<t.Statement>): boolean {

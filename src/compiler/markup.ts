@@ -443,8 +443,10 @@ export abstract class TemplateWriter {
     if (expression !== undefined)
       items.push(() => b.add('(').addSource(expression).add(')'))
 
-    for (const part of classes.parts ?? [])
+    for (const part of classes.parts ?? []) {
+      this.recipeItem(items, part)
       items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
+    }
 
     b.add('[')
 
@@ -456,6 +458,14 @@ export abstract class TemplateWriter {
     }
 
     b.add(']')
+  }
+
+  // The classes the component's recipe gives a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant and a variant to the caller.
+  private recipeItem(items: (() => void)[], part: string): void {
+    const { recipe } = this.facts
+
+    if (recipe !== undefined)
+      items.push(() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`))
   }
 
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.
@@ -495,8 +505,10 @@ export abstract class TemplateWriter {
         items.push(() => b.add('(').addSource(attribute.expression).add(')'))
     }
 
-    for (const part of parts)
+    for (const part of parts) {
+      this.recipeItem(items, part)
       items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
+    }
 
     b.add(element.component ? `${helperName(parts.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
     for (const [index, item] of items.entries()) {

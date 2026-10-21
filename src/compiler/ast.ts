@@ -475,6 +475,8 @@ export interface TemplateFacts {
   classes: string[]
   // The parts the template names, `part="head"`, when it names any.
   parts: PartFacts | undefined
+  // The recipe the script declares, whose classes every part of the component takes before its `class`.
+  recipe?: string | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
@@ -624,11 +626,31 @@ function markRoot(parts: PartFacts, template: Node[]): void {
   }
 }
 
-// What every output and check of a file reads off its template, found once and kept on the file.
-export function templateFacts(file: KayFile): TemplateFacts {
-  if (file.facts)
-    return file.facts
+// What every output and check of a file reads off its template, found once and kept on the file: `recipe` is the name of the script's recipe, which the template alone cannot tell.
+export function templateFacts(file: KayFile, recipe?: string): TemplateFacts {
+  const facts = file.facts ??= factsOf(file)
 
+  if (recipe !== undefined && facts.recipe === undefined)
+    addRecipe(facts, file, recipe)
+
+  return facts
+}
+
+// A component with a recipe has parts even when its template marks none: its root is the single top element.
+function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
+  facts.recipe = recipe
+  facts.helpers.add('partClass')
+
+  if (!facts.parts) {
+    facts.parts = { names: new Map(), root: 'none', merges: true }
+    markRoot(facts.parts, file.template)
+
+    if (facts.parts.implicit?.component)
+      facts.helpers.add('partsClass')
+  }
+}
+
+function factsOf(file: KayFile): TemplateFacts {
   const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
@@ -688,7 +710,7 @@ export function templateFacts(file: KayFile): TemplateFacts {
       facts.helpers.add('partsClass')
   }
 
-  return file.facts = facts
+  return facts
 }
 
 // A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
