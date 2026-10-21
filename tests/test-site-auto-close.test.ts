@@ -41,7 +41,7 @@ function browsing(navigation: string): string {
   return `import { it } from 'bun:test'
 import { testSite } from ${JSON.stringify(join(SRC, 'test'))}
 
-const site = await testSite({ routes: ${JSON.stringify(join(navigation, 'src/routes'))}, browser: { path: process.env.BUN_CHROME_PATH }, onError: () => undefined })
+const site = await testSite({ routes: ${JSON.stringify(join(navigation, 'src/routes'))}, browser: { path: ${JSON.stringify(browserPath())} }, onError: () => undefined })
 const page = await site.open('/')
 
 ;(globalThis as { states?: () => unknown }).states = async () => {

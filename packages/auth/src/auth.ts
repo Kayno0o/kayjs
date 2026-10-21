@@ -1113,6 +1113,19 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 // Where `kay dev` answers the dev tool's Auth tab with the session's user.
 const DEV_PATH = '/_kay/auth'
 
+// `held` with `data` laid over it as the `user` schema accepts it; throws for data it refuses, or when the app declared no schema.
+function signInAsData(core: Core, held: Record<string, unknown> | undefined, data: object): Record<string, unknown> {
+  if (!core.userData)
+    throw new Error('kayjs-auth: signInAs was given `data`, and createAuth has no `user` schema')
+
+  const merged = mergedData(core.userData, held, data)
+
+  if (merged === undefined)
+    throw new Error('kayjs-auth: signInAs was given `data` that does not fit the `user` schema')
+
+  return merged
+}
+
 // Throws when the member `signInAs` found holds other values than the fields it was given.
 function signInAsMismatch(core: Core, user: BareUser, given: { email: string | undefined, username: string | undefined, roles: string[] | undefined, data: object | undefined }): void {
   const differs: string[] = []
@@ -1126,12 +1139,8 @@ function signInAsMismatch(core: Core, user: BareUser, given: { email: string | u
   if (given.roles !== undefined && !given.roles.every(role => user.roles.includes(role)))
     differs.push('roles')
 
-  if (given.data !== undefined) {
-    const wanted = core.userData && mergedData(core.userData, user.data, given.data)
-
-    if (wanted === undefined || JSON.stringify(wanted) !== JSON.stringify(user.data))
-      differs.push('data')
-  }
+  if (given.data !== undefined && !Bun.deepEquals(signInAsData(core, user.data, given.data), user.data))
+    differs.push('data')
 
   if (differs.length > 0)
     throw new Error(`kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
@@ -1368,6 +1377,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         signInAsMismatch(core, user, { email, username, roles: fields.roles, data })
       }
       else {
+        // Checked before the member is made, so a refused `data` leaves no half-made member behind.
+        const merged = data === undefined ? undefined : signInAsData(core, undefined, data)
         const created = await createUser(core, fields)
 
         if (!created.ok)
@@ -1375,14 +1386,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         user = created.user
 
-        if (data !== undefined) {
-          const merged = core.userData && mergedData(core.userData, undefined, data)
-
-          if (merged === undefined)
-            throw new Error(`kayjs-auth: signInAs could not set the member's data: ${core.userData ? 'it does not fit the `user` schema' : 'createAuth has no `user` schema'}`)
-
+        if (merged !== undefined)
           user = publicUser((await core.store.users.update(user.id, { data: merged }))!)
-        }
       }
 
       const lines = await mintSetCookies(user.id, undefined)

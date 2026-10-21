@@ -69,8 +69,11 @@ async function project(seeded: boolean, migrationsDir?: string): Promise<string>
   return dir
 }
 
+// The runner's own DATABASE_URL would win over the project's `.env.test`.
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'DATABASE_URL'))
+
 async function run(dir: string, args: string[]): Promise<{ code: number, report: string }> {
-  const child = Bun.spawn([process.execPath, 'test', ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_ROOT: dir } })
+  const child = Bun.spawn([process.execPath, 'test', ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_ROOT: dir } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, report: out + err }

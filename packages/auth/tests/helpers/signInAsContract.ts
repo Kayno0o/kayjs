@@ -17,7 +17,7 @@ export function signInAsContract(name: string, fresh: () => Promise<AuthStore>) 
   describe(`${name}: signInAs`, () => {
     async function setup() {
       const store = await fresh()
-      const made = testApp({ store, user: s.Object({ avatar: s.Optional(s.String()), theme: s.Optional(s.String()) }) as never })
+      const made = testApp({ store, user: s.Object({ avatar: s.Optional(s.String()), theme: s.Optional(s.String()), prefs: s.Optional(s.Any()) }) as never })
       const signInAs = looseSignInAs(made.auth)
       const site = cookieJar()
       const who = async () => {
@@ -56,12 +56,14 @@ export function signInAsContract(name: string, fresh: () => Promise<AuthStore>) 
     })
 
     test('sets the app\'s user data on a new member, and refuses data the schema rejects or one without a schema', async () => {
-      const { signInAs, site, who } = await setup()
+      const { signInAs, store, site, who } = await setup()
       const ada = await signInAs(site, { username: 'ada', data: { avatar: 'a.png' } })
 
       expect(ada.data).toEqual({ avatar: 'a.png' })
       expect(await who()).toMatchObject({ id: ada.id, data: { avatar: 'a.png' } })
-      await expect(signInAs(site, { username: 'bob', data: { avatar: 3 as unknown as string } })).rejects.toThrow('could not set the member\'s data')
+      await expect(signInAs(site, { username: 'bob', data: { avatar: 3 as unknown as string } })).rejects.toThrow('does not fit the `user` schema')
+      // The refused call made no member, so the same name is free for the next one.
+      expect(await store.users.findByUsername('bob')).toBeUndefined()
       await expect(looseSignInAs(testApp().auth)(cookieJar(), { username: 'bob', data: { avatar: 'b.png' } })).rejects.toThrow('has no `user` schema')
     })
 
@@ -73,6 +75,13 @@ export function signInAsContract(name: string, fresh: () => Promise<AuthStore>) 
       await store.users.update(bob.id, { bannedAt: new Date(), bannedUntil: null })
       await expect(signInAs(site, { username: 'bob' })).rejects.toThrow()
       expect(await who()).toMatchObject({ id: ada.id })
+    })
+
+    test('compares a nested object of data whatever its key order, and accepts a role the member holds beside others', async () => {
+      const { signInAs, site } = await setup()
+      const ada = await signInAs(site, { username: 'ada', roles: ['editor', 'admin'], data: { avatar: 'a.png', prefs: { zeta: 1, alpha: 2, mid: [3, { b: 1, a: 2 }] } } })
+
+      expect(await signInAs(site, { username: 'ada', roles: ['editor'], data: { prefs: { mid: [3, { a: 2, b: 1 }], alpha: 2, zeta: 1 } } })).toMatchObject({ id: ada.id })
     })
 
     test('throws for a member whose email, username, roles or data differ from the fields given, and signs in one that matches', async () => {
