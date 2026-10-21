@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
+### A schedule's boot run no longer takes the shared lock
+
+`schedule(..., { boot: true })` now runs in every process that starts, where a production server with replicas ran it once and a restart within the same slot skipped it. A boot job that must run once across replicas starting together adds `shareBoot: true`. No lint can recognise it.
+
 ### kayjs-auth's guard answers a fetch with a 401, and redirects to `signInPage` without `pages`
 
 `auth.guard()` and `requireUser()` redirect an anonymous GET or HEAD to the sign-in page unless it clearly is not a page opening: a browser fetch (a `Sec-Fetch-Mode` other than `navigate` or `nested-navigate`) or a client whose `Accept` names neither `text/html` nor `*/*`, such as `application/json`, now gets the 401 where the prebuilt `pages` redirected it. Everything else, a test's or curl's request with no headers included, redirects as before. An app that sets `signInPage` in `createAuth` without `pages` now has such a request redirected there with `?redirect=`, where it got a 401; a GET route returning JSON under that guard keeps its 401 when the client sends `Accept: application/json`. No lint can recognise it.

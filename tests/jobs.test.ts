@@ -464,49 +464,43 @@ describe('schedule', () => {
       }
     })
 
+    // Each row restarts within one rounded slot of its schedule: a cron's is the minute, a length's the nearest multiple.
     it.each([
-      ['15m', '15m'],
-      ['1h', '1h'],
-      ['1d', '1d'],
-      ['a cron', '*/15 * * * *'],
-    ])('runs the boot run of a restart within the slot of the previous boot or of a scheduled run, %s', async (_name, when) => {
+      ['15m', '15m', '11:28:00', '11:34:00'],
+      ['1h', '1h', '11:10:00', '11:20:00'],
+      ['1d', '1d', '02:00:00', '10:00:00'],
+      ['a cron', '*/15 * * * *', '11:28:00', '11:28:20'],
+    ])('runs the boot run of a restart within the slot of the previous boot, and skips it under shareBoot, %s', async (_name, when, first, second) => {
       const cron = fakeCron()
       const path = await jobsPath()
       const before = process.env.NODE_ENV ?? 'test'
       const runs: string[] = []
-      const start = async (label: string, shareBoot?: boolean) => {
+      const logged = spyOn(console, 'log').mockImplementation(() => undefined)
+      const restart = async (label: string, time: string, shareBoot?: boolean) => {
         const copy = await import(`../src/server/jobs.ts?process=restart-${++copies}`) as { schedule: typeof scheduleOf }
 
-        return new Elysia().use(copy.schedule(when as '15m', () => runs.push(label), { boot: true, shareBoot, store: sqliteJobs(path) })).listen(0)
+        setSystemTime(new Date(`2026-01-01T${time}Z`))
+        await shutdown(new Elysia().use(copy.schedule(when as '15m', () => runs.push(label), { boot: true, shareBoot, store: sqliteJobs(path) })).listen(0))
       }
 
       process.env.NODE_ENV = 'production'
-      setSystemTime(new Date('2026-01-01T11:28:00Z'))
 
       try {
-        await shutdown(await start('boot-1'))
-        setSystemTime(new Date('2026-01-01T11:34:00Z'))
-        await shutdown(await start('boot-2'))
+        await restart('boot-1', first)
+        await restart('boot-2', second)
         expect(runs).toEqual(['boot-1', 'boot-2'])
+        expect(logged).not.toHaveBeenCalled()
 
-        // A scheduled run takes the slot its time names, and the restart a minute later still runs.
-        const app = await start('boot-3')
-
-        setSystemTime(new Date('2026-01-01T11:45:00Z'))
-        await cron.fired.at(-1)?.handler()
-        await shutdown(app)
-        await shutdown(await start('boot-4'))
-        expect(runs.at(-1)).toBe('boot-4')
-
-        // With the option, the restart within the slot is the one skipped.
         runs.length = 0
-        await shutdown(await start('shared-1', true))
-        await shutdown(await start('shared-2', true))
+        await restart('shared-1', first, true)
+        await restart('shared-2', second, true)
         expect(runs).toEqual(['shared-1'])
+        expect(logged.mock.calls.flat().join('\n')).toContain('boot run of auto:')
       }
       finally {
         setSystemTime()
         process.env.NODE_ENV = before
+        logged.mockRestore()
         cron.restore()
       }
     })
