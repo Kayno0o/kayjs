@@ -203,8 +203,8 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   const recipeStatements = new Set<t.Statement>()
   const recipeCalls = recipeNames(ast.program.body)
 
-  // A `recipe` written in a server fence without its import is no less a recipe than one imported.
-  if (!withRecipes)
+  // A `recipe` written in a server fence with no import and no declaration of its own is kay's, missing its import.
+  if (!withRecipes && !ast.program.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(statement).some(identifier => identifier.name === 'recipe')))
     recipeCalls.add('recipe')
 
   let cursor = fence.start
