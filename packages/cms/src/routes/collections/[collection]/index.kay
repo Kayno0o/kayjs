@@ -7,7 +7,7 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import { denials } from '../../../access'
 import EntryTable from '../../../components/entry-table.kay'
-import { adminTitle, collectionTitle, newEntryPath, statusParam, viewHref } from '../../../listing'
+import { adminTitle, collectionTitle, newEntryPath, statusParam, trashPath, viewHref } from '../../../listing'
 import { listScreen, openPath } from '../../../screens'
 
 export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()), status: s.Optional(s.String()), sort: s.Optional(s.String()), dir: s.Optional(s.String()) }) }
@@ -32,6 +32,8 @@ head
   title {adminTitle(title)}
 PageSection(title={title} level={1})
   @actions
+    if collection.trash && collection.problem === undefined
+      Button(href={trashPath(prefix, collection.name)} label={wording('cms.trash.open', 'Trash')} icon="delete")
     if collection.problem === undefined
       Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" tone="accent")
   if collection.description

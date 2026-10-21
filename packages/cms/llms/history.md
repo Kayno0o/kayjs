@@ -1,6 +1,6 @@
 # History and the trash
 
-A collection read through a SQLite or Postgres loader keeps what an editor saved: the last 50 saves of each entry, which the editor lists, compares and restores. It needs nothing declared, and `cms({ history: false })` turns it off.
+A collection read through a SQLite or Postgres loader keeps what an editor saved, the last 50 saves of each entry, which the editor lists, compares and restores, and what an editor deleted, for 30 days. It needs nothing declared, and `cms({ history: false })` turns it off.
 
 ## Revisions
 
@@ -11,9 +11,16 @@ A collection read through a SQLite or Postgres loader keeps what an editor saved
 - Nothing else sees the history: it never shows in `all()`, a list, a count or a search, and a deleted entry's revisions stay.
 - Only what the cms saved is kept: an edit made outside it, with `sqlite3` or by the app, is not a version, and shows as a change in the next save's diff.
 
+## The trash
+
+- Deleting a loaded entry (from its screen, the list or a bulk delete) keeps it first: its data, body, locale, who deleted it and when, in a hidden collection of the loader. The collection's list has a Trash button, opening `<prefix>/trash/<collection>`: the deleted entries newest first, each with a Restore.
+- Restore writes the entry back under its slug and locale as a new entry (`verb: 'restore'` in `onSave`), so the schema applies and a slug made again since refuses it, the entry staying in the trash. It leaves the trash once restored, and its revisions are still there. A role that may not `publish` gets the entry back as a draft (held back by a far publish date in a collection with no draft flag), as it would a new entry.
+- `cms({ history: { trash: '7d' } })` keeps them for another duration, `false` keeps none. What is older is dropped when the trash is read or an entry is deleted, with no timer, and the revisions of an entry never made again go with it.
+- A delete the collection refuses keeps nothing, and the trash holds the entry as the loader gave it, so a restore after the schema changed may be refused for what it now requires.
+
 ## Which collections
 
 - The history is written through the collection's own loader, into hidden collections of its store: `sqliteLoader` and `postgresLoader` keep them in the same table as the entries (under names no collection can have), so no table, setting or migration is added.
 - A loader of your own gets history by giving `sibling(kind)`, which returns a loader for a hidden collection of that kind (`'history'`, `'trash'`) in the same store. Without it the collection keeps none, and its screens show no History button.
 - A folder collection keeps none: its files are in git, and the forge or the repository has their history.
-- Every read and write is a `get` and a `save` of one row per entry; the revisions of an entry are one row, so a save costs one extra read and one write.
+- Every read and write is a `get` and a `save` of one row per entry; each revision is its own row beside an index row, so a save reads the index and the newest revision, then writes the new revision and the index, and a revision beyond the cap is removed.

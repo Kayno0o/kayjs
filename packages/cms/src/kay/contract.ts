@@ -41,8 +41,8 @@ export interface CollectionLayout {
 export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined }
 
 // A collection as the screens read it: kay's, with the layout `cms({ collections })` gave it.
-// `history` is set for a collection that keeps its entries' revisions and its deleted entries, which the screens then link to.
-export type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined, history?: true | undefined }
+// `history` is set for a collection that keeps its entries' revisions, and `trash` for one that keeps its deleted entries, which the screens then link to.
+export type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined, history?: true | undefined, trash?: true | undefined }
 
 export interface EntryRef {
   collection: string

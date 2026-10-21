@@ -434,6 +434,16 @@ export default defineMessages({
       duplicate: 'Dupliquer',
       duplicateLabel: 'Dupliquer {title}',
     },
+    trash: {
+      back: 'Retour à {collection}',
+      deleted: 'Supprimée',
+      empty: 'La corbeille est vide',
+      emptyHint: 'Une entrée supprimée d\'ici est conservée un temps, pour pouvoir la rétablir.',
+      gone: 'Cette entrée n\'est plus dans la corbeille',
+      open: 'Corbeille',
+      pageTitle: 'Corbeille - {collection}',
+      restoreMessage: 'Rétablir {title} ? Elle revient sous son identifiant.',
+    },
     upload: {
       empty: '{name} est vide',
       notReal: '{name} n\'est pas un fichier {type} valide',

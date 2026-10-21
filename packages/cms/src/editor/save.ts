@@ -9,6 +9,7 @@ import entriesApi from '../api/entries'
 import filesApi from '../api/files'
 import historyApi from '../api/history'
 import redirectsApi from '../api/redirects'
+import trashApi from '../api/trash'
 import { entryKey } from '../markers'
 import { isSignedOut, setSessionEnded } from './session'
 import { uploading } from './upload'
@@ -273,6 +274,13 @@ export async function restoreVersion(ref: EntryRef, at: number, version?: string
     params: { collection: ref.collection, slug: ref.slug },
     body: { at, ...localeOf(ref), ...versionOf(version) },
   }), wording('cms.history.restoreFailure', 'Could not restore'))
+
+  return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
+}
+
+// Writes a deleted entry back and says how it went; true once restored.
+export async function restoreDeleted(collection: string, id: string): Promise<boolean> {
+  const outcome = await attempt(async () => call(trashApi, '/:collection/:id/restore', { method: 'post', params: { collection, id } }), wording('cms.history.restoreFailure', 'Could not restore'))
 
   return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }

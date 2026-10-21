@@ -1,0 +1,17 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { wording } from 'kay/words'
+import EntryTrash from '../../components/entry-trash.kay'
+import { adminTitle, collectionPath, collectionTitle } from '../../listing'
+import { trashScreen } from '../../screens'
+
+const { prefix, collection, rows } = await trashScreen(ctx.params.collection) ?? ctx.notFound()
+const title = collectionTitle(collection)
+---
+head
+  title {adminTitle(wording('cms.trash.pageTitle', 'Trash - {collection}', { collection: title }))}
+PageSection(title={wording('cms.trash.pageTitle', 'Trash - {collection}', { collection: title })} level={1})
+  @actions
+    Button(href={collectionPath(prefix, collection.name)} label={wording('cms.trash.back', 'Back to {collection}', { collection: title })})
+  EntryTrash(collection={collection} rows={rows})

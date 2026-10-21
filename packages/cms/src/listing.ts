@@ -387,6 +387,11 @@ export function historyPath(prefix: string, ref: EntryRef): string {
   return slugged(screenPath(prefix, `/history/${encodeURIComponent(ref.collection)}`), ref)
 }
 
+// The screen of a collection's deleted entries.
+export function trashPath(prefix: string, collection: string): string {
+  return screenPath(prefix, `/trash/${encodeURIComponent(collection)}`)
+}
+
 function slugged(base: string, { slug, locale }: EntryRef): string {
   const parts = slug.split('/')
   // A loaded slug may start with `/` or hold `//`, which a path keeps only escaped.

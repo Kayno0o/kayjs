@@ -5,6 +5,7 @@ import { fieldsOf } from './fields'
 
 // One field that differs between two versions of an entry, each side as short text; empty for a field that was not set.
 export interface Change {
+  key: string
   label: string
   before: string
   after: string
@@ -32,11 +33,11 @@ export function changesBetween(schema: JsonSchema, before: Version, after: Versi
 
   for (const key of keys) {
     if (!Bun.deepEquals(before.data[key], after.data[key]))
-      found.push({ label: labels.get(key) ?? key, before: shown(before.data[key]), after: shown(after.data[key]) })
+      found.push({ key, label: labels.get(key) ?? key, before: shown(before.data[key]), after: shown(after.data[key]) })
   }
 
   if ((before.body ?? '') !== (after.body ?? ''))
-    found.push({ label: wording('cms.entry.body', 'Body'), before: shown(before.body), after: shown(after.body) })
+    found.push({ key: '\u0001body', label: wording('cms.entry.body', 'Body'), before: shown(before.body), after: shown(after.body) })
 
   return found
 }

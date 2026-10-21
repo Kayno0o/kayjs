@@ -7,12 +7,13 @@ import { changesBetween } from './changes'
 import { countEntries } from './counts'
 import { readEdits, readLastEdit } from './history'
 import { collections, entries, translations } from './kay/content'
-import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
+import { collectionPath, entryPath, entryTitle, newEntryPath, pageRows } from './listing'
 import { log } from './log'
 import { revisionsOf } from './revisions'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 import { pairKey, translationReport } from './translations'
+import { trashOf } from './trash'
 
 export interface EntryScreen {
   prefix: string
@@ -221,4 +222,33 @@ export async function historyScreen(ref: EntryRef): Promise<HistoryScreen | unde
   }))
 
   return { prefix: settings().prefix, collection, entry, rows: rows.reverse() }
+}
+
+// A trashed entry as the page shows it: the entry itself stays server side.
+export interface TrashRow {
+  id: string
+  at: number
+  author?: string | undefined
+  slug: string
+  locale?: string | undefined
+  title: string
+}
+
+export interface TrashScreen {
+  prefix: string
+  collection: ScreenCollection
+  // Newest first.
+  rows: TrashRow[]
+}
+
+// What a collection's trash reads: the entries deleted and still kept; undefined for a collection the site lacks or one that keeps no trash.
+export async function trashScreen(name: string): Promise<TrashScreen | undefined> {
+  const collection = await findCollection(name)
+
+  if (collection?.trash !== true)
+    return undefined
+
+  const rows = (await trashOf(name)).map(item => ({ id: item.id, at: item.at, author: item.author, slug: item.slug, locale: item.locale, title: entryTitle(collection, { slug: item.slug, locale: item.locale, data: item.data as SourceEntry['data'], body: item.body, draft: false }) }))
+
+  return { prefix: settings().prefix, collection, rows }
 }

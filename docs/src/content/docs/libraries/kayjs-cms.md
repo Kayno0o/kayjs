@@ -475,13 +475,13 @@ The refresh covers the pages that read the collection, the sitemap, `live: true`
 
 A collection whose entries come from a loader of your own has no database to look at. Call `invalidate()` on it from a webhook route, or restart.
 
-### Bringing back an older version
+### Bringing back an older version or a deleted entry
 
 A collection kept by `sqliteLoader` or `postgresLoader` remembers what editors save. Each entry has a History button: it lists the last 50 saves, newest first, with who made each one, when, and which fields it changed. Restore saves an older version again as a new one, so nothing is lost and the history keeps growing.
 
-You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
+You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 
-`cms({ history: { revisions: 100 } })` keeps more or fewer, and `cms({ history: false })` turns it off. A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
+`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
 
 ### After a save
 

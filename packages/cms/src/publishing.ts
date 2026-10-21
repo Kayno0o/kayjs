@@ -51,6 +51,13 @@ export function keepingPublication(collection: Pick<CollectionInfo, 'draftField'
   return kept
 }
 
+// `data` with the order field of the entry it replaces.
+export function keepingOrder(field: string, data: Record<string, unknown>, current: Record<string, unknown> | undefined): Record<string, unknown> {
+  const { [field]: _, ...rest } = data
+
+  return current?.[field] === undefined ? rest : { ...rest, [field]: current[field] }
+}
+
 function sameValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }

@@ -112,7 +112,7 @@ export default guard(async (ctx) => {
       return forbidden(ctx, needed)
 
     // A save that flips the draft flag or a publish date is a publish as much as the route is.
-    if (method === 'POST' && needed === undefined && !restoring && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
+    if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
       return forbidden(ctx, 'publish')
   }
 

@@ -14,6 +14,7 @@ import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { missingReferences } from './references'
 import { openTrail } from './revisions'
 import { settings } from './settings'
+import { discardTrashed, keepDeleted } from './trash'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
 
@@ -33,10 +34,12 @@ export async function findCollection(name: string): Promise<ScreenCollection | u
   const found = await collectionInfo(name)
   const given = settings().layouts.get(name)
 
-  const history = found?.kind === 'loaded' && hiddenOf(name, 'history') !== undefined ? { history: true as const } : {}
+  const kept = found?.kind === 'loaded'
+  const history = kept && hiddenOf(name, 'history') !== undefined ? { history: true as const } : {}
+  const trash = kept && hiddenOf(name, 'trash') !== undefined ? { trash: true as const } : {}
 
   // Without the icon, which the content list draws on the server and the editor's islands would otherwise carry with each page.
-  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history }
+  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history, ...trash }
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.
@@ -206,9 +209,11 @@ interface SaveOptions extends VersionRule {
   author?: Identity | undefined
   bodyKept?: boolean | undefined
   heldData?: Record<string, unknown> | undefined
+  // A new entry that is an old one coming back, whose history goes on rather than starting over.
+  revived?: boolean | undefined
 }
 
-async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: SaveOptions): Promise<SaveOutcome> {
+async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData, revived = false }: SaveOptions): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
@@ -237,15 +242,18 @@ async function writeEntry(entry: DraftEntry, { create = false, version, required
       if (stale)
         return stale
 
-      const trail = await openTrail(entry, create ? undefined : async () => storedState((await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]))
+      const trail = await openTrail(entry, create ? undefined : async () => storedState((await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]), { fresh: create && !revived })
       const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
       if (issues !== undefined && issues.length > 0)
         return { issues }
 
-      await trail?.record({ data: entry.data, body: entry.body, verb: verb ?? (create ? 'add' : 'update') }, author)
+      // The entry as the loader holds it now, defaults filled in, which is what the history compares the entry with and the next save names.
+      const after = trail || versioned ? await readAfter(entry, collection.name) : undefined
 
-      return versioned ? { saved: true, version: await loadedVersion(entry, collection.schema) } : { saved: true }
+      await trail?.record({ ...storedState(after) ?? { data: entry.data, body: entry.body }, verb: verb ?? (create ? 'add' : 'update') }, author)
+
+      return versioned ? { saved: true, version: after && contentVersion(after, collection.schema) } : { saved: true }
     })
   }
 
@@ -303,9 +311,18 @@ async function removeOne(ref: EntryRef, author: Identity | undefined, { version,
       if (stale)
         return stale
 
+      const kept = hiddenOf(collection.name, 'trash') && storedState((await entries(collection.name, { slug: ref.slug, locale: ref.locale }))[0])
+      const id = kept ? await keepDeleted(ref, kept, author) : undefined
       const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
 
-      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+      if (issues !== undefined && issues.length > 0) {
+        if (id !== undefined)
+          await discardTrashed(collection.name, id)
+
+        return { issues }
+      }
+
+      return { saved: true }
     })
   }
 
@@ -563,10 +580,10 @@ async function currentLoaded(ref: EntryRef, schema: JsonSchema): Promise<string 
   return found === undefined ? undefined : contentVersion(found, schema)
 }
 
-// The version a save leaves a loaded entry at, for the editor's next save to name; none when the loader cannot be read again, which the save does not fail for.
-async function loadedVersion(ref: EntryRef, schema: JsonSchema): Promise<string | undefined> {
+// A loaded entry as its loader gives it after a save; undefined when the loader cannot be read again, which the save does not fail for.
+async function readAfter(ref: EntryRef, collection: string): Promise<SourceEntry | undefined> {
   try {
-    return await currentLoaded(ref, schema)
+    return (await entries(collection, { slug: ref.slug, locale: ref.locale }))[0]
   }
   catch (error) {
     log.error(`${ref.collection}/${ref.slug} failed to read after its save`, error)

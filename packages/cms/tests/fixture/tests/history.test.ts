@@ -36,3 +36,18 @@ test('the history of a collection whose loader keeps none is not found', async (
   expect((await site.fetch('/admin/history/products/mug')).status).toBe(404)
   expect((await site.visit('/admin/collections/products/mug')).find('a[href="/admin/history/products/mug"]')).toHaveLength(0)
 })
+
+test('a deleted entry is listed in the collection\'s trash, which restoring empties', async () => {
+  expect(await post('journal/gone', { data: { title: 'Gone soon' }, create: true })).toMatchObject({ saved: true })
+
+  const opened = await (await site.fetch('/api/cms/entries/journal/gone')).json() as { entry: { version: string } }
+
+  expect(await (await site.fetch(`/api/cms/entries/journal/gone?version=${opened.entry.version}`, { method: 'DELETE' })).json()).toMatchObject({ saved: true })
+  expect((await site.visit('/admin/collections/journal')).find('a[href="/admin/trash/journal"]')).toHaveLength(1)
+
+  const trash = await site.visit('/admin/trash/journal')
+
+  expect(trash.find('.kcms-revision')).toHaveLength(1)
+  expect(trash.text('main')).toContain('Gone soon')
+  expect((await site.fetch('/admin/trash/products')).status).toBe(404)
+})

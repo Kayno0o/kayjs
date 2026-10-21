@@ -50,7 +50,7 @@ else
             ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreLabel', 'Restore')} message={wording('cms.history.restoreMessage', 'Restore this version? It is saved as a new version, and the current one stays in the history.')} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row) }})
         if row.changes.length > 0
           dl.kcms-changes
-            for change of row.changes key={change.label}
+            for change of row.changes key={change.key}
               dt {change.label}
               dd
                 del {change.before}

@@ -1,13 +1,17 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, entries } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
+import { changesBetween } from '../src/changes'
+import { editedMoment } from '../src/datetime'
+import { historyPath } from '../src/listing'
 import { sqliteLoader } from '../src/loaders/sqlite'
-import { restoreRevision } from '../src/restore'
+import { restoreRevision, restoreTrashed } from '../src/restore'
 import { revisionsOf } from '../src/revisions'
-import { historyScreen } from '../src/screens'
+import { historyScreen, trashScreen } from '../src/screens'
 import { configure } from '../src/settings'
 import { deleteEntry, entryOf, findCollection, publishEntry, saveEntry } from '../src/store'
+import { trashOf } from '../src/trash'
 
 const schema = s.Object({ title: s.String(), draft: s.Optional(s.Boolean()) })
 let count = 0
@@ -156,12 +160,124 @@ describe('historyScreen', () => {
 
     const screen = await historyScreen(ref)
 
-    expect(screen?.rows.map(row => [row.verb, row.current, row.changes])).toEqual([['update', true, [{ label: 'Title', before: 'One', after: 'Two' }]], ['add', false, []]])
+    expect(screen?.rows.map(row => [row.verb, row.current, row.changes])).toEqual([['update', true, [{ key: 'title', label: 'Title', before: 'One', after: 'Two' }]], ['add', false, []]])
   })
 
   test('is none for a missing entry or a collection that keeps no history', async () => {
     notes()
     expect(await historyScreen(ref)).toBeUndefined()
     expect(await historyScreen({ collection: 'plain', slug: 'a' })).toBeUndefined()
+  })
+})
+
+describe('the trash', () => {
+  test('keeps a deleted loaded entry with who deleted it, and restores it under its slug with its history', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'One' }, body: 'Text' }, { create: true })
+    expect(await deleteEntry(ref, ada)).toMatchObject({ saved: true })
+    expect(await entryOf(ref)).toBeUndefined()
+
+    const [item] = await trashOf('notes')
+
+    expect(item).toMatchObject({ slug: 'first', author: 'Ada', data: { title: 'One' }, body: 'Text' })
+    expect(await restoreTrashed('notes', item!.id, ada)).toMatchObject({ saved: true })
+    expect((await entryOf(ref))?.data).toEqual({ title: 'One' })
+    expect(await trashOf('notes')).toEqual([])
+    // The restored content is the last version's, which is not kept twice.
+    expect((await revisionsOf(ref)).map(revision => revision.verb)).toEqual(['add'])
+  })
+
+  test('refuses a restore over a slug made since, leaving it in the trash', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref)
+    await saveEntry({ ...ref, data: { title: 'New' } }, { create: true })
+
+    const [item] = await trashOf('notes')
+
+    expect(await restoreTrashed('notes', item!.id)).toHaveProperty('issues')
+    expect(await trashOf('notes')).toHaveLength(1)
+    expect((await entryOf(ref))?.data).toEqual({ title: 'New' })
+  })
+
+  test('says so for an entry that is not in the trash', async () => {
+    notes()
+    expect(await restoreTrashed('notes', '1')).toMatchObject({ issues: [{ message: 'That entry is not in the trash any more' }] })
+  })
+
+  test('forgets what has been in the trash longer than 30 days, and the history of an entry never made again', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref)
+
+    const now = Date.now()
+    const clock = spyOn(Date, 'now').mockReturnValue(now + 29 * 86_400_000)
+
+    expect(await trashOf('notes')).toHaveLength(1)
+    clock.mockReturnValue(now + 31 * 86_400_000)
+    expect(await trashOf('notes')).toEqual([])
+    expect(await revisionsOf(ref)).toEqual([])
+    clock.mockRestore()
+  })
+
+  test('is kept as long as cms({ history: { trash } }) says, and not at all with false', async () => {
+    notes()
+    configure({ history: { trash: false } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref)
+    expect(await trashOf('notes')).toEqual([])
+    expect((await findCollection('notes'))?.trash).toBeUndefined()
+    expect((await findCollection('notes'))?.history).toBe(true)
+    expect(() => configure({ history: { trash: '0s' } })).toThrow('positive duration')
+  })
+
+  test('keeps nothing for a delete that was refused, and restores a draft for a role that may not publish', async () => {
+    notes()
+    expect(await deleteEntry(ref)).toHaveProperty('issues')
+    expect(await trashOf('notes')).toEqual([])
+    await saveEntry({ ...ref, data: { title: 'One', draft: false } }, { create: true })
+    await deleteEntry(ref)
+
+    const [item] = await trashOf('notes')
+
+    await restoreTrashed('notes', item!.id, undefined, { restrained: true })
+    expect((await entryOf(ref))?.data).toEqual({ title: 'One', draft: true })
+  })
+
+  test('is read by the trash screen, newest first, with each entry\'s title', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'second', data: { title: 'Two' } }, { create: true })
+    await deleteEntry(ref)
+    await deleteEntry({ collection: 'notes', slug: 'second' })
+    expect((await trashScreen('notes'))?.rows.map(row => [row.slug, row.title])).toEqual([['second', 'Two'], ['first', 'One']])
+    expect(await trashScreen('plain')).toBeUndefined()
+  })
+})
+
+describe('history details', () => {
+  test('starts a fresh history for a new entry under the slug of a deleted one', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'Old' } }, { create: true })
+    await deleteEntry(ref)
+    await saveEntry({ ...ref, data: { title: 'New' } }, { create: true })
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['New'])
+  })
+
+  test('compares an entry with its defaults filled in, so a save that changes nothing adds nothing', async () => {
+    const withDefault = s.Object({ title: s.String(), tone: s.String({ default: 'calm' }) })
+    const table = `notes_${++count}`
+
+    restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema: withDefault })]])
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'One', tone: 'calm' } })
+    expect((await revisionsOf(ref)).length).toBe(1)
+  })
+
+  test('renders a history path, the changes between two versions and a save moment', () => {
+    expect(historyPath('/admin', { collection: 'notes', slug: 'a/b' })).toBe('/admin/history/notes/a/b')
+    expect(changesBetween(schema, { data: { title: 'A' } }, { data: { title: 'B' }, body: 'x' }).map(change => [change.key, change.before, change.after])).toEqual([['title', 'A', 'B'], ['\u0001body', '', 'x']])
+    expect(editedMoment(Date.UTC(2026, 9, 21, 14, 5))).toBe('2026-10-21 14:05 UTC')
+    expect(editedMoment(Date.UTC(2026, 9, 21, 14, 5), 'Not/AZone')).toBe('2026-10-21 14:05 UTC')
   })
 })

@@ -28,6 +28,6 @@ export function hiddenOf(collection: string, kind: 'history' | 'trash'): Content
 }
 
 // The row of a place in a hidden collection, whether or not its loader answers one place alone.
-export async function rowOf(hidden: ContentLoader, place: string): Promise<{ data: unknown } | undefined> {
+export async function rowOf(hidden: ContentLoader, place: string): Promise<{ data: unknown, body?: string | undefined } | undefined> {
   return hidden.get === undefined ? (await hidden.load({ preview: true })).find(row => row.slug === place) : hidden.get(place, { preview: true })
 }
