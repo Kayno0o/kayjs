@@ -436,6 +436,8 @@ In the list, a published entry whose date is ahead has a `Scheduled for` badge i
 
 Beside the badge, Publish now dates the entry now and Clear schedule removes its date, each saving at once.
 
+A collection with `unpublishAt` also shows an `Ends 2026-10-20 10:00 GMT+2` badge on the entry screen while that date is ahead, and `Ended` once it passes, because the site no longer shows the entry. Clear end date beside it removes the date and saves at once. The date field itself is edited like any other date.
+
 The date and time input shows the time of the editor's own time zone, whatever the server's, and names the zone under the field. What the editor types is stored as the exact moment it names, so an editor in Paris and one in New York see the same entry at their own hours. A time the clocks of the zone skip, on the night they go forward, is stored an hour on. A date field you clear stores nothing.
 
 ## Replacing a screen

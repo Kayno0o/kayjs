@@ -131,6 +131,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
   // A date field, `'publishAt'`, holding an entry back as a draft is until that time and showing it by itself then: in `all()`, `get()`, the pages prerendered from it, the sitemap and the feed. A date alone is 00:00 UTC, a date with an offset is that instant; an entry without one is published. A draft stays one whatever its date.
   publishAt?: DateField<Static<Schema>> | undefined
+  // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering what the app chose when `get()` finds nothing (`ctx.notFound()`, a 410, a redirect). An entry without one never ends; `kay dev` and preview mode keep showing it.
+  unpublishAt?: DateField<Static<Schema>> | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
   order?: NumberField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by `order`, else by slug.
@@ -152,7 +154,7 @@ export interface CollectionOptions<Schema extends TSchema> {
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
   readonly [COLLECTION]: true
   readonly [FEED_PATH]?: FeedPath
-  // The dates `publishAt` reads from the entries, in order and once each.
+  // The dates `publishAt` and `unpublishAt` read from the entries, in order and once each.
   readonly [PUBLISH_TIMES]: () => Promise<number[]>
   // The folder, relative to the project root, or the loader's name.
   readonly name: string
@@ -196,10 +198,13 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const key = contentKey(name)
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
-  const { draft, localized = false, publishAt } = options
+  const { draft, localized = false, publishAt, unpublishAt } = options
 
   if (publishAt !== undefined)
     checkPublishField(name, options.schema, publishAt)
+
+  if (unpublishAt !== undefined)
+    checkPublishField(name, options.schema, unpublishAt, 'unpublishAt')
 
   if (options.single && localized)
     throw new KayError('config-invalid', `kay: the collection ${name} is both \`single\` and \`localized\`; a single entry has no translations, so leave one out`)
@@ -365,21 +370,24 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return withDrafts(await (loader ? fromLoader : fromFolder)())
   }
   const scheduled = (entry: Entry<Data>) => {
-    const time = publishAt === undefined ? undefined : publishTime(publishAt, entry)
+    const now = Date.now()
+    const live = publishAt === undefined ? undefined : publishTime(publishAt, entry)
+    const down = unpublishAt === undefined ? undefined : publishTime(unpublishAt, entry)
 
-    return time !== undefined && time > Date.now()
+    return (live !== undefined && live > now) || (down !== undefined && down <= now)
   }
-  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 
   return {
     [COLLECTION]: true,
     [PUBLISH_TIMES]: async () => {
-      if (publishAt === undefined)
+      if (publishAt === undefined && unpublishAt === undefined)
         return []
 
-      const times = (await (loader ? fromLoader : fromFolder)()).list.map(entry => publishTime(publishAt, entry))
+      const fields = [publishAt, unpublishAt].filter(field => field !== undefined)
+      const times = (await (loader ? fromLoader : fromFolder)()).list.flatMap(entry => fields.map(field => publishTime(field, entry)))
 
       return [...new Set(times.filter(time => time !== undefined))].toSorted((a, b) => a - b)
     },

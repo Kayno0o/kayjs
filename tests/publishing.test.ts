@@ -222,6 +222,35 @@ describe('watchPublishing at boot', () => {
     }
   })
 
+  it('watches a collection with an unpublishAt alone, refreshing its pages when an end date passes', async () => {
+    jest.useFakeTimers({ now: NOW })
+
+    let refreshed = 0
+    const stopHearing = onKeysInvalidated((matches) => {
+      if (matches(contentKey('offers')))
+        refreshed++
+
+      return []
+    })
+
+    try {
+      const ending = { name: 'offers', options: { unpublishAt: 'ends' }, [PUBLISH_TIMES]: async () => [NOW + 10_000] } as unknown as Collection<unknown>
+      const over = await watch({ ...ending, [PUBLISH_TIMES]: async () => [NOW - HOUR] })
+
+      expect(over.passed(page(NOW - 2 * HOUR, contentKey('offers')))).toBe(true)
+      expect(over.passed(page(NOW, contentKey('offers')))).toBe(false)
+      await watch(ending)
+      refreshed = 0
+      await advance(9000)
+      expect(refreshed).toBe(0)
+      await advance(1000)
+      expect(refreshed).toBe(1)
+    }
+    finally {
+      stopHearing()
+    }
+  })
+
   it('watches nothing for collections with no publishAt', async () => {
     const publishing = await watchPublishing([{ name: 'posts', options: {} } as unknown as Collection<unknown>])
 

@@ -7,7 +7,7 @@ export function isDraft<Data>(draft: ((entry: Entry<Data>) => boolean) | string,
   return typeof draft === 'string' ? (entry.data as Record<string, unknown> | undefined)?.[draft] === true : draft(entry)
 }
 
-// When the entry's `publishAt` field says it goes live, in milliseconds, or undefined for an entry with no date.
+// When the entry's `publishAt` or `unpublishAt` field says it goes live or down, in milliseconds, or undefined for an entry with no date.
 export function publishTime(field: string, entry: Entry<unknown>): number | undefined {
   const value = (entry.data as Record<string, unknown> | undefined)?.[field]
   const time = value instanceof Date ? value.getTime() : Number.NaN
@@ -24,10 +24,10 @@ function holdsDate(node: Node): boolean {
   return node.type === 'Date' || (node.anyOf?.some(holdsDate) ?? false)
 }
 
-// A `publishAt` naming anything but an `s.Date()` field would hold nothing back, so it fails where the collection is made.
-export function checkPublishField(name: string, schema: TSchema, field: string): void {
+// A `publishAt` or `unpublishAt` naming anything but an `s.Date()` field would hold nothing back, so it fails where the collection is made.
+export function checkPublishField(name: string, schema: TSchema, field: string, option: 'publishAt' | 'unpublishAt' = 'publishAt'): void {
   const node = (schema as { properties?: Record<string, Node> }).properties?.[field]
 
   if (node === undefined || !holdsDate(node))
-    throw new KayError('config-invalid', `kay: the collection ${name}'s publishAt names ${field}, which is not an s.Date() field of its schema`)
+    throw new KayError('config-invalid', `kay: the collection ${name}'s ${option} names ${field}, which is not an s.Date() field of its schema`)
 }

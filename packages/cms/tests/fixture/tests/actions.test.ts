@@ -15,7 +15,7 @@ const { createEntryForm } = await import('../../../src/form')
 const { deleteMessage } = await import('../../../src/listing')
 const { isSaveShortcut, saveShortcut } = await import('../../../src/editor/shortcut')
 
-const talks: ScreenCollection = { name: 'talks', kind: 'folder', localized: false, components: [], publishField: 'at', draftField: 'draft', schema: { properties: { title: { type: 'string' }, at: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } } }
+const talks: ScreenCollection = { name: 'talks', kind: 'folder', localized: false, components: [], publishField: 'at', draftField: 'draft', schema: { properties: { title: { type: 'string' }, at: { type: 'string', format: 'date-time' }, ends: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } } }
 const ahead = new Date(Date.now() + 86_400_000).toISOString()
 const talk = (data: Record<string, unknown>) => ({ slug: 'talk', data, draft: false, version: 'v1', url: '/talks/talk' }) as StoredEntry
 
@@ -246,6 +246,36 @@ describe('a scheduled entry', () => {
     form.drafts.set(form.entry, 'title', 'Edit')
     await form.unschedule()
     await form.publishNow()
+    expect(sent).toHaveLength(0)
+  })
+})
+
+describe('an ending entry', () => {
+  const offers: ScreenCollection = { ...talks, name: 'offers', publishField: undefined, unpublishField: 'ends' }
+
+  test('keeps living by clearing its end date, and keeps it when the save is refused', async () => {
+    const sent = server(() => ({ saved: true, version: 'v2' }))
+    const form = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+
+    expect(form.ends()).toBeDefined()
+    await form.clearEnd()
+    expect(sent[0]!.body.data).toEqual({ title: 'Offer' })
+    expect([form.ends(), form.ended(), form.dirty()]).toEqual([undefined, false, false])
+
+    server(() => refused)
+
+    const refusedForm = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+
+    await refusedForm.clearEnd()
+    expect([refusedForm.drafts.value(refusedForm.entry, 'ends'), refusedForm.dirty()]).toEqual([ahead, false])
+  })
+
+  test('is left alone with unsaved edits', async () => {
+    const sent = server(() => ({ saved: true }))
+    const form = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+
+    form.drafts.set(form.entry, 'title', 'Edit')
+    await form.clearEnd()
     expect(sent).toHaveLength(0)
   })
 })

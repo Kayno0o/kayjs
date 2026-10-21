@@ -97,6 +97,48 @@ describe('a prerendered site with a scheduled entry', () => {
     })
   })
 
+  it('takes an ending entry down at its time from the listing, its prerendered page, the sitemap and the feed, the page then answering what the app chose', async () => {
+    await build(async (scratch) => {
+      schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: '2999-01-01' }]
+      await scratch.prerender(OPTIONS)
+
+      const app = await serve(scratch)
+
+      expect(await visit(app, '/talks/ending')).toEqual({ status: 200, text: expect.stringContaining('<h1>Ending</h1>') })
+      schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: new Date(Date.now() + 1200).toISOString() }]
+      talks.invalidate()
+      expect((await visit(app, '/talks')).text).toContain('Ending')
+
+      let text = (await visit(app, '/talks')).text
+
+      for (let wait = 0; text.includes('Ending') && wait < 60; wait++) {
+        await Bun.sleep(50)
+        text = (await visit(app, '/talks')).text
+      }
+
+      expect(text).not.toContain('Ending')
+      expect((await visit(app, '/talks/ending')).status).toBe(404)
+      expect((await visit(app, '/talks/now')).status).toBe(200)
+      expect((await visit(app, '/sitemap.xml')).text).not.toContain('/talks/ending')
+      expect((await visit(app, '/talks.xml')).text).not.toContain('Ending')
+    })
+  })
+
+  it('renders a page again on its first visit when the server was down at the end time', async () => {
+    await build(async (scratch) => {
+      setSystemTime(NOW)
+      schedule.items = [{ slug: 'ending', title: 'Ending', ends: '2026-10-19T13:00:00Z' }]
+      await scratch.prerender(OPTIONS)
+      expect(await Bun.file(join(scratch.pages, 'talks.html')).text()).toContain('Ending')
+      setSystemTime(new Date('2026-10-19T14:00:00Z'))
+
+      const app = await serve(scratch)
+
+      expect((await visit(app, '/talks')).text).not.toContain('Ending')
+      expect((await visit(app, '/talks/ending')).status).toBe(404)
+    })
+  })
+
   it('waits for each date in turn, the nearest first', async () => {
     await build(async (scratch) => {
       const app = await schedulesAfter(scratch, 2400, 800)

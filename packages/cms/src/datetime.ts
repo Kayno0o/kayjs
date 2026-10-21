@@ -104,6 +104,11 @@ export function publishTime(collection: Pick<CollectionInfo, 'publishField'>, da
   return collection.publishField === undefined ? undefined : timeOf(data?.[collection.publishField])
 }
 
+// The time in milliseconds an entry's `unpublishAt` date names, or undefined for an entry that has none or a collection with no `unpublishAt`.
+export function unpublishTime(collection: Pick<CollectionInfo, 'unpublishField'>, data: Record<string, unknown> | undefined): number | undefined {
+  return collection.unpublishField === undefined ? undefined : timeOf(data?.[collection.unpublishField])
+}
+
 // Says when a date goes live, in `zone` (UTC by default), or nothing once it has passed.
 export function goesLive(time: number, now = Date.now(), zone?: string): string | undefined {
   if (time <= now)

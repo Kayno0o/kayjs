@@ -111,6 +111,8 @@ export interface CollectionInfo {
   draftField?: string | undefined
   // The date field `publishAt` names, which holds an entry back until its time: a CMS shows it and marks an entry whose date is ahead.
   publishField?: string | undefined
+  // The date field `unpublishAt` names, which takes an entry down from its time: a CMS shows it and marks an entry whose date is ahead or past.
+  unpublishField?: string | undefined
   // The number field `order` names, which the entries are ordered by and a CMS moves one by writing.
   orderField?: string | undefined
   // The collection holds one entry, which a CMS opens its form on from the content list, with no row, no New entry and no Delete.
@@ -344,7 +346,7 @@ export async function collectionInfo(name: string, { counts = true }: { counts?:
 }
 
 async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
-  const { description, draft, localized = false, order, publishAt, schema, title } = collection.options
+  const { description, draft, localized = false, order, publishAt, schema, title, unpublishAt } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
   const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
   const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
@@ -362,6 +364,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...inRepo !== undefined && { dir: inRepo },
     ...typeof draft === 'string' && { draftField: draft },
     ...publishAt !== undefined && { publishField: publishAt },
+    ...unpublishAt !== undefined && { unpublishField: unpublishAt },
     ...order !== undefined && { orderField: order },
     ...collection.options.single && { single: true as const },
     ...collection.options.single && collection.options.seed !== undefined && { seed: collection.options.seed as Record<string, DataValue> },

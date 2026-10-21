@@ -14,13 +14,14 @@ import { fixtureCopy, scratchDir } from './scratch'
 const NOW = new Date('2026-10-19T12:00:00Z')
 const DEV = { dev: true, prebuilt: false }
 
-interface Talk { slug: string, title?: string, at?: string | Date, draft?: boolean }
+interface Talk { slug: string, title?: string, at?: string | Date, ends?: string | Date, draft?: boolean }
 
 // A collection of talks a loader gives, `at` being the date the option names.
 function talks(items: Talk[], options: { draft?: 'draft' | ((entry: { data: { draft?: boolean | undefined } }) => boolean), localized?: boolean } = {}) {
-  return collection({ name: `talks-${crypto.randomUUID()}`, load: () => items.map(({ slug, title = slug, at, draft }) => ({ slug, data: { title, at, draft } })) }, {
-    schema: t.Object({ title: t.String(), at: t.Optional(t.Date()), draft: t.Optional(t.Boolean()) }),
+  return collection({ name: `talks-${crypto.randomUUID()}`, load: () => items.map(({ slug, title = slug, at, ends, draft }) => ({ slug, data: { title, at, ends, draft } })) }, {
+    schema: t.Object({ title: t.String(), at: t.Optional(t.Date()), ends: t.Optional(t.Date()), draft: t.Optional(t.Boolean()) }),
     publishAt: 'at',
+    unpublishAt: 'ends',
     ...options,
   })
 }
@@ -143,6 +144,51 @@ describe('publishAt', () => {
     }
   })
 
+  it('takes an entry down at its unpublishAt date, on the very next read', async () => {
+    setSystemTime(NOW)
+
+    const talk = talks([{ slug: 'over', ends: '2026-10-19T11:59:59Z' }, { slug: 'ending', ends: '2026-10-19T12:00:01Z' }, { slug: 'open' }, { slug: 'window', at: '2026-10-19T11:00:00Z', ends: '2026-10-19T13:00:00Z' }, { slug: 'inverted', at: '2026-10-19T11:00:00Z', ends: '2026-10-19T10:00:00Z' }])
+
+    expect(await slugs(talk)).toEqual(['ending', 'open', 'window'])
+    expect(await talk.get('over')).toBeUndefined()
+    setSystemTime(new Date('2026-10-19T12:00:01Z'))
+    expect(await slugs(talk)).toEqual(['open', 'window'])
+    expect(await talk.get('ending')).toBeUndefined()
+    setSystemTime(new Date('2026-10-19T13:00:00Z'))
+    expect(await slugs(talk)).toEqual(['open'])
+  })
+
+  it('reads an unpublishAt date alone as 00:00 UTC, and keeps the entry in development and in preview mode', async () => {
+    setSystemTime(new Date('2026-10-20T00:00:00Z'))
+
+    const talk = talks([{ slug: 'day', ends: '2026-10-20' }, { slug: 'next', ends: '2026-10-21' }])
+
+    expect(await slugs(talk)).toEqual(['next'])
+    expect(await inPreview(async () => slugs(talk))).toEqual(['day', 'next'])
+    setContentMode(DEV)
+    expect(await slugs(talk)).toEqual(['day', 'next'])
+  })
+
+  it('leaves a translation out once it ends, the default locale standing in as for a missing one', async () => {
+    setSystemTime(NOW)
+
+    const talk = collection({ name: `talks-${crypto.randomUUID()}`, load: () => [{ slug: 'en/hello', data: { title: 'Hello' } }, { slug: 'fr/hello', data: { title: 'Bonjour', ends: '2026-10-20' } }] }, {
+      schema: t.Object({ title: t.String(), ends: t.Optional(t.Date()) }),
+      localized: true,
+      unpublishAt: 'ends',
+    })
+
+    expect((await talk.get('hello', 'fr'))?.data.title).toBe('Bonjour')
+    setSystemTime(new Date('2026-10-20T00:00:00Z'))
+    expect(await talk.get('hello', 'fr')).toBeUndefined()
+    expect(await talk.translation({ slug: 'hello', data: {} }, 'fr')).toBeUndefined()
+  })
+
+  it('refuses an unpublishAt that is not a date, at the collection', () => {
+    expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), unpublishAt: 'title' as never })).toThrow('unpublishAt names title, which is not an s.Date() field')
+    expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), unpublishAt: 'missing' as never })).toThrow('unpublishAt names missing, which is not an s.Date() field')
+  })
+
   it('refuses a field that is not a date, at the collection', () => {
     expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), publishAt: 'title' as never })).toThrow('publishAt names title, which is not an s.Date() field')
     expect(() => collection({ name: 'bad', load: () => [] }, { schema: t.Object({ title: t.String() }), publishAt: 'missing' as never })).toThrow('publishAt names missing, which is not an s.Date() field')
@@ -158,12 +204,12 @@ describe('publishAt', () => {
 })
 
 describe('the CMS', () => {
-  it('is told the field, and reads every entry whether it is held back or not', async () => {
+  it('is told the fields, and reads every entry whether it is held back or not', async () => {
     const talk = talks([{ slug: 'later', at: '2999-01-01' }])
     const before = registerCollections([['talks', talk]])
 
     try {
-      expect(await collectionInfo('talks', { counts: false })).toMatchObject({ publishField: 'at' })
+      expect(await collectionInfo('talks', { counts: false })).toMatchObject({ publishField: 'at', unpublishField: 'ends' })
     }
     finally {
       registerCollections(before)
@@ -176,6 +222,12 @@ describe('the dates a collection holds', () => {
     const talk = talks([{ slug: 'a', at: '2026-10-18T00:00:00Z' }, { slug: 'b', at: '2026-10-20T00:00:00Z' }, { slug: 'c', at: '2026-10-22T00:00:00Z' }, { slug: 'd', at: '2026-10-20T00:00:00Z' }, { slug: 'e' }])
 
     expect(await talk[PUBLISH_TIMES]()).toEqual([Date.parse('2026-10-18T00:00:00Z'), Date.parse('2026-10-20T00:00:00Z'), Date.parse('2026-10-22T00:00:00Z')])
+  })
+
+  it('lists the unpublishAt dates among them', async () => {
+    const talk = talks([{ slug: 'a', at: '2026-10-18T00:00:00Z', ends: '2026-10-21T00:00:00Z' }, { slug: 'b', ends: '2026-10-19T00:00:00Z' }])
+
+    expect(await talk[PUBLISH_TIMES]()).toEqual([Date.parse('2026-10-18T00:00:00Z'), Date.parse('2026-10-19T00:00:00Z'), Date.parse('2026-10-21T00:00:00Z')])
   })
 
   it('is empty for a collection with no publishAt', async () => {

@@ -7,7 +7,7 @@ import { wording } from 'kay/words'
 import { deleteMessage, onPagePath } from '../listing'
 import EntrySaveState from './entry-save-state.kay'
 
-// The Draft badge, or the Scheduled one for a published entry whose date is ahead, and the buttons of an entry's screen: Edit on page, Publish or Unpublish (Publish now and Clear schedule beside the Scheduled badge) and Delete for a saved entry, Reset once edited, Save or Create, which waits for something to save, and where the entry stands. Meant for the header's slot.
+// The Draft badge, or the Scheduled one for a published entry whose date is ahead, and the buttons of an entry's screen: Edit on page, Publish or Unpublish (Publish now and Clear schedule beside the Scheduled badge, Clear end date beside the Ends or Ended badge) and Delete for a saved entry, Reset once edited, Save or Create, which waits for something to save, and where the entry stands. Meant for the header's slot.
 const { form } = props<{ form: EntryForm }>()
 
 const entry = form.stored
@@ -16,12 +16,18 @@ if form.isDraft()
   Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
 else if form.scheduled() as at
   Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at })})
+if form.ended()
+  Badge(tone="warning" label={wording('cms.entry.ended', 'Ended')})
+else if form.ends() as at
+  Badge(tone="info" label={wording('cms.entry.endsAt', 'Ends {at}', { at })})
 .kcms-entry-actions
   EntrySaveState(changed={form.dirty()} saving={form.saving()} saved={form.savedAt()} url={entry?.url})
   if entry
     if form.scheduled() && form.collection.publishField !== undefined
       Button(label={wording('cms.entry.publishNow', 'Publish now')} disabled={form.saving()} onClick={form.publishNow})
       Button(label={wording('cms.entry.unschedule', 'Clear schedule')} disabled={form.saving()} onClick={form.unschedule})
+    if (form.ends() || form.ended()) && form.collection.unpublishField !== undefined
+      Button(label={wording('cms.entry.clearEnd', 'Clear end date')} disabled={form.saving()} onClick={form.clearEnd})
     if entry.url as url
       Button(href={onPagePath(form.prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')})
     if form.isDraft()

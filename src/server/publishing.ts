@@ -12,7 +12,7 @@ const FIRST_READ_MS = 1000
 
 const listeners = new Set<() => void>()
 
-// Hears a date `publishAt` names pass, so what a server keeps beside the pages, such as the sitemap, is built afresh.
+// Hears a date `publishAt` or `unpublishAt` names pass, so what a server keeps beside the pages, such as the sitemap, is built afresh.
 export function onPublished(listener: () => void): () => void {
   listeners.add(listener)
 
@@ -37,10 +37,10 @@ export interface Publishing {
 // What a server watching nothing holds, such as a static export or `kay dev`, which show every entry or are written once.
 export const NOT_PUBLISHING: Publishing = { passed: () => false, caughtUp: Promise.resolve(), stop: () => undefined, start: () => undefined }
 
-// Refreshes the pages that read a collection with a `publishAt` when one of its dates passes, in this process alone: every replica has its clock and its pages, so none needs a lock, a store or a message from another.
+// Refreshes the pages that read a collection with a `publishAt` or `unpublishAt` when one of its dates passes, in this process alone: every replica has its clock and its pages, so none needs a lock, a store or a message from another.
 // A date that passed while no server ran is caught up by `passed`, which compares it with the render of each page the build kept, once a read of the dates ends, which the server's start waits for a second at most before `caughtUp` settles; a failed one is tried again.
 export async function watchPublishing(collections: Collection<unknown>[]): Promise<Publishing> {
-  const watched = collections.filter(collection => collection.options.publishAt !== undefined)
+  const watched = collections.filter(collection => collection.options.publishAt !== undefined || collection.options.unpublishAt !== undefined)
 
   if (watched.length === 0)
     return NOT_PUBLISHING

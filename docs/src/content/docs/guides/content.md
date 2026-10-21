@@ -89,6 +89,23 @@ A [static export](/guides/static-export) has no server, so it cannot change by i
 
 A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start.
 
+## Ending an entry
+
+Name a second date field with `unpublishAt` and the entry takes itself down at that time, as `publishAt` brings it up:
+
+```ts
+export const offers = collection('src/content/offers', {
+  schema: s.Object({ title: s.String(), endsAt: s.Optional(s.Date()) }),
+  unpublishAt: 'endsAt',
+})
+```
+
+From that time the entry is left out of `all()`, `get()`, the sitemap, the feed and the pages built from it. An entry with no end date never ends. The two options work together, so an entry can have a window. `kay dev` and preview mode keep showing it. The date is read like the publish date, in UTC unless you write an offset.
+
+The server builds again the pages that read the collection when the date passes, the same way as for `publishAt`, and does it as it starts when it was down at that time. The page of the ended entry is rendered again too, so its URL answers what its code does when `get()` finds nothing: `?? ctx.notFound()` answers 404, and `?? ctx.redirect('/offers')` sends visitors to the list.
+
+A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start. kayjs-cms shows `Ends` or `Ended` beside the entry's date field and can clear the date.
+
 ## A page per entry
 
 A page named after the slug reads one entry and prerenders a page for each of them.

@@ -59,6 +59,29 @@ describe('a scheduled entry\'s form', () => {
   })
 })
 
+describe('an ending entry\'s form', () => {
+  const offers: ScreenCollection = { name: 'offers', kind: 'folder', localized: false, components: [], unpublishField: 'ends', draftField: 'draft', schema: { properties: { title: { type: 'string' }, ends: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } } }
+  const ahead = new Date(Date.now() + 86_400_000).toISOString()
+  const ending = (data: Record<string, unknown>) => ({ ...entry('offer', 'Offer'), data }) as StoredEntry
+
+  test('says when the entry comes down while its date is ahead, following the edits, then that it ended once it passes', () => {
+    const form = createEntryForm({ prefix: '/admin', collection: offers, entry: ending({ title: 'Offer', ends: ahead }) })
+
+    expect([form.ends(), form.ended()]).toEqual([`${ahead.slice(0, 10)} ${ahead.slice(11, 16)} UTC`, false])
+    form.drafts.set(form.entry, 'ends', '2020-01-01T00:00:00.000Z')
+    expect([form.ends(), form.ended()]).toEqual([undefined, true])
+    form.drafts.set(form.entry, 'ends', undefined)
+    expect([form.ends(), form.ended()]).toEqual([undefined, false])
+  })
+
+  test('leaves a draft and a collection with no unpublishAt alone', () => {
+    const drafted = createEntryForm({ prefix: '/admin', collection: offers, entry: ending({ title: 'Offer', ends: ahead, draft: true }) })
+    const plain = createEntryForm({ prefix: '/admin', collection: { ...offers, unpublishField: undefined }, entry: ending({ title: 'Offer', ends: ahead }) })
+
+    expect([drafted.ends(), drafted.ended(), plain.ends(), plain.ended()]).toEqual([undefined, false, undefined, false])
+  })
+})
+
 describe('createEntryForm', () => {
   test.each(['/', '/admin', '/studio/cms/admin'])('carries the prefix %s the parts write their links from', (prefix) => {
     const form = createEntryForm({ prefix, collection: posts, entry: entry('notes/a b@c', 'Title') })

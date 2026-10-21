@@ -5,7 +5,7 @@ import type { SlugReport } from './slug'
 import { call, effect, guardLeave, navigate, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import slugsApi from './api/slugs'
-import { publishTime, useGoesLive } from './datetime'
+import { publishTime, unpublishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
 import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
@@ -60,12 +60,17 @@ export interface EntryForm extends FormScope {
   isDraft: () => boolean
   // When a published entry whose `publishAt` date is ahead goes live, in the editor's time zone (UTC until the browser says it), as the form holds it now; gone once the date passes, with no reload.
   scheduled: () => string | undefined
+  // When a published entry whose `unpublishAt` date is ahead comes down, in the editor's time zone, as the form holds it now; gone once the date passes, with no reload.
+  ends: () => string | undefined
+  // Whether a published entry's `unpublishAt` date passed: the site no longer shows it.
+  ended: () => boolean
   save: () => Promise<void>
   // Publish, Unpublish, Publish now and Clear schedule change the entry alone: with edits not saved yet they refuse, saving nothing, and a refused save leaves the form as it was.
   publish: () => Promise<void>
   unpublish: () => Promise<void>
   publishNow: () => Promise<void>
   unschedule: () => Promise<void>
+  clearEnd: () => Promise<void>
   remove: () => Promise<void>
   reset: () => void
 }
@@ -203,6 +208,10 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
 
   const goesLiveAt = () => !isDraft() && collection.publishField !== undefined ? publishTime(collection, { [collection.publishField]: drafts.value(ref, collection.publishField) }) : undefined
   const scheduled = useGoesLive(goesLiveAt)
+  const endsAt = () => !isDraft() && collection.unpublishField !== undefined ? unpublishTime(collection, { [collection.unpublishField]: drafts.value(ref, collection.unpublishField) }) : undefined
+  const ends = useGoesLive(endsAt)
+  // `ends` reads the clock, so this follows the date passing.
+  const ended = () => endsAt() !== undefined && ends() === undefined
   // A text that does not parse keeps Save enabled, so pressing it says what to fix.
   const canSave = () => !saving() && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
@@ -297,11 +306,14 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     },
     isDraft,
     scheduled,
+    ends,
+    ended,
     save,
     publish: async () => change(collection.draftField, false),
     unpublish: async () => change(collection.draftField, true),
     publishNow: async () => change(collection.publishField, new Date().toISOString()),
     unschedule: async () => change(collection.publishField, undefined),
+    clearEnd: async () => change(collection.unpublishField, undefined),
     async remove() {
       if (await deleteSaved(ref, drafts.version(ref)))
         await navigate(collectionPath(prefix, collection.name), { replace: true })
