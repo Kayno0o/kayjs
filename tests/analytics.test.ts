@@ -131,6 +131,13 @@ describe('the script and the page', () => {
     expect(home).toContain('&quot;agree&quot;:&quot;Yes&quot;')
   })
 
+  it('reads a language key written in uppercase for the page whose lang is lowercase', async () => {
+    const home = await (await (await site(plausible({ consent: { text: { EN: 'Count?', FR: 'Compter ?' }, agree: { Fr: 'Oui' } } }))).handle(new Request('http://localhost/'))).text()
+
+    expect(home).toContain('&quot;fr&quot;:{&quot;text&quot;:&quot;Compter ?&quot;,&quot;agree&quot;:&quot;Oui&quot;')
+    expect(home).not.toContain('&quot;FR&quot;')
+  })
+
   it('marks the notice as silent when the app asks in its own UI, the gate staying', async () => {
     const home = await (await (await site(plausible({ consent: { notice: false } }))).handle(new Request('http://localhost/'))).text()
 

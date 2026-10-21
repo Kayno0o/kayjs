@@ -253,12 +253,17 @@ function cspOf(options: FathomOptions | CloudflareOptions): Record<string, strin
   return { 'script-src': ['\'self\'', 'https://static.cloudflareinsights.com'], 'connect-src': ['\'self\'', 'https://cloudflareinsights.com'] }
 }
 
+// The notice script lowercases the page's `lang`, so a key written `FR` is read as `fr`.
+function lowered(value: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(Object.entries(value ?? {}).map(([language, text]) => [language.toLowerCase(), text]))
+}
+
 // One entry per language the notice is written in: `en`, every language a text is given in, and the shipped ones too when a text is a plain string, which holds for each of them. A language none of these names reads the shipped words in the browser, English by default.
 function noticeOf(consent: Partial<Record<keyof Words, AnalyticsText | undefined>>, shipped: Record<string, Words>): Record<string, Words> {
   const values = [consent.text, consent.agree, consent.refuse, consent.policy]
-  const given = values.flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
+  const given = values.flatMap(value => typeof value === 'object' ? Object.keys(lowered(value)) : [])
   const plain = values.some(value => typeof value === 'string')
-  const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : value?.[language] ?? fallback
+  const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : lowered(value)[language] ?? fallback
   // The app's languages come first: the script reads the first one for a page language nothing names.
   const languages = new Set([...given, 'en', ...plain ? Object.keys(shipped) : []])
 
