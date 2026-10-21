@@ -22,7 +22,8 @@ import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
 import { inlineTargetOf, isBusy, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
-import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, OWN, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
+import { OWN } from './own'
+import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
 import type { PageListWatch } from './page-lists'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
@@ -371,14 +372,34 @@ function focusedElement(): Element | undefined {
   return element && element !== document.body && !panel?.contains(element) && !menu?.contains(element) && !inBars(element) ? element : undefined
 }
 
+// The bar of the focused item keeps the item while the focus is on it.
 listen(() => document, 'focusin', () => {
   marks?.focus(focusedFields())
-  lists?.focus(focusedElement())
+
+  if (!inBars(document.activeElement ?? undefined))
+    lists?.focus(focusedElement())
 })
-listen(() => document, 'focusout', () => {
+listen(() => document, 'focusout', (event) => {
   marks?.focus(undefined)
-  lists?.focus(undefined)
+
+  if (!inBars(event.relatedTarget instanceof Node ? event.relatedTarget : undefined))
+    lists?.focus(undefined)
 })
+
+// Tab goes through the bar of an item after the item's last tab stop.
+listen(() => document, 'keydown', (event) => {
+  const element = event.target instanceof HTMLElement ? event.target : undefined
+
+  if (event.key !== 'Tab' || !open() || browsing() || event.isComposing || !element || event.altKey || event.ctrlKey || event.metaKey || (element.closest(OWN) && !inBars(element)))
+    return
+
+  const stop = lists?.tab(element, event.shiftKey)
+
+  if (stop) {
+    event.preventDefault()
+    stop.focus()
+  }
+}, { capture: true })
 
 // Alt and Shift with an arrow moves the list item holding the focus, with Delete takes it out, with Enter asks what to do with it; Enter on an empty list adds its first item.
 listen(() => document, 'keydown', (event) => {
@@ -899,6 +920,6 @@ if choosing() as question
   .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={question.label} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey} onFocusOut={leaveMenu})
     for choice of question.choices key={choice.key}
       button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(choice)}) {choice.label}
-PageListTools(bars={unsettled() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
+PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

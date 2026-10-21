@@ -14,3 +14,4 @@ columns:
     cells: [R1]
 empty: []
 limited: [A, B]
+named: [Fine]

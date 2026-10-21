@@ -4,6 +4,10 @@ import { guides } from '../content.config'
 const guide = await guides.get('intro') ?? ctx.notFound()
 ---
 h1 {guide.data.title}
+ol.first
+  for step of guide.data.steps
+    if step === 'Edit'
+      li {step}
 ol.steps
   for step of guide.data.steps
     li {step}
@@ -28,5 +32,11 @@ ul.empty
     li {item}
 ul.limited
   for item of guide.data.limited
+    li
+      span {item}
+      input(aria-label="Note")
+ul.named(tabindex="-1" role="list")
+  for item of guide.data.named
     li {item}
+a.out(href="/about") Out
 .room(style="height: 30rem")

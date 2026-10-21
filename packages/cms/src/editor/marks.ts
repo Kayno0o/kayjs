@@ -1,6 +1,7 @@
 import type { MarkedField } from '../markers'
 import { allMarked, markedBox } from '../markers'
 import { isTypingInline } from './inline'
+import { OWN } from './own'
 
 // The outlines drawn over the page's marked fields in edit mode: the field under the pointer, and with `all` every field at once. They sit in a layer of their own, so an attribute or a comment pair, which no CSS selector reaches, is outlined as an element is, and the page's own markup stays as it is.
 export interface Marks {
@@ -105,7 +106,7 @@ export function createMarks(all: boolean, focusedNow: () => MarkedField[] | unde
     for (const record of records) {
       const element = record.target instanceof Element ? record.target : record.target.parentElement
 
-      if (isTypingInline(record.target) || layer.contains(record.target) || element?.closest('.kcms-editor'))
+      if (isTypingInline(record.target) || layer.contains(record.target) || element?.closest(OWN))
         continue
 
       changed = true

@@ -115,7 +115,7 @@ The "Browse the page" button next to it lets the page's links, menus and tabs wo
 
 When the page shows a list, such as the tags of a post or the blocks of a home page, point at one of its items and a small toolbar appears at its top right corner. It moves the item up or down, adds a new one after it and removes it. For a list of blocks, Add asks which kind of block. A list inside an item has its own toolbar, stacked above the toolbar of the item that holds it. An empty list has an "Add to" button where its items would be.
 
-Everything has a keyboard way. Tab to a field in the item, then press Alt and Shift with the up or down arrow to move the item, Alt and Shift with Delete to remove it, or Alt and Shift with Enter to open a menu of what you can do with it. Tab reaches an empty list, and Enter adds its first item.
+Everything has a keyboard way. Tab to a field in the item, then press Alt and Shift with the up or down arrow to move the item, Alt and Shift with Delete to remove it, or Alt and Shift with Enter to open a menu of what you can do with it. Tab reaches an empty list, and Enter adds its first item. After the last field of an item, Tab goes to its buttons, then on to what follows the item.
 
 The change goes into the entry's draft, the same one the form beside the page edits, so the form and the page agree. A removal shows "Undo" in the editor, and a screen reader is told where an item went. A list at its most items cannot grow, and one at its least cannot shrink.
 

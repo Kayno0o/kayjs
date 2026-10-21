@@ -116,6 +116,7 @@ export const guides = collection('content/guides', {
     columns: s.Array(s.Object({ title: s.String(), cells: s.Array(s.String(), { default: [] }) }), { default: [] }),
     empty: s.Array(s.String(), { default: [] }),
     limited: s.Array(s.String(), { default: [], minItems: 1, maxItems: 2 }),
+    named: s.Array(s.String({ minLength: 1 }), { default: [] }),
   }),
   localized: true,
 })

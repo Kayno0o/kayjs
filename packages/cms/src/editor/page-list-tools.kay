@@ -19,7 +19,7 @@ const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar:
       .kcms-list-start(style={bar.style})
         Button(label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} icon="plus" size="sm" disabled={!bar.add} onClick={event => onAdd(bar, event)})
     else
-      .kcms-list-bar(role="toolbar" style={bar.style} aria-label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })})
+      .kcms-list-bar(role="toolbar" data-key={bar.key} style={bar.style} aria-label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })})
         IconButton(icon={arrowUp} label={wording('cms.reorder.up', 'Move {item} up', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.up} onClick={() => onMove(bar, 'up')})
         IconButton(icon={arrowDown} label={wording('cms.reorder.down', 'Move {item} down', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.down} onClick={() => onMove(bar, 'down')})
         IconButton(icon={plus} label={wording('cms.pageList.addAfter', 'Add after {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.add} aria-haspopup={bar.blocks ? 'menu' : undefined} onClick={event => onAdd(bar, event)})

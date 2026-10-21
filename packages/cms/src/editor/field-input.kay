@@ -18,6 +18,7 @@ import { wording } from 'kay/words'
 import { today } from '../datetime'
 import { blockOf, checkField, emptyBlock, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
+import { followFolds } from './folds'
 import { markdownOptions } from './markdown-options'
 import { previewMarkdown } from './preview'
 import { referenceChoices } from './references'
@@ -228,6 +229,12 @@ function boundsText(): string | undefined {
 function mirror(change: (list: boolean[]) => boolean[]): void {
   folded.set(change(items().map((_, at) => foldedAt(at))))
 }
+
+// A change made on the page moves the folds as the form's own do.
+onMount(() => {
+  if (list)
+    onCleanup(followFolds(entry, path, mirror))
+})
 
 function fold(at: number): void {
   mirror(states => states.map((state, place) => place === at ? !state : state))

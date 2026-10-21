@@ -5,7 +5,9 @@ import type { Direction } from './reorder'
 import { wording } from 'kay/words'
 import { emptyBlock, emptyValue, itemTitle } from '../fields'
 import { entryKey, markersOf, parseMarker } from '../markers'
+import { moveFolds } from './folds'
 import { fieldOfMarker } from './inline'
+import { OWN } from './own'
 import { reordered, targetOf } from './reorder'
 
 // The lists an entry's page renders, on the page in edit mode: the element a `for` over a list fills carries `data-kay-list="<collection>:<slug>[@locale]:<path>"`, and each of its children is one item. The editor adds, removes and reorders the items in the entry's draft, as the form's list does, and the page renders the draft again.
@@ -62,8 +64,6 @@ export interface Removed {
 
 const LIST_ATTRIBUTE = 'data-kay-list'
 
-// The editor's own elements, whose changes and pointer are no business of the page's lists.
-export const OWN = '.kcms-editor, .kcms-marks, .kcms-page-lists, .kcms-marker-menu, .kcms-inline-issue'
 const BAR_TOP = 4
 const BAR_GAP = 36
 
@@ -169,7 +169,7 @@ function limits(list: PageList, count: number): { add: boolean, remove: boolean 
   return { add: maxItems === undefined || count < maxItems, remove: minItems === undefined || count > minItems }
 }
 
-function keyOf(target: ListTarget, index?: number): string {
+export function keyOf(target: ListTarget, index?: number): string {
   return `${entryKey(target)}:${target.path}:${index ?? 'new'}`
 }
 
@@ -177,8 +177,27 @@ function inView(box: DOMRect): boolean {
   return box.width + box.height > 0 && box.bottom >= 0 && box.top <= innerHeight && box.right >= 0 && box.left <= innerWidth
 }
 
+// The part of the window a bar can sit in: without the scrollbars, which fixed positions do not count, and without the docked editor.
+function room(): { right: number, bottom: number } {
+  const root = document.documentElement
+  const room = { right: root.clientWidth, bottom: root.clientHeight }
+  const panel = document.querySelector('.kcms-editor-open')?.getBoundingClientRect()
+
+  if (panel && panel.width > 0) {
+    if (root.classList.contains('kcms-dock-side'))
+      room.right = Math.min(room.right, panel.left)
+    else
+      room.bottom = Math.min(room.bottom, panel.top)
+  }
+
+  return room
+}
+
 // The bars for the items around the pointer and the focus, and for each empty list in view: next to the top right corner of an item, so a bar is reached from the item it acts on, and at the start of an empty list.
-export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
+export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emptyLists(drafts)): ListBar[] {
+  const space = room()
+  const root = document.documentElement
+
   const hits: ItemHit[] = []
 
   for (const anchor of anchors) {
@@ -200,7 +219,7 @@ export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
     const items = itemsOf(drafts, list.target)
     // Nested items stack their bars, the outer one lower, so none covers another.
     const level = hits.filter(other => other !== hit && member.contains(other.member)).length
-    const top = Math.min(Math.max(box.top, 0), innerHeight - BAR_GAP) + BAR_TOP + level * BAR_GAP
+    const top = Math.min(Math.max(box.top, 0), space.bottom - BAR_GAP) + BAR_TOP + level * BAR_GAP
 
     bars.push({
       key: keyOf(list.target, index),
@@ -213,11 +232,11 @@ export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
       up: targetOf('up', index, items.length) !== undefined,
       down: targetOf('down', index, items.length) !== undefined,
       ...limits(list, items.length),
-      style: `top:${top}px;right:${innerWidth - Math.min(box.right, innerWidth) + BAR_TOP}px`,
+      style: `top:${top}px;right:${root.clientWidth - Math.min(box.right, space.right) + BAR_TOP}px`,
     })
   }
 
-  for (const list of emptyLists(drafts)) {
+  for (const list of empty) {
     const box = list.element.getBoundingClientRect()
 
     if (inView(box)) {
@@ -232,7 +251,7 @@ export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
         up: false,
         down: false,
         ...limits(list, 0),
-        style: `top:${Math.min(Math.max(box.top, 0), innerHeight - BAR_GAP) + BAR_TOP}px;left:${Math.max(box.left, 0) + BAR_TOP}px`,
+        style: `top:${Math.min(Math.max(box.top, 0), space.bottom - BAR_GAP) + BAR_TOP}px;left:${Math.min(Math.max(box.left, 0), space.right - BAR_GAP) + BAR_TOP}px`,
       })
     }
   }
@@ -241,7 +260,7 @@ export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
 }
 
 // Gives the keyboard a way to an empty list, as a group named after its field, until the returned function is called. The page renders again and may fill them; what the page set itself is left alone.
-export function reachEmptyLists(drafts: Drafts): { update: () => void, destroy: () => void } {
+export function reachEmptyLists(drafts: Drafts): { update: (lists?: PageList[]) => void, destroy: () => void } {
   const given = new Map<HTMLElement, string[]>()
   const take = (element: HTMLElement) => {
     for (const name of given.get(element) ?? [])
@@ -251,10 +270,10 @@ export function reachEmptyLists(drafts: Drafts): { update: () => void, destroy: 
   }
 
   return {
-    update() {
+    update(lists: PageList[] = emptyLists(drafts)) {
       const empty = new Set<HTMLElement>()
 
-      for (const list of emptyLists(drafts)) {
+      for (const list of lists) {
         const { element } = list
         const label = wording('cms.pageList.empty', '{list}: no item yet, Enter adds one', { list: list.field.label })
         const names = given.get(element) ?? []
@@ -309,6 +328,7 @@ export function addItem(drafts: Drafts, target: ListTarget, at: number, type?: s
   const block = field.blocks?.find(found => found.type === type)
   const place = Math.max(0, Math.min(at, items.length))
 
+  moveFolds(target, target.path, states => states.toSpliced(place, 0, false))
   drafts.set(target, target.path, items.toSpliced(place, 0, block ? emptyBlock(block) : emptyValue(field.item)))
 
   return place
@@ -323,6 +343,7 @@ export function removeItem(drafts: Drafts, target: ListTarget, at: number): Remo
 
   const removed = { target, at, title: itemTitle(field, items[at], at), value: items[at] }
 
+  moveFolds(target, target.path, states => states.filter((_, place) => place !== at))
   drafts.set(target, target.path, items.filter((_, place) => place !== at))
 
   return removed
@@ -336,6 +357,7 @@ export function moveItem(drafts: Drafts, target: ListTarget, from: number, direc
   if (to === undefined)
     return undefined
 
+  moveFolds(target, target.path, states => reordered(states, from, to))
   drafts.set(target, target.path, reordered(items, from, to))
 
   return to
@@ -351,6 +373,7 @@ export function restoreItem(drafts: Drafts, removed: Removed): number | undefine
 
   const place = Math.min(removed.at, items.length)
 
+  moveFolds(removed.target, removed.target.path, states => states.toSpliced(place, 0, false))
   drafts.set(removed.target, removed.target.path, items.toSpliced(place, 0, removed.value))
 
   return place
@@ -366,8 +389,10 @@ export function blockChoices(list: ListTarget, drafts: Drafts): { type: string, 
   return listFieldOf(list, drafts)?.blocks?.map(block => ({ type: block.type, label: block.label })) ?? []
 }
 
-// The list element and the child at `index`, once the page shows them.
+// The list element and the child at `index`, once the page shows them. A page may render the same list twice, so the one that shows the item is the right one, else the first.
 function memberAt(target: ListTarget, index: number): { list: HTMLElement | undefined, member: HTMLElement | undefined } {
+  let first: HTMLElement | undefined
+
   for (const element of document.querySelectorAll(`[${LIST_ATTRIBUTE}]`)) {
     const found = targetOfElement(element)
 
@@ -376,10 +401,13 @@ function memberAt(target: ListTarget, index: number): { list: HTMLElement | unde
 
     const member = [...element.children].find((child): child is HTMLElement => child instanceof HTMLElement && markedIndex(child, target) === index)
 
-    return { list: element, member }
+    if (member)
+      return { list: element, member }
+
+    first ??= element
   }
 
-  return { list: undefined, member: undefined }
+  return { list: first, member: undefined }
 }
 
 // Puts the keyboard focus on the item at `index` of the list (its first tab stop), else on the list when it is a tab stop, once the page shows it. Where it went: an item the page does not mark, such as a new empty text, has no element to take it.
@@ -408,8 +436,42 @@ export function movedWords(item: string, to: number, count: number): string {
   return wording('cms.reorder.moved', 'Moved {item} to {position} of {count}', { item, position: to + 1, count })
 }
 
+const TABBABLE = 'a[href], button, input, select, textarea, summary, [tabindex]'
+
+// What the Tab key reaches inside the root, root included, in document order.
+function tabbablesIn(root: Element): HTMLElement[] {
+  return [root, ...root.querySelectorAll(TABBABLE)].filter((element): element is HTMLElement => element instanceof HTMLElement && element.tabIndex >= 0 && !element.matches(':disabled') && !element.closest('[inert]') && element.checkVisibility())
+}
+
+function barOf(hit: ItemHit): HTMLElement | undefined {
+  const key = keyOf(hit.list.target, hit.index)
+
+  return [...document.querySelectorAll<HTMLElement>('.kcms-list-bar')].find(bar => bar.dataset.key === key)
+}
+
+// The first button of the bar of the innermost item (outward) whose last tab stop is the element: the bars sit apart from the items in the page, so Tab goes to one after the item's last stop.
+function barAfter(element: Element, drafts: Drafts, skip?: string): HTMLElement | undefined {
+  for (const hit of itemsAround(element, drafts)) {
+    if (skip === keyOf(hit.list.target, hit.index) || tabbablesIn(hit.member).at(-1) !== element)
+      continue
+
+    const bar = barOf(hit)
+    const [first] = bar ? tabbablesIn(bar) : []
+
+    if (first)
+      return first
+  }
+
+  return undefined
+}
+
+// The first tab stop after the member of the page, past what it holds.
+function tabbableAfter(member: Element): HTMLElement | undefined {
+  return tabbablesIn(document.body).find(stop => !stop.closest(OWN) && !member.contains(stop) && Boolean(member.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING))
+}
+
 // Keeps the bars for the items under the pointer and the focus, and for the empty lists, up to date as the page scrolls, resizes and renders again.
-export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): { hover: (node: Node | undefined, at?: { x: number, y: number }) => void, focus: (element: Element | undefined) => void, refresh: () => void, reach: () => void, destroy: () => void } {
+export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): { hover: (node: Node | undefined, at?: { x: number, y: number }) => void, focus: (element: Element | undefined) => void, refresh: () => void, reach: () => void, tab: (element: Element, backwards: boolean) => HTMLElement | undefined, destroy: () => void } {
   const reach = reachEmptyLists(drafts)
   const follow = new AbortController()
   let hovered: Node | undefined
@@ -417,10 +479,14 @@ export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): {
   let focused: Element | undefined
   let frame = 0
   let shown = ''
+  let idle = false
 
   const compute = () => {
     frame = 0
-    reach.update()
+
+    const empty = emptyLists(drafts)
+
+    reach.update(empty)
 
     // The page rendering again takes the element under the pointer away: whatever is under it now stands in.
     if (hovered && !hovered.isConnected)
@@ -429,7 +495,12 @@ export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): {
     if (focused && !focused.isConnected)
       focused = undefined
 
-    const bars = barsFor([hovered, focused].filter(anchor => anchor !== undefined), drafts)
+    const anchors = [hovered, focused].filter(anchor => anchor !== undefined)
+    const bars = barsFor(anchors, drafts, empty)
+
+    // Nothing under the pointer or the focus and no empty list: a scroll has no bar to move.
+    idle = anchors.length === 0 && empty.length === 0
+
     const text = JSON.stringify(bars)
 
     if (text !== shown) {
@@ -447,7 +518,10 @@ export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): {
   })
 
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: [LIST_ATTRIBUTE] })
-  addEventListener('scroll', schedule, { capture: true, passive: true, signal: follow.signal })
+  addEventListener('scroll', () => {
+    if (!idle)
+      schedule()
+  }, { capture: true, passive: true, signal: follow.signal })
   addEventListener('resize', schedule, { passive: true, signal: follow.signal })
   schedule()
 
@@ -462,7 +536,28 @@ export function watchLists(drafts: Drafts, onBars: (bars: ListBar[]) => void): {
       schedule()
     },
     refresh: schedule,
-    reach: reach.update,
+    reach: () => reach.update(),
+    // Joins the bars to the Tab order: after the last tab stop of an item its bar comes, then the stop after the item; Shift+Tab back from the bar's first button returns into the item.
+    tab(element, backwards) {
+      const bar = element.closest<HTMLElement>('.kcms-list-bar')
+
+      if (!bar)
+        return backwards ? undefined : barAfter(element, drafts)
+
+      const hit = [focused, hovered].flatMap(anchor => anchor ? itemsAround(anchor, drafts) : []).find(found => keyOf(found.list.target, found.index) === bar.dataset.key)
+      const stops = tabbablesIn(bar)
+
+      if (!hit)
+        return undefined
+
+      if (backwards)
+        return element === stops[0] ? tabbablesIn(hit.member).at(-1) : undefined
+
+      if (element !== stops.at(-1))
+        return undefined
+
+      return barAfter(tabbablesIn(hit.member).at(-1) ?? hit.member, drafts, bar.dataset.key) ?? tabbableAfter(hit.member)
+    },
     destroy() {
       follow.abort()
       observer.disconnect()

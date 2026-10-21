@@ -5,6 +5,7 @@ import type { FieldMarker, MarkedField } from '../markers'
 import { checkField, fieldsOf, itemAt } from '../fields'
 import { BODY, entryKey, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
+import { OWN } from './own'
 
 // What the editor asks of an entry's form to type in a field on the page: its collection once loaded, and whether a save holds the fields still.
 export interface InlineSource {
@@ -260,7 +261,7 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
   // Only what changed is looked at, and not the text being typed in, whose every keystroke is a mutation.
   const observer = new MutationObserver((records) => {
     for (const record of records) {
-      if (isTypingInline(record.target) || (record.target instanceof Element && record.target.closest('.kcms-editor, .kcms-marks')))
+      if (isTypingInline(record.target) || (record.target instanceof Element && record.target.closest(OWN)))
         continue
 
       if (record.type === 'attributes') {
