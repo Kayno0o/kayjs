@@ -45,6 +45,7 @@ describe('how a field is entered', () => {
     expect(lines.kind).toBe('lines')
     expect(emptyValue(lines)).toEqual([])
     expect(one({ 'type': 'array', 'items': { type: 'number' }, 'x-kay-input': { lines: true } }).kind).toBe('list')
+    expect(one({ 'type': 'array', 'items': { type: 'string', enum: ['a', 'b'] }, 'x-kay-input': { lines: true } }).kind).toBe('list')
 
     const people = one({ 'type': 'array', 'x-kay-input': { titleField: 'role' }, 'items': { type: 'object', properties: { name: { type: 'string' }, role: { type: 'string' } } } }) as Field & { kind: 'list' }
 

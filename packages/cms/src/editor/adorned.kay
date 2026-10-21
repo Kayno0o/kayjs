@@ -2,9 +2,12 @@
 // A control with a word before or after it, such as a currency or a unit.
 const { prefix, suffix } = props<{ prefix?: string | undefined, suffix?: string | undefined }>()
 ---
-.kcms-adorned
-  if prefix
-    span.kcms-adorn {prefix}
+if prefix || suffix
+  span.kcms-adorned
+    if prefix
+      span.kcms-adorn {prefix}
+    slot
+    if suffix
+      span.kcms-adorn {suffix}
+else
   slot
-  if suffix
-    span.kcms-adorn {suffix}

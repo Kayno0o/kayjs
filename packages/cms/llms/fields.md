@@ -36,7 +36,8 @@ It wraps any schema, an optional or nullable one too, keeps its kind and keyword
 - `labels`: the label of each `enum` value or union literal by value, which wins over a literal's own `title` (`s.Literal('new', { title: 'Nouveau' })`); the stored value stays the raw one.
 - `lines`: a list of strings entered in one box, a line each, blank lines dropped.
 - `titleField`: the field of a list's object items whose text heads an item, before the first filled text field.
-- `when`: a sibling field (same object) this one is shown for only once the sibling holds a value (not empty, `false` or `[]`). Use it on an optional field: a required one hidden cannot be filled and fails the save.
+- `when`: a sibling field (same object) this one is shown for only once the sibling holds a value (not empty, `false` or `[]`). The sibling must be a key of the same object. Use it on an optional field: a required one hidden cannot be filled and fails the save, and a hidden field keeps its stored value.
+- `placeholder`, `prefix` and `suffix` apply to text and number boxes only; `rows` auto-growing needs a browser with `field-sizing` and a page allowing inline styles, else the box stays at its `rows`.
 
 A collection's `description` (`collection({ description })`) is shown to the editor under the title of its list and of its entries.
 

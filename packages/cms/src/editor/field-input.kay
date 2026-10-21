@@ -12,6 +12,7 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import copy from '~icons/tabler/copy'
+import { uid } from 'kay'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { checkField, emptyValue, isCompact, itemAt, itemTitle } from '../fields'
@@ -84,6 +85,7 @@ const shown = () => field.when === undefined || filled(drafts.value(entry, joinP
 const counter = () => field.limits?.maxLength === undefined ? undefined : wording('cms.field.counter', '{count} / {max}', { count: text().length, max: field.limits.maxLength })
 
 // An integer takes digits and a minus: the keys that would write a decimal or an exponent are refused, and a pasted decimal is cut to its whole part.
+const noteId = `kcms-note-${uid()}`
 const NOT_INTEGER = new Set(['.', ',', 'e', 'E', '+'])
 
 function entered(next: number | null): void {
@@ -269,13 +271,12 @@ function leaveJson(): void {
   const current = field
   match current.kind
     when 'boolean'
-      Toggle(label={current.label} checked={value() === true} aria-describedby={current.hint || issue() ? `kcms-note-${path}` : undefined} onChange={set})
-      if current.hint || issue()
-        .kui-form-field-issues(id={`kcms-note-${path}`} aria-live="polite")
-          if current.hint
-            span.kui-form-field-hint {current.hint}
-          if issue()
-            span.kui-form-field-issue {issue()}
+      Toggle(label={current.label} checked={value() === true} aria-describedby={noteId} aria-invalid={issue() === undefined ? undefined : 'true'} onChange={set})
+      .kui-form-field-issues(id={noteId} aria-live="polite")
+        if current.hint
+          span.kui-form-field-hint {current.hint}
+        if issue()
+          span.kui-form-field-issue {issue()}
     when 'list'
       FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
         .kcms-list(ref={element => box = element})

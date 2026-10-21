@@ -170,7 +170,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       if (inner.items === undefined || Array.isArray(inner.items))
         return { ...base, kind: 'json' }
 
-      if (entering.options.lines === true && typeOf(withoutNull(inner.items).schema) === 'string')
+      if (entering.options.lines === true && typeOf(withoutNull(inner.items).schema) === 'string' && choicesOf(withoutNull(inner.items).schema) === undefined)
         return { ...base, kind: 'lines' }
 
       return { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems), ...entering.options.titleField !== undefined && { titleField: entering.options.titleField } }

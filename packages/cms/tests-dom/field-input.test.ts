@@ -698,5 +698,6 @@ test('a toggle keeps its hint and its issue', async () => {
   const { root } = await openField({ ...base, key: 'tags', label: 'Featured', kind: 'boolean', hint: 'Shown on the home page' }, false)
 
   expect(root.textContent).toContain('Shown on the home page')
-  expect(root.querySelector('input')!.getAttribute('aria-describedby')).toBe('kcms-note-tags')
+  expect(root.querySelector('input')!.getAttribute('aria-describedby')).toStartWith('kcms-note-')
+  expect(root.querySelector('[aria-live]')?.id).toBe(root.querySelector('input')!.getAttribute('aria-describedby') ?? '')
 })
