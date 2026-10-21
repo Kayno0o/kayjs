@@ -90,6 +90,20 @@ async function takeLock() {
   return (await holder(lock, true)).release
 }
 
+// Waits for `work` for at most `ms`, and leaves no timer behind: a pending `Bun.sleep` would keep the landing alive for its whole length once it is done.
+async function settledWithin(work: Promise<void>, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    await Promise.race([work, new Promise((resolve) => {
+      timer = setTimeout(resolve, ms)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
 async function step(label: string, argv: string[], cwd = '.') {
   const started = performance.now()
@@ -127,7 +141,7 @@ async function step(label: string, argv: string[], cwd = '.') {
 
   running = undefined
   clearTimeout(limit)
-  await Promise.race([drained, Bun.sleep(DRAIN_MS)])
+  await settledWithin(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
   await appendFile(LOG, '\n')

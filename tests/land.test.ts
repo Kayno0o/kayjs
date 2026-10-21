@@ -168,8 +168,11 @@ async function until(condition: () => Promise<boolean>) {
 describe('landing', () => {
   it('pushes at once when origin\'s main stayed where the rebase left it, and keeps the output a line per step', async () => {
     const { land, ran, tree } = await landings('a')
-    const { code, out } = await land('a').done()
+    const started = Date.now()
+    // A drain timer left pending after the last step would hold the landing open for its whole length.
+    const { code, out } = await land('a', { KAY_LAND_DRAIN_MS: '20000' }).done()
 
+    expect(Date.now() - started).toBeLessThan(15_000)
     expect(code).toBe(0)
     expect(out).toContain('lint: ok')
     expect(out).toMatch(/landed [0-9a-f]{7} on main/)
