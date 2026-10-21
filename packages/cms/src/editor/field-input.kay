@@ -55,11 +55,6 @@ const starred = () => field.required && typeof field.key === 'string'
 // The schema's refusal of the last save or render, else what the box holds that cannot be saved, else a limit it breaks, the last two once the editor has left the box.
 const issue = () => drafts.issues(entry, path)[0]?.message ?? (touched() ? drafts.blocked(entry, path)[0]?.message ?? checkField(field, value()) : undefined)
 const formatted = () => value() === undefined ? '' : JSON.stringify(value(), null, 2)
-// A select's option, or its emptied state.
-function pick(option: { raw: unknown } | undefined): void {
-  set(option === undefined ? cleared : option.raw)
-}
-
 // A text with rows starts at them and grows from there. The minimum is set on the element, as a style attribute would be dropped by a strict content security policy; until the island hydrates, the `rows` attribute sizes it.
 function grow(element: HTMLTextAreaElement, rows: number | undefined): void {
   if (rows === undefined)
@@ -103,8 +98,15 @@ function typedLines(next: string): void {
 // A field waiting for a sibling shows once that holds a value.
 const parent = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : ''
 const filled = (found: unknown) => found !== undefined && found !== null && found !== '' && found !== false && !(Array.isArray(found) && found.length === 0)
-// A field the schema refused is shown whatever its sibling holds, as a save cannot be fixed through a field that stays hidden.
-const shown = () => field.when === undefined || filled(drafts.value(entry, joinPath(parent, field.when))) || drafts.issues(entry, path).length > 0
+// A field the schema refused, or one of its children, is shown whatever its sibling holds, and stays so: a save cannot be fixed through a field that stays hidden, and an edit drops the issue that surfaced it.
+const surfaced = signal(false)
+const refused = () => drafts.issues(entry).some(found => found.path === path || found.path.startsWith(`${path}.`))
+const shown = () => field.when === undefined || surfaced() || filled(drafts.value(entry, joinPath(parent, field.when)))
+
+effect(() => {
+  if (refused())
+    surfaced = true
+})
 
 // What a limited text says of its length.
 const counter = () => field.limits?.maxLength === undefined ? undefined : wording('cms.field.counter', '{count} / {max}', { count: text().length, max: field.limits.maxLength })
@@ -358,7 +360,7 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
         MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
@@ -371,7 +373,7 @@ function leaveJson(): void {
       DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={next => set(next ?? cleared)})
     when 'select'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => pick(current.options.find(option => option.value === next))})
+        Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} onAlt={setAlt} onChange={setFile})

@@ -377,7 +377,7 @@ A repository checked out with CRLF line endings, or using SHA-256 object names, 
 
 ## Fixing a refused save
 
-When the server refuses a save, the form takes you to what is wrong. The focus goes to the first field to fix and the page scrolls to it. Above the form, a list names every field to fix, and each line links to its field.
+When the server refuses a save, the form takes you to what is wrong. The focus goes to the first field to fix and the page scrolls to it. Above the form, a list names every field to fix, and each line links to its field. A screen reader hears each field's message once, not the list again. On the page editor the list also holds the problems the preview finds as you type.
 
 Fixing one field clears that field's message and leaves the others. A field the form does not show gets a message of its own above the form, with no link.
 
