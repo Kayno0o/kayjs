@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { blocks, collection } from 'kay/content'
 import { files, memoryFiles } from 'kay/server'
@@ -13,6 +13,7 @@ import { SaveConflict, workingTree } from '../src/files'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { MEDIA_FOLDER, mediaIndex, renameUpload } from '../src/media'
 import { migrateUploads } from '../src/migrate-uploads'
+import * as orphans from '../src/orphans'
 import { libraryUploads } from '../src/orphans'
 import { configure } from '../src/settings'
 import { entryOf, saveEntry } from '../src/store'
@@ -157,11 +158,32 @@ test('with nothing left from an older release no entry is read, and an unreadabl
   expect((await dataOf('posts', 'a'))?.photo).toBe(files.url(old))
 })
 
-test('once an older upload is moved and its file kept, a later run moves nothing and reports nothing pending', async () => {
+test('once an older upload is moved and its file kept, a later run lists the folders and reads no entry', async () => {
   const old = await files.put(png(), { folder: 'posts' })
 
   await make('posts', 'a', { title: 'A', photo: files.url(old) })
   await migrateUploads()
-  registerCollections([['posts', collection(join(dir, 'missing-folder'), { schema })]])
-  expect(await migrateUploads()).toEqual({ moved: 0, pending: 0 })
+
+  const read = spyOn(orphans, 'readUploads')
+
+  try {
+    expect(await migrateUploads()).toEqual({ moved: 0, pending: 0 })
+    expect(read).not.toHaveBeenCalled()
+  }
+  finally {
+    read.mockRestore()
+  }
+
+  // Control: the same spy sees the read of a run that has something to move.
+  const fresh = await files.put(png(other), { folder: 'posts' })
+  const counted = spyOn(orphans, 'readUploads')
+
+  try {
+    await make('posts', 'b', { title: 'B', photo: files.url(fresh) })
+    await migrateUploads()
+    expect(counted).toHaveBeenCalledTimes(1)
+  }
+  finally {
+    counted.mockRestore()
+  }
 })
