@@ -1562,28 +1562,64 @@ describe('preview mode', () => {
     }, true)
   })
 
-  it('marks a number rendered whole in an attribute or a text whatever renders before it', () => {
-    inPreview(() => {
-      const marks = editMarks()!
-      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { ratings: [{ label: 'Speed', value: 4 }, { label: 'Aim', value: 2 }] }, Content: () => renderedHtml('') }) as { data: { ratings: { label: string, value: number }[] } }
-      const placed = (render: (rating: { label: string, value: number }) => string) => placeFieldMarks(withFieldMarks(marks, () => render(merge(entry.data.ratings[0]!) as { label: string, value: number })), marks)
-      // A component reads its props before its tag renders, and a role or a `min` between them is no field.
-      const bar = ({ label, value }: { label: string, value: number }, before = () => '') => `<span${before()}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`
+  describe('a number rendered whole after something else rendered', () => {
+    interface Rating { label: string, value: number }
 
-      expect(placed(rating => bar(rating, () => attribute('role', 'meter')))).toBe('<span role="meter" aria-label="Speed" data-kay-field-aria-label="crew:a:ratings.0.label" aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"></span>')
-      expect(placed(rating => `<span${attribute('role', 'meter')}${attribute('aria-valuemin', 0)}${attribute('aria-valuenow', rating.value)}></span>`)).toBe('<span role="meter" aria-valuemin="0" aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"></span>')
-      expect(placed(({ label, value }) => `<span${attribute('title', label)}>${child(value)}</span>`)).toBe('<span title="Speed" data-kay-field-title="crew:a:ratings.0.label" data-kay-field="crew:a:ratings.0.value">4</span>')
-      // Through two components, the props copied at each hand-down.
-      const outer = (rating: { label: string, value: number }) => bar(merge(merge(rating)) as typeof rating, () => attribute('role', 'meter'))
+    const VALUE = 'crew:a:ratings.0.value'
+    const LABEL = 'crew:a:ratings.0.label'
 
-      expect(placed(outer)).toContain('aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"')
-      // A number read for logic as well, before and after it renders.
-      expect(placed((rating) => {
-        const steps = [1, 2, 3, 4, 5].filter(step => step <= rating.value).length
+    // `render` gets the first rating as a component's props are: copied, the fence having read none of them.
+    function placed(render: (rating: Rating) => string, data: Rating[] = [{ label: 'Speed', value: 4 }]): string {
+      let html = ''
 
-        return `${attribute('data-steps', steps)}${bar(rating, () => attribute('role', 'meter'))}${rating.value >= 4 ? '' : 'low'}`
-      })).toContain('aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"')
-    }, true)
+      inPreview(() => {
+        const marks = editMarks()!
+        const entry = editableEntry(marks, 'crew', { slug: 'a', data: { ratings: data }, Content: () => renderedHtml('') }) as { data: { ratings: Rating[] } }
+
+        html = placeFieldMarks(withFieldMarks(marks, () => render(merge(entry.data.ratings[0]!) as Rating)), marks)
+      }, true)
+
+      return html
+    }
+
+    // A component reads its props, destructuring them, before its tag renders; `before` renders between the reads and the attributes.
+    const bar = ({ label, value }: Rating, before = '') => `<span${before}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`
+    const marked = (path: string) => `data-kay-field-aria-valuenow="${path}"`
+
+    it('keeps its mark in an attribute after a static one', () => {
+      expect(placed(({ label, value }) => `<span${attribute('role', 'meter')}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span role="meter" aria-label="Speed" data-kay-field-aria-label="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
+    })
+
+    it('keeps its mark in an attribute after another field\'s attribute, and in a text after another field\'s text', () => {
+      expect(placed(({ label, value }) => `<span${attribute('title', label)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span title="Speed" data-kay-field-title="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
+      expect(placed(({ label, value }) => `<p>${child(label)} ${child(value)}</p>`)).toBe(`<p><!--kay-field ${LABEL}-->Speed<!--/kay-field--> <!--kay-field ${VALUE}-->4<!--/kay-field--></p>`)
+    })
+
+    it('keeps its mark through one and two components, each copying its props', () => {
+      expect(placed(rating => bar(rating, attribute('role', 'meter')))).toContain(marked(VALUE))
+      expect(placed(rating => bar(merge(merge(rating)) as Rating, attribute('role', 'meter')))).toContain(marked(VALUE))
+    })
+
+    it('keeps its mark when it is read for logic too, before and after it renders', () => {
+      const html = placed((rating) => {
+        const steps = [1, 2, 3, 4, 5].filter(step => step < rating.value).length
+        const rendered = bar(rating, attribute('role', 'meter'))
+
+        return `${attribute('data-steps', steps)}${rendered}${rating.value >= 4 ? '' : 'low'}`
+      })
+
+      expect(html).toBe(` data-steps="3"<span role="meter" aria-label="Speed" data-kay-field-aria-label="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
+    })
+
+    it('forgets a number read when a computed number renders first, so an index is not taken for the field', () => {
+      const html = placed((rating) => {
+        const { value } = rating
+
+        return [0, 1, 2, 3, 4].map(index => attribute('aria-posinset', index + value - 4)).join('')
+      })
+
+      expect(html).not.toContain('data-kay-field')
+    })
   })
 
   it('marks the fields a component renders from an entry its page handed down, whatever its fence read', async () => {
