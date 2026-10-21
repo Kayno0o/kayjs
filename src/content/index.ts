@@ -2,6 +2,7 @@ import type { Static, TSchema } from 'elysia'
 import type { CacheStore } from '../runtime/cache'
 import type { Duration } from '../runtime/duration'
 import type { Component } from '../runtime/jsx'
+import type { PreviewScope } from '../runtime/preview'
 import type { Html } from '../runtime/rendered'
 import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
@@ -9,10 +10,10 @@ import type { Heading, Highlighter, Segment } from './markdown'
 import type { Carried, Migration } from './migrate'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
-import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
+import { cachedPublished, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { noteEndedEntry } from '../runtime/ended-entry'
-import { editableEntries } from '../runtime/fields'
+import { editableEntries, exportNameOf } from '../runtime/fields'
 import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -262,14 +263,15 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   // What the loader gives, migrated and compiled; an entry the schema refuses is left out and reported, so one stale row does not hide the others. The result is kept as any load's is, so an entry an editor fixes shows from that save's `invalidate()`, or at the next load past `ttl`.
-  const fetchLoaded = async (preview: boolean) => {
+  const fetchLoaded = async (preview: boolean, write = true) => {
     const { raw, carried } = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<TSchema>)
     const { entries, problems } = validEntries(raw, options.schema, components, localized)
 
     // Only an entry that proved valid is written back.
     const kept = new Set(entries.map(entry => entry.slug))
 
-    await writeBack(loader!, carried.filter(({ entry }) => kept.has(entry.slug)), localized, preview)
+    if (write)
+      await writeBack(loader!, carried.filter(({ entry }) => kept.has(entry.slug)), localized, preview)
 
     if (problems.length > 0) {
       const left = new Set(problems.map(problem => problem.file)).size
@@ -294,11 +296,30 @@ export function collection<Schema extends TSchema, Components extends Record<str
     }
   }
 
+  const published = async (): Promise<Entries<Data>> => {
+    const raw = await cachedPublished(key, loader!.ttl === undefined ? FOREVER : durationSeconds(loader!.ttl, `the collection ${name}'s ttl`), async () => fetchLoaded(contentMode().dev), { store: loader!.store })
+    let entries = decoded.get(raw)
+
+    if (!entries)
+      decoded.set(raw, entries = decode(raw))
+
+    return entries
+  }
+
+  // The published entries, the one a share link names read from the loader's preview data in their place: nothing else of that data is used, and nothing is written back.
+  const sharedFrom = async (scope: PreviewScope): Promise<Entries<Data>> => {
+    const entries = await published()
+    const place = localized ? `${scope.locale}/${scope.slug}` : scope.slug
+    const draft = (await fetchLoaded(true, false)).find(entry => entry.slug === place)
+
+    return draft === undefined ? entries : decode([...(raws.get(entries) ?? []).filter(entry => entry.slug !== place), draft])
+  }
+
   const fromLoader = async (): Promise<Entries<Data>> => {
     const preview = previewState()
 
     // A visitor in preview mode gets what the loader gives now, once per request, which no other visitor is served.
-    if (preview) {
+    if (preview?.scope === undefined && preview) {
       let loads = preview.loads.get(key) as Promise<Entries<Data>> | undefined
 
       if (!loads)
@@ -307,13 +328,18 @@ export function collection<Schema extends TSchema, Components extends Record<str
       return loads
     }
 
-    const raw = await cached(key, loader!.ttl === undefined ? FOREVER : durationSeconds(loader!.ttl, `the collection ${name}'s ttl`), async () => fetchLoaded(contentMode().dev), { store: loader!.store })
-    let entries = decoded.get(raw)
+    // A visitor a share link shows one entry's draft gets the published entries, and that draft in place of its published one.
+    if (preview?.scope && preview.scope.collection === exportNameOf(name)) {
+      const { scope } = preview
+      let loads = preview.loads.get(key) as Promise<Entries<Data>> | undefined
 
-    if (!entries)
-      decoded.set(raw, entries = decode(raw))
+      if (!loads)
+        preview.loads.set(key, loads = sharedFrom(scope))
 
-    return entries
+      return loads
+    }
+
+    return published()
   }
 
   // The entries an editor has not saved stand in for theirs, for the request rendering them alone.
@@ -386,7 +412,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const scheduled = (entry: Entry<Data>) => notYet(entry) || over(entry)
   // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
   const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
-  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && !sharedDraft(name, entry.slug, entry.locale) && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry)) && !sharedDraft(exportNameOf(name), entry.slug, entry.locale)
   const blockItem = (data: unknown, path: string[]) => isBlockItem(options.schema, data, path)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined

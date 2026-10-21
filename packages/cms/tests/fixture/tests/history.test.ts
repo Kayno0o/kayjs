@@ -113,12 +113,16 @@ test('the activity screen pages at the page size', async () => {
   expect(first.find('a[href*="page=2"]').length).toBeGreaterThan(0)
 })
 
-test('an entry is shared by a signed link to its own page, and an entry with no page is refused', async () => {
-  expect(await post('journal/pageless', { data: { title: 'No page' }, create: true })).toMatchObject({ saved: true })
+test('a draft is shared by a signed link to its own page, and an entry with no page is refused', async () => {
+  const shared = await (await site.fetch('/api/cms/entries/posts/notes%2Fgarden/share', { method: 'POST' })).json() as { link: string }
+  const page = shared.link.slice(0, shared.link.indexOf('?'))
 
-  const shared = await (await site.fetch('/api/cms/entries/posts/hello/share', { method: 'POST' })).json() as { link: string }
-
-  expect(shared.link).toStartWith('/blog/hello?kay_preview=')
+  expect(page).toStartWith('/blog/')
+  expect((await site.fetch(page)).status).toBe(404)
   expect((await site.fetch(shared.link)).status).toBe(200)
-  expect((await site.fetch('/api/cms/entries/journal/pageless/share', { method: 'POST' })).json()).resolves.toMatchObject({ issues: [{ message: 'This entry has no page to share' }] })
+  expect((await site.fetch(shared.link.replace(page, '/blog/hello'))).status).toBe(200)
+  expect((await site.fetch(`${page}?kay_preview=garbage`)).status).toBe(404)
+
+  expect(await post('journal/pageless', { data: { title: 'No page' }, create: true })).toMatchObject({ saved: true })
+  expect(await (await site.fetch('/api/cms/entries/journal/pageless/share', { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'This entry has no page to share' }] })
 })

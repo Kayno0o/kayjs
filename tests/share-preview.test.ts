@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { t } from 'elysia'
+import { collection } from '../src/content'
 import { cached } from '../src/runtime/cache'
 import { pages, previewUrl } from '../src/server'
 import { inSharedDraft } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
-import { articles, news } from './fixtures/cms/src/content.config'
+import { news } from './fixtures/cms/src/content.config'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
@@ -63,7 +65,8 @@ describe('an entry-scoped preview link', () => {
 
     const list = (await visit(app, `/news?${token}`)).html
 
-    expect(list).toContain('Next year')
+    // The link is for the entry's own page.
+    expect(list).not.toContain('Next year')
     expect(list).not.toContain('Secret plan')
   })
 
@@ -99,16 +102,35 @@ describe('an entry-scoped preview link', () => {
     expect((await visit(app, link.replace('/news/roadmap', '/news/plan'))).status).toBe(404)
   })
 
-  it('names the locale of a localized entry, so another locale\'s draft stays hidden', async () => {
+  it('names the collection by its export name and the locale of a localized entry, a folder collection\'s draft included', async () => {
+    const app = await pages({ ...options, prebuilt: false })
+    const hello = (locale: string) => previewUrl('/articles-en/hello', { entry: { collection: 'articles', slug: 'hello', locale } })
+
+    expect((await visit(app, '/articles-en/hello')).status).toBe(404)
+    expect((await visit(app, hello('en'))).html).toContain('<h1>Hello</h1>')
+    expect((await visit(app, hello('fr'))).status).toBe(404)
+    expect((await visit(app, previewUrl('/articles-en/hello', { entry: { collection: 'articles', slug: 'hello' } }))).status).toBe(404)
+    expect((await visit(app, previewUrl('/articles-en/hello', { entry: { collection: 'content/articles', slug: 'hello', locale: 'en' } }))).status).toBe(404)
+  })
+
+  it('reads a loader\'s preview data for the shared entry alone', async () => {
     await pages({ ...options, prebuilt: false })
 
-    const read = async (locale: string, scope: { locale?: string }) => inSharedDraft(async () => articles.get('hello', locale), { collection: articles.name, slug: 'hello', ...scope })
+    const loads: boolean[] = []
+    const revisions = collection({
+      name: 'revisions',
+      load: ({ preview }) => {
+        loads.push(preview)
 
-    expect(await articles.get('hello', 'en')).toBeUndefined()
-    expect((await read('en', { locale: 'en' }))?.data.title).toBe('Hello')
-    expect(await read('en', { locale: 'fr' })).toBeUndefined()
-    expect(await read('en', {})).toBeUndefined()
-    expect((await read('fr', { locale: 'fr' }))?.data.title).toBe('Bonjour')
+        return preview ? [{ slug: 'a', data: { title: 'A, edited', draft: false } }, { slug: 'b', data: { title: 'B, edited', draft: false } }] : [{ slug: 'a', data: { title: 'A', draft: false } }, { slug: 'b', data: { title: 'B', draft: false } }]
+      },
+    }, { schema: t.Object({ title: t.String(), draft: t.Boolean() }), draft: 'draft' })
+    const titles = async () => (await revisions.all()).map(entry => entry.data.title)
+
+    expect(await titles()).toEqual(['A', 'B'])
+    expect(await inSharedDraft(titles, { collection: 'revisions', slug: 'a' })).toEqual(['A, edited', 'B'])
+    expect(await inSharedDraft(titles, { collection: 'other', slug: 'a' })).toEqual(['A', 'B'])
+    expect(await titles()).toEqual(['A', 'B'])
   })
 
   it('goes through the site\'s base, which a proxy strips before the request reaches the app', async () => {

@@ -29,7 +29,7 @@ export const PREVIEW_COOKIE = 'kay_preview'
 const EDIT = 'edit'
 
 // The query param of a share link, `until.entry.sig`.
-export const SHARE_PARAM = 'kay_preview'
+const SHARE_PARAM = 'kay_preview'
 const DEFAULT_MAX_AGE = 3600
 const DEFAULT_LINK_TTL = 3600
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
@@ -333,14 +333,15 @@ export function exitPreview(ctx: { cookies: CookieMap }): void {
   ctx.cookies.delete({ name: PREVIEW_COOKIE, path: settingsFor('exitPreview()').base || '/' })
 }
 
-// The entry a request's share link names, when the link is signed by this site and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
+// The entry a request's share link names, when the link is signed by this site for the page asked and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
 export function sharedEntry(request: Request): PreviewScope | undefined {
   if (!settings)
     return undefined
 
-  const [until, entry, sig, ...extra] = requestUrl(request).searchParams.get(SHARE_PARAM)?.split('.') ?? []
+  const url = requestUrl(request)
+  const [until, entry, sig, ...extra] = url.searchParams.get(SHARE_PARAM)?.split('.') ?? []
 
-  if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !sameText(sig, sign(settings, shareText(until, entry))))
+  if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !sameText(sig, sign(settings, shareText(until, entry, sharedPath(url.pathname)))))
     return undefined
 
   try {
@@ -373,7 +374,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
     const entry = Buffer.from(JSON.stringify([collection, slug, locale])).toString('base64url')
     const link = new URL(path, 'http://site')
 
-    link.searchParams.set(SHARE_PARAM, [until, entry, sign(current, shareText(String(until), entry))].join('.'))
+    link.searchParams.set(SHARE_PARAM, [until, entry, sign(current, shareText(String(until), entry, sharedPath(link.pathname)))].join('.'))
 
     return `${current.base}${link.pathname}${link.search}${link.hash}`
   }
@@ -421,8 +422,13 @@ function cookieText(until: string, edit: boolean): string {
   return `cookie\n${until}${edit ? `\n${EDIT}` : ''}`
 }
 
-function shareText(until: string, entry: string): string {
-  return `share\n${until}\n${entry}`
+function shareText(until: string, entry: string, path: string): string {
+  return `share\n${until}\n${entry}\n${path}`
+}
+
+// The page a share link opens, as the router reads it: no trailing slash.
+function sharedPath(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
 }
 
 function linkText(path: string, until: string, edit: boolean): string {

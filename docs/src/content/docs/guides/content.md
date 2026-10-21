@@ -395,7 +395,7 @@ Set `preview: { secret }` in `kay.config.ts` to let an editor see drafts on the 
 
 To share one draft, give `previewUrl` the entry: `previewUrl('/news/draft', { entry: { collection: 'news', slug: 'draft' } })`. The link opens the entry's own page with a signed `kay_preview` in its query, valid an hour or the `ttl` you give. It shows that draft and nothing else. The visitor is put in no mode and gets no cookie, so every other page and entry stays as published.
 
-The link stops working once it expires, or when the entry is renamed. A link for one locale shows no other locale's draft. kayjs-cms offers it as a Share preview button.
+The link works on that page only, and stops working once it expires, when the entry is renamed or when you change the secret. You cannot cancel one earlier. A link for one locale shows no other locale's draft. kayjs-cms offers it as a Share preview button.
 
 Edit mode is preview mode for a CMS that edits content on the page. Enter it with `enterPreview(ctx, { edit: true })` or `previewUrl(path, { edit: true })`. `editing()` from `kay` tells whether the page is in it.
 

@@ -3,7 +3,7 @@ import type { Duration } from './duration'
 import { parse, stringify } from 'devalue'
 import { durationSeconds } from './duration'
 import { kayLog } from './log'
-import { renderingForVisitor } from './preview'
+import { previewing, renderingForVisitor } from './preview'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
 // A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
@@ -72,6 +72,15 @@ const RETRY_MS = 60_000
 // The value `load` gives for `key`, kept for `ttl`, seconds or a string such as '5m', for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background.
 // A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
 export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
+  return cachedFor(key, ttl, load, options, renderingForVisitor())
+}
+
+// `cached` for what every visitor gets, such as a collection's published entries, which a visitor shown one entry's draft by a share link reads as well.
+export async function cachedPublished<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
+  return cachedFor(key, ttl, load, options, previewing())
+}
+
+async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions, bypass: boolean): Promise<T> {
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
 
   noteRead(key)
@@ -80,7 +89,7 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
     noteLive(key)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
-  if (renderingForVisitor())
+  if (bypass)
     return load()
 
   const { store } = options

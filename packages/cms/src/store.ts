@@ -93,8 +93,7 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
   return { collection: collection.value, entry: collection.value.problem === undefined ? entry.value : undefined }
 }
 
-// `kind` is the collection's when the caller has it, else it is read.
-// How long a share link lasts.
+// How long a share link lasts, which the messages word as a week.
 const SHARE_TTL = '7d'
 
 // A link showing the entry's draft alone, on its own page, to whoever it is sent to: the page of the entry as saved. Refused for an entry the site gives no page, or an app without `preview` in kay.config.ts.
@@ -108,7 +107,7 @@ export async function shareLink(ref: EntryRef): Promise<{ link: string } | { iss
     return refused(ref, wording('cms.share.noPage', 'This entry has no page to share'))
 
   try {
-    return { link: previewUrl(entry.url, { ttl: SHARE_TTL, entry: { collection: ref.collection, slug: ref.slug, locale: ref.locale } }) }
+    return { link: previewUrl(entry.url, { ttl: SHARE_TTL, entry: { collection: ref.collection, slug: entry.slug, locale: entry.locale } }) }
   }
   catch (error) {
     // `previewUrl` throws for an app without `preview`, saying so.
@@ -116,6 +115,7 @@ export async function shareLink(ref: EntryRef): Promise<{ link: string } | { iss
   }
 }
 
+// `kind` is the collection's when the caller has it, else it is read.
 export async function entryOf(ref: EntryRef, bare?: CollectionInfo): Promise<StoredEntry | undefined> {
   const entry = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 

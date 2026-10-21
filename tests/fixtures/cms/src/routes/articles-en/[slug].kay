@@ -1,0 +1,6 @@
+--- server
+import { articles } from '../../content.config'
+
+const entry = await articles.get(ctx.params.slug, 'en') ?? ctx.notFound()
+---
+h1 {entry.data.title}
