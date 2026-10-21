@@ -589,4 +589,26 @@ describe('the interception of a kay/test page', () => {
     await Bun.sleep(20)
     expect(other.errors.join('\n')).toContain('not found')
   })
+
+  it('does not report a handler that answers after the last route was removed', async () => {
+    let enabled = true
+    const { network, errors, fire } = scripted((method) => {
+      if (method === 'Fetch.disable')
+        enabled = false
+
+      return method === 'Fetch.continueRequest' && !enabled ? new Error('Fetch domain is not enabled') : undefined
+    })
+    const { promise: gate, resolve } = Promise.withResolvers<void>()
+
+    await network.route('/api', async (request) => {
+      await gate
+      await request.continue()
+    })
+    fire('Fetch.requestPaused', PAUSED)
+    await network.unroute()
+    resolve()
+    await Bun.sleep(20)
+    expect(errors).toEqual([])
+    network.close()
+  })
 })

@@ -119,6 +119,8 @@ const ANNOUNCE_WAIT_MS = 500
 const EXTRA_GRACE_MS = 200
 // What DevTools says of a request that was cancelled while paused (a navigation away, a closed stream): the only error that is no failure.
 const GONE = /Invalid InterceptionId/i
+// What a call fails with once interception stopped under a handler still running, which is no failure of the test.
+const STOPPED = /Fetch domain is not enabled/i
 const GLOBAL_STICKY = /[gy]/g
 const KEBAB = /-([a-z])/g
 
@@ -304,13 +306,19 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     return known === undefined || known === '' ? fallback : known
   }
 
+  const gone = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+
+    return GONE.test(message) || (!fetching && STOPPED.test(message))
+  }
+
   // A call on a request that may have been cancelled since it paused, which fails then and is no failure of the test.
   const quiet = async (method: string, params: Record<string, unknown>) => {
     try {
       await send(method, params)
     }
     catch (error) {
-      if (!GONE.test(error instanceof Error ? error.message : String(error)))
+      if (!gone(error))
         errors.push(`kay: ${method} failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
@@ -327,7 +335,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         await run()
       }
       catch (error) {
-        if (!GONE.test(error instanceof Error ? error.message : String(error)))
+        if (!gone(error))
           throw error
       }
     }
@@ -450,6 +458,9 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     }
     catch (error) {
       if (closed || error instanceof RouteRemoved)
+        return
+
+      if (gone(error))
         return
 
       errors.push(`kay: a route handler for ${paused.request.url} failed: ${error instanceof Error ? error.message : String(error)}`)
