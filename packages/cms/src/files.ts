@@ -22,6 +22,18 @@ export interface FileChange {
   base?: string | null | undefined
 }
 
+// A file moved to another path with new text, in one commit: the path of an entry whose slug changed.
+export interface FileMove {
+  from: { repoPath: string, absolute: string }
+  to: { repoPath: string, absolute: string }
+  // The text the file has at `to`.
+  text: string
+  message: string
+  author?: Identity | undefined
+  // The version of the file at `from` the move is made from, as in `FileChange`; `to` must not exist yet.
+  base?: string | null | undefined
+}
+
 export interface Commit {
   sha: string
   url?: string | undefined
@@ -29,8 +41,10 @@ export interface Commit {
 
 // Where a folder entry's file goes once saved: a commit, or the working tree.
 // A saver given a `base` throws a `SaveConflict` when the file is no longer at that version.
+// `move` renames an entry's file; a saver without it refuses to rename entries. A move throws a `SaveConflict` when `from` is not at its `base`, is gone, or `to` exists.
 export interface FileSaver {
   save: (change: FileChange) => Promise<Commit | undefined>
+  move?: ((move: FileMove) => Promise<Commit | undefined>) | undefined
 }
 
 // A save made from a version of the file another save has replaced since, or a new file where one already is.
@@ -56,31 +70,62 @@ function checkBase(base: string | null | undefined, current: string | undefined)
 // The last write of each file in the working tree, which the next one waits for, so two saves never both pass the version check.
 const writes = new Map<string, Promise<unknown>>()
 
+// Runs `write` after the writes ahead of it on any of the files, and makes it the last of each.
+async function afterWrites<T>(files: string[], write: () => Promise<T>): Promise<T> {
+  const previous = files.map(async file => writes.get(file))
+  const running = (async () => {
+    for (const earlier of previous) {
+      try {
+        await earlier
+      }
+      catch {}
+    }
+
+    return write()
+  })()
+
+  for (const file of files)
+    writes.set(file, running)
+
+  try {
+    return await running
+  }
+  finally {
+    for (const file of files) {
+      if (writes.get(file) === running)
+        writes.delete(file)
+    }
+  }
+}
+
 // Writes the file in place, for `kay dev`: on a deployed site the next deploy would drop it.
 export function workingTree(): FileSaver {
   return {
     async save(change) {
-      const previous = writes.get(change.absolute)
-      const write = (async () => {
-        try {
-          await previous
-        }
-        catch {}
-
-        return writeFile(change)
-      })()
-
-      writes.set(change.absolute, write)
-
-      try {
-        return await write
-      }
-      finally {
-        if (writes.get(change.absolute) === write)
-          writes.delete(change.absolute)
-      }
+      return afterWrites([change.absolute], async () => writeFile(change))
+    },
+    async move(move) {
+      return afterWrites([move.from.absolute, move.to.absolute], async () => moveFile(move))
     },
   }
+}
+
+async function moveFile({ from, to, text, base }: FileMove): Promise<undefined> {
+  const source = Bun.file(from.absolute)
+
+  if (!await source.exists())
+    throw new SaveConflict(null)
+
+  checkBase(base, fileVersion(await source.bytes()))
+
+  if (await Bun.file(to.absolute).exists())
+    throw new SaveConflict(undefined, true)
+
+  await mkdir(dirname(to.absolute), { recursive: true })
+  await Bun.write(to.absolute, text)
+  await rm(from.absolute, { force: true })
+
+  return undefined
 }
 
 async function writeFile({ absolute, text, base }: FileChange): Promise<undefined> {
@@ -160,18 +205,32 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     throw new ForgeError(response.status, `Forgejo answered ${response.status}: ${await errorMessage(response)}`)
   }
 
+  // The blob sha of the file on the branch, which an update or a delete must name; undefined when it does not exist.
+  async function currentSha(repoPath: string, signal: AbortSignal): Promise<string | undefined> {
+    const query = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`
+    const response = await request(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, { headers, signal })
+
+    return response.status === 404 ? undefined : (await answer<{ sha: string }>(response)).sha
+  }
+
+  // Posts the files as one commit; a refused one reports the version of `conflictAt`, and `creating` says it was a new file that was refused.
+  async function post(files: object[], { message, author }: { message: string, author?: Identity | undefined }, conflictAt: string, creating: boolean, signal: AbortSignal, posting: () => void): Promise<Commit> {
+    posting()
+
+    const response = await request(`${api}/contents`, { method: 'POST', headers, signal, body: JSON.stringify({ branch, message, author, files }) })
+
+    // Another save landed between the read and the commit.
+    if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await response.clone().text())))
+      // The read of the version the conflict reports has its own time, as the save's may be all but spent on the commit that was refused.
+      throw new SaveConflict(await conflictVersion(async () => currentSha(conflictAt, AbortSignal.timeout(timeout))), creating)
+
+    const { commit } = await answer<{ commit: { sha: string, html_url?: string } }>(response)
+
+    return { sha: commit.sha, url: commit.html_url }
+  }
+
   async function commit({ repoPath, text, message, author, base }: FileChange, signal: AbortSignal, posting: () => void): Promise<Commit | undefined> {
-    const send = async (address: string, init: RequestInit = {}, within = signal) => request(address, { ...init, headers, signal: within })
-
-    // The blob sha of the file on the branch, which an update or a delete must name; undefined when it does not exist.
-    const currentSha = async (within = signal) => {
-      const query = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`
-      const response = await send(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, {}, within)
-
-      return response.status === 404 ? undefined : (await answer<{ sha: string }>(response)).sha
-    }
-
-    const sha = await currentSha()
+    const sha = await currentSha(repoPath, signal)
 
     checkBase(base, sha)
 
@@ -181,42 +240,52 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     const operation = commitOperation(text, sha)
     const file = { operation, path: repoPath, sha, content: text === undefined ? undefined : Buffer.from(text).toString('base64') }
 
-    posting()
+    return post([file], { message, author }, repoPath, operation === 'create', signal, posting)
+  }
 
-    const response = await send(`${api}/contents`, {
-      method: 'POST',
-      body: JSON.stringify({ branch, message, author, files: [file] }),
-    })
+  // The file deleted at `from` and created at `to` in one commit, which git reads as a rename.
+  async function commitMove({ from, to, text, message, author, base }: FileMove, signal: AbortSignal, posting: () => void): Promise<Commit> {
+    const sha = await currentSha(from.repoPath, signal)
 
-    // Another save landed between the read and the commit.
-    if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await response.clone().text())))
-      // The read of the version the conflict reports has its own time, as the save's may be all but spent on the commit that was refused.
-      throw new SaveConflict(await conflictVersion(async () => currentSha(AbortSignal.timeout(timeout))), operation === 'create')
+    checkBase(base, sha)
 
-    const { commit } = await answer<{ commit: { sha: string, html_url?: string } }>(response)
+    if (sha === undefined)
+      throw new SaveConflict(null)
 
-    return { sha: commit.sha, url: commit.html_url }
+    if (await currentSha(to.repoPath, signal) !== undefined)
+      throw new SaveConflict(undefined, true)
+
+    const files = [{ operation: 'delete', path: from.repoPath, sha }, { operation: 'create', path: to.repoPath, content: Buffer.from(text).toString('base64') }]
+
+    return post(files, { message, author }, from.repoPath, false, signal, posting)
+  }
+
+  // Turns what a request threw into the error a save reports; once the commit was sent, the forge may have made it without its answer arriving.
+  async function guarded<T>(run: (signal: AbortSignal, posting: () => void) => Promise<T>): Promise<T> {
+    let posted = false
+
+    try {
+      return await run(AbortSignal.timeout(timeout), () => posted = true)
+    }
+    catch (error) {
+      if (error instanceof SaveConflict || error instanceof ForgeError)
+        throw error
+
+      const unsure = posted ? ': the save may still have gone through, so check the repository before saving again' : ''
+
+      if (error instanceof Error && error.name === 'TimeoutError')
+        throw new ForgeError(504, `Forgejo did not answer within ${timeout / 1000} s${unsure}`, { cause: error })
+
+      throw new ForgeError(502, `Could not reach Forgejo (${networkReason(error)})${unsure}`, { cause: error })
+    }
   }
 
   return {
     async save(change) {
-      let posted = false
-
-      try {
-        return await commit(change, AbortSignal.timeout(timeout), () => posted = true)
-      }
-      catch (error) {
-        if (error instanceof SaveConflict || error instanceof ForgeError)
-          throw error
-
-        // Once the commit was sent, the forge may have made it without its answer arriving.
-        const unsure = posted ? ': the save may still have gone through, so check the repository before saving again' : ''
-
-        if (error instanceof Error && error.name === 'TimeoutError')
-          throw new ForgeError(504, `Forgejo did not answer within ${timeout / 1000} s${unsure}`, { cause: error })
-
-        throw new ForgeError(502, `Could not reach Forgejo (${networkReason(error)})${unsure}`, { cause: error })
-      }
+      return guarded(async (signal, posting) => commit(change, signal, posting))
+    },
+    async move(change) {
+      return guarded(async (signal, posting) => commitMove(change, signal, posting))
     },
   }
 }

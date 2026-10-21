@@ -260,3 +260,59 @@ describe('fileVersion', () => {
     expect(fileVersion('hello\n')).toBe('ce013625030ba8dba906f756967f9e9ca394464a')
   })
 })
+
+describe('moving a file', () => {
+  const move = { from: { repoPath: 'content/posts/old.md', absolute: '/unused/old' }, to: { repoPath: 'content/posts/new.md', absolute: '/unused/new' }, text: 'moved', message: 'content(posts): rename old to new' }
+
+  test('forgejo deletes the old path and creates the new one in one commit', async () => {
+    const { sent, saver } = forge({ 'content/posts/old.md': 'b10b' })
+
+    expect(await saver.move!({ ...move, base: 'b10b' })).toEqual({ sha: 'c0ffee', url: 'https://git.example.com/me/site/commit/c0ffee' })
+
+    const posts = sent.filter(request => request.method === 'POST')
+
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.body).toMatchObject({ branch: 'main', message: move.message, files: [{ operation: 'delete', path: 'content/posts/old.md', sha: 'b10b' }, { operation: 'create', path: 'content/posts/new.md', content: Buffer.from('moved').toString('base64') }] })
+  })
+
+  test('forgejo refuses a move over a file at the new path, from a version that changed, or from a file that is gone', async () => {
+    const taken = await failureOf<SaveConflict>(forge({ 'content/posts/old.md': 'b10b', 'content/posts/new.md': 'beef' }).saver.move!(move))
+
+    expect(taken).toBeInstanceOf(SaveConflict)
+    expect(taken.creating).toBe(true)
+
+    const stale = forge({ 'content/posts/old.md': 'b10b' })
+
+    expect((await failureOf<SaveConflict>(stale.saver.move!({ ...move, base: 'other' }))).current).toBe('b10b')
+    expect(stale.sent.some(request => request.method === 'POST')).toBe(false)
+    expect((await failureOf<SaveConflict>(forge({}).saver.move!(move))).current).toBeNull()
+  })
+
+  test('forgejo reports a move another commit raced as a conflict', async () => {
+    const { saver } = forge({ 'content/posts/old.md': 'b10b' }, Response.json({ message: 'sha does not match' }, { status: 422 }))
+
+    expect(await failureOf(saver.move!(move))).toBeInstanceOf(SaveConflict)
+  })
+
+  test('the working tree moves the file, and refuses a taken path or a stale version', async () => {
+    const dir = await scratchDir('move-working-tree')
+    const saver = workingTree()
+    const at = (name: string) => ({ repoPath: `posts/${name}`, absolute: join(dir, name) })
+
+    await Bun.write(join(dir, 'old.md'), 'before')
+
+    const stale = await failureOf<SaveConflict>(saver.move!({ ...move, from: at('old.md'), to: at('deep/new.md'), base: fileVersion('else') }))
+
+    expect(stale.current).toBe(fileVersion('before'))
+    expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(true)
+
+    await saver.move!({ ...move, from: at('old.md'), to: at('deep/new.md'), base: fileVersion('before') })
+    expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(false)
+    expect(await Bun.file(join(dir, 'deep/new.md')).text()).toBe('moved')
+
+    await Bun.write(join(dir, 'other.md'), 'x')
+    expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('other.md'), to: at('deep/new.md') }))).creating).toBe(true)
+    expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('gone.md'), to: at('free.md') }))).current).toBeNull()
+    await rm(dir, { recursive: true, force: true })
+  })
+})

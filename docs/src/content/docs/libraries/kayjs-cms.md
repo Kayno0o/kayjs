@@ -538,6 +538,10 @@ const saver: FileSaver = {
 
 `base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflict`, which the editor shows with its Keep my edits button.
 
+A saver may also have `move(move)`, which renames an entry's file. `move.from` and `move.to` hold the `repoPath` and `absolute` path of each, `move.text` is the text the file has at `to`, and `move.base` is the version of `from`.
+
+It writes `to` and removes `from` in one step. It throws `SaveConflict` when `from` is at another version or gone, or when `to` exists (`new SaveConflict(undefined, true)`). `forgejo()` commits the move as one commit and `workingTree()` does it in place. A saver without `move` cannot rename entries.
+
 ## The entries API
 
 The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
