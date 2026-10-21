@@ -133,7 +133,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   prefix?: Prefix | undefined
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
   site?: string | undefined
-  // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous visitor reading a page.
+  // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous page navigation.
   signInPage?: string | undefined
   // Where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak, as with an `allow` list.
   failurePage?: string | undefined

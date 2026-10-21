@@ -385,7 +385,7 @@ The proof needs kay's script in the browser. A client without it sets Turnstile 
 
 ## Guarding routes
 
-A `_guard.ts` default-exports the guard. An anonymous visitor goes to the sign-in page, then back. One without the role gets a 403.
+A `_guard.ts` default-exports the guard. An anonymous page navigation goes to the sign-in page, then back. One without the role gets a 403.
 
 ```ts
 import { auth } from '../../auth'
