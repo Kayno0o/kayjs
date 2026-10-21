@@ -1,4 +1,4 @@
-import type { I18nConfig, KayExtension } from '../config'
+import type { I18nConfig, KayConfig, KayExtension } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { Route } from './routes'
@@ -270,6 +270,18 @@ export async function renderState(locale: string | undefined): Promise<LocaleSta
     throw new Error(`kay: renderToString renders in ${chosen}, which is none of the site's locales: ${i18n.settings.locales.join(', ')}`)
 
   return { ...translations, settings: i18n.settings, path: '/', ...i18n.implicit && { implicit: true } }
+}
+
+// The state of the site's default locale from its catalogs, for what runs outside a request, such as `kay build` and `kay check` wording an entry's refusal; undefined where the catalogs cannot be read, which leaves the English.
+export async function defaultLocaleState(root: string, config: Pick<KayConfig, 'i18n' | 'lang' | 'extensions'>): Promise<LocaleState | undefined> {
+  try {
+    const i18n = config.i18n ? await loadI18n(root, config.i18n, config.extensions) : await implicitI18n(root, config.lang, config.extensions)
+
+    return stateFor(i18n, i18n.settings.defaultLocale, '/', new Request('http://localhost/'))
+  }
+  catch {
+    return undefined
+  }
 }
 
 async function projectI18n(): Promise<I18n> {

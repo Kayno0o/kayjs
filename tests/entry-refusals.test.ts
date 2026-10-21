@@ -1,9 +1,14 @@
 import type { LocaleState } from '../src/runtime/locale-state'
+import { rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { humanize } from '../packages/cms/src/fields'
+import { checkContent } from '../src/check/project'
+import { writeContentManifests } from '../src/content/server'
 import { ContentError, dataIssues, decodeEntries } from '../src/content/validate'
 import { runInLocale } from '../src/runtime/locale-state'
+import { fixtureCopy } from './scratch'
 
 const schema = t.Object({
   title: t.String({ minLength: 1 }),
@@ -171,4 +176,36 @@ describe('the labels', () => {
       expect((error as ContentError).problems.map(problem => [problem.line, problem.message.slice(0, problem.message.indexOf(':'))])).toEqual([[2, 'a/b'], [3, 'c~d'], [4, 'a.b'], [5, 'a.b']])
     }
   })
+})
+
+describe('kay build and kay check', () => {
+  const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'
+  const FRENCH_KEY = 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ kay: { entry: { type: \'{field} n\\\'est pas valide\' } } })\n'
+
+  // The i18n-content fixture with a French default locale, and a French entry whose date is no date.
+  async function site(messages: string): Promise<string> {
+    const copy = await fixtureCopy('i18n-content')
+
+    await Bun.write(join(copy, 'kay.config.ts'), CONFIG)
+    await Bun.write(join(copy, 'src/messages/fr.ts'), messages)
+    await Bun.write(join(copy, 'src/content/news/fr/broken.md'), '---\ntitle: Cassé\ndate: someday\n---\n')
+
+    return copy
+  }
+
+  it('word an entry\'s refusal in the default locale\'s catalog, and in English where the site gives no key', async () => {
+    const french = await site(FRENCH_KEY)
+    const bare = await site('import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n')
+
+    try {
+      expect((await checkContent(french, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date n\'est pas valide'])
+      expect((await checkContent(bare, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date is not valid'])
+
+      await expect(writeContentManifests(resolve(french), join(french, 'out'), undefined)).rejects.toThrow('date: Date n\'est pas valide')
+    }
+    finally {
+      await rm(french, { recursive: true, force: true })
+      await rm(bare, { recursive: true, force: true })
+    }
+  }, 30_000)
 })
