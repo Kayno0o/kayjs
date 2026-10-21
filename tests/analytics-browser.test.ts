@@ -882,7 +882,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
 
     expect(await noticeIn('en')).toEqual({ text: 'We count visits to improve this site with Plausible, without cookies that follow you. Do you agree?', buttons: ['Agree', 'Refuse'] })
     await close()
-    expect(await noticeIn('fr')).toEqual({ text: 'Nous comptons les visites pour améliorer ce site avec Plausible, sans cookie qui vous suit. Êtes-vous d\'accord ?', buttons: ['Accepter', 'Refuser'] })
+    expect(await noticeIn('fr')).toEqual({ text: 'Nous comptons les visites pour améliorer ce site avec Plausible, sans cookie qui vous suit. Êtes-vous d\'accord\u00A0?', buttons: ['Accepter', 'Refuser'] })
     await close()
     expect((await noticeIn('fr-CA')).buttons).toEqual(['Accepter', 'Refuser'])
     await close()
