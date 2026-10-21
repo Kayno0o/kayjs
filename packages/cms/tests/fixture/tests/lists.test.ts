@@ -202,6 +202,8 @@ test('a localized entry changes its own locale\'s draft, in the site\'s words', 
 
   await showBar(page, 'ol.steps li:first-child')
   expect(await page.evaluate(selector => document.querySelector(selector)!.getAttribute('aria-label'), `${BAR} button:nth-child(2)`)).toContain('Descendre')
+  expect(await page.evaluate(selector => document.querySelector(selector)!.getAttribute('aria-label'), `${BAR} button:nth-child(3)`)).toContain('Ajouter après')
+  expect(await page.evaluate(() => document.querySelector('ul.empty')!.getAttribute('aria-label'))).toContain('aucun élément')
   await page.click(DOWN)
   await page.waitUntil(() => document.querySelector('ol.steps li')!.textContent === 'Modifier')
   expect(await formSteps(page)).toEqual(['Modifier', 'Ouvrir'])

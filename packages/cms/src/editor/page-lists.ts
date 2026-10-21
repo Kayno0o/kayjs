@@ -66,8 +66,6 @@ const LIST_ATTRIBUTE = 'data-kay-list'
 export const OWN = '.kcms-editor, .kcms-marks, .kcms-page-lists, .kcms-marker-menu, .kcms-inline-issue'
 const BAR_TOP = 4
 const BAR_GAP = 36
-// The attributes the editor gives an empty list so that the keyboard reaches it.
-const EMPTY_ATTRIBUTES = ['tabindex', 'role', 'aria-label']
 
 function targetOfElement(element: Element): ListTarget | undefined {
   const value = element.getAttribute(LIST_ATTRIBUTE)
@@ -242,14 +240,14 @@ export function barsFor(anchors: Node[], drafts: Drafts): ListBar[] {
   return bars
 }
 
-// Gives the keyboard a way to an empty list, as a group named after its field, until the returned function is called. The page renders again and may fill them.
+// Gives the keyboard a way to an empty list, as a group named after its field, until the returned function is called. The page renders again and may fill them; what the page set itself is left alone.
 export function reachEmptyLists(drafts: Drafts): { update: () => void, destroy: () => void } {
-  const given = new Set<HTMLElement>()
+  const given = new Map<HTMLElement, string[]>()
   const take = (element: HTMLElement) => {
-    given.delete(element)
-
-    for (const name of EMPTY_ATTRIBUTES)
+    for (const name of given.get(element) ?? [])
       element.removeAttribute(name)
+
+    given.delete(element)
   }
 
   return {
@@ -257,25 +255,33 @@ export function reachEmptyLists(drafts: Drafts): { update: () => void, destroy: 
       const empty = new Set<HTMLElement>()
 
       for (const list of emptyLists(drafts)) {
-        empty.add(list.element)
+        const { element } = list
+        const label = wording('cms.pageList.empty', '{list}: no item yet, Enter adds one', { list: list.field.label })
+        const names = given.get(element) ?? []
 
-        if (!given.has(list.element) && !list.element.hasAttribute('tabindex')) {
-          list.element.setAttribute('tabindex', '0')
-          list.element.setAttribute('role', 'group')
-          given.add(list.element)
+        empty.add(element)
+
+        for (const [name, value] of [['tabindex', '0'], ['role', 'group'], ['aria-label', label]] as const) {
+          if (!element.hasAttribute(name)) {
+            element.setAttribute(name, value)
+            names.push(name)
+          }
+          else if (name === 'aria-label' && names.includes(name) && element.getAttribute(name) !== value) {
+            element.setAttribute(name, value)
+          }
         }
 
-        if (given.has(list.element))
-          list.element.setAttribute('aria-label', wording('cms.pageList.empty', '{list}: no item yet, Enter adds one', { list: list.field.label }))
+        if (names.length > 0)
+          given.set(element, names)
       }
 
-      for (const element of given) {
+      for (const element of given.keys()) {
         if (!empty.has(element))
           take(element)
       }
     },
     destroy() {
-      for (const element of given)
+      for (const element of given.keys())
         take(element)
     },
   }

@@ -55,6 +55,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const recoveries = signal<ReadonlyMap<string, Recovery>>(new Map())
   const failure = signal<string>()
   const rendering = signal(false)
+  // Whether an edit is typed whose render has not ended: the page still shows what it showed before.
+  const waiting = signal(false)
   // The entries whose edits are typed but not yet written to the keeper: writing waits for the render's pause, since each write stringifies the whole entry.
   const unwritten = new Set<string>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -73,6 +75,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
   function schedule(): void {
     reported = false
+    waiting.set(true)
     clearTimeout(timer)
     timer = setTimeout(() => {
       flush()
@@ -108,8 +111,10 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
         failure.set(error instanceof Error ? error.message : String(error))
     }
     finally {
-      if (call === latest)
+      if (call === latest) {
         rendering.set(false)
+        waiting.set(false)
+      }
     }
   }
 
@@ -426,5 +431,6 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     // Why the last render failed, other than the schema refusing it.
     failure: () => failure(),
     rendering: () => rendering(),
+    pending: () => waiting(),
   }
 }

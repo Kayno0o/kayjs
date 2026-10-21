@@ -83,6 +83,7 @@ let lists: PageListWatch | undefined
 // Where the focus goes once the page shows the list changed, and whether a render has begun since.
 let pending: { target: ListTarget, index: number, form: boolean } | undefined
 let rendered = false
+let settleId = 0
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = 0
 let frame = 0
@@ -396,7 +397,8 @@ listen(() => document, 'keydown', (event) => {
     return
   }
 
-  if (!event.altKey || !event.shiftKey)
+  // A text box keeps these keys: they select a paragraph on macOS and Delete erases there.
+  if (!event.altKey || !event.shiftKey || element.matches('textarea, input, select'))
     return
 
   const [hit] = itemsAround(element, drafts)
@@ -481,6 +483,14 @@ effect(() => {
   untrack(() => lists?.refresh())
 })
 
+// An item taken out of an entry the page no longer shows cannot be put back.
+effect(() => {
+  const gone = removed()
+
+  if (gone && !entries.some(entry => entryKey(entry) === entryKey(gone.target)))
+    removed = undefined
+})
+
 // Stepping away from the editor or the page closes the question of which field.
 effect(() => {
   if (!open() || browsing()) {
@@ -514,7 +524,11 @@ function toggleMarking(): void {
 }
 
 function closeMenu(): void {
-  choosing()?.back?.focus()
+  const back = choosing()?.back
+
+  if (back?.isConnected)
+    back.focus()
+
   choosing = undefined
 }
 
@@ -563,13 +577,18 @@ function below(from: { element?: HTMLElement, event?: Event }): { x: number, y: 
   return { x: box?.left ?? 0, y: box?.bottom ?? 0, back: element }
 }
 
+// Until the page shows the draft, its items are not the draft's: a change made in the form counts as much as one made here.
+const unsettled = () => settling() || drafts.pending()
+
 // A change of a list is shown by the page rendering the draft again: until then the page's items are not the draft's, so no other change is made, and the focus goes to the item once they match.
 function settle(target: ListTarget, index: number, form = false): void {
+  const id = ++settleId
+
   pending = { target, index, form }
   rendered = false
   settling = true
   setTimeout(() => {
-    if (pending?.target === target) {
+    if (settleId === id) {
       pending = undefined
       settling = false
     }
@@ -601,8 +620,10 @@ effect(() => {
     settling = false
     lists?.reach()
 
-    // A new item the page cannot mark, as an empty text is, has no element to take the focus: its field in the form does.
-    if (focusItem(target, index) !== 'item' && form)
+    // A new item the page cannot mark, as an empty text is, has no element to take the focus, nor has one the draft's issues keep the page from showing: its field in the form does.
+    if (drafts.stale().some(entry => entryKey(entry) === entryKey(target)))
+      showInForm({ ...target, path: `${target.path}.${index}` })
+    else if (focusItem(target, index) !== 'item' && form)
       showInForm({ ...target, path: `${target.path}.${index}` })
 
     lists?.refresh()
@@ -616,7 +637,7 @@ function showInForm(marker: FieldMarker): void {
 }
 
 function addTo(target: ListTarget, at: number, from: { element?: HTMLElement, event?: Event }): void {
-  if (settling() || isBusy(target))
+  if (unsettled() || isBusy(target))
     return
 
   const blocks = blockChoices(target, drafts)
@@ -633,7 +654,7 @@ function addTo(target: ListTarget, at: number, from: { element?: HTMLElement, ev
 }
 
 function addOne(target: ListTarget, at: number, type?: string): void {
-  if (settling() || isBusy(target))
+  if (unsettled() || isBusy(target))
     return
 
   const place = addItem(drafts, target, at, type)
@@ -646,7 +667,7 @@ function addOne(target: ListTarget, at: number, type?: string): void {
 }
 
 function moveOne(target: ListTarget, from: number, direction: Direction): void {
-  if (settling() || isBusy(target))
+  if (unsettled() || isBusy(target))
     return
 
   const title = titleOf(drafts, target, from)
@@ -661,7 +682,7 @@ function moveOne(target: ListTarget, from: number, direction: Direction): void {
 }
 
 function removeOne(target: ListTarget, at: number): void {
-  if (settling() || isBusy(target))
+  if (unsettled() || isBusy(target))
     return
 
   const gone = removeItem(drafts, target, at)
@@ -677,7 +698,7 @@ function removeOne(target: ListTarget, at: number): void {
 function undoRemoval(): void {
   const gone = removed()
 
-  if (!gone || settling() || isBusy(gone.target))
+  if (!gone || unsettled() || isBusy(gone.target))
     return
 
   const place = restoreItem(drafts, gone)
@@ -691,7 +712,7 @@ function undoRemoval(): void {
 
 // What can be done with an item: put one before or after it, move it, take it out.
 function itemMenu(target: ListTarget, index: number, from: { element?: HTMLElement, event?: Event }): void {
-  if (settling() || isBusy(target))
+  if (unsettled() || isBusy(target))
     return
 
   const count = itemsOf(drafts, target).length
@@ -861,7 +882,7 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         if removed() as gone
           .kcms-editor-undo
             span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
-            Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={settling()} onClick={undoRemoval})
+            Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={unsettled()} onClick={undoRemoval})
         if drafts.rendering()
           p {wording('cms.editor.rendering', 'Updating the page…')}
         if drafts.stale().length > 0
@@ -878,6 +899,6 @@ if choosing() as question
   .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={question.label} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey} onFocusOut={leaveMenu})
     for choice of question.choices key={choice.key}
       button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(choice)}) {choice.label}
-PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
+PageListTools(bars={unsettled() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost
