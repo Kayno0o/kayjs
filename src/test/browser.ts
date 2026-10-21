@@ -605,10 +605,17 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       const budget = wait.timeout ?? timeout
       const until = Date.now() + budget
+      // Why the last try could not click, which a budget running out on the next scroll reports rather than the scroll's own wait.
+      let refused: Error | undefined
 
       // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. Scrolled again between short waits, as a page restoring its scroll once loaded moves it away. An island not hydrated yet replays the click once it is.
       for (;;) {
-        await poll(script(scrolledTo, [selector, false]), selector, Math.max(until - Date.now(), 1))
+        try {
+          await poll(script(scrolledTo, [selector, false]), selector, Math.max(until - Date.now(), 1))
+        }
+        catch (error) {
+          throw refused !== undefined && error instanceof Error && error.message.startsWith(UNSETTLED) ? refused : error
+        }
 
         const tried = Date.now()
 
@@ -632,6 +639,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         catch (error) {
           if (gone || !(error instanceof Error) || !(ACTIONABLE.test(error.message) || Date.now() - tried >= CLICK_WAIT_MS - POLL_MS) || Date.now() >= until)
             throw error
+
+          refused = error
         }
       }
     }),
