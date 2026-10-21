@@ -8,7 +8,7 @@ describe('how a field is entered', () => {
   const one = (property: Record<string, unknown>, required = false) => fieldsOf({ type: 'object', required: required ? ['field'] : [], properties: { field: property as JsonSchema } })[0]!
 
   it('carries a placeholder, a prefix and a suffix, a price being a number with its unit', () => {
-    expect(one({ 'type': 'number', 'minimum': 0, 'maximum': 9999, 'x-kay-input': { suffix: '€', placeholder: '600' } })).toMatchObject({ kind: 'number', suffix: '€', placeholder: '600', min: 0, max: 9999 })
+    expect(one({ 'type': 'number', 'minimum': 0, 'maximum': 9999, 'x-kay-input': { suffix: '€', placeholder: '600' } })).toMatchObject({ kind: 'number', suffix: '€', placeholder: '600', limits: { minimum: 0, maximum: 9999 } })
   })
 
   it('reads the options through a nullable or optional wrapper', () => {
@@ -17,10 +17,10 @@ describe('how a field is entered', () => {
   })
 
   it('types an email or a uri input and keeps it on one line whatever its maxLength', () => {
-    expect(one({ type: 'string', format: 'email', maxLength: 254 })).toMatchObject({ kind: 'text', inputType: 'email', maxLength: 254 })
+    expect(one({ type: 'string', format: 'email', maxLength: 254 })).toMatchObject({ kind: 'text', inputType: 'email', limits: { maxLength: 254 } })
     expect(one({ type: 'string', format: 'uri', maxLength: 2000 })).toMatchObject({ kind: 'text', inputType: 'url' })
-    expect(one({ 'type': 'string', 'maxLength': 30, 'x-kay-input': { type: 'tel' } })).toMatchObject({ kind: 'text', inputType: 'tel', maxLength: 30 })
-    expect(one({ type: 'string', maxLength: 300 })).toMatchObject({ kind: 'textarea', maxLength: 300 })
+    expect(one({ 'type': 'string', 'maxLength': 30, 'x-kay-input': { type: 'tel' } })).toMatchObject({ kind: 'text', inputType: 'tel', limits: { maxLength: 30 } })
+    expect(one({ type: 'string', maxLength: 300 })).toMatchObject({ kind: 'textarea', limits: { maxLength: 300 } })
   })
 
   it('makes a string multi-line with the rows asked for', () => {
@@ -55,7 +55,7 @@ describe('how a field is entered', () => {
 
   it('leaves a field the schema says nothing of with no entering keys', () => {
     expect(Object.keys(one({ type: 'string' }))).not.toContain('placeholder')
-    expect(Object.keys(one({ type: 'string' })).filter(key => ['prefix', 'suffix', 'inputType', 'maxLength', 'min', 'max', 'rows', 'when'].includes(key))).toEqual([])
+    expect(Object.keys(one({ type: 'string' })).filter(key => ['prefix', 'suffix', 'inputType', 'rows', 'when'].includes(key))).toEqual([])
   })
 })
 
@@ -77,7 +77,7 @@ describe('fieldsOf', () => {
     expect(fields).toEqual([
       { key: 'title', label: 'Title', required: true, hint: undefined, kind: 'text' },
       { key: 'publishedAt', label: 'Published at', required: true, hint: undefined, kind: 'date' },
-      { key: 'summary', label: 'Summary', required: false, hint: 'Shown in lists', limits: { maxLength: 300 }, kind: 'textarea', maxLength: 300 },
+      { key: 'summary', label: 'Summary', required: false, hint: 'Shown in lists', limits: { maxLength: 300 }, kind: 'textarea' },
       { key: 'featured', label: 'Featured', required: false, hint: undefined, kind: 'boolean' },
       { key: 'price', label: 'Price', required: false, hint: undefined, kind: 'number' },
       { key: 'stock', label: 'Stock', required: false, hint: undefined, kind: 'integer' },

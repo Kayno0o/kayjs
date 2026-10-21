@@ -611,7 +611,7 @@ test('a text shows its placeholder, takes its prefix and suffix beside it and co
   expect(input.placeholder).toBe('600')
   expect(root.querySelector('.kcms-adorned')?.textContent?.trim()).toBe('€')
 
-  const mail = await openField({ ...base, key: 'tags', label: 'Mail', kind: 'text', inputType: 'email', maxLength: 254 }, 'a@b.fr')
+  const mail = await openField({ ...base, key: 'tags', label: 'Mail', kind: 'text', inputType: 'email', limits: { maxLength: 254 } }, 'a@b.fr')
   const box = mail.root.querySelector<HTMLInputElement>('input')!
 
   expect(box.type).toBe('email')
@@ -620,7 +620,7 @@ test('a text shows its placeholder, takes its prefix and suffix beside it and co
 })
 
 test('an integer refuses the keys of a decimal, cuts a pasted one and leaves the box on a wheel turn', async () => {
-  const { root, drafted } = await openField({ ...base, key: 'tags', label: 'Stock', kind: 'integer', min: 0 }, 3)
+  const { root, drafted } = await openField({ ...base, key: 'tags', label: 'Stock', kind: 'integer', limits: { minimum: 0 } }, 3)
   const input = root.querySelector<HTMLInputElement>('input')!
   const key = new KeyboardEvent('keydown', { key: '.', bubbles: true, cancelable: true })
 
