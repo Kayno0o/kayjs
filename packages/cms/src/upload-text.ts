@@ -31,7 +31,7 @@ export function tooSmall(name: string, width: number, height: number, minWidth: 
   return wording('cms.upload.tooSmall', '{name} is {width} by {height} pixels. {need}', { name: fileName(name), width, height, need: atLeast(minWidth, minHeight) })
 }
 
-const KEY_SIZE = /\.(\d+)x(\d+)\.[a-z\d]{1,10}(?:\?.*)?$/i
+const KEY_SIZE = /\.(\d+)x(\d+)(?:-[\da-f]{6})?\.[a-z\d]{1,10}(?:\?.*)?$/i
 
 // The width and height of an image kay's storage named a key or a URL for, which it reads off the file when it stores it; none for any other file.
 export function sizeOfPath(path: string): { width: number, height: number } | undefined {

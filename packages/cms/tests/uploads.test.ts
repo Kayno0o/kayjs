@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
 import { setupStorage } from '../../../src/server/storage'
 import { configure } from '../src/settings'
-import { emptyFile, tooLarge } from '../src/upload-text'
+import { emptyFile, sizeOfPath, tooLarge } from '../src/upload-text'
 import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
 
 const PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1]
@@ -177,4 +177,10 @@ test('judges a name as the type kay\'s file route serves it, whatever its case o
   // Any other is a download of no type, whatever it is judged as.
   for (const name of ['a.html', 'a.js', 'a.json', 'a.png.html'])
     expect(await typeServed(name), name).toBe('application/octet-stream')
+})
+
+test('reads the size off a stored key, with or without the placeholder colour kay keeps in it, and none off another file', () => {
+  expect(sizeOfPath('/_kay/files/products/a1.1600x1200-c86432.jpg')).toEqual({ width: 1600, height: 1200 })
+  expect(sizeOfPath('/_kay/files/products/a1.1600x1200.png?v=2')).toEqual({ width: 1600, height: 1200 })
+  expect(sizeOfPath('/_kay/files/products/a1.pdf')).toBeUndefined()
 })

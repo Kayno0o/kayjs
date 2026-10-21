@@ -589,7 +589,7 @@ test('an image upload answers its size, a file that is no image none, and the up
   expect(everything).toEqual(expect.arrayContaining([image.path, pdf.path]))
   expect(images).toContain(image.path)
   expect(images).not.toContain(pdf.path)
-  expect((await listed()).find(upload => upload.path === image.path)?.name).toMatch(/\.1x1\.png$/)
+  expect((await listed()).find(upload => upload.path === image.path)?.name).toMatch(/\.1x1-[\da-f]{6}\.png$/)
   expect((await site.fetch('/api/cms/files/nope')).status).toBe(404)
 })
 
