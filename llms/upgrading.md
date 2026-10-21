@@ -7,6 +7,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### A later Tailwind class overrides an earlier one
 
 With Tailwind, classes merged from the shorthand, `class`, a spread and a component's `class` prop no longer both stay when they set the same property under the same variants: the later one wins, so a `twMerge` or `cn` around a component's class can go. Literal classes written together in one template stay as written; nothing for `kay upgrade` to rewrite, as an old pair that both stayed was a CSS-order accident ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
+
 ### kayjs-auth and kayjs-mail register with `auth({ module })` and `mail({ module })`
 
 `authPages({ auth: () => import('./src/auth') })` is `auth({ module: './src/auth' })`, `authExtension(() => import('./src/auth'))` is `auth({ module: './src/auth', pages: false })` and `mailExtension('./src/mail')` is `mail({ module: './src/mail' })`; `authPages({ server })` is `auth({ server })` and `mailExtension(fn)` is `mail({ server: fn })`. The old names work for three minors, and `kay upgrade` rewrites them (the `deprecated-library-registration` lint) where the module is a literal path. `auth({ module })` reads the `auth` export alone, no longer the default one, so a `src/auth.ts` exporting `createAuth` as `default` gains `export const auth`. `kay.config.ts` still imports none of the module, which loads as the server starts.
