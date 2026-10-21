@@ -277,6 +277,18 @@ export interface ActivityScreen {
   pages: number
 }
 
+// Whether the entry still holds the slug and locale an event names; a collection that cannot be read links nothing rather than failing the screen.
+async function holds(event: Activity): Promise<boolean> {
+  try {
+    return (await entries(event.collection, { slug: event.slug, locale: event.locale })).length > 0
+  }
+  catch (error) {
+    log.error(`${event.collection}/${event.slug} could not be read for the activity log`, error)
+
+    return false
+  }
+}
+
 // What the activity log reads, every collection's events together and paged; undefined when no collection keeps any.
 export async function activityScreen(page: number | undefined): Promise<ActivityScreen | undefined> {
   const { prefix, pageSize } = settings()
@@ -289,7 +301,7 @@ export async function activityScreen(page: number | undefined): Promise<Activity
   const shown = pageOf(events, page ?? 1, pageSize)
 
   // An entry renamed, deleted or in the trash since holds no such slug: its earlier rows link nowhere.
-  const rows = await Promise.all(shown.rows.map(async ({ event, title }) => ({ ...event, title, href: (await entries(event.collection, { slug: event.slug, locale: event.locale }))[0] ? entryPath(prefix, event) : undefined })))
+  const rows = await Promise.all(shown.rows.map(async ({ event, title }) => ({ ...event, title, href: await holds(event) ? entryPath(prefix, event) : undefined })))
 
   return { prefix, page: shown.page, pages: shown.pages, rows }
 }
