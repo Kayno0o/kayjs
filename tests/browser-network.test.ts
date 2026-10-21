@@ -518,4 +518,75 @@ describe('the interception of a kay/test page', () => {
     await expect(network.route('/api', async request => request.continue())).rejects.toThrow('Fetch.enable refused')
     expect(sent).toEqual(['Network.setCacheDisabled', 'Fetch.enable', 'Network.setCacheDisabled'])
   })
+
+  // A network over a scripted DevTools: `fire` delivers an event, `sent` lists the commands.
+  function scripted(fail?: (method: string) => Error | undefined) {
+    const listeners = new Map<string, (event: Event) => void>()
+    const sent: { method: string, params?: Record<string, unknown> | undefined }[] = []
+    const errors: string[] = []
+    const network = createNetwork({
+      view: { addEventListener: (name, listener) => void listeners.set(name, listener) },
+      cdp: async (method, params) => {
+        sent.push({ method, params })
+
+        const error = fail?.(method)
+
+        if (error !== undefined)
+          throw error
+
+        return undefined as never
+      },
+      origin: () => 'http://localhost',
+      errors,
+      timeout: 1000,
+    })
+    const fire = (name: string, data: unknown) => listeners.get(name)?.({ data } as MessageEvent)
+
+    return { network, sent, errors, fire }
+  }
+
+  const PAUSED = { requestId: 'r1', request: { url: 'http://localhost/api', method: 'GET', headers: {} }, resourceType: 'Fetch' }
+
+  it('pauses a request once, at the request stage, when its handler does not fetch it', async () => {
+    const { network, sent, fire } = scripted()
+
+    await network.route('/api', async request => request.continue())
+    expect(sent.find(({ method }) => method === 'Fetch.enable')?.params).toEqual({ patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
+
+    fire('Fetch.requestPaused', PAUSED)
+    await Bun.sleep(20)
+    expect(sent.filter(({ method }) => method === 'Fetch.continueRequest').map(({ params }) => params)).toEqual([{ requestId: 'r1' }])
+    network.close()
+  })
+
+  it('asks for the response of a request a handler fetches', async () => {
+    const { network, sent, fire } = scripted()
+
+    await network.route('/api', async (request) => {
+      try {
+        await request.fetch()
+      }
+      catch {}
+    })
+    fire('Fetch.requestPaused', PAUSED)
+    await Bun.sleep(20)
+    expect(sent.find(({ method }) => method === 'Fetch.continueRequest')?.params).toEqual({ requestId: 'r1', interceptResponse: true })
+    network.close()
+  })
+
+  it('swallows the error of a request no longer paused and reports any other', async () => {
+    const gone = scripted(method => method === 'Fetch.continueRequest' ? new Error('Invalid InterceptionId.') : undefined)
+
+    await gone.network.route('/api', async request => request.continue())
+    gone.fire('Fetch.requestPaused', PAUSED)
+    await Bun.sleep(20)
+    expect(gone.errors).toEqual([])
+
+    const other = scripted(method => method === 'Fetch.continueRequest' ? new Error('Session with given id not found.') : undefined)
+
+    await other.network.route('/api', async request => request.continue())
+    other.fire('Fetch.requestPaused', PAUSED)
+    await Bun.sleep(20)
+    expect(other.errors.join('\n')).toContain('not found')
+  })
 })

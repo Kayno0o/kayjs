@@ -117,8 +117,8 @@ const ENCODING = new Set(['content-encoding', 'content-length'])
 const ANNOUNCE_WAIT_MS = 500
 // How long a finished response waits for the extra info that carries its wire headers.
 const EXTRA_GRACE_MS = 200
-// What DevTools says of a request that was cancelled while paused, a navigation away or a closed stream.
-const GONE = /Invalid InterceptionId|No such|not found|Fetch domain is not enabled/i
+// What DevTools says of a request that was cancelled while paused (a navigation away, a closed stream): the only error that is no failure.
+const GONE = /Invalid InterceptionId/i
 const GLOBAL_STICKY = /[gy]/g
 const KEBAB = /-([a-z])/g
 
@@ -348,7 +348,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         awaited.set(requestId, response)
 
         try {
-          await send('Fetch.continueRequest', { requestId })
+          await send('Fetch.continueRequest', { requestId, interceptResponse: true })
         }
         catch (error) {
           // Interception stopped while the request was let go.
@@ -422,7 +422,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   const answer = async (paused: Paused): Promise<void> => {
     const waiting = awaited.get(paused.requestId)
 
-    // The response of a request a handler fetched; any other response pauses only because both stages are watched.
+    // The response of a request a handler fetched; a response pauses only for a request asked to.
     if (paused.responseStatusCode !== undefined || paused.responseErrorReason !== undefined) {
       if (waiting === undefined)
         return quiet('Fetch.continueRequest', { requestId: paused.requestId })
@@ -472,7 +472,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     await send('Network.setCacheDisabled', { cacheDisabled: true })
 
     try {
-      await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
+      await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
     }
     catch (error) {
       // The refusal to intercept is what the caller hears, not a failure to undo the cache change.
