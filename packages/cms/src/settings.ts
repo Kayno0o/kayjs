@@ -29,7 +29,7 @@ export interface CmsOptions {
   rawHtml?: string[] | undefined
   // How the screens arrange a collection, by its name: `form` its entry form (`fields` shown first, a nested list being a row of columns, `hide` left out) and `list` its list (`columns` of field keys after the title, `actions` kept among 'move', 'publish', 'editOnPage' and 'delete').
   collections?: Record<string, CollectionLayout> | undefined
-  // `false` leaves out the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-cms-edit-page` and is shown in its place.
+  // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-cms-edit-page` and is shown in its place.
   pageLink?: false | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined

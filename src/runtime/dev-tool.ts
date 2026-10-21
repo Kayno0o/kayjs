@@ -769,7 +769,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const status = make('span', 'sr')
   const copies = make('div', 'sr copies')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
-  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it, with the room the bar takes as `--kay-dev-bar-<edge>`. The bar and a floating drawer keep out of what a panel of the page holds, which it publishes as `--kay-panel-right` or `-bottom`.
+  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it, with the room the bar takes at a bottom corner as `--kay-dev-bar-bottom-<side>`. The bar and a floating drawer keep out of what a panel of the page holds, which it publishes as `--kay-panel-right` or `-bottom`.
   const pageSheet = new CSSStyleSheet()
   const save = () => writeState(win, state)
   const saveLayout = () => writeLayout(win, layout)

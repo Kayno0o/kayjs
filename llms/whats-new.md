@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The dev tool's bar publishes its measured room as `--kay-dev-bar-bottom-left` or `-right` for a bottom corner (see [the dev tool](dev-tool.md)), and kayjs-cms's collapsed editor button is a panel the bar keeps off.
 - The kayjs-cms on-page editor names, above an entry's form, the fields the page cannot let it click (a transformed value, an island's props, a frozen object), from the new `unclickable` of `EditorProps` ([Edit mode](content-edit.md#the-editor)).
 - kayjs-cms's admin takes `cms({ logo })`, shows crumbs on entry screens and keeps its chrome and guard at `prefix: '/'` under an app root layout; a new folder entry's slug is written from its title, cleaned as typed and checked against the collection, and its missing pages screen dismisses and clears paths, names the linking pages, edits and bulk-removes redirects, answers 410 and lists the config's ([Screens](../packages/cms/llms/screens.md)).
 

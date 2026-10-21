@@ -1476,7 +1476,7 @@ describe('preview mode', () => {
     }, true)
   })
 
-  it('reads the handlers and innerHTML an element spread drops unmarked, and marks the attributes it keeps', () => {
+  it('reads the handlers and innerHTML an element spread drops unmarked', () => {
     inPreview(() => {
       const marks = editMarks()!
       const entry = editableEntry(marks, 'crew', { slug: 'a', data: { title: 'Pilot', onclick: 'steal()', innerHTML: '<b>raw</b>' }, Content: () => renderedHtml('') })

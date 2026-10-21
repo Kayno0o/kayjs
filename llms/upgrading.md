@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 `POST /api/cms/redirects` takes `{ from, to, status? }` (307, 308 or 410) and `/remove` takes `{ froms }`; `permanent` and a single `from` still work. At `prefix: '/'` the screens mount in a `(admin)` group, so a page of yours replacing a screen goes in `src/routes/(admin)/`: outside it the cms guard and layout no longer reach it ([kayjs-cms](../packages/cms/llms/screens.md)).
 
+### The dev tool's bar variables are per bottom corner, and `pageLink: false` sets no hint
+
+A page's CSS reading `--kay-dev-bar-bottom` reads `--kay-dev-bar-bottom-left` or `--kay-dev-bar-bottom-right` instead, for the corner the bar is in; `--kay-dev-bar-top` is no longer published. With kayjs-cms's `pageLink: false`, the guard and the check no longer set `kay_editor`, so an app loading the module itself sets the hint.
+
 ## 1.62.0
 
 ### kayjs-cms's admin leaves the site's layouts

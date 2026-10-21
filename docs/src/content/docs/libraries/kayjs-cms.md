@@ -59,7 +59,7 @@ Every page carries one short script that looks for either cookie, so a visitor w
 
 With another way of signing in, an editor who never opened the admin sees no button until they open it once.
 
-To place the link yourself, write an `a(data-cms-edit-page hidden)` in your layout. The cms fills in its address, shows it, and writes its text when it is empty, instead of drawing its own button. `cms({ pageLink: false })` turns the button off.
+To place the link yourself, write an `a(data-cms-edit-page hidden)` in your layout. The cms fills in its address, shows it, and writes its text when it is empty, instead of drawing its own button. `cms({ pageLink: false })` turns the button off, and the hint cookie with it.
 
 The editor never covers the page it edits. From 64rem wide it docks to the right and moves the page's body aside by its width. On a narrower window, and always below 40rem, it is a sheet at the bottom and pads the page by its height, so the page keeps its width and a fixed header at the top stays in view. At the side, the editor starts under a header fixed or sticky across the top of the window, so the header stays visible, and the dev tool's bar and floating drawer sit outside it.
 

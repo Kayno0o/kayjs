@@ -58,7 +58,7 @@ export function spreadAttributes<T>(source: T): T {
   if (fieldMarks.marking === undefined || source == null || typeof source !== 'object')
     return keepAttributes(source)
 
-  return keepAttributes(new Proxy(source, { get: (target, key, receiver) => typeof key === 'string' && (key === 'innerHTML' || handlerName(key)) ? withFieldMarks(undefined, () => Reflect.get(target, key, receiver)) : Reflect.get(target, key, receiver) }))
+  return keepAttributes(new Proxy(source, { get: (target, key, receiver) => typeof key === 'string' && (key === 'innerHTML' || handlerName(key)) ? withFieldMarks(undefined, () => Reflect.get(target, key)) : Reflect.get(target, key, receiver) }))
 }
 
 // A child value's markup: text escaped, any other object as the markup it holds.
