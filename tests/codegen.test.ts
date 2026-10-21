@@ -105,6 +105,58 @@ describe('values of kay without an import', () => {
   })
 })
 
+describe('values of kay a template reads', () => {
+  const imports = (source: string) => (/^import \{ ([^}]*) \} from 'kay'$/m).exec(tsx(source))?.[1]?.split(', ').toSorted() ?? []
+  const island = (source: string) => compileKay(source, 'test.kay').tsx.includes('Island')
+
+  it('imports what a component template reads with no script, and keeps the component static for a helper', () => {
+    const source = 'a(href={route(\'/x\')}) {durationMs(5)} {withBase(\'/y\')}'
+
+    expect(imports(source)).toEqual(['durationMs', 'route', 'withBase'])
+    expect(island(source)).toBe(false)
+  })
+
+  it('imports what a page template reads, beside what its fences read', () => {
+    expect(imports('--- server\nconst id = uid()\n---\na(href={localPath(\'/x\')}) {id}')).toEqual(['localPath', 'uid'])
+    expect(imports('--- server\nconst Row = s.Object({})\n---\na(href={route(\'/x\')}) {s.String}')).toEqual(['route', 's'])
+  })
+
+  it('imports what an island template reads, and a stateful one makes the component an island', () => {
+    const source = '---\nconst count = signal(0)\n---\na(href={withBase(\'/x\')}) {count()}'
+
+    expect(imports(source)).toEqual(['signal', 'withBase'])
+    expect(island(source)).toBe(true)
+    expect(island('p {memo(() => 1)()}')).toBe(true)
+    expect(island('p {listen}')).toBe(true)
+  })
+
+  it('keeps a component static for a script reading only helpers that read nothing reactive', () => {
+    for (const body of ['route(\'/x\')', 'localPath(\'/x\')', 'withBase(\'/x\')', 's.String()', 'durationMs(5)', 'refusalMessage(undefined)'])
+      expect(island(`---\nconst x = ${body}\n---\np {String(x)}`)).toBe(false)
+  })
+
+  it('leaves a name the file declares, a template binds or a string and a key only spell', () => {
+    expect(imports('---\nconst route = 1\n---\np {route}')).toEqual([])
+    expect(imports('---\nimport { watch } from \'./watch\'\n---\np {watch()}')).toEqual([])
+    expect(imports('---\nconst { stream } = props<{ stream: string }>()\n---\np {stream}')).toEqual([])
+    expect(imports('for route of [1]\n  p {route}')).toEqual([])
+    expect(imports('const watch = 1\np {watch}')).toEqual([])
+    expect(imports('p {[1].map(signal => signal + 1)}')).toEqual([])
+    expect(imports('p {\'watch later\'} {({ signal: 1 }).signal} {String(Math.route)}')).toEqual([])
+    expect(island('p {\'watch later\'}')).toBe(false)
+  })
+
+  it('leaves a name the server fence declares to the template, in an island too', () => {
+    expect(imports('--- server\nconst root = 1\n---\np {root}')).toEqual([])
+    expect(imports('--- server\nconst route = 1\n---\n---\nconst count = signal(0)\n---\np {route} {count()}')).toEqual(['signal'])
+    expect(imports('--- server\nimport { route } from \'./routes\'\n---\na(href={route(\'/x\')}) x')).toEqual([])
+  })
+
+  it('imports typeof route in a type position like any other read', () => {
+    expect(imports('---\ntype R = typeof route\nconst x = 1 as unknown as R\n---\np {String(x)}')).toEqual(imports('---\nconst x = route(\'/\')\n---\np {x}'))
+  })
+})
+
 describe('props', () => {
   it('types the component from props<T>() and reads destructured names off the props object', () => {
     const code = tsx('---\nconst { title, count } = props<{ title: string, count: number }>()\nconst label = () => `${title}: ${count}`\n---\np {label()} {title}')

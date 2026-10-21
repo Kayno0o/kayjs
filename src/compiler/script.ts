@@ -18,14 +18,15 @@ const WHITESPACE = /\s/
 const FIRST_TOKEN = /^[\w$]*/
 // A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
 const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
-const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
+// What `kay` exports that reads nothing reactive: a script using only these stays a static component.
+const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 // Each name written as a name of its own, not a member or part of a longer one.
-const GLOBAL_NAME = new RegExp(`(?<![\\w$.])(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
+export const KAY_NAME = new RegExp(`(?<![\\w$.])(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -92,14 +93,18 @@ export interface ParsedFence {
 }
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
-// `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of.
-export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = []): ScriptAnalysis {
+// `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
+export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = []): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
 
-  if (!script)
-    return analysis
+  if (!script) {
+    analysis.implicit = templateReads.filter(name => !serverNames.includes(name))
+    analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name))
 
-  const split = splitFence(source, script, serverNames, analysis)
+    return analysis
+  }
+
+  const split = splitFence(source, script, serverNames, analysis, templateReads)
 
   if (!split)
     return analysis
@@ -171,7 +176,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
 
 // Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
+function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = []): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -196,7 +201,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
       analysis.broken.push(span)
   }
 
-  analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'))
+  analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'), templateReads)
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -875,7 +880,7 @@ const OBJECT_KEY = /([{,]\s*)[\w$]+(?=\s*:)/g
 const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};])\s*$/
 const REGEX_LITERAL = /^\/(?:[^/\\\n[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+\//
 
-function codeOf(text: string): string {
+export function codeOf(text: string): string {
   let code = ''
   // The open interpolations of template literals, each counting the braces opened inside it.
   const interpolations: number[] = []
@@ -954,20 +959,20 @@ function codeOf(text: string): string {
   return code.replaceAll(OBJECT_KEY, '$1')
 }
 
-// Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read.
-function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string): string[] {
-  const written = new Set((typed === '' ? [code] : [code, typed]).flatMap(text => text.match(GLOBAL_NAME) ?? []))
+// Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.
+function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
+  const written = new Set([...(typed === '' ? [code] : [code, typed]).flatMap(text => text.match(KAY_NAME) ?? []), ...read])
   const mentioned = [...written].filter(name => !declared.includes(name))
   const found: string[] = []
 
   if (mentioned.length === 0)
     return found
 
-  const inTyped = new Set(typed.match(GLOBAL_NAME) ?? [])
+  const inTyped = new Set(typed.match(KAY_NAME) ?? [])
 
   loadTraverse()(ast, {
     Program(path) {
-      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name)) && !path.scope.hasBinding(name)))
+      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
       path.stop()
     },
   })

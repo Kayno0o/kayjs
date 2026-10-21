@@ -53,7 +53,10 @@ Contact(action={contact} token={token})
 ```
 
 ```kay
+---
 // src/components/contact.kay
+const { action, token } = props<{ action: string, token: string }>()
+---
 Section(title="Contact")
   p Write to us
   ContactForm(server="defer" action={action} token={token})
@@ -181,7 +184,10 @@ Contact(action={contact} token={token})
 ```
 
 ```kay
+---
 // src/components/contact.kay
+const { action, token } = props<{ action: string, token: string }>()
+---
 Section(title="Contact")
   p Write to us
   ContactForm(server="defer" action={action} token={token})

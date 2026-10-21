@@ -16,6 +16,7 @@ import { parseExpanded } from './markdown-block'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer } from './script'
+import { templateReads } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { validate } from './validate'
 
@@ -100,7 +101,7 @@ export function rendersAsIsland(original: string, imported?: ImportedSignals): b
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
 
   return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
 }
@@ -114,7 +115,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
     return undefined
 
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
 
   if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
@@ -127,7 +128,7 @@ export function promotedChecks(original: string): Diagnostic[] {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
 
   return script.fence === undefined ? [] : serverOnlyImports(script.fence)
 }
@@ -137,7 +138,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const { file, expansion, problems } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
 
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 

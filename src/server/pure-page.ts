@@ -6,6 +6,7 @@ import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
+import { templateReads } from '../compiler/template-reads'
 import { neverWritten, parseLiteral } from './literal-writes'
 import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
@@ -777,7 +778,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   if (file.endsWith('.kay')) {
     const parts = parseKay(source)
     const server = analyzeServer(source, parts.server)
-    const implicit = [...new Set([...analyzeScript(source, parts.script, server?.data.map(({ name }) => name)).implicit, ...server?.implicit ?? []])]
+    const implicit = [...new Set([...analyzeScript(source, parts.script, server?.data.map(({ name }) => name), templateReads(parts)).implicit, ...server?.implicit ?? []])]
 
     if (implicit.length > 0)
       imports.push({ clause: `{ ${implicit.join(', ')} }`, specifier: 'kay', index: 0, length: 0 })

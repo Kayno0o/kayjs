@@ -12,6 +12,7 @@ import { isErrorCode } from '../compiler/errors'
 import { nativeManifestIfInstalled } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
+import { templateReads } from '../compiler/template-reads'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
@@ -258,7 +259,7 @@ function probedPackages(source: string): string[] {
   if (file.client || !file.script || file.server)
     return []
 
-  const script = analyzeScript(source, file.script)
+  const script = analyzeScript(source, file.script, [], templateReads(file))
 
   return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }
