@@ -176,6 +176,25 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
   }
 })
 
+it('plans the package.json write of a library that resolves but is not in package.json, on a dry run', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
+
+    const before = await Bun.file(join(dir, 'package.json')).text()
+    const result = await addFeatures(dir, ['mail'], { dryRun: true })
+
+    expect(result.written).toContain('package.json')
+    expect(await Bun.file(join(dir, 'package.json')).text()).toBe(before)
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
 it('adds kayjs-ai as its extension alone, with no file', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 

@@ -231,6 +231,16 @@ describe('kay i18n', () => {
     expect((await kay(['i18n', 'accept'], root)).code).toBe(1)
   })
 
+  it('accept --dry-run counts the drafts and leaves the file as it was', async () => {
+    const root = await project(site)
+    const before = await Bun.file(join(root, 'src/messages/fr.ts')).text()
+    const { stdout, code } = await kay(['i18n', 'accept', 'fr', '--dry-run'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('Would accept 2 drafts in src/messages/fr.ts')
+    expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(before)
+  })
+
   it('gives a library what each locale lacks, with the default locale\'s message for each', async () => {
     const root = await project(site)
     const config = { i18n, extensions: [{ name: 'kay-lib', messages: './lib/messages' }] }

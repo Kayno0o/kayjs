@@ -47,6 +47,8 @@ export interface RuntimeRules {
   configured: Record<string, string>
   // Every path the site serves, when the server knows them, to refuse a target nothing serves.
   served?: (() => string[]) | undefined
+  // Runs every check, the capacity one included, and writes nothing.
+  dryRun?: boolean | undefined
 }
 
 export interface RedirectSet {
@@ -246,7 +248,8 @@ export function redirectSet(db: Database): RedirectSet {
 
         const addedAt = Date.now()
 
-        insert.run(key, to, status, isPattern(key) ? 1 : 0, addedAt)
+        if (rules.dryRun !== true)
+          insert.run(key, to, status, isPattern(key) ? 1 : 0, addedAt)
 
         return { from: key, to, status, addedAt }
       })

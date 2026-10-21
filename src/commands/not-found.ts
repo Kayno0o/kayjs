@@ -1,4 +1,5 @@
 import type { MissingPath } from '../server/not-found'
+import type { RuntimeRules } from '../server/runtime-redirects'
 import type { Command } from './command'
 import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -6,7 +7,7 @@ import process from 'node:process'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
 import { answeredBy, missingStore, NOT_FOUND_FILE } from '../server/not-found'
-import { addRedirect, checkRedirect, redirectEntry } from '../server/not-found-config'
+import { addRedirect, checkRedirect, redirectEntry, withRedirect } from '../server/not-found-config'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 import { USAGES } from './usages'
 
@@ -52,7 +53,9 @@ export const notFound: Command = {
       const config = await withStdoutOnStderr(async () => loadConfig(root))
       const redirects = Object.keys(config.redirects ?? {})
       const redirected = new Set(redirects)
-      const store = existsSync(file) || runtime ? missingStore(file, false) : undefined
+      // A dry run with no file keeps its store in memory, so it creates none.
+      const storeFile = existsSync(file) || !dryRun ? file : ':memory:'
+      const store = existsSync(file) || runtime ? missingStore(storeFile, false) : undefined
 
       try {
         const all = store?.list() ?? []
@@ -67,7 +70,21 @@ export const notFound: Command = {
             throw new Error(`${redirect} has no suggested target: name one with --to <path>`)
 
           if (dryRun) {
-            checkRedirect(redirect, target, redirected)
+            if (runtime) {
+              store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, true))
+            }
+            else {
+              checkRedirect(redirect, target, redirected)
+
+              const configFile = join(root, 'kay.config.ts')
+              const text = existsSync(configFile) ? await Bun.file(configFile).text() : undefined
+
+              if (text === undefined || withRedirect(text, redirect, target) === undefined) {
+                printFailure('not-found', `kay.config.ts has no \`redirects\` object literal to add the redirect to: add it by hand\n  ${redirectEntry(redirect, target)}`, format)
+
+                return 1
+              }
+            }
 
             if (format === 'json')
               printDocument({ redirect: { from: redirect, to: target, ...runtime && { runtime }, dryRun } })
@@ -78,11 +95,7 @@ export const notFound: Command = {
           }
 
           if (runtime) {
-            // Loaded here: the type checker's modules are heavy, and only this path needs them.
-            const [{ configCheckOptions }, { servedPathsOf }] = await Promise.all([import('../check'), import('../check/shadow-types')])
-            const options = configCheckOptions(config)
-            const served = await servedPathsOf(root, options)
-            const added = store!.redirects.add(redirect, target, undefined, { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])), served: () => served })
+            const added = store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, false))
 
             store!.forget(added.from)
 
@@ -134,6 +147,15 @@ export const notFound: Command = {
       return 1
     }
   },
+}
+
+// The host and served-path rules of a runtime redirect.
+async function runtimeRules(root: string, config: Awaited<ReturnType<typeof loadConfig>>, dryRun: boolean): Promise<RuntimeRules> {
+  // Loaded here: the type checker's modules are heavy, and only this path needs them.
+  const [{ configCheckOptions }, { servedPathsOf }] = await Promise.all([import('../check'), import('../check/shadow-types')])
+  const served = await servedPathsOf(root, configCheckOptions(config))
+
+  return { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])), served: () => served, dryRun }
 }
 
 function formatListing(missing: MissingPath[], redirected: boolean): string {

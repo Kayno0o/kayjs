@@ -112,6 +112,39 @@ describe('--quiet', () => {
     }
   })
 
+  it('start leaves out the warning that the build is older than the sources', async () => {
+    const root = await project({ '.kay/client/manifest.json': '{}' })
+
+    await Bun.sleep(20)
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(root, 'server.ts'), 'console.log("up")\n')
+
+    const loud = await kay(['start', '--entry', 'server.ts'], root)
+    const quiet = await kay(['start', '--entry', 'server.ts', '--quiet'], root)
+
+    expect(loud.stderr).toContain('the build is older than')
+    expect([quiet.stdout, quiet.stderr, quiet.code]).toEqual(['up\n', '', 0])
+  })
+
+  it('render leaves out the line naming a failing status', async () => {
+    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'main Home\n' })
+    const loud = await kay(['render', '/nowhere'], root)
+    const quiet = await kay(['render', '/nowhere', '--quiet'], root)
+
+    expect(loud.stderr).toContain('kay render: 404')
+    expect(quiet.stderr).not.toContain('kay render: 404')
+    expect(quiet.code).toBe(1)
+  }, 30_000)
+
+  it('routes leaves out the note on the routes the server adds when it starts', async () => {
+    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'main Home\n', 'src/server.ts': 'export {}\n' })
+    const loud = await kay(['routes'], root)
+    const quiet = await kay(['routes', '--quiet'], root)
+
+    expect(loud.stdout).toContain('Not listed:')
+    expect(quiet.stdout).not.toContain('Not listed:')
+  }, 30_000)
+
   it('is refused by a command whose output is its answer', async () => {
     const { code, stderr } = await kay(['explain', '--quiet'], process.cwd())
 

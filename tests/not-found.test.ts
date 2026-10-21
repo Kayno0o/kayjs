@@ -558,6 +558,40 @@ describe('kay not-found', () => {
     expect(readRuntimeRedirects(join(root, 'data/not-found.sqlite'))).toHaveLength(1)
   })
 
+  it('with --dry-run says the config has no redirects literal the real run refuses, and runs the runtime rules without writing', async () => {
+    const root = await project()
+
+    await Bun.write(join(root, 'src/routes/new.kay'), 'main New\n')
+
+    const config = await Bun.file(join(root, 'kay.config.ts')).text()
+    const sqlite = join(root, 'data/not-found.sqlite')
+    const before = await Bun.file(sqlite).bytes()
+
+    await Bun.write(join(root, 'kay.config.ts'), 'const redirects = {}\nexport default { favicon: false, redirects }\n')
+
+    const byHand = await run(['not-found', '--redirect', '/old', '--dry-run'], root)
+
+    expect(byHand.code).toBe(1)
+    expect(byHand.stderr).toContain('add it by hand')
+    await Bun.write(join(root, 'kay.config.ts'), config)
+
+    const ok = await run(['not-found', '--redirect', '/old', '--runtime', '--dry-run'], root)
+
+    expect(ok.code).toBe(0)
+    expect(ok.stdout).toContain('Would add to the store')
+    expect((await run(['not-found', '--redirect', '/other', '--to', '/nothing-serves-this', '--runtime', '--dry-run'], root)).stderr).toContain('nothing on the site serves')
+    expect((await run(['not-found', '--redirect', '/other', '--to', '//evil.example', '--runtime', '--dry-run'], root)).code).toBe(1)
+    expect(readRuntimeRedirects(sqlite)).toEqual([])
+    expect(await Bun.file(sqlite).bytes()).toEqual(before)
+
+    const bare = await scratchDir('not-found-cli-')
+
+    await Bun.write(join(bare, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(bare, 'src/routes/new.kay'), 'main New\n')
+    expect((await run(['not-found', '--redirect', '/old', '--to', '/new', '--runtime', '--dry-run'], bare)).code).toBe(0)
+    expect(await Bun.file(join(bare, 'data/not-found.sqlite')).exists()).toBe(false)
+  })
+
   it('quotes a hostile path in the hint it prints, and leaves out what a pattern redirect answers', async () => {
     const root = await scratchDir('not-found-cli-')
     const store = missingStore(join(root, 'data/not-found.sqlite'))

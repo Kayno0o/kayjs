@@ -494,10 +494,17 @@ function failIfConflicts({ conflicts }: Plan): void {
 // Packages `kay new` lists under devDependencies.
 const DEV_PACKAGES = new Set(['@iconify-json/tabler'])
 
+// The range a kayjs package is installed at (kay's own minor), any other at the range kay uses.
+async function packageRange(name: string): Promise<string> {
+  const own = JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies: Record<string, string> }
+
+  return name.startsWith('@kaynooo/kayjs-') ? `~${own.version}` : own.devDependencies[name]!
+}
+
 // Installs what the libraries need and the project lacks: a kayjs package at kay's own minor, any other at the range kay uses, the dev ones in a call of their own.
 async function installPackages(dir: string, missing: readonly string[], bun: string): Promise<void> {
-  const own = JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies: Record<string, string> }
-  const spec = (name: string) => name.startsWith('@kaynooo/kayjs-') ? `${name}@~${own.version}` : `${name}@${own.devDependencies[name]!}`
+  const ranges = new Map(await Promise.all(missing.map(async name => [name, await packageRange(name)] as const)))
+  const spec = (name: string) => `${name}@${ranges.get(name)!}`
 
   for (const [flags, names] of [[[], missing.filter(name => !DEV_PACKAGES.has(name))], [['-d'], missing.filter(name => DEV_PACKAGES.has(name))]] as const) {
     if (names.length === 0)
@@ -622,6 +629,19 @@ async function addLibraries(dir: string, core: readonly Feature[], libraries: re
       // The package.json changed on disk, so the merge starts over from it.
       next = await planCore(dir, core, libraries.includes('auth'))
       failIfConflicts(next)
+    }
+
+    // A dry run installs nothing, so the plan names the dependencies the install would add.
+    if (missing.length > 0 && options.dryRun === true) {
+      const current = JSON.parse(next.writes.get('package.json') ?? (await readManifest(dir)).text) as Manifest
+
+      for (const name of missing) {
+        const group = DEV_PACKAGES.has(name) ? 'devDependencies' : 'dependencies'
+
+        current[group] = { ...current[group], [name]: await packageRange(name) }
+      }
+
+      next.writes.set('package.json', `${JSON.stringify(current, null, 2)}\n`)
     }
 
     await planLibraries(dir, libraries, next)
