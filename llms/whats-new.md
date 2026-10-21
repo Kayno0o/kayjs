@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.61.0
 
 - Edit mode in kayjs-cms pairs fields of the same text with the field rendered, not one read only in a condition, and a literal text between two numbers of a child keeps the second's mark: [Edit mode](content-cms.md#edit-mode).
+- The kayjs-cms on-page editor keeps clear of the dev tool's bar, which publishes the room it takes as `--kay-dev-bar-top` and `-bottom`, starts under a header fixed across the top of the page so it stays visible, scrolls a clicked element clear of such a header, and a collapsed editor no longer flashes open while the page loads ([content CMS](content-cms.md)).
 - `kay dev` follows a `.env` edit for a value that expands another (`A=$HOME/x`, `B=${A}`), which kept its first value, and the process loading `kay.config.ts` for the editor types reads the new `.env` values as the server does ([Dev server](dev-server.md)).
 - A post behind a proxy that ends TLS swaps its page in place: the redirect back is a path, so the browser no longer reads `http:` against its own `https:` and loads the page in full ([Actions](actions.md#forms)).
 - Edit mode in kayjs-cms marks every field a page renders from an entry, also one a component reads from data its page handed down (`Crew({...data})`), and each part of a mixed child like `{age} ans`: [Edit mode](content-cms.md#edit-mode).

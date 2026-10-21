@@ -37,7 +37,10 @@ async function open(width: number, height: number) {
 
     spacer.style.height = '3000px'
     document.body.append(spacer)
+    dispatchEvent(new Event('scroll'))
   })
+  // The side dock moves under the header once it measures it.
+  await page.waitUntil(() => document.documentElement.classList.contains('kcms-dock-bottom') || document.querySelector('.kcms-editor')!.getBoundingClientRect().top === 48)
 
   return page
 }
@@ -61,9 +64,104 @@ test('on a wide window the editor sits at the side and the page keeps the rest, 
 
   expect(panel.right).toBe(window.width)
   expect(panel.left).toBe(window.width - 384)
-  expect(panel.top).toBe(0)
   expect(body.right).toBeLessThanOrEqual(panel.left)
   expect(page.errors).toEqual([])
+})
+
+test('a header fixed across the window stays visible over the side dock, which starts under it', async () => {
+  const page = await open(1280, 800)
+
+  const { panel, window } = await measure(page)
+  const seen = await page.evaluate(() => document.elementFromPoint(document.documentElement.clientWidth - 10, 24)?.id)
+
+  expect(panel.top).toBe(48)
+  expect(panel.bottom).toBe(window.height)
+  expect(seen).toBe('site-header')
+})
+
+test('a drag of the edge resizes the editor and keeps the layout once, when the drag ends', async () => {
+  const page = await open(1280, 800)
+  const grip = await page.evaluate(() => {
+    const box = document.querySelector('.kcms-editor-grip')!.getBoundingClientRect()
+
+    return { x: box.left + box.width / 2, y: box.top + 300 }
+  })
+  const mouse = (type: string, x: number) => page.cdp('Input.dispatchMouseEvent', { type, x, y: grip.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 })
+
+  await page.evaluate(() => {
+    const keep = Storage.prototype.setItem
+    const writes: string[] = []
+
+    Object.assign(window, { writes })
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === 'kcms-editor')
+        writes.push(value)
+
+      return keep.call(this, key, value)
+    }
+  })
+  await mouse('mouseMoved', grip.x)
+  await mouse('mousePressed', grip.x)
+  await mouse('mouseMoved', grip.x - 20)
+  await mouse('mouseMoved', grip.x - 50)
+  await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().width === 434)
+  expect(await page.evaluate(() => (window as unknown as { writes: string[] }).writes.length)).toBe(0)
+  await mouse('mouseReleased', grip.x - 50)
+  await page.waitUntil(() => (window as unknown as { writes: string[] }).writes.length > 0)
+  expect((await page.evaluate(() => (window as unknown as { writes: string[] }).writes)).map(write => JSON.parse(write))).toEqual([{ open: true, side: 434 }])
+
+  await page.reload()
+  await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().width === 434)
+})
+
+test('the values of the resize separator account for what a docked dev tool holds', async () => {
+  const page = await open(1280, 800)
+  const values = () => page.evaluate(() => {
+    const grip = document.querySelector('.kcms-editor-grip')!
+
+    return [grip.getAttribute('aria-valuenow'), grip.getAttribute('aria-valuemax')]
+  })
+
+  expect(await values()).toEqual(['384', '928'])
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--kay-dev-inset-right', '600px')
+    document.documentElement.style.paddingRight = '600px'
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax') === '328')
+  expect(await values()).toEqual(['328', '328'])
+})
+
+test('an editor left collapsed never shows open while the page loads', async () => {
+  const page = await open(390, 800)
+
+  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null)
+  await page.cdp('Page.addScriptToEvaluateOnNewDocument', {
+    source: `(function watch() {
+      const panel = document.querySelector('.kcms-editor-open')
+
+      if (panel && getComputedStyle(panel).visibility !== 'hidden')
+        window.flashed = true
+
+      requestAnimationFrame(watch)
+    })()`,
+  })
+  await page.reload()
+  await page.waitUntil(() => document.documentElement.classList.contains('kcms-dock-bottom'))
+  await Bun.sleep(300)
+  expect(await page.evaluate(() => (window as unknown as { flashed?: boolean }).flashed)).toBeUndefined()
+})
+
+test('a click that lies under a fixed header at the top scrolls the element clear of it', async () => {
+  const page = await open(390, 800)
+
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('h1')!.style.marginTop = '1000px'
+    scrollTo(0, document.querySelector('h1')!.getBoundingClientRect().top + scrollY - 20)
+  })
+  await page.waitUntil(() => document.querySelector('h1')!.getBoundingClientRect().top < 30)
+  await page.evaluate(() => document.querySelector<HTMLElement>('h1')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 0 })))
+  await page.waitUntil(() => document.querySelector('h1')!.getBoundingClientRect().top >= 48)
 })
 
 test('between 40rem and 64rem the editor takes the bottom, so the page keeps its width and a fixed header stays in view', async () => {

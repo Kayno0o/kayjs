@@ -636,6 +636,8 @@ const PAGE_LEFT = 80
 // How near an edge a moved drawer snaps to it, and how far from it it lands.
 const SNAP = 24
 const MARGIN = 12
+// What the bar takes of the window's top or bottom edge, its margin and height, published as `--kay-dev-bar-<edge>` for a panel of the page to keep clear of it.
+const BAR_ROOM = MARGIN + 36
 // How far the bar's mark moves before a press becomes a drag.
 const DRAG_START = 5
 const KEY_STEP = 16
@@ -765,7 +767,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const status = make('span', 'sr')
   const copies = make('div', 'sr copies')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
-  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it.
+  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it, with the room the bar takes as `--kay-dev-bar-<edge>`.
   const pageSheet = new CSSStyleSheet()
   const save = () => writeState(win, state)
   const saveLayout = () => writeLayout(win, layout)
@@ -827,7 +829,8 @@ export function startDevTool(doc: Document = document): DevTool {
     const free = floating && !layout.max && win.innerWidth > NARROW
     const box = free && layout.box !== undefined ? fitBox(layout.box, room()) : undefined
     const keyGrip = KEY_GRIPS[current]
-    const sheet = state.open && !floating ? `html { padding-${current}: ${docked}px !important; --kay-dev-inset-${current}: ${docked}px; }` : ''
+    const edge = layout.corner.startsWith('top') ? 'top' : 'bottom'
+    const sheet = `html { --kay-dev-bar-${edge}: ${BAR_ROOM}px;${state.open && !floating ? ` padding-${current}: ${docked}px !important; --kay-dev-inset-${current}: ${docked}px;` : ''} }`
 
     ui.classList.toggle('right', layout.corner.endsWith('right'))
     ui.classList.toggle('top', layout.corner.startsWith('top'))

@@ -8,7 +8,7 @@ html.kcms-editing {
   position: fixed;
   z-index: 2147483000;
   right: calc(1rem + var(--kay-dev-inset-right, 0px));
-  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + var(--kay-dev-bar-bottom, 0px) + env(safe-area-inset-bottom, 0px));
   color: var(--color-kui-text);
   background: var(--color-kui-mantle);
   border: 1px solid var(--color-kui-surface2);
@@ -52,7 +52,18 @@ html.kcms-editing {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--kay-dev-bar-bottom, 0px));
+}
+
+/* Hidden until the editor has read how it was left, so a collapsed one does not flash open. */
+.kcms-editor-pending {
+  visibility: hidden;
+}
+
+/* The side dock starts under a header fixed across the top of the page and under the dev tool's bar if that sits there, so neither covers the other. */
+html.kcms-dock-side .kcms-editor-open {
+  top: var(--kcms-top, 0px);
+  padding-top: var(--kay-dev-bar-top, 0px);
 }
 
 .kcms-editor-failure,

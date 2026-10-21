@@ -489,6 +489,7 @@ describe('the dev tool', () => {
 
     shadow().querySelector<HTMLButtonElement>('.mark')!.click()
     expect(padding()).not.toContain('padding')
+    expect(padding()).toContain('--kay-dev-bar-bottom: 48px')
 
     tool.stop()
     tool = undefined
