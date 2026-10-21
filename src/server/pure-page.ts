@@ -107,6 +107,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   collections: 'request',
   collectionInfo: 'request',
   collectionLoader: 'request',
+  entryPage: 'request',
   entries: 'request',
   entrySource: 'request',
   entryFile: 'request',
