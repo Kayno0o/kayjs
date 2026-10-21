@@ -51,6 +51,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
+- [Test databases and setup](llms/testing-setup.md): `kay/test/preload`, a database per file, seeds
 - [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): every lint at its default level, how to change a level, allow one, or apply its fix
