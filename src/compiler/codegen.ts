@@ -34,6 +34,8 @@ export interface GenerateOptions {
   inspect?: boolean | undefined
   // The file as written when the template was expanded from it, so the positions the inspector shows are the file's.
   inspectSource?: { text: string, real: (offset: number) => number } | undefined
+  // A page, a layout or a special page: it has no `class` prop for its parts to take.
+  pageFile?: boolean | undefined
   // Type checking a page, a layout or a special page, which render once on the server, whether or not they carry a server fence.
   route?: boolean | undefined
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
@@ -161,7 +163,9 @@ class ModuleShell {
     this.mode = outputMode(options)
     this.kind = islandKind(options)
     this.fence = options.includeServer === false ? undefined : server
-    this.facts = templateFacts(file)
+    const facts = templateFacts(file)
+
+    this.facts = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
     this.deferred = deferredData(this.facts, this.fence)
   }
 
@@ -304,6 +308,9 @@ class ModuleShell {
     if (this.kind === 'twin' || this.kind === 'promotable twin')
       b.add(`import { ${this.kind === 'twin' ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
+    if (this.partsType().helper)
+      b.add('import type { PartClass as KayPartOf } from \'kay\'\n')
+
     if (this.kind === 'island' && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
@@ -332,11 +339,34 @@ class ModuleShell {
     }
   }
 
+  // The `class` prop the template's parts give a component, typed from them so the app declares nothing: a string for the root, when there is one, or an object of a string per part, and of the called component's own `class` for a part that is one.
+  private partsType(): { type?: string, helper: boolean } {
+    const parts = this.facts.parts
+
+    if (!parts?.merges || this.server)
+      return { helper: false }
+
+    const imported = new Set(this.script.imports.map(binding => binding.local))
+    let helper = false
+    const entries = [...parts.names].toSorted(([a], [b]) => Number(b === 'root') - Number(a === 'root')).map(([name, component]) => {
+      const typed = component !== undefined && imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined))
+
+      helper ||= typed
+
+      return `${JSON.stringify(name)}?: ${typed ? `KayPartOf<typeof ${component}>` : 'string'}`
+    })
+    const object = `{ ${entries.join('; ')} }`
+
+    return { type: `{ class?: ${parts.root === 'none' ? '' : 'string | '}${object} }`, helper }
+  }
+
   // The component function's head: its type parameters and props, read off `__props`.
   private signature(): void {
     const { b, script, server } = this
     const { childrenSlot } = this.facts
     const childrenType = ' & { children?: KayJSX.Element }'
+    const parts = this.partsType().type
+    const typed = parts !== undefined
 
     b.add(`\n${this.wrapped ? '' : 'export default '}function ${this.options.name}`)
 
@@ -349,15 +379,18 @@ class ModuleShell {
       b.add(`${PROPS}: KayPageData<typeof ${LOAD}>${childrenSlot ? childrenType : ''}`)
     }
     else if (script.props) {
-      b.add(childrenSlot ? `${PROPS}: (` : `${PROPS}: `)
+      b.add(childrenSlot || typed ? `${PROPS}: (` : `${PROPS}: `)
 
       if (script.props.type)
         b.addSource(script.props.type)
       else
         b.add('Record<string, unknown>')
 
-      if (childrenSlot)
-        b.add(`)${childrenType}`)
+      if (childrenSlot || typed)
+        b.add(`)${typed ? ` & ${parts}` : ''}${childrenSlot ? childrenType : ''}`)
+    }
+    else if (typed) {
+      b.add(`${PROPS}: ${parts}${childrenSlot ? childrenType : ''}`)
     }
     else if (childrenSlot) {
       b.add(`${PROPS}: { children?: KayJSX.Element }`)
@@ -607,7 +640,7 @@ class ModuleShell {
     }
 
     if (props.rest)
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${props.bindings.map(binding => JSON.stringify(binding.key)).join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.map(binding => binding.key), ...this.facts.parts?.merges ? ['class'] : []].map(key => JSON.stringify(key)).join(', ')});\n`)
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.
     if (!this.options.rewrites && props.bindings.length > 0) {

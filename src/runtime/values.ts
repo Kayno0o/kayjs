@@ -136,8 +136,40 @@ export function classText(value: unknown): string {
 }
 
 // The `class` a component gets when its call merges a shorthand, a `class` attribute or a spread's: one string, as a `class?: string` prop takes it, or none when nothing is set.
-export function componentClass(list: readonly unknown[]): string | undefined {
-  return classText(list) || undefined
+export function componentClass(list: readonly unknown[]): unknown {
+  const parts = list.find(isParts)
+
+  if (parts === undefined)
+    return classText(list) || undefined
+
+  const rest = list.filter(item => item !== parts)
+
+  return rest.length === 0 ? parts : taggedParts({ ...parts, root: [...rest, parts.root] })
+}
+
+const PARTS = Symbol.for('kay.parts')
+
+type Parts = Record<string, unknown> & { readonly [PARTS]?: true }
+
+// An object of classes by part name, as a part that is a component hands it: told from a `{ class: condition }` object, which a plain `class` takes.
+function isParts(value: unknown): value is Parts {
+  return typeof value === 'object' && value !== null && (value as Parts)[PARTS] === true
+}
+
+function taggedParts(parts: Record<string, unknown>): Parts {
+  return Object.defineProperty({ ...parts }, PARTS, { value: true })
+}
+
+// What a component's `class` prop gives a part: a string, or an array, is the root's, and an object holds one entry per part, its own object when that part is a component.
+export function partClass(props: unknown, part: string): unknown {
+  const value = (props as { class?: unknown } | undefined)?.class
+
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return part === 'root' ? value : undefined
+
+  const entry = (value as Record<string, unknown>)[part]
+
+  return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }
 
 // A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`; empty when it is falsy.

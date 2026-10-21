@@ -2,8 +2,9 @@ import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, 
 import type { CodeBuilder } from './mapping'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, sectionOf } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
+import { PROPS } from './names'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -88,7 +89,7 @@ export type PlannedAttribute
 export interface ElementPlan {
   id: string | undefined
   // The class shorthand, merged with a static `class`, or beside an expression one.
-  classes: { text: string, expression?: Span } | undefined
+  classes: { text: string, expression?: Span | undefined, parts?: string[] } | undefined
   attributes: PlannedAttribute[]
   // The `sizes` an image source caps, left out of the attributes.
   sizes: NamedAttribute | undefined
@@ -144,7 +145,12 @@ export abstract class TemplateWriter {
       described,
     }
 
-    if (element.classes.length > 0)
+    const parts = partsOf(element, this.src, this.facts.parts)
+    const partAttr = partAttribute(element, this.src)
+
+    if (parts.length > 0)
+      plan.classes = { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
+    else if (element.classes.length > 0)
       plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute) }
 
     const section = name === 'a' ? sectionOf(element, this.src) : undefined
@@ -154,6 +160,12 @@ export abstract class TemplateWriter {
         continue
 
       const attributeName = this.source(attribute.name)
+
+      if (attribute === partAttr) {
+        plan.attributes.push({ kind: 'text', name: 'data-part', text: decodeEntities(attribute.text), bare: false })
+
+        continue
+      }
 
       // Read below with the image's source, and never written.
       if (name === 'img' && attributeName === NO_PLACEHOLDER)
@@ -307,7 +319,9 @@ export abstract class TemplateWriter {
     const { b } = this
     const classAttribute = this.classAttribute(element)
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const mergedClass = element.classes.length > 0 || (spreads && classAttribute !== undefined)
+    const parts = partsOf(element, this.src, this.facts.parts)
+    const partAttr = partAttribute(element, this.src)
+    const mergedClass = element.classes.length > 0 || (spreads && classAttribute !== undefined) || parts.length > 0
     let open = false
     let entries = 0
     let objects = 0
@@ -382,6 +396,12 @@ export abstract class TemplateWriter {
       if (mergedClass && attribute === classAttribute)
         continue
 
+      if (attribute === partAttr) {
+        entry('data-part', () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
+
+        continue
+      }
+
       const name = this.source(attribute.name)
 
       // Takes the color a spread brings off the image, which the attributes after it cannot unset.
@@ -410,6 +430,24 @@ export abstract class TemplateWriter {
     return { separate, close }
   }
 
+  // A class list of the static text, the expression and what the component's props hand each part it answers for, later ones overriding earlier.
+  protected classList(classes: NonNullable<ElementPlan['classes']>): void {
+    const { b } = this
+
+    b.add('[')
+
+    const text = classes.text === '' && (classes.expression || classes.parts) ? [] : [JSON.stringify(classes.text)]
+
+    for (const [index, item] of [...text.map(item => () => b.add(item)), ...classes.expression ? [() => b.add('(').addSource(classes.expression!).add(')')] : [], ...(classes.parts ?? []).map(part => () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))].entries()) {
+      if (index > 0)
+        b.add(', ')
+
+      item()
+    }
+
+    b.add(']')
+  }
+
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.
   protected formDefaults(element: ElementNode): void {
     if (!actionOf(element, this.src))
@@ -425,8 +463,9 @@ export abstract class TemplateWriter {
   protected mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
+    const parts = partsOf(element, this.src, this.facts.parts)
 
-    if (!spreads && classAttribute?.kind !== 'expression') {
+    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0) {
       b.add(JSON.stringify(this.staticClass(element, classAttribute)))
 
       return
@@ -445,6 +484,9 @@ export abstract class TemplateWriter {
       else if (attribute === classAttribute && attribute.kind === 'expression')
         items.push(() => b.add('(').addSource(attribute.expression).add(')'))
     }
+
+    for (const part of parts)
+      items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
 
     b.add(element.component ? `${helperName('componentClass')}([` : '[')
     for (const [index, item] of items.entries()) {

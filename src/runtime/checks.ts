@@ -265,6 +265,9 @@ export interface AwaitProps<T> {
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>
 
+// The `class` a part that is a call of this component takes, as the component types it: a string for its root, or an object of its own parts.
+export type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
+
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
   For: {
@@ -274,6 +277,7 @@ export interface TemplateHelpers {
   staticFor: <T>(each: readonly T[] | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   componentClass: (list: readonly unknown[]) => string | undefined
+  partClass: (props: unknown, part: string) => unknown
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
   Try: (props: { block: JSX.Element, failed?: JSX.Element }) => JSX.Element

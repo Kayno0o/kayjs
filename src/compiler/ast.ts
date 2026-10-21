@@ -454,7 +454,7 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-export type TemplateHelper = 'For' | 'componentClass'
+export type TemplateHelper = 'For' | 'componentClass' | 'partClass'
 
 // What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
 export interface TemplateFacts {
@@ -473,6 +473,8 @@ export interface TemplateFacts {
   try: boolean
   // The shorthand classes of elements and `error` lines, `.card`, as written.
   classes: string[]
+  // The parts the template names, `part="head"`, when it names any.
+  parts: PartFacts | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
@@ -573,12 +575,61 @@ export function someNode(nodes: readonly Node[], found: (node: Node) => boolean)
 export const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 
+// The parts a template names with `part="head"`, which a component's `class` prop reaches by name.
+export interface PartFacts {
+  // Each part, with the component it is a call of when it is one: its class is then that component's own.
+  names: Map<string, string | undefined>
+  // Where the string form of `class` goes: the part marked `root`, else the template's single top element, else nowhere.
+  root: 'marked' | 'implicit' | 'none'
+  implicit?: ElementNode | undefined
+  // The file is a component, whose props carry `class`; a page or a layout only renders `data-part`.
+  merges: boolean
+}
+
+// The attribute that names a part, when it is written as a plain string.
+export function partAttribute(element: ElementNode, source: string): Extract<NamedAttribute, { kind: 'static' }> | undefined {
+  return element.attributes.find((attribute): attribute is Extract<NamedAttribute, { kind: 'static' }> => attribute.kind === 'static' && source.slice(attribute.name.start, attribute.name.end) === 'part')
+}
+
+export function partName(element: ElementNode, source: string): string | undefined {
+  const text = partAttribute(element, source)?.text
+
+  return text === undefined || text === '' ? undefined : text
+}
+
+// The parts an element answers for in a component: the one it names, and `root` when it is the single top element.
+export function partsOf(element: ElementNode, source: string, parts: PartFacts | undefined): string[] {
+  if (!parts?.merges)
+    return []
+
+  const named = partName(element, source)
+
+  return [...named === undefined ? [] : [named], ...element === parts.implicit && named !== 'root' ? ['root'] : []]
+}
+
+function markRoot(parts: PartFacts, template: Node[]): void {
+  if (parts.names.has('root')) {
+    parts.root = 'marked'
+
+    return
+  }
+
+  const top = template.filter(node => !isHead(node) && node.kind !== 'const' && node.kind !== 'snippet')
+  const only = top.length === 1 ? top[0] : undefined
+
+  if (only?.kind === 'element' && !isSlot(only)) {
+    parts.root = 'implicit'
+    parts.implicit = only
+    parts.names.set('root', only.component ? only.name : undefined)
+  }
+}
+
 // What every output and check of a file reads off its template, found once and kept on the file.
 export function templateFacts(file: KayFile): TemplateFacts {
   if (file.facts)
     return file.facts
 
-  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], forms: formTargets(file.template, file.source), functions: new Map() }
+  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {
@@ -591,6 +642,17 @@ export function templateFacts(file: KayFile): TemplateFacts {
 
       if (mergesComponentClass(node, file.source))
         facts.helpers.add('componentClass')
+
+      const part = partName(node, file.source)
+
+      if (part !== undefined) {
+        facts.parts ??= { names: new Map(), root: 'none', merges: true }
+        facts.parts.names.set(part, node.component ? node.name : undefined)
+        facts.helpers.add('partClass')
+
+        if (node.component)
+          facts.helpers.add('componentClass')
+      }
     }
     else if (node.kind === 'snippet') {
       facts.snippet = true
@@ -613,6 +675,13 @@ export function templateFacts(file: KayFile): TemplateFacts {
       facts.classes.push(...node.classes.map(text))
     }
   })
+
+  if (facts.parts) {
+    markRoot(facts.parts, file.template)
+
+    if (facts.parts.implicit?.component)
+      facts.helpers.add('componentClass')
+  }
 
   return file.facts = facts
 }

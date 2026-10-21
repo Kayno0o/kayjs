@@ -1,7 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
-import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
+import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
@@ -620,8 +620,14 @@ export class JsxTemplate {
     if (element.classes.length > 0 && !spreads)
       this.emitShorthandClass(element, classAttributes[0])
 
+    const part = partAttribute(element, this.src)
+
     for (const attribute of element.attributes) {
       if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
+        continue
+
+      // Not a prop of the element or the component: it names a part, whose class the component's own `class` type takes.
+      if (attribute === part)
         continue
 
       if (attribute === serverIsland?.attribute)

@@ -8,13 +8,15 @@ import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
-type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
+type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer' | 'pageFile'>
 
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
+// A part's name, which becomes a key of the component's `class` type.
+const PART_NAME = /^[A-Z][\w-]*$/i
 // `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
@@ -123,6 +125,13 @@ class Validator {
 
     if (this.file.typeParameters && server)
       this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
+
+    if (this.options.pageFile !== true && templateFacts(this.file).parts) {
+      const taken = script.props?.bindings.find(binding => binding.key === 'class')
+
+      if (taken)
+        this.error(taken.local, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+    }
 
     if (server && script.props)
       this.error(script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
@@ -384,6 +393,9 @@ class Validator {
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
+    if (name === 'part' && (attribute.kind !== 'static' || !PART_NAME.test(attribute.text)))
+      this.error(attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes' })
+
     if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
       if (element.component)
         this.error(attribute.name, `\`${name}\` animates an element, not a component`, { help: 'set it on the element the component renders, which a prop can carry' })

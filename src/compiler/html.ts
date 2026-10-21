@@ -13,7 +13,7 @@ const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
 export function htmlHelperImport(): string {
   return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
@@ -427,7 +427,16 @@ export class HtmlTemplate extends TemplateWriter {
     if (plan.id !== undefined)
       markup.text(` id="${escapeStaticAttribute(plan.id)}"`)
 
-    if (plan.classes?.expression) {
+    if (plan.classes?.parts) {
+      const classes = plan.classes
+
+      markup.dynamic(() => {
+        b.add(`${helperName('nonEmptyAttribute')}("class", ${helperName('className')}(`)
+        this.classList(classes)
+        b.add('))')
+      })
+    }
+    else if (plan.classes?.expression) {
       const { text, expression } = plan.classes
 
       markup.text(' class="')

@@ -11,7 +11,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -397,10 +397,14 @@ export class DomTemplate extends TemplateWriter {
       if (plan.id !== undefined)
         html += ` id="${escapeStaticAttribute(plan.id)}"`
 
-      if (plan.classes?.expression) {
-        const { text, expression } = plan.classes
+      if (plan.classes?.expression || plan.classes?.parts) {
+        const classes = plan.classes
 
-        own.push(variable => b.add(`KayEffect(() => KaySetClass(${variable(node)}, [${JSON.stringify(text)}, (`).addSource(expression).add(')]));'))
+        own.push((variable) => {
+          b.add(`KayEffect(() => KaySetClass(${variable(node)}, `)
+          this.classList(classes)
+          b.add('));')
+        })
       }
       else if (plan.classes) {
         html += ` class="${escapeStaticAttribute(plan.classes.text)}"`

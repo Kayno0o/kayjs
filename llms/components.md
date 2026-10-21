@@ -25,6 +25,10 @@ li(class={size})
   span {todo.title}
 ```
 
+### Let a caller style the parts of a component
+
+`part="head"` on an element, or a component call, lets the caller style it by name: `Card(class={{ root: 'mt-4', head: 'p-6' }})`, or a string for the root. The component declares nothing, see [Style a part of a component](styles-and-assets.md#style-a-part-of-a-component).
+
 ### Keep state that changes
 
 A signal holds it, read by calling it and written by assigning it, in the template as in the script; a memo derives a value from it:
