@@ -93,7 +93,7 @@ function configEntries(source: string, name: string): { start: number, end: numb
       const next = properties[index + 1]
       const previous = properties[index - 1]
       // The only entry goes with its trailing comma, if any.
-      const lone = (/^\s*,/).exec(source.slice(property.end!))?.[0].length ?? 0
+      const lone = LEADING_COMMA.exec(source.slice(property.end!))?.[0].length ?? 0
       const edit = next === undefined && previous !== undefined ? { start: previous.end!, end: property.end!, text: '' } : { start: property.start!, end: next?.start ?? property.end! + lone, text: '' }
 
       found.push({ start: property.key.start!, end: property.end!, edit })
