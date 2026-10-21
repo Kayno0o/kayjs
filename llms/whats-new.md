@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `a(href="/docs" section)` is marked `aria-current="true"` on the pages below `/docs`, and `page` on it, so a header lights a section with no path passed down; the attribute is never written out and `section-not-a-link` flags it on anything but a link ([Navigation](navigation.md)).
 - kayjs-mail's `contactForm` takes `honeypot: 'nectar'` to rename its honeypot field, which frees `website` as a field of yours, and `consent: true` for a required consent checkbox, refused when unticked in the page's language and left out of the mail; kayjs-ui's `ContactForm` draws it from the action and links `privacy="/privacy"` ([A contact form](../packages/mail/llms/contact-form-and-testing.md)).
 - A post in place keeps the focus inside a held deferred server island, which goes to the same field (by `id`, else `name`) once the island's fetch lands, and an island of its own still waiting to hydrate no longer logs a missing client chunk ([Prerendering](prerendering.md#prerendering)).
 - `page.click` in kay/test reaches an element covered at the middle of the view, such as one under a fixed bar or the dev tool's open panel: it scrolls it to the other alignments and aims at a point of its box nothing covers, and one covered everywhere fails naming what covers it ([Testing in a browser](testing-browser.md)).

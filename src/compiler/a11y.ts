@@ -451,6 +451,11 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     if (alt !== undefined && alt !== '' && (REDUNDANT_ALT.test(alt) || FILENAME_ALT.test(alt)))
       lint(attribute(element, 'alt')!.name, 'redundant-alt', FILENAME_ALT.test(alt) ? 'This alt text is a filename' : 'This alt text says it is an image', { note: 'a screen reader already announces an image as one, and a filename says nothing of what it shows', help: 'say what the image shows, as you would to someone who cannot see it' })
 
+    const section = attribute(element, 'section')
+
+    if (section?.kind === 'boolean' && (element.name !== 'a' || !has(element, 'href')))
+      lint(section.name, 'section-not-a-link', 'A `section` only marks a link', { note: 'kay marks a link carrying it as current on the pages below it, and writes the attribute out of the page', help: 'put it on an `a` with an `href`, or remove it' })
+
     const autocomplete = staticValue(element, 'autocomplete')
 
     if (autocomplete !== undefined && (element.name === 'form' ? !['on', 'off'].includes(autocomplete.trim().toLowerCase()) : LABELLED.has(element.name) && !validAutocomplete(autocomplete)))

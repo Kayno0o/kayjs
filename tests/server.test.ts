@@ -1306,6 +1306,11 @@ describe('prerendering', () => {
     const current = (href: string) => inServerScope(request, () => undefined, () => currentPage(href))
 
     expect(['/docs/guide', '/docs/guide/', '/docs/./guide', '/blog/../docs/guide', '/blog/./../docs/guide/'].map(current)).toEqual(new Array(5).fill(' aria-current="page"'))
+    const section = (href: string) => inServerScope(request, () => undefined, () => currentPage(href, true))
+
+    expect(['/docs', '/docs/', '/blog/../docs'].map(section)).toEqual(new Array(3).fill(' aria-current="true"'))
+    expect(['/docs/guide', '/docs/guide/'].map(section)).toEqual(new Array(2).fill(' aria-current="page"'))
+    expect(['/', '/docs/gui', '/docs/guide?x=1', '//docs'].map(section)).toEqual(new Array(4).fill(''))
     expect(['/docs', '/docs/guide.html', '/docs/guide?x=1', '//docs/guide'].map(current)).toEqual(new Array(4).fill(''))
   })
 

@@ -161,17 +161,10 @@ export default defineConfig({
 - `src/routes/_layout.kay` wraps every page of its directory and below, the 404 page included, rendering the page at its `slot`:
 
 ```kay
---- server
-const section = ctx.url.pathname.split('/')[1]
----
 header
   a(href="/") Journal
   nav(aria-label="Main")
-    a(
-      href="/posts"
-      aria-current={section === 'posts' ? 'page' : undefined}
-    )
-      | Posts
+    a(href="/posts" section) Posts
     a(href="/about") About
 main
   slot
@@ -179,7 +172,7 @@ footer © Journal
 ```
 
 - A link to the page being rendered gets `aria-current="page"` by itself, as the About link does on `/about`.
-- A section's link lit on the pages below it, `/posts/first` here, is the template's to write.
+- A section's link, `a(href="/posts" section)`, also gets `aria-current="true"` on the pages below it, `/posts/first` here; a link without `section` that merely points up is not marked.
 - A link writing `aria-current={undefined}` is never marked, such as a logo linking to `/`.
 - See [Pages and routing](routing.md).
 

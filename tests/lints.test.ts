@@ -401,7 +401,7 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios'])
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
   // One lint alone, for those the other examples here would trip.
   const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
@@ -530,6 +530,10 @@ describe('a11y lints', () => {
 
   it('reports radios sharing a name outside a fieldset or a radiogroup, once per name', () => {
     expect(a11y('input(type="radio" name="plan" value="a" aria-label="A")\ninput(type="radio" name="plan" value="b" aria-label="B")\ninput(type="radio" name="solo" aria-label="Solo")\nfieldset\n  legend Size\n  input(type="radio" name="size" value="s" aria-label="S")\n  input(type="radio" name="size" value="m" aria-label="M")\ndiv(role="radiogroup" aria-label="Tone")\n  input(type="radio" name="tone" value="a" aria-label="A")\n  input(type="radio" name="tone" value="b" aria-label="B")\n')).toEqual(['ungrouped-radios input'])
+  })
+
+  it('reports a bare section on anything but a link with an href', () => {
+    expect(a11y('a(href="/docs" section) Docs\na(section) Docs\nspan(section) Docs\na(href="/docs" section="x") Docs\n')).toEqual(['section-not-a-link section', 'section-not-a-link section'])
   })
 
   it('reports alt text naming the image as one, or a filename, as whole words only', () => {

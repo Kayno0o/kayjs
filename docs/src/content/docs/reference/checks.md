@@ -69,6 +69,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `uncontrolled-autoplay` | warn | a11y | Media playing by itself with no `controls` |
 | `meta-refresh` | warn | a11y | A `meta` refresh with a delay |
 | `ungrouped-radios` | warn | a11y | Radios sharing a name outside a `fieldset` |
+| `section-not-a-link` | warn | a11y | A `section` mark on something that is not a link |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |

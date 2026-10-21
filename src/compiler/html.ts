@@ -695,11 +695,13 @@ export class HtmlTemplate extends TemplateWriter {
     const href = element.attributes.find(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'href')
 
     const local = this.localLink(element)
+    // A bare `section` also marks the link on the pages below it.
+    const below = element.attributes.some(attribute => attribute.kind === 'boolean' && this.source(attribute.name) === 'section') ? ', true' : ''
 
     if (href?.kind === 'static' && fromRoot(decodeEntities(href.text)))
-      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''})`))
+      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''}${below})`))
     else if (href?.kind === 'expression')
-      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}(`).addSource(href.expression).add(local ? ')))' : '))'))
+      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}(`).addSource(href.expression).add(local ? `))${below})` : `)${below})`))
   }
 
   // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.

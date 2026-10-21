@@ -18,6 +18,7 @@ const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
 // The attribute of an `img` that leaves out the color it shows until it loads.
 const NO_PLACEHOLDER = 'no-placeholder'
+const SECTION = 'section'
 // A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
 const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
@@ -155,6 +156,10 @@ export abstract class TemplateWriter {
 
       // Read below with the image's source, and never written.
       if (name === 'img' && attributeName === NO_PLACEHOLDER)
+        continue
+
+      // Read by `currentLink` on the server, and never written.
+      if (name === 'a' && attribute.kind === 'boolean' && attributeName === SECTION)
         continue
 
       if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {

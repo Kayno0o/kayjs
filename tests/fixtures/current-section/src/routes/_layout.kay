@@ -1,0 +1,11 @@
+nav
+  a.home(href="/" section) Home
+  a.docs(href="/docs" section) Docs
+  a.guide(href="/docs/guide" section) Guide
+  a.other(href="/docs/guide?x=1" section) Query
+  a.old(href="/docs-old" section) Old
+  a.self(href="/docs" section aria-current={undefined}) Own
+  a.up(href="/docs") Up
+  a.ext(href="https://example.com/docs" section) Away
+main
+  slot

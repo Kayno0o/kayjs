@@ -112,6 +112,7 @@ kay check --only seo
 | `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |
 | `meta-refresh` | warn | a11y | A `meta(http-equiv="refresh")` reloading or leaving the page after a delay. |
 | `ungrouped-radios` | warn | a11y | Radios sharing a `name` outside a `fieldset` or a `role="radiogroup"`. |
+| `section-not-a-link` | warn | a11y | A bare `section` on anything but an `a` with an `href`. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `uncalled-signal` | deny | islands | A signal or memo the template names without calling it where its value goes, `{count}` or `if count > 1`: a signal is read by calling it, in the template as in the script, `{count()}`. Handed on whole, as a component prop or a function argument, it passes the signal itself, which a parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes; one typed `unknown` or `any` is reported too, `String(count)`. `--fix` calls the signal named where its value goes. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |

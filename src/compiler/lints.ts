@@ -215,6 +215,13 @@ export const LINTS = {
     wrong: 'img(src="/team.jpg" alt="Photo of the team")',
     right: 'img(src="/team.jpg" alt="The team at the 2025 offsite")',
   },
+  'section-not-a-link': {
+    level: 'warn',
+    group: 'a11y',
+    summary: 'A bare `section` on an element that is not an `a` with an `href`: it marks a link as current on the pages below it, and does nothing anywhere else.',
+    wrong: 'span(section) Docs',
+    right: 'a(href="/docs" section) Docs',
+  },
   'invalid-autocomplete': {
     level: 'deny',
     group: 'forms',
