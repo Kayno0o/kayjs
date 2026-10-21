@@ -37,7 +37,7 @@ In production the mailer reads, as the server boots, through kay's `defineEnv`; 
 | `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS, and a server not offering it is refused, at the first send and in a boot warning naming `SMTP_INSECURE`, so a stripped STARTTLS never sends a reset link in clear |
 | `SMTP_INSECURE` | `true` sends in clear to a server not offering STARTTLS, such as a local Mailpit; a password still never goes in clear |
 | `SMTP_USER`, `SMTP_PASS` | both or neither, for a server needing no login |
-| `SMTP_RATE_LIMIT` | optional: the most mails a second, for a provider capping the rate |
+| `SMTP_RATE_LIMIT` | optional: the most mails in a window, `5/1s`, for a provider capping the rate; a bare `5` is 5 a second |
 | `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | both or neither: signs each mail with DKIM, for a relay that does not, the public key published at `<selector>._domainkey.<domain>`; the PEM key's line breaks may be written `\n` to hold it on one line |
 | `SMTP_DKIM_DOMAIN` | the domain the signature vouches for, the sender's by default |
 | `SMTP_FROM` | required unless `mailer({ from })` gives the sender: `Name <address>` or a bare address |

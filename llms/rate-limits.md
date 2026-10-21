@@ -86,5 +86,5 @@ An API route or module sets its own with `api({ rateLimit })` or the route's `de
 - Every library names its limits as an action does: `rateLimit`, with `max`, `window`, `store?` and `key?`, and `false` lifts a default one.
 - kayjs-ai takes `ai({ rateLimit, budget, key })` and `ask(messages, { key })`, see [Limits and the token budget](../packages/ai/llms/limits.md).
 - kayjs-auth takes `createAuth({ rateLimit: { signIn: { max, window } } })`, one entry per kind of attempt, see [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
-- kayjs-mail's contact form takes the action's `protection: { rateLimit }` ([Contact form](../packages/mail/llms/contact-form-and-testing.md)); `smtp({ rateLimit })` is a different cap, the mails sent per second.
+- kayjs-mail's contact form takes the action's `protection: { rateLimit }` ([Contact form](../packages/mail/llms/contact-form-and-testing.md)); `smtp({ rateLimit: { max: 5, window: '1s' } })` caps the mails sent, and `SMTP_RATE_LIMIT=5/1s` sets it from the environment.
 - The old names `limit`, `visitor` and `limits` still work and `kay check` finds them (`deprecated-rate-limit`).

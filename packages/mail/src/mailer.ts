@@ -12,7 +12,7 @@ import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
-import { checkKey, checkOptions, greetingOf, smtp } from './smtp'
+import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
 
 // The development pages' routes, which read `./preview` on the first request to one: a plugin that registers its routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded. Each is registered by its method and path, as the pages do, since a catch-all would lose to the page fallback's `GET /*`.
@@ -216,7 +216,7 @@ function smtpEnv({ optional = false, hasFrom = false, listed = false }: { option
     SMTP_INSECURE: s.Optional(s.Boolean()),
     SMTP_USER: s.Optional(s.String()),
     SMTP_PASS: s.Optional(s.String()),
-    SMTP_RATE_LIMIT: s.Optional(s.Integer({ minimum: 1 })),
+    SMTP_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
     SMTP_DKIM_SELECTOR: s.Optional(s.String()),
     SMTP_DKIM_PRIVATE_KEY: s.Optional(s.String()),
     SMTP_DKIM_DOMAIN: s.Optional(s.String()),
@@ -252,7 +252,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: rateFromText(env.SMTP_RATE_LIMIT), name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {

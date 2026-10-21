@@ -117,8 +117,8 @@ describe('smtp', () => {
     }
   })
 
-  it('holds sends to the rate limit', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, maxConnections: 1, rateLimit: 1 }) })
+  it.each([[{ max: 1, window: '1s' }], [1]] as const)('holds sends to the rate limit, as %j', async (rateLimit) => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, maxConnections: 1, rateLimit }) })
     const started = performance.now()
 
     await Promise.all([1, 2].map(async n => mail.send({ to: 'ada@example.com', subject: `Limited ${n}`, text: 'Hi' })))
@@ -129,6 +129,8 @@ describe('smtp', () => {
   it('refuses a connection count or a rate limit that is no whole number of at least 1', () => {
     expect(() => smtp({ host: '127.0.0.1', maxConnections: 0 })).toThrow('maxConnections is 0')
     expect(() => smtp({ host: '127.0.0.1', rateLimit: 0.5 })).toThrow('rateLimit is 0.5')
+    expect(() => smtp({ host: '127.0.0.1', rateLimit: { max: 0, window: '1s' } })).toThrow('rateLimit.max is 0')
+    expect(() => smtp({ host: '127.0.0.1', rateLimit: { max: 1, window: 'soon' as '1s' } })).toThrow('rateLimit.window')
   })
 
   it('signs each mail with DKIM when given a key, and refuses a key that is none where the transport is made', async () => {
@@ -246,10 +248,10 @@ describe('mailer({ smtp })', () => {
     const started = performance.now()
 
     await inProduction(server.port, async () => {
-      const mail = mailer({ queue: { name: 'smtp-rate' }, smtp: { rateLimit: 1000, maxConnections: 1 } })
+      const mail = mailer({ queue: { name: 'smtp-rate' }, smtp: { rateLimit: { max: 1000, window: '1s' }, maxConnections: 1 } })
 
       await Promise.all([1, 2].map(async n => mail.send({ to: 'bob@example.com', subject: `Rate ${n}`, text: 'Hi' })))
-    }, { SMTP_RATE_LIMIT: '1' })
+    }, { SMTP_RATE_LIMIT: '1/1s' })
 
     expect(performance.now() - started).toBeLessThan(900)
   })

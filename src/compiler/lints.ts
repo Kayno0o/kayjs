@@ -548,7 +548,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.70',
     site: true,
-    summary: 'A rate limit option under its old name: kayjs-ai\'s `limit` and `visitor` in `ai({ ... })` (and `visitor` in `ask(messages, { ... })`), which are `rateLimit` and `key` since 1.70, and kayjs-auth\'s `limits` in `createAuth({ ... })`, which is `rateLimit`. The old names still work for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
+    summary: 'A rate limit option under its old name: kayjs-ai\'s `limit` and `visitor` in `ai({ ... })` (and `visitor` in `ask(messages, { ... })`), which are `rateLimit` and `key` since 1.70, kayjs-auth\'s `limits` in `createAuth({ ... })`, which is `rateLimit`, and a bare number in kayjs-mail\'s `smtp({ rateLimit })` or `mailer({ smtp: { rateLimit } })`, mails a second, which is `{ max, window: \'1s\' }`. The old forms still work for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it, and writes the number as `{ max, window: \'1s\' }`.',
     wrong: 'ai({ limit: { max: 10, window: \'1m\' }, visitor: request => request.headers.get(\'x-user\') ?? undefined })',
     right: 'ai({ rateLimit: { max: 10, window: \'1m\' }, key: request => request.headers.get(\'x-user\') ?? undefined })',
   },

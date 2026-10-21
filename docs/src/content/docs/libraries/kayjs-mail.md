@@ -52,7 +52,7 @@ In production the mailer reads its settings from the environment. `SMTP_HOST` is
 | `SMTP_HOST` | The server to send through. Required. |
 | `SMTP_PORT` | Optional, 465 by default. |
 | `SMTP_USER`, `SMTP_PASS` | Optional, both or neither, for a server needing no login. |
-| `SMTP_RATE_LIMIT` | Optional. The most mails sent a second, for a provider capping the rate. |
+| `SMTP_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
 | `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
 | `SMTP_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
 | `SMTP_FROM` | The sender, unless `from` is set. |
@@ -63,7 +63,7 @@ On a port other than 465 a server not offering STARTTLS is refused, at the first
 
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
-What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails a second, unlimited by default). An option left out keeps the default.
+What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails in a window, `{ max: 5, window: '1s' }`, unlimited by default). An option left out keeps the default.
 
 A name, a timeout or a count that cannot be used stops the boot. `smtp` cannot go with a `transport`, which replaces the SMTP: give them to `smtp()` instead.
 

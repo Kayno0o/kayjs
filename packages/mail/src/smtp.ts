@@ -26,8 +26,8 @@ export interface SmtpSettings {
   timeout?: Duration | undefined
   // How many connections send at once. 5 by default.
   maxConnections?: number | undefined
-  // The most mails sent in a second, for a provider capping the rate. Unlimited by default.
-  rateLimit?: number | undefined
+  // The most mails sent in a window, for a provider capping the rate: `{ max: 5, window: '1s' }`. Unlimited by default. A bare number of mails a second is the old form, taken until 1.73.
+  rateLimit?: { max: number, window: Duration } | number | undefined
   dkim?: DkimSettings | undefined
 }
 
@@ -77,13 +77,44 @@ function positiveInteger(what: string, name: string, value: number | undefined):
     throw new Error(`kayjs-mail: ${what}'s ${name} is ${value}; it takes a whole number of at least 1`)
 }
 
+const WHOLE_NUMBER = /^\d+$/
+
+// The `rateLimit` and `rateDelta` nodemailer takes for a cap, a bare number being mails a second; throws naming `what` for one that cannot be used.
+function rateOf(limit: SmtpSettings['rateLimit'], what: string): { rateLimit: number, rateDelta: number } | undefined {
+  if (limit === undefined)
+    return undefined
+
+  if (typeof limit === 'number') {
+    positiveInteger(what, 'rateLimit', limit)
+
+    return { rateLimit: limit, rateDelta: 1000 }
+  }
+
+  positiveInteger(what, 'rateLimit.max', limit.max)
+
+  return { rateLimit: limit.max, rateDelta: durationSeconds(limit.window, `${what}'s rateLimit.window`, 'kayjs-mail') * 1000 }
+}
+
+// `SMTP_RATE_LIMIT` as text: `5/1s` is 5 mails a second, a bare `5` the old form of the same.
+export function rateFromText(text: string | undefined): { max: number, window: Duration } | undefined {
+  if (text === undefined || text === '')
+    return undefined
+
+  const [max, window = '1s'] = text.split('/')
+
+  if (!WHOLE_NUMBER.test(max!))
+    throw new Error(`kayjs-mail: SMTP_RATE_LIMIT is ${JSON.stringify(text)}; it takes a count and a window, such as 5/1s`)
+
+  return { max: Number(max), window: window as Duration }
+}
+
 // Throws naming `what` for a name, a timeout or a count that cannot be used, so one fails where it is given rather than at the first mail.
 export function checkOptions(settings: SmtpOverrides, what: string): number | undefined {
   if (settings.name !== undefined && !GREETING.test(settings.name))
     throw new Error(`kayjs-mail: ${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
 
   positiveInteger(what, 'maxConnections', settings.maxConnections)
-  positiveInteger(what, 'rateLimit', settings.rateLimit)
+  rateOf(settings.rateLimit, what)
 
   return settings.timeout === undefined ? undefined : durationSeconds(settings.timeout, `${what}'s timeout`, 'kayjs-mail') * 1000
 }
@@ -176,7 +207,7 @@ async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): 
   }
 }
 
-async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
+async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit: cap, dkim }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
 
   // nodemailer is read with the first mail, so an app that never sends over SMTP never loads it.
@@ -185,7 +216,7 @@ async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, n
   return createTransport({
     pool: true,
     maxConnections,
-    rateLimit,
+    ...rateOf(cap, 'smtp()'),
     host,
     port,
     name,
