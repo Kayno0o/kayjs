@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
-import { collection } from 'kay/content'
+import { collection, reference } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
 import { hiddenOf } from '../src/hidden'
@@ -87,7 +87,36 @@ describe('activity', () => {
     sites()
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await deleteEntry(ref)
-    expect((await activityScreen(1))?.rows.map(row => [row.verb, row.href])).toEqual([['delete', undefined], ['add', '/admin/collections/notes/first']])
+    expect((await activityScreen(1))?.rows.map(row => [row.verb, row.href])).toEqual([['delete', undefined], ['add', undefined]])
+  })
+
+  test('links a row only while its entry holds that slug', async () => {
+    sites()
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await renameEntry(ref, 'second')
+
+    const hrefs = async () => (await activityScreen(1))?.rows.map(row => [row.verb, row.slug, row.href])
+
+    // The add row names a slug the entry no longer holds.
+    expect(await hrefs()).toEqual([['rename', 'second', '/admin/collections/notes/second'], ['add', 'first', undefined]])
+
+    await deleteEntry({ ...ref, slug: 'second' })
+    // In the trash, nothing is at either slug.
+    expect(await hrefs()).toEqual([['delete', 'second', undefined], ['rename', 'second', undefined], ['add', 'first', undefined]])
+
+    await restoreTrashed('notes', (await trashOf('notes'))[0]!.id)
+    expect(await hrefs()).toEqual([['restore', 'second', '/admin/collections/notes/second'], ['delete', 'second', '/admin/collections/notes/second'], ['rename', 'second', '/admin/collections/notes/second'], ['add', 'first', undefined]])
+  })
+
+  test('records the rename above the updates it caused to the entries naming it', async () => {
+    restore = registerCollections([
+      ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_n` }), { schema, draft: 'draft' })],
+      ['posts', collection(sqliteLoader({ name: 'posts', database: ':memory:', table: `activity_${count}_p` }), { schema: s.Object({ title: s.String(), note: reference('notes') }) })],
+    ])
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ collection: 'posts', slug: 'p', data: { title: 'P', note: 'first' } }, { create: true })
+    await renameEntry(ref, 'second')
+    expect((await activityScreen(1))?.rows.slice(0, 2).map(row => [row.collection, row.verb])).toEqual([['posts', 'update'], ['notes', 'rename']])
   })
 
   test('keeps the last 500 events of a collection, trimming once read', async () => {
@@ -100,8 +129,19 @@ describe('activity', () => {
     const stored = async () => (await hiddenOf('notes', 'activity')!.load({ preview: true })).length
 
     expect(await stored()).toBe(505)
-    expect((await activityOf('notes')).length).toBe(500)
+
+    const hidden = hiddenOf('notes', 'activity')!
+    const remove = hidden.remove!
+    let removals = 0
+
+    hidden.remove = async (...args) => {
+      removals++
+      await remove.apply(hidden, args)
+    }
+    // Two reads over the cap trim the same rows once.
+    expect((await Promise.all([activityOf('notes'), activityOf('notes')])).map(events => events.length)).toEqual([500, 500])
     await Bun.sleep(100)
+    expect(removals).toBe(5)
     expect(await stored()).toBe(500)
   })
 

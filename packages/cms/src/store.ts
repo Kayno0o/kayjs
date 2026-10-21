@@ -642,12 +642,7 @@ export async function renameEntry(ref: EntryRef, slug: string, options: { author
     forgetCounts()
   }
 
-  if (!('saved' in outcome))
-    return outcome
-
-  await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
-
-  return { ...outcome, slug }
+  return !('saved' in outcome) ? outcome : { ...outcome, slug }
 }
 
 async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome & { unpointed?: string[] }> {
@@ -697,6 +692,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   if (!('saved' in moved))
     return moved
 
+  await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...author !== undefined && { author }, ...moved.commit !== undefined && { commit: moved.commit } })
   await pointRedirect(existing, target, data)
 
   const apart = plan.filter(each => !joined.some(done => done.pointing === each))

@@ -325,7 +325,7 @@ describe('renaming an entry other entries refer to', () => {
     await make('books', 'engine', { title: 'Engine', author: 'ada' })
     events.length = 0
     await renameEntry(ADA, 'lovelace')
-    expect(events.map(event => [event.collection, event.slug, event.verb])).toEqual([['books', 'engine', 'update'], ['authors', 'lovelace', 'rename']])
+    expect(events.map(event => [event.collection, event.slug, event.verb])).toEqual([['authors', 'lovelace', 'rename'], ['books', 'engine', 'update']])
   })
 
   test('refuses the rename, writing nothing, when an entry naming this one was saved meanwhile', async () => {

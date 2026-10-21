@@ -288,5 +288,8 @@ export async function activityScreen(page: number | undefined): Promise<Activity
   const events = (await Promise.all(keeping.map(async collection => (await activityOf(collection.name)).map(event => ({ event, title: collectionTitle(collection) }))))).flat().sort((a, b) => b.event.at - a.event.at)
   const shown = pageOf(events, page ?? 1, pageSize)
 
-  return { prefix, page: shown.page, pages: shown.pages, rows: shown.rows.map(({ event, title }) => ({ ...event, title, href: event.verb === 'delete' ? undefined : entryPath(prefix, event) })) }
+  // An entry renamed, deleted or in the trash since holds no such slug: its earlier rows link nowhere.
+  const rows = await Promise.all(shown.rows.map(async ({ event, title }) => ({ ...event, title, href: (await entries(event.collection, { slug: event.slug, locale: event.locale }))[0] ? entryPath(prefix, event) : undefined })))
+
+  return { prefix, page: shown.page, pages: shown.pages, rows }
 }

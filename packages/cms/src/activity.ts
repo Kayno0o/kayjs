@@ -23,6 +23,8 @@ const KEPT = 500
 const TRIM_EVERY = 100
 
 const written = new Map<string, number>()
+// The collections being trimmed, so two reads over the cap do not trim the same rows twice.
+const trimming = new Set<string>()
 // Two events of a process never share a millisecond, so they keep the order they happened in.
 let latest = 0
 
@@ -34,12 +36,19 @@ async function trim(hidden: ContentLoader, rows: Awaited<ReturnType<ContentLoade
 
 // Trims without making a save or a read wait for it; a failure is logged.
 function trimLater(collection: string, hidden: ContentLoader, rows: () => ReturnType<ContentLoader['load']>): void {
+  if (trimming.has(collection))
+    return
+
+  trimming.add(collection)
   void (async () => {
     try {
       await trim(hidden, await rows())
     }
     catch (error) {
       log.error(`${collection}'s activity could not be trimmed`, error)
+    }
+    finally {
+      trimming.delete(collection)
     }
   })()
 }

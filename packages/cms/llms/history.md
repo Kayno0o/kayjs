@@ -20,7 +20,7 @@ A collection read through a SQLite or Postgres loader keeps what an editor saved
 
 ## The activity log
 
-- `<prefix>/activity`, an Activity button on the content list, lists what editors did across the collections, newest first and paged by `pageSize`: who, when, and created, saved, published, unpublished, duplicated, deleted, restored or renamed (with the old slug) which entry, linked to its screen unless it was deleted. It shows once a collection keeps a history, and a folder collection, one with `history: false` or `cms({ history: false })` adds nothing to it.
+- `<prefix>/activity`, an Activity button on the content list, lists what editors did across the collections, newest first and paged by `pageSize`: who, when, and created, saved, published, unpublished, duplicated, deleted, restored or renamed (with the old slug) which entry, linked to its screen only while the entry holds that slug (not after a delete or a rename). It shows once a collection keeps a history, and a folder collection, one with `history: false` or `cms({ history: false })` adds nothing to it.
 - Each event is a small row of a third hidden collection, `activity`, written when the change is, so two saves at once never write over each other and a delete or rename is in it whether or not the trash is on. A reorder is not logged, and a save that changes nothing is, as the editor did save.
 - The last 500 events of each collection are kept: what is past them is dropped when the log is read, and by a process once in 100 events it writes.
 

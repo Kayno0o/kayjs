@@ -5,6 +5,7 @@ export default defineMessages({
   cms: {
     activity: {
       add: 'Créée',
+      back: 'Retour au contenu',
       delete: 'Supprimée',
       duplicate: 'Dupliquée',
       empty: 'Rien pour le moment',
