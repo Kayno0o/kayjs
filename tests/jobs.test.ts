@@ -193,8 +193,8 @@ describe('schedule', () => {
     const app = new Elysia().use(schedule('@daily', async () => {
       await Bun.sleep(20)
       runs.push('cron')
-    }, { boot: true, shareBoot: true, lock: 'boot', store: sqliteJobs(path) }))
-    const other = new Elysia().use(schedule('@hourly', () => runs.push('other'), { boot: true, shareBoot: true, lock: 'boot', store: sqliteJobs(path) }))
+    }, { boot: true, lock: 'boot', store: sqliteJobs(path) }))
+    const other = new Elysia().use(schedule('@hourly', () => runs.push('other'), { boot: true, lock: 'boot', store: sqliteJobs(path) }))
 
     try {
       app.listen(0)
@@ -239,7 +239,7 @@ describe('schedule', () => {
 
     setSystemTime(new Date('2026-01-01T11:59:40Z'))
 
-    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { boot: true, shareBoot: true, lock: 'report', store: sqliteJobs(path) })).listen(0)
+    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { boot: true, lock: 'report', store: sqliteJobs(path) })).listen(0)
 
     try {
       await shutdown(app)
@@ -281,8 +281,8 @@ describe('schedule', () => {
     const apps = [
       new Elysia().use(schedule('@hourly', [job, job], { lock: 'list', store })),
       new Elysia().use(schedule({ '@hourly': job, '@daily': [job, job] }, { lock: 'table', store })),
-      new Elysia().use(schedule('@hourly', [job, job], { lock: 'boots', boot: true, shareBoot: true, store })),
-      new Elysia().use(schedule('@hourly', job, { lock: 'single', boot: true, shareBoot: true, store })),
+      new Elysia().use(schedule('@hourly', [job, job], { lock: 'boots', boot: true, store })),
+      new Elysia().use(schedule('@hourly', job, { lock: 'single', boot: true, store })),
     ]
 
     try {
@@ -431,7 +431,7 @@ describe('schedule', () => {
 
     it('locks an every-so-long schedule and its boot run by default too', async () => {
       const runs: string[] = []
-      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, shareBoot: true, store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
 
       try {
         await Bun.sleep(20)
@@ -442,45 +442,36 @@ describe('schedule', () => {
       }
     })
 
-    it('runs a boot run in every process starting together unless shareBoot asks for one', async () => {
+    it('runs a boot run once across the processes starting together', async () => {
       const runs: string[] = []
-      const own = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(`own-${name}`), { boot: true, store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
 
       try {
         await Bun.sleep(20)
+        expect(runs).toEqual(['first'])
       }
       finally {
-        await own.done()
-      }
-
-      const shared = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(`shared-${name}`), { boot: true, shareBoot: true, store }))])
-
-      try {
-        await Bun.sleep(20)
-        expect(runs.toSorted()).toEqual(['own-first', 'own-second', 'shared-first'])
-      }
-      finally {
-        await shared.done()
+        await world.done()
       }
     })
 
-    // Each row restarts within one rounded slot of its schedule: a cron's is the minute, a length's the nearest multiple.
+    // Each row restarts within the rounded slot the boot run used to be locked under, minutes after the first start.
     it.each([
-      ['15m', '15m', '11:28:00', '11:34:00'],
-      ['1h', '1h', '11:10:00', '11:20:00'],
-      ['1d', '1d', '02:00:00', '10:00:00'],
-      ['a cron', '*/15 * * * *', '11:28:00', '11:28:20'],
-    ])('runs the boot run of a restart within the slot of the previous boot, and skips it under shareBoot, %s', async (_name, when, first, second) => {
+      ['15m', '15m', '11:28:00', '11:34:00', '11:34:20'],
+      ['1h', '1h', '11:10:00', '11:20:00', '11:20:20'],
+      ['1d', '1d', '02:00:00', '10:00:00', '10:00:20'],
+      ['a cron', '*/15 * * * *', '11:28:00', '11:29:30', '11:29:50'],
+    ])('runs the boot run of a restart minutes after the previous boot, and not one within a minute, %s', async (_name, when, first, second, together) => {
       const cron = fakeCron()
       const path = await jobsPath()
       const before = process.env.NODE_ENV ?? 'test'
       const runs: string[] = []
       const logged = spyOn(console, 'log').mockImplementation(() => undefined)
-      const restart = async (label: string, time: string, shareBoot?: boolean) => {
+      const restart = async (label: string, time: string) => {
         const copy = await import(`../src/server/jobs.ts?process=restart-${++copies}`) as { schedule: typeof scheduleOf }
 
         setSystemTime(new Date(`2026-01-01T${time}Z`))
-        await shutdown(new Elysia().use(copy.schedule(when as '15m', () => runs.push(label), { boot: true, shareBoot, store: sqliteJobs(path) })).listen(0))
+        await shutdown(new Elysia().use(copy.schedule(when as '15m', () => runs.push(label), { boot: true, store: sqliteJobs(path) })).listen(0))
       }
 
       process.env.NODE_ENV = 'production'
@@ -491,10 +482,9 @@ describe('schedule', () => {
         expect(runs).toEqual(['boot-1', 'boot-2'])
         expect(logged).not.toHaveBeenCalled()
 
-        runs.length = 0
-        await restart('shared-1', first, true)
-        await restart('shared-2', second, true)
-        expect(runs).toEqual(['shared-1'])
+        // Started 20 s after the second boot, as the processes of one deploy are.
+        await restart('boot-3', together)
+        expect(runs).toEqual(['boot-1', 'boot-2'])
         expect(logged.mock.calls.flat().join('\n')).toContain('boot run of auto:')
       }
       finally {

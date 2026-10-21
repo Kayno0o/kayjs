@@ -18,10 +18,8 @@ export interface ScheduleOptions {
   lock?: string | false | undefined
   // Where the lock is taken: the queues' default store unless given.
   store?: JobStore | undefined
-  // Runs each job once as the server starts too, in every process that starts, without waiting for the first time it comes.
+  // Runs each job once as the server starts too, without waiting for the first time it comes: processes starting within a minute of each other run it once, a restart later runs it again.
   boot?: boolean | undefined
-  // Makes the boot run take the lock `<lock>:boot` too, so processes starting together run it once; a restart within the same slot then skips its boot run, which is logged.
-  shareBoot?: boolean | undefined
   // How long a run may take: past it, the run is logged as failed, its signal aborts and the schedule goes on without it. 10 minutes by default, `false` for no limit.
   timeout?: Duration | false | undefined
 }
@@ -38,6 +36,8 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
 const DEFAULT_TIMEOUT = 600
+// How far apart processes may start and still share one boot run; a start further apart is a restart and runs its own.
+const BOOT_WINDOW_MS = 60_000
 // How long a stop waits for a run that ignores its signal before leaving it.
 const STOP_GRACE_MS = 5000
 let warnedAutoLock = false
@@ -190,18 +190,15 @@ async function after(previous: Promise<void> | undefined, run: () => Promise<voi
 }
 
 // One run of a schedule, taken by one process when it locks: `slotMs` is how far apart its runs fall due.
-// A boot run takes no lock unless `shareBoot` asks, and then under a name of its own, so its slot, rounded to the nearest, never takes the one of the run due next.
+// A boot run locks under a name of its own and a slot of at most a minute, so the processes of one deploy run it once while a restart a few minutes later finds the lock free; it never takes the lock of the run due next.
 // A run still going after `timeout` is reported as failed and left, its signal aborted, so one that never settles blocks the next run no longer; `abort()` aborts the runs in progress as a stop does, which then waits for them a few seconds at most.
 // Takes the lock of a run. A lock the app did not name that its store cannot give, a `data/` not writable say, is warned about once and the run goes on unlocked, as it did before schedules locked themselves; an app's own lock skips the run.
 async function taken(lock: string, boot: boolean, slotMs: number, options: ScheduleOptions, implicit: boolean): Promise<boolean> {
-  if (boot && options.shareBoot !== true)
-    return true
-
   try {
-    const won = await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, Math.round(Date.now() / slotMs))
+    const won = await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, boot ? Math.floor(Date.now() / Math.min(slotMs, BOOT_WINDOW_MS)) : Math.round(Date.now() / slotMs))
 
     if (!won && boot)
-      kayLog('info', `the boot run of ${lock} was skipped: another process holds its boot lock for this slot`)
+      kayLog('info', `the boot run of ${lock} was skipped: another process started within the last minute and ran it`)
 
     return won
   }

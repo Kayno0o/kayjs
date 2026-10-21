@@ -29,7 +29,7 @@ new Elysia()
   .listen(3000)
 ```
 
-Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts, in every process that starts. Add `shareBoot: true` so processes starting together run it once; a restart within the same slot then skips its boot run, and the log says so.
+Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts. Servers starting within a minute of each other run it once, and a restart later runs it again.
 
 ```ts
 app.use(schedule({
