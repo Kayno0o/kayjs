@@ -339,7 +339,7 @@ test('a field the layout hides still says why a save was refused', async () => {
   expect(page.errors).toEqual([])
 }, 60_000)
 
-test('the on-page editor shows each issue of a refused save once, the body\'s beside its field', async () => {
+test('the on-page editor shows each issue of a refused save beside its field and as one link of the summary, never as a notice of its own, the body\'s too', async () => {
   saved.length = 0
 
   const built = await browser()
@@ -354,9 +354,9 @@ test('the on-page editor shows each issue of a refused save once, the body\'s be
   await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)
   await Bun.sleep(200)
 
-  const shown = await page.evaluate(() => (document.querySelector('.kcms-editor')?.textContent?.match(/would run as the site/g) ?? []).length)
+  const count = async (selector: string) => page.evaluate((query: string) => [...document.querySelectorAll(`.kcms-editor ${query}`)].filter(node => node.textContent?.includes('would run as the site')).length, selector)
 
-  expect(shown).toBe(1)
+  expect([await count('.kui-form-field-issue'), await count('.kcms-summary a'), await count('p.kcms-entry-failure')]).toEqual([1, 1, 0])
   expect(saved).toEqual([])
   expect(page.errors).toEqual([])
 }, 60_000)

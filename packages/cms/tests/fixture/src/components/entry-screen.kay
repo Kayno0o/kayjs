@@ -1,0 +1,8 @@
+--- client
+import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
+import EntryEditor from '@kaynooo/kayjs-cms/entry-editor.kay'
+
+// A whole entry form, mounted with `mountComponent`: a new entry when `entry` is left out.
+const { collection, entry } = props<{ collection: ScreenCollection, entry?: StoredEntry | undefined }>()
+---
+EntryEditor(prefix="/admin" collection={collection} entry={entry})

@@ -4,13 +4,28 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
+import { fieldId } from '../paths'
 
 // A new entry's slug and, in a localized collection, its locale. Renders nothing for a saved entry.
 const { form } = props<{ form: EntryForm }>()
+
+// The slug and the locale of a new entry may be refused, as when the slug is taken: each shows its own issue, and an edit of one answers it alone.
+const issueOf = (key: 'slug' | 'locale') => form.drafts.issues(form.entry, '').find(issue => issue.key === key)?.message
+
+effect(() => {
+  if (form.stored)
+    return
+
+  const forgets = [form.shown.add('#slug'), ...form.collection.localized ? [form.shown.add('#locale')] : []]
+
+  onCleanup(() => { for (const forget of forgets) { forget() } })
+})
 ---
 if !form.stored && !form.collection.single
-  FormField(label={wording('cms.entry.slug', 'Slug')} hint={form.collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
-    TextInput(value={form.slug()} onInput={text => form.slug.set(text)} required)
+  .kcms-field(id={fieldId(form.entry, 's')})
+    FormField(label={wording('cms.entry.slug', 'Slug')} hint={form.collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} issue={issueOf('slug')} required)
+      TextInput(value={form.slug()} onInput={text => { form.slug.set(text); form.drafts.dismissWhere(form.entry, issue => issue.key === 'slug') }} required)
   if form.collection.localized
-    FormField(label={wording('cms.entry.locale', 'Locale')} required)
-      Select(value={form.newLocale()} options={(form.collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => form.newLocale.set(code)})
+    .kcms-field(id={fieldId(form.entry, 'l')})
+      FormField(label={wording('cms.entry.locale', 'Locale')} issue={issueOf('locale')} required)
+        Select(value={form.newLocale()} options={(form.collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={(code) => { form.newLocale.set(code); form.drafts.dismissWhere(form.entry, issue => issue.key === 'locale') }})

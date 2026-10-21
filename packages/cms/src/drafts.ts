@@ -43,6 +43,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const recreated = new Set<string>()
   const current = signal<ReadonlyMap<string, DraftEntry>>(new Map())
   const issues = signal<readonly Issue[]>([])
+  // The fields whose text cannot be turned into a value yet, by entry then field path: what the editor typed in a JSON box that does not parse. A save refuses until they are fixed, as the entry holds the last text that parsed.
+  const unparsed = signal<ReadonlyMap<string, ReadonlyMap<string, string>>>(new Map())
   const refusals = signal<ReadonlyMap<string, Refusal>>(new Map())
   const recoveries = signal<ReadonlyMap<string, Recovery>>(new Map())
   const failure = signal<string>()
@@ -76,8 +78,9 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       const result = await show(changed())
 
       if (call === latest) {
-        if (!reported)
-          issues.set(result.issues ?? [])
+        // A render that names no issues, as a form with no preview, leaves the ones shown be: an edit has already dropped its own.
+        if (!reported && result.issues !== undefined)
+          issues.set(result.issues)
 
         failure.set(undefined)
       }
@@ -123,6 +126,43 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       recoveries.set(new Map(recoveries()).set(key, { at: kept.at, restored }))
 
     return restored ? kept.entry : entry
+  }
+
+  function inEntry(issue: Issue, key: string, path: FieldPath): boolean {
+    return entryKey(issue) === key && (path === BODY ? issue.body === true : issue.body !== true && issue.path === path)
+  }
+
+  // Drops the issues of one field, leaving every other field's shown.
+  function dismiss(key: string, path: FieldPath): void {
+    if (issues().some(issue => inEntry(issue, key, path)))
+      issues.set(issues().filter(issue => !inEntry(issue, key, path)))
+  }
+
+  function block(key: string, path: string, message: string | undefined): void {
+    const fields = new Map(unparsed().get(key))
+
+    if (message === undefined)
+      fields.delete(path)
+    else
+      fields.set(path, message)
+
+    const next = new Map(unparsed())
+
+    if (fields.size === 0)
+      next.delete(key)
+    else
+      next.set(key, fields)
+
+    unparsed.set(next)
+  }
+
+  function unblock(key: string): void {
+    if (unparsed().has(key)) {
+      const next = new Map(unparsed())
+
+      next.delete(key)
+      unparsed.set(next)
+    }
   }
 
   function refuse(ref: EntryRef, refusal: Refusal | undefined): void {
@@ -205,6 +245,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return path === BODY ? entry?.body : valueAt(entry?.data, path)
     },
     set(ref: EntryRef, path: FieldPath, value: unknown): void {
+      // An edit answers its own field's issue only: the others still stand until their fields are edited too.
+      dismiss(entryKey(ref), path)
       update(ref, entry => path === BODY ? { ...entry, body: String(value) } : { ...entry, data: withValueAt(entry.data, path, value) })
     },
     changed(ref: EntryRef): boolean {
@@ -215,6 +257,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     // Drops the entry's unsaved edits, rendering the page without them.
     reset(ref: EntryRef): void {
       forget(entryKey(ref))
+      unblock(entryKey(ref))
+      issues.set(issues().filter(issue => entryKey(issue) !== entryKey(ref)))
       refuse(ref, undefined)
       recreated.delete(entryKey(ref))
       update(ref, () => undefined)
@@ -256,6 +300,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       const key = entryKey(ref)
 
       forget(key)
+      unblock(key)
       recreated.delete(key)
       keepSaved(key, entry)
       versions.set(key, version)
@@ -289,6 +334,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       }
 
       recreated.clear()
+      unparsed.set(new Map())
       refusals.set(new Map())
       recoveries.set(new Map())
       // A draft of an entry this page never opened, left by a visit that ended without Stop editing, goes too: the edit cookie names no user.
@@ -317,6 +363,18 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     report(refusals: readonly Issue[]): void {
       reported = true
       issues.set(refusals)
+    },
+    // Drops one field's issues, such as the slug's of a new entry (`path` `''` with `key`), which no edit of the draft reaches.
+    dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void {
+      issues.set(issues().filter(issue => entryKey(issue) !== entryKey(ref) || !match(issue)))
+    },
+    // Says a field's text cannot be turned into a value (a message), or that it can again (none).
+    block(ref: EntryRef, path: string, message: string | undefined): void {
+      block(entryKey(ref), path, message)
+    },
+    // The fields of the entry whose text does not parse, with why.
+    blocked(ref: EntryRef, path?: string): { path: string, message: string }[] {
+      return [...unparsed().get(entryKey(ref)) ?? []].filter(([at]) => path === undefined || at === path).map(([at, message]) => ({ path: at, message }))
     },
     // The schema's refusals of the last render or save, of the entry or of one of its fields.
     issues(ref: EntryRef, path?: FieldPath): Issue[] {

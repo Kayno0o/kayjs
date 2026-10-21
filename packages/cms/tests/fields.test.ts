@@ -1,7 +1,7 @@
 import type { Field } from '../src/fields'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { emptyValue, fieldsOf, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
+import { checkField, emptyValue, fieldsOf, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
 
 describe('fieldsOf', () => {
   it('turns each property into a field, in order, with its label and whether it is required', () => {
@@ -21,7 +21,7 @@ describe('fieldsOf', () => {
     expect(fields).toEqual([
       { key: 'title', label: 'Title', required: true, hint: undefined, kind: 'text' },
       { key: 'publishedAt', label: 'Published at', required: true, hint: undefined, kind: 'date' },
-      { key: 'summary', label: 'Summary', required: false, hint: 'Shown in lists', kind: 'textarea' },
+      { key: 'summary', label: 'Summary', required: false, hint: 'Shown in lists', limits: { maxLength: 300 }, kind: 'textarea' },
       { key: 'featured', label: 'Featured', required: false, hint: undefined, kind: 'boolean' },
       { key: 'price', label: 'Price', required: false, hint: undefined, kind: 'number' },
       { key: 'stock', label: 'Stock', required: false, hint: undefined, kind: 'integer' },
@@ -262,5 +262,45 @@ describe('image fields', () => {
 
     expect(list).toMatchObject({ kind: 'list', item: { kind: 'image', upload: { minWidth: 10 } } })
     expect((list as Field & { kind: 'list' }).item).not.toHaveProperty('upload.alt')
+  })
+})
+
+describe('checkField', () => {
+  const [name, age, note, mail, flag] = fieldsOf({
+    required: ['name', 'age'],
+    properties: {
+      name: { type: 'string', minLength: 3, maxLength: 5 },
+      age: { type: 'integer', minimum: 18, maximum: 99 },
+      note: { type: 'string' },
+      mail: { type: 'string', pattern: '^[a-z]+@[a-z]+$' },
+      flag: { type: 'boolean' },
+    },
+  }) as [Field, Field, Field, Field, Field]
+
+  it('words a missing required value and a text out of its length or pattern as the server does', () => {
+    expect(checkField(name, undefined)).toBe('Name is required')
+    expect(checkField(name, 'ab')).toBe('Name needs at least 3 characters')
+    expect(checkField(name, 'abcdef')).toBe('Name takes 5 characters at most')
+    expect(checkField(name, 'abcd')).toBeUndefined()
+    expect(checkField(mail, 'nope')).toBe('Mail is not in the expected form')
+    expect(checkField(mail, 'a@b')).toBeUndefined()
+  })
+
+  it('words a figure out of its bounds, and reads the empty of a field that need not be filled as fine', () => {
+    expect(checkField(age, 17)).toBe('Age must be at least 18')
+    expect(checkField(age, 100)).toBe('Age must be at most 99')
+    expect(checkField(age, 30)).toBeUndefined()
+    expect(checkField(mail, undefined)).toBeUndefined()
+    expect(checkField(note, '')).toBeUndefined()
+  })
+
+  it('takes empty text as filled unless the schema asks for a character, as the server judges it, and checks nothing of a toggle', () => {
+    expect(checkField(name, '')).toBe('Name needs at least 3 characters')
+    expect(checkField({ ...note, limits: { minLength: 1 } }, '')).toBe('Note is required')
+    expect(checkField(flag, undefined)).toBeUndefined()
+  })
+
+  it('leaves a pattern a RegExp cannot compile to the server', () => {
+    expect(checkField({ ...mail, limits: { pattern: '(' } }, 'anything')).toBeUndefined()
   })
 })

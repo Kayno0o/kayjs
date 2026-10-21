@@ -1,4 +1,4 @@
-import type { DraftEntry } from './kay/contract'
+import type { DraftEntry, EntryRef } from './kay/contract'
 import type { FieldPath } from './markers'
 import { BODY } from './markers'
 // Field paths as kay's markers write them: dotted keys, list indexes as numbers, `sections.1.heading`.
@@ -62,6 +62,11 @@ function setIn(container: unknown, segments: string[], value: unknown): unknown 
   }
 
   return { ...container, [segment]: setIn((container as Record<string, unknown>)[segment], rest, value) }
+}
+
+// The id of the element holding one part of an entry's form, which the summary of the issues links to: a data field by its path (`f:` and the path), the body (`b`), a new entry's slug (`s`) or locale (`l`). Characters an id and a link would trip on become `_`.
+export function fieldId(ref: EntryRef, part: string): string {
+  return `kcms-${[ref.collection, ref.slug, ref.locale ?? '', part].join('-').replaceAll(/[^\w-]/g, '_')}`
 }
 
 // The first key of a dotted path: the field of the entry's data it lies in.

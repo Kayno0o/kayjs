@@ -20,6 +20,14 @@ export default defineMessages({
       uploads: 'Fichiers inutilisés',
       viewSite: 'Voir le site',
     },
+    check: {
+      pattern: '{field} n\'a pas la forme attendue',
+      required: '{field} est obligatoire',
+      tooBig: '{field} doit valoir {max} au plus',
+      tooLong: '{field} accepte {max} caractères au plus',
+      tooShort: '{field} demande au moins {min} caractères',
+      tooSmall: '{field} doit valoir {min} au moins',
+    },
     editor: {
       discard: 'Les abandonner et arrêter',
       discardAsk: 'Vous avez des modifications non enregistrées. Arrêter les abandonne.',
@@ -44,6 +52,7 @@ export default defineMessages({
       differs: 'Les deux côtés ont changé : {fields}.',
       notRestored: 'Les modifications non enregistrées de {time} ont été écartées : cette entrée a été enregistrée depuis.',
       restored: 'Vos modifications non enregistrées de {time} sont revenues. Réinitialiser les abandonne.',
+      summary: { one: 'Un champ est à corriger :', other: '{count} champs sont à corriger :' },
       takeTheirs: 'Prendre leur version',
       theirsFailure: 'Impossible de charger leur version',
       alsoOpen: 'Aussi ouvert : {names}',
@@ -79,7 +88,7 @@ export default defineMessages({
     },
     field: {
       add: 'Ajouter',
-      invalidJson: 'JSON invalide',
+      invalidJson: '{field} n\'est pas du JSON valide',
       item: 'Élément {n}',
       noKind: 'Aucun éditeur pour le type {kind} : ajoutez src/cms/fields/{kind}.kay. En attendant, il se modifie en JSON.',
       removeItem: 'Retirer {item}',

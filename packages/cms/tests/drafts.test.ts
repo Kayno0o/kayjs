@@ -265,7 +265,7 @@ describe('saving', () => {
   })
 
   it('keeps the issues of a refused save through a render scheduled before it, until the next edit renders', async () => {
-    const { drafts, calls } = setup()
+    const { drafts, calls } = setup(async () => ({ issues: [] }))
     const refusal = { collection: 'posts', slug: 'hello', path: '', message: 'would run as the site' }
 
     drafts.set(post, 'title', 'Hel')
@@ -280,6 +280,78 @@ describe('saving', () => {
 
     expect(calls).toHaveLength(2)
     expect(drafts.issues(post, '')).toEqual([])
+  })
+})
+
+describe('the issues of a refused save', () => {
+  const issue = (path: string, message: string) => ({ collection: 'posts', slug: 'hello', path, message })
+
+  it('lose only the edited field\'s own on an edit, whatever the render answers', async () => {
+    const { drafts } = setup()
+
+    drafts.report([issue('title', 'Title is required'), issue('tags', 'Tags is not valid'), issue('', 'Entry level')])
+    drafts.set(post, 'title', 'Hel')
+    await settled()
+
+    expect(drafts.issues(post).map(found => found.message)).toEqual(['Tags is not valid', 'Entry level'])
+
+    drafts.set(post, 'tags', ['b'])
+    await settled()
+
+    expect(drafts.issues(post).map(found => found.message)).toEqual(['Entry level'])
+  })
+
+  it('lose the body\'s only to an edit of the body, not to a data field named body', () => {
+    const { drafts } = setup()
+
+    drafts.report([{ ...issue('', 'Unknown component'), body: true }, issue('body', 'Data field')])
+    drafts.set(post, 'body', 'x')
+
+    expect(drafts.issues(post).map(found => found.message)).toEqual(['Unknown component'])
+
+    drafts.set(post, BODY, 'y')
+
+    expect(drafts.issues(post)).toEqual([])
+  })
+
+  it('are replaced by a render that names issues, as the page\'s preview does, and kept by one that names none', async () => {
+    const { drafts } = setup(async () => ({ issues: [issue('tags', 'Fresh')] }))
+
+    drafts.report([issue('title', 'Stale'), issue('tags', 'Older')])
+    drafts.set(post, 'title', 'Hel')
+    await settled()
+
+    expect(drafts.issues(post).map(found => found.message)).toEqual(['Fresh'])
+  })
+
+  it('go one by one with the slug\'s dismissed alone', () => {
+    const { drafts } = setup()
+
+    drafts.report([{ ...issue('', 'taken'), key: 'slug' }, { ...issue('', 'bad locale'), key: 'locale' }])
+    drafts.dismissWhere(post, found => found.key === 'slug')
+
+    expect(drafts.issues(post, '').map(found => found.message)).toEqual(['bad locale'])
+  })
+
+  it('go with a reset, and a text that does not parse is forgotten with it', () => {
+    const { drafts } = setup()
+
+    drafts.report([issue('title', 'x')])
+    drafts.block(post, 'meta', 'Meta is not valid JSON')
+    drafts.reset(post)
+
+    expect([drafts.issues(post), drafts.blocked(post)]).toEqual([[], []])
+  })
+
+  it('remember the fields whose text does not parse, until it does', () => {
+    const { drafts } = setup()
+
+    drafts.block(post, 'meta', 'bad')
+    drafts.block(post, 'other', 'worse')
+    drafts.block(post, 'meta', undefined)
+
+    expect(drafts.blocked(post)).toEqual([{ path: 'other', message: 'worse' }])
+    expect(drafts.blocked(post, 'meta')).toEqual([])
   })
 
   it('names the entries with edits the page does not show, as the schema refuses them', async () => {

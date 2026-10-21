@@ -14,8 +14,8 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import copy from '~icons/tabler/copy'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
-import { emptyValue, isCompact, itemAt, itemTitle } from '../fields'
-import { joinPath, siblingPath } from '../paths'
+import { checkField, emptyValue, isCompact, itemAt, itemTitle } from '../fields'
+import { fieldId, joinPath, siblingPath } from '../paths'
 import { sizeOfPath } from '../upload-text'
 import DatetimeInput from './datetime-input.kay'
 import FieldInput from './field-input.kay'
@@ -33,7 +33,10 @@ const kinds = import.meta.glob<Component<CustomFieldProps>>('/src/cms/fields/*.k
 // The hint to add a component is for the author running the site, not for an editor on a deployed one: only a development server, where the island's build defines the same `NODE_ENV`, shows it, so the server render and the island agree whatever `NODE_ENV` a server started without.
 const development = process.env.NODE_ENV === 'development'
 
-const jsonIssue = signal<string>()
+// What a box with limits has been left once: its limits are checked from then on, as it is typed, not while the editor is still on the first letters.
+const touched = signal(false)
+// The text of a JSON box while it is edited, which the draft's value is formatted from once the box is left.
+const jsonText = signal<string>()
 // The list's items folded away by place, and the last item removed, which Undo puts back.
 const folded = signal<readonly boolean[]>([])
 const removed = signal<{ at: number, title: string, value: unknown }>()
@@ -46,10 +49,16 @@ const items = () => Array.isArray(value()) ? value() as unknown[] : []
 const kindOf = (name: string) => Object.hasOwn(kinds, `/src/cms/fields/${name}.kay`) ? kinds[`/src/cms/fields/${name}.kay`] : undefined
 // A list item is never marked required: a list holds as many items as it has, none of them optional or mandatory on its own.
 const starred = () => field.required && typeof field.key === 'string'
-const issue = () => jsonIssue() ?? drafts.issues(entry, path)[0]?.message
+// The schema's refusal of the last save or render, else what the box holds that cannot be saved, else a limit it breaks, the last two once the editor has left the box.
+const issue = () => drafts.issues(entry, path)[0]?.message ?? (touched() ? drafts.blocked(entry, path)[0]?.message ?? checkField(field, value()) : undefined)
+const formatted = () => value() === undefined ? '' : JSON.stringify(value(), null, 2)
 
-function set(next: unknown): void {
+// A box typed in is checked once left; any other control, a pick or a choice, at its first change.
+function set(next: unknown, typing = false): void {
   drafts.set(entry, path, next)
+
+  if (!typing)
+    touched = true
 }
 
 const list = field.kind === 'list' ? field : undefined
@@ -195,17 +204,28 @@ function setFile(next: string, uploaded?: { width: number, height: number }): vo
     drafts.set(entry, siblingPath(path, field.upload.height.key), size?.height)
 }
 
+// The draft takes each text that parses as it is typed; one that does not keeps the last value and stops the save until it is fixed.
 function setJson(next: string): void {
+  jsonText = next
+
   try {
-    set(next.trim() === '' ? undefined : JSON.parse(next))
-    jsonIssue = undefined
+    drafts.block(entry, path, undefined)
+    set(next.trim() === '' ? undefined : JSON.parse(next), true)
   }
   catch {
-    jsonIssue = wording('cms.field.invalidJson', 'Not valid JSON')
+    drafts.block(entry, path, wording('cms.field.invalidJson', '{field} is not valid JSON', { field: field.label }))
   }
 }
+
+function leaveJson(): void {
+  touched = true
+
+  if (drafts.blocked(entry, path).length === 0)
+    jsonText = undefined
+}
+
 ---
-.kcms-field(data-kcms-path={path})
+.kcms-field(data-kcms-path={path} id={fieldId(entry, `f:${path}`)})
   const current = field
   match current.kind
     when 'boolean'
@@ -251,13 +271,13 @@ function setJson(next: string): void {
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'textarea'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Textarea(rows="4" value={text()} onInput={set})
+        Textarea(rows="4" value={text()} onInput={next => set(next, true)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        MarkdownEditor(value={text()} onInput={set} onImage={async file => (await uploadFile(entry.collection, file)).path})
+        MarkdownEditor(value={text()} onInput={next => set(next, true)} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})
+        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} value={text()} onInput={next => set(next ?? undefined, true)} onBlur={() => touched = true})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="date" value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
@@ -275,10 +295,10 @@ function setJson(next: string): void {
         Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={starred()})
       else
         FormField(label={current.label} hint={[current.hint, development ? wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name }) : undefined].filter(Boolean).join(' ')} issue={issue()} required={starred()})
-          Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
+          Textarea.kcms-json(rows="4" value={jsonText() ?? formatted()} onInput={setJson} onBlur={leaveJson})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
-        Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
+        Textarea.kcms-json(rows="4" value={jsonText() ?? formatted()} onInput={setJson} onBlur={leaveJson})
     else
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(value={text()} onInput={set})
+        TextInput(value={text()} onInput={next => set(next, true)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={current.limits?.pattern})

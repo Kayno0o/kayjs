@@ -5,6 +5,7 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { wording } from 'kay/words'
 import { uploadFile } from '../editor/upload'
 import { BODY } from '../markers'
+import { fieldId } from '../paths'
 
 // The Markdown body of an entry whose collection has one.
 const { form } = props<{ form: FormScope }>()
@@ -14,6 +15,6 @@ effect(() => {
 })
 ---
 if form.collection.body
-  .kcms-field(data-kcms-body)
+  .kcms-field(data-kcms-body id={fieldId(form.entry, 'b')})
     FormField(label={wording('cms.entry.body', 'Body')} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
       MarkdownEditor(value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={async file => (await uploadFile(form.entry.collection, file)).path})

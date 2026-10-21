@@ -133,14 +133,15 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
 
   const goesLiveAt = () => !isDraft() && collection.publishField !== undefined ? publishTime(collection, { [collection.publishField]: drafts.value(ref, collection.publishField) }) : undefined
   const scheduled = useGoesLive(goesLiveAt)
-  const canSave = () => !saving() && (first === undefined || drafts.changed(ref))
+  // A text that does not parse keeps Save enabled, so pressing it says what to fix.
+  const canSave = () => !saving() && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
   const lastSave = signal<{ at: number, rebuilding: boolean }>()
   const onSaved = ({ rebuilding }: { rebuilding: boolean }) => lastSave.set({ at: Date.now(), rebuilding })
 
   async function saveNow(): Promise<boolean> {
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
-    if (first && !drafts.changed(ref))
+    if (first && !drafts.changed(ref) && drafts.blocked(ref).length === 0)
       return true
 
     saving.set(true)

@@ -1,6 +1,15 @@
 import type { FieldHint, JsonSchema } from './kay/contract'
 import { wording } from 'kay/words'
 
+// The limits a schema puts on a field's text or figure, which the control states as attributes and the form checks as it is typed.
+export interface Limits {
+  minLength?: number | undefined
+  maxLength?: number | undefined
+  pattern?: string | undefined
+  minimum?: number | undefined
+  maximum?: number | undefined
+}
+
 interface FieldBase {
   key: string | number
   label: string
@@ -8,6 +17,7 @@ interface FieldBase {
   hint?: string | undefined
   // What the schema starts the field as, which a new list item takes.
   default?: unknown
+  limits?: Limits | undefined
 }
 
 // `value` is what the select posts, `raw` what the entry holds, a number for a numeric enum.
@@ -90,6 +100,7 @@ function pairUploads(fields: Field[]): Field[] {
 
 export function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field {
   const { schema: inner, nullable } = withoutNull(schema)
+  const limits = limitsOf(inner)
   const base: FieldBase = {
     key,
     label: inner.title ?? schema.title ?? (typeof key === 'number' ? wording('cms.field.item', 'Item {n}', { n: key + 1 }) : humanize(key)),
@@ -97,6 +108,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     required: required && !nullable && schema.default === undefined,
     hint: inner.description ?? schema.description,
     default: inner.default ?? schema.default,
+    ...limits && { limits },
   }
   const hint = inner['x-kay']
 
@@ -139,6 +151,74 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     case undefined:
     default:
       return { ...base, kind: 'json' }
+  }
+}
+
+const LIMIT_KEYS = ['minLength', 'maxLength', 'minimum', 'maximum'] as const
+
+function limitsOf(schema: JsonSchema): Limits | undefined {
+  const limits: Limits = {}
+
+  for (const key of LIMIT_KEYS) {
+    const value = schema[key]
+
+    if (typeof value === 'number')
+      limits[key] = value
+  }
+
+  if (typeof schema.pattern === 'string')
+    limits.pattern = schema.pattern
+
+  return Object.keys(limits).length > 0 ? limits : undefined
+}
+
+// The kinds whose control holds one value an editor may leave empty, so `required` and the limits apply to what is typed.
+const CHECKED = new Set<Field['kind']>(['text', 'textarea', 'markdown', 'number', 'integer', 'date', 'datetime', 'select', 'image', 'file', 'json'])
+
+// Why a field's value would be refused by its schema, worded as the server words it, or undefined when it holds; the form shows it as the value is typed, before a save asks the server.
+export function checkField(field: Field, value: unknown): string | undefined {
+  if (!CHECKED.has(field.kind))
+    return undefined
+
+  const label = field.label
+  const { limits } = field
+
+  if (value === undefined || value === null)
+    return field.required ? wording('cms.check.required', '{field} is required', { field: label }) : undefined
+
+  // Empty text passes unless the schema asks for a character, as the server judges it.
+  if (value === '' && limits?.minLength === 1)
+    return wording('cms.check.required', '{field} is required', { field: label })
+
+  if (typeof value === 'string' && limits) {
+    if (limits.minLength !== undefined && value.length < limits.minLength)
+      return wording('cms.check.tooShort', '{field} needs at least {min} characters', { field: label, min: limits.minLength })
+
+    if (limits.maxLength !== undefined && value.length > limits.maxLength)
+      return wording('cms.check.tooLong', '{field} takes {max} characters at most', { field: label, max: limits.maxLength })
+
+    if (limits.pattern !== undefined && !matches(limits.pattern, value))
+      return wording('cms.check.pattern', '{field} is not in the expected form', { field: label })
+  }
+
+  if (typeof value === 'number' && limits) {
+    if (limits.minimum !== undefined && value < limits.minimum)
+      return wording('cms.check.tooSmall', '{field} must be at least {min}', { field: label, min: limits.minimum })
+
+    if (limits.maximum !== undefined && value > limits.maximum)
+      return wording('cms.check.tooBig', '{field} must be at most {max}', { field: label, max: limits.maximum })
+  }
+
+  return undefined
+}
+
+// A pattern a plain RegExp cannot compile is left to the server.
+function matches(pattern: string, value: string): boolean {
+  try {
+    return new RegExp(pattern).test(value)
+  }
+  catch {
+    return true
   }
 }
 

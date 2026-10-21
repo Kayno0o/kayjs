@@ -351,6 +351,16 @@ A save that takes over 15 seconds (`timeout`), or a forge out of reach, fails wi
 
 A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts.
 
+## Fixing a refused save
+
+When the server refuses a save, the form takes you to what is wrong. The focus goes to the first field to fix and the page scrolls to it. Above the form, a list names every field to fix, and each line links to its field.
+
+Fixing one field clears that field's message and leaves the others. A field the form does not show keeps its message in the list, without a link.
+
+The form also checks as you type. A field with a minimum or maximum length, a pattern, or a minimum or maximum number gets the matching limit on its input, and says what is wrong once you leave it. The server still decides on a save.
+
+A JSON box that does not parse blocks the save. It says `Meta is not valid JSON` under the box, and nothing is sent until you fix it. A slug that is already taken is marked on the slug field, and typing another one clears it.
+
 ## Arranging a collection
 
 The screens read each collection's schema. To change how one looks, name it in `cms({ collections })`:

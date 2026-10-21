@@ -1,7 +1,7 @@
 import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
-import { call } from 'kay'
+import { call, focusInvalid } from 'kay'
 import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import filesApi from '../api/files'
@@ -81,6 +81,17 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   // Edits kept over a file deleted meanwhile make it again, refused if one was made since rather than written over.
   create ||= drafts.recreating(ref)
 
+  const blocked = drafts.blocked(ref)
+
+  // A text that does not parse never reaches the server, which would save the value before it.
+  if (blocked.length > 0) {
+    drafts.report([...drafts.issues(ref).filter(issue => issue.body === true || !blocked.some(({ path }) => path === issue.path)), ...blocked.map(({ path, message }) => ({ ...ref, path, message }))])
+    tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
+    await showRefusal()
+
+    return false
+  }
+
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug', {
     method: 'post',
     params: { collection: ref.collection, slug },
@@ -96,12 +107,14 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     if (whole) {
       drafts.refuse(ref, { message: whole.message, conflict: outcome.conflict })
       tell(flight, told, wording('cms.save.refusal', 'Not saved: {message}', { message: whole.message }))
+      await showRefusal()
 
       return false
     }
 
     drafts.report(issues)
     tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
+    await showRefusal()
 
     return false
   }
@@ -114,6 +127,15 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   onSaved?.({ rebuilding: 'commit' in outcome && outcome.commit !== undefined })
 
   return true
+}
+
+// Takes the focus to the first field a refusal marked, else to the first notice above the form, so the editor and a screen reader land on what to fix; the page scrolls to it.
+async function showRefusal(): Promise<void> {
+  if (typeof document === 'undefined')
+    return
+
+  if (!await focusInvalid())
+    document.querySelector<HTMLElement>('.kcms-entry-failure')?.focus()
 }
 
 // Toasts a refusal, unless the save this one waited for ended on the same toast.
