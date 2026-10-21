@@ -1,10 +1,12 @@
 import type { ContentLoader } from 'kay/content'
 import type { SeedEntry } from '../src/loaders/shared'
+import { join } from 'node:path'
 import { SQL } from 'bun'
 import { Database } from 'bun:sqlite'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
+import { scratchDir } from 'kay/test'
 import { postgresLoader } from '../src/loaders/postgres'
 import { sqliteLoader } from '../src/loaders/sqlite'
 
@@ -15,7 +17,7 @@ const seed: SeedEntry[] = [
 ]
 
 const url = process.env.TEST_DATABASE_URL ?? ''
-const skipPostgres = url === '' && (process.env.CI ?? '') === ''
+const skipPostgres = url === ''
 const admin = skipPostgres ? undefined : new SQL(Object.assign(new URL(url), { pathname: '/postgres' }).href)
 const database = `kay_cms_loaders_${process.pid}`
 let shared: SQL | undefined
@@ -93,8 +95,6 @@ function contract(label: string, make: (options: { name: string, seed?: SeedEntr
   })
 }
 
-let sqlites = 0
-
 contract('sqliteLoader', (options) => {
   const handle = sharedSqlite()
 
@@ -105,14 +105,13 @@ let db: Database | undefined
 
 function sharedSqlite(): Database {
   db ??= new Database(':memory:')
-  sqlites++
 
   return db
 }
 
 describe('sqliteLoader files', () => {
   test('creates the file with its folder', async () => {
-    const path = `${process.env.TMPDIR ?? '/tmp'}/kay-cms-loader-${process.pid}-${sqlites}/nested/content.db`
+    const path = join(await scratchDir('loader-'), 'nested/content.db')
     const loader = sqliteLoader({ name: 'posts', database: path, seed })
 
     expect((await loader.load({ preview: false })).length).toBe(3)

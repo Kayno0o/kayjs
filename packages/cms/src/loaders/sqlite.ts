@@ -14,7 +14,7 @@ export interface SqliteLoaderOptions extends LoaderOptions {
 
 // A collection's entries kept in one SQLite table of JSON entries: `collection(sqliteLoader({ name: 'posts', database: 'data/content.db', seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
 export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
-  const { name, body, ttl } = options
+  const { name, ttl } = options
   const table = tableOf(options.table)
   const key = seededKey(name)
   let opened: Database | undefined
@@ -25,7 +25,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
       return opened
 
     const { database } = options
-    const db = typeof database === 'string' ? connect(database) : database
+    const db = typeof database === 'string' ? connection(database) : database
 
     db.run(`CREATE TABLE IF NOT EXISTS ${table} (collection TEXT NOT NULL, place TEXT NOT NULL, data TEXT NOT NULL, body TEXT, PRIMARY KEY (collection, place))`)
 
@@ -74,7 +74,6 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
 
   return {
     name,
-    ...body === undefined ? {} : { body },
     ...ttl === undefined ? {} : { ttl },
     load: async () => {
       const db = await database()
@@ -111,6 +110,20 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
       db.query(`DELETE FROM ${table} WHERE collection = ? AND place = ?`).run(name, placeOf(entry))
     },
   }
+}
+
+// The databases opened from a path, one per path, so a retried start or a second collection reuses it.
+const connections = new Map<string, Database>()
+
+function connection(path: string): Database {
+  let db = connections.get(path)
+
+  if (db === undefined) {
+    db = connect(path)
+    connections.set(path, db)
+  }
+
+  return db
 }
 
 function connect(path: string): Database {

@@ -7,6 +7,7 @@ import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
+import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
 import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
@@ -1133,6 +1134,59 @@ describe('the collections a CMS edits', () => {
       expect(await saveEntries('single', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
       expect(singles).toEqual(['a', 'b'])
       expect(await rejection(saveEntries('bare', [{ slug: 'a', data: { title: 'A' } }]))).toMatchObject({ message: expect.stringContaining('declares no save') })
+    })
+  })
+
+  it('reads again after a saveMany that threw, and queues behind a save in flight', async () => {
+    const schema = t.Object({ title: t.String() })
+    const gate = Promise.withResolvers<void>()
+    const order: string[] = []
+    let reads = 0
+    const flaky = collection({ name: 'flaky-many', load: () => {
+      reads++
+
+      return []
+    }, save: async (entry) => {
+      order.push(`save ${entry.slug}`)
+      await gate.promise
+    }, saveMany: (entries) => {
+      order.push(`many ${entries.map(entry => entry.slug).join('+')}`)
+
+      throw new Error('disk full')
+    } }, { schema })
+
+    await exporting([['flaky', flaky]], async () => {
+      const first = saveEntry('flaky', { slug: 'a', data: { title: 'A' } })
+      const batch = saveEntries('flaky', [{ slug: 'b', data: { title: 'B' } }, { slug: 'c', data: { title: 'C' } }])
+
+      await Bun.sleep(20)
+      expect(order).toEqual(['save a'])
+      gate.resolve()
+      await first
+      expect(await rejection(batch)).toMatchObject({ message: 'disk full' })
+      expect(order).toEqual(['save a', 'many b+c'])
+
+      const before = reads
+
+      await flaky.all()
+      expect(reads).toBeGreaterThan(before)
+    })
+  })
+
+  it('writes a real SQLite collection through save, saveEntries and remove, locales included', async () => {
+    const schema = t.Object({ title: t.String(), order: t.Optional(t.Number()) })
+    const posts = collection(sqliteLoader({ name: 'sqlposts', database: ':memory:', seed: [{ slug: 'a', data: { title: 'A', order: 1 } }, { slug: 'b', data: { title: 'B', order: 2 } }] }), { schema, order: 'order' })
+
+    await exporting([['sqlposts', posts]], async () => {
+      expect((await posts.all()).map(post => post.slug)).toEqual(['a', 'b'])
+      expect(await saveEntries('sqlposts', [{ slug: 'a', data: { title: 'A', order: 2 } }, { slug: 'b', data: { title: 'B', order: 1 } }])).toEqual({})
+      expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
+      expect(await saveEntries('sqlposts', [{ slug: 'a', data: { title: 'A', order: 5 } }, { slug: 'b', data: { title: 3 } }])).toMatchObject({ issues: [{ slug: 'b' }] })
+      expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
+      expect(await saveEntry('sqlposts', { slug: 'c', data: { title: 'C' } }, { create: true })).toEqual({})
+      expect(await saveEntry('sqlposts', { slug: 'c', data: { title: 'C' } }, { create: true })).toMatchObject({ issues: [{ key: 'slug' }] })
+      expect(await removeEntry('sqlposts', 'c')).toEqual({})
+      expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
     })
   })
 

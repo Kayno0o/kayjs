@@ -16,15 +16,32 @@ type Runner = Pick<SQL, 'unsafe'>
 // The lock `CREATE TABLE` and the seed take, so processes starting together do not race on the table.
 const LOCK = 7_624_881
 
+// The clients opened from a URL, one per URL, so the collections of an app share a pool.
+const clients = new Map<string, SQL>()
+
+function clientOf(sql: string | SQL): SQL {
+  if (typeof sql !== 'string')
+    return sql
+
+  let client = clients.get(sql)
+
+  if (client === undefined) {
+    client = new SQL(sql)
+    clients.set(sql, client)
+  }
+
+  return client
+}
+
 // A collection's entries kept in one Postgres table of JSON entries: `collection(postgresLoader({ name: 'posts', sql: db.sql, seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
 export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
-  const { name, body, ttl } = options
+  const { name, ttl } = options
   const table = tableOf(options.table)
   const key = seededKey(name)
   let ready: Promise<SQL> | undefined
 
   const open = async (): Promise<SQL> => {
-    const client = typeof options.sql === 'string' ? new SQL(options.sql) : options.sql
+    const client = clientOf(options.sql)
 
     await client.begin(async (tx) => {
       await tx.unsafe('SELECT pg_advisory_xact_lock($1)', [LOCK])
@@ -70,7 +87,6 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
 
   return {
     name,
-    ...body === undefined ? {} : { body },
     ...ttl === undefined ? {} : { ttl },
     load: async () => {
       const sql = await database()

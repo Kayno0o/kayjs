@@ -12,10 +12,8 @@ export interface SeedEntry {
 export interface LoaderOptions {
   // The collection's name in the loader, keying its rows: any name unique among the collections sharing the table.
   name: string
-  // The entries written the first time the loader meets this collection and never again, so an entry an editor deleted stays deleted: a list, or a function returning it that runs only then.
+  // The entries written once per collection, never again, so an entry an editor deleted stays deleted: a list, or a function returning it. Processes starting together may each run the function, one writing its result.
   seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
-  // Whether the entries hold a Markdown `body`, true by default.
-  body?: boolean | undefined
   // The table holding every collection's entries, `kay_content` by default.
   table?: string | undefined
   // How long the entries are served before the next read refreshes them, as `collection()` loaders keep them.
@@ -38,14 +36,14 @@ export interface Row {
 const IDENTIFIER = /^[A-Z_]\w*$/i
 const DEFAULT_TABLE = 'kay_content'
 
-// The table name, which goes into SQL text, so only a plain identifier is taken.
+// The table name, which goes into SQL text, so only a plain identifier is taken, quoted so a reserved word works.
 export function tableOf(table: string | undefined): string {
   const name = table ?? DEFAULT_TABLE
 
   if (!IDENTIFIER.test(name))
     throw new Error(`kayjs-cms: the loader's table ${JSON.stringify(name)} is not a plain identifier`)
 
-  return name
+  return `"${name}"`
 }
 
 // The key of an entry in its collection: the slug, with the locale before it in a localized collection.

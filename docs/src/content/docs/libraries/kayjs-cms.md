@@ -359,7 +359,7 @@ export const news = collection({
 
 `create` is `true` for a new entry. Throw then if the entry exists, so another editor's new entry is not overwritten.
 
-kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, after checking the entry against the schema. Never call those two from inside `save` or `remove` of the same collection, as they wait for each other.
+kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, after checking the entry against the schema. Never call those two, nor `saveEntries`, from inside `save`, `saveMany` or `remove` of the same collection, as they wait for each other.
 
 A loader may also give `saveMany(entries)`, which writes the entries of one action together, all or none, such as the two a reorder swaps. Without it they go to `save` one at a time. [A live site with a database](#a-live-site-with-a-database) needs none of this written.
 
@@ -382,9 +382,9 @@ export const posts = collection(sqliteLoader({
 })
 ```
 
-For Postgres, import `postgresLoader` from `@kaynooo/kayjs-cms/postgres` and give it `sql`, a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`.
+For Postgres, import `postgresLoader` from `@kaynooo/kayjs-cms/postgres` and give it `sql`, a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`, and adds the table to pg-orm's `ignoreTables` (`kay_content` unless you pass `table`), or pg-orm sees it as a table to drop.
 
-The `seed` is your initial content. It is written once, the first time the loader meets the collection, so an entry an editor deletes stays deleted and a new seed never overwrites their work. Several collections can share the table, each keyed by its `name`. Pass `table` to name another.
+The `seed` is your initial content. It is written once per collection, so an entry an editor deletes stays deleted and a new seed never overwrites their work. Several collections can share the table, each keyed by its `name`. Pass `table` to name another.
 
 A reorder saves two entries, and the loader writes them in one transaction: it never half-applies.
 
