@@ -5,8 +5,8 @@ export interface KeptDraft {
   entry: DraftEntry
   version: string | undefined
   at: number
-  // The saved copy the edits were made from, kept for an entry with no version, which cannot tell by it that the entry was saved since.
-  base?: DraftEntry | undefined
+  // A hash of the saved copy the edits were made from, kept for an entry with no version, which cannot tell by it that the entry was saved since.
+  base?: string | undefined
 }
 
 // Where unsaved edits survive a reload or a crash. Every method gives up quietly when the browser has no storage to give.
@@ -39,7 +39,7 @@ function isKept(value: unknown): value is KeptDraft {
 
   const { entry, version, at, base } = value as Record<string, unknown>
 
-  return typeof at === 'number' && (base === undefined || (typeof base === 'object' && base !== null && typeof (base as DraftEntry).data === 'object' && (base as DraftEntry).data !== null)) && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as DraftEntry).collection === 'string' && typeof (entry as DraftEntry).slug === 'string' && typeof (entry as DraftEntry).data === 'object' && (entry as DraftEntry).data !== null
+  return typeof at === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as DraftEntry).collection === 'string' && typeof (entry as DraftEntry).slug === 'string' && typeof (entry as DraftEntry).data === 'object' && (entry as DraftEntry).data !== null
 }
 
 // Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give.

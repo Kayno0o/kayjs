@@ -5,6 +5,7 @@ import type { FieldPath } from './markers'
 import { durationMs, signal } from 'kay'
 import { BODY, entryKey } from './markers'
 import { differing, valueAt, withValueAt } from './paths'
+import { hashOf } from './room'
 
 export interface DraftsOptions {
   // Renders the page with these entries in place of the saved ones: kay's `showDraft`.
@@ -13,6 +14,11 @@ export interface DraftsOptions {
   delay?: DurationText | undefined
   // Where unsaved edits are kept across a reload, a crash and a second tab: `browserKeeper()`. None keeps them in memory only.
   keep?: DraftKeeper | undefined
+}
+
+// What a kept draft names the saved copy it was made from by, as the copy itself would double a Markdown body in the browser's storage.
+function fingerprint(entry: DraftEntry): string {
+  return hashOf(JSON.stringify([entry.data, entry.body ?? '']))
 }
 
 export type Drafts = ReturnType<typeof createDrafts>
@@ -118,7 +124,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return
 
     if (entry && entry !== base)
-      keep.write(key, { entry, version: versions.get(key), at: keep.now(), ...versions.get(key) === undefined ? { base } : {} })
+      keep.write(key, { entry, version: versions.get(key), at: keep.now(), ...versions.get(key) === undefined && base ? { base: fingerprint(base) } : {} })
     else
       keep.remove(key)
   }
@@ -130,7 +136,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return entry
 
     // Edits made from another version of the file would write over what was saved since. An entry with no version, a folder entry outside the repository, is told by the copy the edits were made from.
-    const stale = kept.version !== version || (version === undefined && (!kept.base || differing(kept.base, entry).length > 0))
+    const stale = kept.version !== version || (version === undefined && kept.base !== fingerprint(entry))
     const restored = !stale && JSON.stringify(kept.entry) !== JSON.stringify(entry)
 
     if (!restored)

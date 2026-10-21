@@ -21,7 +21,7 @@ export function watchRoom(room: string): string {
 }
 
 // A hash of the whole text in plain JavaScript, as the room is also named in the browser, where there is no `Bun`: two 32-bit FNV-1a runs, the second seeded apart.
-function hashOf(text: string): string {
+export function hashOf(text: string): string {
   let first = 0x811C9DC5
   let second = 0x01000193
 

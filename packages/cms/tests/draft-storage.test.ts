@@ -198,6 +198,31 @@ describe('kept drafts of an entry with no version', () => {
     expect([moved.value(post, 'title'), moved.changed(post), moved.recovery(post)?.restored, storage.length]).toEqual(['Saved elsewhere', false, false, 0])
   })
 
+  it('keeps a hash of the saved copy, not the copy', () => {
+    const storage = memoryStorage()
+    const body = 'A long Markdown body. '.repeat(50)
+    const before = pageOf(storage)
+
+    before.open({ ...post, body })
+    before.set(post, 'title', 'Mine')
+    before.flush()
+
+    const kept = JSON.parse(storage.getItem('kcms:draft:posts:hello')!) as { base: unknown }
+
+    expect(kept.base).toBeTypeOf('string')
+    expect(storage.getItem('kcms:draft:posts:hello')!.split(body).length - 1).toBe(1)
+
+    const same = pageOf(storage)
+
+    same.open({ ...post, body })
+    expect(same.recovery(post)?.restored).toBe(true)
+
+    const moved = pageOf(storage)
+
+    moved.open({ ...post, body: `${body}!` })
+    expect(moved.recovery(post)?.restored).toBe(false)
+  })
+
   it('drops a draft kept with no record of its saved copy', () => {
     const storage = memoryStorage()
 
