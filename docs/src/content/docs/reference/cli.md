@@ -78,7 +78,7 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site as an unprivileged user on port 8080 | server, site, app |
 | `auth` | Sessions, a sign-in, members in SQLite through pg-orm and a guarded `/account`; needs `server` | app |
-| `postgres` | The members in Postgres instead of SQLite, with a compose stack for development; needs `auth` | none |
+| `postgres` | The members in Postgres instead of SQLite, with a compose stack for development; `kay add` plans the members it needs | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
 
 `blank` has none of them. In the terminal, checking a feature checks what it needs. With options, a feature missing what it needs is refused with the flag to add:

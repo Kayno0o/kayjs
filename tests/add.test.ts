@@ -1,4 +1,5 @@
 import type { Feature } from '../src/new'
+import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -75,7 +76,7 @@ it('names what a feature needs, and writes nothing', async () => {
     const before = await snapshot(dir)
 
     await expect(addFeatures(dir, ['ws'], { install: false })).rejects.toThrow('kay add: ws needs server: run `kay add server,ws` to add them together')
-    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('start from `kay new --with auth,postgres`')
+    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('postgres needs server: run `kay add server,postgres`')
     await expect(addFeatures(dir, ['bogus'], { install: false })).rejects.toThrow('kay add: bogus is none of the features')
     expect(await snapshot(dir)).toEqual(before)
   }
@@ -682,6 +683,43 @@ it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () 
     expect(source).toContain('email: { mailer: { send: mail.enqueue } },')
     expect(source).not.toContain('sqlite://')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('adds postgres to a project without the demo sign-in, which it plans under it', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await addFeatures(dir, ['postgres'], { install: false })
+
+    expect([...await detectFeatures(dir)]).toEqual(expect.arrayContaining(['auth', 'postgres']))
+    expect((await addFeatures(dir, ['postgres'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('adds kayjs-auth over the Postgres database postgres sets up, with no demo sign-in', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, PRESETS.server.features, ['auth', 'ui'])
+    await addFeatures(dir, ['auth', 'postgres'], { install: false })
+
+    expect(existsSync(join(dir, 'compose.dev.yaml'))).toBe(true)
+    expect(existsSync(join(dir, 'src/routes/login.kay'))).toBe(false)
+    expect(existsSync(join(dir, 'src/session.ts'))).toBe(false)
+
+    const tables = await Bun.file(join(dir, 'src/db/index.ts')).text()
+
+    expect(tables).toContain('authTables')
+    expect(await Bun.file(join(dir, 'src/auth.ts')).text()).toContain('import { db } from \'./db\'')
+    expect((await addFeatures(dir, ['auth', 'postgres'], { install: false })).written).toEqual([])
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })

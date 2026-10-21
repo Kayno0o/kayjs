@@ -281,7 +281,11 @@ function mergeEnv(disk: string | undefined, content: string, { writes, conflicts
 }
 
 // What adding the core features changes: the files to write, and the files that are not in the shape `kay new` writes.
-async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
+// The files of the demo sign-in, which kayjs-auth replaces when both are added.
+const DEMO_AUTH_PAGES = new Set(['src/routes/login.kay', 'src/routes/account/_guard.ts', 'src/routes/account/index.kay', 'src/session.ts', 'src/server.ts', 'tests/members.test.ts', 'tests/account.test.ts'])
+
+// `postgres` keeps its members in the demo auth's database, so adding it to a project without them plans them too; with `libraryAuth`, kayjs-auth is added beside, so only the database files of the demo are kept and kayjs-auth uses that database.
+async function planCore(dir: string, core: readonly Feature[], libraryAuth = false): Promise<Plan> {
   const { text, manifest } = await readManifest(dir)
   const kay = manifest.dependencies?.kay
 
@@ -294,17 +298,26 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
     return plan
 
   const current = await detectFeatures(dir)
+
+  if (core.every(feature => current.has(feature)))
+    return plan
+
   const wanted = new Set([...current, ...core])
+  const implied = wanted.has('postgres') && !wanted.has('auth') && !current.has('postgres')
+
+  if (implied)
+    wanted.add('auth')
 
   for (const feature of core) {
-    const missing = FEATURES[feature].needs.filter(need => !wanted.has(need))
-
-    if (missing.includes('auth'))
-      throw new Error(`kay add: ${feature} needs the members of the auth feature of \`kay new\` (src/db/member.ts), which \`kay add auth\` no longer adds, as it adds kayjs-auth: start from \`kay new --with auth,${feature}\``)
+    // postgres plans the members itself, or has them in kayjs-auth's database.
+    const missing = FEATURES[feature].needs.filter(need => !wanted.has(need) && !(feature === 'postgres' && need === 'auth'))
 
     if (missing.length > 0)
       throw new Error(`kay add: ${feature} needs ${missing.join(' and ')}: run \`kay add ${[...missing, feature].join(',')}\` to add them together`)
   }
+
+  if (implied && !wanted.has('server'))
+    throw new Error('kay add: postgres needs server: run `kay add server,postgres` to add them together')
 
   const { writes, conflicts, notes } = plan
   // The project may have been renamed since `kay new` named its package after the directory, so the templates take its own name.
@@ -316,6 +329,9 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
   for (const [path, content] of Object.entries(next)) {
     const disk = await read(join(dir, path))
     const was = old[path]
+
+    if (libraryAuth && DEMO_AUTH_PAGES.has(path) && !current.has('auth'))
+      continue
 
     if (path === 'package.json') {
       const merged = mergeManifest(manifest, JSON.parse(was!) as Manifest, JSON.parse(content) as Manifest, conflicts)
@@ -490,7 +506,9 @@ async function installPackages(dir: string, missing: readonly string[], bun: str
 
 // What the project holds for a library to read: the files on disk, as an earlier library of the run is about to change them.
 async function projectOf(dir: string, plan: Plan): Promise<LibraryProject> {
-  const { manifest } = await readManifest(dir)
+  const { manifest: onDiskManifest } = await readManifest(dir)
+  const planned = plan.writes.get('package.json')
+  const manifest = planned === undefined ? onDiskManifest : JSON.parse(planned) as Manifest
   const held = new Map<string, string | undefined>()
 
   for (const path of ['src/db/index.ts', 'src/mail.ts', '.env', '.env.example'])
@@ -596,7 +614,7 @@ async function addLibraries(dir: string, core: readonly Feature[], libraries: re
       await installPackages(dir, missing, options.bun ?? process.execPath)
 
       // The package.json changed on disk, so the merge starts over from it.
-      next = await planCore(dir, core)
+      next = await planCore(dir, core, libraries.includes('auth'))
       failIfConflicts(next)
     }
 
@@ -660,7 +678,7 @@ export async function addFeatures(dir: string, names: readonly string[], options
   // A library's name wins over a core feature's: `auth` is kayjs-auth.
   const core = names.filter((name): name is Feature => FEATURE_NAMES.includes(name as Feature) && !Object.hasOwn(LIBRARIES, name))
   const libraries = withBrought(names.filter(name => Object.hasOwn(LIBRARIES, name)))
-  let plan = await planCore(dir, core)
+  let plan = await planCore(dir, core, libraries.includes('auth'))
 
   failIfConflicts(plan)
   await requireFeatures(dir, core, libraries)
