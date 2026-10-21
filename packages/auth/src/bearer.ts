@@ -37,14 +37,16 @@ export interface BearerToken {
 export interface TokenOptions<Scope extends string = string> {
   // What the token may reach, from the scopes the app declares; every one when left out.
   scopes?: Scope[] | undefined
-  // How long until it stops working, seconds or a string such as '30d'; 90 days when left out, never with null.
+  // How long until it stops working, a string such as '30d'; 90 days when left out, never with null.
+  maxAge?: Duration | null | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
   expiresIn?: Duration | null | undefined
 }
 
 // The seconds a token lives, undefined for a value that is no positive duration.
-function expirySeconds(expiresIn: Duration): number | undefined {
+function expirySeconds(maxAge: Duration): number | undefined {
   try {
-    return durationSeconds(expiresIn, 'expiresIn')
+    return durationSeconds(maxAge, 'maxAge')
   }
   catch {
     return undefined
@@ -64,20 +66,27 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
   if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !core.scopes.has(scope))))
     return 'scope'
 
-  return options.expiresIn != null && expirySeconds(options.expiresIn) === undefined ? 'expiry' : undefined
+  const maxAge = tokenMaxAge(options)
+
+  return maxAge != null && expirySeconds(maxAge) === undefined ? 'expiry' : undefined
 }
 
 // The seconds a token lives: the default when left out, null for never.
-function lifetime(expiresIn: Duration | null | undefined): number | null {
-  if (expiresIn === undefined)
+function lifetime(maxAge: Duration | null | undefined): number | null {
+  if (maxAge === undefined)
     return DEFAULT_EXPIRY_SECONDS
 
-  return expiresIn === null ? null : expirySeconds(expiresIn)!
+  return maxAge === null ? null : expirySeconds(maxAge)!
+}
+
+// `maxAge`, or the `expiresIn` it was called before 1.70.
+function tokenMaxAge(options: TokenOptions): Duration | null | undefined {
+  return options.maxAge === undefined ? options.expiresIn : options.maxAge
 }
 
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
   const id = crypto.randomUUID()
-  const seconds = lifetime(options.expiresIn)
+  const seconds = lifetime(tokenMaxAge(options))
 
   await core.store.bearerTokens.create({
     id,

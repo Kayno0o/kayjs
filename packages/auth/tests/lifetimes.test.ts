@@ -11,7 +11,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-function setup(email: { expires?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
+function setup(email: { maxAge?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
   const { mails, mailer } = mailbox()
   const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: LINKS, requireVerified: false, ...email, ...locales && { locales } } })
 
@@ -56,7 +56,7 @@ describe('email.expires', () => {
         requireVerified: false,
         locales: ['en', 'fr'],
         codes: 'both',
-        expires: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': '3h', 'verify-code': '20m', 'sign-in-code': '5m' },
+        maxAge: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': '3h', 'verify-code': '20m', 'sign-in-code': '5m' },
         templates: { 'reset-password': (data) => {
           seen.push(data.expires)
 
@@ -85,7 +85,7 @@ describe('email.expires', () => {
   })
 
   test('a reset link lives its set time and no longer', async () => {
-    const { browser, mails } = setup({ expires: { 'reset-password': '2h' } })
+    const { browser, mails } = setup({ maxAge: { 'reset-password': '2h' } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -102,7 +102,7 @@ describe('email.expires', () => {
   })
 
   test('a verification link set to a week still works after the default day, and a code after its own time', async () => {
-    const { browser, mails } = setup({ expires: { 'verify-email': '7d', 'verify-code': '1h' }, codes: 'both' })
+    const { browser, mails } = setup({ maxAge: { 'verify-email': '7d', 'verify-code': '1h' }, codes: 'both' })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -116,9 +116,9 @@ describe('email.expires', () => {
   })
 
   test('a bad lifetime fails at boot naming it', () => {
-    expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.expires.verify-email is \'a week\'')
-    expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kay: email.expires.verify is no link or code')
-    expect(() => setup({ expires: { constructor: '1d' } as never })).toThrow('kay: email.expires.constructor is no link or code')
-    expect(() => setup({ expires: { 'magic-link': '0s' } })).toThrow('kay: email.expires.magic-link is \'0s\'')
+    expect(() => setup({ maxAge: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.maxAge.verify-email is \'a week\'')
+    expect(() => setup({ maxAge: { verify: '1d' } as never })).toThrow('kay: email.maxAge.verify is no link or code')
+    expect(() => setup({ maxAge: { constructor: '1d' } as never })).toThrow('kay: email.maxAge.constructor is no link or code')
+    expect(() => setup({ maxAge: { 'magic-link': '0s' } })).toThrow('kay: email.maxAge.magic-link is \'0s\'')
   })
 })

@@ -9,19 +9,29 @@ import { importedName, walk } from './ast'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 
-// An option of a library function renamed in 1.70: where the options object sits among the call's arguments, and why the new name is the one the other options of kay use.
+// An option renamed in 1.70: the call it is given to (the function a package exports, or `method` of an object it exports), where the options object sits among the call's arguments, the keys leading to the object holding it, and why the new name is the one the other options of kay use.
+// `wrap` is the key the new name sits under, as `remember: { maxAge }` for `rememberMaxAge`.
 interface Rename {
   package: string
   function: string
+  method?: string
   at: number
+  path?: string[]
   from: string
   to: string
+  wrap?: string
   because: string
 }
+
+const MAX_AGE = 'how long something stays valid is `maxAge` across kay and its libraries'
 
 const RENAMES: Rename[] = [
   { package: '@kaynooo/kayjs-mail', function: 'mailer', at: 0, from: 'lang', to: 'locale', because: 'a language an app writes or formats for is a locale across kay' },
   { package: '@kaynooo/kayjs-cms', function: 'forgejo', at: 0, from: 'url', to: 'baseUrl', because: 'the address of a service API is named in kay\'s libraries' },
+  { package: '@kaynooo/kayjs-auth', function: 'createAuth', at: 0, from: 'rememberMaxAge', to: 'maxAge', wrap: 'remember', because: MAX_AGE },
+  { package: '@kaynooo/kayjs-auth', function: 'createAuth', at: 0, path: ['email'], from: 'expires', to: 'maxAge', because: MAX_AGE },
+  { package: '@kaynooo/kayjs-auth', function: 'createAuth', at: 0, path: ['organizations'], from: 'invitationMaxAge', to: 'maxAge', wrap: 'invitations', because: MAX_AGE },
+  { package: 'kay/server', function: 'files', method: 'url', at: 1, from: 'expires', to: 'maxAge', because: MAX_AGE },
 ]
 
 const BY_PACKAGE = Map.groupBy(RENAMES, rename => rename.package)
@@ -34,6 +44,17 @@ function keyOf(property: t.ObjectProperty): string | undefined {
     return property.key.name
 
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
+}
+
+// The edit renaming `property`: the key alone, or the whole property when the new name sits under a key of its own.
+function fix(rename: Rename, property: t.ObjectProperty, base: number, code: string): { start: number, end: number, text: string } {
+  const start = base + property.key.start!
+  const value = property.shorthand ? rename.from : code.slice(property.value.start!, property.value.end!)
+
+  if (rename.wrap !== undefined)
+    return { start, end: base + property.end!, text: `${rename.wrap}: { ${rename.to}: ${value} }` }
+
+  return property.shorthand ? { start, end: base + property.end!, text: `${rename.to}: ${rename.from}` } : { start, end: base + property.key.end!, text: rename.to }
 }
 
 // The options a library function took under their old names before 1.70, as an object literal at the call writes them.
@@ -93,33 +114,45 @@ export async function renamedOptions(root: string, options: CheckOptions): Promi
         const callee = node.callee
         let renames: Rename[] | undefined
 
-        if (callee.type === 'Identifier')
-          renames = locals.get(callee.name)
-        else if (callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier')
-          renames = namespaces.get(callee.object.name)?.filter(rename => rename.function === (callee.property as t.Identifier).name)
+        if (callee.type === 'Identifier') {
+          renames = locals.get(callee.name)?.filter(rename => rename.method === undefined)
+        }
+        else if (callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier') {
+          const name = callee.property.name
+
+          renames = [...namespaces.get(callee.object.name)?.filter(rename => rename.function === name && rename.method === undefined) ?? [], ...locals.get(callee.object.name)?.filter(rename => rename.method === name) ?? []]
+        }
 
         for (const rename of renames ?? []) {
-          const argument = node.arguments[rename.at]
+          let holder: t.Node | null | undefined = node.arguments[rename.at]
 
-          if (argument?.type !== 'ObjectExpression')
+          for (const key of rename.path ?? []) {
+            const next: t.ObjectProperty | undefined = holder?.type === 'ObjectExpression' ? holder.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === key) : undefined
+
+            holder = next?.value
+          }
+
+          if (holder?.type !== 'ObjectExpression')
             continue
 
-          const properties = argument.properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty')
+          const properties = holder.properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty')
+          const was = [...rename.path ?? [], rename.from].join('.')
+          const now = rename.wrap === undefined ? rename.to : `${rename.wrap}: { ${rename.to} }`
 
           for (const property of properties.filter(property => keyOf(property) === rename.from)) {
             // The new name beside the old one: the new wins already, and renaming would repeat a key.
-            const taken = properties.some(other => keyOf(other) === rename.to)
+            const taken = properties.some(other => keyOf(other) === (rename.wrap ?? rename.to))
             const at = base + property.key.start!
 
             found.push({
               file,
               ...positionAt(source, at),
               end: base + property.key.end!,
-              message: `\`${rename.from}\` is \`${rename.to}\` since 1.70, as ${rename.because}`,
-              help: `rename \`${rename.from}\` to \`${rename.to}\``,
+              message: `\`${was}\` is \`${now}\` since 1.70, as ${rename.because}`,
+              help: `write \`${now}\` for \`${rename.from}\``,
               code: 'deprecated-option-name',
               severity: level === 'warn' ? 'warning' : 'error',
-              ...!taken && { fixes: [{ title: `Use ${rename.to}`, edits: [{ start: at, end: property.shorthand ? base + property.end! : base + property.key.end!, text: property.shorthand ? `${rename.to}: ${rename.from}` : rename.to }], safe: true }] },
+              ...!taken && { fixes: [{ title: `Use ${now}`, edits: [fix(rename, property, base, code)], safe: true }] },
             })
           }
         }

@@ -253,7 +253,9 @@ describe('the file route', () => {
       // Another first character, as one the signature starts with would leave it valid.
       expect((await get(url.replace(/sig=(.)/, (_, first: string) => `sig=${first === 'A' ? 'B' : 'A'}`))).status).toBe(403)
       expect((await get(url.replace(/until=\d+/, `until=${until + 600}`))).status).toBe(403)
-      expect(files.url(key, { expires: '1d' })).not.toBe(url)
+      expect(files.url(key, { maxAge: '1d' })).not.toBe(url)
+      // `expires` is the name before 1.70, read until 1.73.
+      expect(files.url(key, { expires: '1d' })).toBe(files.url(key, { maxAge: '1d' }))
 
       setSystemTime(new Date((until + 1) * 1000))
       expect((await get(url)).status).toBe(403)

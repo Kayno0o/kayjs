@@ -94,11 +94,11 @@ So call `regenerate()` at sign-in, not on every request.
 
 ### Remember me
 
-`lifetime()` gives one session its own lifetime in place of `maxAge`. Call it right after `regenerate()`. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`.
+`maxAge()` gives one session its own `maxAge` in place of the plugin's. Call it right after `regenerate()`. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`.
 
 ```ts
 await ctx.locals.session.regenerate()
-await ctx.locals.session.lifetime(input.remember ? '90d' : 'browser')
+await ctx.locals.session.maxAge(input.remember ? '90d' : 'browser')
 ```
 
 `'browser'` sends a cookie the browser drops when it closes. The server keeps that session for `browserMaxAge` without use, one day by default.

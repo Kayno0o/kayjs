@@ -73,7 +73,7 @@ export const signOut = action(async ctx => {
 
 ### Remember a visitor for longer
 
-`lifetime()` gives this session its own lifetime in place of `maxAge`, right after `regenerate()`:
+`maxAge()` gives this session its own `maxAge` in place of the plugin's, right after `regenerate()`:
 
 ```kay
 --- server
@@ -93,7 +93,7 @@ export const signIn = action(credentials, async (input, ctx) => {
 
   await ctx.locals.session.regenerate()
   await ctx.locals.session.set('userId', user.id)
-  await ctx.locals.session.lifetime(input.remember ? '90d' : 'browser')
+  await ctx.locals.session.maxAge(input.remember ? '90d' : 'browser')
   ctx.redirect('/')
 })
 ---
@@ -171,7 +171,7 @@ export default defineConfig({ requireGuards: true })
 - `regenerate()` moves the data to a new id, for right after signing in, so an id planted before it is worth nothing.
 - `regenerate()` also restarts the `absoluteMaxAge` clock, so it belongs at a sign-in or a change of privileges, never on every request.
 - All of them return promises.
-- `lifetime(maxAge)` gives this session its own lifetime in place of `maxAge`, for "remember me" at sign-in, right after `regenerate()`.
+- `maxAge(value)` gives this session its own `maxAge` in place of the plugin's, for "remember me" at sign-in, right after `regenerate()`.
 - It takes a string such as `'90d'`, or `'browser'` for a cookie without `Max-Age`, which the browser drops on closing, lasting `browserMaxAge` unused on the server, `'1d'` by default.
 - The session keeps it through its extensions and `regenerate()`, a store getting it as `set`'s `maxAge`, until `destroy()`, never past `absoluteMaxAge`.
 - A lifetime that is no positive duration throws.
@@ -198,7 +198,7 @@ export default defineConfig({ requireGuards: true })
 - Adding `domain` to a running site leaves each browser's host-only cookie beside the new one until it expires, so a site keeping its sessions in the cookie, without a store, changes its `cookie` name with it.
 - Those sibling hosts still count as other sites to each other's actions, API posts and websockets, which only a page of the same host reaches.
 - It is read on first use only, and written only when the session changed or is due an extension.
-- A session lasts `maxAge` without use, `'30d'` by default, and one used past half of it is extended, but never past `absoluteMaxAge` from its start or its last `regenerate()`, `'90d'` by default, however much it is used, so a stolen cookie dies too; no `lifetime()` outlasts it.
+- A session lasts `maxAge` without use, `'30d'` by default, and one used past half of it is extended, but never past `absoluteMaxAge` from its start or its last `regenerate()`, `'90d'` by default, however much it is used, so a stolen cookie dies too; no `maxAge()` outlasts it.
 - A forged or expired cookie reads as an empty session and is cleared.
 
 ### Files from a folder

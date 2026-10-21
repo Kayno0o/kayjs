@@ -54,7 +54,7 @@ export interface ProfileOptions<Field extends string = string> {
 
 // What `createAuth`'s `pages` option takes: `auth()`'s own options and the profile data of the app.
 export interface AuthPagesConfig extends AuthPagesOptions {
-  // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `rememberMaxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
+  // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `remember.maxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
   remember?: RememberMode | undefined
   // Extra fields on the account page's profile form, with where they are read and stored.
   profile?: ProfileOptions | undefined

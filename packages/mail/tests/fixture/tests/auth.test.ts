@@ -48,7 +48,7 @@ describe('authMailer', () => {
   })
 
   it('words the lifetimes kayjs-auth was set to, in the mail\'s language, and the defaults when it sends none', async () => {
-    const set = await authMailer(mail.render).send({ ...link, expires: { link: 7 * 86_400, code: 20 * 60 } })
+    const set = await authMailer(mail.render).send({ ...link, maxAge: { link: 7 * 86_400, code: 20 * 60 } })
     const magic = await authMailer(mail.render).send({ ...link, kind: 'magic-link', locale: 'en', expires: { link: 7200, code: 300 } })
 
     expect(set.html?.replace(SPACES, ' ')).toContain('Le lien est valable 7 jours. Le code est valable 20 minutes, saisi là où vous l\'avez demandé.')

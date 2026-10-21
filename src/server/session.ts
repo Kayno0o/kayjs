@@ -41,7 +41,7 @@ export interface SessionOptions {
   maxAge?: Duration | undefined
   // How long a session lasts from its start or its last `regenerate()`, however much it is used, 90 days by default; no lifetime outlasts it.
   absoluteMaxAge?: Duration | undefined
-  // How long a session whose cookie dies with the browser, through `lifetime('browser')`, lasts without being used, a day by default.
+  // How long a session whose cookie dies with the browser, through `maxAge('browser')`, lasts without being used, a day by default.
   browserMaxAge?: Duration | undefined
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string | undefined
@@ -59,7 +59,9 @@ export interface Session<Data extends object> {
   destroy: () => Promise<void>
   // Moves the data to a new id, for right after signing in, so an id planted before it is worth nothing.
   regenerate: () => Promise<void>
-  // This session's own lifetime in place of `maxAge`, kept until it is destroyed, for "remember me": seconds or a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
+  // This session's own maxAge in place of `maxAge`, kept until it is destroyed, for "remember me": seconds or a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
+  maxAge: (maxAge: Duration | 'browser') => Promise<void>
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge()`. */
   lifetime: (maxAge: Duration | 'browser') => Promise<void>
   // The lifetimes the plugin resolved, in seconds, defaults included: for a library that must agree with the app's session instead of asking for them again.
   readonly settings: SessionSettings
@@ -243,10 +245,14 @@ class RequestSession<Data extends object> implements Session<Data> {
     return { maxAge, absoluteMaxAge, browserMaxAge }
   }
 
-  async lifetime(maxAge: Duration | 'browser'): Promise<void> {
+  async maxAge(maxAge: Duration | 'browser'): Promise<void> {
     await this.load()
-    this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: wholeSeconds(maxAge, 'a session lifetime') }
+    this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: wholeSeconds(maxAge, 'a session maxAge') }
     this.changed = true
+  }
+
+  async lifetime(maxAge: Duration | 'browser'): Promise<void> {
+    await this.maxAge(maxAge)
   }
 
   // The Set-Cookie value to send, or undefined when the session needs none.

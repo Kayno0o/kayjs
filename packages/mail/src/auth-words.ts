@@ -27,9 +27,10 @@ export function authWords(mail: AuthMail): AuthWords {
 
   const of = (line: 'subject' | 'lead' | 'ending'): string => t(`mail.auth.${kind}.${line}`, { site: mail.site, email: mail.to, detail: mail.detail ?? '', what: t(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
-  const link = mail.expires?.link === undefined ? undefined : durationWords(mail.expires.link, mail.locale) + (kind === 'magic-link' ? t('mail.auth.once') : '')
+  const maxAge = mail.maxAge ?? mail.expires
+  const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? t('mail.auth.once') : '')
   const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? t(`mail.auth.${kind}.lasts`) : ''
-  const code = mail.expires?.code === undefined ? t('mail.auth.codeWorks', { duration: t('mail.auth.codeLasts') }) : t('mail.auth.codeWorks', { duration: durationWords(mail.expires.code, mail.locale) })
+  const code = maxAge?.code === undefined ? t('mail.auth.codeWorks', { duration: t('mail.auth.codeLasts') }) : t('mail.auth.codeWorks', { duration: durationWords(maxAge.code, mail.locale) })
   const ending = [lasts === '' ? undefined : t('mail.auth.linkWorks', { duration: lasts }), mail.code === undefined ? undefined : code, of('ending')]
 
   return {

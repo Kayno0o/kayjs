@@ -11,21 +11,21 @@ afterEach(() => {
 })
 
 describe('time options take a Duration', () => {
-  test('rememberMaxAge takes a string, the bare seconds of before 1.70 still work, and a bad one fails at boot naming it', async () => {
-    for (const rememberMaxAge of ['45d' as never, 45 * 24 * 60 * 60 as never]) {
-      const { browser, store } = testApp({ rememberMaxAge })
+  test('remember.maxAge takes a string, the bare seconds of before 1.70 still work, and a bad one fails at boot naming it', async () => {
+    for (const maxAge of ['45d' as never, 45 * 24 * 60 * 60 as never]) {
+      const { browser, store } = testApp({ remember: { maxAge } })
       const ada = browser()
 
       await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
       expect((await store.sessions.listByUser((await ada.json('/me') as { id: string }).id))[0]!.maxAge).toBe(45 * 24 * 60 * 60)
     }
 
-    expect(() => testApp({ rememberMaxAge: '3 weeks' as Duration })).toThrow('kay: rememberMaxAge is \'3 weeks\'')
-    expect(() => testApp({ rememberMaxAge: '0s' })).toThrow('kay: rememberMaxAge is \'0s\'')
+    expect(() => testApp({ remember: { maxAge: '3 weeks' as Duration } })).toThrow('kay: remember.maxAge is \'3 weeks\'')
+    expect(() => testApp({ remember: { maxAge: '0s' } })).toThrow('kay: remember.maxAge is \'0s\'')
   })
 
-  test('a sub-second rememberMaxAge is stored as whole seconds, rounded up', async () => {
-    const { browser, store } = testApp({ rememberMaxAge: '0.4s' })
+  test('a sub-second remember.maxAge is stored as whole seconds, rounded up', async () => {
+    const { browser, store } = testApp({ remember: { maxAge: '0.4s' } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
@@ -111,18 +111,18 @@ describe('time options take a Duration', () => {
     expect(() => testApp({ limits: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: limits.signIn.window is \'-5m\'')
   })
 
-  test('a token\'s expiresIn takes a string, and a bad one answers expiry', async () => {
+  test('a token\'s maxAge takes a string, and a bad one answers expiry', async () => {
     const { browser, store } = testApp({ scopes: ['posts:read'] })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
-    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone', { expiresIn: '30d' })
+    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone', { maxAge: '30d' })
     const [stored] = await store.bearerTokens.listByUser((await ada.json('/me') as { id: string }).id)
 
     expect(minted.id).toBe(stored!.id)
     expect(stored!.expiresAt!.getTime() - Date.now()).toBeGreaterThan(30 * DAY_MS - 60_000)
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { expiresIn: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { expiresIn: '3600s' })).toMatchObject({ ok: true })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { maxAge: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { maxAge: '3600s' })).toMatchObject({ ok: true })
   })
 })

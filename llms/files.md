@@ -55,7 +55,7 @@ await files.delete(key)
 import { files } from 'kay/server'
 
 const key = await files.put(file, { private: true })
-const link = files.url(key, { expires: '1d' })
+const link = files.url(key, { maxAge: '1d' })
 ```
 
 ### Decide in a route who gets a file
@@ -129,7 +129,7 @@ const real = holdsType(await file.slice(0, SNIFFED_BYTES).bytes(), typeOfName(fi
 ### Private files
 
 - `files.put(file, { private: true })` gives a key starting `private/`, which `/_kay/files/` serves only to a link `files.url(key)` signed: the page rendering it is what decides who gets the file, behind its guard.
-- The link stays valid an hour, `files.url(key, { expires: '1d' })` longer, rounded up to the next ten minutes so a page rendered again soon gives the same link, which the browser keeps cached.
+- The link stays valid an hour, `files.url(key, { maxAge: '1d' })` longer, rounded up to the next ten minutes so a page rendered again soon gives the same link, which the browser keeps cached.
 - It is signed with a key derived from [the app secret](environment.md#the-app-secret), else a key of the process, which a restart changes, which several processes do not share, and which a production server warns of once. A script signing one with no server reads `KAY_SECRET`, and `secret` in the kay.config.ts beside it once it has used the store (`files.put`, `files.get`).
 - A private image is resized through its signed link, its variants kept by no shared cache.
 - `diskFiles` writes private files at mode 0600 in folders at 0700, closing a `private/` folder an older release left open. The image cache, where a store off this disk is copied and variants are made, is a folder only the server's user can enter: `.kay/cache/images` in a project, a per-user, per-executable folder in the temp directory for a compiled executable. A folder that is a link, or another user's, is never written into: kay uses a fresh private one, and a copy found there that is not the server's own at 0600 is copied again.

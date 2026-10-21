@@ -60,9 +60,9 @@ A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replace
 
 `pages.home` is where a visitor lands when nothing asked for another page, `/` by default: after a password reset, a verified address, a changed one, a magic link, a code, registering, a passkey or a provider. On a site with locales it is read as written for the default locale, and the pages put it in the visitor's language.
 
-How long a session lasts is the `session()` plugin's: its `maxAge` unseen, its `absoluteMaxAge` from the sign-in, and its `browserMaxAge` for a visitor who did not ask to be remembered. kayjs-auth repeats none of it, so the cookie and the list of sessions agree. Only the longer session of "keep me signed in" is its own, `rememberMaxAge: '90d'`.
+How long a session lasts is the `session()` plugin's: its `maxAge` unseen, its `absoluteMaxAge` from the sign-in, and its `browserMaxAge` for a visitor who did not ask to be remembered. kayjs-auth repeats none of it, so the cookie and the list of sessions agree. Only the longer session of "keep me signed in" is its own, `remember: { maxAge: '90d' }`.
 
-The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `rememberMaxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
+The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `remember.maxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
 
 A magic link carries the choice of the browser that asked for it, so opened in another browser it signs in as chosen. The sign-out route and a provider link with no `redirect` go to `home` as written, not in the visitor's language.
 
@@ -291,19 +291,19 @@ From then on, every way of signing in stops at the two-factor page. `verifyTwoFa
 A bearer token lets a device or a script call your API with `Authorization: Bearer <token>`. `createToken(proof, label, options)` makes one from a signed-in session. The token is shown once, as only its digest is stored.
 
 ```ts
-const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], expiresIn: '30d' })
+const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], maxAge: '30d' })
 
 if (result.ok)
   console.log(result.token)
 ```
 
-`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `expiresIn` is a string such as `'30d'`; a token expires after 90 days without it, and `expiresIn: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
+`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `maxAge` is a string such as `'30d'`; a token expires after 90 days without it, and `maxAge: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
 
 Control characters are removed from a token's label and from a passkey's name.
 
 `listTokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
-For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `expiresIn: null` to keep an old device working. Only `null` means never: do not forward a client's value into `expiresIn` unchecked.
+For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `maxAge: null` to keep an old device working. Only `null` means never: do not forward a client's value into `maxAge` unchecked.
 
 ## Your own profile fields
 
@@ -461,7 +461,7 @@ createAuth({
     manage: 'admin',
     defaultRoles: ['member'],
     invitationPage: '/invitation',
-    invitationMaxAge: '7d',
+    invitations: { maxAge: '7d' },
   },
 })
 ```
@@ -547,7 +547,7 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails. `authMailer` comes from kayjs-mail and needs its `mail({ module })` in `kay.config.ts`.
 
-Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.expires` changes any of them, such as a week for invited users: `email: { expires: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `expires.link` and `expires.code`, and `lifetime(seconds, locale)` words them.
+Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.maxAge` changes any of them, such as a week for invited users: `email: { maxAge: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `expires.link` and `expires.code`, and `lifetime(seconds, locale)` words them.
 
 The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `auth`, `mail` and `authMailer`, and no sign-in page of its own.
 

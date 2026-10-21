@@ -24,7 +24,7 @@ import { reprove } from './twoFactor'
 const MINUTE = 60
 const HOUR = 60 * MINUTE
 
-// How long each link and code works, in seconds, unless the `email.expires` option says otherwise.
+// How long each link and code works, in seconds, unless the `email.maxAge` option says otherwise.
 const TOKEN_LIFETIMES: Record<TokenType, number> = {
   'verify-email': 24 * HOUR,
   'reset-password': HOUR,
@@ -34,19 +34,19 @@ const TOKEN_LIFETIMES: Record<TokenType, number> = {
   'verify-code': 10 * MINUTE,
 }
 
-// The lifetimes the `expires` option sets over the defaults, in seconds, a bad one failing at boot naming it.
-export function tokenLifetimes(expires: EmailOptions['expires']): Record<TokenType, number> {
+// The lifetimes the `maxAge` option sets over the defaults, in seconds, a bad one failing at boot naming it.
+export function tokenLifetimes(maxAge: EmailOptions['maxAge']): Record<TokenType, number> {
   const lifetimes = { ...TOKEN_LIFETIMES }
-  const unknown = Object.keys(expires ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
+  const unknown = Object.keys(maxAge ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
-    throw configError(`email.expires.${unknown} is no link or code of kayjs-auth`)
+    throw configError(`email.maxAge.${unknown} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
-    const wanted = expires?.[type]
+    const wanted = maxAge?.[type]
 
     if (wanted !== undefined)
-      lifetimes[type] = durationSeconds(wanted, `email.expires.${type}`)
+      lifetimes[type] = durationSeconds(wanted, `email.maxAge.${type}`)
   }
 
   return lifetimes
@@ -81,12 +81,14 @@ export interface EmailOptions {
   // How long an account registered and never verified is kept before it is deleted, `onDelete` first: seconds or a string such as '7d'. 30 days by default with `requireVerified`; without it accounts are kept unless this is set, as an unverified one may be in use.
   unverifiedMaxAge?: Duration | undefined
   // How long each link and code works, over the defaults: `{ 'verify-email': '7d' }` for invited users. The keys are the four links, `verify-email`, `reset-password`, `magic-link` and `change-email`, and the two codes, `sign-in-code` and `verify-code`; the mails state what is set.
+  maxAge?: Partial<Record<TokenType, Duration>> | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
   expires?: Partial<Record<TokenType, Duration>> | undefined
   // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'unverifiedMaxAge' | 'codes' | 'locales' | 'translations' | 'expires'>> & { expires: Record<TokenType, number>, links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
+export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'unverifiedMaxAge' | 'codes' | 'locales' | 'translations' | 'maxAge' | 'expires'>> & { maxAge: Record<TokenType, number>, links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
 
 // A code waiting in the session that asked for it, which alone can spend it.
 export interface PendingCode {
@@ -385,7 +387,7 @@ async function bindCode(state: RequestState, type: LinkType, email: string): Pro
   const nonce = randomToken()
   const codeType = CODE_OF[type as CodedLink]
 
-  await state.session.set('authEmailCode', { type: codeType, email, nonce, expires: Date.now() + state.core.email!.expires[codeType] * 1000 })
+  await state.session.set('authEmailCode', { type: codeType, email, nonce, expires: Date.now() + state.core.email!.maxAge[codeType] * 1000 })
 
   return nonce
 }
@@ -405,7 +407,7 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   const record = spent && await core.store.users.get(spent.userId)
 
   if (!spent || !record || record.email !== spent.email) {
-    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, `${core.email!.expires[type]}s`) < CODE_MISSES)
+    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, `${core.email!.maxAge[type]}s`) < CODE_MISSES)
       return { ok: false, error: 'invalid' } as const
 
     // Only this session's pending code is dropped: the holder's live code may be one another session asked for, and it is unreachable from here anyway, since its digest binds that session's nonce.
@@ -490,8 +492,8 @@ async function spendResend(state: RequestState, id: string, limit: 'resend' | 'e
 }
 
 // The seconds the link and the code of a mail work, for the ones it carries.
-function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['expires'] {
-  return { ...content.url === undefined ? {} : { link: mail.expires[type] }, ...content.code === undefined ? {} : { code: mail.expires[CODE_OF[type as CodedLink]] } }
+function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['maxAge'] {
+  return { ...content.url === undefined ? {} : { link: mail.maxAge[type] }, ...content.code === undefined ? {} : { code: mail.maxAge[CODE_OF[type as CodedLink]] } }
 }
 
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.
@@ -508,7 +510,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
     const token = randomToken() + await rememberMark(state, type)
 
     content.url = `${core.url}${mail.links[type]}?token=${token}`
-    await core.store.tokens.create({ digest: digest(type === 'magic-link' ? unmarked(token) : token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.expires[type] * 1000) })
+    await core.store.tokens.create({ digest: digest(type === 'magic-link' ? unmarked(token) : token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.maxAge[type] * 1000) })
   }
 
   if (mode !== 'link' && nonce !== undefined) {
@@ -517,14 +519,14 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
     content.code = code
     await core.store.tokens.deleteForUser(record.id, codeType)
-    await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.expires[codeType] * 1000) })
+    await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.maxAge[codeType] * 1000) })
   }
 
   const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-  const expires = lifetimesOf(mail, type, content)
+  const maxAge = lifetimesOf(mail, type, content)
 
-  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, expires, ...templates[type]({ site: core.site, email, locale, ...content, expires }) })
+  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, maxAge, expires: maxAge, ...templates[type]({ site: core.site, email, locale, ...content, maxAge, expires: maxAge }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

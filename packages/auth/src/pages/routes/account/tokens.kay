@@ -19,7 +19,7 @@ const expiry = (days: number | undefined) => days === undefined ? undefined : da
 // The plain token comes back once, for the page to show it this one time.
 export const create = action(schemas.createToken, async (input, ctx) => {
   // The app's scopes are its own type, which this page cannot name: createToken refuses any it does not declare.
-  const result = await ctx.locals.auth.createToken(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes as never[] : undefined, expiresIn: expiry(input.days) })
+  const result = await ctx.locals.auth.createToken(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes as never[] : undefined, maxAge: expiry(input.days) })
 
   return result.ok ? result.token : ctx.fail(400, { error: result.error })
 })

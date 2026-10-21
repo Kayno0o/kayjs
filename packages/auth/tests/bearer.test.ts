@@ -10,7 +10,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'stats')[], expiresIn?: Duration | null } = {}) {
+async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'stats')[], maxAge?: Duration | null } = {}) {
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'] })
   const ada = app.browser()
 
@@ -185,11 +185,11 @@ describe('scoped and expiring tokens', () => {
 
     expect(await ada.post('/call/createToken', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toEqual({ ok: false, error: 'scope' })
     expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { expiresIn: '0s' })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
   })
 
   test('an expired token is refused, and listed as expired', async () => {
-    const { ada, browser, bearer, auth, minted } = await withToken({ expiresIn: '1h' })
+    const { ada, browser, bearer, auth, minted } = await withToken({ maxAge: '1h' })
 
     expect(await browser().json('/me', { headers: bearer })).toMatchObject({ email: 'ada@example.com' })
 
@@ -208,7 +208,7 @@ describe('issuing a token from the server', () => {
     const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
     events.length = 0
-    const issued = await app.auth.issueToken(user.id, 'Kitchen display', { expiresIn: '31536000s' })
+    const issued = await app.auth.issueToken(user.id, 'Kitchen display', { maxAge: '31536000s' })
 
     expect(issued.ok).toBe(true)
     expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${issued.ok && issued.token}` } })).toMatchObject({ email: 'ada@example.com' })
@@ -232,7 +232,7 @@ describe('issuing a token from the server', () => {
     expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toEqual({ ok: false, error: 'token' })
     expect(await app.auth.issueToken(user.id, 'Phone', { token: 'has a space in it, sixteen+' })).toEqual({ ok: false, error: 'token' })
     expect(await app.auth.issueToken(user.id, ' ')).toEqual({ ok: false, error: 'label' })
-    expect(await app.auth.issueToken(user.id, 'Phone', { expiresIn: '0s' })).toEqual({ ok: false, error: 'expiry' })
+    expect(await app.auth.issueToken(user.id, 'Phone', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
 
     await app.store.users.update(user.id, { bannedAt: new Date() })
 
@@ -315,8 +315,8 @@ describe('token hygiene', () => {
 
     expect(Math.abs(stored!.expiresAt!.getTime() - (Date.now() + 90 * DAY_MS))).toBeLessThan(60_000)
 
-    const forever = await ada.callOk('createToken', { password: PASSWORD }, 'Forever', { expiresIn: null })
-    const issuedForever = await auth.issueToken(id, 'Script', { expiresIn: null })
+    const forever = await ada.callOk('createToken', { password: PASSWORD }, 'Forever', { maxAge: null })
+    const issuedForever = await auth.issueToken(id, 'Script', { maxAge: null })
     const issuedDefault = await auth.issueToken(id, 'Default')
     const byId = new Map((await store.bearerTokens.listByUser(id)).map(token => [token.id, token]))
 
@@ -338,8 +338,8 @@ describe('token hygiene', () => {
     const { ada, auth } = await withToken()
     const { id } = await ada.json('/me') as { id: string }
 
-    for (const expiresIn of [0, -5, 'forever'] as never[])
-      expect(await auth.issueToken(id, 'Phone', { expiresIn })).toEqual({ ok: false, error: 'expiry' })
+    for (const maxAge of [0, -5, 'forever'] as never[])
+      expect(await auth.issueToken(id, 'Phone', { maxAge })).toEqual({ ok: false, error: 'expiry' })
   })
 
   test('an adopted token needs 32 characters of at least 10 kinds, and keeps its own form without the prefix', async () => {

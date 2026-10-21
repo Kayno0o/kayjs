@@ -57,13 +57,13 @@ A route of your own that takes uploads can judge them the way the file route doe
 
 `files.put(file, { private: true })` stores a file that only a signed link reaches. `files.url(key)` signs one, valid for an hour.
 
-The page rendering the link, behind its guard, decides who gets the file. Use `files.url(key, { expires: '1d' })` for a longer link.
+The page rendering the link, behind its guard, decides who gets the file. Use `files.url(key, { maxAge: '1d' })` for a longer link.
 
 The link is signed with a key made from the app's secret. See [The app secret](/guides/sessions-and-guards#the-app-secret).
 
 A route of your own can answer with `files.response(key, request)` instead.
 
-A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers the key and the time it expires, so changing either breaks it. A link stays valid for an hour, and `files.url(key, { expires: '1d' })` makes it longer.
+A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers the key and the time it expires, so changing either breaks it. A link stays valid for an hour, and `files.url(key, { maxAge: '1d' })` makes it longer.
 
 The time is rounded up to the next ten minutes at most. Pages rendered a few minutes apart then give the same link, which the browser keeps cached.
 

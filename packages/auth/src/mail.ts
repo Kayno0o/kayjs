@@ -30,6 +30,8 @@ export interface Mail extends MailContent {
   // The language it is written in, one of the `locales` option's.
   locale: string
   // How many seconds its link and its code work, for the ones it carries.
+  maxAge?: { link?: number, code?: number } | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
   expires?: { link?: number, code?: number } | undefined
 }
 
@@ -48,6 +50,8 @@ export interface MailData {
   // The language to write in, one of the `locales` option's.
   locale: string
   // How many seconds the mail's link and its code work, for the ones it carries: `{ link: 86400, code: 600 }`. `lifetime(seconds, locale)` words them.
+  maxAge?: { link?: number, code?: number } | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
   expires?: { link?: number, code?: number } | undefined
 }
 
@@ -120,7 +124,7 @@ export const lifetime = durationWords
 
 // How long what the mail carries works, a magic link being usable once.
 function lasting(words: Wording, data: MailData, once = false): string {
-  const { link, code } = data.expires ?? {}
+  const { link, code } = data.maxAge ?? data.expires ?? {}
   const parts = [data.url === undefined || link === undefined ? undefined : words.linkWorks(lifetime(link, data.locale), once), data.code === undefined || code === undefined ? undefined : words.codeWorks(lifetime(code, data.locale))]
 
   return parts.filter(part => part !== undefined).join(' ')

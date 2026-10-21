@@ -51,6 +51,8 @@ export interface PutOptions {
 
 export interface UrlOptions {
   // How long a link to a private file stays valid, an hour by default; it is rounded up so pages rendered minutes apart give the same link, which the browser keeps cached.
+  maxAge?: Duration | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
   expires?: Duration | undefined
 }
 
@@ -345,7 +347,7 @@ export const files = {
 
     readScriptSecret()
 
-    const seconds = durationSeconds(options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s expires')
+    const seconds = durationSeconds(options.maxAge ?? options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s maxAge')
     const step = Math.min(EXPIRY_STEP, seconds)
     const until = Math.ceil((Date.now() / 1000 + seconds) / step) * step
 

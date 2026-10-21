@@ -114,7 +114,8 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
     destroy: write(async () => session.destroy()),
     settings: session.settings,
     regenerate: write(async () => session.regenerate()),
-    lifetime: write(async maxAge => session.lifetime(maxAge)),
+    maxAge: write(async maxAge => session.maxAge(maxAge)),
+    lifetime: write(async maxAge => session.maxAge(maxAge)),
   }
 }
 
@@ -179,7 +180,9 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
   defaultRoles?: NoInfer<Role>[] | undefined
-  // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: seconds or a string such as '90d', 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
+  // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: `remember: { maxAge: '90d' }`, 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
+  remember?: { maxAge?: Duration | undefined } | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `remember: { maxAge }`. */
   rememberMaxAge?: Duration | undefined
   // The password and username rules, over the defaults of 10 to 128 characters and 2 to 32: `{ password: { min: 12, check: p => /\d/.test(p) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } }`. The server, the prebuilt pages and `features().rules` all follow them, and an island passes the same object, or `features().rules`, to `passwordProblem` and `usernameProblem` from `@kaynooo/kayjs-auth/rules`.
   rules?: CredentialRules | undefined
@@ -1726,7 +1729,6 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       return bind().site
     },
     limits: resolveLimits(options.limits, options.rateLimit),
-    rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
     rules: asConfigError(() => resolveRules(options.rules)),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     securityPage: paths?.security,
@@ -1739,7 +1741,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
       ...options.email,
-      expires: tokenLifetimes(options.email.expires),
+      maxAge: tokenLifetimes(options.email.maxAge ?? options.email.expires),
       links: emailLinks(options.email.links, paths?.links),
       requireVerified: options.email.requireVerified ?? true,
       locales,
@@ -1769,6 +1771,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
+    url,
+    rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? options.rememberMaxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
+    oauth,
   }
 
   function refreshersFor(made: SiteBound): void {

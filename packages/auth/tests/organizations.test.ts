@@ -13,7 +13,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}, extra: { onDelete?: () => Promise<void> } = {}) {
+async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitations?: { maxAge: Duration } } = {}, extra: { onDelete?: () => Promise<void> } = {}) {
   const mails: Mail[] = []
   // What `onAuthEvent` hears of the same events: the event, who it happened to, its fields and who acted.
   const heard: [AuthEvent, string | null, object, string | undefined][] = []
@@ -187,16 +187,16 @@ describe('organizations', () => {
     expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
-  test('invitationMaxAge takes a duration string, the bare seconds of before 1.70 still work, and a bad one fails naming the option', async () => {
+  test('invitations.maxAge takes a duration string, the bare seconds of before 1.70 still work, and a bad one fails naming the option', async () => {
     for (const maxAge of ['2d' as never, 2 * 24 * 60 * 60 as never]) {
-      const { ada, org } = await setup({ invitationMaxAge: maxAge })
+      const { ada, org } = await setup({ invitations: { maxAge } })
       const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
 
       expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeGreaterThan(2 * 24 * 60 * 60 * 1000 - 60_000)
       expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(2 * 24 * 60 * 60 * 1000)
     }
 
-    await expect(setup({ invitationMaxAge: 'soon' as Duration })).rejects.toThrow('kay: organizations.invitationMaxAge is \'soon\'')
+    await expect(setup({ invitations: { maxAge: 'soon' as Duration } })).rejects.toThrow('kay: organizations.invitations.maxAge is \'soon\'')
   })
 
   test('invitations are listed for managers, replaced when sent again, revoked, declined and expire', async () => {

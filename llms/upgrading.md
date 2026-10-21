@@ -85,6 +85,10 @@ Every option, store argument and test helper of kay and its libraries takes a `D
 
 `mailer({ lang })` and a message's `lang` are `locale`, as kayjs-auth's mail and `i18n` name a language an app serves or formats for; `lang` stays the language of a document, as kay's own `lang`. The old name still works for three minors, and `kay upgrade` renames it in a `mailer({ ... })` call. A message's `lang`, and an object held in a variable, are not found: rename them where they are passed.
 
+### A lifetime is `maxAge`
+
+How long something stays valid is `maxAge` in every option, as the conventions say ([Component libraries](component-libraries.md)): `files.url(key, { expires })`, a token's `expiresIn` (`createToken`, `issueToken`), kayjs-auth's `email.expires`, `rememberMaxAge` (now `remember: { maxAge }`) and `organizations.invitationMaxAge` (now `invitations: { maxAge }`), `session.lifetime()` (now `session.maxAge()`), and the `expires` a mail carries for a template and a mailer (`MailData`, `Mail`, kayjs-mail's `AuthMail`). The old names still work for three minors, until 1.73. `kay check --fix` (or `kay upgrade`) renames those it finds in a `createAuth` or `files.url` call written out (`deprecated-option-name`); a token's `expiresIn`, `session.lifetime()` and a template's `data.expires` are on objects `kay check` cannot tell by name, so rename them where they are written.
+
 ## 1.69.0
 
 ### `guards` and `layouts` held in a variable, and a spread in an endpoint or `api()`, are errors

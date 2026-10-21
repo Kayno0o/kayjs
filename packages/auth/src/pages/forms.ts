@@ -52,7 +52,7 @@ export const guarded = {
 // The current password, or a code for an account without one or a change asking for the second factor.
 const proof = { password: t.Optional(password), code: t.Optional(code) }
 
-// Whether the sign-in a form asks for lasts `rememberMaxAge`: the box when the pages show one, else what `pages.remember` fixes, the same by every way of signing in.
+// Whether the sign-in a form asks for lasts `remember.maxAge`: the box when the pages show one, else what `pages.remember` fixes, the same by every way of signing in.
 export function remembered(features: Pick<AuthFeatures, 'pages'>, chosen: boolean | undefined): boolean {
   const mode = features.pages?.remember ?? 'checkbox'
 
