@@ -11,6 +11,7 @@ import { componentName } from '../compiler'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
 import { OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
+import { publicEnvFiles } from '../server/env-state'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -118,11 +119,14 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // What `route()` takes: each page as its file names it, a catch-all as `*name`.
   const named = [...new Set(routes.map(route => route.catchAll === undefined ? route.pattern : route.pattern.replace(CATCH_ALL, `/*${route.catchAll}`)))]
 
-  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named)
+  // The modules declaring a `s.Public` field, whose `defineEnv` results carry the type of what an island reads.
+  const publicModules = publicEnvFiles(root).filter(file => file.endsWith('.ts')).map(file => modulePath(join(root, file)))
+
+  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named, publicModules)
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, serverModules: { module: string, name: string }[] = [], endpoints: string[] = [], named: string[] = []): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, serverModules: { module: string, name: string }[] = [], endpoints: string[] = [], named: string[] = [], publicModules: string[] = []): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
@@ -134,14 +138,15 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
   const pageNames = named.length > 0 ? `, patterns: ${named.map(pattern => JSON.stringify(pattern)).join(' | ')}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
-  const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
+  const publicTypes = [...config === undefined ? [] : [`PublicEnvOf<typeof import(${importSpecifier(config)}).default>`], ...publicModules.map(file => `PublicFieldsOfModule<typeof import(${importSpecifier(file)})>`)]
+  const publicEnv = publicTypes.length === 0 ? '' : `, publicEnv: ${publicTypes.join(' & ')}`
   const inferred = [
     ...app === undefined ? [] : [`app: typeof import(${importSpecifier(app)}).app`, `locals: LocalsOf<typeof import(${importSpecifier(app)}).app>`],
     ...!servers || config === undefined ? [] : [`extensions: ${[`ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`, ...serverModules.map(({ module, name }) => `ServerOfModule<typeof import(${importSpecifier(module)}), ${JSON.stringify(name)}>`)].join(' | ')}`],
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, LocalsOf, PublicEnvOf, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',

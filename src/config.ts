@@ -29,6 +29,7 @@ import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { kayLog } from './runtime/log'
 import { bundled, importModule } from './server/bundle'
+import { publicEnvFiles } from './server/env-state'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
@@ -132,7 +133,7 @@ export interface KayConfig {
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string> | undefined
-  // Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
+  // Deprecated since 1.70, dropped in 1.73: mark the field `s.Public` in `defineEnv` instead. Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
@@ -481,7 +482,7 @@ export function defineConfig<Config extends KayConfig>(config: Config): Config {
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
-  return withSiteUrl(withExtensions(withLibraryMessages(root, await importConfig(root, fresh))))
+  return withSiteUrl(withExtensions(withPublicFields(root, withLibraryMessages(root, await importConfig(root, fresh)))))
 }
 
 const SERVER_SPECIFIER = /(['"])kay\/server\1/g
@@ -637,6 +638,14 @@ export function siteFromEnv(): string | undefined {
   return ORIGIN
 }
 
+// A project with a `s.Public` field in `src` sends the browser an environment as one with `publicEnv` does: an empty schema stands for it, as the fields themselves register as `defineEnv` reads them.
+function withPublicFields<Config extends KayConfig>(root: string, config: Config): Config {
+  if (config.publicEnv !== undefined || typeof Bun === 'undefined' || publicEnvFiles(root).length === 0)
+    return config
+
+  return { ...config, publicEnv: { type: 'object', properties: {} } as unknown as EnvSchema }
+}
+
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {
   const site = siteFromEnv()
 
@@ -645,7 +654,7 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return mergeConfig(withLibraryMessages(root, await importConfig(root)), options)
+  return mergeConfig(withPublicFields(root, withLibraryMessages(root, await importConfig(root))), options)
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

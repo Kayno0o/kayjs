@@ -160,7 +160,7 @@ export const theme = persisted('theme', 'light')
 | `next/font` | `fonts` in `kay.config.ts`, which self-hosts font files, see [Styling and assets](/essentials/styling-and-assets#fonts) |
 | `next/link` | A plain `a(href="/about")`, which `kay check` verifies |
 | `useRouter().push('/todos')` | `navigate('/todos')` from `kay` |
-| `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `publicEnv` in `kay.config.ts` for the browser |
+| `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `s.Public` fields of it for the browser |
 | Streaming with `Suspense` | An `await` block, see [Data loading](/essentials/data-loading) |
 
 `kay build` prerenders a page by itself when it can show that the page reads nothing from its request or the clock. It reports what it decided for each route. See [Routing](/essentials/routing#prerendering).

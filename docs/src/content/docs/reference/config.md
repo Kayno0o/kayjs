@@ -87,7 +87,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `lateStyles` | `true` links the whole stylesheet after the paint on a page that inlines its own rules, so a class the build cannot read still gets its style, and the build warns of none. Off by default: a page ships only its own rules. See [Styling and assets](/essentials/styling-and-assets#a-class-kay-cannot-see) |
 | `typography` | `false` leaves the spaces of a French page, the ones before `: ; ! ?` and inside `« »`, as they were typed. On by default for a page whose `lang` is `fr` or `fr-...`, islands included. See [Internationalization](/guides/i18n#french-typography) |
 | `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
-| `publicEnv` | The environment variables islands may read, as a schema. No other variable reaches the browser |
+| `publicEnv` | Deprecated, mark the field `s.Public` in `defineEnv` instead. The environment variables islands may read, as a schema |
 | `settings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
 | `lints` | The level of each lint. See [Checks](/reference/checks) |
 

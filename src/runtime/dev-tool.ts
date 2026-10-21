@@ -2338,7 +2338,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     if (values === undefined) {
       tab.count(0)
-      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: kay.config.ts declares no `publicEnv`.'))
+      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: no `defineEnv` field is `s.Public` and kay.config.ts declares no `publicEnv`.'))
 
       return
     }
@@ -2364,7 +2364,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
 
     tab.count(flagged, flagged > 0 ? 'error' : undefined)
-    content.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : list, bar.empty)
+    content.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: no variable is `s.Public`.') : list, bar.empty)
     bar.apply(content)
   }
 

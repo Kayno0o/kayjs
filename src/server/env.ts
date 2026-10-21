@@ -1,4 +1,5 @@
 import type { Elysia, Static, TSchema } from 'elysia'
+import type { PublicFieldsOf, WithPublicFields } from '../runtime/env'
 import type { EnvSchemaRecord } from './env-state'
 import process from 'node:process'
 import { t } from 'elysia'
@@ -16,8 +17,9 @@ export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
+// A field marked `s.Public` reaches islands as `publicEnv` from `kay`, with no config key; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused.
 // A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
-export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
+export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>) {
   recordEnv(declared, defineEnv)
 
   const production = source.NODE_ENV === 'production'
@@ -36,8 +38,13 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   const schema = production ? requiredInProduction(declared) : without(declared, placeholders)
   const read = readFields(schema, input, false)
 
-  if (!('refused' in read))
-    return { ...read.value, ...placeholders }
+  if (!('refused' in read)) {
+    const values = { ...read.value, ...placeholders }
+
+    exposePublic(declared, values, 's.Public')
+
+    return values as ReturnType<typeof defineEnv<Schema>>
+  }
 
   if (!building())
     throw new KayError('env-invalid', `kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
@@ -58,7 +65,9 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
     })
   }
 
-  return env
+  exposePublic(declared, env, 's.Public')
+
+  return env as ReturnType<typeof defineEnv<Schema>>
 }
 
 function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {
@@ -116,6 +125,8 @@ export interface EnvVariable {
   description?: string
   // A value no visitor may read, which development and tests derive from the project path.
   secret?: true
+  // A variable an island reads as `publicEnv`: `s.Public`.
+  public?: true
 }
 
 // What a schema declares, as `defineEnv` reads it: each name with its type, whether it is required and its default.
@@ -123,7 +134,7 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
   const required = new Set((schema as { required?: string[] }).required ?? [])
 
   return Object.entries(schema.properties).map(([name, field]) => {
-    const { default: fallback, description, requiredInProduction: production, secret, type, anyOf, format } = field as { default?: unknown, description?: unknown, requiredInProduction?: unknown, secret?: unknown, type?: unknown, anyOf?: { type?: unknown }[], format?: unknown }
+    const { default: fallback, description, requiredInProduction: production, secret, public: isPublic, type, anyOf, format } = field as { public?: unknown, default?: unknown, description?: unknown, requiredInProduction?: unknown, secret?: unknown, type?: unknown, anyOf?: { type?: unknown }[], format?: unknown }
     // A number or boolean is a union with its text, the form it is read from.
     const parts = anyOf?.map(part => part.type).filter(part => typeof part === 'string') ?? []
     const kinds = parts.length > 1 ? parts.filter(part => part !== 'string') : parts
@@ -138,6 +149,7 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
       ...fallback !== undefined && { default: fallback },
       ...typeof description === 'string' && { description },
       ...secret === true && { secret: true as const },
+      ...isPublic === true && { public: true as const },
     }
   })
 }
@@ -145,21 +157,38 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
 // Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret, a token, an API key or a database address never is.
 const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
 
-// Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
+// Hands the browser the variables of `schema` marked `s.Public`, or all of them for the `publicEnv` of kay.config.ts: the server refuses a name meant for the server alone, and an island reads the values as `publicEnv` from `kay`.
+// A variable the build could not read is left out here and throws where a page reads it.
+function exposePublic(schema: EnvSchema, values: Record<string, unknown>, owner: string, all = false): void {
+  const names = Object.entries(schema.properties).filter(([, field]) => all || (field as { public?: unknown }).public === true).map(([name]) => name)
+
+  if (names.length === 0)
+    return
+
+  const exposed = names.filter(name => SERVER_ONLY.test(name) || (schema.properties[name] as { secret?: unknown }).secret === true)
+
+  if (exposed.length > 0)
+    throw new KayError('config-invalid', `kay: ${owner} declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv without s.Public, read on the server alone`)
+
+  const held = (globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV] ??= {}
+
+  for (const name of names) {
+    const descriptor = Object.getOwnPropertyDescriptor(values, name)
+
+    if (descriptor !== undefined && 'value' in descriptor && descriptor.value !== undefined)
+      held[name] = descriptor.value
+  }
+}
+
+// Reads the `publicEnv` of kay.config.ts as `defineEnv` reads the server's, and serves the module the browser loads with it and every `s.Public` field `defineEnv` has read.
 // The boot claims its path before any build.
 export function servePublicEnv(app: Elysia, schema: EnvSchema): void {
-  const values = defineEnv(schema) as Record<string, unknown>
-  const exposed = Object.keys(values).filter(name => SERVER_ONLY.test(name))
-
-  if (exposed.length > 0) {
-    throw new KayError('config-invalid', `kay: publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
-  }
-
-  (globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
+  if (Object.keys(schema.properties).length > 0)
+    exposePublic(schema, defineEnv(schema) as Record<string, unknown>, 'publicEnv', true)
 
   let reply: ReturnType<typeof fixedReply> | undefined
 
-  app.get(PUBLIC_ENV_PATH, async ({ request }) => (reply ??= fixedReply(publicEnvModule(values), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }))(request))
+  app.get(PUBLIC_ENV_PATH, async ({ request }) => (reply ??= fixedReply(publicEnvModule((globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV] ?? {}), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }))(request))
 }
 
 export function publicEnvModule(values: Record<string, unknown>): string {

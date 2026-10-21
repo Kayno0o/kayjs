@@ -153,7 +153,7 @@ Runes become the signals of kay. A signal is read by calling it and written by a
 | A snippet passed as a prop | An `@name` block, which can take parameters, rendered with `slot name`, or a snippet or function passed as `row={x}` |
 | `<svelte:head>` | A `head` block, see [Head and SEO](/essentials/head-and-seo) |
 | `setContext`, `getContext` | `context`, see the [islands reference](/llms/islands) |
-| `$env/static/public` | `publicEnv` in `kay.config.ts`, read from `kay` |
+| `$env/static/public` | `s.Public` fields of `defineEnv`, read as `publicEnv` from `kay` |
 | `$env/static/private` | `defineEnv` in `src/env.ts`, imported from server code |
 | `goto('/todos')` | `navigate('/todos')` from `kay` |
 | `page.url.searchParams` in a component | `queryParam('page')` from `kay`, or `ctx.query` on the server |

@@ -2,8 +2,10 @@ import type { FieldSchema } from '../src/runtime/form'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
+import { PUBLIC_ENV } from '../src/runtime/env'
 import { formInput, nativeConstraints } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
+import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { publicEnvModule, servePublicEnv } from '../src/server/env'
 import { buildingWithoutEnv } from '../src/server/env-state'
@@ -119,6 +121,57 @@ describe('servePublicEnv', () => {
     }
   })
 })
+
+describe('s.Public', () => {
+  it('hands the browser the public fields of defineEnv alone, served from the env module', async () => {
+    const held = globalThis as { [PUBLIC_ENV]?: Record<string, unknown> | undefined }
+    const before = held[PUBLIC_ENV]
+
+    held[PUBLIC_ENV] = undefined
+
+    try {
+      const env = defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.String()), KAY_TEST_ZOOM: s.Public(s.Optional(s.Integer({ default: 3 }))), KAY_TEST_HIDDEN: s.String() }), { KAY_TEST_MAP_KEY: 'pk', KAY_TEST_HIDDEN: 'x' })
+
+      expect(env.KAY_TEST_HIDDEN).toBe('x')
+      expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({ KAY_TEST_MAP_KEY: 'pk', KAY_TEST_ZOOM: 3 })
+
+      const response = await servePublicApp().handle(new Request('http://localhost/_kay/env.js'))
+
+      expect(await response.text()).toBe('export default {"KAY_TEST_MAP_KEY":"pk","KAY_TEST_ZOOM":3}\n')
+    }
+    finally {
+      held[PUBLIC_ENV] = before
+    }
+  })
+
+  it('refuses a public field named as a secret, a token or a database address, and a secret one', () => {
+    for (const name of ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_API_KEY', 'KAY_TEST_DATABASE_URL'])
+      expect(() => defineEnv(s.Object({ [name]: s.Public(s.String()) }), { [name]: 'v' }), name).toThrow(`kay: s.Public declares ${name}, which every visitor reads`)
+
+    expect(() => defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.Secret()) }), { NODE_ENV: 'test' })).toThrow('kay: s.Public declares KAY_TEST_MAP_KEY')
+  })
+
+  it('leaves a public field the build could not read out, as the page reading it throws', () => {
+    buildingWithoutEnv()
+
+    try {
+      const env = defineEnv(s.Object({ KAY_TEST_MISSING_PUBLIC: s.Public(s.String()) }), {})
+
+      expect(() => env.KAY_TEST_MISSING_PUBLIC).toThrow('KAY_TEST_MISSING_PUBLIC')
+    }
+    finally {
+      ;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.building')] = undefined
+    }
+  })
+})
+
+function servePublicApp(): Elysia {
+  const app = new Elysia()
+
+  servePublicEnv(app, t.Object({}))
+
+  return app
+}
 
 describe('formInput', () => {
   const schema = t.Object({ message: t.String({ maxLength: 10 }), name: t.Optional(t.String()) })

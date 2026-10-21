@@ -83,3 +83,11 @@ export function building(): boolean {
 
 // The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
 export const PUBLIC_ENV_PATH = '/_kay/env.js'
+
+const PUBLIC_FIELD = /\bs\.Public\s*\(/
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
+
+// The files under `src` declaring a field with `s.Public`, found by reading them as text so `kay build`, `kay check` and `kay routes` know the project sends the browser an environment without loading its modules.
+export function publicEnvFiles(root: string): string[] {
+  return [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && PUBLIC_FIELD.test(readFileSync(join(root, file), 'utf8')))
+}

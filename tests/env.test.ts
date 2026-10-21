@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { t } from 'elysia'
+import { loadConfig } from '../src/config'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { overrideEnv } from '../src/test'
@@ -156,6 +157,20 @@ describe('kay env', () => {
     'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nconsole.log(\'loading the env\')\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }),\n  PORT: s.Integer({ default: 8080 }),\n  DEBUG: s.Optional(s.Boolean()),\n}))\n',
     'src/broken.ts': 'import { defineEnv } from \'kay/server\'\nimport \'./missing\'\n\nexport const env = defineEnv({} as never)\n',
   }
+
+  it('lists an s.Public field as public, and sends the browser an environment with no publicEnv in the config', async () => {
+    const root = await project({
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String()), DATABASE_URL: s.String() }))\n',
+    })
+    const { stdout, code } = await kay(['env', '--format', 'json'], root)
+    const rows = (JSON.parse(stdout) as { variables: Record<string, unknown>[] }).variables
+
+    expect(code).toBe(0)
+    expect(rows.find(row => row.name === 'MAP_KEY')).toEqual({ name: 'MAP_KEY', source: 'src/env.ts', type: 'string', required: 'always', public: true })
+    expect(rows.find(row => row.name === 'DATABASE_URL')).toEqual({ name: 'DATABASE_URL', source: 'src/env.ts', type: 'string', required: 'always' })
+    expect((await loadConfig(root)).publicEnv).toBeDefined()
+  })
 
   it('marks s.Secret as a secret required in production, with kay env and kay build run without it', async () => {
     const root = await project({

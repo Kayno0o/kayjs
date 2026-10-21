@@ -59,7 +59,7 @@ const KNOWN: Known[] = [
   { method: 'POST', path: CSP_REPORTS, purpose: 'what the Content-Security-Policy blocked, with `security.reports`', docs: '/llms/proxy-and-security', when: served => served.cspReports },
   { method: 'GET', path: PREVIEW_ROUTE, purpose: 'enters preview mode from a signed link', docs: '/llms/content-cms', when: served => served.preview },
   { method: 'POST', path: DRAFT_ROUTE, purpose: 'a page rendered with the drafts an editor has not saved', docs: '/llms/content-cms', when: served => served.preview },
-  { method: 'GET', path: PUBLIC_ENV_PATH, purpose: 'the variables `publicEnv` sends the browser', docs: '/llms/server', when: served => served.publicEnv },
+  { method: 'GET', path: PUBLIC_ENV_PATH, purpose: 'the variables `s.Public` and `publicEnv` send the browser', docs: '/llms/server', when: served => served.publicEnv },
   { method: 'GET', path: SEARCH_MANIFEST, purpose: 'the site search\'s index, which names its chunks', docs: '/llms/sitemap-search-fonts', when: (_, files) => files.includes(SEARCH_MANIFEST) },
   { method: 'GET', path: `${SEARCH_DIR}*`, purpose: 'the site search\'s index chunks', docs: '/llms/sitemap-search-fonts', when: built(SEARCH_DIR) },
   { method: 'GET', path: ANALYTICS_SCRIPT_PATH, purpose: 'the visit counter, served from the app', docs: '/llms/analytics', when: mounted('GET', ANALYTICS_SCRIPT_PATH) },

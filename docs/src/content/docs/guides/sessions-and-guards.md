@@ -258,17 +258,18 @@ The OpenAPI document is refused too, unless a guard covers every module not sett
 
 `defineEnv` reads `process.env` once against a schema at boot. It stops the server with an error naming each missing variable.
 
-For variables an island may read, such as a map key, declare `publicEnv` in `kay.config.ts` and import it from `kay`.
+For variables an island may read, such as a map key, mark the field `s.Public` in `defineEnv` and import `publicEnv` from `kay`.
 
 ```ts
 import { s } from 'kay'
-import { defineConfig } from 'kay/server'
+import { defineEnv } from 'kay/server'
 
-export default defineConfig({
-  publicEnv: s.Object({ MAP_KEY: s.String() }),
-})
+export const env = defineEnv(s.Object({
+  DATABASE_URL: s.String(),
+  MAP_KEY: s.Public(s.String()),
+}))
 ```
 
-Nothing else of the environment reaches the browser. The server refuses to boot when `publicEnv` names a variable that looks secret, such as `DATABASE_URL`, `API_KEY` or one with `SECRET`, `PASSWORD`, `PRIVATE` or `TOKEN` in its name. Every visitor reads those, so keep them in `defineEnv`.
+Nothing else of the environment reaches the browser. The server refuses to boot when an `s.Public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY` or one with `SECRET`, `PASSWORD`, `PRIVATE` or `TOKEN` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.Public`. The `publicEnv` key of `kay.config.ts` still works until 1.73; move its fields to `defineEnv`.
 
 <ReadMore href="/llms/environment#environment">Required-in-production fields, empty variables, `kay env` and how a prerendered page sees public variables are in the full server reference.</ReadMore>

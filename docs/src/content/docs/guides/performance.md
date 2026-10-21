@@ -36,7 +36,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Head | The search result, canonical and hreflang links, social tags and JSON-LD |
 | Screen reader | The page's landmarks, headings, links, controls and form fields in reading order, with the names a screen reader speaks |
 | Routes | Every page, endpoint and API route the server serves, and the endpoints of kay's own |
-| Env | The variables `publicEnv` sends to the browser |
+| Env | The public variables sent to the browser |
 | Images | Each image's variant, format, size and what it is drawn at |
 | Performance | The Web Vitals of the load and the weight of the page |
 | i18n | The page's locale, its copies and the message keys no locale has |

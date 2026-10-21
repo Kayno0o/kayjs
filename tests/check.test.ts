@@ -3945,6 +3945,24 @@ describe.concurrent('kay check, public environment', () => {
   })
 })
 
+describe.concurrent('kay check, s.Public fields', () => {
+  it('types publicEnv from the s.Public fields of defineEnv, beside kay.config.ts\'s', async () => {
+    const root = await scratchProject({
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String()), ZOOM: s.Public(s.Optional(s.Integer())), DATABASE_URL: s.String() }))\n',
+      'src/map.kay': '---\nimport { publicEnv } from \'kay\'\n\nconst key: string = publicEnv.MAP_KEY\nconst zoom: number | undefined = publicEnv.ZOOM\n---\np {key} {zoom} {publicEnv.DATABASE_URL}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([
+        [7, expect.stringContaining('Property \'DATABASE_URL\' does not exist on type')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 // Alone, as a busy machine would stretch the moments they wait for a signal to land.
 describe('kay check --watch, stopped by a signal', () => {
   it.each([
