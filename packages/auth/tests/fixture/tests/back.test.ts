@@ -8,6 +8,8 @@ import { mails } from '../src/auth'
 const ROOT = join(import.meta.dir, '..')
 const PAGES = join(ROOT, '..', '..', 'src', 'pages', 'routes')
 const PASSWORD = 'correct horse battery'
+// What a browser sends opening a page, which is what the guard redirects.
+const NAVIGATE = { 'sec-fetch-mode': 'navigate' }
 const HOSTILE = ['//evil.test', 'https://evil.test', '/\\evil.test', 'javascript:alert(1)']
 
 type Site = Awaited<ReturnType<typeof testSite>>
@@ -30,7 +32,7 @@ for (const { name, options, base, slash, tag } of mounts) {
     let forms: Record<string, Parameters<Site['submit']>[0]>
 
     beforeAll(async () => {
-      site = await testSite({ root: ROOT, ...options })
+      site = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
       // After the site loads, as the pages' modules are compiled with it.
       const [signIn, register, reset, twoFactor, verify, security] = await Promise.all(['sign-in', 'register', 'reset-password', 'two-factor', 'verify-email', 'account/security'].map(async page => import(join(PAGES, `${page}.kay`))))
 
@@ -43,7 +45,7 @@ for (const { name, options, base, slash, tag } of mounts) {
     const form = (name: string) => forms[name] as never
 
     async function registered(email: string, redirect?: string) {
-      const visitor = await testSite({ root: ROOT, ...options })
+      const visitor = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
       const page = await visitor.visit(`/auth/register${slash}${redirect === undefined ? '' : `?redirect=${encodeURIComponent(redirect)}`}`)
       const done = await visitor.submit(form('register'), { email, password: PASSWORD, redirect: hidden(page) }, { from: page })
 
@@ -65,7 +67,7 @@ for (const { name, options, base, slash, tag } of mounts) {
 
       for (const prefix of ['', '/fr']) {
         const asked = `${prefix}/note${slash}`
-        const fresh = await testSite({ root: ROOT, ...options })
+        const fresh = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
         const page = await fresh.visit(`${prefix}/auth/sign-in${slash}?redirect=${encodeURIComponent(asked)}`)
 
         expect(hidden(page)).toBe(asked)
@@ -85,7 +87,7 @@ for (const { name, options, base, slash, tag } of mounts) {
     })
 
     test('an OAuth sign-in that fails goes back to the sign-in page with the page kept', async () => {
-      const visitor = await testSite({ root: ROOT, ...options })
+      const visitor = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
       const left = await visitor.fetch(`/auth/discord?redirect=${encodeURIComponent(`/fr/note${slash}`)}`, { redirect: 'manual' })
       const state = new URL(left.headers.get('location')!).searchParams.get('state')
       const back = await visitor.fetch(`/auth/discord/callback?error=access_denied&state=${state}`, { redirect: 'manual' })
@@ -94,7 +96,7 @@ for (const { name, options, base, slash, tag } of mounts) {
     })
 
     test('an OAuth sign-in that fails leaves no trace of a page that leaves the site, nor of one not asked for', async () => {
-      const visitor = await testSite({ root: ROOT, ...options })
+      const visitor = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
 
       for (const hostile of [...HOSTILE, undefined]) {
         const left = await visitor.fetch(`/auth/discord${hostile === undefined ? '' : `?redirect=${encodeURIComponent(hostile)}`}`, { redirect: 'manual' })
@@ -161,7 +163,7 @@ for (const { name, options, base, slash, tag } of mounts) {
       await registered(email, asked)
 
       const link = lastLink('verify-email')
-      const elsewhere = await testSite({ root: ROOT, ...options })
+      const elsewhere = await testSite({ root: ROOT, headers: NAVIGATE, ...options })
       const opened = await elsewhere.visit(link.pathname + link.search)
       const verified = await elsewhere.submit(form('verify'), { token: link.searchParams.get('token')!, password: PASSWORD }, { from: opened })
 

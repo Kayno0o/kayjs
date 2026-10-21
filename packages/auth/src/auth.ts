@@ -41,7 +41,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { backOf, banned, guardPageOf, homeOf, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack, withQuery } from './core'
+import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack, withQuery } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
@@ -302,7 +302,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return held
   }
 
-  // The signed-in user, who must be there: an anonymous visitor reading a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
+  // The signed-in user, who must be there: an anonymous page navigation goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
   // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds.
   async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User<UserData>> {
     const user = await this.user()
@@ -311,7 +311,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!user) {
       const signIn = options.redirect === undefined || options.redirect === '' ? guardPageOf(this.core) : options.redirect
 
-      if (signIn !== undefined && READ_METHODS.has(this.request.method))
+      if (signIn !== undefined && isNavigation(this.request))
         redirect(this.signInLink(signIn))
 
       return deny(401, 'Sign in to continue')
@@ -1368,7 +1368,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => gate(app.use(plugin))
     },
 
-    // A `_guard.ts` default export. An anonymous visitor goes to `redirect`, the prebuilt sign-in page with `pages`, else `signInPage`, with where they were going as `?redirect=`, or gets a 401 without any, as does any post; a user who does not meet `require` gets a 403.
+    // A `_guard.ts` default export. An anonymous page navigation (a GET or HEAD from a browser opening a page) goes to `redirect`, the prebuilt sign-in page with `pages`, else `signInPage`, with where they were going as `?redirect=`, or gets a 401 without any, as does any post; a user who does not meet `require` gets a 403.
     // A scoped bearer token passes only with one of `scope`.
     guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
       const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? guardPageOf(core) : guardOptions.redirect
@@ -1378,7 +1378,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         const reading = READ_METHODS.has(ctx.request.method)
 
         if (!user) {
-          if (redirect !== undefined && reading)
+          if (redirect !== undefined && isNavigation(ctx.request))
             ctx.redirect(withBack(redirect, ctx.url.pathname + ctx.url.search))
 
           ctx.deny(401, 'Sign in to continue')

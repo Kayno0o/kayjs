@@ -237,6 +237,16 @@ export function backOf(core: Pick<Core, 'pages'>, redirect: string | null | unde
   return path === home ? null : path
 }
 
+// Whether `request` is a browser navigation: a GET or HEAD with `Sec-Fetch-Mode: navigate`, or without that header one accepting HTML. A fetch for JSON keeps its 401.
+export function isNavigation(request: Request): boolean {
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return false
+
+  const mode = request.headers.get('sec-fetch-mode')
+
+  return mode === null ? request.headers.get('accept')?.includes('text/html') === true : mode === 'navigate'
+}
+
 // Where a guard sends an anonymous visitor: the prebuilt sign-in page, else the app's own `signInPage`, else nowhere and the visitor gets a 401.
 export function guardPageOf(core: Pick<Core, 'pages' | 'signInPage' | 'ownSignInPage'>): string | undefined {
   return core.pages ? core.signInPage : core.ownSignInPage

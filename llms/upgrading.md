@@ -4,9 +4,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
-### kayjs-auth's guard redirects to `signInPage` without `pages`
+### kayjs-auth's guard redirects only a navigation, and to `signInPage` without `pages`
 
-An app that sets `signInPage` in `createAuth` and has no `pages` now has `auth.guard()` and `requireUser()` redirect an anonymous GET there with `?redirect=`, where they answered a 401. A GET route that returns JSON under such a guard now gets a 302: give it a guard of its own, or check `auth.user()` and answer the 401 yourself. No lint can recognise it.
+`auth.guard()` and `requireUser()` redirect an anonymous request to the sign-in page only when it is a page navigation: a GET or HEAD with `Sec-Fetch-Mode: navigate`, or, with no such header, an `Accept` including `text/html`. Any other request, a fetch for JSON or a `curl` with `*/*` included, now gets the 401 where the prebuilt `pages` redirected every GET. An app that sets `signInPage` in `createAuth` without `pages` now has a page navigation redirected there with `?redirect=`, where it got a 401. A test driving a guarded page with `site.fetch` or `visit` sends `headers: { 'sec-fetch-mode': 'navigate' }` to be redirected. No lint can recognise it.
 
 ### An entry's page takes its head from the entry
 

@@ -14,7 +14,9 @@ const PASSWORD = 'correct horse battery'
 const realFetch = globalThis.fetch
 
 // A browser without JavaScript, keeping its own cookies.
-const browser = () => testSite({ root: ROOT })
+// What a browser sends opening a page, which is what the guard redirects.
+const NAVIGATE = { 'sec-fetch-mode': 'navigate' }
+const browser = () => testSite({ root: ROOT, headers: NAVIGATE })
 
 // Imported once a site has registered the .kay loader for the fixture, a project of its own beside kayjs-auth.
 await browser()
@@ -653,7 +655,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
   })
 
   test('under a base and trailing slashes, a visitor is sent to the sign-in page under the base, coming back to the path the server saw', async () => {
-    const site = await testSite({ root: ROOT, base: '/app', trailingSlash: 'always' })
+    const site = await testSite({ root: ROOT, headers: NAVIGATE, base: '/app', trailingSlash: 'always' })
     const sentTo = async (path: string) => (await site.fetch(path, { redirect: 'manual' })).headers.get('location')
 
     expect(await sentTo('/note/')).toBe('/app/auth/sign-in?redirect=%2Fnote%2F')
@@ -663,7 +665,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
   })
 
   test('under a base, a session signs in, keeps its cookie and reaches requireUser and signInUrl, the paths given with the base or without it', async () => {
-    const site = await testSite({ root: ROOT, base: '/app' })
+    const site = await testSite({ root: ROOT, headers: NAVIGATE, base: '/app' })
 
     expect(await site.visit('/note')).toMatchObject({ url: '/app/auth/sign-in?redirect=%2Fnote', status: 200 })
 
