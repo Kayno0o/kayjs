@@ -1068,6 +1068,29 @@ describe('queue', () => {
     }
   })
 
+  it('waits for an enqueue the app left unawaited, and still rejects one the caller awaits', async () => {
+    const log: string[] = []
+    const inner = memoryJobs()
+    const slow: JobStore = { ...inner, add: async (job) => {
+      await Bun.sleep(30)
+
+      return inner.add(job)
+    } }
+    const work = queue('unawaited', (step: string) => void log.push(step), { store: slow })
+
+    try {
+      void work.enqueue('late')
+
+      expect(await drainQueues()).toBe(1)
+      expect(log).toEqual(['late'])
+      await expect(work.enqueue('bad', { key: '' })).rejects.toThrow('empty key')
+      expect(await drainQueues()).toBe(0)
+    }
+    finally {
+      forgetQueue(work)
+    }
+  })
+
   it('does not wait for its own run when a job awaits a drain', async () => {
     const log: string[] = []
     const work = queue('work', async (step: string) => {

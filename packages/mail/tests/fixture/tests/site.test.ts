@@ -4,6 +4,7 @@ import { outbox } from '@kaynooo/kayjs-mail'
 import { beforeEach, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'
+import { signUpLater } from '../src/routes/later.kay'
 
 // The fixture is an app installing the library, linked back to the library by the repository root's scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
@@ -40,4 +41,16 @@ test('an action enqueues a mail, which the queue sends to the outbox once run', 
   expect(sent.map(mail => mail.subject)).toEqual(['Welcome, Ada'])
   expect(sent[0]!.text).toContain('Confirm my address (https://fixture.test/confirm?token=abc)')
   expect(sent[0]!.html).toContain('background:#0047ff')
+})
+
+test('runJobs runs a mail an action enqueued after its response, every time', async () => {
+  for (let at = 0; at < 20; at++) {
+    outbox.clear()
+
+    const page = await site.submit(signUpLater, { name: `Ada${at}`, email: 'ada@example.com' }, { from: '/later' })
+
+    expect(page.status).toBe(200)
+    expect(await site.runJobs()).toBe(1)
+    expect(outbox.to('ada@example.com').map(mail => mail.subject)).toEqual([`Welcome, Ada${at}`])
+  }
 })

@@ -6,7 +6,7 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
-import { escapeHtml as escape, underKayDev } from 'kay/library'
+import { escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -478,7 +478,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     mountPreview(plugin, render, realDelivery)
 
   const sending = Object.assign(plugin, {
-    send: async <P extends object>(message: Message<P>) => {
+    send: async <P extends object>(message: Message<P>) => inFlightWork(async () => {
       ready(message)
 
       const mail = await render(message)
@@ -497,12 +497,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
         throw thrown
       }
-    },
-    enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => {
+    }),
+    enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
       ready(message)
 
       return jobs.enqueue(await render(message), enqueueOptions)
-    },
+    }),
     render,
     drain: jobs.drain,
     failed: jobs.failed,

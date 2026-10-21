@@ -197,6 +197,31 @@ export function trackDetached(work: Promise<unknown>): void {
 
   detached.add(tracked)
 }
+
+// Calls of kay's and its libraries' own async entry points (an enqueue, a mail send) that have not settled, which `drainQueues` waits for like detached work, so one an app left unawaited is found without the app declaring anything.
+let inFlight = 0
+const idleWaiters = new Set<() => void>()
+const flying = () => inFlight > 0
+const working = () => detached.size > 0 || flying()
+
+// Runs `work` counting it as in flight, and hands back its own promise, so its rejection reaches the caller as it would and an unawaited one stays unhandled.
+export async function inFlightWork<T>(work: () => Promise<T>): Promise<T> {
+  inFlight++
+
+  try {
+    return await work()
+  }
+  finally {
+    inFlight--
+
+    if (inFlight === 0) {
+      for (const wake of idleWaiters)
+        wake()
+
+      idleWaiters.clear()
+    }
+  }
+}
 // Set while a job runs, so a drain the job awaits does not wait for the run awaiting it.
 const inJob = new AsyncLocalStorage<true>()
 let defaultStore: JobStore | undefined
@@ -863,7 +888,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     })
 
   const queued = Object.assign(plugin, {
-    enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => {
+    enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => inFlightWork(async () => {
       const id = crypto.randomUUID()
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
       const { key } = enqueueOptions
@@ -885,7 +910,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       await tidy()
 
       return id
-    },
+    }),
     job: async (job: string | { id: string }) => {
       const read = store().state
 
@@ -989,8 +1014,12 @@ export async function drainQueues(): Promise<number> {
   for (let more = true; more;) {
     more = false
 
-    while (detached.size > 0)
+    while (working()) {
       await Promise.all(detached)
+
+      if (flying())
+        await new Promise<void>(resolve => idleWaiters.add(resolve))
+    }
 
     for (const drain of drains) {
       const count = await drain()

@@ -327,7 +327,7 @@ export default {
 
 ## Testing
 
-Under `bun test`, mails go to the `outbox`. An enqueued mail reaches it once `site.runJobs()` ran.
+Under `bun test`, mails go to the `outbox`. An enqueued mail reaches it once `site.runJobs()` ran, including one the action enqueued or sent without awaiting.
 
 ```ts
 import { outbox } from '@kaynooo/kayjs-mail'
