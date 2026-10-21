@@ -19,8 +19,8 @@ describe('a page swap over an element being typed in', () => {
     await show({ url: location.href, type: 'text/html', html }, '', { intent: 'refresh', focused: document.activeElement })
   }
 
-  it('leaves a focused contenteditable element its text and attribute, and renders the rest', async () => {
-    document.body.innerHTML = '<h1 contenteditable="plaintext-only">Typed so far</h1><p>Old</p>'
+  it('leaves a focused element marked as typed in its text and attribute, and renders the rest', async () => {
+    document.body.innerHTML = '<h1 contenteditable="plaintext-only" data-kay-typing>Typed so far</h1><p>Old</p>'
 
     const heading = document.querySelector('h1')!
 
@@ -36,7 +36,7 @@ describe('a page swap over an element being typed in', () => {
   })
 
   it('renders a contenteditable element nobody is typing in like any other', async () => {
-    document.body.innerHTML = '<h1 contenteditable="plaintext-only">Typed so far</h1><p>Old</p>'
+    document.body.innerHTML = '<h1 contenteditable="plaintext-only" data-kay-typing>Typed so far</h1><p>Old</p>'
     ;(document.activeElement as HTMLElement | null)?.blur()
 
     await refresh('<!doctype html><html><head><title>t</title></head><body><h1>Saved text</h1><p>New</p></body></html>')

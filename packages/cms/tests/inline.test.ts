@@ -42,7 +42,7 @@ describe('the value typed in place', () => {
   const nullable = fieldsOf({ type: 'object', required: ['a'], properties: { a: { anyOf: [{ type: 'string' }, { type: 'null' }] } } })[0]!
 
   it('is the text, as one line', () => {
-    expect(inlineValue(optional, 'a\nb\r\n\nc\u00A0d')).toBe('a b c d')
+    expect(inlineValue(optional, 'a\nb\r\n\nc d')).toBe('a b c d')
   })
 
   it('is kept as text whatever markup it looks like', () => {

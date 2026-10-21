@@ -269,9 +269,13 @@ function clickedNode(event: MouseEvent): Node | undefined {
 listen(() => document, 'click', (event) => {
   const node = open() ? clickedNode(event) : undefined
 
-  // A click in the text being typed in places the caret.
-  if (node && isTypingInline(node))
+  // A click in the text being typed in places the caret, which the browser did on the press: the click itself acts on nothing.
+  if (node && isTypingInline(node)) {
+    event.preventDefault()
+    event.stopPropagation()
+
     return
+  }
 
   const found = node && !panel?.contains(node) ? fieldsAt(node) : []
   const [field] = found

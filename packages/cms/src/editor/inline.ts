@@ -21,8 +21,9 @@ export interface InlineTarget {
 }
 
 const sources = new Map<string, InlineSource>()
+// Elements whose own keys and clicks act on a page, left to the form.
+const CONTROLS = 'button, summary, input, select, textarea, label'
 const LINE_BREAKS = /[\r\n]+/g
-const NO_BREAK_SPACE = /\u00A0/g
 
 // Lets the page's clicks type in the entry's fields until the returned function is called.
 export function registerInline(key: string, source: InlineSource): () => void {
@@ -72,7 +73,7 @@ function onlyText(element: Element): boolean {
 export function inlineTargetOf(found: MarkedField[], drafts: Drafts): InlineTarget | undefined {
   const [only] = found
 
-  if (found.length !== 1 || !only || only.attribute !== undefined || only.start !== undefined || !(only.element instanceof HTMLElement) || !onlyText(only.element))
+  if (found.length !== 1 || !only || only.attribute !== undefined || only.start !== undefined || !(only.element instanceof HTMLElement) || !onlyText(only.element) || only.element.matches(CONTROLS))
     return undefined
 
   const { marker } = only
@@ -94,7 +95,7 @@ export function inlineTargetOf(found: MarkedField[], drafts: Drafts): InlineTarg
 
 // What an emptied text stores, as the form's box does: nothing for an optional one (`null` when the schema lists it as required but nullable), else the empty text.
 export function inlineValue(field: Field, text: string): unknown {
-  const line = text.replace(NO_BREAK_SPACE, ' ').replace(LINE_BREAKS, ' ')
+  const line = text.replace(LINE_BREAKS, ' ')
 
   if (line !== '' || field.required)
     return line
@@ -116,9 +117,16 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
   const caret = at ? document.caretPositionFromPoint(at.x, at.y) : null
   const controller = new AbortController()
   const { signal } = controller
+  let emptied = false
+  const commit = () => drafts.set(entry, path, inlineValue(field, element.textContent ?? ''))
   const end = () => {
     controller.abort()
-    element.removeAttribute('contenteditable')
+    for (const name of ['contenteditable', 'data-kay-typing', 'role', 'aria-label'])
+      element.removeAttribute(name)
+
+    // An emptied optional text is unset once the edit ends: the page renders nothing for it, which would take the element being typed in away.
+    if (emptied)
+      commit()
 
     if (active?.element === element)
       active = undefined
@@ -126,11 +134,19 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
 
   active = { element, end }
   element.setAttribute('contenteditable', 'plaintext-only')
+  element.setAttribute('data-kay-typing', '')
+  element.setAttribute('role', 'textbox')
+  element.setAttribute('aria-label', field.label)
   element.addEventListener('beforeinput', (event) => {
     if (busy())
       event.preventDefault()
   }, { signal })
-  element.addEventListener('input', () => drafts.set(entry, path, inlineValue(field, element.textContent ?? '')), { signal })
+  element.addEventListener('input', () => {
+    emptied = !field.required && (element.textContent ?? '') === ''
+
+    if (!emptied)
+      commit()
+  }, { signal })
   element.addEventListener('keydown', (event) => {
     if (event.isComposing || (event.key !== 'Enter' && event.key !== 'Escape'))
       return

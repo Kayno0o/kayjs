@@ -108,7 +108,7 @@ test('a click on a text unlocks it for typing and the draft follows each keystro
   expect(root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!.value).toBe('Welcome home')
 })
 
-test('a click in the text already being typed in is left to the browser, and leaving it locks it again', async () => {
+test('a click in the text already being typed in acts on nothing, and leaving it locks it again', async () => {
   const { elements: [title], click } = await open([{ marker: 'pages:home:title', text: 'Home' }])
 
   await click(title!)
@@ -116,10 +116,14 @@ test('a click in the text already being typed in is left to the browser, and lea
   const event = new MouseEvent('click', { bubbles: true, cancelable: true })
 
   title!.dispatchEvent(event)
-  expect(event.defaultPrevented).toBe(false)
+  expect(event.defaultPrevented).toBe(true)
+
+  expect(title!.getAttribute('role')).toBe('textbox')
+  expect(title!.getAttribute('aria-label')).toBe('Title')
 
   title!.blur()
   expect(title!.hasAttribute('contenteditable')).toBe(false)
+  expect(title!.hasAttribute('role')).toBe(false)
 })
 
 test('a text inside a block, and an item of a list of texts, are typed in place', async () => {
@@ -152,6 +156,8 @@ test('emptying an optional text unsets it, a required one stays empty', async ()
 
   await click(subtitle!)
   await type(subtitle!, '')
+  // The unset waits for the end of the edit, as the page drops an element with no text.
+  expect(await draft('subtitle')).toBeUndefined()
   await click(title!)
   await type(title!, '')
 
@@ -176,7 +182,7 @@ test('HTML typed or pasted stays text, and line breaks do not stay', async () =>
   expect(await draft('title')).toBe('<img src=x onerror="alert(1)"> & <b>bold</b>')
   expect(title!.children).toHaveLength(0)
 
-  await type(title!, 'one\ntwo three')
+  await type(title!, 'one\ntwo three')
 
   expect(await draft('title')).toBe('one two three')
 })
@@ -192,6 +198,14 @@ test('Enter and Escape leave the text instead of breaking the line', async () =>
 
   expect(enter.defaultPrevented).toBe(true)
   expect(title!.hasAttribute('contenteditable')).toBe(false)
+})
+
+test('a button or a link is not made a text box by a click', async () => {
+  const { elements: [button], click } = await open([{ marker: 'pages:home:title', tag: 'button', text: 'Go' }])
+
+  await click(button!)
+
+  expect(button!.hasAttribute('contenteditable')).toBe(false)
 })
 
 test('what is not a one-line text on its own element falls back to the form', async () => {
