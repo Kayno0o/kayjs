@@ -20,6 +20,7 @@ const ICON_PAGE = /\/api\/cms\/icons$/
 const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
 const DEV_STATE = /\/api\/cms\/dev$/
+const EDITOR_CAN = /\/api\/cms\/editor\/can$/
 
 // What a role may be limited from, by the route: publishing, deleting, uploading and the redirects.
 const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
@@ -90,8 +91,9 @@ export default guard(async (ctx) => {
   await admits(ctx)
 
   if (settings().roles !== undefined) {
-    // Read now so a route can tell what the person may do.
-    await memberOf(ctx)
+    // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.
+    if (method === 'GET' && EDITOR_CAN.test(ctx.url.pathname))
+      await memberOf(ctx)
 
     const path = routePath(ctx.url)
     const needed = actionOf(method, path)

@@ -335,3 +335,39 @@ describe('the screens for a site on kayjs-auth', () => {
     expect(await visit('//evil.example/x', 'GET', back => `/login?redirect=${encodeURIComponent(back ?? '/')}`)).toBe('/login?redirect=%2F')
   })
 })
+
+describe('the members the screens read', () => {
+  test('`member` replaces kayjs-auth\'s lookup, and the password guard comes first', async () => {
+    const { memberOf } = await import('../src/access')
+
+    configure({ guard: () => undefined, roles, member: () => ({ name: 'custom', roles: ['admin'] }) })
+
+    const withAuth = ask({ method: 'GET', path: '/x', user: { roles: ['editor'] } })
+
+    expect((await memberOf(withAuth))?.name).toBe('custom')
+
+    const guard = passwordGuard({ editor: 'pw' })
+
+    configure({ guard, roles, member: () => ({ name: 'custom', roles: ['admin'] }) })
+
+    const { activePasswords } = await import('../src/password')
+    const ctx = ask({ method: 'GET', path: '/x', cookie: activePasswords()!.issue('editor', false).value })
+
+    await guard(ctx)
+    expect(await memberOf(ctx)).toEqual({ name: 'editor', held: ['editor'] })
+  })
+
+  test('a read does not look the person up unless asked', async () => {
+    let looked = 0
+
+    configure({ guard: () => undefined, roles, member: () => {
+      looked++
+
+      return undefined
+    } })
+    await statusOf(ask({ method: 'GET', path: '/entries/posts/hello' }))
+    expect(looked).toBe(0)
+    await statusOf(ask({ method: 'GET', path: '/editor/can' }))
+    expect(looked).toBe(1)
+  })
+})

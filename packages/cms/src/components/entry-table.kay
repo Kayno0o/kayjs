@@ -118,7 +118,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
       if watched(row)
         EntryWatch(collection={collection.name} entry={ref(row)})
     else if column.key.startsWith('cell:')
-      span {row.cells?.[column.key.slice(5)]}
+      span {row.cells?.[column.key.slice(5)] ?? ''}
     else if column.key === 'locale'
       span {row.locale}
       if row.missing as lacks

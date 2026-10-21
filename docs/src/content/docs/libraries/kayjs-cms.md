@@ -73,19 +73,19 @@ cms({
 })
 ```
 
-The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries and unused uploads), `upload` and `redirects` (the missing pages screen and its API). 
+The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries and unused uploads), `upload` and `redirects` (the missing pages screen and its API).
 
 A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks. The screens show its button disabled, with that sentence as a tooltip.
 
 A role without `publish` can still add an entry to a collection that has a publish date and no draft flag. The server holds it back with a far publish date until a publisher sets one.
 
-A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in:
+A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in. It also runs on screens the guard does not cover, so it returns nothing for a visitor who is not signed in. When given, it replaces kayjs-auth's lookup and never falls back to it:
 
 ```ts
 cms({
   guard: myGuard,
   roles: { publisher: ['publish'] },
-  member: ({ locals }) => ({ name: locals.user.email, roles: locals.user.roles }),
+  member: ({ locals }) => locals.user && { name: locals.user.email, roles: locals.user.roles },
 })
 ```
 

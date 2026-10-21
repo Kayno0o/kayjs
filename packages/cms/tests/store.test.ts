@@ -727,3 +727,13 @@ describe('cms({ onSave })', () => {
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } })).toHaveProperty('saved', true)
   })
 })
+
+describe('heldDate', () => {
+  test('is a far date in the format the publish field takes', async () => {
+    const { heldDate } = await import('../src/store')
+    const held = (format: string) => heldDate({ publishField: 'at', schema: { type: 'object', properties: { at: { type: 'string', format } } } })
+
+    expect(held('date')).toBe('9999-12-31')
+    expect(held('date-time')).toBe('9999-12-31T00:00:00.000Z')
+  })
+})

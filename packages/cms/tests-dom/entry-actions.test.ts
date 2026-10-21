@@ -263,3 +263,26 @@ test('a role holding every action sees the enabled buttons', async () => {
   expect(button(root, 'Publish')!.disabled).toBe(false)
   expect(root.querySelector('.kcms-refused')).toBeNull()
 })
+
+test('every button of publishing is disabled for a role that may not publish', async () => {
+  const future = { ...POSTS, unpublishField: 'endsAt' }
+  const denied = { publish: 'Your role may not publish' }
+  const cases: [Record<string, unknown>, string[]][] = [
+    [{ draft: false }, ['Unpublish']],
+    [{ draft: false, publishAt: FUTURE }, ['Publish now', 'Clear schedule']],
+    [{ draft: false, endsAt: FUTURE }, ['Clear end date']],
+  ]
+
+  for (const [data, labels] of cases) {
+    mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: future, entry: stored(data), denied })
+    await settle()
+
+    for (const label of labels) {
+      expect(button(mounted.root, label)?.disabled, label).toBe(true)
+      expect(button(mounted.root, label)?.closest('[data-tooltip]')?.getAttribute('data-tooltip'), label).toBe('Your role may not publish')
+    }
+
+    mounted.unmount()
+    mounted = undefined
+  }
+})
