@@ -2,10 +2,14 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.61.0
+## Unreleased
 
 - kayjs-cms's admin sets `layouts: false` on its layout, which a library layout can do to start its own chain: it draws its own chrome (skip link, nav with Missing pages and Uploads, a link back to the site, `Content admin` in every title, `noindex`, kayjs-ui's theme in light or dark) instead of rendering inside the site's header and footer ([Libraries](component-libraries.md), [kayjs-cms](../packages/cms/llms/screens.md)).
 - A page swap keeps a fetched deferred server island on screen while its next copy is fetched, so a post back to the same page no longer swaps the form for its inert copy and back, which jumped the scroll ([Prerendering](prerendering.md#prerendering)).
+- kayjs-cms ships the French of every `cms.*` text, the screens, the editor and its messages, read on a French page after the app's own catalog with no setup, so a French site no longer words each one itself; another language is a `cms` block in the app's `src/messages/<locale>.ts`, and `tests/words.test.ts` fails for a new key without its French ([Texts and languages](../packages/cms/llms/words.md)).
+
+## 1.61.0
+
 - `kay dev` follows a `.env` edit for a value that expands another (`A=$HOME/x`, `B=${A}`), which kept its first value, and the process loading `kay.config.ts` for the editor types reads the new `.env` values as the server does ([Dev server](dev-server.md)).
 - A post behind a proxy that ends TLS swaps its page in place: the redirect back is a path, so the browser no longer reads `http:` against its own `https:` and loads the page in full ([Actions](actions.md#forms)).
 - Edit mode in kayjs-cms marks every field a page renders from an entry, also one a component reads from data its page handed down (`Crew({...data})`), and each part of a mixed child like `{age} ans`: [Edit mode](content-cms.md#edit-mode).
@@ -42,7 +46,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A keyed row that moves, and an island kept by `persist` across a page swap, keep their loaded iframe, playing video and focus in a browser with `Element.moveBefore` (Chrome 133, Firefox 144). An island kept across a page swap keeps the scroll of its scrolled panels in every browser ([Templates](templates.md), [Navigation](navigation.md)).
 - A server build sends each page after the first as its difference from the build's 404 page to a browser holding it (Compression Dictionary Transport, `Content-Encoding: dcz`): no setup, off in development and in a static export, and a browser without the feature gets what it did before; on kay's docs a 41 KB page goes in 4.4 KB instead of 9.2 KB with brotli ([Production](proxy-and-security.md#compression)).
 - `kay check` no longer asks an app's locale for the `ui.*` or `mail.*` keys of kayjs-ui or kayjs-mail when the library ships no catalog for it, `de` for one: the locale reads the default locale's texts ([Locales](locales.md)).
-- kayjs-cms ships the French of every `cms.*` text, the screens, the editor and its messages, read on a French page after the app's own catalog with no setup, so a French site no longer words each one itself; another language is a `cms` block in the app's `src/messages/<locale>.ts`, and `tests/words.test.ts` fails for a new key without its French ([Texts and languages](../packages/cms/llms/words.md)).
 
 ## 1.60.1
 

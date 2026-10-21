@@ -2,11 +2,13 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.61.0
+## 1.62.0
 
 ### kayjs-cms's admin leaves the site's layouts
 
 The screens no longer render inside the app's root layout, so the site's header, footer, CSS and `@theme` no longer reach them: they draw their own chrome with kayjs-ui's default theme, and kayjs-cms now lists `tailwindcss` as a peer. To keep the old look, write `src/routes/admin/_layout.kay` (at your prefix) without `layouts: false`, rendering the Content link, `Toaster` and `TooltipHost` and importing `@kaynooo/kayjs-cms/admin.css` ([kayjs-cms](../packages/cms/llms/screens.md)).
+
+## 1.61.0
 
 ### kayjs-cms's delete confirmation names the entry
 
