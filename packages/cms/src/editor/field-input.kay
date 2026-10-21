@@ -84,8 +84,10 @@ const shown = () => field.when === undefined || filled(drafts.value(entry, joinP
 // What a limited text says of its length.
 const counter = () => field.limits?.maxLength === undefined ? undefined : wording('cms.field.counter', '{count} / {max}', { count: text().length, max: field.limits.maxLength })
 
-// An integer takes digits and a minus: the keys that would write a decimal or an exponent are refused, and a pasted decimal is cut to its whole part.
+// Ties a toggle to its hint and issue.
 const noteId = `kcms-note-${uid()}`
+
+// An integer takes digits and a minus: the keys that would write a decimal or an exponent are refused, and a pasted decimal is cut to its whole part.
 const NOT_INTEGER = new Set(['.', ',', 'e', 'E', '+'])
 
 function entered(next: number | null): void {
