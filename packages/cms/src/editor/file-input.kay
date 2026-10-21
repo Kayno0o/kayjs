@@ -45,9 +45,17 @@ async function offer(): Promise<void> {
 void offer()
 
 // An address the CMS stored: its path says nothing an editor needs to read or type.
-const stays = () => value.includes('/_kay/files/')
+const stays = () => value.startsWith('/_kay/files/')
 
-const fileName = () => decodeURIComponent(new URL(value, 'http://site.invalid').pathname.split('/').at(-1) || value)
+// The last segment of the address, which the editor may be half-way through typing: one that does not parse or decode is shown as it is.
+function fileName(): string {
+  try {
+    return decodeURIComponent(new URL(value, 'http://site.invalid').pathname.split('/').at(-1) || value)
+  }
+  catch {
+    return value.split('/').at(-1) || value
+  }
+}
 
 const SUBTYPE_SUFFIX = /\+.*$/
 

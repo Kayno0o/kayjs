@@ -107,32 +107,36 @@ async function pixelsOf(file: File): Promise<{ width: number, height: number } |
 // Uploads a file where a file field's upload goes for `collection`, and answers where it is served and the size of an image; throws when the upload fails, saying why when the type, the size or the pixels are refused, and with the signal's reason when `signal` aborts it.
 // `limits` are the field's own, checked with the server's: the smaller size wins.
 export async function uploadFile(collection: string, file: File, { progress, signal, limits: own }: UploadOptions = {}): Promise<Uploaded> {
-  if (file.size === 0)
-    throw refused(400, emptyFile(file.name))
-
-  const limits = await uploadRules()
-  const maxBytes = Math.min(own?.maxSize ?? Infinity, limits?.maxBytes ?? Infinity)
-
-  if (file.size > maxBytes)
-    throw refused(413, tooLarge(file.name, file.size, maxBytes))
-
-  if (own?.minWidth !== undefined || own?.minHeight !== undefined) {
-    const pixels = await pixelsOf(file)
-
-    if (pixels && (pixels.width < (own.minWidth ?? 0) || pixels.height < (own.minHeight ?? 0)))
-      throw refused(400, tooSmall(file.name, pixels.width, pixels.height, own.minWidth, own.minHeight))
-  }
-
-  const form = new FormData()
-
-  form.append('file', file)
+  // Counted from the start, as the checks before the request take a moment a save could slip through.
   track(1)
 
   try {
-    return await call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, ...progress && { progress }, ...signal && { signal } })
-  }
-  catch (error) {
-    throw signal?.aborted === true ? error : uploadFailure(error, file, limits)
+    if (file.size === 0)
+      throw refused(400, emptyFile(file.name))
+
+    const limits = await uploadRules()
+    const maxBytes = Math.min(own?.maxSize ?? Infinity, limits?.maxBytes ?? Infinity)
+
+    if (file.size > maxBytes)
+      throw refused(413, tooLarge(file.name, file.size, maxBytes))
+
+    if (own?.minWidth !== undefined || own?.minHeight !== undefined) {
+      const pixels = await pixelsOf(file)
+
+      if (pixels && (pixels.width < (own.minWidth ?? 0) || pixels.height < (own.minHeight ?? 0)))
+        throw refused(400, tooSmall(file.name, pixels.width, pixels.height, own.minWidth, own.minHeight))
+    }
+
+    const form = new FormData()
+
+    form.append('file', file)
+
+    try {
+      return await call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, ...progress && { progress }, ...signal && { signal } })
+    }
+    catch (error) {
+      throw signal?.aborted === true ? error : uploadFailure(error, file, limits)
+    }
   }
   finally {
     track(-1)

@@ -558,3 +558,35 @@ test('a typed script address is neither linked nor previewed as one', async () =
   expect(root.querySelector('a.kcms-file-link')?.getAttribute('href') ?? '').not.toMatch(/^javascript:/i)
   expect(root.querySelector('img.kcms-file-preview')?.getAttribute('src') ?? '').not.toMatch(/^javascript:/i)
 })
+
+test('typing an address one character at a time never breaks the field, whatever the state it passes through', async () => {
+  const root = await openFile('')
+  const typed = root.querySelector<HTMLInputElement>('.kcms-file-path input')!
+
+  for (const text of ['h', 'https:', 'https:/', 'https://', '/a/100%', 'https://example.com/a.png']) {
+    typed.value = text
+    typed.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+  }
+
+  expect(root.querySelector('a.kcms-file-link')?.textContent).toBe('a.png')
+})
+
+test('the zone of a list of images shows and applies the item field\'s own limits', async () => {
+  const drafts = createDrafts({ show: async () => ({}) })
+  const item: Field = { key: 0, label: 'Photo', hint: undefined, required: false, kind: 'image', upload: { accept: ['image/png'], maxSize: 1024 } }
+
+  drafts.open({ ...ENTRY, data: { tags: [] } })
+  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: { key: 'tags', label: 'Photos', hint: undefined, required: false, kind: 'list', numbered: true, item } })
+  await settle()
+  expect(mounted.root.querySelector('.kcms-file-rules')?.textContent).toBe('Accepts PNG. Up to 1 KB.')
+  expect(mounted.root.querySelector('input[type=file]')?.getAttribute('accept')).toBe('image/png')
+})
+
+test('clearing an image takes its alt text with it', async () => {
+  const { drafts, root } = await openImage({ tags: UPLOADED, alt: 'A cat' }, { alt: sibling('alt') })
+
+  root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
+  await settle()
+  expect(drafts.value(ENTRY, 'alt')).toBeUndefined()
+})

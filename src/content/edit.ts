@@ -37,7 +37,7 @@ export type DataValue = string | number | boolean | bigint | null | undefined | 
 export interface FieldHint {
   kind: string
   collection?: string | undefined
-  // The types an upload may have, exact or as `image/*`, in place of what the CMS takes.
+  // The types the editor takes for this field, exact or as `image/*`, which the CMS's `uploads` still has to take for the route to accept one.
   accept?: string[] | undefined
   // The most bytes an upload may weigh.
   maxSize?: number | undefined
@@ -234,7 +234,7 @@ function uploadHint<Extra extends UploadFieldOptions>(kind: 'image' | 'file', op
   const { accept, maxSize, minWidth, minHeight, alt, width, height, ...rest } = (options ?? {}) as UploadStringOptions<ImageFieldOptions>
   const hint: FieldHint = { kind }
 
-  if (accept !== undefined)
+  if (accept !== undefined && accept.length > 0)
     hint.accept = accept
 
   if (maxSize !== undefined)

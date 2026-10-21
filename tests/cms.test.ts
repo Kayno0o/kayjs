@@ -260,6 +260,7 @@ describe('the collections a CMS edits', () => {
     expect(image).not.toHaveProperty('alt')
     expect((JSON.parse(JSON.stringify(fileField({ accept: ['application/pdf'], maxSize: 1024 }))) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'file', accept: ['application/pdf'], maxSize: 1024 })
     expect((JSON.parse(JSON.stringify(imageField())) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'image' })
+    expect((JSON.parse(JSON.stringify(imageField({ accept: [] }))) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'image' })
     expect(() => imageField({ maxSize: '0mb' })).toThrow('imageField({ maxSize })')
     expect(() => imageField({ minWidth: 0 })).toThrow('minWidth')
     expect(() => imageField({ minHeight: 1.5 })).toThrow('minHeight')

@@ -184,6 +184,10 @@ function setFile(next: string, uploaded?: { width: number, height: number }): vo
   if (field.kind !== 'image')
     return
 
+  // The alt text described the image that went.
+  if (next === '' && field.upload.alt !== undefined)
+    drafts.set(entry, siblingPath(path, field.upload.alt.key), undefined)
+
   if (field.upload.width !== undefined)
     drafts.set(entry, siblingPath(path, field.upload.width.key), size?.width)
 
@@ -239,7 +243,7 @@ function setJson(next: string): void {
               Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={atMax()} onClick={undo})
           if !atMax()
             if current.item.kind === 'image' || current.item.kind === 'file'
-              FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} many onChange={path => append(path)})
+              FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} upload={current.item.kind === 'image' || current.item.kind === 'file' ? current.item.upload : undefined} many onChange={path => append(path)})
             Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add onClick={() => append(emptyValue(current.item))})
     when 'group'
       FormField.kcms-group(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
