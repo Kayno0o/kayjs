@@ -352,4 +352,108 @@ export const authors = collection('content/authors', {
     expect(report.written).not.toContain('src/server.ts')
     expect(report.notes.map(note => lead(note.message))).toEqual(['Tailwind 3'])
   })
+
+  it('translates or lists what an Astro project holds beyond Astro itself: a script after html, astro-icon, Astro.self, Vite\'s env and raw imports, Fontsource, UnoCSS, ESLint and a registry range', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-migrate-'))
+    const out = join(root, 'kay')
+
+    dirs.push(root)
+    await Promise.all([
+      Bun.write(join(root, 'package.json'), JSON.stringify({
+        dependencies: { 'astro': '^4.0.0', 'astro-icon': '^1.1.0', '@fontsource/montserrat': '^5.0.0', '@kaynooo/utils': '^1.0.14', 'unocss': '^0.60.0' },
+        devDependencies: { '@antfu/eslint-config': '^2.0.0', 'eslint': '^9.0.0', 'eslint-plugin-format': '^0.1.0', '@unocss/eslint-plugin': '^0.60.0', '@iconify-json/mdi': '^1.1.0' },
+      }, null, 2)),
+      Bun.write(join(root, 'astro.config.mjs'), 'import UnoCSS from \'unocss/astro\'\n\nexport default defineConfig({ integrations: [UnoCSS()] })\n'),
+      Bun.write(join(root, 'uno.config.ts'), 'export default {}\n'),
+      Bun.write(join(root, '.gitignore'), '# build\ndist/\n.astro/\nnode_modules\nworld\ndata\npublic/generated/\n'),
+      Bun.write(join(root, 'public/svg/x.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>\n'),
+      Bun.write(join(root, 'src/lib/rcon.ts'), 'export const host = import.meta.env.RCON_HOST\nimport logo from \'../../public/svg/x.svg?raw\'\n'),
+      Bun.write(join(root, 'src/layouts/Layout.astro'), `---
+import '@fontsource/montserrat/400.css'
+import '@fontsource/montserrat/700.css'
+import '@fontsource/montserrat/400-italic.css'
+import { Icon } from 'astro-icon/components'
+---
+<html lang="en">
+  <head>
+    <title>Stats</title>
+    <script is:inline src="https://unpkg.com/lib@1/dist/lib.js" defer></script>
+  </head>
+  <body>
+    <button id="toggle"><Icon name="mdi:white-balance-sunny" class="size-5" /></button>
+    <div class="text-red-5 group-even:(top-0 -translate-y-full)"><slot /></div>
+  </body>
+</html>
+<script is:inline>
+  document.getElementById('toggle').addEventListener('click', () => document.documentElement.classList.toggle('dark'))
+</script>
+`),
+      Bun.write(join(root, 'src/components/Tree.astro'), `---
+import separation from '../../public/svg/x.svg?raw'
+const { item } = Astro.props
+const host = import.meta.env.RCON_HOST
+---
+<div set:html={separation} />
+<p>{host}</p>
+{item.children.map(child => <Astro.self item={child} />)}
+`),
+      Bun.write(join(root, 'src/pages/index.astro'), '---\nimport Layout from \'../layouts/Layout.astro\'\n---\n<Layout><h1>Stats</h1></Layout>\n'),
+    ])
+
+    const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
+    const layout = await Bun.file(join(out, 'src/layouts/layout.kay')).text()
+    const packageJson = await Bun.file(join(out, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string> }
+    const tree = await Bun.file(join(out, 'src/components/tree.kay')).text()
+
+    // The script after html stays, the Fontsource imports leave for kay.config.ts, the icon is imported from its set and the script from another host needs no empty body.
+    expect(layout).toContain('document.getElementById(\'toggle\')')
+    expect(layout).toContain('import MdiWhiteBalanceSunny from \'~icons/mdi/white-balance-sunny\'')
+    expect(layout).toContain('MdiWhiteBalanceSunny.size-5')
+    expect(layout).toContain('script(src="https://unpkg.com/lib@1/dist/lib.js" defer)\n')
+    expect(layout).not.toContain('fontsource')
+    expect(layout).not.toContain('astro-icon')
+    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toContain('  fonts: [{ fontsource: \'@fontsource/montserrat\', weights: [400, 700] }, { fontsource: \'@fontsource/montserrat\', weights: [400], styles: [\'italic\'] }],\n')
+    expect(tree).toContain('import separation from \'../../public/svg/x.svg\' with { type: \'text\' }')
+    expect(tree).toContain('// kay migrate: Astro.self')
+    expect(Object.keys(packageJson.dependencies)).toEqual(['@fontsource/montserrat', '@kaynooo/utils', 'elysia', 'kay'])
+    expect(Object.keys(packageJson.devDependencies)).toEqual(['@iconify-json/mdi', '@kaynooo/eslint', '@types/bun'])
+    expect(await Bun.file(join(out, '.gitignore')).text()).toEndWith('\n# From the Astro project\nworld\ndata\npublic/generated/\n')
+    expect(report.notes.map(note => `${note.file}:${note.line} ${lead(note.message)}`)).toEqual([
+      'package.json:6 `@kaynooo/utils@^1.0.14` is carried over, and the Forgejo registry the .npmrc names may hold no version in that range',
+      'src/components/Tree.astro:3 Astro.props without a `Props` type',
+      'src/components/Tree.astro:4 import.meta.env.RCON_HOST is Vite\'s',
+      'src/components/Tree.astro:8 Astro.self, a component rendering itself, has no kay counterpart (import its own .kay file under a name and render that)',
+      'src/layouts/Layout.astro:10 a script from unpkg.com',
+      'src/lib/rcon.ts:1 import.meta.env is Vite\'s',
+      'src/lib/rcon.ts:2 a `?raw` import is Vite\'s',
+      'uno.config.ts:1 UnoCSS',
+    ])
+  })
+
+  it('reads the Fontsource stylesheets it removes, and keeps and lists the ones it does not know', () => {
+    const { code, fonts, notes } = component(`---
+import '@fontsource/open-sans/latin-500-italic.css'
+import '@fontsource/open-sans'
+import '@fontsource-variable/inter/wght-italic.css'
+import '@fontsource-variable/inter'
+import '@fontsource/open-sans/600.css?inline'
+import '@fontsource/open-sans/scss/mixins.scss'
+---
+<p>Hi</p>
+`)
+
+    expect(fonts.map(({ fontsource, weight, style }) => [fontsource, weight, style])).toEqual([['@fontsource/open-sans', 500, 'italic'], ['@fontsource/open-sans', 400, 'normal'], ['@fontsource-variable/inter', undefined, 'italic'], ['@fontsource-variable/inter', undefined, 'normal']])
+    expect(code).toBe('---\nimport \'@fontsource/open-sans/600.css?inline\'\nimport \'@fontsource/open-sans/scss/mixins.scss\'\n---\np Hi\n')
+    expect(notes.map(note => note.line)).toEqual([6, 7])
+  })
+
+  it('keeps what stands beside the html element, a define:vars script and an expression attribute listed', () => {
+    const { code, notes } = component(`<!-- before -->
+<html><body><p>a</p></body></html>
+<script is:inline define:vars={{ a }} src={url}>document.x = 1</script>
+`)
+
+    expect(code).toBe('// before\np a\nscript {`document.x = 1`}\n')
+    expect(notes.map(note => lead(note.message))).toEqual(['define', 'a script attribute holding an expression'])
+  })
 })

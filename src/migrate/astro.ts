@@ -19,6 +19,17 @@ export interface MigratedFile {
   notes: Note[]
   // The `lang` a layout's `html` gives as text, which kay sets once in kay.config.ts.
   lang?: { line: number, value: string } | undefined
+  // The Fontsource stylesheets the file imported, which kay serves through `fonts` in kay.config.ts instead.
+  fonts: FontImport[]
+}
+
+export interface FontImport {
+  line: number
+  // The package, `@fontsource/montserrat`.
+  fontsource: string
+  // Undefined for a variable font, whose one file spans every weight.
+  weight: number | undefined
+  style: 'normal' | 'italic'
 }
 
 export interface MigrateOptions {
@@ -29,6 +40,12 @@ export interface MigrateOptions {
 
 const FRONTMATTER = /^\s*---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 const OTHER_FRAMEWORK = /\.(?:svelte|vue|jsx|tsx)$/
+const ASTRO_ICON = /^astro-icon(?:\/.*)?$/
+// `@fontsource/montserrat/400.css`, `@fontsource/montserrat/latin-400-italic.css`, `@fontsource-variable/inter/wght-italic.css` or the package alone.
+const FONTSOURCE = /^(@fontsource(?:-variable)?\/[^/]+)(?:\/(.+?)(?:\.css)?)?$/
+const FONT_WEIGHT = /^(?:[a-z][a-z-]*-)?(\d{3})(?:-(italic|normal))?$/
+const FONT_VARIABLE = /^(?:[a-z][a-z-]*-)?(?:index|variable|wght|opsz|wdth|slnt|full)(?:-(italic|normal))?$/
+const RAW_QUERY = /\?raw$/
 
 interface Edit {
   start: number
@@ -56,11 +73,13 @@ export function migrateAstro(source: string, options: MigrateOptions): MigratedF
   // The template's first line in the file, for the lines notes give.
   const templateStart = match ? match[0].length : 0
   const templateLine = lineAt(source, templateStart)
-  const imports: Imports = { image: new Set(), router: new Set(), kay: new Set(), kayTypes: new Set() }
-  const script = migrateFrontmatter(frontmatter, options, imports, (line, message) => notes.push({ line: line + 1, message }))
+  const imports: Imports = { image: new Set(), router: new Set(), kay: new Set(), kayTypes: new Set(), icon: new Set(), icons: new Map() }
+  const fonts: FontImport[] = []
+  const script = migrateFrontmatter(frontmatter, options, imports, fonts, (line, message) => notes.push({ line: line + 1, message }))
   let lang: MigratedFile['lang']
   const template = migrateTemplate(source.slice(templateStart), options, imports, (line, message) => notes.push({ line: line + templateLine - 1, message }), (line, value) => lang = { line: line + templateLine - 1, value })
-  const kayImport = [...imports.kayTypes.size > 0 ? [`import type { ${[...imports.kayTypes].toSorted().join(', ')} } from 'kay'\n`] : [], ...imports.kay.size > 0 ? [`import { ${[...imports.kay].toSorted().join(', ')} } from 'kay'\n`] : []].join('')
+  const iconImports = [...imports.icons].toSorted(([a], [b]) => a.localeCompare(b)).map(([name, specifier]) => `import ${name} from '${specifier}'\n`).join('')
+  const kayImport = [...imports.kayTypes.size > 0 ? [`import type { ${[...imports.kayTypes].toSorted().join(', ')} } from 'kay'\n`] : [], ...imports.kay.size > 0 ? [`import { ${[...imports.kay].toSorted().join(', ')} } from 'kay'\n`] : [], iconImports].join('')
   const fenced = `${kayImport}${script.trim()}`.trim()
   const fence = fenced === '' ? '' : `${options.role === 'page' ? '--- server' : '---'}\n${fenced}\n---\n`
   const code = `${fence}${template}`
@@ -69,7 +88,7 @@ export function migrateAstro(source: string, options: MigrateOptions): MigratedF
   if (formatted.diagnostics.length > 0)
     notes.push({ line: 1, message: `the translation does not parse as kay (${formatted.diagnostics[0]!.message}), so it is left as written; fix it by hand` })
 
-  return { code: formatted.diagnostics.length > 0 ? code : formatted.code, notes: notes.toSorted((a, b) => a.line - b.line), lang }
+  return { code: formatted.diagnostics.length > 0 ? code : formatted.code, notes: notes.toSorted((a, b) => a.line - b.line), lang, fonts }
 }
 
 function migrateTemplate(markup: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void, lang: (line: number, value: string) => void): string {
@@ -88,7 +107,7 @@ function migrateTemplate(markup: string, options: MigrateOptions, imports: Impor
   }
 }
 
-function migrateFrontmatter(code: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void): string {
+function migrateFrontmatter(code: string, options: MigrateOptions, imports: Imports, fonts: FontImport[], note: (line: number, message: string) => void): string {
   if (code.trim() === '')
     return ''
 
@@ -144,6 +163,27 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
 
         remove()
       }
+      else if (ASTRO_ICON.test(from)) {
+        for (const specifier of statement.specifiers) {
+          if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier' && specifier.imported.name === 'Icon')
+            imports.icon.add(specifier.local.name)
+          else
+            note(lineOf(specifier), `\`${specifier.local.name}\` from ${from} has no kay counterpart: import the svg file, or the icon from \`@iconify-json/<prefix>\` as \`~icons/<prefix>/<name>\``)
+        }
+
+        remove()
+      }
+      else if (FONTSOURCE.test(from) && statement.specifiers.length === 0) {
+        const font = fontOf(from, lineOf(statement))
+
+        if (font) {
+          fonts.push(font)
+          remove()
+        }
+        else {
+          note(lineOf(statement), `${from} is a stylesheet kay does not read: serve the font with \`fonts: [{ fontsource: '<package>' }]\` in kay.config.ts, which declares its faces without inlining every file into the page stylesheet`)
+        }
+      }
       else if (from.startsWith('astro:')) {
         note(lineOf(statement), `${from} has no kay counterpart${from === 'astro:content' ? ': a content collection is read with `collection` from `kay/content` (see Content collections)' : ''}`)
       }
@@ -157,6 +197,10 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       }
       else if (OTHER_FRAMEWORK.test(from)) {
         note(lineOf(statement), `${from} is another framework's component: rewrite it as a .kay island`)
+      }
+      else if (RAW_QUERY.test(from) && (statement.attributes?.length ?? 0) === 0) {
+        // `?raw` is Vite's; Bun reads a file's text through an import attribute.
+        edits.push({ start: statement.source.start!, end: statement.end!, text: `'${from.replace(RAW_QUERY, '')}' with { type: 'text' }` })
       }
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'FunctionDeclaration' && statement.declaration.id?.name === 'getStaticPaths') {
@@ -240,6 +284,12 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
   const page = role === 'page'
 
   eachNode(node, (inner) => {
+    if (inner.type === 'MemberExpression' && isMetaEnv(inner.object)) {
+      note(inner.loc!.start.line, `import.meta.env.${inner.property.type === 'Identifier' ? inner.property.name : '...'} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or in \`publicEnv\` for an island`)
+
+      return false
+    }
+
     // `return Astro.redirect('/login')` ends the frontmatter; `ctx.redirect` stops the render by itself.
     if (inner.type === 'ReturnStatement' && inner.argument?.type === 'CallExpression' && isAstro(inner.argument.callee, 'redirect') && page) {
       at(inner, code.slice(inner.argument.start! - offset, inner.argument.end! - offset).replace('Astro.redirect', 'ctx.redirect'))
@@ -276,6 +326,37 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
   })
 
   return edits
+}
+
+function isMetaEnv(node: t.Node): boolean {
+  return node.type === 'MemberExpression' && node.object.type === 'MetaProperty' && node.object.meta.name === 'import' && node.object.property.name === 'meta' && node.property.type === 'Identifier' && node.property.name === 'env'
+}
+
+// The font a Fontsource stylesheet import declares, or undefined for a file kay migrate does not know.
+function fontOf(specifier: string, line: number): FontImport | undefined {
+  const match = FONTSOURCE.exec(specifier)
+  const fontsource = match?.[1]
+
+  if (fontsource === undefined)
+    return undefined
+
+  const file = match?.[2]
+  const variable = fontsource.startsWith('@fontsource-variable/')
+
+  if (file === undefined || file === 'index')
+    return variable ? { line, fontsource, weight: undefined, style: 'normal' } : { line, fontsource, weight: 400, style: 'normal' }
+
+  const weight = FONT_WEIGHT.exec(file)
+
+  if (weight && !variable)
+    return { line, fontsource, weight: Number(weight[1]), style: weight[2] === 'italic' ? 'italic' : 'normal' }
+
+  const spans = FONT_VARIABLE.exec(file)
+
+  if (spans && variable)
+    return { line, fontsource, weight: undefined, style: spans[1] === 'italic' ? 'italic' : 'normal' }
+
+  return undefined
 }
 
 function isAstro(node: t.Node, name: string): boolean {

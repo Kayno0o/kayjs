@@ -74,7 +74,7 @@ function prepare(html: string, note: (line: number, message: string) => void): s
 export function htmlToKay(html: string): ConvertedHtml {
   const notes: Note[] = []
   const note = (line: number, message: string) => notes.push({ line, message })
-  const imports: Imports = { image: new Set(), router: new Set(), kay: new Set(), kayTypes: new Set() }
+  const imports: Imports = { image: new Set(), router: new Set(), kay: new Set(), kayTypes: new Set(), icon: new Set(), icons: new Map() }
   const host: MarkupHost = { mode: 'html', note, lang: (line, value) => note(line, `\`lang\` on html is "${value}": set \`lang: '${value}'\` in kay.config.ts, which writes it on every page`), expression: (_node, code) => code, prepare: markup => prepare(markup, note) }
   let code: string
 

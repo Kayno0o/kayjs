@@ -148,7 +148,7 @@ function folderOf(options: t.ObjectExpression, name: string): string | undefined
   return folder.startsWith('src/') ? folder.slice(4) : `../${folder}`
 }
 
-export function migrateContentConfig(source: string): MigratedFile {
+export function migrateContentConfig(source: string): Pick<MigratedFile, 'code' | 'notes'> {
   const ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
   const zod = new Set<string>()
   const translator = new SchemaTranslator(source, zod)

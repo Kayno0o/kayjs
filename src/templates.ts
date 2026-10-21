@@ -9,6 +9,8 @@ export interface ConfigSettings {
   base?: string | undefined
   // The `seo` defaults, left out where the pages already write their own titles and descriptions.
   seo?: boolean | undefined
+  // The `fonts` entries of the installed Fontsource packages the site served.
+  fonts?: { fontsource: string, weights?: number[] | undefined, styles?: string[] | undefined }[] | undefined
 }
 
 // Where the project's repository is hosted, which decides the CI it is scaffolded with.
@@ -303,6 +305,7 @@ function config({ has, settings }: Setup): string {
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
     has('tailwind') && '  plugins: [tailwind],',
+    settings.fonts !== undefined && settings.fonts.length > 0 && `  fonts: [${settings.fonts.map(font => `{ fontsource: ${quote(font.fontsource)}${font.weights ? `, weights: [${font.weights.join(', ')}]` : ''}${font.styles ? `, styles: [${font.styles.map(quote).join(', ')}]` : ''} }`).join(', ')}],`,
     server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s. It trusts private-range peers, so a dev server bound to 0.0.0.0 believes a LAN client\'s X-Forwarded-For.',
     server && has('docker') && '  proxy: true,',
     server && has('docker') && has('auth') && '  // `kay check` compares the variables src/env.ts declares with what production sets.',

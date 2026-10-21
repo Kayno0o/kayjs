@@ -26,6 +26,7 @@ The new project has these.
 - A `tsconfig.json` keeping the Astro project's `paths`.
 - `src/server.ts` when the Astro site renders on demand (`output: 'server'` or an adapter); otherwise it is a static site built with `kay build --static`.
 - Tailwind, ESLint, the Forgejo workflow and the Dockerfile when the Astro project had them.
+- A `.gitignore` holding the Astro project's own entries too, a `fonts` entry in `kay.config.ts` for each Fontsource package the layouts imported, and none of the Astro project's ESLint or UnoCSS packages.
 
 It never writes over a file that exists.
 
@@ -46,6 +47,9 @@ Run without `--outdir`, it writes the `.kay` files next to the `.astro` ones and
 | `client:idle`, `client:visible` | `hydrate` |
 | `set:html` | `innerHTML` through `trustHtml` |
 | A layout's `<head>` | A `head` block |
+| `<Icon name="mdi:sun" />` from astro-icon | The icon imported from `~icons/mdi/sun`, drawn as a tag (see [Images](/essentials/styling-and-assets)) |
+| `import '@fontsource/inter/400.css'` | A `fonts` entry in `kay.config.ts` |
+| `import text from './x.svg?raw'` | `import text from './x.svg' with { type: 'text' }` |
 
 A page reads like this before.
 
@@ -100,6 +104,11 @@ In the `.kay` file, the code an item concerns is commented out under a `// kay m
 - **`astro:assets` and `Image`**: an imported image is its URL, `img(src={photo})`, which kay sizes and serves in modern formats (see [Styling and assets](/essentials/styling-and-assets)).
 - **Tailwind 3**: kay builds with Tailwind 4, so upgrade the stylesheets with `bunx @tailwindcss/upgrade`.
 - **Attributes on `<body>`**: kay writes `body` itself, so move them to an element inside it.
+- **`Astro.self`**: a component rendering itself imports its own `.kay` file under a name and renders that.
+- **`import.meta.env`**: declare the variable in a `defineEnv` schema from `kay/server` and read it from there, or in `publicEnv` for an island (see [Data loading](/essentials/data-loading)).
+- **A script from another host**: kay's Content-Security-Policy blocks it until `security: { csp: { 'script-src': ['https://unpkg.com'] } }` in `kay.config.ts` allows it.
+- **UnoCSS**: kay has no plugin for it, so its packages are left out and a class only UnoCSS knows (a variant group, a shortcut, a custom variant, a theme colour) passes through unstyled; port them to Tailwind 4.
+- **A `@kaynooo/*` range** carried over: the registry may hold no version in it, which fails `bun install`.
 - **A Markdown page** (`src/pages/*.md`): make it an entry of a [content collection](/guides/content) and render it from a page.
 - **A `site` or `base` that is not a plain string**, such as one read from the environment: set it in `kay.config.ts`.
 

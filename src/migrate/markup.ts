@@ -19,6 +19,14 @@ const TRAILING_SPACE = /[ \t\n\r\f]*$/
 const INTERPOLATION = /#\[/g
 const EVENT_ATTRIBUTE = /^on[a-z]+$/
 
+const ICON_NAME = /^([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)$/
+const ICON_SEPARATOR = /[^a-z0-9]+/i
+const EXTERNAL_URL = /^(?:https?:)?\/\/([^/\s"'?#]+)/i
+const EXPRESSION_START = /\s[\w:-]+=\{/
+const SET_HTML = /\sset:html\b/
+const SET_HTML_VALUE = /\sset:html=\{(?:[^{}]|\{[^{}]*\})*\}/
+const DEFINE_VARS = /\sdefine:vars=\{(?:[^{}]|\{[^{}]*\})*\}/
+const EXPRESSION_ATTRIBUTE = /\s[\w:-]+=\{(?:[^{}]|\{[^{}]*\})*\}/g
 const RAW_TAG = /^kay-raw-(\d+)$/
 const WHITESPACE = /\s+/
 // HTML's own whitespace, which leaves a no-break space alone.
@@ -58,6 +66,9 @@ export interface Imports {
   // What the translation uses from `kay`, imported in the fence.
   kay: Set<string>
   kayTypes: Set<string>
+  // The local names astro-icon's `Icon` is imported under, and the `~icons/<prefix>/<name>` modules (by the name they are imported under) the translation draws its icons with.
+  icon: Set<string>
+  icons: Map<string, string>
 }
 
 // What a caller supplies: where a note goes, what a layout's `lang` becomes, and how an expression of the markup is read (Astro's `Astro.*` rewritten, HTML having none).
@@ -134,12 +145,15 @@ class Translator {
 
   // The top level of a file: a layout's `html` gives its `head` children to kay's `head` block and its `body` children to the template.
   document(children: Child[]): string {
-    const html = this.meaningful(children).find((child): child is t.JSXElement => child.type === 'JSXElement' && this.tagName(child) === 'html')
+    const top = this.meaningful(children)
+    const html = top.find((child): child is t.JSXElement => child.type === 'JSXElement' && this.tagName(child) === 'html')
 
     if (!html)
       return `${this.block(children).join('\n')}\n`
 
     const lines: string[] = []
+    const siblings = (nodes: Child[]) => nodes.flatMap((child, index) => this.child(child, nodes[index - 1], nodes[index + 1]))
+    const at = top.indexOf(html)
 
     for (const attribute of html.openingElement.attributes) {
       if (attribute.type !== 'JSXAttribute' || this.attributeName(attribute) !== 'lang')
@@ -150,6 +164,9 @@ class Translator {
       else
         this.note(this.line(attribute), `\`lang\` on html: set \`lang: ${this.text(attribute.value!)}\` in kay.config.ts, which writes it on every page`)
     }
+
+    // What stands before or after the `html` element, such as a script closing a layout, goes beside its body.
+    lines.push(...siblings(top.slice(0, at)))
 
     for (const part of this.meaningful(html.children)) {
       if (part.type !== 'JSXElement') {
@@ -177,6 +194,8 @@ class Translator {
         lines.push(...this.child(part))
       }
     }
+
+    lines.push(...siblings(top.slice(at + 1)))
 
     return `${lines.join('\n')}\n`
   }
@@ -323,6 +342,12 @@ class Translator {
     if (this.imports.router.has(name) || ROUTER_COMPONENTS.has(name))
       return []
 
+    if (name === 'Astro.self')
+      return this.untranslated(element, 'Astro.self, a component rendering itself, has no kay counterpart (import its own .kay file under a name and render that)')
+
+    if (this.imports.icon.has(name))
+      return this.icon(element)
+
     if (name === 'Fragment')
       return this.fragment(element)
 
@@ -352,6 +377,22 @@ class Translator {
       return [`${head} ${inline}`]
 
     return [head, ...this.indent(this.componentChildren(element, children))]
+  }
+
+  // astro-icon's `<Icon name="mdi:sun" />`, drawn as the icon imported from its `@iconify-json` set.
+  private icon(element: t.JSXElement): string[] {
+    const name = element.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name')
+    const match = name?.value?.type === 'StringLiteral' ? ICON_NAME.exec(name.value.value) : null
+
+    if (!match)
+      return this.untranslated(element, 'an astro-icon whose name is not a plain `set:name` (a local icon, or a computed name): import the icon from `@iconify-json/<prefix>` as `~icons/<prefix>/<name>` and draw it as a tag, or import the svg file')
+
+    const [, prefix, icon] = match as unknown as [string, string, string]
+    const local = [prefix, icon].flatMap(part => part.split(ICON_SEPARATOR)).map(part => `${part[0]!.toUpperCase()}${part.slice(1)}`).join('')
+
+    this.imports.icons.set(local, `~icons/${prefix}/${icon}`)
+
+    return [this.head(element, local, 'name')]
   }
 
   // A component's children given to a named slot, `<h2 slot="title">`, become its `@title` block.
@@ -422,7 +463,7 @@ class Translator {
   }
 
   // `tag.class#id(attributes)`, with the static classes and id as shorthand where kay's syntax takes them.
-  private head(element: t.JSXElement, tag: string): string {
+  private head(element: t.JSXElement, tag: string, skip?: string): string {
     const shorthand: string[] = []
     const attributes: string[] = []
     let id = ''
@@ -439,6 +480,9 @@ class Translator {
       const value = attribute.value
 
       if (!this.html && (name === 'key' || name === 'slot'))
+        continue
+
+      if (name === skip)
         continue
 
       // `onclick="..."` is code in a string, where kay's `onClick={...}` takes a function.
@@ -553,10 +597,22 @@ class Translator {
 
   // A `<script>` or `<style>` taken out before parsing: an inline script and a stylesheet stay as their element, a bundled script cannot.
   private rawBlock(block: RawBlock, element: t.JSXElement): string[] {
-    const attributes = [...block.attributes.matchAll(ATTRIBUTE_PART)].map(([, name, value]) => ({ name: name!, value }))
+    // An attribute holding an expression is listed below, not read as text.
+    const attributes = [...block.attributes.replace(EXPRESSION_ATTRIBUTE, '').matchAll(ATTRIBUTE_PART)].map(([, name, value]) => ({ name: name!, value }))
     const kept = attributes.filter(attribute => !DROPPED.has(attribute.name) && attribute.name !== 'set:html')
-    const html = attributes.find(attribute => attribute.name === 'set:html')
+    const html = SET_HTML.test(block.attributes)
     const head = `${block.tag}${kept.length > 0 ? `(${kept.map(attribute => attribute.value === undefined ? attribute.name : `${attribute.name}=${attribute.value.startsWith('\'') ? `"${attribute.value.slice(1, -1)}"` : attribute.value}`).join(' ')})` : ''}`
+
+    if (block.attributes.includes('define:vars'))
+      this.note(this.line(element), `define:vars on a ${block.tag}: pass the values through an attribute or a prop instead; dropped`)
+
+    if (EXPRESSION_START.test(block.attributes.replace(DEFINE_VARS, '').replace(SET_HTML_VALUE, '')))
+      this.note(this.line(element), `a ${block.tag} attribute holding an expression: kay migrate keeps only the attributes written as text, so write it by hand`)
+
+    const host = block.tag === 'script' ? EXTERNAL_URL.exec(attributes.find(attribute => attribute.name === 'src')?.value?.slice(1, -1) ?? '')?.[1] : undefined
+
+    if (host !== undefined && !this.html)
+      this.note(this.line(element), `a script from ${host}: kay's Content-Security-Policy blocks it until \`security: { csp: { 'script-src': ['https://${host}'] } }\` in kay.config.ts allows it`)
 
     if (html) {
       this.note(this.line(element), `${block.tag} with set:html={...}: set its \`innerHTML\` from the value instead`)
@@ -573,7 +629,10 @@ class Translator {
     if (block.tag === 'style' && !this.html && !attributes.some(attribute => attribute.name === 'is:global'))
       this.note(this.line(element), 'a style Astro scoped to the component is global in kay: check its selectors reach only what they styled')
 
-    return [`${head.replace('(is:global)', '').replace(' is:global', '')} {\`${escapeTemplate(block.content.trim())}\`}`]
+    const content = block.content.trim()
+    const bare = head.replace('(is:global)', '').replace(' is:global', '')
+
+    return [content === '' ? bare : `${bare} {\`${escapeTemplate(content)}\`}`]
   }
 }
 
