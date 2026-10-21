@@ -9,7 +9,7 @@ const search = (event: Event) => {
   const { value: q } = event.currentTarget as HTMLInputElement
 
   clearTimeout(timer)
-  timer = setTimeout(() => void navigate({ query: { q } }, { replace: true }), 40)
+  timer = setTimeout(() => void navigate({ query: { q } }, { replace: true }), 150)
 }
 ---
 if area

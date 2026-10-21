@@ -1017,7 +1017,7 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   announce(document.title)
 }
 
-// A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. When the new text differs, a caret that was at the end stays at the end and any other is kept within it. A caret at the end scrolls the field to its end, which the browser does not do for a field just hydrated.
+// A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. When the new text differs, a caret that was at the end stays at the end and any other is kept within it. A caret (not a selection) at the end scrolls the field to its end, which the browser does not do for a field just hydrated.
 function carryCaret(from: Element | null, to: HTMLElement): void {
   if (!(from instanceof HTMLInputElement || from instanceof HTMLTextAreaElement) || !(to instanceof HTMLInputElement || to instanceof HTMLTextAreaElement))
     return
@@ -1039,7 +1039,7 @@ function carryCaret(from: Element | null, to: HTMLElement): void {
 
   to.setSelectionRange(place(selectionStart), end, selectionDirection ?? undefined)
 
-  if (end === length) {
+  if (end === length && selectionStart === selectionEnd) {
     to.scrollLeft = to.scrollWidth
     to.scrollTop = to.scrollHeight
   }
