@@ -99,7 +99,7 @@ export interface ContentLoader<Data = unknown> {
   saveMany?: ((entries: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined }[]) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
-  // A hidden collection in the same store, named by what a CMS keeps in it (`history`, `trash`), whose entries never show in this one: kayjs-cms keeps an entry's revisions and its deleted entries there, so a loader without it has no history.
+  // A hidden collection in the same store, named by what a CMS keeps in it (`history`, `trash`, `activity`), whose entries never show in this one: kayjs-cms keeps an entry's revisions, its deleted entries and who did what there, so a loader without it has no history.
   sibling?: ((kind: string) => ContentLoader) | undefined
 }
 

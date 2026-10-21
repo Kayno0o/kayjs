@@ -26,6 +26,11 @@ interface Row {
   body?: string
 }
 
+// Rows a loader answering several kinds from one store may hold are not trashed entries.
+function isRow(data: unknown): boolean {
+  return typeof data === 'object' && data !== null && typeof (data as Row).data === 'object' && typeof (data as Row).at === 'number'
+}
+
 function trashedOf(id: string, row: Row): Trashed {
   return { id, at: row.at, author: row.author, slug: row.slug, locale: row.locale, data: row.data, body: row.body }
 }
@@ -39,7 +44,7 @@ async function purge(collection: string): Promise<void> {
     return
 
   try {
-    const rows = await trash.load({ preview: true })
+    const rows = (await trash.load({ preview: true })).filter(row => isRow(row.data))
     const expired = rows.filter(row => (row.data as Row).at < Date.now() - kept)
     const staying = rows.filter(row => !expired.includes(row))
 
@@ -70,7 +75,7 @@ export async function trashOf(collection: string): Promise<Trashed[]> {
 
   await purge(collection)
 
-  return (await trash.load({ preview: true })).map(row => trashedOf(row.slug, row.data as Row)).sort((a, b) => b.at - a.at)
+  return (await trash.load({ preview: true })).filter(row => isRow(row.data)).map(row => trashedOf(row.slug, row.data as Row)).sort((a, b) => b.at - a.at)
 }
 
 export async function trashed(collection: string, id: string): Promise<Trashed | undefined> {

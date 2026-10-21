@@ -29,8 +29,24 @@ let latest = 0
 async function trim(hidden: ContentLoader, rows: Awaited<ReturnType<ContentLoader['load']>>): Promise<void> {
   const newest = [...rows].sort((a, b) => (b.data as Row).at - (a.data as Row).at)
 
-  for (const row of newest.slice(KEPT))
-    await hidden.remove!({ slug: row.slug })
+  await Promise.all(newest.slice(KEPT).map(async row => hidden.remove!({ slug: row.slug })))
+}
+
+// Trims without making a save or a read wait for it; a failure is logged.
+function trimLater(collection: string, hidden: ContentLoader, rows: () => ReturnType<ContentLoader['load']>): void {
+  void (async () => {
+    try {
+      await trim(hidden, await rows())
+    }
+    catch (error) {
+      log.error(`${collection}'s activity could not be trimmed`, error)
+    }
+  })()
+}
+
+// A row a loader of another kind wrote here by mistake has no verb.
+function isEvent(data: unknown): data is Row {
+  return typeof data === 'object' && data !== null && typeof (data as Row).verb === 'string' && typeof (data as Row).at === 'number'
 }
 
 // Keeps what an editor's change went through, in a hidden collection beside the entries: one small row per event, so two saves at once never write over each other. Never throws, as the change is written.
@@ -56,7 +72,7 @@ export async function recordActivity(event: SaveEvent): Promise<void> {
     written.set(event.collection, count)
 
     if (count % TRIM_EVERY === 0)
-      await trim(hidden, await hidden.load({ preview: true }))
+      trimLater(event.collection, hidden, async () => hidden.load({ preview: true }))
   }
   catch (error) {
     log.error(`${event.collection}/${event.slug}'s activity could not be kept`, error)
@@ -70,15 +86,17 @@ export async function activityOf(collection: string): Promise<Activity[]> {
   if (hidden === undefined)
     return []
 
-  const rows = await hidden.load({ preview: true })
-
   try {
+    const rows = (await hidden.load({ preview: true })).filter(row => isEvent(row.data))
+
     if (rows.length > KEPT)
-      await trim(hidden, rows)
+      trimLater(collection, hidden, async () => Promise.resolve(rows))
+
+    return rows.map(row => ({ collection, ...row.data as Row })).sort((a, b) => b.at - a.at).slice(0, KEPT)
   }
   catch (error) {
-    log.error(`${collection}'s activity could not be trimmed`, error)
-  }
+    log.error(`${collection}'s activity could not be read`, error)
 
-  return rows.map(row => ({ collection, ...row.data as Row })).sort((a, b) => b.at - a.at).slice(0, KEPT)
+    return []
+  }
 }
