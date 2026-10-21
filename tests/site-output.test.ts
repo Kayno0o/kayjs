@@ -266,7 +266,7 @@ describe('layout settings', () => {
   })
 
   it('has a layout\'s noindex and search: false keep the pages under it out of the search index, and its revalidate set their period', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes: `${ROOT}/src/routes`, search: true, publicDir: `${ROOT}/public` })
     const rendered: RenderedPage[] = []
 
     try {

@@ -196,7 +196,7 @@ describe('pages', () => {
   })
 
   it('links the stylesheets of a page whose together compress past the limit, and inlines those of a page below it', async () => {
-    const scratch = await scratchBuild()
+    const scratch = await scratchBuild({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 
     try {
       const client = await scratch.client()
@@ -225,7 +225,7 @@ describe('pages', () => {
   })
 
   it('inlines the stylesheets of a page that compress to exactly the limit together, and links them one byte over', async () => {
-    const scratch = await scratchBuild()
+    const scratch = await scratchBuild({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
     // Base 36 digits of an LCG's high bits, which gzip cannot shrink much below their entropy; the length is searched until the gzip lands on the target exactly.
     const padding = (base: string, target: number): string => {
       for (let seed = 1; seed < 200; seed++) {
@@ -843,7 +843,7 @@ describe('route params in guards and actions', () => {
   })
 
   it('gives a prerendered page\'s guards its params', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes: dir })
 
     try {
       await build.prerender({ routes: dir })

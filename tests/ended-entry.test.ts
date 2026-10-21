@@ -20,7 +20,7 @@ function optionsFor(base: string, redirects: Record<string, string> = {}, traili
 // The app answers paths with the base already stripped, as a proxy under it passes them, and writes it into the locations it sends.
 // A site built while the talk is running, then served once it ended.
 async function endedSite(base: string, redirects?: Record<string, string>, trailingSlash?: 'always') {
-  const scratch = await scratchBuild()
+  const scratch = await scratchBuild(optionsFor(base, redirects, trailingSlash))
 
   setSystemTime(new Date('2026-10-19T12:00:00Z'))
   schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: ENDING }, { slug: 'later', title: 'Later', at: '2999-01-01' }, { slug: 'inverted', title: 'Inverted', at: '2999-01-01', ends: '2020-01-01' }]

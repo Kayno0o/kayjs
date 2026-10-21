@@ -65,7 +65,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       // One page for the tests of a mode, as every page a test opens is a tab the later tests of the file pay for.
       beforeAll(async () => {
         await pages({ routes, prebuilt: false, ...site })
-        build = await scratchBuild()
+        build = await scratchBuild({ routes, ...site })
         await build.prerender({ routes, ...site })
 
         const app = await build.serve({ routes, security: false, ...site })

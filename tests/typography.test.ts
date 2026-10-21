@@ -341,7 +341,7 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces into a page prerendered at build time, served from its file', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes, content, lang: 'fr', inlineStyles: false })
 
     try {
       await build.prerender({ routes, content, lang: 'fr', inlineStyles: false })
@@ -361,7 +361,7 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of a server island, rendered when the page is requested and when the browser fetches it', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes, content, lang: 'fr', inlineStyles: false })
 
     try {
       await build.prerender({ routes, content, lang: 'fr', inlineStyles: false })
@@ -403,7 +403,7 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of a page prerendered in a locale only', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes, content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
 
     try {
       await build.prerender({ routes, content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })

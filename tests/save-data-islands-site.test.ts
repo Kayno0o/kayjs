@@ -24,7 +24,7 @@ describe.each([
     if (kind === 'request')
       return { app: await pages({ ...options, prebuilt: false }), remove: async () => undefined }
 
-    const build = await scratchBuild()
+    const build = await scratchBuild(options)
 
     await build.prerender(options)
 

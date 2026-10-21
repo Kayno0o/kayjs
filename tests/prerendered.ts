@@ -3,16 +3,17 @@ import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import type { PrerenderOptions } from '../src/server/prerender'
 import { cp, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll } from 'bun:test'
-import { outputDir } from '../src/build/assets'
 import { withConfig } from '../src/config'
-import { modeOf, resolveProject } from '../src/project'
+import { clientOptionsOf, modeOf, resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
 import { PRERENDERED_DIR, readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
+import { projectSource } from '../src/server/source'
 import { scratchDir } from './scratch'
+import { sharedClient } from './shared-pages'
 
 // A copy of the checkout's client build in a scratch directory, without the pages it prerendered: what a test prerenders into and serves from, so the checkout's own `.kay/client` is never written.
 // The `.kay` loader stays on the checkout's root, as the project's `paths.output` is the only thing that moves.
@@ -31,17 +32,21 @@ export interface ScratchBuild {
   remove: () => Promise<void>
 }
 
+// The build is the file's shared one for `config` (`tests/shared-pages.ts`), as the test files' own servers no longer build into the default output.
 // `manifestOnly` leaves the client build's files out, for a prerender refused before it reads any.
-export async function scratchBuild(manifestOnly = false): Promise<ScratchBuild> {
+export async function scratchBuild(config: KayConfig = {}, manifestOnly = false): Promise<ScratchBuild> {
   const root = process.cwd()
+  const source = projectSource()
+  const mode = modeOf({ prebuilt: false })
+  const built = dirname((await sharedClient(root, clientOptionsOf(await source.config(root, config), mode))).dir)
   const dir = await scratchDir('build-')
   const pages = join(dir, PRERENDERED_DIR)
 
   try {
     if (!manifestOnly)
-      await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
+      await cp(built, dir, { recursive: true, filter: file => file !== join(built, PRERENDERED_DIR) })
 
-    const manifest = (await readManifest(root, manifestOnly ? outputDir(root) : dir))!
+    const manifest = (await readManifest(root, manifestOnly ? built : dir))!
 
     delete manifest.pages
     delete manifest.site
@@ -98,7 +103,7 @@ export function prerendered(config: KayConfig, client: (built: ClientBuild) => C
   let build: ScratchBuild | undefined
 
   beforeAll(async () => {
-    build = await scratchBuild()
+    build = await scratchBuild(config)
     count = await build.prerender(config, undefined, client(await build.client()))
   })
 
@@ -123,7 +128,7 @@ export function prerendered(config: KayConfig, client: (built: ClientBuild) => C
 
 // A prerender a test expects refused, which throws before it writes the manifest or reads the build's files: only the manifest is copied.
 export async function refusedPrerender(config: KayConfig, client: ClientBuild, options?: PrerenderOptions): Promise<number> {
-  const build = await scratchBuild(true)
+  const build = await scratchBuild(config, true)
 
   try {
     return await build.prerender(config, options, client)

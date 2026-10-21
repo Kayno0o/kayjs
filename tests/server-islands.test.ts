@@ -33,7 +33,7 @@ describe('server islands', () => {
   }, 60_000)
 
   it('prerenders a page reaching one, and renders each per request: spliced in, or fetched by the browser', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes })
 
     try {
       await build.prerender({ routes })
@@ -250,7 +250,7 @@ describe('server islands', () => {
   }
 
   it('keeps a page holding one out of a static export, naming it', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes })
 
     try {
       const exporting = build.prerender({ routes }, { exportAll: true })

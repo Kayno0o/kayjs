@@ -549,7 +549,7 @@ describe('locale detection', () => {
 
 describe('prerendering', () => {
   async function prerendered(config: I18nConfig, check: (build: ScratchBuild) => Promise<void>, more: Partial<KayConfig> = {}): Promise<void> {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes, i18n: config, ...more })
 
     try {
       // The home page that marks prerender, and the pages reading nothing from a request, in each of the two locales.

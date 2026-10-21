@@ -303,7 +303,7 @@ describe('feeds', () => {
 
 describe('prerendering a collection', () => {
   it('renders a page for every entry of the collection it exports as prerender, from what kay build compiled', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes, content })
 
     try {
       expect(await writeContentManifests(process.cwd(), build.dir, content)).toBe(5)

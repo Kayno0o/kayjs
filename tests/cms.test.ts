@@ -1962,7 +1962,7 @@ describe('preview mode', () => {
   })
 
   it('renders a prerendered page afresh for a visitor in preview mode, the copy served to everyone else', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild(options)
 
     try {
       // The page visited below, and four that read nothing from a request.

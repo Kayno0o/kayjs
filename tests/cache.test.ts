@@ -209,7 +209,7 @@ describe('cached with a store', () => {
   })
 
   it('marks a prerendered page stale when another process sharing a store invalidated it, rendering it afresh with no one request\'s timings', async () => {
-    const build = await scratchBuild()
+    const build = await scratchBuild({ routes: 'tests/fixtures/production/src/routes' })
     const { news } = await import('./fixtures/production/src/news')
     const path = await storePath()
 
