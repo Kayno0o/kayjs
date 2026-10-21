@@ -12,6 +12,7 @@ import { KayError } from '../compiler/errors'
 import { entryIssues } from '../content/edit'
 import { wholeSeconds } from '../runtime/duration'
 import { exportNameOf } from '../runtime/fields'
+import { kayLog } from '../runtime/log'
 import { setPreviewScope } from '../runtime/preview'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { isCrossSite, overHttps } from './actions'
@@ -252,7 +253,7 @@ export function enterPreview(ctx: { cookies: CookieMap, request: Request }, opti
 
 // Renders the page at `url` through `handle` in edit mode, as an editor's request would, and gives the entries it read; undefined when the app has no preview, or the page answered nothing.
 // The request carries an edit cookie only this process signs for, and the answer is dropped: it is how the CMS learns which page shows an entry no collection page does.
-export async function entriesReadAt(handle: (request: Request) => Promise<Response>, url: string): Promise<EntryRef[] | undefined> {
+export async function entriesReadAt(handle: (request: Request) => Promise<Response>, url: string, timeout = 5000): Promise<EntryRef[] | undefined> {
   if (!settings)
     return undefined
 
@@ -265,13 +266,15 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
   try {
     const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${PREVIEW_COOKIE}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
 
-    const response = await probing.run(true, async () => handle(new Request(url, { headers })))
+    const response = await probing.run(true, async () => handle(new Request(url, { headers, signal: AbortSignal.timeout(timeout) })))
 
     await response.body?.cancel()
 
     return reads
   }
-  catch {
+  catch (error) {
+    kayLog('warn', `kay: the page at ${url} could not be rendered to find the entries it shows: ${error instanceof Error ? error.message : String(error)}`)
+
     return undefined
   }
   finally {

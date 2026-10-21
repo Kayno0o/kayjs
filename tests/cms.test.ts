@@ -653,6 +653,9 @@ describe('the collections a CMS edits', () => {
     expect(new Set(asked)).toEqual(new Set(['localhost/', 'localhost/fr/', 'localhost/about/', 'localhost/fr/about/', 'localhost/about/team/', 'localhost/fr/about/team/', 'localhost/private/', 'localhost/fr/private/']))
     expect(asked).toHaveLength(8)
 
+    // The home page wins over a page as deep as its path is long, whatever the order of the routes.
+    expect(await entryUrls([plain('/about'), plain('/')], '', undefined, undefined, handle)(sections, { slug: 'intro' })).toBe('/')
+
     const domains = entryUrls([plain('/')], '', undefined, { ...settings, hosts: { en: 'news.example', fr: 'nouvelles.example' } }, handle)
 
     expect(await domains(sections, { slug: 'intro', locale: 'fr' })).toBe('https://nouvelles.example/')

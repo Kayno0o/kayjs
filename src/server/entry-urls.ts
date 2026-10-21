@@ -11,11 +11,15 @@ import { pathOf } from './prerendered'
 import { entriesReadAt, inProbe } from './preview'
 import { slashedPath } from './routes'
 
+// How long the pages found stay known, and the most a page may take to answer.
+const SHOWN_TTL_MS = 5 * 60_000
+const PAGE_TIMEOUT_MS = 5000
+
 // An entry's page: the route whose `prerender` or `sitemap` lists its collection, its one param the entry's slug, in the entry's locale, under the base; another domain's page whole.
 // An entry of no such collection takes the first page without params that shows it, learned by rendering those pages once in edit mode through `handle`: a section a page reads by its slug, a site's settings.
 export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, handle?: (request: Request) => Promise<Response>): EditSite['urls'] {
   let listing: Promise<Map<string, ServedRoute>> | undefined
-  let shown: Promise<Map<string, string>> | undefined
+  let shown: { until: number, pages: Promise<Map<string, string>> } | undefined
 
   const urlOf = (route: ServedRoute, params: Record<string, string>, locale: string | undefined) => {
     const copies = localeCopies(settings, pathOf(route, params))
@@ -37,9 +41,24 @@ export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: T
     if (!handle || inProbe())
       return undefined
 
-    shown ??= pagesShowing(routes, handle, base, trailingSlash, settings)
+    // Learned again after a while, so an entry made since, or a page that failed to answer, is found.
+    if (!shown || shown.until < Date.now()) {
+      const current: NonNullable<typeof shown> = { until: Date.now() + SHOWN_TTL_MS, pages: Promise.resolve(new Map()) }
 
-    const pages = await shown
+      current.pages = (async () => {
+        const failed = { count: 0 }
+        const found = await pagesShowing(routes, handle, base, trailingSlash, settings, failed)
+
+        // A probe that failed is tried again by the next screen.
+        if (failed.count > 0)
+          current.until = 0
+
+        return found
+      })()
+      shown = current
+    }
+
+    const pages = await shown.pages
     const name = exportNameOf(collection.name)
 
     for (const locale of [entry.locale, settings?.defaultLocale, '']) {
@@ -58,17 +77,20 @@ function readKey(collection: string, slug: string, locale: string): string {
 }
 
 // The first page showing each entry it read, by the entry: pages without params, the shallowest first, each in every locale it is served in.
-async function pagesShowing(routes: ServedRoute[], handle: (request: Request) => Promise<Response>, base: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined): Promise<Map<string, string>> {
+async function pagesShowing(routes: ServedRoute[], handle: (request: Request) => Promise<Response>, base: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, failed: { count: number }): Promise<Map<string, string>> {
   const pages = new Map<string, string>()
   const plain = routes.filter(route => route.params.length === 0)
-  const depth = (route: ServedRoute) => pathOf(route, {}).split('/').length
+  const depth = (route: ServedRoute) => pathOf(route, {}) === '/' ? 0 : pathOf(route, {}).split('/').length
 
   for (const route of plain.toSorted((a, b) => depth(a) - depth(b))) {
     for (const copy of localeCopies(settings, pathOf(route, {}))) {
       const served = slashedPath(copy.path, trailingSlash)
       const path = `${base}${served}`
       // The server answers paths without the base, which a proxy in front takes off.
-      const read = await entriesReadAt(handle, `${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`)
+      const read = await entriesReadAt(handle, `${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`, PAGE_TIMEOUT_MS)
+
+      if (read === undefined)
+        failed.count++
 
       for (const { collection, slug, locale } of read ?? []) {
         const key = readKey(collection, slug, locale ?? copy.locale ?? '')

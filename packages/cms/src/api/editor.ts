@@ -8,7 +8,8 @@ export default api()
   // Answers only a request the app's guard lets through, so a browser holding the hint learns whether its session still stands; it slides the hint forward, as the session slides.
   .get('/', ({ request, set }) => {
     set.headers['cache-control'] = 'no-store'
-    set.headers['set-cookie'] = hintCookie(new URL(request.url).protocol === 'https:').serialize()
+    // Beside any cookie the guard already set.
+    set.headers['set-cookie'] = [set.headers['set-cookie'] ?? []].flat().concat(hintCookie(new URL(request.url).protocol === 'https:').serialize())
 
     return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page') }
   })
