@@ -19,6 +19,16 @@ test('renders a text as the site\'s pipeline does, with its images and tables ke
   expect(html).toContain('<td>1</td>')
 })
 
+test('shows a component as its content, a heading without its anchor, and a link in a new tab', async () => {
+  const { html } = await (await render('# Title\n\n<Card title="x">hello **w**</Card>\n\n<Badge text="n" />\n\n[out](https://example.com)')).json() as { html: string }
+
+  expect(html).not.toContain('kay-component')
+  expect(html).not.toContain('&lt;')
+  expect(html).toContain('hello <strong>w</strong>')
+  expect(html).toMatch(/<h1[^>]*>Title<\/h1>/)
+  expect(html).toContain('<a target="_blank" href="https://example.com"')
+})
+
 test('drops what would run in the screens, whatever the collection allows in its pages', async () => {
   const { html } = await (await render('Hi <script>alert(1)</script><img src="/a.png" onerror="alert(2)"> [x](javascript:alert(3))')).json() as { html: string }
 
@@ -33,5 +43,5 @@ test('answers 422 with the reason for a component kay cannot read, and refuses w
   expect(bad.status).toBe(422)
   expect(await bad.text()).toContain('</Card> closes no component')
   expect((await render('x', { 'x-deny': '1' })).status).toBe(403)
-  expect((await site.fetch('/api/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBeGreaterThanOrEqual(400)
+  expect((await site.fetch('/api/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(422)
 })

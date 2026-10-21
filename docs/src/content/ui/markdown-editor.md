@@ -25,15 +25,16 @@ The editor ships no Markdown parser: the function asks your server, so the previ
 ```ts
 // src/routes/api/preview.ts
 import { s } from 'kay'
+import { sanitizeHtml } from 'kay'
 import { renderMarkdown } from 'kay/content'
 import { api } from 'kay/server'
 
-export default api().post('/', async ({ body }) => (await renderMarkdown(body.markdown)).html, { body: s.Object({ markdown: s.String() }) })
+export default api().post('/', async ({ body }) => sanitizeHtml((await renderMarkdown(body.markdown)).html), { body: s.Object({ markdown: s.String() }) })
 ```
 
 In the page, `preview={async markdown => call(preview, '/', { method: 'post', body: { markdown } })}`.
 
-The HTML is inserted as it comes, so it must be your own renderer's output and not text a visitor sent. The preview waits for a short pause in typing, and if the call throws, the pane says it could not be shown. kayjs-cms does all of this for you.
+The HTML is inserted as it comes, so pass it through `sanitizeHtml` when the text is not the author's own. The preview waits for a short pause in typing, and if the call throws, the pane says it could not be shown. kayjs-cms does all of this for you.
 
 ## Image uploads
 

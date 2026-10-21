@@ -505,7 +505,7 @@ const saver: FileSaver = {
 
 The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
 
-`POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. kay checks the data against the schema before anything is written.
+`POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
@@ -568,7 +568,7 @@ In the form, `fields` come first, in that order. A list inside it is a row of co
 
 The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Over every Markdown box, the body and the `markdown` fields, sits a toolbar of bold, italic, heading, lists, link and image buttons. `toolbar: false` removes it and `toolbar: ['bold', 'italic', 'link']` keeps those buttons, in that order.
 
-Each Markdown box also has a Preview button. It shows the text rendered by your site's own Markdown code, beside the box, or in place of it where there is no room. Nothing in your app is needed for it. The preview shows the text's structure, not your page's styles, and shows a short reason when the text cannot be read, such as a component left open.
+Each Markdown box also has a Preview button. It shows the text rendered by your site's own Markdown parser, beside the box, or in place of it where there is no room. Nothing in your app is needed for it. The preview shows the text's structure, not your page's styles: a component shows as its content and code is not highlighted. It shows a short reason when the text cannot be read, such as a component left open.
 
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
