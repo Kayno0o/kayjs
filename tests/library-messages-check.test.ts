@@ -1,10 +1,9 @@
 import { rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 
-const CLI = resolve('src/cli.ts')
 const TIMEOUT = 120_000
 const projects: string[] = []
 
@@ -34,10 +33,9 @@ afterAll(async () => {
 })
 
 async function check(root: string): Promise<{ code: number, output: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'check', root], { stdout: 'pipe', stderr: 'pipe' })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { code, output, report } = await kayCheck([root])
 
-  return { code, output: `${stdout}${stderr}` }
+  return { code, output: `${report}${output}` }
 }
 
 const CLEAN = /checked with no problems in \d+ ms/

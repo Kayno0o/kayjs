@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { findKayLibraries } from '../src/build/libraries'
 import { throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
+import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
@@ -49,6 +50,13 @@ async function run(...args: string[]): Promise<{ code: number, output: string }>
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, output: `${stdout}${stderr}` }
+}
+
+// `kay check` on the project, run in this process, answered as `run` answers a spawned command.
+async function checkIn(project: string): Promise<{ code: number, output: string }> {
+  const { code, output, report } = await kayCheck([project])
+
+  return { code, output: `${report}${output}` }
 }
 
 // Each error kay check printed, as its location then its heading.
@@ -108,7 +116,7 @@ describe('a linked kay library', () => {
   it('builds and checks as an installed one does', async () => {
     const out = join(linked, 'out')
     const built = await run('build', linked, '--static', '--outdir', out)
-    const checked = await run('check', linked)
+    const checked = await checkIn(linked)
 
     expect(built.code).toBe(0)
     const html = await Bun.file(join(out, 'index.html')).text()
@@ -140,13 +148,13 @@ describe('a kay library hoisted above the project', () => {
   })
 
   it('types its components, a component it imports beside one included, keeping their shadows inside the project\'s tree', async () => {
-    expect(await run('check', project)).toEqual({ code: 0, output: expect.stringMatching(/^checked with no problems in \d+ ms\n$/) })
+    expect(await checkIn(project)).toEqual({ code: 0, output: expect.stringMatching(/^checked with no problems in \d+ ms\n$/) })
     expect(await Bun.file(join(project, '.kay/types/__/__/node_modules/kay-lib/src/framed.kay.tsx')).exists()).toBe(true)
     expect(await Bun.file(join(project, 'node_modules')).exists()).toBe(false)
 
     await write(project, { 'src/routes/typed.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nFramed(label={1})\n' })
 
-    const { code, output } = await run('check', project)
+    const { code, output } = await checkIn(project)
 
     expect(reported(output)).toEqual([`${relative(process.cwd(), join(project, 'src/routes/typed.kay'))}:4:8 error[TS2322]: Type 'number' is not assignable to type 'string'.`])
     expect(code).toBe(1)
@@ -326,7 +334,7 @@ describe('kay libraries', () => {
         'src/doubled.ts': 'import { scale } from \'kay-lib\'\n\nexport const doubled = scale(\'two\')\n',
       })
 
-      const { code, output } = await run('check', project)
+      const { code, output } = await checkIn(project)
 
       expect(reported(output)).toEqual([
         `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 error[TS2345]: Argument of type 'string' is not assignable to parameter of type 'number'.`,
@@ -341,7 +349,7 @@ describe('kay libraries', () => {
     await write(join(project, 'node_modules/kay-lib'), { 'src/signup.kay': '--- server\nimport { action, s } from \'kay\'\n\nexport const page = { guards: false }\n\nexport const signup = action(s.Object({ email: s.String({ maxLength: 200 }) }), input => input.email)\n\nexport const leave = action(() => 1)\n---\np signup\n' })
     await write(project, { 'src/signup.test.ts': 'import { leave, signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const wrong: number = signup\nexport const alsoWrong: number = leave\n' })
 
-    const { code, output } = await run('check', project)
+    const { code, output } = await checkIn(project)
 
     const test = relative(process.cwd(), join(project, 'src/signup.test.ts'))
 
@@ -363,7 +371,7 @@ describe('kay libraries', () => {
     })
     await write(join(project, 'node_modules/kay-lib'), { 'src/typo.kay': '---\nconst { size } = props<{ size: number }>()\n---\np {size.toFixed(1).missing}\n' })
 
-    const { code, output } = await run('check', project)
+    const { code, output } = await checkIn(project)
 
     expect(code).toBe(1)
     expect(output).not.toContain('takes its patterns as strings written in the call')

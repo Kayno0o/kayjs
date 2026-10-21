@@ -14,6 +14,7 @@ import { extensionServers, mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
 import { apiStubs } from '../src/server/api-modules'
 import { routeMounts, scanRoutes } from '../src/server/routes'
+import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
@@ -291,6 +292,14 @@ async function run(command: string[], cwd: string): Promise<{ code: number, stdo
   return { code, stdout, stderr }
 }
 
+// `kay check` on the project at `root`, run in this process, answered as `run` answers a spawned command.
+// Only for a test that reads no file path from the report: a check prints paths relative to the working directory, so one asserting them still spawns the CLI from the project.
+async function checkIn(root: string): Promise<{ code: number, stdout: string, stderr: string }> {
+  const { code, output, report } = await kayCheck([root])
+
+  return { code, stdout: report, stderr: output }
+}
+
 // What `SERVE` reports, checked the same whichever way it ran.
 function expectServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
   expect(stderr).not.toContain('error')
@@ -485,7 +494,7 @@ describe('an extension naming its server plugin by a module importing a .kay fil
 
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
-    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root)
+    const { code, stdout, stderr } = await checkIn(root)
 
     // The plugin's local is typed, and the .kay file its module imports resolves, so the one error is the wrong type the page gives it.
     expect(`${stdout}${stderr}`).not.toContain('Cannot find module')
@@ -826,7 +835,7 @@ describe('an extension whose tsconfig or dependencies sit apart from the app', (
         await mkdir(join(dir, 'app/node_modules'))
         await symlink('../../ws/pkg', join(dir, 'app/node_modules/pkg'))
 
-        const { stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+        const { stdout, stderr } = await checkIn(join(dir, 'app'))
         const output = `${stdout}${stderr}`
 
         expect(output).not.toContain('Cannot find module')
@@ -872,11 +881,11 @@ describe('an extension whose tsconfig or dependencies sit apart from the app', (
       await mkdir(join(dir, 'app/node_modules'))
       await symlink('../../tight', join(dir, 'app/node_modules/tight'))
 
-      const before = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+      const before = await checkIn(join(dir, 'app'))
 
       await Bun.write(join(dir, 'tight/tsconfig.json'), TSCONFIG)
 
-      const after = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+      const after = await checkIn(join(dir, 'app'))
 
       expect(`${before.stdout}${before.stderr}`).toContain('node_modules/tight/routes/page.kay:3:7')
       expect(`${after.stdout}${after.stderr}`).not.toContain('tight')
@@ -935,7 +944,7 @@ describe('an extension whose tsconfig or dependencies sit apart from the app', (
       await mkdir(join(dir, 'app/node_modules'))
       await symlink('../../tight', join(dir, 'app/node_modules/tight'))
 
-      const { stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+      const { stdout, stderr } = await checkIn(join(dir, 'app'))
 
       expect(`${stdout}${stderr}`).toContain('tsgo cannot read the tsconfig of the extension tight')
     }
