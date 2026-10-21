@@ -22,6 +22,9 @@ function hintOf(): string | undefined {
   if (form.collection.kind !== 'folder')
     return undefined
 
+  if (form.slugNeedsTyping())
+    return wording('cms.slug.empty', 'The title has no letter or digit to write a slug from: type one')
+
   const report = form.slugReport()
   const folder = (path: string) => report?.inside ? `${report.inside}/${path}` : path
 

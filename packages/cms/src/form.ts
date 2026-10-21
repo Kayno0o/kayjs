@@ -41,6 +41,8 @@ export interface EntryForm extends FormScope {
   newLocale: Signal<string>
   // Whether a new entry's slug is written from its title as the title is typed, which typing in the slug box turns off and clearing it turns on again; a saved entry's slug is never touched, nor a loaded collection's.
   suggestsSlug: Signal<boolean>
+  // Whether a title is typed but gives no letter or digit to write the slug from, which the slug box then says.
+  slugNeedsTyping: () => boolean
   // Reads the slugs the collection holds, once the screen has loaded, for `slugReport`.
   readSlugs: () => Promise<void>
   // Takes the text typed in the slug box, cleaned the way a folder entry's slug is (accents, spaces and case).
@@ -154,6 +156,12 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     slug.set(typed)
     suggestsSlug.set(cleans && typed === '')
     drafts.dismissWhere(ref, issue => issue.key === 'slug')
+  }
+
+  const slugNeedsTyping = () => {
+    const title = titleKey === undefined ? undefined : drafts.value(ref, titleKey)
+
+    return suggestsSlug() && typeof title === 'string' && title.trim() !== '' && slug() === ''
   }
 
   const slugReport = () => {
@@ -279,6 +287,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     readSlugs,
     typeSlug,
     slugReport,
+    slugNeedsTyping,
     saving,
     dirty: () => drafts.changed(ref) || drafts.blocked(ref).length > 0,
     canSave,

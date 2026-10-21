@@ -397,7 +397,7 @@ A JSON box that does not parse blocks the save. It says `Meta is not valid JSON`
 
 ### Writing the slug
 
-On a new entry of a folder collection, the slug writes itself from the title as you type it, so `Été à la ferme` becomes `ete-a-la-ferme`. Typing in the slug box takes over and turns that off. The checkbox under the box turns it on again, and so does clearing the box.
+On a new entry of a folder collection, the slug writes itself from the title as you type it, so `Été à la ferme` becomes `ete-a-la-ferme`. Latin accents are dropped and letters of other scripts are kept, so `Привет мир` becomes `привет-мир`. A title with no letter or digit leaves the slug empty and the box says to type one. Typing in the slug box takes over and turns that off. The checkbox under the box turns it on again, and so does clearing the box.
 
 What you type in the slug box is cleaned as you type: accents go, spaces become dashes and capitals become lowercase. A `/` stays, to put the entry in a folder. A loaded collection keeps the slug as typed.
 

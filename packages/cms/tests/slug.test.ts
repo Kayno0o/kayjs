@@ -7,6 +7,13 @@ describe('slugify', () => {
     expect(slugify('Ça déjà « Straße » ŁÓDŹ', { final: true })).toBe('ca-deja-strasse-lodz')
   })
 
+  test('keeps the letters and digits of any script', () => {
+    expect(slugify('Привет, Мир 2', { final: true })).toBe('привет-мир-2')
+    expect(slugify('你好 世界', { final: true })).toBe('你好-世界')
+    expect(slugify('مرحبا بالعالم', { final: true })).toBe('مرحبا-بالعالم')
+    expect(slugify('Café Привет', { final: true })).toBe('cafe-привет')
+  })
+
   test('keeps folders, one slash between them, and no dash against a slash', () => {
     expect(slugify('Notes / 2024 //  Mon Article', { final: true })).toBe('notes/2024/mon-article')
     expect(slugify('/notes-/-a', { final: true })).toBe('notes/a')

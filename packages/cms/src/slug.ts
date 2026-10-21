@@ -2,7 +2,7 @@
 const MARKS = /\p{M}/gu
 const LETTERS = { œ: 'oe', æ: 'ae', ß: 'ss', ø: 'o', đ: 'd', ł: 'l', þ: 'th' } as const
 const LIGATURE = /[œæßøđłþ]/g
-const OTHER = /[^a-z0-9/_-]+/g
+const OTHER = /[^\p{L}\p{N}/_-]+/gu
 const DASHES = /-{2,}/g
 const SLASHES = /\/{2,}/g
 const AROUND_SLASH = /-*\/-*/g
@@ -11,7 +11,7 @@ const NUMBER = /^\d+$/
 const LEADING = /^[-/]+/
 const EDGES = /^[-/]+|[-/]+$/g
 
-// A slug from the text typed, accents dropped, case lowered, spaces and punctuation turned to `-` and `/` kept between folders. While typing (`final` left off) a trailing `-` or `/` stays, since the next letter comes after it.
+// A slug from the text typed, letters and digits of any script kept (Latin marks dropped, so a Cyrillic or CJK title gives its own letters), case lowered, spaces and punctuation turned to `-` and `/` kept between folders. While typing (`final` left off) a trailing `-` or `/` stays, since the next letter comes after it.
 export function slugify(text: string, { final = false }: { final?: boolean } = {}): string {
   const slug = text
     .normalize('NFKD')

@@ -105,6 +105,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.save.saved',
   'cms.save.uploading',
   'cms.slug.creates',
+  'cms.slug.empty',
   'cms.slug.inside',
   'cms.slug.near',
   'cms.slug.suggest',

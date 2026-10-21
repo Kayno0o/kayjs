@@ -230,6 +230,7 @@ export default defineMessages({
     },
     slug: {
       creates: 'Crée le dossier {folder}',
+      empty: 'Le titre n\'a ni lettre ni chiffre pour écrire une adresse : saisissez-en une',
       inside: 'Dans le dossier {folder}',
       near: 'Aucun dossier {folder} pour l\'instant : vouliez-vous {near} ?',
       suggest: 'L\'écrire d\'après le titre',

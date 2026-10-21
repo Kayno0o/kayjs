@@ -122,3 +122,13 @@ test('a slug is taken in its own locale only', async () => {
   await type(root, 'Slug', 'only-en')
   expect(root.querySelector('.kui-form-field-issue')).toBeNull()
 })
+
+test('writes the slug from a Cyrillic title, and says why when the title has no letter or digit', async () => {
+  const root = await open()
+
+  await type(root, 'Title', 'Привет, Мир')
+  expect(slugBox(root).value).toBe('привет-мир')
+  await type(root, 'Title', '!?!')
+  expect(slugBox(root).value).toBe('')
+  expect(root.textContent).toContain('no letter or digit')
+})
