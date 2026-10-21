@@ -605,6 +605,15 @@ export const LINTS = {
     wrong: '---\nimport type { JSX } from \'kay\'\n\nconst { actions, row } = props<{ actions?: JSX.Element, row: (item: string, index: number) => JSX.Element }>()\n---\nslot actions\nslot row(\'x\', 0)',
     right: '---\nimport type { Snippet } from \'kay\'\n\nconst { actions, row } = props<{ actions?: Snippet, row: Snippet<[item: string, index: number]> }>()\n---\nslot actions\nslot row(\'x\', 0)',
   },
+  'deprecated-option-name': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'An option of a library function under its old name: kayjs-cms\'s `forgejo({ url })`, which is `baseUrl` since 1.70, as the address of a service API is named across kay\'s libraries. The old name still works for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
+    wrong: 'forgejo({ url: \'https://git.example.com\', repo: \'me/site\', token })',
+    right: 'forgejo({ baseUrl: \'https://git.example.com\', repo: \'me/site\', token })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

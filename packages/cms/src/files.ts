@@ -171,9 +171,7 @@ async function writeFile({ absolute, text, base }: FileChange): Promise<undefine
   return undefined
 }
 
-export interface ForgejoOptions {
-  // The forge's address, `https://git.example.com`.
-  url: string
+interface ForgejoSettings {
   // `owner/name`.
   repo: string
   // The repository's default branch when left out.
@@ -184,6 +182,16 @@ export interface ForgejoOptions {
   timeout?: DurationText | undefined
   fetch?: typeof fetch | undefined
 }
+
+// The forge's address is `baseUrl`, `https://git.example.com`, as a service API is named across kay's libraries; `url` still works until 1.73 (the `deprecated-option-name` lint).
+export type ForgejoOptions = ForgejoSettings & (
+  | { baseUrl: string, url?: string | undefined }
+  | {
+    /** @deprecated Since 1.70, dropped in 1.73: this is `baseUrl`. */
+    url: string
+    baseUrl?: string | undefined
+  }
+)
 
 export class ForgeError extends Error {
   override readonly name = 'ForgeError'
@@ -214,12 +222,13 @@ function requireSecure(url: string): void {
   const parsed = URL.parse(url)
 
   if (parsed === null || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK.test(parsed.hostname))))
-    throw configError(`forgejo url is '${url}', which must be https:, or http: on localhost`)
+    throw configError(`forgejo baseUrl is '${url}', which must be https:, or http: on localhost`)
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
-export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch: request = fetch }: ForgejoOptions): FileSaver {
+export function forgejo({ baseUrl, url: legacyUrl, repo, branch, token, timeout: wait = '15s', fetch: request = fetch }: ForgejoOptions): FileSaver {
   const timeout = optionMs(wait, 'forgejo timeout')
+  const url = baseUrl ?? legacyUrl ?? ''
 
   requireSecure(url)
   const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`

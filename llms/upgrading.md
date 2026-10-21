@@ -53,6 +53,9 @@ A prop is now always a value. A child that writes its parent's state types the p
 ### A prop taking markup is typed `Snippet`
 
 `kay upgrade` rewrites a props type member written `JSX.Element` to `Snippet` and `(item: T, index: number) => JSX.Element` to `Snippet<[item: T, index: number]>`, with the `kay` import updated and `JSX` dropped when nothing else uses it (the `deprecated-markup-prop` lint, kept three minors). The old types keep working meanwhile; a `JSX.Element[]` stays, and a `() => JSX.Element` becomes `Snippet`, so a script calling that prop as a function must stop (a `Snippet` is rendered by `slot`). A block filled with other parameters than its `Snippet<[...]>` names is now a `kay check` error ([Slots](templates.md#slots)).
+### `forgejo({ url })` is `forgejo({ baseUrl })`
+
+kayjs-cms's `forgejo` names the forge's address `baseUrl`, as the other service options of kay do. `url` still works for three minors (the `deprecated-option-name` lint), and `kay upgrade` renames it. A `url` in an object held in a variable is not found: rename it where it is passed.
 
 ## 1.69.0
 

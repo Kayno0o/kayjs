@@ -32,7 +32,7 @@ export default defineConfig({
     // Who may use the screens and save; edit mode alone only reads. Loaded on the first request, so this file imports nothing of the app's auth or database.
     guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) },
     // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot so.
-    files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
+    files: process.env.FORGEJO_TOKEN ? forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
   // Edit mode is kay's preview mode: it needs the secret signing its cookie.
   preview: { secret: process.env.PREVIEW_SECRET },

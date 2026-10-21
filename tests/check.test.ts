@@ -3346,6 +3346,27 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports forgejo({ url }) and --fix renames it, leaving a call that gives both and an object held elsewhere', async () => {
+    const config = 'import * as cms from \'@kaynooo/kayjs-cms\'\nimport { forgejo } from \'@kaynooo/kayjs-cms\'\n\nconst url = \'https://git.example.com\'\nconst held = { url }\n\nexport const a = forgejo({ url, repo: \'me/site\', token: \'t\' })\nexport const b = forgejo({ url: \'https://x.example.com\', baseUrl: url, repo: \'me/site\', token: \'t\' })\nexport const c = forgejo({ ...held, repo: \'me/site\', token: \'t\' })\nexport const d = cms.forgejo({ url, repo: \'me/site\', token: \'t\' })\n'
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/forge.ts': config,
+      'src/routes/index.kay': '--- server\nimport { forgejo } from \'@kaynooo/kayjs-cms\'\n\nconst saver = forgejo({ url: \'https://git.example.com\', repo: \'r\', token: \'t\' })\n---\np hi\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-option-name/g)).toHaveLength(4)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/forge.ts')).text()).toBe(config.replace('forgejo({ url, repo', 'forgejo({ baseUrl: url, repo').replace('cms.forgejo({ url, repo', 'cms.forgejo({ baseUrl: url, repo'))
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('forgejo({ baseUrl: \'https://git.example.com\'')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('--fix removes the reason of a sole identity-key kay-allow comment with it, and keeps the reason of one naming other lints', async () => {
     const root = await scratchProject({
       'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\n---\n// kay-allow-file identity-key - the whole file\nul\n  // kay-allow identity-key - rows are static\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key - rows are static\n  for row of posts()\n    li {row.slug}\nbutton(onClick={() => posts.set([])}) Clear\n',

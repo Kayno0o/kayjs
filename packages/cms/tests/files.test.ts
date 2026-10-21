@@ -32,7 +32,7 @@ function forge(files: Record<string, string>, refuse?: Response, onPost?: () => 
     return sha === undefined ? Response.json({ message: 'not found' }, { status: 404 }) : Response.json({ sha })
   }
 
-  return { sent, saver: forgejo({ url: 'https://git.example.com/', repo: 'me/site', branch: 'main', token: 't0k', fetch: request as typeof fetch }) }
+  return { sent, saver: forgejo({ baseUrl: 'https://git.example.com/', repo: 'me/site', branch: 'main', token: 't0k', fetch: request as typeof fetch }) }
 }
 
 async function failureOf<T extends Error>(save: Promise<unknown>): Promise<T> {
@@ -108,7 +108,7 @@ describe('forgejo', () => {
     const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
     })
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
     const failure = saver.save({ ...change, repoPath: 'a.md', text: 'a' })
 
     await expect(failure).rejects.toBeInstanceOf(ForgeError)
@@ -119,23 +119,40 @@ describe('forgejo', () => {
     const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
     })
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.05 s')
-    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 50 as never })).toThrow('kay: forgejo timeout is 50')
-    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kay: forgejo timeout is \'soon\'')
+    expect(() => forgejo({ baseUrl: 'u', repo: 'r', token: 't', timeout: 50 as never })).toThrow('kay: forgejo timeout is 50')
+    expect(() => forgejo({ baseUrl: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kay: forgejo timeout is \'soon\'')
   })
 
   test('refuses a plain http address outside localhost, since the token travels in every request', () => {
-    const make = (url: string) => () => forgejo({ url, repo: 'me/site', token: 't0k' })
+    const make = (url: string) => () => forgejo({ baseUrl: url, repo: 'me/site', token: 't0k' })
 
-    expect(make('http://git.example.com')).toThrow('kay: forgejo url is \'http://git.example.com\'')
-    expect(make('git.example.com')).toThrow('kay: forgejo url')
-    expect(make('ftp://git.example.com')).toThrow('kay: forgejo url')
+    expect(make('http://git.example.com')).toThrow('kay: forgejo baseUrl is \'http://git.example.com\'')
+    expect(make('git.example.com')).toThrow('kay: forgejo baseUrl')
+    expect(make('ftp://git.example.com')).toThrow('kay: forgejo baseUrl')
     expect(make('http://localhost:3000')).not.toThrow()
     expect(make('http://127.0.0.1:3000')).not.toThrow()
     expect(make('http://[::1]:3000')).not.toThrow()
     expect(make('https://git.example.com')).not.toThrow()
+  })
+
+  test('still takes url, the old name of baseUrl, which wins when both are given', async () => {
+    const sent: string[] = []
+    const request = (async (input: unknown) => {
+      sent.push(String(input))
+
+      return Response.json({ content: { sha: 'a' }, commit: { sha: 'c0ffee' } }, { status: 201 })
+    }) as unknown as typeof fetch
+    const change = { repoPath: 'content/a.md', absolute: '/tmp/a.md', text: 'x' }
+
+    for (const options of [{ url: 'https://old.example.com' }, { url: 'https://old.example.com', baseUrl: 'https://new.example.com' }])
+      await forgejo({ ...options, repo: 'me/site', token: 't0k', fetch: request }).save({ ...change, message: 'm' })
+
+    expect(sent[0]).toStartWith('https://old.example.com/api/v1/repos/me/site/')
+    expect(sent.at(-1)).toStartWith('https://new.example.com/api/v1/repos/me/site/')
+    expect(() => forgejo({ repo: 'me/site', token: 't0k' } as never)).toThrow('forgejo baseUrl')
   })
 
   test('throws a proxy\'s plain-text refusal as it came, cut to its first 200 characters', async () => {
@@ -161,7 +178,7 @@ describe('forgejo', () => {
       void input
     })
     // Each request is under the timeout, both together over it.
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: slow as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: slow as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.06 s: the save may still have gone through, so check the repository before saving again')
   })
@@ -170,7 +187,7 @@ describe('forgejo', () => {
     const refused = async () => {
       throw Object.assign(new Error('Unable to connect'), { code: 'ConnectionRefused' })
     }
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', fetch: refused as unknown as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', fetch: refused as unknown as typeof fetch })
     const failure = await failureOf<ForgeError>(saver.save({ ...change, repoPath: 'a.md', text: 'a' }))
 
     expect(failure).toBeInstanceOf(ForgeError)
@@ -210,7 +227,7 @@ describe('forgejo timeout', () => {
 
       return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
     }
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: request as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: request as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'mine', base: 'f00d' })).rejects.toMatchObject({ current: 'f00d' })
   })
@@ -356,7 +373,7 @@ describe('moving a file', () => {
         reject(init.signal?.reason)
       })
     })
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '150ms', fetch: slow as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '150ms', fetch: slow as typeof fetch })
     const also = ['one', 'two', 'three'].map(name => ({ repoPath: `content/books/${name}.md`, absolute: `/unused/${name}`, text: 'pointed', message: 'm', base: 'a1' }))
 
     await saver.move!({ ...move, from: { repoPath: 'content/posts/old.md', absolute: '/unused/old' }, to: { repoPath: 'content/posts/new.md', absolute: '/unused/new' }, base: 'a1', also })
