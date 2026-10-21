@@ -276,7 +276,7 @@ s.Object({
 
 Each key is a block type, and its object holds the fields of that block. An item is stored with a `type` key naming its block, like `{ type: 'hero', heading: 'Welcome' }`. When you read the entry, `section.type === 'hero'` narrows the item to a hero, so `section.heading` is typed.
 
-The editor adds a block by its type, with an Add button for each type at the end of the list and a menu at the top. Each block shows the fields of its own type. Blocks move up and down across types, and can be duplicated or removed, as the items of any list can. A block may not have a field named `type`, since kay keeps it for the block's name.
+The editor adds a block by its type, with an Add button for each type at the end of the list and a menu at the top. Each block shows the fields of its own type. Blocks move up and down across types, and can be duplicated or removed, as the items of any list can. In edit mode, clicking a block's text on the page opens that field in the editor, even when its block is folded. A block may not have a field named `type`, since kay keeps it for the block's name.
 
 ## Field kinds of your own
 

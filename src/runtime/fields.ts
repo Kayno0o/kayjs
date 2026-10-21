@@ -23,6 +23,8 @@ export interface FieldMarks {
   read: Map<string, Where>
   frozen: Map<string, Where>
   wrapped: WeakMap<object, object>
+  // By entry, whether the object at a path is a `blocks()` item, whose `type` key names the block and is no text of the page.
+  blockItems: Map<string, (path: string[]) => boolean>
   // Set apart from any text an entry holds, which may use these private-use characters too, an icon font's glyphs say.
   nonce: string
   fence: RegExp
@@ -94,17 +96,17 @@ export function editMarks(): FieldMarks | undefined {
   if (!state.marks) {
     const nonce = crypto.randomUUID().slice(0, 8)
 
-    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), read: new Map(), frozen: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
+    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), read: new Map(), frozen: new Map(), wrapped: new WeakMap(), blockItems: new Map(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
   }
 
   return state.marks
 }
 
 // The entries a collection gives a page, wrapped in edit mode.
-export function editableEntries<E extends Editable>(collection: string, entries: E[]): E[] {
+export function editableEntries<E extends Editable>(collection: string, entries: E[], isBlockItem?: (data: unknown, path: string[]) => boolean): E[] {
   const marks = editMarks()
 
-  return marks === undefined ? entries : entries.map(entry => editableEntry(marks, collection, entry))
+  return marks === undefined ? entries : entries.map(entry => editableEntry(marks, collection, entry, isBlockItem))
 }
 
 // Renders with the request's marks, or with none inside an island, whose markup hydration claims node by node.
@@ -125,7 +127,7 @@ export function withFieldMarks<T>(marks: FieldMarks | undefined, render: () => T
 }
 
 // `entry` as an editor's page reads it: its data reporting each field read, and its body marked.
-export function editableEntry<E extends Editable>(marks: FieldMarks, collection: string, entry: E): E {
+export function editableEntry<E extends Editable>(marks: FieldMarks, collection: string, entry: E, isBlockItem?: (data: unknown, path: string[]) => boolean): E {
   const known = marks.wrapped.get(entry) as E | undefined
 
   if (known)
@@ -134,6 +136,10 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
   const exported = exportNameOf(collection)
   const name = `${encodeURIComponent(exported)}:${encodeURIComponent(entry.slug)}${entry.locale === undefined ? '' : `@${encodeURIComponent(entry.locale)}`}`
   const body = refIndex(marks, name)
+
+  if (isBlockItem)
+    marks.blockItems.set(name, path => isBlockItem(entry.data, path))
+
   const Content = entry.Content as () => unknown
   const editable: E = {
     ...entry,
@@ -307,6 +313,10 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         return ref()
 
       const read = Reflect.get(target, key, receiver) as unknown
+
+      // A block's `type` is compared to pick its markup, never rendered, so it is no field of the page.
+      if (key === 'type' && typeof read === 'string' && marks.blockItems.get(name)?.(path))
+        return read
 
       if (typeof key === 'string' && Object.hasOwn(target, key) && !configurable(target, key) && !(key === 'length' && Array.isArray(target)) && ((typeof read === 'string' && !BLANK.test(read)) || typeof read === 'number' || (typeof read === 'object' && read !== null)))
         note(marks.frozen, name, [...path, key])

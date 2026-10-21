@@ -130,10 +130,11 @@ export function dataIssues(schema: TSchema, data: unknown): { path: string, mess
 const INDEX = /^\d+$/
 
 interface SchemaNode {
-  title?: unknown
-  properties?: Record<string, SchemaNode & { const?: unknown }>
-  items?: SchemaNode
-  anyOf?: SchemaNode[]
+  'title'?: unknown
+  'properties'?: Record<string, SchemaNode & { const?: unknown }>
+  'items'?: SchemaNode
+  'anyOf'?: SchemaNode[]
+  'x-kay'?: { kind?: unknown }
 }
 
 // The node of a field one step down: a property by its name, else an array's item for an index, looking through the branches of a union such as a nullable field; `item` says it was a list's.
@@ -149,6 +150,19 @@ function stepInto(node: SchemaNode | undefined, segment: string, value: unknown)
   }
 
   return { node: undefined, item: false }
+}
+
+// Whether the object at `segments` of an entry's data is an item of a `blocks()` list, however deep and whether the list is nullable, optional or the block unknown, which is where its `type` key names the block.
+export function isBlockItem(schema: TSchema, data: unknown, segments: string[]): boolean {
+  let node: SchemaNode | undefined = schema
+  let value = data
+
+  for (const segment of segments) {
+    node = stepInto(node, segment, value).node
+    value = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[segment] : undefined
+  }
+
+  return node?.['x-kay']?.kind === 'block'
 }
 
 // The branches of a union to look through; a `blocks()` item's, only the block its `type` names, so a field two blocks share is read from its own.

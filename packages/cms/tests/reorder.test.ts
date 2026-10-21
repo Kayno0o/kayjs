@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { keyDirection, reordered, reorderKey, targetOf } from '../src/editor/reorder'
+import { keyDirection, reordered, reorderKey, targetOf, unfoldAround } from '../src/editor/reorder'
 
 function key(name: string, held: Partial<Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>> = {}): KeyboardEvent {
   return { key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...held } as KeyboardEvent
@@ -82,5 +82,47 @@ describe('reorderKey', () => {
     expect(reorderKey(plain, 1, 3)).toBeUndefined()
     expect(plain.defaultPrevented).toBe(false)
     expect(reorderKey(taken, 1, 3)).toBeUndefined()
+  })
+})
+
+describe('unfoldAround', () => {
+  // A field under nested folded items: each body is hidden until its fold button is clicked, the inner one nearest.
+  function nested(stuck = false) {
+    const clicked: string[] = []
+    const bodies = ['outer', 'inner'].map((name) => {
+      const body = { hidden: true, closest: () => ({ querySelector: () => ({ click: () => {
+        clicked.push(name)
+
+        if (!stuck)
+          body.hidden = false
+      } }) }) }
+
+      return body
+    })
+    const field = { closest: () => [...bodies].reverse().find(body => body.hidden) ?? null } as unknown as Element
+
+    return { field, clicked }
+  }
+
+  it('unfolds each folded item the field sits in, the nearest first', () => {
+    const { field, clicked } = nested()
+
+    unfoldAround(field)
+
+    expect(clicked).toEqual(['inner', 'outer'])
+  })
+
+  it('stops at a body that stays folded', () => {
+    const { field, clicked } = nested(true)
+
+    unfoldAround(field)
+
+    expect(clicked).toEqual(['inner'])
+  })
+
+  it('leaves a field in no folded item alone', () => {
+    const field = { closest: () => null } as unknown as Element
+
+    expect(() => unfoldAround(field)).not.toThrow()
   })
 })

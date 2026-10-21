@@ -13,6 +13,7 @@ import { BODY } from '../markers'
 import { drafts } from './drafts'
 import { savedHandler } from './live'
 import { rebuildFinished, rebuildStarted } from './rebuild'
+import { unfoldAround } from './reorder'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
@@ -66,6 +67,9 @@ effect(() => {
 
   const selector = path === BODY ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"]`
   const field = box.querySelector(selector)
+
+  if (field)
+    unfoldAround(field)
 
   field?.scrollIntoView({ block: 'nearest' })
   field?.querySelector<HTMLElement>('input, textarea, select')?.focus()

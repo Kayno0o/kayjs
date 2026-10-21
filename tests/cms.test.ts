@@ -9,7 +9,7 @@ import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
+import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -1608,6 +1608,99 @@ describe('preview mode', () => {
         { collection: 'crew', slug: 'a', locale: 'fr', path: 'seo.title', frozen: true },
       ])
     }, true)
+  })
+
+  describe('blocks in edit mode', () => {
+    const sections = blocks({ hero: t.Object({ heading: t.String() }), text: t.Object({ body: t.String(), items: t.Array(t.Object({ label: t.String() })) }), columns: t.Object({ cells: blocks({ cell: t.Object({ text: t.String() }) }) }) })
+    const schema = t.Object({ title: t.String(), sections, maybe: t.Union([sections, t.Null()]), optional: t.Optional(sections) })
+    const entry = (data: Record<string, unknown>) => ({ slug: 'home', data, Content: () => renderedHtml('') })
+
+    // What a page does with a block: compares its `type`, then renders the fields of that block.
+    const page = (data: Record<string, unknown>, key: 'sections' | 'maybe' | 'optional' = 'sections') => inPreview(() => {
+      const marks = editMarks()!
+      const home = editableEntry(marks, 'pages', entry(data), (all, path) => validate.isBlockItem(schema, all, path))
+      const html = withFieldMarks(marks, () => {
+        const list = home.data[key] as { type: string, [field: string]: unknown }[] | null | undefined
+
+        return `<h1>${child(home.data.title)}</h1>${loop(list ?? [], (item) => {
+          const block = item as { type: string, [field: string]: unknown }
+          const { type } = block
+
+          if (type === 'hero')
+            return `<h2>${child(block.heading)}</h2>`
+
+          if (type === 'text') {
+            return `<p>${child(block.body)}</p>${loop(block.items as { label: string }[], (each) => {
+              const item = each as { label: string }
+
+              return `<i>${child(item.label)}</i>`
+            })}`
+          }
+
+          if (type === 'columns') {
+            return loop(block.cells as { type: string, text: string }[], (each) => {
+              const cell = each as { type: string, text: string }
+
+              return cell.type === 'cell' ? `<b>${child(cell.text)}</b>` : ''
+            })
+          }
+
+          return ''
+        })}`
+      })
+      const placed = placeFieldMarks(html, marks)
+
+      return { placed, unclickable: unclickableFields(marks, placed), pending: [...marks.unrendered].filter(([, reads]) => reads.length > 0).map(([text]) => text) }
+    }, true)
+
+    it('marks the fields of a block by its place in the list, at any depth, and its type as no field', () => {
+      const { placed, unclickable, pending } = page({ title: 'Home', sections: [{ type: 'hero', heading: 'Welcome' }, { type: 'text', body: 'Hello', items: [{ label: 'One' }, { label: 'Two' }] }, { type: 'columns', cells: [{ type: 'cell', text: 'Deep' }] }] })
+
+      expect(placed).toContain('<h2 data-kay-field="pages:home:sections.0.heading">Welcome</h2>')
+      expect(placed).toContain('<p data-kay-field="pages:home:sections.1.body">Hello</p>')
+      expect(placed).toContain('<i data-kay-field="pages:home:sections.1.items.0.label">One</i><i data-kay-field="pages:home:sections.1.items.1.label">Two</i>')
+      expect(placed).toContain('<b data-kay-field="pages:home:sections.2.cells.0.text">Deep</b>')
+      expect(unclickable).toEqual([])
+      expect(pending).toEqual([])
+    })
+
+    it('follows the order the blocks are stored in', () => {
+      const { placed } = page({ title: 'Home', sections: [{ type: 'text', body: 'Hello', items: [] }, { type: 'hero', heading: 'Welcome' }] })
+
+      expect(placed).toContain('<p data-kay-field="pages:home:sections.0.body">Hello</p><h2 data-kay-field="pages:home:sections.1.heading">Welcome</h2>')
+    })
+
+    it('marks a nullable and an optional list the same, and an empty or null one as nothing', () => {
+      expect(page({ title: 'Home', maybe: [{ type: 'hero', heading: 'Welcome' }] }, 'maybe').placed).toContain('data-kay-field="pages:home:maybe.0.heading"')
+      expect(page({ title: 'Home', optional: [{ type: 'hero', heading: 'Welcome' }] }, 'optional').unclickable).toEqual([])
+      expect(page({ title: 'Home', maybe: null }, 'maybe')).toMatchObject({ unclickable: [], pending: [] })
+      expect(page({ title: 'Home', sections: [] })).toMatchObject({ unclickable: [], pending: [] })
+    })
+
+    it('leaves a block of an unknown type unmarked, and its type read as no field', () => {
+      const { placed, unclickable, pending } = page({ title: 'Home', sections: [{ type: 'retired', heading: 'Gone' }, { type: 'hero', heading: 'Welcome' }] })
+
+      expect(placed).toContain('<h2 data-kay-field="pages:home:sections.1.heading">Welcome</h2>')
+      expect(unclickable).toEqual([])
+      expect(pending).toEqual([])
+    })
+
+    it('keeps a text equal to a block type from taking its place', () => {
+      const { placed } = page({ title: 'hero', sections: [{ type: 'hero', heading: 'Welcome' }] })
+
+      expect(placed).toContain('<h1 data-kay-field="pages:home:title">hero</h1>')
+    })
+
+    it('still reports a type field of a list that is no blocks', () => {
+      inPreview(() => {
+        const marks = editMarks()!
+        const plain = t.Object({ rows: t.Array(t.Object({ type: t.String() })) })
+        const home = editableEntry(marks, 'pages', entry({ rows: [{ type: 'Article' }] }), (all, path) => validate.isBlockItem(plain, all, path))
+        const html = withFieldMarks(marks, () => loop(home.data.rows as { type: string }[], row => `<em>${child((row as { type: string }).type)}</em>`))
+
+        expect(placeFieldMarks(html, marks)).toContain('<em data-kay-field="pages:home:rows.0.type">Article</em>')
+      }, true)
+    })
   })
 
   it('queues no text for an entry spread into an island, nor for its slots, so a later equal text stays unmarked', () => {

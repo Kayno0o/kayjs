@@ -22,7 +22,7 @@ import { sizedImages } from './images'
 import { contentKey, contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
-import { ContentError, decodeEntries, validEntries } from './validate'
+import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
 export { blocks, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
@@ -385,6 +385,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
   const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
   const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
+  const blockItem = (data: unknown, path: string[]) => isBlockItem(options.schema, data, path)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 
@@ -409,12 +410,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const wanted = localized ? locale ?? localeState()?.locale : undefined
 
       if (wanted === undefined)
-        return editableEntries(name, list.filter(entry => !hidden(entry)))
+        return editableEntries(name, list.filter(entry => !hidden(entry)), blockItem)
 
       const own = paired.get(wanted)
       const fallback = localeState()?.settings.defaultLocale
 
-      return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(translationKey(entry))) === undefined))))
+      return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(translationKey(entry))) === undefined))), blockItem)
     },
     get: async (slug, locale) => {
       const { bySlug, byLocale } = await loaded()
@@ -426,12 +427,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
       if (found === undefined && !contentMode().dev && !previewing() && (wanted === undefined ? [bySlug.get(slug)] : [byLocale.get(wanted)?.get(slug), fallback === undefined ? undefined : byLocale.get(fallback)?.get(slug)]).some(ended))
         noteEndedEntry()
 
-      return found && editableEntries(name, [found])[0]
+      return found && editableEntries(name, [found], blockItem)[0]
     },
     translation: async (entry, locale) => {
       const found = shown((await loaded()).paired.get(locale)?.get(translationKey(entry)))
 
-      return found && editableEntries(name, [found])[0]
+      return found && editableEntries(name, [found], blockItem)[0]
     },
     one: async <Fallback extends Data | undefined = undefined>(fallback?: Fallback) => {
       if (!options.single)
@@ -440,7 +441,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const { list } = await loaded()
       const entry = list.find(candidate => !hidden(candidate))
 
-      return entry ? editableEntries(name, [entry])[0]!.data : fallback ?? options.seed
+      return entry ? editableEntries(name, [entry], blockItem)[0]!.data : fallback ?? options.seed
     },
     // Holds `reset`, which the listener only holds weakly.
     invalidate: () => {

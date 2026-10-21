@@ -77,3 +77,20 @@ export function focusItem(rows: Element | null | undefined, index: number, fallb
   if (target instanceof HTMLElement)
     target.focus()
 }
+
+// A field a click on the page named may sit in a folded item, at any depth: the fold button of each unfolds it, so the field takes the focus.
+export function unfoldAround(field: Element): void {
+  for (let body = field.closest('.kcms-item-body[hidden]'); body; body = field.closest('.kcms-item-body[hidden]')) {
+    const fold = body.closest('[data-kcms-row]')?.querySelector<HTMLElement>(':scope > .kcms-item-head [data-kcms-fold]')
+
+    if (!fold)
+      return
+
+    fold.click()
+    flush()
+
+    // A body that stayed folded would loop for ever.
+    if (field.closest('.kcms-item-body[hidden]') === body)
+      return
+  }
+}

@@ -93,6 +93,7 @@ s.Object({
 - The editor adds a block by its type: an `Add <type>` button for each at the end of the list and a menu of the types to add at the top. Each item shows the fields of its own type, headed by its label then its first filled text (`Hero banner: Welcome`), and folds, moves (across types), duplicates and removes with Undo as any list item does. `fieldsOf` gives a `list` field with `blocks`, each `{ type, label, fields }`, and `itemAt(list, index, value)` the group of one item.
 - An item saved with an unknown `type` shows as `Unknown block` with no field, left to be removed, and the save refuses it.
 - A block failing its schema is refused at its own field (`sections.1.heading`), the issue worded with that field's label. `withDefaults` fills the defaults of a block by its type, and a reference inside a block is checked like any other.
+- In edit mode a block's fields are marked by their place in the list (`sections.1.heading`) like any list's, and a block's `type` read to pick its markup is no field of the page, so it is never listed among the fields a click cannot reach. A click on a field inside a folded block unfolds it, and every folded block around it, then focuses the field.
 - The texts of the editor are the `cms.blocks.*` messages ([Texts and languages](words.md)).
 
 ## Field kinds of your own
