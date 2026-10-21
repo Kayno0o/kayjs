@@ -35,6 +35,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
+| `kay test [args]` | Run `bun test` with each file isolated and kay's preload loaded |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
 | `kay migrate content [dir]` | Rewrite the entry files that `migrations` carry over |
 | `kay lsp --stdio` | The language server behind the editor extension |
@@ -74,7 +75,7 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `tailwind` | Tailwind over the Catppuccin Mocha palette; without it, the markup carries no classes | server, site, app |
 | `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | server, site, app |
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
-| `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
+| `tests` | `kay test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site as an unprivileged user on port 8080 | server, site, app |
 | `auth` | Sessions, a sign-in, members in SQLite through pg-orm and a guarded `/account`; needs `server` | app |
@@ -521,7 +522,7 @@ It also lists actions, endpoints, API routes, redirects, feeds and the routes ka
 
 API modules are the one thing it runs, as their routes are only known once they are built. What they print goes to stderr.
 
-## kay lint, fmt and explain
+## kay lint, test, fmt and explain
 
 ```sh
 kay explain positional-key   # one lint, with an example and the fix
@@ -533,6 +534,8 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 ```
 
 `kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`.
+
+`kay test` runs `bun test` with every file in modules of its own and `kay/test/preload` loaded, and passes its arguments on, so `kay test --watch` and `kay test tests/cart.test.ts` work. A project needs no `bunfig.toml` for it. A failure is reported at the line of the `.kay` file. The `test` script of a new project is `kay test`.
 
 `kay fmt` keeps the `.class` shorthand while a line fits in 120 characters. When an element's classes make its line longer, it writes them as a `class` attribute inside the parentheses, over several lines when the list is long, so a long Tailwind list reads as a block.
 

@@ -212,7 +212,7 @@ export function mapStack(stack: string): string {
   }).join('\n')
 }
 
-function mapPosition(file: string, line: string, column: string): string | undefined {
+export function mapPosition(file: string, line: string, column: string): string | undefined {
   let module: Compiled | undefined
 
   // A map that cannot be made leaves its frames as they are, rather than the log of the error that needed it failing.

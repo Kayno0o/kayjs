@@ -34,6 +34,9 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 ### kayjs-auth names its methods by the kind of thing
 
 A collection is `list*` (`listSessions`, `listPasskeys`, `listTokens`, `listMembers`, `listOrganizations`, `listInvitations`, `listMyInvitations`, `listOAuthClients`, `listIdentities`, `listAuditLog`, `listAdminAuditLog`), one item `get*` (`getOrganization`, `getInvitation`), a credential `revoke*` (`revokePasskey`, `revokeSession`) and a record `delete*` (`deleteMember`). `revokeSession(id)` answers `{ ok }` where `endSession(id)` answered a boolean. The old names work three minors, and `kay upgrade` renames the calls on `auth` (the `deprecated-auth-method` lint), `await auth.endSession(id)` becoming `(await auth.revokeSession(id)).ok`; any other use of `endSession`, and `revokeToken`, `revokeOAuthClient`, `renamePasskey`, `declineInvitation` and `setLocale`, which still answer a boolean, are left as they are.
+### A project with a test database runs `kay test`
+
+`kay/test/preload` refuses a run without `--isolate` when the project has a `pg-orm.config.ts` and a `DATABASE_URL`, as every file would share one database: set the `test` script to `kay test` (no lint can recognise it, `kay check` not reading `package.json` scripts). `kay/test/dom` no longer needs listing in `bunfig.toml`: `mountComponent` loads it, and a test reading `document` before then imports it.
 
 ## 1.69.0
 

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll } from 'bun:test'
+import { isolatedRun } from './isolation'
 
 type Seed = (db: Database) => Promise<void> | void
 
@@ -14,6 +15,10 @@ export async function copyTestDatabase(root: string): Promise<void> {
 
   if (url === undefined || url === '' || !existsSync(configFile))
     return
+
+  // Without isolation every file reads the one copy and meets the others' rows with no message.
+  if (isolatedRun() === false)
+    throw new Error('kay: this project has a test database, which every test file would share without isolation and see each other\'s rows in: run the tests as `kay test`, or `bun test --isolate`')
 
   const { testDatabase } = await import('@kaynooo/pg-orm')
   const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: Partial<PgOrmConfig> | undefined }).default ?? {}

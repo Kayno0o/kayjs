@@ -25,6 +25,7 @@ const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   'types': async () => (await import('./commands/types')).types,
   'fmt': async () => (await import('./commands/fmt')).fmt,
   'lint': async () => (await import('./commands/lint')).lint,
+  'test': async () => (await import('./commands/test')).test,
   'i18n missing': async () => (await import('./commands/i18n')).i18nMissing,
   'i18n accept': async () => (await import('./commands/i18n')).i18nAccept,
   'migrate': async () => (await import('./commands/migrate')).migrate,

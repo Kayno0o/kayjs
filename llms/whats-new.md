@@ -22,6 +22,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth names its methods `list*`, `get*`, `revoke*` and `delete*` (`listSessions()`, `getOrganization(ref)`, `revokeSession(id)` answering `{ ok }`), the old names kept three minors ([Setup](../packages/auth/llms/setup.md)).
 - Lists paged by number take `pageSize`: kayjs-ui's `infiniteList({ pageSize })` and the `pageSize` of a `paginate()` result, the old `size` kept three minors ([Content](content.md)); `limit` and `offset` stay for windows.
 - Every size limit is `maxSize`: `bodyLimit` in the config, an action, `api()` and a route's `detail` is renamed, the old name kept three minors ([Protecting actions](action-protection.md#body-limit)).
+- `kay test` runs `bun test` isolated, with kay's preload and failures at `.kay` lines, so a project needs no `bunfig.toml` or `--isolate`; `mountComponent` loads happy-dom itself ([Testing](testing.md)).
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
 - `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
 - `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).

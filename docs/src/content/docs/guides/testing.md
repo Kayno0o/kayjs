@@ -4,7 +4,7 @@ order: 8
 description: Test pages and actions in-process with kay/test, and drive a real browser when you need one.
 ---
 
-`kay/test` serves your pages and actions inside the test process, with no server and no browser. `kay new` writes the `bunfig.toml` preload and a first test. Run them with `bun test`.
+`kay/test` serves your pages and actions inside the test process, with no server and no browser. `kay new` writes a first test and a `test` script. Run them with `bun run test`, which is `kay test`: it runs `bun test` with each file isolated and kay's preload loaded, so you write no flag, and a failure points at the line of the `.kay` file. Its arguments go on to `bun test`, as in `kay test --watch` or `kay test tests/cart.test.ts`.
 
 It does build your islands for the browser, so a test fails when one cannot be built. See [Islands that fail the browser build](#islands-that-fail-the-browser-build).
 
@@ -176,12 +176,11 @@ if (created.ok)
 
 `mountComponent(file, props)` renders one component into `document`. Use it to test what its handlers and effects do.
 
-List `kay/test/dom` after the preload, with `@happy-dom/global-registrator` installed as a dev dependency. It registers happy-dom's DOM for every test file, and adds the popover API happy-dom lacks. `fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` stay Bun's, and `FormData` stays Bun's class while reading a form element as in a browser, so a test serving with `Bun.serve` still works beside it.
+Install `@happy-dom/global-registrator` as a dev dependency. The first `mountComponent` of a file registers happy-dom's DOM, and a file that mounts nothing never loads it. The popover API happy-dom lacks comes with it.
 
-```toml
-[test]
-preload = ["kay/test/preload", "kay/test/dom"]
-```
+`fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` stay Bun's, and `FormData` stays Bun's class while reading a form element as in a browser, so a test serving with `Bun.serve` still works beside it.
+
+A test that reads `document` before its first mount imports `kay/test/dom`, which registers the DOM at once.
 
 ```ts
 import { expect, it } from 'bun:test'
@@ -218,7 +217,7 @@ export default async function seed(db: Database): Promise<void> {
 }
 ```
 
-Each file gets a copy of the database the migrations build, with what `seed` adds. Run `bun test --isolate` so each file reads its own copy. Without it, every file shares one.
+Each file gets a copy of the database the migrations build, with what `seed` adds. `kay test` runs each file in modules of its own, so each reads its own copy. A plain `bun test` would share one copy among the files, so the preload refuses it and names `kay test`.
 
 An app that wrote its own `tests/database.ts` with `testDatabase()` deletes that file and its line in `bunfig.toml`, and moves its seed to `tests/seed.ts`.
 

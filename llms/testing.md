@@ -2,6 +2,10 @@
 
 ## Common tasks
 
+### Run the tests
+
+`kay test [bun test arguments]` (the `test` script `kay new` writes) runs `bun test` with each file in modules of its own and `kay/test/preload` loaded, so a project needs no `bunfig.toml` and no flag: `kay test tests/cart.test.ts`, `kay test --watch`, `kay test --changed`. A failure is reported at the line of the `.kay` file.
+
 ### Test a page
 
 `testSite()` from `kay/test` serves the project in the test process, `site.visit(path)` GETs a page, and `page.text(selector)` reads what a visitor reads:
@@ -145,12 +149,7 @@ A test never writes into the project's `src/content`: a folder collection moves 
 
 ### Test a component's handlers
 
-`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later):
-
-```toml
-[test]
-preload = ["kay/test/preload", "kay/test/dom"]
-```
+`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it.
 
 ```ts
 import { expect, it } from 'bun:test'
@@ -255,7 +254,7 @@ it('shows why a todo was refused', async () => {
 - A library's settings apply as `kay.config.ts` sets them.
 - A component may `call()` or `resource()` a route of an API module, the project's or an extension's: it is bundled as in the browser, knowing the module only by where it is served, so the call goes out as `fetch` (stub it in the test).
 - Each mount runs the component's modules afresh, as a page load does, so module state, a persisted signal read from storage included, does not carry over from an earlier mount: set localStorage, then mount.
-- `kay/test/dom`, listed after `kay/test/preload` under `[test] preload`, registers happy-dom's DOM for every test file, with `@happy-dom/global-registrator` installed as a dev dependency.
+- A test reading `document` before its first mount imports `kay/test/dom`, which registers the DOM at once; listed after `kay/test/preload` under `[test] preload`, it registers it for every file.
 - It shims the popover API happy-dom lacks: `showPopover`, `hidePopover` and `togglePopover` fire `toggle` as a browser does, and `matches(':popover-open')` reads whether one is shown.
 - It leaves `fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` as Bun's, and `FormData` is Bun's class that also reads a form element (a file input keeps its file), so a test serving with `Bun.serve` and fetching it works beside the DOM.
 - A test may register the DOM itself instead, such as `GlobalRegistrator.register({ url: 'http://localhost/' })` for a document whose cookies the page reads.

@@ -157,10 +157,15 @@ async function installKay(dir: string) {
   await mkdir(kay, { recursive: true })
   await Promise.all([
     // The checkout's own `kay` is a link back to it, which the packed copy below replaces.
-    ...(await readdir(join(repo, 'node_modules'))).filter(name => name !== 'kay').map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
+    ...(await readdir(join(repo, 'node_modules'))).filter(name => name !== 'kay' && name !== '.bin').map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
     ...['package.json', 'src'].map(async name => symlink(join(repo, name), join(kay, name))),
   ])
   await cp(await packed, kay, { recursive: true })
+  // The `kay` an install links into `.bin`, which the scripts of the scaffold run.
+  await mkdir(join(modules, '.bin'), { recursive: true })
+  await Promise.all((await readdir(join(repo, 'node_modules/.bin'))).filter(name => name !== 'kay').map(async name => symlink(join(repo, 'node_modules/.bin', name), join(modules, '.bin', name))))
+  await Bun.write(join(modules, '.bin', 'kay'), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repo, 'src/cli.ts'))} "$@"\n`)
+  await chmod(join(modules, '.bin', 'kay'), 0o755)
 }
 
 // Each feature alone, and the app with each one left out, or put in where the app lacks it.
@@ -655,6 +660,7 @@ describe('kay new', () => {
       expect(files).toContain('Dockerfile')
       expect(files).not.toContain('src/server.ts')
       expect(manifest.scripts.build).toBe('kay build --static')
+      expect(manifest.scripts.test).toBe('kay test')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3.9.3')
       // Tested before it builds, which checks it, and linted after.

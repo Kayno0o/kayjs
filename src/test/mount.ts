@@ -51,11 +51,24 @@ export function readPersisted(key: string): unknown {
   return text === null ? undefined : decodeValue(text)
 }
 
+// Registers happy-dom's DOM on the first mount of a file, so a file that mounts nothing never loads it; a project that preloaded `kay/test/dom` already has one.
+async function registerDom(): Promise<void> {
+  try {
+    await import('./dom')
+  }
+  catch (error) {
+    if (error instanceof Error && error.message.includes('@happy-dom/global-registrator'))
+      throw new Error('kay: mountComponent renders into a DOM that happy-dom provides: add it with `bun add -d @happy-dom/global-registrator`', { cause: error })
+
+    throw error
+  }
+}
+
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.
 // `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
 export async function mountComponent(file: string, props: Record<string, unknown> = {}): Promise<Mounted> {
   if (typeof document === 'undefined')
-    throw new Error('kay: mountComponent renders into `document`; register a DOM first, such as `kay/test/dom` preloaded after `kay/test/preload` in bunfig.toml')
+    await registerDom()
 
   const root = testRoot()
   const path = resolve(root, file)

@@ -31,7 +31,7 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   tailwind: { description: 'Tailwind over the Catppuccin Mocha palette', needs: [] },
   accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
   eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
-  tests: { description: 'bun test through kay/test, with a first test', needs: [] },
+  tests: { description: 'kay test through kay/test, with a first test', needs: [] },
   ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
   auth: { description: 'sessions, a sign-in, members in SQLite through pg-orm and a guarded /account', needs: ['server'] },
@@ -171,7 +171,6 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
   // A kay minor may break, so the project takes its patches only.
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
-  // An app's tests run each file in modules of its own, so each gets the database kay/test/preload copies for it.
   const scripts = {
     // The members' SQLite file is migrated before the server starts, so a fresh app needs nothing else.
     dev: has('auth') && !has('postgres') ? 'pg-orm apply && kay dev' : 'kay dev',
@@ -179,7 +178,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     check: 'kay check',
     ...has('eslint') && { 'lint': 'kay lint --cache', 'lint:fix': 'kay lint --fix --cache' },
     fmt: 'kay fmt',
-    ...has('tests') && { test: has('auth') ? 'bun test --isolate' : 'bun test' },
+    ...has('tests') && { test: 'kay test' },
     ...has('auth') && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' },
   }
   const devDependencies = [

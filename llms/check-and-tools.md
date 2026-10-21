@@ -125,6 +125,8 @@ kay fmt --check
   - `--format json` prints `{ code, notes }` on one line. It takes no `--check` and one file at most. The docs site has the same conversion in a box ([Migrating from HTML](https://kayjs.kaynooo.fr/migrating/from-html)).
 - `kay lint [keslint arguments]...`:
   - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
+- `kay test [bun test arguments]...`:
+  - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer (see [Testing](testing.md)).
 - `kay types [dir] [--quiet]`:
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
 - `kay lsp`, `kay screenshot` and `kay mcp` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).

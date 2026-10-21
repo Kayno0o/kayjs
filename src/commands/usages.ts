@@ -17,6 +17,7 @@ export const USAGES = {
   'types': 'types [dir] [--quiet]',
   'fmt': 'fmt [paths...] [--check] [--format text|json] [--quiet] | fmt --from-html [file] [--format text|json]',
   'lint': 'lint [keslint arguments]...',
+  'test': 'test [bun test arguments]...',
   'i18n missing': 'i18n missing [locale] [dir] [--format text|json]',
   'i18n accept': 'i18n accept <locale> [dir]',
   'migrate': 'migrate astro [dir] [--outdir <dir>] [--format text|json] [--quiet] | migrate content [dir] [--format text|json] [--quiet]',
