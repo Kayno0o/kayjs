@@ -14,6 +14,12 @@ The chart is drawn by chartist, which the app installs with `bun add chartist`. 
 
 A series takes an optional CSS `color`, otherwise the next `--color-kui-chart-*` token, and every line after the first is dashed in its own pattern, which the legend shows, so the series stay apart without their colours. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis, the tooltip and what screen readers hear.
 
+A label that is a date, such as `2026-10-21` or `2026-10-21T16:12:12Z`, heads the tooltip as a date in the page's language, with its time when it has one and its seconds when points are under a minute apart.
+
+A span under a day labels the x-axis with times. The tooltip keeps its width and stays inside the window, flipping below the pointer near the top.
+
+`formatLabel(label, context)` writes the heading and the x-axis labels itself, for labels that are not dates or a format of your own. The context tells which point it is (`index`), whether the label heads the tooltip or sits on the axis (`place`, `'tooltip'` or `'tick'`), how many milliseconds the labels span (`span`) and whether points are under a minute apart (`seconds`).
+
 <Demo name="line-chart/formatted" />
 
 ## Picking a span

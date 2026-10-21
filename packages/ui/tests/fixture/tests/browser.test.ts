@@ -70,6 +70,76 @@ inBrowser('in the browser', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart tooltip', () => {
+  // Hovers a chart at a pointer position and reads the tooltip's box, heading and the viewport it sits in.
+  const hover = async (page: { evaluate: (...args: never[]) => Promise<unknown>, waitFor: (selector: string) => Promise<void> }, id: string, at: { x: number | 'left' | 'right', y?: number }) => {
+    await page.waitFor(`#${id} .kui-line-chart-plot svg`)
+    await page.evaluate(((within: string, x: number | string, y: number | undefined) => {
+      const overlay = document.querySelector(`#${within} .kui-line-chart-overlay`)!
+      const edge = x === 'left' ? 1 : document.documentElement.clientWidth - 1
+      const clientX = typeof x === 'string' ? edge : x
+
+      overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX, clientY: y ?? overlay.getBoundingClientRect().top + 40 }))
+    }) as never, id as never, at.x as never, at.y as never)
+    await page.waitFor(`#${id} .kui-line-chart-tooltip`)
+    // The tooltip is placed once the observer has measured it.
+    await page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
+
+    return await page.evaluate(((within: string) => {
+      const box = document.querySelector(`#${within} .kui-line-chart-tooltip`)!
+      const rect = box.getBoundingClientRect()
+
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, scroll: box.scrollWidth, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight, heading: box.querySelector('.kui-line-chart-tooltip-label')!.textContent, wraps: [...box.querySelectorAll('.kui-line-chart-tooltip-name')].some(name => name.scrollWidth > name.clientWidth) }
+    }) as never, id as never) as { left: number, right: number, top: number, bottom: number, width: number, scroll: number, wide: number, high: number, heading: string, wraps: boolean }
+  }
+
+  test('keeps its natural width and stays inside the viewport at the first and last point, and flips below near the top', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+    const natural = await hover(page, 'seconds', { x: 'left' })
+    const right = await hover(page, 'seconds', { x: 'right' })
+
+    expect(natural.left).toBeGreaterThanOrEqual(0)
+    expect(right.right).toBeLessThanOrEqual(right.wide)
+    expect(Math.abs(right.width - natural.width)).toBeLessThan(12)
+    expect(right.wraps).toBe(false)
+
+    const top = await hover(page, 'seconds', { x: 400, y: 2 })
+
+    expect(top.top).toBeGreaterThan(2)
+    expect(Math.abs(top.width - natural.width)).toBeLessThan(12)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('heads a date label in the page\'s locale with the precision its points need, and leaves other labels alone or to formatLabel', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+
+    expect((await hover(page, 'seconds', { x: 300 })).heading).toMatch(/^21 Oct 2026, \d\d:\d\d:\d\d$/)
+    expect((await hover(page, 'hours', { x: 300 })).heading).toMatch(/^2[01] Oct 2026, \d\d:\d\d$/)
+    expect((await hover(page, 'days', { x: 300 })).heading).toMatch(/^\d\d Oct 2026$/)
+    expect((await hover(page, 'plain', { x: 300 })).heading).toMatch(/^(Mon|Tue|Wed)$/)
+    expect((await hover(page, 'formatted', { x: 300 })).heading).toMatch(/^Point [abc]$/)
+
+    const ticks = (id: string) => page.evaluate((within: string) => [...document.querySelectorAll(`#${within} .ct-label.ct-horizontal`)].map(label => label.textContent), id)
+    const hourTicks = await ticks('hours')
+
+    expect(hourTicks.length).toBeGreaterThan(1)
+    expect(new Set(hourTicks).size).toBe(hourTicks.length)
+    expect(hourTicks.every(tick => (/^\d\d:\d\d$/).test(tick ?? ''))).toBe(true)
+    expect((await ticks('days')).every(tick => (/^\d+ Oct$/).test(tick ?? ''))).toBe(true)
+    expect(await ticks('formatted')).toEqual(['Tick a', 'Tick b', 'Tick c'])
+    expect(page.errors).toEqual([])
+
+    await using french = await site.open('/fr/chart-tooltip')
+
+    expect((await hover(french, 'seconds', { x: 300 })).heading).toMatch(/^21 oct\. 2026, \d\d:\d\d:\d\d$/)
+    expect((await hover(french, 'days', { x: 300 })).heading).toMatch(/^\d\d oct\. 2026$/)
+  }, 120_000)
+})
+
 inBrowser('FormField in an island', () => {
   test('ConfirmDelete words its dialog in the French kayjs-ui ships, a prop winning over it, English on an English page', async () => {
     const site = await shared()

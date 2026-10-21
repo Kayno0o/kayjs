@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms has an activity log at `<prefix>/activity`: who created, saved, published, deleted, restored or renamed which entry and when, across the collections that keep a history ([The activity log](../packages/cms/llms/history.md)).
 - kayjs-cms: `cms({ collections: { notes: { history: false } } })` keeps no revisions nor trash for one collection ([History and the trash](../packages/cms/llms/history.md)).
 - kayjs-cms's editor adds, removes and reorders a list's items, blocks included, on the page: a toolbar on the item under the pointer or the focus, an Add on an empty list, Alt+Shift with the arrows, Delete or Enter on the keyboard, and Undo for a removal ([Screens](../packages/cms/llms/screens.md)).
+- kayjs-ui's LineChart heads its tooltip with a date label in the page's locale, time of day and seconds included when the points need them, labels the x-axis of a span under a day with times, keeps the tooltip at its natural width inside the viewport, and takes `formatLabel` to write any label itself ([LineChart](../packages/ui/llms/charts-drag-and-media.md)).
 
 ## 1.66.0
 

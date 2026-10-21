@@ -1,0 +1,20 @@
+---
+import '../app.css'
+import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+
+const seconds = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 9, 21, 16, 12, index * 10)).toISOString())
+const hours = Array.from({ length: 12 }, (_, index) => new Date(Date.UTC(2026, 9, 21, index * 2, 0, 0)).toISOString())
+const days = Array.from({ length: 7 }, (_, index) => new Date(Date.UTC(2026, 9, 15 + index)).toISOString().slice(0, 10))
+const spread = [{ name: 'A reasonably long series name', values: seconds.map((_, index) => index) }, { name: 'Other', values: seconds.map((_, index) => index * 2) }]
+---
+main
+  article#seconds
+    LineChart(label="Seconds" labels={seconds} series={spread} xLabels)
+  article#hours
+    LineChart(label="Hours" labels={hours} series={[{ name: 'Load', values: hours.map((_, index) => index) }]} xLabels)
+  article#days
+    LineChart(label="Days" labels={days} series={[{ name: 'Load', values: days.map((_, index) => index) }]} xLabels)
+  article#plain
+    LineChart(label="Plain" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Load', values: [1, 2, 3] }]})
+  article#formatted
+    LineChart(label="Formatted" labels={['a', 'b', 'c']} formatLabel={(label, { place }) => `${place === 'tick' ? 'Tick' : 'Point'} ${label}`} series={[{ name: 'Load', values: [1, 2, 3] }]} xLabels)

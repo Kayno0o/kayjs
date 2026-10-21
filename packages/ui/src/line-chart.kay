@@ -3,7 +3,8 @@ import type { Axis, ChartRect, FixedScaleAxis, LineChart as LineChartClass, Line
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
-import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
+import type { LabelContext } from './chart-axis'
+import { chartData, headings, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
 import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
@@ -12,11 +13,13 @@ const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
   formatValue?: ((value: number) => string) | undefined
+  // Formats a label for the tooltip's heading, the x-axis ticks and what screen readers hear; the context says which point it is, whether it heads the tooltip or sits on the axis, how many milliseconds the labels span and whether points are seconds apart. A label that is a date reads in the page's locale by default.
+  formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   // Draws the x-axis labels: up to five, spaced by time when every label is a date.
   xLabels?: boolean | undefined
   // Names each series under the chart; shown by default once there is more than one.
@@ -34,6 +37,7 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
 
 const id = uid()
 const times = memo(() => labelTimes(labels))
+const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
 const dashes = memo(() => series.map((_, index) => SERIES_DASHES[index % SERIES_DASHES.length]!))
 
@@ -46,7 +50,7 @@ const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
     showPoint: false,
     ...options,
     chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
-    axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale), ...options?.axisX },
+    axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
     axisY: { showLabel: true, showGrid: true, labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
   }
 }
@@ -56,7 +60,28 @@ const plot = signal<{ rect: ChartRect, axisY: Axis } | null>(null)
 const hovered = signal<{ index: number, clientX: number, clientY: number } | null>(null)
 // The points a drag or a keyboard pick under way started and stands at.
 const dragged = signal<{ from: number, to: number } | null>(null)
+// The tooltip's own size, watched so it is placed from its natural width and never narrowed against an edge.
+const tipSize = signal({ width: 0, height: 0, wide: 0, high: 0 })
 let canvas: HTMLDivElement | undefined
+let tipObserver: ResizeObserver | undefined
+
+// The distance kept between the tooltip and the viewport's edges, and between it and the pointer.
+const EDGE = 4
+const GAP = 12
+
+// Where the tooltip's corner goes: centred over the pointer and above it, flipped below when the top would be cut off, and shifted to stay inside the viewport on every side.
+const tipPlace = () => {
+  const at = hovered()!
+  const { width, height, wide, high } = tipSize()
+  const above = at.clientY - height - GAP
+  const top = above >= EDGE ? above : at.clientY + GAP
+
+  return `translate: ${Math.max(EDGE, Math.min(at.clientX - width / 2, wide - width - EDGE))}px ${Math.max(EDGE, Math.min(top, high - height - EDGE))}px`
+}
+
+const watchTip = (element: HTMLElement) => {
+  tipObserver?.observe(element)
+}
 
 const cursor = () => {
   const drawn = plot()
@@ -86,6 +111,8 @@ const reading = (index: number) => {
   return at ? valueText(series[index]!, at.index) : '-'
 }
 
+const heading = (index: number) => headingTexts()[index] ?? ''
+
 // The point the keyboard stands at, the latest one before it moved.
 const current = () => hovered()?.index ?? Math.max(0, labels.length - 1)
 
@@ -94,13 +121,24 @@ const announced = () => {
   const index = current()
   const span = dragged()
   const readings = series.map(item => `${item.name} ${valueText(item, index)}`).join(', ')
-  const picked = span && span.from !== span.to ? `; ${labels[Math.min(span.from, span.to)]} - ${labels[Math.max(span.from, span.to)]}` : ''
+  const picked = span && span.from !== span.to ? `; ${heading(Math.min(span.from, span.to))} - ${heading(Math.max(span.from, span.to))}` : ''
 
-  return `${labels[index] ?? ''}: ${readings}${picked}`
+  return `${heading(index)}: ${readings}${picked}`
 }
 
 // Drawn in the browser alone: chartist measures the box it draws into. It is read once the chart is on the page, so the page's own code loads and runs first.
 onMount(() => {
+  tipObserver = new ResizeObserver((entries) => {
+    const box = entries.at(-1)?.target
+
+    if (!box?.isConnected)
+      return
+
+    const { width, height } = box.getBoundingClientRect()
+
+    tipSize.set({ width, height, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight })
+  })
+
   const drawing = signal<{ chart: InstanceType<typeof LineChartClass>, fixedScale: typeof FixedScaleAxis } | null>(null)
   let gone = false
   let chart: InstanceType<typeof LineChartClass> | undefined
@@ -161,6 +199,7 @@ onMount(() => {
 
   onCleanup(() => {
     gone = true
+    tipObserver?.disconnect()
     chart?.detach()
   })
 })
@@ -294,8 +333,8 @@ function pointerLeave(event: PointerEvent) {
       .kui-line-chart-band(style={band()})
     .kui-line-chart-overlay(role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={pointerLeave})
   if hovered()
-    .kui-line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`} aria-hidden="true")
-      .kui-line-chart-tooltip-label {labels[hovered()!.index]}
+    .kui-line-chart-tooltip(ref={watchTip} style={tipPlace()} aria-hidden="true")
+      .kui-line-chart-tooltip-label {heading(hovered()!.index)}
       for item, index of series key={item.name}
         .kui-line-chart-tooltip-row
           span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})

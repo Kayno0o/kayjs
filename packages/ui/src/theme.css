@@ -1003,7 +1003,7 @@
   }
 
   .kui-line-chart-tooltip {
-    @apply pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] flex-col gap-0.5 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs;
+    @apply pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs;
   }
 
   .kui-line-chart-tooltip-label {

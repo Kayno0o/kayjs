@@ -439,7 +439,7 @@ describe('charts', () => {
     expect(await attributes('/charts', '#line [role="figure"], #line [aria-hidden="true"], #line [role="slider"]', ['aria-label', 'aria-valuenow', 'aria-valuemax', 'aria-valuetext', 'tabindex'])).toEqual([
       { 'aria-label': 'Visits', 'aria-valuenow': null, 'aria-valuemax': null, 'aria-valuetext': null, 'tabindex': null },
       { 'aria-label': null, 'aria-valuenow': null, 'aria-valuemax': null, 'aria-valuetext': null, 'tabindex': null },
-      { 'aria-label': 'Visits', 'aria-valuenow': '2', 'aria-valuemax': '2', 'aria-valuetext': '2026-09-08: Visits 5, Sales 1', 'tabindex': '0' },
+      { 'aria-label': 'Visits', 'aria-valuenow': '2', 'aria-valuemax': '2', 'aria-valuetext': '8 Sept 2026: Visits 5, Sales 1', 'tabindex': '0' },
     ])
     expect((await one('/charts', '#line [aria-hidden="true"]')).html).toBe('')
     expect((await find('/charts', '#line caption, #line thead th, #line tbody th, #line tbody td')).map(found => found.text)).toEqual(['Visits', 'Visits', 'Sales', '2026-09-01', '3', '1', '2026-09-02', '-', '2', '2026-09-08', '5', '1'])
