@@ -326,7 +326,7 @@ describe('the collections a CMS edits', () => {
 
       return seen
     }, save: (entry) => {
-      held = [{ slug: entry.slug, data: entry.data as { title: string } }]
+      held = [{ slug: entry.slug, data: entry.data }]
     } }, { schema: t.Object({ title: t.String() }) })
 
     await exporting([['tales', tales]], async () => {
@@ -366,7 +366,7 @@ describe('the collections a CMS edits', () => {
     }, save: async (entry) => {
       writeBegun.resolve()
       await writeGate.promise
-      held = [{ slug: entry.slug, data: entry.data as { title: string } }]
+      held = [{ slug: entry.slug, data: entry.data }]
     }, remove: async () => {
       writeBegun.resolve()
       await writeGate.promise
@@ -871,7 +871,7 @@ describe('the collections a CMS edits', () => {
     }, save: async (entry) => {
       await Bun.sleep(5)
       saved.push(entry)
-      held = [...held.filter(each => each.slug !== `${entry.locale}/${entry.slug}`), { slug: `${entry.locale}/${entry.slug}`, data: entry.data as { title: string }, html: '' }]
+      held = [...held.filter(each => each.slug !== `${entry.locale}/${entry.slug}`), { slug: `${entry.locale}/${entry.slug}`, data: entry.data, html: '' }]
     } }, { schema: t.Object({ title: t.String() }), localized: true })
 
     await exporting([['tales', tales]], async () => {
