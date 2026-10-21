@@ -263,7 +263,7 @@ async function askStop(): Promise<void> {
 // Asks before the page, a link or a reload drops edits not saved.
 guardLeave(() => drafts.anyChanged())
 
-// Renders the page again as visitors see it, once kay forgot the edit mode; with edits not saved, asks first.
+// Renders the page again as visitors see it, once kay forgot the edit mode.
 async function stopEditing(): Promise<void> {
   confirming = false
   leaving = true
