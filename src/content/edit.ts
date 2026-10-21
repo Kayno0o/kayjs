@@ -371,16 +371,16 @@ export function findIcons(prefix: string, query: string, limit: number, offset: 
     if (!name.includes(needle))
       continue
 
+    const icon = iconProps(set, name)
+
+    if (icon === undefined)
+      continue
+
     if (skipped < offset) {
       skipped++
 
       continue
     }
-
-    const icon = iconProps(set, name)
-
-    if (icon === undefined)
-      continue
 
     found.push({ name: `${prefix}:${name}`, icon })
 
