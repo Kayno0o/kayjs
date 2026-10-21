@@ -6,6 +6,15 @@ process.on('SIGHUP', () => undefined)
 // Writing to a terminal that went away fails, which is no part of what is tested.
 process.stdout.on('error', () => undefined)
 process.stderr.on('error', () => undefined)
+// No test run leaves this behind: a failure ends it, and so does the test that started it.
+process.on('uncaughtException', () => process.exit(1))
+
+const parent = process.ppid
+
+setInterval(() => {
+  if (process.ppid !== parent)
+    process.exit(1)
+}, 500).unref()
 process.on('exit', () => console.log(`exit raw=${process.stdin.isRaw}`))
 console.log(`start raw=${process.stdin.isRaw}`)
 

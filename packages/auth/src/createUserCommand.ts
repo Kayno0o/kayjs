@@ -33,7 +33,7 @@ export function typedSecret(value: string, chunk: string): { value: string, end?
   return { value: typed }
 }
 
-// One line typed without an echo, the label written on stderr so a piped stdout stays clean. Cancelled with Ctrl+C, or when the input ends or closes: undefined. The terminal is restored on SIGTERM too, which raw mode would otherwise leave typing without an echo.
+// One line typed without an echo, the label written on stderr so a piped stdout stays clean. Cancelled with Ctrl+C, or when the input ends, closes or fails (a terminal that went away reads as an EIO error): undefined. The terminal is restored on SIGTERM too, which raw mode would otherwise leave typing without an echo.
 export async function readFromTerminal(label: string): Promise<string | undefined> {
   const { stdin } = process
   const restore = () => {
@@ -52,7 +52,15 @@ export async function readFromTerminal(label: string): Promise<string | undefine
   }
 
   process.stderr.write(label)
-  stdin.setRawMode(true)
+
+  // A terminal that went away before the first read refuses raw mode.
+  try {
+    stdin.setRawMode(true)
+  }
+  catch {
+    return undefined
+  }
+
   stdin.setEncoding('utf8')
   stdin.resume()
   process.once('SIGTERM', onTerminate)
@@ -75,12 +83,14 @@ export async function readFromTerminal(label: string): Promise<string | undefine
       stdin.on('data', onData)
       stdin.once('end', onEnd)
       stdin.once('close', onEnd)
+      stdin.once('error', onEnd)
     })
   }
   finally {
     stdin.off('data', onData)
     stdin.off('end', onEnd)
     stdin.off('close', onEnd)
+    stdin.off('error', onEnd)
     process.off('SIGTERM', onTerminate)
     restore()
   }

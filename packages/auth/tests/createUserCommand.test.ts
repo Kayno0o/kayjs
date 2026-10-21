@@ -185,6 +185,35 @@ describe('reading a secret on a terminal', () => {
     }
   })
 
+  test('leaves no helper behind when the process that started it dies', async () => {
+    const script = `const child = Bun.spawn([process.execPath, ${JSON.stringify(`${import.meta.dir}/helpers/readTerminal.ts`)}], { terminal: { data: () => {} } }); console.log(child.pid); await Bun.sleep(300); process.kill(process.pid, 'SIGKILL')`
+    const starter = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
+    const pid = Number((await new Response(starter.stdout).text()).trim())
+    const alive = () => {
+      try {
+        process.kill(pid, 0)
+
+        return true
+      }
+      catch {
+        return false
+      }
+    }
+
+    try {
+      const deadline = Date.now() + 5000
+
+      while (alive() && Date.now() < deadline)
+        await Bun.sleep(50)
+
+      expect(alive()).toBe(false)
+    }
+    finally {
+      if (alive())
+        process.kill(pid, 'SIGKILL')
+    }
+  })
+
   test('puts the terminal back when it is terminated while asking', async () => {
     const { child, seen, output } = onTerminal()
 
