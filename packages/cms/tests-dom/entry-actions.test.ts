@@ -386,3 +386,104 @@ test('a refused Rename keeps the dialog open and the page where it is', async ()
   expect(document.querySelector('dialog[open]')).not.toBeNull()
   expect(window.location.pathname).not.toContain('/other')
 })
+
+// The API of a Rename dialog: the slugs the collection holds, the entries referring to `hello`, and the answer to the rename.
+function renameServer({ slugs = ['hello'], referrers = [], answer = { saved: true, slug: 'other' } }: { slugs?: string[], referrers?: string[], answer?: object } = {}) {
+  return spyOn(globalThis, 'fetch').mockImplementation((async (url: string | URL | Request, init?: RequestInit) => {
+    const path = String(url)
+
+    if (init?.method === 'POST')
+      return Response.json(answer)
+
+    if (path.includes('/referrers/'))
+      return Response.json(referrers.length > 0 ? { hello: referrers } : {})
+
+    if (path.includes('/slugs/'))
+      return Response.json(slugs.map(slug => ({ slug })))
+
+    return Response.json({ collection: POSTS, entry: stored({}) })
+  }) as unknown as typeof fetch)
+}
+
+const dialogRename = () => [...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(each => each.textContent?.trim() === 'Rename')!
+
+async function typeSlug(text: string): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>('dialog input')!
+
+  input.value = text
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+}
+
+async function openRename(root: ParentNode): Promise<void> {
+  button(root, 'Rename')!.click()
+  await settle()
+  await pause()
+}
+
+test('the Rename dialog turns Rename off for a slug the collection holds, saying why', async () => {
+  const fetched = renameServer({ slugs: ['hello', 'taken'] })
+  const root = await open(stored({}))
+
+  await openRename(root)
+  await typeSlug('taken')
+  expect(dialogRename().disabled).toBe(true)
+  expect(dialogRename().closest('[data-tooltip]')?.getAttribute('data-tooltip')).toContain('already exists')
+  expect(document.querySelector('dialog')!.textContent).toContain('already exists')
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  document.querySelector('dialog form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  await pause()
+  expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
+  await typeSlug('free')
+  expect(dialogRename().disabled).toBe(false)
+})
+
+test('the Rename dialog says an entry referring to this one must change first', async () => {
+  const fetched = renameServer({ referrers: ['Books: Engine'] })
+  const root = await open(stored({}))
+
+  await openRename(root)
+  await typeSlug('other')
+  expect(dialogRename().disabled).toBe(true)
+  expect(document.querySelector('dialog')!.textContent).toContain('Books: Engine')
+  expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
+})
+
+test('the Rename dialog shows a refusal of the server inside itself, and clears it when the slug is typed again', async () => {
+  renameServer({ answer: { saved: false, issues: [{ message: 'The saver is down' }] } })
+
+  const root = await open(stored({}))
+
+  await openRename(root)
+  await typeSlug('other')
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+  expect(document.querySelector('dialog[open]')!.textContent).toContain('The saver is down')
+  await typeSlug('another')
+  expect(document.querySelector('dialog')!.textContent).not.toContain('The saver is down')
+})
+
+test('the Rename dialog cannot submit once the form turns dirty while it is open', async () => {
+  const fetched = renameServer()
+  const root = await open(stored({}))
+
+  await openRename(root)
+  await typeSlug('other')
+  await type(root, 'Edited')
+  expect(dialogRename().disabled).toBe(true)
+  expect(document.querySelector('dialog')!.textContent).toContain('Save or reset your edits first')
+  document.querySelector('dialog form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  await pause()
+  expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
+})
+
+test('the Rename dialog hints that a slug with a new folder creates it', async () => {
+  renameServer({ slugs: ['hello', 'notes/a'] })
+
+  const root = await open(stored({}))
+
+  await openRename(root)
+  await typeSlug('drafts/other')
+  expect(document.querySelector('dialog')!.textContent).toContain('Creates the folder drafts')
+  expect(dialogRename().disabled).toBe(false)
+})

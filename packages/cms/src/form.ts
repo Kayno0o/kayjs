@@ -53,12 +53,12 @@ export interface EntryForm extends FormScope {
   suggestsSlug: Signal<boolean>
   // Whether a title is typed but gives no letter or digit to write the slug from, which the slug box then says.
   slugNeedsTyping: () => boolean
-  // Reads the slugs the collection holds, once the screen has loaded, for `slugReport`.
+  // Reads the slugs the collection holds, once the screen has loaded, for `slugReport`; the Rename dialog reads them for a saved entry.
   readSlugs: () => Promise<void>
   // Takes the text typed in the slug box, cleaned the way a folder entry's slug is (accents, spaces and case).
   typeSlug: (text: string) => void
-  // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single.
-  slugReport: () => SlugReport | undefined
+  // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single. Given `typed`, where that slug lands among those of the saved entry's locale: what the Rename dialog checks.
+  slugReport: (typed?: string) => SlugReport | undefined
   saving: Signal<boolean>
   // Whether the entry has edits not saved yet.
   dirty: () => boolean
@@ -86,8 +86,8 @@ export interface EntryForm extends FormScope {
   // The entries naming this one in a reference field, as `Collection: title`, read by `askReferrers` when the delete confirmation opens.
   referrers: () => string[]
   askReferrers: () => Promise<void>
-  // Renames the saved entry's slug, then opens it under the new one; the entry must have no edits not saved yet. True once renamed.
-  rename: (slug: string) => Promise<boolean>
+  // Renames the saved entry's slug, then opens it under the new one; the entry must have no edits not saved yet. True once renamed. `onRefused` hears the message of a refusal, which is toasted all the same.
+  rename: (slug: string, onRefused?: (message: string) => void) => Promise<boolean>
   remove: () => Promise<void>
   reset: () => void
 }
@@ -149,11 +149,13 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
 
   // The slugs only flag a taken one and a folder typo: the server decides, so a list that cannot be read changes nothing.
   async function readSlugs(): Promise<void> {
-    if (first || collection.single)
+    if (collection.single)
       return
 
     try {
-      known.set(await call(slugsApi, '/:collection', { params: { collection: collection.name } }))
+      const slugs = await call(slugsApi, '/:collection', { params: { collection: collection.name } })
+
+      known.set(Array.isArray(slugs) ? slugs : undefined)
     }
     catch {
       known.set(undefined)
@@ -187,15 +189,16 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     return suggestsSlug() && typeof title === 'string' && title.trim() !== '' && slug() === ''
   }
 
-  const slugReport = () => {
+  const slugReport = (typed?: string) => {
     const list = known()
 
-    if (first || collection.single || list === undefined)
+    if (collection.single || list === undefined || (first && typed === undefined))
       return undefined
 
-    const locale = collection.localized ? newLocale() : undefined
+    const newOne = collection.localized ? newLocale() : undefined
+    const locale = first ? first.locale : newOne
 
-    return checkSlug(slug(), list.filter(entry => entry.locale === locale).map(entry => entry.slug))
+    return checkSlug(typed ?? slug(), list.filter(entry => entry.locale === locale).map(entry => entry.slug))
   }
 
   // A copy is held back as a draft, so the untranslated text is not published as it is.
@@ -371,8 +374,8 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       if (await deleteSaved(ref, drafts.version(ref)))
         await navigate(collectionPath(prefix, collection.name), { replace: true })
     },
-    async rename(next) {
-      const renamed = await renameSaved(ref, next, drafts.version(ref))
+    async rename(next, onRefused) {
+      const renamed = await renameSaved(ref, next, drafts.version(ref), onRefused)
 
       if (renamed === undefined)
         return false

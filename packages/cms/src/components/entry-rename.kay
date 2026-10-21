@@ -1,6 +1,7 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
@@ -15,21 +16,60 @@ const { form, denied = {} } = props<{ form: EntryForm, denied?: Denials }>()
 const open = signal(false)
 const typed = signal('')
 const pending = signal(false)
+// What the server refused the last rename for, shown in the dialog until the slug is typed again.
+const refusal = signal<string>()
 const entry = form.stored
 
 const clean = () => slugify(typed(), { final: true })
 const unchanged = () => clean() === '' || clean() === entry?.slug
+const report = () => unchanged() ? undefined : form.slugReport(clean())
+const referred = () => form.referrers()
+const dirtyReason = () => form.dirty() ? wording('cms.entry.renameDirty', 'Save or reset your edits first') : undefined
+
+// Why Rename cannot go ahead, from what the dialog knows before asking the server, which refuses all the same.
+const reason = () => {
+  if (dirtyReason() !== undefined)
+    return dirtyReason()
+
+  if (report()?.taken)
+    return wording('cms.store.exists', 'An entry with this slug already exists: pick another slug')
+
+  if (referred().length > 0)
+    return wording('cms.store.renameReferred', '{slug} is referred to by {names}: change them to name the new slug first', { slug: entry?.slug ?? '', names: referred().join(', ') })
+
+  return undefined
+}
+
+const hint = () => {
+  const created = report()?.created
+
+  if (created)
+    return wording('cms.slug.creates', 'Creates the folder {folder}', { folder: report()?.inside ? `${report()?.inside}/${created}` : created })
+
+  return entry?.url ? wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.') : undefined
+}
 
 function start(): void {
   typed = entry?.slug ?? ''
+  refusal = undefined
   open = true
+  void form.readSlugs()
+  void form.askReferrers()
+}
+
+function type(text: string): void {
+  typed = slugify(text)
+  refusal = undefined
 }
 
 async function rename(): Promise<void> {
+  if (unchanged() || pending() || reason() !== undefined)
+    return
+
   pending = true
 
   try {
-    if (await form.rename(clean()))
+    if (await form.rename(clean(), message => refusal = message))
       open = false
   }
   finally {
@@ -37,18 +77,18 @@ async function rename(): Promise<void> {
   }
 }
 ---
-if denied.redirects !== undefined
-  Refused(label={wording('cms.entry.rename', 'Rename')} reason={denied.redirects})
-else if form.dirty()
-  span.kcms-refused(data-tooltip={wording('cms.entry.renameDirty', 'Save or reset your edits first')} tabindex="0")
-    Button(label={wording('cms.entry.rename', 'Rename')} disabled)
+if denied.redirects !== undefined || dirtyReason() !== undefined
+  Refused(label={wording('cms.entry.rename', 'Rename')} reason={denied.redirects ?? dirtyReason()})
 else
   Button(label={wording('cms.entry.rename', 'Rename')} disabled={form.saving()} onClick={start})
 Dialog(open={open()} title={wording('cms.entry.renameTitle', 'Rename {slug}', { slug: entry?.slug ?? '' })} dirty={pending()} onOpenChange={shown => { if (!shown) open = false }})
   @footer
     Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => open = false})
-    Button(label={wording('cms.entry.rename', 'Rename')} tone="accent" busy={pending()} disabled={pending() || unchanged()} onClick={rename})
-  form(onSubmit={(event) => { event.preventDefault(); if (!unchanged() && !pending()) void rename() }})
-    TextInput(autofocus value={typed()} onInput={text => typed = slugify(text)} aria-label={wording('cms.entry.renameSlug', 'New slug')} size={32})
-    if entry?.url
-      p {wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.')}
+    if reason() !== undefined
+      Refused(label={wording('cms.entry.rename', 'Rename')} reason={reason()} tone="accent")
+    else
+      Button(label={wording('cms.entry.rename', 'Rename')} tone="accent" busy={pending()} disabled={pending() || unchanged()} onClick={rename})
+  // The dialog sits inside the entry's form, whose own submit saves the edits: this one must not reach it.
+  form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void rename() }})
+    FormField(label={wording('cms.entry.renameSlug', 'New slug')} hint={hint()} issue={refusal() ?? reason()})
+      TextInput(autofocus value={typed()} onInput={type} size={32})

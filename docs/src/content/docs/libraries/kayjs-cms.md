@@ -191,7 +191,7 @@ const { headline } = await home.one()
 
 ## Renaming an entry
 
-The Rename button in an entry's header changes its slug. Type the new slug and the entry opens under it. The button is off for a collection of one entry and while the form has edits you have not saved.
+The Rename button in an entry's header changes its slug. Type the new slug and the entry opens under it. The button is off for a collection of one entry and while the form has edits you have not saved. The dialog checks the slug as you type: a slug another entry holds, or an entry referring to this one, turns Rename off and says why, a new folder is announced, and a refusal of the server shows in the dialog.
 
 The old address of the page redirects to the new one, with nothing to write in `kay.config.ts`. It works per language and survives a restart, because the redirect joins the ones the Not found screen lists, where you can make it permanent.
 

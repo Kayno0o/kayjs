@@ -43,7 +43,10 @@ function hintOf(): string | undefined {
 // A slug the collection holds already is flagged as it is typed, and the server refuses it all the same.
 const slugIssue = () => issueOf('slug') ?? (form.slugReport()?.taken ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : undefined)
 
-onMount(() => { void form.readSlugs() })
+onMount(() => {
+  if (!form.stored)
+    void form.readSlugs()
+})
 
 effect(() => {
   if (form.stored)
