@@ -797,3 +797,22 @@ describe('variant names the form and tone the meaning', () => {
     expect(await roles('notice-default')).toEqual(['info', 'status'])
   })
 })
+
+test('a toast on screen as a page swap brings the next page hydrates that page\'s toaster without a mismatch', async () => {
+  const built = await testSite({ root: ROOT, browser: true })
+
+  try {
+    await using page = await built.open('/toast-a')
+
+    await page.waitUntil(() => document.querySelector('.kui-toaster') !== null)
+    await page.click('#saved')
+    await page.waitUntil(() => document.querySelector('.kui-toast') !== null)
+    await page.click('#next')
+    await page.waitUntil(() => document.querySelector('h1')?.textContent === 'Toast b')
+    await page.waitUntil(() => document.querySelector('.kui-toast-message')?.textContent === 'Saved')
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    await built.close()
+  }
+}, 60_000)

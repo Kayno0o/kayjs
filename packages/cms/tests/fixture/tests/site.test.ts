@@ -1303,8 +1303,7 @@ test('Create and add another saves the entry and opens an empty form for the nex
 
   const built = await browser()
 
-  // Not strict: the toaster logs a hydration mismatch after any save's swap, kaynooo/kayjs#1548.
-  await using page = await built.open('/admin/new/ledger', { strict: false })
+  await using page = await built.open('/admin/new/ledger')
   const name = '[data-kcms-path="name"] input'
 
   await page.waitUntil(() => document.querySelector('form.kcms-entry-editor input') !== null)
@@ -1322,6 +1321,6 @@ test('Create and add another saves the entry and opens an empty form for the nex
   expect(ledgerRows.map(row => row.data.name)).toEqual(['First one'])
   await page.waitUntil(() => (document.querySelector('[data-kcms-path="name"] input') as HTMLInputElement | null)?.value === '')
   expect(await page.evaluate(() => location.pathname)).toBe('/admin/new/ledger')
-  expect(page.errors.filter(error => !error.includes('toaster.kay did not match'))).toEqual([])
+  expect(page.errors).toEqual([])
   ledgerRows.length = 0
 }, 60_000)

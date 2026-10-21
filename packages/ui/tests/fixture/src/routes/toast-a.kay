@@ -1,0 +1,8 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+---
+h1 Toast a
+button#saved(type="button" onClick={() => toast.success('Saved')}) Save
+a#next(href="/toast-b") Next
+Toaster

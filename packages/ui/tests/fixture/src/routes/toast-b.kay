@@ -1,0 +1,5 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+---
+h1 Toast b
+Toaster

@@ -1,7 +1,7 @@
 ---
 import type { IconSlot } from './defaults'
 import type { ToastType } from './toast'
-import { effect, shortcut, signal } from 'kay'
+import { effect, onMount, shortcut, signal } from 'kay'
 import { claim } from './claim'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
@@ -24,10 +24,18 @@ const { dismissLabel = wording('ui.toaster.dismissLabel', 'Dismiss notification'
 const toaster = signal<HTMLElement>()
 // An extension rendering its own Toaster inside an app that has one shows each toast once.
 const owns = claim('toaster')
+// The toasts outlive a page swap, so one on screen when the next page's Toaster hydrates is not in the server markup: shown from the mount on, hydration meets the markup it was given.
+const mounted = signal(false)
+
+onMount(() => mounted.set(true))
+
+function listed() {
+  return mounted() ? toasts() : []
+}
 
 // A manual popover lives in the top layer, and showing it again lifts it above any dialog opened since.
 effect(() => {
-  const shown = toasts().length > 0
+  const shown = listed().length > 0
 
   const element = toaster()
 
@@ -71,14 +79,14 @@ function dismissed(event: KeyboardEvent) {
 // Screen readers hear a toast from regions kept in the page, which a message joining reads out: a live region shown only as it fills, as the toaster is, is often not read.
 if owns()
   .kui-toaster-live(role="status")
-    for item of toasts().filter(item => toneOf(item) !== 'danger') key={item.id}
+    for item of listed().filter(item => toneOf(item) !== 'danger') key={item.id}
       span {item.message}
   .kui-toaster-live(role="alert")
-    for item of toasts().filter(item => toneOf(item) === 'danger') key={item.id}
+    for item of listed().filter(item => toneOf(item) === 'danger') key={item.id}
       span {item.message}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
   .kui-toaster(ref={element => toaster.set(element)} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
-    for item of toasts() key={item.id}
+    for item of listed() key={item.id}
       .kui-toast(data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
         Icon(icon={ICONS[item.type]} class="kui-toast-icon")
         p.kui-toast-message {item.message}
