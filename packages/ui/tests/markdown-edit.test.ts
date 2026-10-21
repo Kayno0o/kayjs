@@ -1,6 +1,6 @@
 import type { TextEdit } from '../src/markdown-edit'
 import { describe, expect, test } from 'bun:test'
-import { enterEdit, indentEdit, linkEdit, listContinuation, wrapEdit } from '../src/markdown-edit'
+import { enterEdit, headingEdit, imageEdit, indentEdit, linkEdit, listContinuation, listEdit, wrapEdit } from '../src/markdown-edit'
 
 // The text and selection an edit leaves, the selection marked with `[` and `]`.
 function applied(value: string, edit: TextEdit | null): string | null {
@@ -75,5 +75,37 @@ describe('enterEdit', () => {
   test('leaves Enter alone off a list or over a selection', () => {
     expect(enterEdit('text', 4, 4)).toBeNull()
     expect(enterEdit('- a', 0, 3)).toBeNull()
+  })
+})
+
+describe('headingEdit', () => {
+  test('makes the caret line a second-level heading, and a paragraph again on a second go', () => {
+    expect(applied('a\nb c\nd', headingEdit('a\nb c\nd', 3, 3))).toBe('a\n## b[] c\nd')
+    expect(applied('## b c', headingEdit('## b c', 4, 4))).toBe('b[] c')
+  })
+
+  test('turns another level into the second, and never moves the selection before the line', () => {
+    expect(applied('#### b', headingEdit('#### b', 0, 0))).toBe('[]## b')
+    expect(applied('', headingEdit('', 0, 0))).toBe('## []')
+  })
+})
+
+describe('listEdit', () => {
+  test('lists each selected line, numbering an ordered list, and unlists when each already is one', () => {
+    expect(applied('a\nb\nc', listEdit('a\nb\nc', 0, 5, false))).toBe('[- a\n- b\n- c]')
+    expect(applied('a\nb', listEdit('a\nb', 0, 3, true))).toBe('[1. a\n2. b]')
+    expect(applied('- a\n- b', listEdit('- a\n- b', 0, 7, false))).toBe('[a\nb]')
+  })
+
+  test('changes the kind of an item of the other list, and lists the rest of a mixed selection', () => {
+    expect(applied('1. a\n2. b', listEdit('1. a\n2. b', 0, 9, false))).toBe('[- a\n- b]')
+    expect(applied('- a\nb', listEdit('- a\nb', 0, 5, false))).toBe('[- a\n- b]')
+  })
+})
+
+describe('imageEdit', () => {
+  test('writes an image with its url selected, the selection as its text', () => {
+    expect(applied('a word', imageEdit('a word', 2, 6))).toBe('a ![word]([url])')
+    expect(applied('', imageEdit('', 0, 0))).toBe('![]([url])')
   })
 })

@@ -28,7 +28,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`)
 - `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)
-- `ui.markdownEditor.*`: `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `placeholder` (`Write markdown…`), `uploadFailure` (`Could not upload the image`)
+- `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `previewLabel` (`Preview`), `toolbarLabel` (`Formatting`), `uploadFailure` (`Could not upload the image`)
 - `ui.mediaGallery.*`: `closeLabel` (`Close`), `emptyLabel` (`No media.`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)
 - `ui.multiSelect.*`: `allLabel` (`All`), `emptyLabel` (`No match`), `noneLabel` (`None`), `placeholder` (`Any`), `searchLabel` (`Search`), `selectedLabel` (`{count} selected`)
 - `ui.pagination.*`: `label` (`Pagination`), `nextLabel` (`Next`), `previousLabel` (`Previous`)

@@ -10,10 +10,10 @@ afterEach(() => {
 })
 
 // An editor whose every change is kept, read back through the returned getter.
-async function editor(initial: string, onImage?: (file: File) => Promise<string>) {
+async function editor(initial: string, onImage?: (file: File) => Promise<string>, extra: Record<string, unknown> = {}) {
   let value = initial
 
-  mounted = await mountComponent('src/components/editor.kay', { value: initial, onInput: (next: string) => value = next, onImage })
+  mounted = await mountComponent('src/components/editor.kay', { value: initial, onInput: (next: string) => value = next, onImage, ...extra })
 
   const area = mounted.root.querySelector<HTMLTextAreaElement>('#editor')!
 
@@ -156,5 +156,128 @@ describe('MarkdownEditor', () => {
     const state = await editor('')
 
     expect(paste(state.area, [new File(['x'], 'cat.png', { type: 'image/png' })]).defaultPrevented).toBe(false)
+  })
+})
+
+const buttons = (root: Element) => [...root.querySelectorAll<HTMLButtonElement>('.kui-markdown-bar button')]
+const named = (root: Element, label: string) => buttons(root).find(button => button.getAttribute('aria-label') === label)!
+
+describe('MarkdownEditor toolbar', () => {
+  test('offers every format by default, and each acts on the selection', async () => {
+    const state = await editor('word')
+
+    expect(buttons(state.root).map(button => button.getAttribute('aria-label'))).toEqual(['Bold', 'Italic', 'Heading', 'Bulleted list', 'Numbered list', 'Link', 'Image'])
+
+    state.area.setSelectionRange(0, 4)
+    named(state.root, 'Bold').click()
+
+    expect(state.value).toBe('**word**')
+
+    named(state.root, 'Heading').click()
+
+    expect(state.value).toBe('## **word**')
+
+    named(state.root, 'Bulleted list').click()
+
+    expect(state.value).toBe('- ## **word**')
+  })
+
+  test('can be turned off or cut down to a few buttons in the order given', async () => {
+    const off = await editor('x', undefined, { toolbar: false })
+
+    expect(off.root.querySelector('.kui-markdown-bar')).toBeNull()
+
+    mounted?.unmount()
+
+    const some = await editor('x', undefined, { toolbar: ['link', 'bold'] })
+
+    expect(buttons(some.root).map(button => button.getAttribute('aria-label'))).toEqual(['Link', 'Bold'])
+  })
+
+  test('writes an image to fill in where nothing uploads', async () => {
+    const state = await editor('')
+
+    named(state.root, 'Image').click()
+
+    expect(state.value).toBe('![](url)')
+  })
+
+  test('keeps the field named by its form field, not by the first button', async () => {
+    const state = await editor('', undefined, { labelled: true })
+    const label = state.root.querySelector('label')!
+
+    expect(label.control).toBe(state.area)
+  })
+})
+
+describe('MarkdownEditor preview', () => {
+  test('has no Preview button without a preview function', async () => {
+    const state = await editor('x')
+
+    expect(buttons(state.root).some(button => button.getAttribute('aria-label') === 'Preview')).toBe(false)
+  })
+
+  test('shows the server HTML once asked, follows the text, and hides on a second press', async () => {
+    const asked: string[] = []
+    const state = await editor('one', undefined, { preview: async (markdown: string) => {
+      asked.push(markdown)
+
+      return `<p>${markdown}</p>`
+    } })
+    const toggle = named(state.root, 'Preview')
+
+    expect(state.root.querySelector('.kui-markdown-preview')).toBeNull()
+
+    toggle.click()
+    await Bun.sleep(20)
+    await settle()
+
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(state.root.querySelector('.kui-markdown-preview-body')?.innerHTML).toBe('<p>one</p>')
+
+    state.area.setRangeText(' two', 3, 3, 'end')
+    state.area.dispatchEvent(new Event('input', { bubbles: true }))
+    await Bun.sleep(350)
+    await settle()
+
+    expect(state.root.querySelector('.kui-markdown-preview-body')?.innerHTML).toBe('<p>one two</p>')
+
+    toggle.click()
+    await settle()
+
+    expect(state.root.querySelector('.kui-markdown-preview')).toBeNull()
+    expect(state.area.value).toBe('one two')
+  })
+
+  test('keeps the newest answer when an older call finishes last', async () => {
+    const answers: ((html: string) => void)[] = []
+    const state = await editor('a', undefined, { preview: async () => new Promise<string>(resolve => answers.push(resolve)) })
+
+    named(state.root, 'Preview').click()
+    await Bun.sleep(20)
+    state.area.setRangeText('b', 1, 1, 'end')
+    state.area.dispatchEvent(new Event('input', { bubbles: true }))
+    await Bun.sleep(350)
+
+    expect(answers).toHaveLength(2)
+
+    answers[1]!('<p>newer</p>')
+    await settle()
+    answers[0]!('<p>older</p>')
+    await settle()
+
+    expect(state.root.querySelector('.kui-markdown-preview-body')?.innerHTML).toBe('<p>newer</p>')
+  })
+
+  test('says so in the pane when the call throws', async () => {
+    const state = await editor('a', undefined, { preview: async () => {
+      throw new Error('down')
+    } })
+
+    named(state.root, 'Preview').click()
+    await Bun.sleep(20)
+    await settle()
+
+    expect(state.root.querySelector('.kui-markdown-preview-failed')?.textContent).toBe('The preview could not be shown')
   })
 })

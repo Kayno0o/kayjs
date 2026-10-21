@@ -1048,6 +1048,110 @@
     }
   }
 
+  /* The textarea comes first in the markup, for the label a form field puts around the editor, and the grid places the bar above it. The preview sits beside the text where the editor is wide, and replaces it, with the formatting buttons, where it is narrow. */
+  .kui-markdown {
+    @apply grid gap-x-3 gap-y-1;
+
+    container: kui-markdown / inline-size;
+    grid-template-areas: 'bar' 'text';
+
+    &:where([data-preview]) {
+      grid-template-areas: 'bar bar' 'text view';
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  .kui-markdown > .kui-markdown-editor {
+    grid-area: text;
+  }
+
+  .kui-markdown-bar {
+    @apply flex flex-wrap items-center gap-1;
+
+    grid-area: bar;
+  }
+
+  .kui-markdown-tools {
+    @apply flex flex-wrap items-center gap-0.5;
+  }
+
+  .kui-markdown-toggle {
+    @apply ml-auto;
+
+    &[aria-pressed='true'] {
+      @apply bg-kui-surface1 text-kui-text;
+    }
+  }
+
+  .kui-markdown-preview {
+    @apply max-h-[70dvh] min-h-[12lh] overflow-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-3 text-sm;
+
+    grid-area: view;
+  }
+
+  .kui-markdown-preview-failed {
+    @apply text-kui-error;
+  }
+
+  /* Just enough to read the text's structure; the page's own styles are not the admin's. */
+  .kui-markdown-preview-body {
+    :where(h1, h2, h3, h4, h5, h6) {
+      @apply mt-3 mb-1 font-semibold first:mt-0;
+    }
+
+    :where(h1) {
+      @apply text-xl;
+    }
+
+    :where(h2) {
+      @apply text-lg;
+    }
+
+    :where(p, ul, ol, blockquote, pre, table) {
+      @apply my-2;
+    }
+
+    :where(ul) {
+      @apply list-disc pl-5;
+    }
+
+    :where(ol) {
+      @apply list-decimal pl-5;
+    }
+
+    :where(a) {
+      @apply text-kui-accent underline;
+    }
+
+    :where(img) {
+      @apply h-auto max-w-full;
+    }
+
+    :where(blockquote) {
+      @apply border-0 border-l-2 border-solid border-kui-surface2 pl-3 text-kui-subtext0;
+    }
+
+    :where(code, pre) {
+      @apply bg-kui-surface0 font-mono text-xs;
+    }
+
+    :where(pre) {
+      @apply overflow-x-auto p-2;
+    }
+  }
+
+  @container kui-markdown (width < 36rem) {
+    .kui-markdown:where([data-preview]) {
+      grid-template-areas: 'bar' 'view';
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .kui-markdown:where([data-preview]) > .kui-markdown-editor,
+    .kui-markdown:where([data-preview]) .kui-markdown-tools {
+      @apply hidden;
+    }
+  }
+
   /* A plain grid of the same lanes until the width is known, then tiles placed by hand. */
   /* The infinite-scroll sentinel: a line with no height, there only to come into view. */
   .kui-when-visible {

@@ -130,3 +130,49 @@ export function enterEdit(value: string, start: number, end: number): TextEdit |
 
   return { start, end, text, selectionStart: start + text.length, selectionEnd: start + text.length }
 }
+
+const HEADING_PREFIX = /^#{1,6} /
+const BULLET_PREFIX = /^\s*[-*+] (?!\[)/
+const NUMBER_PREFIX = /^\s*\d+\. /
+
+// Turns the line under the caret into a second-level heading, or back into a paragraph when it is one; any other level becomes the second.
+export function headingEdit(value: string, start: number, end: number): TextEdit {
+  const lineStart = lineStartOf(value, start)
+  const lineEnd = lineEndOf(value, end)
+  const line = value.slice(lineStart, lineEnd)
+  const text = line.startsWith('## ') ? line.slice(3) : `## ${line.replace(HEADING_PREFIX, '')}`
+  const shift = text.length - line.length
+
+  return { start: lineStart, end: lineEnd, text, selectionStart: Math.max(lineStart, start + shift), selectionEnd: Math.max(lineStart, end + shift) }
+}
+
+// Makes each line the selection touches an item of a bulleted or numbered list, or takes them out of that kind of list when each already is one; an item of the other kind changes kind.
+export function listEdit(value: string, start: number, end: number, ordered: boolean): TextEdit {
+  const lineStart = lineStartOf(value, start)
+  const lineEnd = lineEndOf(value, end)
+  const lines = value.slice(lineStart, lineEnd).split('\n')
+  const own = ordered ? NUMBER_PREFIX : BULLET_PREFIX
+  const other = ordered ? BULLET_PREFIX : NUMBER_PREFIX
+  const off = lines.every(line => own.test(line))
+  let number = 0
+  const text = lines.map((line) => {
+    const bare = line.replace(own, '').replace(other, '')
+
+    if (off)
+      return bare
+
+    number++
+
+    return `${ordered ? `${number}. ` : '- '}${bare}`
+  }).join('\n')
+
+  return { start: lineStart, end: lineEnd, text, selectionStart: lineStart, selectionEnd: lineStart + text.length }
+}
+
+// Writes an image where the caret is, with its url selected to type over, for an editor that has nowhere to upload one.
+export function imageEdit(value: string, start: number, end: number): TextEdit {
+  const label = value.slice(start, end)
+  const url = start + label.length + 4
+
+  return { start, end, text: `![${label}](url)`, selectionStart: url, selectionEnd: url + 3 }
+}
