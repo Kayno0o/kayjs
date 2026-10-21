@@ -357,7 +357,90 @@ test('the entry header stays on one line on a phone, its buttons reachable', asy
   expect(Math.max(...head.buttons.map(([, right]) => right!))).toBeLessThanOrEqual(390)
 })
 
-test('the editor says a forge save may still be rebuilding, and shows the edits again once the page changes', async () => {
+// Wraps the page's fetch so the draft renders are recorded, and held while `held` is set on the window.
+async function watchDrafts(page: Awaited<ReturnType<typeof open>>): Promise<void> {
+  await page.evaluate(() => {
+    const drafts = { bodies: [] as string[], held: false, release: (): void => undefined }
+    const request = window.fetch.bind(window)
+
+    window.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
+      if (!String(args[0]).endsWith('/_kay/draft'))
+        return request(...args)
+
+      drafts.bodies.push(String(args[1]?.body))
+
+      if (drafts.held) {
+        await new Promise<void>((resolve) => {
+          drafts.release = resolve
+        })
+      }
+
+      return request(...args)
+    }, { preconnect: request.preconnect })
+    Object.assign(window, { drafts })
+  })
+}
+
+async function typeInTitle(page: Awaited<ReturnType<typeof open>>, text: string) {
+  const field = '.kcms-editor input[type="text"]'
+
+  await page.waitUntil(() => document.querySelector('.kcms-editor input[type="text"]') !== null)
+  await page.click(field)
+  await page.type(text)
+}
+
+const status = (page: Awaited<ReturnType<typeof open>>) => page.evaluate(() => [...document.querySelectorAll('.kcms-editor-status p')].map(line => line.textContent))
+
+test('the editor says the page is updating while an edit renders, and not once it has', async () => {
+  const page = await open(1280, 800)
+
+  await watchDrafts(page)
+  await page.evaluate(() => {
+    (window as unknown as { drafts: { held: boolean } }).drafts.held = true
+  })
+  await typeInTitle(page, 'Edited')
+  await page.waitUntil(() => [...document.querySelectorAll('.kcms-editor-status p')].some(line => line.textContent === 'Updating the page…'))
+  expect(await status(page)).toEqual(['Updating the page…'])
+  await page.evaluate(() => {
+    const drafts = (window as unknown as { drafts: { held: boolean, release: () => void } }).drafts
+
+    drafts.held = false
+    drafts.release()
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-editor-status p') === null)
+  expect(await status(page)).toEqual([])
+})
+
+test('an entry the schema refuses is named with its collection, and the line goes once it is valid again', async () => {
+  const page = await open(1280, 800)
+
+  await watchDrafts(page)
+  // The server's own answer for an entry failing its schema, which the fixture's posts have no way to do from the form.
+  await page.evaluate(() => {
+    const request = window.fetch.bind(window)
+
+    window.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
+      const sent = JSON.parse(String(args[1]?.body ?? '{}')) as { entries?: unknown[] }
+
+      if (String(args[0]).endsWith('/_kay/draft') && (sent.entries?.length ?? 0) > 0 && (window as unknown as { refuse?: boolean }).refuse)
+        return Response.json({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Required' }] }, { status: 422 })
+
+      return request(...args)
+    }, { preconnect: request.preconnect })
+    Object.assign(window, { refuse: true })
+  })
+  await typeInTitle(page, 'x')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-failure') !== null)
+  expect(await status(page)).toEqual(['The page shows the saved text of posts/hello until your changes there are valid.'])
+  await page.evaluate(() => {
+    Object.assign(window, { refuse: false })
+  })
+  await page.type('y')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-failure') === null)
+  expect(await status(page)).toEqual([])
+})
+
+test('the editor says a forge save may still be rebuilding, and sends the edits again once the page changes', async () => {
   const page = await open(1280, 800)
 
   expect(await page.evaluate(() => document.querySelector('.kcms-editor-status')?.getAttribute('role'))).toBe('status')
@@ -365,27 +448,24 @@ test('the editor says a forge save may still be rebuilding, and shows the edits 
   await page.evaluate(() => localStorage.setItem('kcms:rebuilding', String(Date.now())))
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-editor-status p') !== null)
+  expect(await status(page)).toEqual(['Your last save is still reaching the live site, which shows the old content until it has rebuilt.'])
 
-  const field = '.kcms-editor input[type="text"]'
+  await watchDrafts(page)
+  await typeInTitle(page, 'Edited')
+  await page.waitUntil(() => (window as unknown as { drafts: { bodies: string[] } }).drafts.bodies.length > 0)
 
-  await page.waitUntil(() => document.querySelector('.kcms-editor input[type="text"]') !== null)
-  await page.click(field)
-  await page.type('Edited')
-  await page.evaluate(() => {
-    const posts = { count: 0 }
-    const request = window.fetch.bind(window)
+  const before = await page.evaluate(() => (window as unknown as { drafts: { bodies: string[] } }).drafts.bodies.length)
 
-    window.fetch = Object.assign((...args: Parameters<typeof fetch>) => {
-      if (String(args[0]).endsWith('/_kay/draft'))
-        posts.count++
-
-      return request(...args)
-    }, { preconnect: request.preconnect })
-    ;(window as unknown as { posts: typeof posts }).posts = posts
-  })
   await page.evaluate(() => {
     history.pushState(null, '', `${location.pathname}${location.search}&again=1`)
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: location.href } }))
   })
-  await page.waitUntil(() => (window as unknown as { posts: { count: number } }).posts.count > 0)
+  await page.waitUntil(count => (window as unknown as { drafts: { bodies: string[] } }).drafts.bodies.length > count, {}, before)
+
+  const sent = await page.evaluate(() => (window as unknown as { drafts: { bodies: string[] } }).drafts.bodies.at(-1))
+  const body = JSON.parse(sent!) as { path: string, entries: { slug: string, data: { title: string } }[] }
+
+  expect(body.path).toContain('again=1')
+  expect(body.entries[0]!.slug).toBe('hello')
+  expect(body.entries[0]!.data.title).toContain('Edited')
 })
