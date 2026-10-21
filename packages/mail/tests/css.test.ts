@@ -15,7 +15,7 @@ describe('cssColours', () => {
   })
 
   it('names a property missing, no colour, seen through or referring to itself, in the stylesheet named', () => {
-    expect(() => colour('--color-wine')).toThrow('--color-wine is not declared in styles/site.css')
+    expect(() => colour('--color-wine')).toThrow(expect.objectContaining({ code: 'config-invalid', message: expect.stringContaining('--color-wine is not declared in styles/site.css') }))
     expect(() => colour('--space')).toThrow('--space in styles/site.css is 12px, which is no colour')
     expect(() => colour('--color-shade')).toThrow('a colour seen through')
     expect(() => colour('--loop-a')).toThrow('--loop-a -> --loop-b -> --loop-a in styles/site.css refers to itself')

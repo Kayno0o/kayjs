@@ -6,9 +6,9 @@ import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
 // The exports a library renamed, whose old names it keeps as aliases for three minors: the lint goes with the alias, and a row with it.
-const RENAMED: { module: string, from: string, to: string, since: string }[] = [
-  { module: '@kaynooo/kayjs-cms', from: 'SaveConflict', to: 'SaveConflictError', since: '1.70' },
-  { module: '@kaynooo/kayjs-mail', from: 'MailNotConfigured', to: 'MailNotConfiguredError', since: '1.70' },
+const RENAMED: { module: string, from: string, to: string }[] = [
+  { module: '@kaynooo/kayjs-cms', from: 'SaveConflict', to: 'SaveConflictError' },
+  { module: '@kaynooo/kayjs-mail', from: 'MailNotConfigured', to: 'MailNotConfiguredError' },
 ]
 
 const SOURCE_FILE = /\.(?:kay|[cm]?tsx?)$/
@@ -82,6 +82,10 @@ export async function renamedExports(root: string, options: CheckOptions): Promi
 
   for (const file of files) {
     const source = await Bun.file(file).text()
+
+    if (!RENAMED.some(({ module }) => source.includes(module)))
+      continue
+
     const imports = [...source.matchAll(IMPORT)]
 
     for (const { module, from, to } of RENAMED) {

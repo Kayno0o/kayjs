@@ -22,7 +22,7 @@ kayjs-cms's `SaveConflict` is `SaveConflictError` and kayjs-mail's `MailNotConfi
 
 ### Boot config errors of the libraries are `KayError`s
 
-A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
+A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a bad argument to `ask()`, throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
 
 ## 1.69.0
 

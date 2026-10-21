@@ -15,7 +15,7 @@ p Assistant
 ```
 
 - `tools` takes actions exported by page modules. Passing one is its opt-in: the model is offered those and no other, and a name it invents is an unknown tool.
-- Each tool is described as `/mcp` describes it: the name from the export (`addNote` is `add_note`), the description from the action's `tool` option (a string or `{ name, description }`), else its name as a sentence, and the input schema from the action's schema. `tool: false`, an action taking a file and one of a page with params cannot be a tool: `ask()` throws a `TypeError` naming the index.
+- Each tool is described as `/mcp` describes it: the name from the export (`addNote` is `add_note`), the description from the action's `tool` option (a string or `{ name, description }`), else its name as a sentence, and the input schema from the action's schema. `tool: false`, an action taking a file and one of a page with params cannot be a tool: `ask()` throws a `config-invalid` `KayError` naming the index.
 - Each call runs as the visitor, through the whole app as a form post does: guards, validation and rate limits apply, while the honeypot, minimum time and proof of work are skipped. A request a browser sent from another site is refused. The visitor's cookies and headers are used, so an anonymous visitor gets a guarded action refused.
 - `ask()` with tools needs the request being answered (a page, an action or a handler kay is answering), and throws without one; the tools keep running as that visitor after the answer is sent, while a reply streams on. An API route's handler runs outside that context, so offer tools from an action.
 

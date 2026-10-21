@@ -111,6 +111,7 @@ describe('an OpenAI-compatible provider asked for a schema', () => {
     expect(sent.stars).toMatchObject({ type: 'integer', description: '{minimum: 1, maximum: 5}' })
     expect(sent.stars).not.toHaveProperty('minimum')
     expect(error.kind).toBe('schema')
+    expect(error.code).toBe('schema')
     expect([...error.fields!].sort()).toEqual(['name', 'stars'])
   })
 

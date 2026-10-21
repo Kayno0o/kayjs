@@ -136,7 +136,11 @@ test('lists 50 entries a page unless pageSize says otherwise, and refuses one th
   expect(configure({ pageSize: 20 }).pageSize).toBe(20)
 
   for (const pageSize of [0, -1, 1.5, Number.NaN, Infinity, '20'])
-    expect(() => configure({ pageSize } as never)).toThrow(/pageSize/)
+    expect(() => configure({ pageSize } as never)).toThrow(expect.objectContaining({ code: 'config-invalid', message: expect.stringContaining('pageSize') }))
+
+  // A browser-safe checker's plain error is raised as a config error too.
+  expect(() => configure({ collections: { posts: { form: { toolbar: 'bold' } } } } as never)).toThrow(expect.objectContaining({ code: 'config-invalid' }))
+  expect(() => configure({ roles: { editor: ['nope'] }, guard: () => undefined } as never)).toThrow(expect.objectContaining({ code: 'config-invalid' }))
 
   configure({})
 })

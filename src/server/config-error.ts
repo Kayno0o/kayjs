@@ -14,7 +14,15 @@ export function configError(first: string, second?: unknown, takes?: string): Ka
 }
 
 function shown(value: unknown): string {
-  return value === undefined || typeof value === 'function' ? String(value) : JSON.stringify(value) ?? String(value)
+  if (typeof value !== 'object' && typeof value !== 'string' && typeof value !== 'boolean' && !(typeof value === 'number' && Number.isFinite(value)))
+    return String(value)
+
+  try {
+    return JSON.stringify(value) ?? String(value)
+  }
+  catch {
+    return String(value)
+  }
 }
 
 // Runs a reader that also runs in the browser, so throws a plain error, and raises what it throws as a `config-invalid` KayError.
@@ -23,7 +31,7 @@ export function asConfigError<T>(read: () => T): T {
     return read()
   }
   catch (error) {
-    throw error instanceof Error ? new KayError('config-invalid', error.message, { cause: error }) : error
+    throw error instanceof Error && !(error instanceof KayError) ? new KayError('config-invalid', error.message, { cause: error }) : error
   }
 }
 
