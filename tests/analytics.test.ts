@@ -5,6 +5,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { analytics } from '../src/server/analytics'
 import { forwardsSettled, warningsReset } from '../src/server/analytics-server'
+import { SHIPPED_WORDS } from '../src/server/analytics-words'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -166,7 +167,7 @@ describe('the notice, its lifetime and what a visit carries', () => {
     const html = await page(options)
 
     expect(html).toContain(`with ${shown},`)
-    expect(html).toContain('Privacy policy')
+    expect(html).toContain('Privacy\u00A0policy')
   })
 
   it('names the provider in the information line of a counter that asks nothing, and in the notice once consent is on', async () => {
@@ -194,9 +195,9 @@ describe('the notice, its lifetime and what a visit carries', () => {
   it('words a language the app writes only some strings of from the shipped words of that language', async () => {
     const texts = textsOf(await page(plausible({ info: { optOut: { fr: 'Stop' } } })))
 
-    expect(texts.fr).toMatchObject({ agree: 'OK', refuse: 'Stop', policy: 'Politique de confidentialité' })
+    expect(texts.fr).toMatchObject({ agree: 'OK', refuse: 'Stop', policy: 'Politique\u00A0de\u00A0confidentialité' })
     expect(texts.fr!.text).toContain('Nous comptons les visites pour améliorer ce site avec Plausible')
-    expect(texts.en).toMatchObject({ agree: 'OK', refuse: 'Opt out' })
+    expect(texts.en).toMatchObject({ agree: 'OK', refuse: 'Opt\u00A0out' })
   })
 
   it('keeps the first language the app wrote ahead of the shipped English, for a page language nothing names', async () => {
@@ -444,7 +445,7 @@ describe('consent by provider', () => {
 
     expect(html).toContain('data-info')
     expect(html).not.toContain('data-consent')
-    expect(html).toContain('Opt out')
+    expect(html).toContain('Opt\u00A0out')
   })
 
   it('translates the information line, and leaves it out with info false or consent false and nothing to say', async () => {
@@ -1121,5 +1122,16 @@ describe('the consent signal on the server', () => {
 
     expect(consent()).toBe('')
     expect(() => consent.set('yes')).toThrow('from the browser')
+  })
+})
+
+describe('shipped analytics words', () => {
+  it('hold no breakable space in a label, so a narrow screen never leaves one word alone', () => {
+    for (const kind of Object.values(SHIPPED_WORDS)) {
+      for (const [language, words] of Object.entries(kind)) {
+        for (const label of [words.agree, words.refuse, words.policy])
+          expect([language, label, label.includes(' ')]).toEqual([language, label, false])
+      }
+    }
   })
 })
