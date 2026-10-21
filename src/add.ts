@@ -299,6 +299,9 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
   for (const feature of core) {
     const missing = FEATURES[feature].needs.filter(need => !wanted.has(need))
 
+    if (missing.includes('auth'))
+      throw new Error(`kay add: ${feature} needs the members of the auth feature of \`kay new\` (src/db/member.ts), which \`kay add auth\` no longer adds, as it adds kayjs-auth: start from \`kay new --with auth,${feature}\``)
+
     if (missing.length > 0)
       throw new Error(`kay add: ${feature} needs ${missing.join(' and ')}: run \`kay add ${[...missing, feature].join(',')}\` to add them together`)
   }
@@ -629,7 +632,10 @@ export interface AddOptions {
 
 // The libraries with the ones they bring along, each once, a library after those it brings.
 function withBrought(libraries: readonly string[]): string[] {
-  return [...new Set(libraries.flatMap(library => [...LIBRARY_NEEDS[library]?.libraries ?? [], library]))]
+  const all = [...new Set(libraries.flatMap(library => [...LIBRARY_NEEDS[library]?.libraries ?? [], library]))]
+
+  // The mail library goes first: kayjs-auth wires its mailer when src/mail.ts exists.
+  return [...all.filter(library => library === 'mail'), ...all.filter(library => library !== 'mail')]
 }
 
 // A library needing a core feature the project lacks is refused naming the command that adds them together.

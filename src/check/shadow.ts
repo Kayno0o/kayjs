@@ -58,7 +58,7 @@ export function shadowSource(root: string, shadow: string): string {
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
-  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(({ dir, prefix }) => ({ dir: relative(root, dir), prefix })), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.publicDir !== undefined && { public: relative(root, settings.publicDir) }, ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
+  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(({ dir, prefix, outer }) => ({ dir: relative(root, dir), prefix, ...outer !== undefined && { outer: relative(root, outer) } })), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.publicDir !== undefined && { public: relative(root, settings.publicDir) }, ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
 }
 
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
@@ -66,7 +66,7 @@ export function readShadowSettings(root: string): ShadowSettings {
   try {
     const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: (string | RouteMount)[], islandOnly: string[], public?: string, lints?: LintLevels }
 
-    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(mount => typeof mount === 'string' ? { dir: resolve(root, mount), prefix: '' } : { ...mount, dir: resolve(root, mount.dir) }), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), publicDir: resolve(root, saved.public ?? projectPaths(root).public), lints: saved.lints }
+    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(mount => typeof mount === 'string' ? { dir: resolve(root, mount), prefix: '' } : { ...mount, dir: resolve(root, mount.dir), ...mount.outer !== undefined && { outer: resolve(root, mount.outer) } }), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), publicDir: resolve(root, saved.public ?? projectPaths(root).public), lints: saved.lints }
   }
   catch {
     return { routesDir: projectPaths(root).routes, mounts: [], islandOnly: new Set() }
@@ -146,6 +146,12 @@ export function outerQueries(file: string, source: string, trees: RouteMount[], 
 
     if (layout !== undefined && layout !== file)
       above.push({ layout, facts: serverFacts(layout, readFileSync(layout, 'utf8')) })
+  }
+
+  // The layouts extensions wrap every page in come outside the app's.
+  for (const { outer } of trees) {
+    if (outer !== undefined && outer !== file)
+      above.push({ layout: outer, facts: serverFacts(outer, readFileSync(outer, 'utf8')) })
   }
 
   // The innermost layout that leaves its parents out starts the chain.

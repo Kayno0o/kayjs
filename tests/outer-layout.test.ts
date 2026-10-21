@@ -40,6 +40,11 @@ describe('an extension layout wrapping every page', () => {
     })
   }
 
+  it('refuses a layout that is not an existing _layout.kay', () => {
+    expect(() => routeMounts(process.cwd(), [{ name: 'bad', layout: `${FIXTURE}/lib/own/index.kay` }])).toThrow('not an existing _layout.kay')
+    expect(() => routeMounts(process.cwd(), [{ name: 'bad', layout: `${FIXTURE}/lib/outer/_missing/_layout.kay` }])).toThrow('not an existing _layout.kay')
+  })
+
   it('serves no page of its own and the app\'s layout leads the chain', async () => {
     const routes = await scanRoutes(`${FIXTURE}/src/routes`, routeMounts(process.cwd(), [OUTER, OWN]))
 

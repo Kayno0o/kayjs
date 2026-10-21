@@ -626,11 +626,21 @@ function outerMount(layout: string): RouteMount {
   return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout }
 }
 
+// An extension's layout is a `_layout.kay` alone in its directory, which is mounted as a tree of its own.
+function checkedLayout(root: string, layout: string): string {
+  const file = resolve(root, layout)
+
+  if (basename(file) !== LAYOUT || !existsSync(file))
+    throw new KayError('route-invalid', `kay: the layout ${layout} of an extension is not an existing ${LAYOUT}`)
+
+  return file
+}
+
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
   return extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
-    ...layout === undefined ? [] : [outerMount(throughLinks(root, resolve(root, layout)))],
+    ...layout === undefined ? [] : [outerMount(throughLinks(root, checkedLayout(root, layout)))],
   ])
 }
 

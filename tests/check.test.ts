@@ -1027,6 +1027,18 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types a page\'s ctx.query with the query of an extension\'s outer layout', async () => {
+    const layout = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nconst q: number = ctx.query.q\n---\np {q}\n', 'lib/outer/_layout.kay': layout })
+
+    try {
+      expect((await check(root, { extensions: [{ name: 'lib', layout: join(root, 'lib/outer/_layout.kay') }] })).map(d => [basename(d.file), d.line, named(d)])).toEqual([['index.kay', 2, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types the pages of an extension the app reaches through a workspace link in a node_modules above it', async () => {
     const base = await scratchDir('linked-')
     const root = join(base, 'app')

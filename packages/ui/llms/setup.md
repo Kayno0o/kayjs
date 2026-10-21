@@ -62,7 +62,8 @@ Toaster
 TooltipHost
 ```
 
-The extension puts both islands on every page, so each page loads the hydration code, as the layout above does.
+The extension puts both islands on every page, so each page loads the hydration code, as the layout above does, and since the Toaster holds state `kay build` does not keep a page prerendered under it, as with the two in your own layout.
+
 ## Settings
 
 The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:

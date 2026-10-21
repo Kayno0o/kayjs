@@ -75,6 +75,7 @@ it('names what a feature needs, and writes nothing', async () => {
     const before = await snapshot(dir)
 
     await expect(addFeatures(dir, ['ws'], { install: false })).rejects.toThrow('kay add: ws needs server: run `kay add server,ws` to add them together')
+    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('start from `kay new --with auth,postgres`')
     await expect(addFeatures(dir, ['bogus'], { install: false })).rejects.toThrow('kay add: bogus is none of the features')
     expect(await snapshot(dir)).toEqual(before)
   }

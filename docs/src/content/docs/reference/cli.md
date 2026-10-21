@@ -95,7 +95,6 @@ kay add auth
 kay add mail
 kay add ai
 kay add ui
-kay add auth
 ```
 
 `kay add` gives an existing project the files and edits `kay new --with` would have written, then runs `bun install`. A feature that needs another is refused with the command that adds both, such as `kay add server,ws`. `ai`, `mail`, `cms`, `ui` and `auth` install kay's libraries and list their extension in `kay.config.ts`; `kay add auth` is kayjs-auth, with its `src/auth.ts`, a root guard, a session secret and kayjs-ui's `ui()`.
