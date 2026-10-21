@@ -11,7 +11,15 @@ function answering(status: number, body: unknown = ANSWER) {
 
 // The listeners a run leaves on the document, so a later page swap reaches only its own.
 const listeners: [string, EventListener][] = []
+const windowListeners: [string, EventListener][] = []
 const addListener = document.addEventListener.bind(document)
+
+const addWindowListener = window.addEventListener.bind(window)
+
+window.addEventListener = ((type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
+  windowListeners.push([type, listener])
+  addWindowListener(type, listener, options)
+}) as typeof window.addEventListener
 
 document.addEventListener = ((type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
   listeners.push([type, listener])
@@ -42,6 +50,9 @@ beforeEach(() => {
 afterEach(() => {
   for (const [type, listener] of listeners.splice(0))
     document.removeEventListener(type, listener)
+
+  for (const [type, listener] of windowListeners.splice(0))
+    window.removeEventListener(type, listener)
 
   for (const button of document.querySelectorAll(BUTTON))
     button.remove()
@@ -247,6 +258,25 @@ test('the loader imports the module once, on the page swap that brings the cooki
   document.dispatchEvent(new Event('kay:navigate'))
   expect(imported).toHaveLength(1)
   document.cookie = `x_${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+})
+
+test('the loader imports the module from under the base a meta names, and waits for the document', () => {
+  const imported: string[] = []
+
+  document.head.insertAdjacentHTML('beforeend', '<meta name="kay-base" content="/site/fr">')
+
+  try {
+    Object.assign(globalThis, { loaded: (url: string) => imported.push(url) })
+    // eslint-disable-next-line no-new-func, ts/no-unsafe-call -- the loader is the page's inline script, which only evaluating it runs
+    new Function(pageLinkLoader().replace('import(', 'globalThis.loaded('))()
+    expect(imported).toEqual([])
+    window.dispatchEvent(new Event('DOMContentLoaded'))
+    window.dispatchEvent(new Event('DOMContentLoaded'))
+    expect(imported).toEqual(['/site/fr/api/cms/editor/module.js'])
+  }
+  finally {
+    document.head.querySelector('meta[name="kay-base"]')?.remove()
+  }
 })
 
 test('a page swap signing in as another user is asked again, not answered with the old verdict', async () => {

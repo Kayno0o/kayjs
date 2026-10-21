@@ -224,6 +224,20 @@ describe('what the app tells the screens', () => {
     knowRuntimeRules({ redirects: {} })
     expect(sitePaths()).toEqual([])
   })
+
+  it('follows the pages when they change, and hands out a copy of the sorted answer', () => {
+    let pages = ['/b', '/a']
+
+    knowRuntimeRules({ redirects: {}, pages: () => [...pages] })
+    expect(sitePaths()).toEqual(['/a', '/b'])
+    sitePaths().push('/x')
+    expect(sitePaths()).toEqual(['/a', '/b'])
+    pages = ['/c', '/b', '/a']
+    expect(sitePaths()).toEqual(['/a', '/b', '/c'])
+    pages = ['/z']
+    expect(sitePaths()).toEqual(['/z'])
+    knowRuntimeRules({ redirects: {} })
+  })
 })
 
 describe('a served app', () => {

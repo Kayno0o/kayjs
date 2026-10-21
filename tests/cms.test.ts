@@ -26,7 +26,7 @@ import { html as renderedHtml } from '../src/runtime/rendered'
 import { merge } from '../src/runtime/values'
 import { editedEntry, editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { entryUrls } from '../src/server/entry-urls'
-import { inPreview, noteProbedEntries, previewRequested, requestDrafts } from '../src/server/preview'
+import { inPreview, noteEditedEntries, noteProbedEntries, previewRequested, requestDrafts } from '../src/server/preview'
 import { extensionEditor } from '../src/server/routes'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
@@ -715,6 +715,44 @@ describe('the collections a CMS edits', () => {
     asked.length = 0
     expect(await urls(sections, { slug: 'intro' })).toBe('/')
     expect(asked).toContain('/hang')
+  })
+
+  it('starts no other probe from a screen a probe rendered', async () => {
+    const plain = (pattern: string) => ({ pattern, file: resolve(`${FIXTURE}/src/routes/news/[slug].kay`), params: [], layouts: [], special: {}, guards: [] }) as unknown as ServedRoute
+    const asked: string[] = []
+    const nested: (string | undefined)[] = []
+    const sections = collection({ name: 'sections', load: () => [] }, { schema: t.Object({ title: t.String() }) })
+    let urls: ReturnType<typeof entryUrls>
+
+    // The page renders a screen that asks for an entry's page, as a CMS's entry screen does.
+    const handle = async (request: Request) => {
+      asked.push(new URL(request.url).pathname)
+      nested.push(await urls(sections, { slug: 'elsewhere' }))
+      noteProbedEntries(request, [{ collection: 'sections', slug: 'intro' }])
+
+      return new Response('page')
+    }
+
+    urls = entryUrls([plain('/'), plain('/about')], '', undefined, undefined, handle)
+
+    expect(await urls(sections, { slug: 'intro' })).toBe('/')
+    expect(asked.toSorted()).toEqual(['/', '/about'])
+    expect(nested).toEqual([undefined, undefined])
+  })
+
+  it('opens no edit session for a probe\'s cookie, and a probe id nobody holds notes nothing', async () => {
+    setSystemTime(new Date(Date.now() + 20 * 60_000))
+
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const asked = (slug: string) => editedEntry(new Request('http://localhost/', { headers: { cookie: edit } }), 'news', slug)
+
+    noteEditedEntries(new Request('http://localhost/', { headers: { 'cookie': edit, 'x-kay-probe': 'some-id' } }), [{ collection: 'news', slug: 'probed' }])
+    expect(asked('probed')).toBe(false)
+    noteEditedEntries(new Request('http://localhost/', { headers: { cookie: edit } }), [{ collection: 'news', slug: 'read' }])
+    expect(asked('read')).toBe(true)
+    expect(asked('probed')).toBe(false)
+    expect(() => noteProbedEntries(new Request('http://localhost/', { headers: { 'x-kay-probe': 'nobody-holds-this' } }), [{ collection: 'news', slug: 'read' }])).not.toThrow()
+    expect(() => noteProbedEntries(new Request('http://localhost/'), [{ collection: 'news', slug: 'read' }])).not.toThrow()
   })
 
   it('lists a collection in a sitemap setting as its entries\' page', async () => {

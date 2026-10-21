@@ -3,7 +3,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
-import { sitePathsLike } from '../editor/save'
+import { fetchSitePaths } from '../editor/save'
 import type { RedirectStatus } from '../missing'
 
 // The Add redirect control of a missing path: one button for the target kay suggests, else a box for the target to type, so every row can be redirected, and a button saying the path is gone (410).
@@ -32,7 +32,7 @@ async function offer(text: string, wait = 0): Promise<void> {
   if (turn !== asked)
     return
 
-  const paths = await sitePathsLike(text)
+  const paths = await fetchSitePaths(text)
 
   if (turn === asked)
     offered.set(paths)

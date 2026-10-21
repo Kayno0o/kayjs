@@ -248,7 +248,7 @@ const FLAG_DEPENDENT = /\\[pPu]\{|[\u{10000}-\u{10FFFF}]/u
 
 // The pattern for the control's `pattern` attribute, which HTML anchors itself and compiles with the `v` flag, while the schema's is unanchored and the form's own check compiles it with no flag: only a pattern already anchored at both ends in one alternative, which all read the same, becomes the attribute. Any other is left to the form's own check.
 export function htmlPattern(pattern: string | undefined): string | undefined {
-  if (pattern === undefined || !pattern.startsWith('^') || !pattern.endsWith('$') || endsEscaped(pattern) || hasTopLevelAlternative(pattern) || FLAG_DEPENDENT.test(pattern))
+  if (pattern === undefined || !pattern.startsWith('^') || !pattern.endsWith('$') || endsEscaped(pattern) || hasTopLevelAlternative(pattern) || FLAG_DEPENDENT.test(pattern) || meetsAstral(pattern))
     return undefined
 
   try {
@@ -260,6 +260,25 @@ export function htmlPattern(pattern: string | undefined): string | undefined {
   catch {
     return undefined
   }
+}
+
+// Whether the pattern has a `.`, a negated class or a `\S`, `\W` or `\D`, which match one code point under the attribute's flag but half of an astral character under none, so a typed emoji would pass the control and fail the form's check. A `.` inside a class counts too, which only leaves that pattern to the form.
+function meetsAstral(pattern: string): boolean {
+  for (let at = 0; at < pattern.length; at++) {
+    const char = pattern[at]
+
+    if (char === '\\') {
+      if ('SWD'.includes(pattern[at + 1] ?? ''))
+        return true
+
+      at++
+    }
+    else if (char === '.' || (char === '[' && pattern[at + 1] === '^')) {
+      return true
+    }
+  }
+
+  return false
 }
 
 // Whether the final `$` is escaped, an odd run of backslashes before it.

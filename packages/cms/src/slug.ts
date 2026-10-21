@@ -1,6 +1,7 @@
 // What a new entry's slug is helped with: written from a title, cleaned as it is typed, and checked against the slugs the collection holds.
 // The marks of a Latin letter, which are dropped; another script's keep theirs, as they change the word.
-const MARKS = /(?<=\p{Script=Latin})\p{M}+/gu
+// Matched with the letter and put back, as a lookbehind is a syntax error before Safari 16.4 and would break the whole editor module.
+const MARKS = /(\p{Script=Latin})\p{M}+/gu
 const LETTERS = { œ: 'oe', æ: 'ae', ß: 'ss', ø: 'o', đ: 'd', ł: 'l', þ: 'th' } as const
 const LIGATURE = /[œæßøđłþ]/g
 const OTHER = /[^\p{L}\p{M}\p{N}/_-]+/gu
@@ -16,7 +17,7 @@ const EDGES = /^[-/]+|[-/]+$/g
 export function slugify(text: string, { final = false }: { final?: boolean } = {}): string {
   const slug = text
     .normalize('NFKD')
-    .replace(MARKS, '')
+    .replace(MARKS, '$1')
     .normalize('NFC')
     .toLowerCase()
     .replace(LIGATURE, letter => LETTERS[letter as keyof typeof LETTERS])

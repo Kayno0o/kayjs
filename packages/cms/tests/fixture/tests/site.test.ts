@@ -1088,6 +1088,15 @@ test('every page carries one line looking for the editor hint, and the screens s
   expect(loader[0]!.html.length).toBeLessThan(300)
   expect((await site.visit('/blog/hello')).find('script').filter(script => script.html.includes('kay_editor='))).toHaveLength(1)
   expect((await site.fetch('/admin')).headers.get('set-cookie')).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
+
+  // The loader reads the cookie in the browser, so the page stays as cacheable as it was, and a locale's page carries the same line, the module being served at one path whatever the locale.
+  expect((await site.fetch('/about')).headers.get('cache-control') ?? '').not.toMatch(/private|no-store/)
+
+  const french = (await site.visit('/fr/about')).find('script').filter(script => script.html.includes('kay_editor='))
+
+  expect(french).toHaveLength(1)
+  expect(french[0]!.html).toBe(loader[0]!.html)
+  expect(french[0]!.html).toContain('"/api/cms/editor/module.js"')
   expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()
 })
 

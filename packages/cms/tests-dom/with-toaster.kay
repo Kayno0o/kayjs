@@ -1,0 +1,14 @@
+---
+import type { AddedRedirect, MissingRow } from '../src/missing'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import AddedRedirects from '../src/components/added-redirects.kay'
+import MissingPaths from '../src/components/missing-paths.kay'
+
+// A screen of the redirects with the toaster beside it, in one bundle, so the toasts a failure raises show where a test can read them.
+const { rows, redirects } = props<{ rows?: MissingRow[], redirects?: AddedRedirect[] }>()
+---
+Toaster
+if rows
+  MissingPaths(rows={rows} hint="")
+if redirects
+  AddedRedirects(redirects={redirects})

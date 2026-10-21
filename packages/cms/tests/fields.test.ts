@@ -383,4 +383,12 @@ describe('htmlPattern', () => {
     expect(htmlPattern('^😀$')).toBeUndefined()
     expect(htmlPattern(undefined)).toBeUndefined()
   })
+
+  it('drops one that would meet an astral character differently: a dot, a negated class, \\S, \\W or \\D', () => {
+    for (const pattern of ['^.{3}$', '^[^a]+$', '^\\S+$', '^\\W$', '^\\D*$', '^a.$'])
+      expect(htmlPattern(pattern)).toBeUndefined()
+
+    expect(htmlPattern('^\\.[a-z]\\\\$')).toBe('^\\.[a-z]\\\\$')
+    expect(htmlPattern('^\\d+\\w$')).toBe('^\\d+\\w$')
+  })
 })

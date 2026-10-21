@@ -259,48 +259,32 @@ export async function addMissingRedirect(from: string, to: string, status: Redir
   return done !== undefined
 }
 
+// Runs a change and toasts `done` once it went through. A failure is toasted as `failure`, or with `throws` thrown instead, for a confirm that words it itself and stays open.
+async function runOrThrow(run: () => Promise<unknown>, throws: boolean, failure: string, done: string): Promise<boolean> {
+  const outcome = throws ? await run() : await attempt(run, failure)
+
+  if (outcome === undefined && !throws)
+    return false
+
+  toast.success(done)
+
+  return true
+}
+
 // Removes redirects added from the screen, so their paths answer 404 again; true once removed.
 // With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
 export async function removeAddedRedirects(froms: string[], throws = false): Promise<boolean> {
-  const run = async () => call(redirectsApi, '/remove', { method: 'post', body: { froms } })
-
-  if (throws) {
-    await run()
-    toast.success(wording('cms.redirects.removed', 'Redirect removed'))
-
-    return true
-  }
-
-  const done = await attempt(run, wording('cms.redirects.removeFailure', 'Could not remove the redirect'))
-
-  if (done)
-    toast.success(wording('cms.redirects.removed', 'Redirect removed'))
-
-  return done !== undefined
+  return runOrThrow(async () => call(redirectsApi, '/remove', { method: 'post', body: { froms } }), throws, wording('cms.redirects.removeFailure', 'Could not remove the redirect'), wording('cms.redirects.removed', 'Redirect removed'))
 }
 
 // Forgets missing paths, all of them when none is named; true once done. They are listed again if a visitor asks for them again.
 // With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
 export async function dismissMissingPaths(paths?: string[], throws = false): Promise<boolean> {
-  const run = async () => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' })
-
-  if (throws) {
-    await run()
-    toast.success(wording('cms.missing.dismissed', 'Dismissed'))
-
-    return true
-  }
-
-  const done = await attempt(run, wording('cms.missing.dismissFailure', 'Could not dismiss the paths'))
-
-  if (done)
-    toast.success(wording('cms.missing.dismissed', 'Dismissed'))
-
-  return done !== undefined
+  return runOrThrow(async () => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' }), throws, wording('cms.missing.dismissFailure', 'Could not dismiss the paths'), wording('cms.missing.dismissed', 'Dismissed'))
 }
 
 // The paths of the site holding the text typed, for a redirect's target box; none when they cannot be read, as the box takes any path typed.
-export async function sitePathsLike(q: string): Promise<string[]> {
+export async function fetchSitePaths(q: string): Promise<string[]> {
   try {
     return await call(redirectsApi, '/paths', { query: { q } })
   }

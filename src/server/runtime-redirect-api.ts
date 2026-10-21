@@ -19,6 +19,7 @@ let rules: RuntimeRules = { hosts: [], configured: {} }
 let hosts: readonly string[] = []
 let pagesOf: (() => string[]) | undefined
 let statuses: Record<string, RedirectStatus> = {}
+let sorted: { from: string[], paths: string[] } | undefined
 
 // What the running app lets an editor add, from its config: the redirects of kay.config.ts, which win and count in a chain; the hosts a target may name besides the site's own; the paths the site serves.
 export function knowRuntimeRules(options: { redirects: Record<string, string>, statuses?: Record<string, RedirectStatus> | undefined, hosts?: readonly string[] | undefined, served?: (() => string[]) | undefined, pages?: (() => string[]) | undefined }): void {
@@ -26,6 +27,7 @@ export function knowRuntimeRules(options: { redirects: Record<string, string>, s
   rules = { hosts, configured: options.redirects, served: options.served }
   statuses = options.statuses ?? {}
   pagesOf = options.pages
+  sorted = undefined
 }
 
 // The redirects of kay.config.ts, which an editor reads and cannot change.
@@ -34,8 +36,17 @@ export function configuredRedirects(): { from: string, to: string, status: Redir
 }
 
 // The pages the running site serves, for a screen to offer as a redirect's target: none before the server knows them.
+// Sorted once per set of pages: a box asking on each keystroke reads the kept answer while the pages are the same.
 export function sitePaths(): string[] {
-  return pagesOf ? [...new Set(pagesOf())].sort() : []
+  if (!pagesOf)
+    return []
+
+  const pages = pagesOf()
+
+  if (!sorted || sorted.from.length !== pages.length || sorted.from.some((path, at) => path !== pages[at]))
+    sorted = { from: pages, paths: [...new Set(pages)].sort() }
+
+  return [...sorted.paths]
 }
 
 // Runs `use` on the store of the running server, else on the file opened for the call.

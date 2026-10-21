@@ -15,6 +15,13 @@ describe('slugify', () => {
     // Marks that belong to another script's letters stay.
     for (const word of ['हिन्दी', 'สวัสดี', 'がっこう', 'йод', '한국어'])
       expect(slugify(word, { final: true })).toBe(word)
+
+    // Greek tonos and Arabic harakat are marks too, so they stay with their letters, in any normalization the text arrived in.
+    for (const word of ['καλημέρα', 'καλημέρα'.normalize('NFD'), 'مَرْحَبًا'])
+      expect(slugify(word, { final: true })).toBe(word.normalize('NFC'))
+
+    // A Latin letter followed by several marks loses them all.
+    expect(slugify('e\u0301\u0302 a\u0308', { final: true })).toBe('e-a')
   })
 
   test('keeps folders, one slash between them, and no dash against a slash', () => {

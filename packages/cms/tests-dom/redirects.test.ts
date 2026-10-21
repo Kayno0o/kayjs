@@ -124,19 +124,62 @@ test('the target box asks for the site\'s paths holding what is typed, and offer
   expect(asked).toContain('ab')
 })
 
+test('the target box sends one request for several keystrokes typed within the pause', async () => {
+  const asked: string[] = []
+
+  spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => {
+    asked.push(new URL(String(input), 'http://localhost').searchParams.get('q') ?? '')
+
+    return Response.json([])
+  }) as unknown as typeof fetch)
+
+  const { root } = await open({})
+
+  for (const text of ['a', 'ab', 'abo'])
+    await type(root, text)
+
+  await Bun.sleep(300)
+  await settle()
+  expect(asked).toEqual(['abo'])
+})
+
 test('the confirmed bulk actions reach their confirm when they fail, which stays open', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('boom', { status: 500 })) as unknown as typeof fetch)
-  mounted = await mountComponent('../../src/components/missing-paths.kay', { hint: '', rows: [{ path: '/gone', hits: 1, lastSeen: '2026-01-01 00:00', pages: [], from: '', target: undefined, reason: undefined, line: undefined }] })
+
+  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { rows: [{ path: '/gone', hits: 1, lastSeen: '2026-01-01 00:00', pages: [], from: '', target: undefined, reason: undefined, line: undefined }] })
   await settle()
 
   button(mounted.root, 'Clear the list')?.click()
   await settle()
 
-  const confirm = [...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Clear the list').at(-1)
+  const confirm = [...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Delete').at(-1)
 
   confirm?.click()
   await settle()
 
-  // The confirm stays open on a failure, as the failure reaches it.
+  // The confirm stays open on a failure, as the failure reaches it, and words it.
   expect(document.body.textContent).toContain('Forget all the paths listed?')
+  expect(document.body.textContent).toContain('Could not dismiss the paths')
+})
+
+test('removing the selected redirects reaches its confirm when it fails, which stays open', async () => {
+  spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('boom', { status: 500 })) as unknown as typeof fetch)
+
+  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { redirects: [{ from: '/old', to: '/new', status: 307, at: '2026-01-01 00:00' }] })
+  await settle()
+
+  const select = mounted.root.querySelector<HTMLInputElement>('thead input[type="checkbox"]') ?? mounted.root.querySelector<HTMLInputElement>('input[type="checkbox"]')
+
+  select?.click()
+  await settle()
+  mounted.root.querySelector<HTMLElement>('button[aria-label="Remove 1 selected"]')?.click()
+  await settle()
+
+  const confirm = [...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Delete').at(-1)
+
+  confirm?.click()
+  await settle()
+
+  expect(document.body.textContent).toContain('Remove 1 redirect?')
+  expect(document.body.textContent).toContain('Could not remove the redirect')
 })
