@@ -16,6 +16,7 @@ export interface Edit {
 // Reads the last edit of each file, by path relative to the repository, in one `git log`.
 export type EditReader = (paths: string[]) => Promise<Map<string, Edit>>
 
+const LEADING_NEWLINE = /^\n/u
 const MARK = '\u0001'
 
 // Runs git in the repository and gives its output, undefined when git is missing, fails or runs out of time.
@@ -41,7 +42,7 @@ async function logged(paths: string[]): Promise<Map<string, Edit>> {
   for (let i = 1; i + 1 < parts.length; i += 2) {
     const [author = '', ...files] = parts[i + 1]!.split('\0')
 
-    for (const file of files.map(name => name.replace(/^\n/u, ''))) {
+    for (const file of files.map(name => name.replace(LEADING_NEWLINE, ''))) {
       if (wanted.has(file) && !edits.has(file))
         edits.set(file, { at: Number(parts[i]) * 1000, author })
     }
