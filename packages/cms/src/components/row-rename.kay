@@ -1,0 +1,50 @@
+---
+import type { Denials } from '../access'
+import type { ScreenCollection } from '../kay/contract'
+import type { EntryRow } from '../listing'
+import type { HeldSlug } from '../editor/slugs'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { refresh, signal } from 'kay'
+import { wording } from 'kay/words'
+import { readReferrers } from '../editor/referrers'
+import { renameSaved } from '../editor/save'
+import { readHeldSlugs, reportSlug } from '../editor/slugs'
+import Refused from './refused.kay'
+import RenameDialog from './rename-dialog.kay'
+
+// A row's Rename button and its dialog, as the entry editor's: the slugs the collection holds and the entries naming this one are read when the dialog opens, so they are never older than the click.
+const { collection, row, denied = {} } = props<{ collection: ScreenCollection, row: EntryRow, denied?: Denials }>()
+
+const open = signal(false)
+const held = signal<HeldSlug[]>()
+const referrers = signal<string[]>([])
+
+async function start(): Promise<void> {
+  open = true
+  held.set(undefined)
+  referrers.set([])
+
+  const [slugs, named] = await Promise.all([readHeldSlugs(collection.name), readReferrers(collection.name, [row.slug])])
+
+  held.set(slugs)
+  referrers.set(named[row.slug] ?? [])
+}
+
+async function rename(slug: string, onRefused: (message: string) => void): Promise<boolean> {
+  const renamed = await renameSaved({ collection: collection.name, slug: row.slug, locale: row.locale }, slug, row.version, onRefused)
+
+  if (renamed === undefined)
+    return false
+
+  await refresh()
+
+  return true
+}
+
+const report = (typed: string) => held() && reportSlug(typed, held()!, row.locale)
+---
+if denied.redirects !== undefined
+  Refused(label={wording('cms.table.renameLabel', 'Rename {title}', { title: row.title })} reason={denied.redirects})
+else
+  Button(label={wording('cms.entry.rename', 'Rename')} aria-label={wording('cms.table.renameLabel', 'Rename {title}', { title: row.title })} onClick={start})
+RenameDialog(open={open()} onOpenChange={shown => { open = shown }} slug={row.slug} hasPage={row.url !== undefined} report={report} referrers={referrers()} blocked={undefined} rename={rename})

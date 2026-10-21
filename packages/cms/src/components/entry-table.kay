@@ -16,6 +16,7 @@ import { deleteSaved, moveSaved, publishSaved, unpublishSaved } from '../editor/
 import EntryEdited from './entry-edited.kay'
 import EntryBulk from './entry-bulk.kay'
 import Refused from './refused.kay'
+import RowRename from './row-rename.kay'
 import EntryStatus from './entry-status.kay'
 import EntryWatch from './entry-watch.kay'
 import { shipWords } from '../editor/words'
@@ -152,6 +153,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
           ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
           Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateLabel', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
+        if actions.has('rename') && !collection.single && row.problem === undefined
+          RowRename(collection={collection} row={row} denied={denied})
         if actions.has('editOnPage')
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})

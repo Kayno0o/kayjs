@@ -103,6 +103,7 @@ export default defineMessages({
       rename: 'Renommer',
       renameDirty: 'Enregistrez ou réinitialisez d\'abord vos modifications',
       renameHint: 'L\'ancienne adresse de la page redirige vers la nouvelle.',
+      renameReferrers: 'Ces entrées pointent aussi vers le nouveau slug : {names}',
       renameSlug: 'Nouveau slug',
       renameTitle: 'Renommer {slug}',
       body: 'Contenu',
@@ -373,6 +374,7 @@ export default defineMessages({
       notRenamed: 'Non renommé',
       renamed: 'Renommé',
       renameFailure: 'Renommage impossible',
+      unpointed: 'Renommé, mais {names} n\'ont pas pu pointer vers le nouveau slug : modifiez-les à la main',
     },
     session: {
       ended: 'Votre session a pris fin, donc rien n\'a été enregistré. Vos modifications sont conservées ici.',
@@ -415,7 +417,8 @@ export default defineMessages({
       singleRename: '{collection} contient une seule entrée, qui ne peut pas être renommée',
       sameSlug: '{slug} est déjà le slug',
       noMove: 'Le système d\'enregistrement de ce site ne sait pas renommer les fichiers',
-      renameReferred: '{slug} est référencée par {names} : faites-les pointer vers le nouveau slug d\'abord',
+      renameReferred: '{slug} est référencée par {names}, qui ne peuvent pas être enregistrées ici : faites-les pointer vers le nouveau slug d\'abord',
+      renameStale: 'Une entrée référençant {slug} a été enregistrée pendant le renommage : réessayez',
     },
     table: {
       editing: 'En cours de modification par {names}',
@@ -445,6 +448,7 @@ export default defineMessages({
       yes: 'Oui',
       duplicate: 'Dupliquer',
       duplicateLabel: 'Dupliquer {title}',
+      renameLabel: 'Renommer {title}',
     },
     trash: {
       back: 'Retour à {collection}',

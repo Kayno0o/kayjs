@@ -1,21 +1,25 @@
+import type { FileSaver } from '../src/files'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
-import { collection, reference, unique } from 'kay/content'
+import { blocks, collection, reference, unique } from 'kay/content'
 import { removeRuntimeRedirect, runtimeRedirects } from 'kay/library'
 import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { knowRuntimeRules } from '../../../src/server/runtime-redirect-api'
-import { fileVersion, workingTree } from '../src/files'
+import { fileVersion, SaveConflict, workingTree } from '../src/files'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
 import { deleteEntry, entryOf, renameEntry, saveEntry } from '../src/store'
 import { trashOf } from '../src/trash'
 
-const schema = s.Object({ title: s.String(), code: s.Optional(unique(s.String())), author: s.Optional(reference('authors')) })
+const schema = s.Object({ title: s.String(), code: s.Optional(unique(s.String())), author: s.Optional(reference('authors')), note: s.Optional(reference('notes')), book: s.Optional(reference('books')) })
+const articleSchema = s.Object({ title: s.String(), editors: s.Optional(s.Array(reference('authors'))), credit: s.Optional(s.Object({ by: reference('authors') })), sections: s.Optional(blocks({ team: s.Object({ member: reference('authors') }), text: s.Object({ body: s.String() }) })) })
+const spotSchema = s.Object({ title: s.String(), translationKey: s.Optional(s.String()) })
+const visitSchema = s.Object({ title: s.String(), spot: s.Optional(reference('spots')) })
 let count = 0
 let dir: string
 let restore: ReturnType<typeof registerCollections>
@@ -30,6 +34,12 @@ beforeEach(async () => {
   await mkdir(join(dir, 'pages/fr'), { recursive: true })
   await mkdir(join(dir, 'authors'), { recursive: true })
   await mkdir(join(dir, 'books'), { recursive: true })
+  await mkdir(join(dir, 'articles'), { recursive: true })
+  await mkdir(join(dir, 'spots/en'), { recursive: true })
+  await mkdir(join(dir, 'spots/fr'), { recursive: true })
+  await mkdir(join(dir, 'visits'), { recursive: true })
+  await mkdir(join(dir, 'guides/en'), { recursive: true })
+  await mkdir(join(dir, 'guides/fr'), { recursive: true })
   setContentPlace(dir, dir)
   registerEditSite({ urls: async () => undefined, locales: ['en', 'fr'], defaultLocale: 'en' })
 
@@ -40,6 +50,10 @@ beforeEach(async () => {
     ['pages', collection(join(dir, 'pages'), { schema, localized: true, url: entry => `/${entry.locale}/rn-p/${entry.slug}` })],
     ['authors', collection(join(dir, 'authors'), { schema })],
     ['books', collection(join(dir, 'books'), { schema })],
+    ['articles', collection(join(dir, 'articles'), { schema: articleSchema })],
+    ['spots', collection(join(dir, 'spots'), { schema: spotSchema, localized: true })],
+    ['visits', collection(join(dir, 'visits'), { schema: visitSchema })],
+    ['guides', collection(join(dir, 'guides'), { schema: s.Object({ title: s.String(), spot: s.Optional(reference('spots')) }), localized: true })],
     ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema, url: entry => `/rn-notes/${entry.slug}` })],
   ])
   configure({ files: workingTree() })
@@ -136,14 +150,6 @@ describe('renaming a folder entry', () => {
     expect(await entryOf({ collection: 'posts', slug: 'second' })).toMatchObject({ data: { code: 'ABC' } })
   })
 
-  test('is refused while another entry refers to it, naming it', async () => {
-    await make('authors', 'ada', { title: 'Ada' })
-    await make('books', 'engine', { title: 'Engine', author: 'ada' })
-
-    expect(await renameEntry({ collection: 'authors', slug: 'ada' }, 'lovelace')).toMatchObject({ issues: [{ message: expect.stringContaining('Books: Engine') }] })
-    expect(await Bun.file(join(dir, 'authors/ada.md')).exists() || await Bun.file(join(dir, 'authors/ada.json')).exists()).toBe(true)
-  })
-
   test('requires the version of a folder entry when the editor is meant to name one', async () => {
     await make('posts', 'first')
 
@@ -237,5 +243,181 @@ describe('renaming a loaded entry', () => {
     expect(await renameEntry({ collection: 'notes', slug: 'first' }, 'third', { version: 'stale' })).toHaveProperty('conflict')
     expect(await entryOf({ collection: 'notes', slug: 'first' })).toBeDefined()
     expect(redirects()).toEqual([])
+  })
+})
+
+const ADA = { collection: 'authors', slug: 'ada' }
+const dataOf = async (collectionName: string, slug: string, locale?: string) => (await entryOf({ collection: collectionName, slug, locale }))?.data
+
+describe('renaming an entry other entries refer to', () => {
+  test('points a reference field, a list, a group and a block at the new slug, and leaves other references alone', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('authors', 'bob', { title: 'Bob' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+    await make('books', 'other', { title: 'Other', author: 'bob' })
+    await make('articles', 'a', { title: 'A', editors: ['bob', 'ada'], credit: { by: 'ada' }, sections: [{ type: 'text', body: 'ada' }, { type: 'team', member: 'ada' }, { type: 'team', member: 'bob' }] })
+
+    expect(await renameEntry(ADA, 'lovelace')).toMatchObject({ saved: true, slug: 'lovelace' })
+    expect(await dataOf('books', 'engine')).toMatchObject({ author: 'lovelace' })
+    expect(await dataOf('books', 'other')).toMatchObject({ author: 'bob' })
+    expect(await dataOf('articles', 'a')).toEqual({ title: 'A', editors: ['bob', 'lovelace'], credit: { by: 'lovelace' }, sections: [{ type: 'text', body: 'ada' }, { type: 'team', member: 'lovelace' }, { type: 'team', member: 'bob' }] })
+  })
+
+  test('points the references of every locale of a localized collection, each file on its own', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('pages', 'about', { title: 'About', author: 'ada' }, 'en')
+    await make('pages', 'a-propos', { title: 'A propos', author: 'ada' }, 'fr')
+
+    await renameEntry(ADA, 'lovelace')
+    expect(await dataOf('pages', 'about', 'en')).toMatchObject({ author: 'lovelace' })
+    expect(await dataOf('pages', 'a-propos', 'fr')).toMatchObject({ author: 'lovelace' })
+  })
+
+  test('points a loaded collection\'s entries too, with the save in their history', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('notes', 'n', { title: 'N', author: 'ada' })
+
+    const before = (await revisionsOf({ collection: 'notes', slug: 'n' })).length
+
+    expect(await renameEntry(ADA, 'lovelace')).toMatchObject({ saved: true })
+    expect(await dataOf('notes', 'n')).toMatchObject({ author: 'lovelace' })
+    expect((await revisionsOf({ collection: 'notes', slug: 'n' })).length).toBe(before + 1)
+  })
+
+  test('points the entries naming a loaded entry, a folder one among them', async () => {
+    await make('notes', 'first', { title: 'First' })
+    await make('notes', 'friend', { title: 'Friend', note: 'first' })
+    await make('posts', 'p', { title: 'P', note: 'first' })
+
+    expect(await renameEntry({ collection: 'notes', slug: 'first' }, 'second')).toMatchObject({ saved: true })
+    expect(await dataOf('notes', 'friend')).toMatchObject({ note: 'second' })
+    expect(await dataOf('posts', 'p')).toMatchObject({ note: 'second' })
+  })
+
+  test('points the renamed entry\'s reference to itself and leaves its other references', async () => {
+    await make('books', 'engine', { title: 'Engine' })
+    await make('books', 'loop', { title: 'Loop', book: 'engine' })
+    await saveEntry({ collection: 'books', slug: 'engine', data: { title: 'Engine', book: 'engine' } }, {})
+
+    expect(await renameEntry({ collection: 'books', slug: 'engine' }, 'machine')).toMatchObject({ saved: true })
+    expect(await dataOf('books', 'machine')).toMatchObject({ book: 'machine' })
+    expect(await dataOf('books', 'loop')).toMatchObject({ book: 'machine' })
+  })
+
+  test('tells onSave each entry it pointed, as an update', async () => {
+    const events: { collection: string, slug: string, verb: string }[] = []
+
+    configure({ files: workingTree(), onSave: event => void events.push(event) })
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+    events.length = 0
+    await renameEntry(ADA, 'lovelace')
+    expect(events.map(event => [event.collection, event.slug, event.verb])).toEqual([['books', 'engine', 'update'], ['authors', 'lovelace', 'rename']])
+  })
+
+  test('refuses the rename, writing nothing, when an entry naming this one was saved meanwhile', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+
+    const tree = workingTree()
+    const racing: FileSaver = {
+      ...tree,
+      async move(move) {
+        await Bun.write(join(dir, 'books/engine.json'), JSON.stringify({ title: 'Edited', author: 'ada' }))
+
+        return tree.move!(move)
+      },
+    }
+
+    configure({ files: racing })
+
+    const outcome = await renameEntry(ADA, 'lovelace')
+
+    expect(outcome).toHaveProperty('issues')
+    expect(outcome).not.toHaveProperty('conflict')
+    expect(await dataOf('authors', 'ada')).toBeDefined()
+    expect(await dataOf('books', 'engine')).toMatchObject({ title: 'Edited', author: 'ada' })
+    expect(redirects()).toEqual([])
+  })
+
+  test('saves the entries one by one after the move for a saver that cannot commit them together', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+
+    const tree = workingTree()
+
+    configure({ files: { save: tree.save, move: tree.move } })
+    expect(await renameEntry(ADA, 'lovelace')).toMatchObject({ saved: true })
+    expect(await dataOf('books', 'engine')).toMatchObject({ author: 'lovelace' })
+  })
+
+  test('names the entries it could not point, the rename standing', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+    await make('books', 'plain', { title: 'Plain', author: 'ada' })
+
+    const tree = workingTree()
+
+    configure({
+      files: {
+        move: tree.move,
+        async save(change) {
+          if (change.repoPath.includes('engine'))
+            throw new SaveConflict('other')
+
+          return tree.save(change)
+        },
+      },
+    })
+
+    const outcome = await renameEntry(ADA, 'lovelace')
+
+    expect(outcome).toMatchObject({ saved: true, slug: 'lovelace', unpointed: ['Books: Engine'] })
+    expect(await dataOf('books', 'plain')).toMatchObject({ author: 'lovelace' })
+    expect(await dataOf('books', 'engine')).toMatchObject({ author: 'ada' })
+  })
+
+  test('a rename with no referrer reports none unpointed', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    expect(await renameEntry(ADA, 'lovelace')).not.toHaveProperty('unpointed')
+  })
+})
+
+describe('renaming one locale of a translated entry', () => {
+  test('keeps the translations paired by writing the old slug as the translationKey', async () => {
+    await make('spots', 'about', { title: 'About' }, 'en')
+    await make('spots', 'about', { title: 'A propos' }, 'fr')
+
+    expect(await renameEntry({ collection: 'spots', slug: 'about', locale: 'en' }, 'about-us')).toMatchObject({ saved: true })
+    expect(await dataOf('spots', 'about-us', 'en')).toMatchObject({ translationKey: 'about' })
+    expect(await dataOf('spots', 'about', 'fr')).toEqual({ title: 'A propos' })
+  })
+
+  test('writes no key for an entry with no translation, or one that pairs by a key already', async () => {
+    await make('spots', 'alone', { title: 'Alone' }, 'en')
+    await make('spots', 'keyed', { title: 'Keyed', translationKey: 'k' }, 'en')
+    await make('spots', 'keyed', { title: 'Cle' }, 'fr')
+
+    await renameEntry({ collection: 'spots', slug: 'alone', locale: 'en' }, 'lonely')
+    await renameEntry({ collection: 'spots', slug: 'keyed', locale: 'en' }, 'clef')
+    expect(await dataOf('spots', 'lonely', 'en')).toEqual({ title: 'Alone' })
+    expect(await dataOf('spots', 'clef', 'en')).toMatchObject({ translationKey: 'k' })
+  })
+
+  test('points the references of its locale, and of an entry with no locale only while no other locale holds the old slug', async () => {
+    await make('spots', 'about', { title: 'About' }, 'en')
+    await make('spots', 'about', { title: 'A propos' }, 'fr')
+    await make('guides', 'g', { title: 'G', spot: 'about' }, 'en')
+    await make('guides', 'g', { title: 'G fr', spot: 'about' }, 'fr')
+    await make('visits', 'v', { title: 'V', spot: 'about' })
+
+    await renameEntry({ collection: 'spots', slug: 'about', locale: 'en' }, 'about-us')
+    expect(await dataOf('guides', 'g', 'en')).toMatchObject({ spot: 'about-us' })
+    expect(await dataOf('guides', 'g', 'fr')).toMatchObject({ spot: 'about' })
+    expect(await dataOf('visits', 'v')).toMatchObject({ spot: 'about' })
+
+    await renameEntry({ collection: 'spots', slug: 'about', locale: 'fr' }, 'a-propos')
+    expect(await dataOf('guides', 'g', 'fr')).toMatchObject({ spot: 'a-propos' })
+    expect(await dataOf('visits', 'v')).toMatchObject({ spot: 'a-propos' })
   })
 })

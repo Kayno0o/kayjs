@@ -2,12 +2,12 @@ import type { Signal } from 'kay'
 import type { Denials } from './access'
 import type { Drafts } from './drafts'
 import type { SavedState } from './editor/live'
+import type { HeldSlug } from './editor/slugs'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { SlugReport } from './slug'
 import type { PairedEntry } from './translations'
-import { call, effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
+import { effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
-import slugsApi from './api/slugs'
 import { publishTime, unpublishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
 import { savedHandler } from './editor/live'
@@ -15,10 +15,11 @@ import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
 import { deleteSaved, refuseUnsaved, renameSaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
+import { readHeldSlugs, reportSlug } from './editor/slugs'
 import { shipWords } from './editor/words'
 import { fieldsOf } from './fields'
 import { collectionPath, collectionTitle, entryPath, entryTitle, newEntryPath, SINGLE_SLUG } from './listing'
-import { checkSlug, slugify } from './slug'
+import { slugify } from './slug'
 
 // What the parts of an entry's form read: the drafts, the entry they edit, its collection, and which fields the screen renders.
 export interface FormScope {
@@ -144,7 +145,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
   const cleans = collection.kind === 'folder'
   const suggestsSlug = signal(!first && !copy && !collection.single && cleans)
-  const known = signal<{ slug: string, locale?: string | undefined }[]>()
+  const known = signal<HeldSlug[]>()
   const titleKey = fieldsOf(collection.schema).find(field => field.kind === 'text')?.key.toString()
 
   // The slugs only flag a taken one and a folder typo: the server decides, so a list that cannot be read changes nothing.
@@ -152,14 +153,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     if (collection.single)
       return
 
-    try {
-      const slugs = await call(slugsApi, '/:collection', { params: { collection: collection.name } })
-
-      known.set(Array.isArray(slugs) ? slugs : undefined)
-    }
-    catch {
-      known.set(undefined)
-    }
+    known.set(await readHeldSlugs(collection.name))
   }
 
   // The slug follows the title until the slug is typed in.
@@ -198,7 +192,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     const newOne = collection.localized ? newLocale() : undefined
     const locale = first ? first.locale : newOne
 
-    return checkSlug(typed ?? slug(), list.filter(entry => entry.locale === locale).map(entry => entry.slug))
+    return reportSlug(typed ?? slug(), list, locale)
   }
 
   // A copy is held back as a draft, so the untranslated text is not published as it is.

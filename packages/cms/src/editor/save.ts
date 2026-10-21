@@ -252,6 +252,9 @@ export async function renameSaved(ref: EntryRef, slug: string, version?: string 
   if (outcome && 'issues' in outcome)
     onRefused?.(outcome.issues.map(issue => issue.message).join('; '))
 
+  if (outcome && 'unpointed' in outcome && Array.isArray(outcome.unpointed) && outcome.unpointed.length > 0)
+    toast.error(wording('cms.save.unpointed', 'Renamed, but {names} could not be pointed at the new slug: change them by hand', { names: outcome.unpointed.join(', ') }))
+
   if (!settled(outcome, wording('cms.save.renamed', 'Renamed'), wording('cms.save.notRenamed', 'Not renamed')))
     return undefined
 

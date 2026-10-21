@@ -12,9 +12,10 @@ import { collectionInfo, entries, entryFile, entryPage, entrySource, removeEntry
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
-import { missingReferences, referrersOf } from './references'
+import { missingReferences, pointReferences, referrersWith } from './references'
 import { moveRevisions, openTrail } from './revisions'
 import { settings } from './settings'
+import { pairKey } from './translations'
 import { discardTrashed, keepDeleted } from './trash'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
@@ -543,10 +544,55 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
 // The most entries named in the refusal of a rename.
 const REFERRERS_NAMED = 3
 
-// Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, and the page it had redirects to the page it has, without the app writing anything.
-// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or another entry refers to this one by its slug. `version` is the one the editor opened.
-export async function renameEntry(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome & { slug?: string }> {
-  let outcome: SaveOutcome
+// An entry naming the renamed one, with the data it takes once it names the new slug.
+interface Pointing {
+  collection: CollectionInfo
+  ref: EntryRef
+  label: string
+  data: Record<string, unknown>
+  body: string | undefined
+  // The version it was read at, for the save to name.
+  version: string | undefined
+}
+
+// Whether an entry naming the old slug follows the rename. A localized collection's entry names the entry of its own locale, so only that locale's follow; one with no locale names the entry by its slug whichever the locale, so it follows unless another locale still holds the old slug.
+function follows(collection: CollectionInfo, renamed: EntryRef, locale: string | undefined, otherLocaleHolds: boolean): boolean {
+  if (!collection.localized)
+    return true
+
+  return locale === undefined ? !otherLocaleHolds : locale === renamed.locale
+}
+
+// The entries to point at the new slug, each read again with the version it is at, so a save made since is never written over.
+async function pointings(collection: CollectionInfo, ref: EntryRef, slug: string): Promise<Pointing[]> {
+  const found = (await referrersWith(collection.name, [ref.slug])).get(ref.slug) ?? []
+
+  if (found.length === 0)
+    return []
+
+  const otherLocaleHolds = collection.localized === true && (await entries(collection.name, { slug: ref.slug })).some(each => each.locale !== ref.locale)
+  const result: Pointing[] = []
+
+  for (const { collection: holder, entry, label } of found) {
+    if (!follows(collection, ref, entry.locale, otherLocaleHolds))
+      continue
+
+    const at = { collection: holder.name, slug: entry.slug, locale: entry.locale }
+    const version = holder.kind === 'loaded' ? undefined : await versionOf(at)
+    const now = await entryOf(at, holder)
+    const data = now?.data && pointReferences(holder, now.data, collection.name, ref.slug, slug)
+
+    if (data)
+      result.push({ collection: holder, ref: at, label, data, body: now.body, version: version ?? now.version })
+  }
+
+  return result
+}
+
+// Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, the entries naming it point at the new slug, and the page it had redirects to the page it has, without the app writing anything.
+// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or an entry naming this one cannot be saved. `version` is the one the editor opened. `unpointed` names the entries naming this one that could not be saved after it.
+export async function renameEntry(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome & { slug?: string, unpointed?: string[] }> {
+  let outcome: Awaited<ReturnType<typeof renameOne>>
 
   try {
     outcome = await renameOne(ref, slug, options)
@@ -563,7 +609,7 @@ export async function renameEntry(ref: EntryRef, slug: string, options: { author
   return { ...outcome, slug }
 }
 
-async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome & { unpointed?: string[] }> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.single)
@@ -581,30 +627,80 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     return refused(ref, wording('cms.store.sameSlug', '{slug} is the slug already', { slug }), 'slug')
 
   const target = { ...ref, slug }
-  const data = renamedData(existing.data, slug)
+  const keepPairing = await pairedBySlug(collection, existing)
+  const data = renamedData(collection, existing.data, ref.slug, slug, keepPairing)
+  const plan = await pointings(collection, ref, slug)
 
-  // A reference names its entry by the slug, so every entry naming this one would point at nothing.
-  const named = (await referrersOf(collection.name, [ref.slug])).get(ref.slug) ?? []
+  // A folder outside the repository cannot be committed to, so an entry in it cannot be pointed at the new slug.
+  const unsavable = plan.filter(each => each.collection.kind === 'folder' && each.collection.dir === undefined).map(each => each.label)
 
-  if (named.length > 0)
-    return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}: change them to name the new slug first', { slug: ref.slug, names: named.slice(0, REFERRERS_NAMED).join(', ') + (named.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')
+  if (unsavable.length > 0)
+    return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}, which cannot be saved here: change them to name the new slug first', { slug: ref.slug, names: unsavable.slice(0, REFERRERS_NAMED).join(', ') + (unsavable.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')
 
-  const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, { version, required }) : await renameFile(collection, existing, target, data, { author, version, required })
+  const together = collection.kind === 'folder' && settings().files.together === true
+  const joined = together ? await joinedFiles(plan) : []
+  const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, { version, required, keepPairing }) : await renameFile(collection, existing, target, data, { author, version, required, also: joined.map(each => each.change) })
 
   if (!('saved' in moved))
     return moved
 
   await pointRedirect(existing, target, data)
 
-  return moved
+  const apart = plan.filter(each => !joined.some(done => done.pointing === each))
+  const unpointed: string[] = []
+
+  for (const each of apart) {
+    const outcome = await saveEntry({ ...each.ref, data: each.data, body: each.body }, { version: each.version, verb: 'update', author, bodyKept: true })
+
+    if (!('saved' in outcome))
+      unpointed.push(each.label)
+  }
+
+  for (const { pointing } of joined)
+    await saved({ collection: pointing.ref.collection, slug: pointing.ref.slug, ...pointing.ref.locale !== undefined && { locale: pointing.ref.locale }, verb: 'update', ...author !== undefined && { author }, ...moved.commit !== undefined && { commit: moved.commit } })
+
+  if (unpointed.length > 0)
+    log.warn(`${ref.collection}/${ref.slug} was renamed to ${slug}, but ${unpointed.join(', ')} could not be pointed at it`)
+
+  return unpointed.length > 0 ? { ...moved, unpointed } : moved
 }
 
-// The entry's data under its new slug, the `slug` field of its own, if it has one, following.
-function renamedData(data: Record<string, unknown>, slug: string): Record<string, unknown> {
-  return typeof data.slug === 'string' ? { ...data, slug } : data
+// The files of the entries to point, to commit with the move; one whose new data the collection refuses is left to be saved on its own, which says why.
+async function joinedFiles(plan: Pointing[]): Promise<{ pointing: Pointing, change: FileChange & { text: string } }[]> {
+  const files: { pointing: Pointing, change: FileChange & { text: string } }[] = []
+
+  for (const pointing of plan) {
+    if (pointing.collection.kind !== 'folder' || pointing.version === undefined)
+      continue
+
+    const source = await entrySource(pointing.ref.collection, pointing.ref.slug, pointing.data, { locale: pointing.ref.locale, body: pointing.body })
+
+    if ('issues' in source)
+      continue
+
+    files.push({ pointing, change: { repoPath: source.file.repoPath, absolute: source.file.absolute, text: source.file.text, message: `content(${pointing.ref.collection}): update ${pointing.ref.slug}`, base: pointing.version } })
+  }
+
+  return files
 }
 
-async function renameFile(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { author, version, required }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+// Whether the entry's translations pair with it by its slug, in a collection that gives entries a `translationKey` field to keep them paired once the slug changes.
+async function pairedBySlug(collection: CollectionInfo, existing: StoredEntry): Promise<boolean> {
+  if (collection.localized !== true || collection.schema.properties?.translationKey === undefined || pairKey(existing) !== existing.slug)
+    return false
+
+  return (await entries(collection.name, { slug: existing.slug })).some(each => each.locale !== existing.locale && pairKey(each) === existing.slug)
+}
+
+// The entry's data under its new slug: the `slug` field of its own, if it has one, following, so do its references to itself, and the `translationKey` its translations pair it by when `keepPairing`.
+function renamedData(collection: CollectionInfo, data: Record<string, unknown>, from: string, slug: string, keepPairing: boolean): Record<string, unknown> {
+  const own = typeof data.slug === 'string' ? { ...data, slug } : data
+  const pointing = pointReferences(collection, own, collection.name, from, slug) ?? own
+
+  return keepPairing ? { ...pointing, translationKey: from } : pointing
+}
+
+async function renameFile(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { author, version, required, also }: { author?: Identity | undefined, version?: string | undefined, also: (FileChange & { text: string })[] } & VersionRule): Promise<SaveOutcome> {
   const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
 
   if (collection.dir === undefined)
@@ -636,12 +732,17 @@ async function renameFile(collection: CollectionInfo, existing: StoredEntry, tar
     message: `content(${collection.name}): rename ${ref.slug} to ${target.slug}`,
     author,
     base: version,
+    ...also.length > 0 && { also },
   }
 
   try {
     return { saved: true, commit: await saver.move!(change), version: fileVersion(source.file.text) }
   }
   catch (error) {
+    // An entry naming this one was saved since it was read: the rename is tried again.
+    if (error instanceof SaveConflict && error.at !== undefined)
+      return refused(target, wording('cms.store.renameStale', 'An entry naming {slug} was saved while it was renamed: try again', { slug: existing.slug }), 'slug')
+
     if (error instanceof SaveConflict)
       return { ...refused(target, error.message), ...error.creating || error.current === undefined ? {} : { conflict: { version: error.current } } }
 
@@ -654,7 +755,7 @@ async function renameFile(collection: CollectionInfo, existing: StoredEntry, tar
   }
 }
 
-async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, { version, required = false, keepPairing }: { version?: string | undefined, keepPairing: boolean } & VersionRule): Promise<SaveOutcome> {
   const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
 
   return inTurn(collection.name, async () => {
@@ -669,7 +770,7 @@ async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, t
     if (current === undefined)
       return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
-    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data: renamedData(current.data, target.slug), body: current.body }, { create: true, replacing: ref.slug })
+    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data: renamedData(collection, current.data, ref.slug, target.slug, keepPairing), body: current.body }, { create: true, replacing: ref.slug })
 
     if (refusedNew !== undefined && refusedNew.length > 0)
       return { issues: refusedNew }

@@ -4,7 +4,7 @@ import type { CollectionInfo, FormLayout, GivenLayout, ListLayout, RowAction, To
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from './fields'
 
-export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete']
+export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'duplicate', 'rename', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
 
 // MarkdownEditor's buttons, which tests/layout.test.ts holds to kayjs-ui's list; kept here because kay.config.ts loads this file, which must not pull kayjs-ui's index and its components.

@@ -37,10 +37,27 @@ function refersTo(fields: Field[], target: string): boolean {
   })
 }
 
+// An entry naming a slug in a reference field, with the label the screens give it.
+export interface Referrer {
+  collection: CollectionInfo
+  entry: SourceEntry
+  label: string
+}
+
 // The entries that name each slug of `target` in a reference field, as `Collection: title`, by slug. Reads the collections whose schema holds a reference to `target` and no other; one that fails to read is left out.
 export async function referrersOf(target: string, slugs: Iterable<string>): Promise<Map<string, string[]>> {
-  const wanted = new Set(slugs)
   const result = new Map<string, string[]>()
+
+  for (const [slug, found] of await referrersWith(target, slugs))
+    result.set(slug, found.map(each => each.label))
+
+  return result
+}
+
+// The entries behind `referrersOf`, with their collection.
+export async function referrersWith(target: string, slugs: Iterable<string>): Promise<Map<string, Referrer[]>> {
+  const wanted = new Set(slugs)
+  const result = new Map<string, Referrer[]>()
 
   if (wanted.size === 0)
     return result
@@ -71,7 +88,7 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
   return result
 }
 
-function collect(collection: CollectionInfo, found: SourceEntry[], target: string, wanted: Set<string>, result: Map<string, string[]>): void {
+function collect(collection: CollectionInfo, found: SourceEntry[], target: string, wanted: Set<string>, result: Map<string, Referrer[]>): void {
   const fields = fieldsOf(collection.schema)
 
   for (const entry of found) {
@@ -91,10 +108,46 @@ function collect(collection: CollectionInfo, found: SourceEntry[], target: strin
       const label = `${collectionTitle(collection)}${entry.locale === undefined ? '' : ` (${entry.locale})`}: ${entryTitle(collection, entry)}`
       const listed = result.get(slug) ?? []
 
-      if (!listed.includes(label))
-        result.set(slug, [...listed, label])
+      if (!listed.some(each => each.label === label))
+        result.set(slug, [...listed, { collection, entry, label }])
     }
   }
+}
+
+// The value with every reference to `target` that names `from` pointing at `to` instead, however deep in lists, blocks and groups; the value itself when it names none.
+function pointed(field: Field, value: unknown, target: string, from: string, to: string): unknown {
+  if (field.kind === 'reference')
+    return field.collection === target && value === from ? to : value
+
+  if (field.kind === 'list' && Array.isArray(value)) {
+    const items = value.map(item => pointed(itemOf(field, item), item, target, from, to))
+
+    return items.some((item, i) => item !== value[i]) ? items : value
+  }
+
+  if (field.kind === 'group' && typeof value === 'object' && value !== null) {
+    const group = value as Record<string, unknown>
+    const changes = field.fields.flatMap((child) => {
+      const next = pointed(child, group[child.key], target, from, to)
+
+      return next === group[child.key] ? [] : [[child.key, next] as const]
+    })
+
+    return changes.length === 0 ? value : { ...group, ...Object.fromEntries(changes) }
+  }
+
+  return value
+}
+
+// The entry's data with its references to `target` that name `from` pointing at `to`; undefined when it holds none.
+export function pointReferences(collection: CollectionInfo, data: Record<string, unknown>, target: string, from: string, to: string): Record<string, unknown> | undefined {
+  const changes = fieldsOf(collection.schema).flatMap((field) => {
+    const next = pointed(field, data[field.key], target, from, to)
+
+    return next === data[field.key] ? [] : [[String(field.key), next] as const]
+  })
+
+  return changes.length === 0 ? undefined : { ...data, ...Object.fromEntries(changes) }
 }
 
 interface Named {

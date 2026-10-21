@@ -187,3 +187,86 @@ test('a row of the list disables its publish and delete for a role that may not,
   expect(refused.map(each => each.getAttribute('data-tooltip'))).toEqual(['Your role may not publish', 'Your role may not delete'])
   expect(refused.every(each => each.querySelector('button')!.disabled)).toBe(true)
 })
+
+// The API of a row's Rename dialog: the slugs the collection holds, the entries naming `a`, and the answer to the rename.
+function renameServer(answer: object = { saved: true, slug: 'new' }, referrers: string[] = []) {
+  return spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request, init?: RequestInit) => {
+    const path = String(input)
+
+    if (init?.method === 'POST')
+      return Response.json(answer)
+
+    if (path.includes('/referrers/'))
+      return Response.json(referrers.length > 0 ? { a: referrers } : {})
+
+    return Response.json([{ slug: 'a' }, { slug: 'b' }])
+  }) as unknown as typeof fetch)
+}
+
+const dialogRename = () => [...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(item => item.textContent?.trim() === 'Rename')!
+
+async function typeSlug(slug: string): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>('dialog input')!
+
+  input.value = slug
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+}
+
+test('a row\'s Rename opens the dialog, turns off for a slug the collection holds, and names the version the list read', async () => {
+  const fetched = renameServer({ saved: true, slug: 'new' }, ['Books: Engine'])
+  const root = await openTable([row('a'), row('b')])
+
+  root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
+  await pause()
+  expect(document.querySelector('dialog')!.textContent).toContain('Books: Engine')
+  await typeSlug('b')
+  expect(dialogRename().disabled).toBe(true)
+  expect(document.querySelector('dialog')!.textContent).toContain('already exists')
+  await typeSlug('new')
+  expect(dialogRename().disabled).toBe(false)
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+
+  const posts = fetched.mock.calls.filter(call => call[1]?.method === 'POST' && String(call[0]).includes('/rename'))
+
+  expect(posts).toHaveLength(1)
+  expect(String(posts[0]![0])).toContain('/posts/a/rename')
+  expect(String(posts[0]![0])).toContain('version=v-a')
+  expect(JSON.parse(String((posts[0]![1] as RequestInit).body))).toEqual({ slug: 'new' })
+})
+
+test('a row\'s Rename shows the refusal in the dialog, and a role without the redirects role gets it off with the reason', async () => {
+  renameServer({ saved: false, issues: [{ message: 'The saver is down' }] })
+
+  const root = await openTable([row('a')])
+
+  root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
+  await pause()
+  await typeSlug('new')
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+  expect(document.querySelector('dialog[open]')!.textContent).toContain('The saver is down')
+  mounted?.unmount()
+
+  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { table: { collection: POSTS, rows: [row('a')], denied: { redirects: 'Your role may not redirect' } } })
+  await settle()
+
+  const refused = mounted.root.querySelector('.kcms-row-actions [data-tooltip="Your role may not redirect"]')
+
+  expect(refused?.querySelector('button')?.disabled).toBe(true)
+})
+
+test('a rename that left an entry unpointed tells which', async () => {
+  renameServer({ saved: true, slug: 'new', unpointed: ['Books: Engine'] })
+  page.happyDOM.setURL('http://localhost/admin/collections/posts')
+
+  const root = await openTable([row('a')])
+
+  root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
+  await pause()
+  await typeSlug('new')
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+  expect(text()).toContain('Renamed, but Books: Engine could not be pointed at the new slug')
+})

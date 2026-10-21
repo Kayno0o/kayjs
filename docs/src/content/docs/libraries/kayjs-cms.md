@@ -191,7 +191,7 @@ const { headline } = await home.one()
 
 ## Renaming an entry
 
-The Rename button in an entry's header changes its slug. Type the new slug and the entry opens under it. The button is off for a collection of one entry and while the form has edits you have not saved. The dialog checks the slug as you type: a slug another entry holds, or an entry referring to this one, turns Rename off and says why, a new folder is announced, and a refusal of the server shows in the dialog.
+The Rename button in an entry's header changes its slug. Type the new slug and the entry opens under it. The button is off for a collection of one entry and while the form has edits you have not saved. The dialog checks the slug as you type: a slug another entry holds turns Rename off and says why, a new folder is announced, and a refusal of the server shows in the dialog. Each row of the entries list has a Rename button too.
 
 The old address of the page redirects to the new one, with nothing to write in `kay.config.ts`. It works per language and survives a restart, because the redirect joins the ones the Not found screen lists, where you can make it permanent.
 
@@ -199,7 +199,17 @@ Rename twice and both old addresses go straight to the last one. Rename back and
 
 A folder entry's file is moved and keeps its format. With `forgejo()` it is one commit. A saver of your own needs `move` to allow it. A loaded entry is saved under the new slug and removed from the old one, with its history, and it does not go to the trash.
 
-A rename is refused if the new slug is taken or names another place, or if another entry refers to this one by its slug: change those first. Entries of a language are paired by `translationKey`, or by the slug without one, so set it before renaming one language.
+Every entry that refers to this one in a `reference` field is pointed at the new slug, in lists, groups and blocks, in every language it is written in, in folder and loaded collections alike. The dialog lists them before you rename.
+
+With `forgejo()` and the working tree they are part of the same commit as the move, and a saver of your own saves them one by one afterwards. A loaded entry's save shows in its history. If one was saved meanwhile, the rename is refused and nothing is written. If one cannot be saved after the move, the editor names it so you can change it by hand.
+
+A rename is refused if the new slug is taken or names another place, or if an entry that refers to this one lives in a folder outside the repository.
+
+Entries of a language are paired by `translationKey`, or by the slug without one.
+
+When the collection has a `translationKey` text field and the entry is paired with a translation by its slug, the rename writes the old slug as the entry's `translationKey`, so its translations stay paired. A collection with no such field cannot keep them paired: set a `translationKey` before renaming one language.
+
+A page that refers to a translated entry follows the rename in its own language, and a page with no language follows it only once no other language holds the old slug.
 
 ## Ordering entries
 
@@ -558,7 +568,7 @@ It writes `to`, then removes `from`; `forgejo()` does both in one commit. It thr
 
 The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
 
-`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
+`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry, and answers the `unpointed` entries it could not point. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
@@ -627,11 +637,11 @@ Each Markdown box also has a Preview button. It shows the text rendered by your 
 
 A component shows as its content, code is highlighted by your site's highlighter, and an image written as a path in the entry's folder, such as `./cat.png`, shows from there. `previewClass: 'prose'` in `form` gives the preview the classes your pages style rendered Markdown with. It shows a short reason when the text cannot be read, such as a component left open.
 
-In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
+In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `rename`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
 To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts, when it was last edited and a New entry button. `icon` takes an icon imported from `~icons/<prefix>/<name>`, drawn before the collection: `shop: { icon: cart }`.
 
-The list keeps its state in the URL, so you can send a link to a view. You can search without caring for accents, filter by status, sort any column across every page, including when an entry was last modified and by whom (read from git history), tick entries to publish, unpublish or delete them together, and duplicate an entry into a draft.
+The list keeps its state in the URL, so you can send a link to a view. You can search without caring for accents, filter by status, sort any column across every page, including when an entry was last modified and by whom (read from git history), tick entries to publish, unpublish or delete them together, and duplicate or rename an entry.
 
 A new entry has Cancel, and Create and add another, which opens an empty form for the next one. A copy goes last in an ordered collection. In a collection with a publish date and no draft field, the copy is dated 9999-12-31 until you pick a date, so it does not go live at once. When an action fails, the message says why.
 

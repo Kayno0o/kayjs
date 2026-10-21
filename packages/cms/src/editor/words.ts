@@ -147,6 +147,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.save.renamed',
   'cms.save.saveFirst',
   'cms.save.saved',
+  'cms.save.unpointed',
   'cms.save.unpublished',
   'cms.save.uploading',
   'cms.session.ended',

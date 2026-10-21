@@ -438,15 +438,17 @@ test('the Rename dialog turns Rename off for a slug the collection holds, saying
   expect(dialogRename().disabled).toBe(false)
 })
 
-test('the Rename dialog says an entry referring to this one must change first', async () => {
+test('the Rename dialog lists the entries it points at the new slug, and stays on', async () => {
   const fetched = renameServer({ referrers: ['Books: Engine'] })
   const root = await open(stored({}))
 
   await openRename(root)
   await typeSlug('other')
-  expect(dialogRename().disabled).toBe(true)
+  expect(dialogRename().disabled).toBe(false)
   expect(document.querySelector('dialog')!.textContent).toContain('Books: Engine')
-  expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
+  dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+  expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1)
 })
 
 test('the Rename dialog shows a refusal of the server inside itself, and clears it when the slug is typed again', async () => {

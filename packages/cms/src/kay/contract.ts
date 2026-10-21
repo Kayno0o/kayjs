@@ -20,7 +20,7 @@ export interface FormLayout {
 }
 
 // What a row of a collection's list can offer beside its title.
-export type RowAction = 'move' | 'publish' | 'unpublish' | 'duplicate' | 'editOnPage' | 'delete'
+export type RowAction = 'move' | 'publish' | 'unpublish' | 'duplicate' | 'rename' | 'editOnPage' | 'delete'
 
 // The columns of a collection's list, field keys shown after the title, and the row actions kept, all by default.
 export interface ListLayout {

@@ -1,0 +1,93 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { effect, signal, untrack } from 'kay'
+import { wording } from 'kay/words'
+import type { SlugReport } from '../slug'
+import Refused from './refused.kay'
+import { slugify } from '../slug'
+
+// The dialog that renames an entry's slug, for the entry's editor and for a row of the list: a new slug to type, cleaned as it is typed, checked against the slugs the collection holds before the server is asked.
+// `blocked` is why Rename cannot go ahead whatever is typed, as edits not saved yet. `referrers` are the entries that name the entry, which the rename points at the new slug. `rename` answers true once renamed, and tells `onRefused` what the server refused it for.
+const { open, onOpenChange, slug, hasPage, report, referrers, blocked, rename } = props<{
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  slug: string
+  hasPage: boolean
+  report: (typed: string) => SlugReport | undefined
+  referrers: string[]
+  blocked: string | undefined
+  rename: (slug: string, onRefused: (message: string) => void) => Promise<boolean>
+}>()
+
+const typed = signal('')
+const pending = signal(false)
+// What the server refused the last rename for, shown until the slug is typed again.
+const refusal = signal<string>()
+
+effect(() => {
+  if (!open)
+    return
+
+  untrack(() => {
+    typed = slug
+    refusal = undefined
+  })
+})
+
+const clean = () => slugify(typed(), { final: true })
+const unchanged = () => clean() === '' || clean() === slug
+const checked = () => unchanged() ? undefined : report(clean())
+
+// Why Rename cannot go ahead, from what the dialog knows before asking the server, which refuses all the same.
+const reason = () => {
+  if (blocked !== undefined)
+    return blocked
+
+  return checked()?.taken ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : undefined
+}
+
+const hint = () => {
+  const found = checked()
+
+  if (found?.created)
+    return wording('cms.slug.creates', 'Creates the folder {folder}', { folder: found.inside ? `${found.inside}/${found.created}` : found.created })
+
+  return hasPage ? wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.') : undefined
+}
+
+function type(text: string): void {
+  typed = slugify(text)
+  refusal = undefined
+}
+
+async function submit(): Promise<void> {
+  if (unchanged() || pending() || reason() !== undefined)
+    return
+
+  pending = true
+
+  try {
+    if (await rename(clean(), message => refusal = message))
+      onOpenChange(false)
+  }
+  finally {
+    pending = false
+  }
+}
+---
+Dialog(open={open} title={wording('cms.entry.renameTitle', 'Rename {slug}', { slug })} dirty={pending()} onOpenChange={onOpenChange})
+  @footer
+    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => onOpenChange(false)})
+    if reason() !== undefined
+      Refused(label={wording('cms.entry.rename', 'Rename')} reason={reason()} tone="accent")
+    else
+      Button(label={wording('cms.entry.rename', 'Rename')} tone="accent" busy={pending()} disabled={pending() || unchanged()} onClick={submit})
+  // The dialog may sit inside the entry's form, whose own submit saves the edits: this one must not reach it.
+  form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void submit() }})
+    FormField(label={wording('cms.entry.renameSlug', 'New slug')} hint={hint()} issue={reason() ?? refusal()})
+      TextInput(autofocus value={typed()} onInput={type} size={32})
+    if referrers.length > 0
+      p.kcms-rename-referrers {wording('cms.entry.renameReferrers', 'These entries are pointed at the new slug too: {names}', { names: referrers.join(', ') })}

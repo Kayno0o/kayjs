@@ -32,6 +32,8 @@ export interface FileMove {
   author?: Identity | undefined
   // The version of the file at `from` the move is made from, as `fileVersion` gives it; undefined to move whatever is there. `to` must not exist yet.
   base?: string | undefined
+  // Other files rewritten in the same commit, the entries that named the renamed one. Each has a `base`, and one at another version refuses the whole move with a `SaveConflict` naming its path in `at`.
+  also?: (FileChange & { text: string })[] | undefined
 }
 
 export interface Commit {
@@ -42,15 +44,18 @@ export interface Commit {
 // Where a folder entry's file goes once saved: a commit, or the working tree.
 // A saver given a `base` throws a `SaveConflict` when the file is no longer at that version.
 // `move` renames an entry's file; a saver without it refuses to rename entries. A move throws a `SaveConflict` when `from` is not at its `base`, is gone, or `to` exists.
+// `together` says `move` writes the move's `also` files with it; without it the entries that named the renamed one are saved one by one after the move.
 export interface FileSaver {
   save: (change: FileChange) => Promise<Commit | undefined>
   move?: ((move: FileMove) => Promise<Commit | undefined>) | undefined
+  together?: boolean | undefined
 }
 
 // A save made from a version of the file another save has replaced since, or a new file where one already is.
 // `current` is the version the file is at, null once deleted, undefined when the saver could not tell.
+// `at` is the repository path of the file refused, when a move refuses one that is not the one moved.
 export class SaveConflict extends Error {
-  constructor(readonly current?: string | null, readonly creating = false) {
+  constructor(readonly current?: string | null, readonly creating = false, readonly at?: string) {
     super(creating ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : wording('cms.store.conflict', 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it'))
   }
 }
@@ -62,9 +67,9 @@ export function fileVersion(bytes: Uint8Array | string): string {
   return new Bun.CryptoHasher('sha1').update(`blob ${content.byteLength}\0`).update(content).digest('hex')
 }
 
-function checkBase(base: string | null | undefined, current: string | undefined): void {
+function checkBase(base: string | null | undefined, current: string | undefined, at?: string): void {
   if (base !== undefined && base !== (current ?? null))
-    throw new SaveConflict(current ?? null, base === null)
+    throw new SaveConflict(current ?? null, base === null, at)
 }
 
 // The last write of each file in the working tree, which the next one waits for, so two saves never both pass the version check.
@@ -105,12 +110,13 @@ export function workingTree(): FileSaver {
       return afterWrites([change.absolute], async () => writeFile(change))
     },
     async move(move) {
-      return afterWrites([move.from.absolute, move.to.absolute], async () => moveFile(move))
+      return afterWrites([move.from.absolute, move.to.absolute, ...move.also?.map(change => change.absolute) ?? []], async () => moveFile(move))
     },
+    together: true,
   }
 }
 
-async function moveFile({ from, to, text, base }: FileMove): Promise<undefined> {
+async function moveFile({ from, to, text, base, also = [] }: FileMove): Promise<undefined> {
   const source = Bun.file(from.absolute)
 
   if (!await source.exists())
@@ -121,9 +127,19 @@ async function moveFile({ from, to, text, base }: FileMove): Promise<undefined> 
   if (await Bun.file(to.absolute).exists())
     throw new SaveConflict(undefined, true)
 
+  // Every version is checked before the first write, so a refused referrer leaves the tree as it was.
+  for (const change of also) {
+    const file = Bun.file(change.absolute)
+
+    checkBase(change.base, await file.exists() ? fileVersion(await file.bytes()) : undefined, change.repoPath)
+  }
+
   await mkdir(dirname(to.absolute), { recursive: true })
   await Bun.write(to.absolute, text)
   await rm(from.absolute, { force: true })
+
+  for (const change of also)
+    await Bun.write(change.absolute, change.text)
 
   return undefined
 }
@@ -244,7 +260,7 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
   }
 
   // The file deleted at `from` and created at `to` in one commit, which git reads as a rename.
-  async function commitMove({ from, to, text, message, author, base }: FileMove, signal: AbortSignal, posting: () => void): Promise<Commit> {
+  async function commitMove({ from, to, text, message, author, base, also = [] }: FileMove, signal: AbortSignal, posting: () => void): Promise<Commit> {
     const sha = await currentSha(from.repoPath, signal)
 
     checkBase(base, sha)
@@ -255,7 +271,18 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     if (await currentSha(to.repoPath, signal) !== undefined)
       throw new SaveConflict(undefined, true)
 
-    const files = [{ operation: 'delete', path: from.repoPath, sha }, { operation: 'create', path: to.repoPath, content: Buffer.from(text).toString('base64') }]
+    const files: object[] = [{ operation: 'delete', path: from.repoPath, sha }, { operation: 'create', path: to.repoPath, content: Buffer.from(text).toString('base64') }]
+
+    for (const change of also) {
+      const held = await currentSha(change.repoPath, signal)
+
+      checkBase(change.base, held, change.repoPath)
+
+      if (held === undefined)
+        throw new SaveConflict(null, false, change.repoPath)
+
+      files.push({ operation: 'update', path: change.repoPath, sha: held, content: Buffer.from(change.text).toString('base64') })
+    }
 
     return post(files, { message, author }, from.repoPath, false, signal, posting)
   }
@@ -287,6 +314,7 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     async move(change) {
       return guarded(async (signal, posting) => commitMove(change, signal, posting))
     },
+    together: true,
   }
 }
 
