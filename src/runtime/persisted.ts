@@ -13,7 +13,7 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
   storage?: PersistStorage | undefined
   // How long a cookie is kept after the last write, a year by default: `'30d'`. Only the cookie takes one; `local` and `query` keep no time.
   maxAge?: Duration | undefined
-  // The values the signal may hold, the default among them: a kept value among none of them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans. Cookie and `local` storage only.
+  // The values the signal may hold, the default among them: a kept value outside them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans. Cookie and `local` storage only.
   values?: readonly T[] | undefined
 }
 
