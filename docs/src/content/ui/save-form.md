@@ -43,7 +43,7 @@ SaveForm(dirty={isNew || changed()} onSave={() => save({ name: name(), config: c
   // the editor
 ```
 
-The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` toasts `failure`, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. The page clears `dirty` once it has saved, and `status` replaces the status line.
+The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` is handled as a refused action is, with its messages on their FormField and `failure` toasted, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. `onSaved` is for `action` only. The page clears `dirty` once it has saved, and `status` replaces the status line.
 
 ## Discarding
 

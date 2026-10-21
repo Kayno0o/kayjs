@@ -403,7 +403,7 @@ describe('SaveForm', () => {
 })
 
 describe('SaveForm driven by signals', () => {
-  async function editor(save: (input: { name: string }) => Promise<boolean | undefined>, props: { isNew?: boolean, status?: string } = {}) {
+  async function editor(save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, props: { isNew?: boolean, status?: string } = {}) {
     mounted = await mountComponent('src/components/save-form-signals.kay', { save, onDiscard: () => discarded++, ...props })
 
     return mounted.root
@@ -496,6 +496,60 @@ describe('SaveForm driven by signals', () => {
     const custom = await editor(async () => undefined, { status: 'Draft' })
 
     expect(status(custom)).toBe('Draft')
+  })
+
+  test('Ctrl+S saves, a second submit while it runs is ignored and the leave guard waits', async () => {
+    let calls = 0
+    let finish: () => void = () => undefined
+    const root = await editor(async () => {
+      calls++
+
+      return new Promise<undefined>((resolve) => {
+        finish = () => resolve(undefined)
+      })
+    })
+
+    await edit(root)
+    root.querySelector('#title')!.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(calls).toBe(1)
+    expect(buttons(root)[1]!.getAttribute('aria-busy')).toBe('true')
+    expect(leaves()).toBe(false)
+    finish()
+    await settle()
+  })
+
+  test('a rejection carrying field errors shows them on their field and keeps the bar unsaved', async () => {
+    const root = await editor(async () => ({ errors: { title: 'Too short' } }))
+
+    await edit(root)
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(status(root)).toBe('Unsaved changes.')
+    expect(root.textContent).toContain('Too short')
+  })
+
+  test('Discard goes back to the value saved, not the first one drawn', async () => {
+    const root = await editor(async () => undefined)
+    const title = () => root.querySelector<HTMLInputElement>('#title')!
+
+    type(root, 'Grace', '#title')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    type(root, 'Hopper', '#title')
+    await settle()
+    click(buttons(root)[0]!)
+    await settle()
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(title().value).toBe('Grace')
+    expect(root.querySelector('#name')!.textContent).toBe('Grace')
+    expect(status(root)).toBe('No unsaved change.')
   })
 
   test('Discard calls onDiscard', async () => {

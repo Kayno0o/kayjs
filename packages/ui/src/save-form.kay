@@ -10,11 +10,11 @@ import { wording } from 'kay/words'
 const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s', class: className } = props<{
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
-  // Toasted when the call fails other than on a field, or when \`onSave\` rejects.
+  // Toasted when the call fails other than on a field, or when `onSave` rejects.
   failure?: string | undefined
   // Whether the editor holds unsaved changes, when its state is the app's own signals rather than named fields: the bar, the leave guard and Save follow it instead of the fields, so `dirty={isNew || changed()}` lets a new item save with no change.
   dirty?: boolean | undefined
-  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection toasts `failure`; `false` is a refusal the app shows itself, and either leaves the bar unsaved. The app clears `dirty` once it has saved.
+  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection is handled as an action's refusal is (`refused`, the messages on their FormField, `failure`); `false` is a refusal the app shows itself, and either leaves the bar unsaved. `onSaved` is for `action` only. The app clears `dirty` once it has saved.
   onSave?: (() => Promise<unknown>) | undefined
   // Replaces the status line, whatever the form's state.
   status?: string | undefined
@@ -95,7 +95,8 @@ const isDirty = () => dirty ?? changed()
 const busy = () => saving() || action?.pending() === true
 
 function check() {
-  changed.set(snapshot() !== baseline)
+  if (dirty === undefined)
+    changed.set(snapshot() !== baseline)
 }
 
 let queued = false
@@ -134,35 +135,31 @@ async function submit(event: SubmitEvent) {
   if (busy() || !form || !(dirty ?? snapshot() !== baseline))
     return
 
+  if (!action && !onSave)
+    return
+
+  // Edits made while the save is under way stay unsaved.
+  const sent = dirty === undefined ? snapshot() : ''
+  const adopt = values()
+  let done: Awaited<ReturnType<typeof callAction>>
+
   if (onSave) {
     saving.set(true)
 
     try {
-      if (await onSave() === false)
-        return
-    }
-    catch {
-      toast.error(failure)
-
-      return
+      done = await callAction(form, onSave as unknown as Action<never, Output>, issues, failure, refused)
     }
     finally {
       saving.set(false)
     }
 
-    if (saved)
-      toast.success(saved)
-
-    return
+    // A refusal the app shows itself.
+    if (done?.result === false)
+      return
   }
-
-  if (!action)
-    return
-
-  // Edits made while the save is under way stay unsaved.
-  const sent = snapshot()
-  const adopt = values()
-  const done = await callAction(form, action, issues, failure, refused)
+  else {
+    done = await callAction(form, action!, issues, failure, refused)
+  }
 
   if (!done)
     return
@@ -175,7 +172,8 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  onSaved?.(done.result)
+  if (!onSave)
+    onSaved?.(done.result as Answer<Success<Output>>)
 }
 
 function discard() {
