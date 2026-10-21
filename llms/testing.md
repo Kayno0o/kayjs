@@ -135,6 +135,10 @@ const refused = await site.socketRefusal(chat, '/:room', { params: { room: 'gene
 expect(refused.status).toBe(403)
 ```
 
+### Reset or seed content
+
+A test never writes into the project's `src/content`: a folder collection moves to a copy under `.kay/scratch` as its first save, delete or CMS screen reaches it, and the site reads it from there. `site.content.reset()` puts everything back (folders read from the project, loaders on their own source), `site.content.reset({ posts: [{ slug: 'a', data: { title: 'A' }, body: '...' }] })` or `site.content.seed('posts', entries)` makes a collection hold exactly those entries (`locale` for a localized one), and `site.content.write('posts', 'broken.json', text)` writes a raw file in the copy, for an entry that does not parse. A loaded collection's seed lives in memory: its loader's `load`, `get` and `count` read it, and `save` and `remove` (where declared) change it, never the source. A file written straight into `src/content` is read only until the copy is made.
+
 ### Test a component's handlers
 
 `mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later):

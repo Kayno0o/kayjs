@@ -212,6 +212,24 @@ Each file gets a copy of the database the migrations build, with what `seed` add
 
 The database in `.env.test` need not exist. A SQLite file is made on first use, and a Postgres user only needs `CREATEDB`.
 
+## Content in a test
+
+A test never writes into your `src/content`. A folder collection moves to a copy under `.kay/scratch` the first time a save, a delete or a CMS screen reaches it, and the site reads it from there. A file you wrote straight into `src/content` after that is not seen, and the file a save wrote is not in your project.
+
+`site.content` starts a test from known content:
+
+```ts
+await site.content.reset({
+  posts: [{ slug: 'hello', data: { title: 'Hello' }, body: 'Hi' }],
+})
+```
+
+- `reset()` puts everything back: folders are read from the project again and loaded collections go back to their own source.
+- `reset(seed)` and `seed(name, entries)` make a collection hold exactly the entries you list. Give a localized collection's entries a `locale`.
+- `write(name, file, text)` writes a raw file in the copy, for an entry that does not parse.
+
+A loaded collection's seed is kept in memory. Its `load`, `get` and `count` read it, and its `save` and `remove`, where it has them, change it. Your database or API is never touched.
+
 ## Several projects
 
 One test process serves one project. When test files call `testSite({ root })` on different folders, run them with `bun test --parallel`, which gives each file a process of its own.

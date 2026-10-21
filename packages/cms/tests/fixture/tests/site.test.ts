@@ -1,4 +1,3 @@
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, setSystemTime, test } from 'bun:test'
@@ -475,9 +474,7 @@ test('an entry\'s screen is headed by its title as the page\'s title, its slug b
 })
 
 test('a file that does not parse lists as broken, why said on its link too, and is written over or deleted', async () => {
-  const file = join(ROOT, 'src/content/posts/broken.json')
-
-  await Bun.write(file, '{ "title": ')
+  await site.content.write('posts', 'broken.json', '{ "title": ')
 
   try {
     const listed = await site.visit('/admin/collections/posts')
@@ -500,7 +497,7 @@ test('a file that does not parse lists as broken, why said on its link too, and 
     expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['packages/cms/tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['packages/cms/tests/fixture/src/content/posts/broken.json', undefined]])
   }
   finally {
-    await rm(file, { force: true })
+    await site.content.reset()
   }
 })
 
@@ -531,15 +528,13 @@ test('a collection whose loader throws says so on its screens, its error kept to
 })
 
 test('a Markdown file whose frontmatter does not parse opens with its body kept', async () => {
-  const file = join(ROOT, 'src/content/posts/torn.md')
-
-  await Bun.write(file, '---\ntitle: [unclosed\n---\nThe body survives.\n')
+  await site.content.write('posts', 'torn.md', '---\ntitle: [unclosed\n---\nThe body survives.\n')
 
   try {
     expect((await site.visit('/admin/collections/posts/torn')).text('[data-kcms-body] textarea')).toContain('The body survives.')
   }
   finally {
-    await rm(file, { force: true })
+    await site.content.reset()
   }
 })
 

@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
+### A test site saves content into a copy
+
+`testSite()` moves a folder collection to a copy under `.kay/scratch` once a save, a delete or a CMS screen reaches it, so a test that writes a file into `src/content` after that, or reads the file a save wrote there, no longer sees it. Write a file for the test with `site.content.write(collection, file, text)` and read what a save wrote through the site. No lint can see it, as it is a test's behavior ([Reset or seed content](testing.md#reset-or-seed-content)).
+
 ### kayjs-cms's calls take `status` and `froms`
 
 `POST /api/cms/redirects` takes `{ from, to, status? }` (307, 308 or 410) and `/remove` takes `{ froms }`; `permanent` and a single `from` still work. At `prefix: '/'` the screens mount in a `(admin)` group, so a page of yours replacing a screen goes in `src/routes/(admin)/`: outside it the cms guard and layout no longer reach it ([kayjs-cms](../packages/cms/llms/screens.md)).

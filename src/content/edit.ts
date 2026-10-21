@@ -13,7 +13,7 @@ import { byteSize } from '../runtime/byte-size'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
-import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
+import { collectionFolder, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { takeTurn } from './turns'
@@ -348,7 +348,7 @@ export async function collectionInfo(name: string, { counts = true }: { counts?:
 async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
   const { description, draft, localized = false, order, publishAt, schema, title, unpublishAt } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
-  const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
+  const inRepo = dir === undefined ? undefined : repoPath(repoRoot, sourcePath(dir))
   const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
 
   return {
@@ -459,7 +459,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   if (issues.length > 0)
     return { issues }
 
-  const dir = folderOf(collection.dir)
+  const dir = await writableFolder(collection.dir)
   const { files, place, existing } = await entryPlace(name, dir, slug, options.locale)
 
   if (existing !== undefined && options.create === true)
@@ -488,7 +488,7 @@ export async function entryFile(name: string, slug: string, options: { locale?: 
   if (issues.length > 0)
     return { issues }
 
-  const dir = folderOf(collection.dir)
+  const dir = await writableFolder(collection.dir)
   const { existing } = await entryPlace(name, dir, slug, options.locale)
 
   if (existing === undefined)
@@ -547,12 +547,12 @@ function slugRead(file: string, source: string, localized: boolean): string {
 
 function fileIn(name: string, dir: string, file: string): EntryPath {
   const absolute = join(dir, file)
-  const inRepo = repoPath(repositoryRoot(), absolute)
+  const inRepo = repoPath(repositoryRoot(), sourcePath(absolute))
 
   if (inRepo === undefined)
     throw new KayError('content-api-misuse', `kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
 
-  return { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo }
+  return { path: relative(contentPlace().root, sourcePath(absolute)).split(sep).join('/'), absolute, repoPath: inRepo }
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
@@ -713,13 +713,13 @@ function repoPath(repoRoot: string, file: string): string | undefined {
 }
 
 function folderOf(dir: string): string {
-  return resolve(contentPlace().base, dir)
+  return collectionFolder(dir)
 }
 
 // A folder missing, as in an executable or a container holding the build alone, throws rather than read as empty, where a CMS would write a file clashing with one it cannot see.
 async function folderFiles(name: string, dir: string): Promise<string[]> {
   if (!existsSync(dir))
-    throw new KayError('content-api-misuse', `kay: ${name}'s folder ${relative(contentPlace().root, dir)} is missing: a CMS edits a collection's entries where its source files are, not from a build`)
+    throw new KayError('content-api-misuse', `kay: ${name}'s folder ${relative(contentPlace().root, sourcePath(dir))} is missing: a CMS edits a collection's entries where its source files are, not from a build`)
 
   return entryFiles(dir)
 }
@@ -748,7 +748,7 @@ async function readEntry(dir: string, file: string): Promise<{ data: SourceEntry
     const { data, body } = parseEntry(file, source)
 
     if (!isFields(data))
-      return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, absolute).split(sep).join('/')} holds ${valueKind(data)}, not an entry's fields` }
+      return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, sourcePath(absolute)).split(sep).join('/')} holds ${valueKind(data)}, not an entry's fields` }
 
     return { data, ...body !== undefined && { body } }
   }
@@ -758,7 +758,7 @@ async function readEntry(dir: string, file: string): Promise<{ data: SourceEntry
 
     const body = MARKDOWN.test(file) ? splitFrontmatter(source).body : undefined
 
-    return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, absolute).split(sep).join('/')}:${error.line} ${error.message}` }
+    return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, sourcePath(absolute)).split(sep).join('/')}:${error.line} ${error.message}` }
   }
 }
 

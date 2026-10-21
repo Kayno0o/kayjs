@@ -6,11 +6,12 @@ import type { ApiAnswer, ApiRequest, CallMethod, CallPath, EventReader, NodeAt, 
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
+import type { TestContent } from './content'
 import type { PageReading } from './page'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import process from 'node:process'
-import { beforeEach } from 'bun:test'
+import { afterAll, beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir, inOutput, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
@@ -39,6 +40,7 @@ import { servedThrough } from '../server/visit'
 import { memoryVitals } from '../server/vitals-store'
 import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
+import { testContent } from './content'
 import { cookieJar, withKept } from './cookies'
 import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, settledHtml, sitemapUrls } from './page'
@@ -46,6 +48,7 @@ import { testRoot } from './root'
 
 export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
+export type { ContentSeed, SeedEntry, TestContent } from './content'
 export type { CookieJar } from './cookies'
 export { cookieJar } from './cookies'
 export type { Mounted } from './mount'
@@ -136,6 +139,8 @@ export interface TestSite {
   // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
   runJobs: () => Promise<number>
   cookies: Bun.CookieMap
+  // The site's content, which a test works on apart from the project's: a folder collection moves to a copy as the first save or delete reaches it, so a CMS's save never reaches the real `src/content`.
+  content: TestContent
   handle: (request: Request) => Promise<Response>
   // Closes the pages `open()` opened and stops the server it or `socket()` started, if any.
   close: () => Promise<void>
@@ -308,6 +313,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
   const jar = cookieJar()
+  const { content, release } = await testContent(root, config.content)
   const base = basePath(config.base)
   let address = nextClient()
 
@@ -316,6 +322,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     beforeEach(() => {
       address = nextClient()
     })
+    afterAll(release)
   }
   catch {}
 
@@ -575,6 +582,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
           await shutdown(app, true)
 
         server = undefined
+        await release()
       },
       visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
       submit: async (action, fields, init = {}) => {
@@ -618,6 +626,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         return visit
       },
       call,
+      content,
       refusal: async (action, input, init) => {
         try {
           await call(action, ...[input, init] as CallArguments<typeof action>)

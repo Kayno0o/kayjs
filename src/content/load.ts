@@ -104,6 +104,39 @@ export function setContentPlace(root: string, base: string, config?: string): vo
   place = { root, base, config }
 }
 
+// Folder collections read and written elsewhere than their own folder, by the folder resolved: `kay/test` points a folder at a copy as the first save or delete reaches it, so a test's save never writes into the real content.
+let redirected: ReadonlyMap<string, string> = new Map()
+let beforeWrite: ((folder: string) => Promise<void>) | undefined
+
+export function redirectFolders(folders: ReadonlyMap<string, string>, before?: (folder: string) => Promise<void>): void {
+  redirected = folders
+  beforeWrite = before
+}
+
+// Where a folder collection's files are read and written, its `dir` resolved against the content config's.
+export function collectionFolder(dir: string): string {
+  const absolute = resolve(baseOf(), dir)
+
+  return redirected.get(absolute) ?? absolute
+}
+
+// Where a folder collection's files are written: the same as `collectionFolder`, after `kay/test` moved the folder to a copy when it had not yet.
+export async function writableFolder(dir: string): Promise<string> {
+  await beforeWrite?.(resolve(baseOf(), dir))
+
+  return collectionFolder(dir)
+}
+
+// A path under a redirected folder as it is in the project, so what a CMS reports and commits names the real file.
+export function sourcePath(path: string): string {
+  for (const [from, to] of redirected) {
+    if (path === to || path.startsWith(to + sep))
+      return from + path.slice(to.length)
+  }
+
+  return path
+}
+
 let mode: ContentMode | undefined
 // Where the build holds the entries, when the running server's project keeps it elsewhere than `.kay/client`.
 let output: string | undefined
@@ -181,7 +214,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
 
 async function compileDirectory(dir: string, highlight: Highlighter | undefined, localized: boolean, headingLinks: boolean): Promise<RawEntry[]> {
   const root = rootOf()
-  const absolute = resolve(baseOf(), dir)
+  const absolute = collectionFolder(dir)
   const cacheDir = projectCache(root, 'content')
   // Bun's Markdown output, the highlighter's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
   const imported = highlight === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
@@ -198,7 +231,7 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
   for (let start = 0; start < files.length; start += READ_BATCH) {
     entries.push(...(await Promise.all(files.slice(start, start + READ_BATCH).map(async (name) => {
       const path = join(absolute, name)
-      const file = relative(root, path).split(sep).join('/')
+      const file = relative(root, sourcePath(path)).split(sep).join('/')
       const cacheFile = join(cacheDir, `${Bun.hash(file).toString(36)}.entry.json`)
 
       touchCacheFile(cacheFile)
