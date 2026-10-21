@@ -1221,6 +1221,44 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => document.querySelector('#drawer')!.matches(':popover-open'))).toBe(false)
   })
 
+  it('marks a section link on the pages below it and clears the mark as the swap leaves them, Back included', async () => {
+    const current = async (link: string) => page.evaluate((selector: string) => document.querySelector(selector)!.getAttribute('aria-current'), `a.${link}`)
+    const go = async (link: string, heading: string) => {
+      await page.click(`a.${link}`)
+      await page.waitFor('h1', { text: heading })
+    }
+
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+
+    expect(await current('docs')).toBeNull()
+
+    await go('guide', 'Guide')
+
+    expect(await current('docs')).toBe('true')
+    expect(await current('guide')).toBe('page')
+
+    await go('docs', 'Docs')
+
+    expect(await current('docs')).toBe('page')
+
+    await go('second', 'Second')
+
+    expect(await current('docs')).toBeNull()
+    expect(await current('guide')).toBeNull()
+
+    await page.back()
+    await page.waitFor('h1', { text: 'Docs' })
+    await page.back()
+    await page.waitFor('h1', { text: 'Guide' })
+
+    expect(await current('docs')).toBe('true')
+    expect(await current('guide')).toBe('page')
+    expect(await sameDocument()).toBe(true)
+  })
+
   it('swaps on a browser without popovers, which throws on the :popover-open selector', async () => {
     const fresh = await open('/')
 
