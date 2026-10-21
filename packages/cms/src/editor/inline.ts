@@ -191,6 +191,16 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
     element.setAttribute(name, value)
     given.set(element, [...given.get(element) ?? [], name])
   }
+  // An element that gained children holds more than one field's text, so the role we gave it goes.
+  const drop = (element: HTMLElement, name: string) => {
+    const names = given.get(element)
+
+    if (!names?.includes(name))
+      return
+
+    element.removeAttribute(name)
+    given.set(element, names.filter(kept => kept !== name))
+  }
   const give = (root: Element) => {
     for (const element of [root, ...root.querySelectorAll('*')]) {
       if (!(element instanceof HTMLElement) || isTypingInline(element))
@@ -202,20 +212,27 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
         continue
 
       const reached = element.matches(`[tabindex], ${CONTROLS}, a[href]`)
+      const description = describe(found)
 
       // The form may have loaded since, which names the field by its label instead of its path.
-      if (given.get(element)?.includes('aria-description'))
-        element.setAttribute('aria-description', describe(found))
-      else
-        set(element, 'aria-description', describe(found))
+      if (given.get(element)?.includes('aria-description')) {
+        if (element.getAttribute('aria-description') !== description)
+          element.setAttribute('aria-description', description)
+      }
+      else {
+        set(element, 'aria-description', description)
+      }
 
       if (!reached)
         set(element, 'tabindex', '0')
 
       const [only] = found
+      const plain = GENERIC.has(element.localName) && found.length === 1 && only?.attribute === undefined && only?.marker.path !== BODY && element.childElementCount === 0
 
-      if (!reached && GENERIC.has(element.localName) && found.length === 1 && only?.attribute === undefined && only?.marker.path !== BODY && element.childElementCount === 0)
+      if (!reached && plain)
         set(element, 'role', 'button')
+      else if (!plain)
+        drop(element, 'role')
     }
   }
   // Only what changed is looked at, and not the text being typed in, whose every keystroke is a mutation.
@@ -230,6 +247,9 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
 
         continue
       }
+
+      if (record.target instanceof HTMLElement && record.target.childElementCount > 0)
+        drop(record.target, 'role')
 
       for (const node of record.addedNodes) {
         if (node instanceof Element)

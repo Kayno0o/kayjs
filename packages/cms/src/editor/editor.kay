@@ -33,7 +33,7 @@ const PINNED = new Set(['fixed', 'sticky'])
 const COLLAPSED_GAP = 16
 // The widest the choice of field is, which a click near the window's right edge keeps inside it.
 const MENU_WIDTH = 256
-// What an item of that choice takes of the height, with its padding, which a tap near the bottom of the window keeps inside it.
+// What a one-line item of that choice takes of the height, which a tap near the bottom of the window keeps inside it. The placement reserves one item more for the menu's padding and border, and the menu is measured once shown, so an item that wraps still fits.
 const MENU_ITEM = 44
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
@@ -294,28 +294,42 @@ listen(() => document, 'click', (event) => {
 
 // The fields under the pointer are outlined, whichever way the page marks them, once a frame at most.
 let hoverFrame = 0
+// The frame reads the pointer where it is by then, not where it was when the frame was asked for.
+let pointer: PointerEvent | undefined
+
+function stopHover(): void {
+  cancelAnimationFrame(hoverFrame)
+  hoverFrame = 0
+  pointer = undefined
+  marks?.hover(undefined)
+}
 
 listen(() => document, 'pointermove', (event) => {
+  pointer = event
+
   if (hoverFrame !== 0)
     return
 
   hoverFrame = requestAnimationFrame(() => {
     hoverFrame = 0
 
-    const node = open() && !browsing() ? clickedNode(event) : undefined
+    const node = pointer && open() && !browsing() ? clickedNode(pointer) : undefined
 
     marks?.hover(node && !panel?.contains(node) && !menu?.contains(node) ? fieldsAt(node) : undefined)
   })
 }, { passive: true })
-listen(() => document.documentElement, 'pointerleave', () => marks?.hover(undefined))
+listen(() => document.documentElement, 'pointerleave', stopHover)
+onCleanup(stopHover)
 
 // The element the keyboard reached is outlined as the pointer's is.
-listen(() => document, 'focusin', (event) => {
-  const element = event.target instanceof Element ? event.target : undefined
-  const found = element && !panel?.contains(element) && !menu?.contains(element) ? markersOf(element) : []
+function focusedFields(): MarkedField[] | undefined {
+  const element = document.activeElement
+  const found = element && element !== document.body && !panel?.contains(element) && !menu?.contains(element) ? markersOf(element) : []
 
-  marks?.focus(found.length > 0 ? found : undefined)
-})
+  return found.length > 0 ? found : undefined
+}
+
+listen(() => document, 'focusin', () => marks?.focus(focusedFields()))
 listen(() => document, 'focusout', () => marks?.focus(undefined))
 
 // Enter on a marked element reached by the keyboard edits its field as a click on it does.
@@ -350,7 +364,7 @@ effect(() => {
   if (!open() || browsing())
     return
 
-  const made = createMarks(marking())
+  const made = createMarks(marking(), focusedFields)
 
   marks = made
   onCleanup(() => {
@@ -370,7 +384,15 @@ effect(() => {
   if (!choosing())
     return
 
-  const frame = requestAnimationFrame(() => menu?.querySelector('button')?.focus())
+  const frame = requestAnimationFrame(() => {
+    // The placement counted one-line items, so a menu that came out taller is moved up to fit.
+    const box = menu?.getBoundingClientRect()
+
+    if (menu && box && box.bottom > window.innerHeight)
+      menu.style.top = `${Math.max(0, box.top - (box.bottom - window.innerHeight))}px`
+
+    menu?.querySelector('button')?.focus()
+  })
 
   onCleanup(() => cancelAnimationFrame(frame))
 })
@@ -407,9 +429,9 @@ function menuKey(event: KeyboardEvent): void {
   next?.focus()
 }
 
-// Tab out of the menu closes the question, as the focus no longer answers it.
+// Tab out of the menu closes the question, as the focus no longer answers it. A focus going nowhere (`relatedTarget` null) does not: Safari and macOS Firefox give a button no focus on a click, so a click on an item must still choose, and a click elsewhere closes the menu on its own.
 function leaveMenu(event: FocusEvent): void {
-  if (!(event.relatedTarget instanceof Node && menu?.contains(event.relatedTarget)))
+  if (event.relatedTarget instanceof Node && !menu?.contains(event.relatedTarget))
     choosing = undefined
 }
 

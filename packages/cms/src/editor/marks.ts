@@ -36,11 +36,12 @@ function same(next: MarkedField[], current: MarkedField[]): boolean {
   return next.length === current.length && next.every((field, index) => field.element === current[index]?.element && field.start === current[index]?.start && field.attribute === current[index]?.attribute)
 }
 
-export function createMarks(all: boolean): Marks {
+export function createMarks(all: boolean, focusedNow: () => MarkedField[] | undefined): Marks {
   const layer = document.createElement('div')
   const follow = new AbortController()
   let hovered: MarkedField[] = []
-  let focused: MarkedField[] = []
+  // The focus the marks are made under is outlined at once, as the editor reopening or the marks made again must not lose it.
+  let focused: MarkedField[] = focusedNow() ?? []
   // The marked fields of the page, walked again only once the page's elements or markers changed, not on a scroll.
   let known: MarkedField[] | undefined
   let frame = 0
@@ -55,6 +56,10 @@ export function createMarks(all: boolean): Marks {
     // A page swap takes the layer away with the rest of the body it does not hold.
     if (!layer.isConnected)
       document.body.append(layer)
+
+    // An element the page took away no longer holds the focus, which moves to whatever has it now.
+    if (focused.some(field => !field.element.isConnected))
+      focused = focusedNow() ?? []
 
     const boxes: HTMLElement[] = []
     const add = (field: MarkedField, state?: 'hover' | 'focus') => {
@@ -109,17 +114,15 @@ export function createMarks(all: boolean): Marks {
         known = undefined
     }
 
-    if (changed)
+    if (changed && (all || focused.length > 0))
       redraw()
   })
 
   addEventListener('scroll', redraw, { capture: true, passive: true, signal: follow.signal })
   addEventListener('resize', redraw, { passive: true, signal: follow.signal })
 
-  if (all) {
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
-    redraw()
-  }
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
+  redraw()
 
   return {
     hover(fields) {

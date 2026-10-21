@@ -241,3 +241,99 @@ test('the keyboard focus is outlined as an attribute marker, and the default out
   await page.waitUntil(() => document.querySelectorAll('.kcms-mark[data-focus]').length === 1)
   expect(await page.evaluate(() => localStorage.getItem('kcms-marks'))).toBeNull()
 }, 60_000)
+
+test('a click on an item chooses when the button takes no focus, as in Safari and macOS Firefox', async () => {
+  const page = await open()
+
+  await page.evaluate((selector: string) => document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title'), TITLE)
+  await page.click(TITLE)
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(`${selector} button`), undefined, MENU)
+
+  // The focus leaves for nowhere (focusout with no relatedTarget), then the click lands on an item and on the padding beside it.
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+  expect(await page.evaluate((selector: string) => document.querySelector(selector) !== null, MENU)).toBe(true)
+  await page.click(`${MENU} button:nth-child(2)`)
+  await page.waitUntil(selector => document.querySelector(selector) === null, undefined, MENU)
+}, 60_000)
+
+test('a menu taller than its estimate still fits the window', async () => {
+  const page = await open()
+
+  await page.evaluate((selector: string) => {
+    document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title')
+    document.head.insertAdjacentHTML('beforeend', '<style>.kcms-marker-item { min-height: 6rem !important }</style>')
+  }, TITLE)
+  await page.evaluate((selector: string) => {
+    const box = document.querySelector(selector)!.getBoundingClientRect()
+
+    document.querySelector(selector)!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: box.left + 2, clientY: innerHeight - 4 }))
+  }, TITLE)
+  await page.waitUntil((selector: string) => document.querySelector(selector) !== null, undefined, MENU)
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getBoundingClientRect().bottom <= innerHeight + 0.5, undefined, MENU)
+}, 60_000)
+
+test('the hover frame reads the latest pointer and a pointer leaving cancels it', async () => {
+  const page = await open()
+
+  const move = (selector: string | undefined, leave: boolean) => page.evaluate((target: string | undefined, gone: boolean) => {
+    const box = (target ? document.querySelector(target)! : document.documentElement).getBoundingClientRect()
+    const element = target ? document.querySelector(target)! : document.body
+
+    element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + 4, clientY: box.top + 4 }))
+
+    if (gone)
+      document.documentElement.dispatchEvent(new PointerEvent('pointerleave'))
+  }, selector, leave)
+  const frames = () => page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
+
+  await move(TITLE, true)
+  await frames()
+  expect(await page.evaluate(() => document.querySelectorAll('.kcms-mark[data-hover]').length)).toBe(0)
+
+  // Two moves in one frame: the second, off every field, is the one drawn.
+  await move(TITLE, false)
+  await move(undefined, false)
+  await frames()
+  expect(await page.evaluate(() => document.querySelectorAll('.kcms-mark[data-hover]').length)).toBe(0)
+}, 60_000)
+
+test('the focus outline survives the marks being made again and goes with a removed element', async () => {
+  const page = await open()
+
+  await addMarked(page, '<p id="alt" data-kay-field-title="posts:hello:title">Attribute</p>')
+  await page.waitUntil(() => document.querySelector('#alt')!.getAttribute('tabindex') === '0')
+  await page.evaluate(() => document.querySelector<HTMLElement>('#alt')!.focus())
+  await page.waitUntil(() => document.querySelectorAll('.kcms-mark[data-focus]').length === 1)
+
+  // Turning the outlines on makes the marks again; the button is clicked without taking the focus from the element.
+  await page.evaluate((selector: string) => document.querySelector<HTMLElement>(selector)!.click(), OUTLINE_ALL)
+  await page.waitUntil(() => document.querySelectorAll('.kcms-mark').length >= 2)
+  expect(await page.evaluate(() => document.querySelectorAll('.kcms-mark[data-focus]').length)).toBe(1)
+
+  await page.evaluate(() => document.querySelector('#alt')!.remove())
+  await page.waitUntil(() => document.querySelectorAll('.kcms-mark[data-focus]').length === 0)
+}, 60_000)
+
+test('a tab stop that gains children loses its button role, and a focus rewrites nothing that did not change', async () => {
+  const page = await open()
+
+  await addMarked(page, '<div id="plain" data-kay-field="posts:hello:title">Plain</div>')
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
+
+  await page.evaluate(() => document.querySelector<HTMLElement>('#plain')!.focus())
+  await page.evaluate(() => {
+    const seen: string[] = []
+
+    Object.assign(window, { seen })
+    new MutationObserver(records => seen.push(...records.map(record => record.attributeName!))).observe(document.querySelector('#plain')!, { attributes: true })
+  })
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('h1')!.focus()
+    document.querySelector<HTMLElement>('#plain')!.focus()
+  })
+  await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => done())))
+  expect(await page.evaluate(() => (window as unknown as { seen: string[] }).seen)).toEqual([])
+
+  await page.evaluate(() => document.querySelector('#plain')!.append(document.createElement('b')))
+  await page.waitUntil(() => !document.querySelector('#plain')!.hasAttribute('role'))
+}, 60_000)
