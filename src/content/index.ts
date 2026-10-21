@@ -11,6 +11,7 @@ import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
 import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
+import { noteEndedEntry } from '../runtime/ended-entry'
 import { editableEntries } from '../runtime/fields'
 import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
@@ -132,7 +133,7 @@ export interface CollectionOptions<Schema extends TSchema> {
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
   // A date field, `'publishAt'`, holding an entry back as a draft is until that time and showing it by itself then: in `all()`, `get()`, the pages prerendered from it, the sitemap and the feed. A date alone is 00:00 UTC, a date with an offset is that instant; an entry without one is published. A draft stays one whatever its date.
   publishAt?: DateField<Static<Schema>> | undefined
-  // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering what the app chose when `get()` finds nothing (`ctx.notFound()`, a 410, a redirect). An entry without one never ends; `kay dev` and preview mode keep showing it.
+  // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering 410 Gone when its code calls `ctx.notFound()` after `get()` found nothing for the ended entry, or what the app chose otherwise (a redirect); a redirect from the path wins over the 410. An entry without one never ends; `kay dev` and preview mode keep showing it.
   unpublishAt?: DateField<Static<Schema>> | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
   order?: NumberField<Static<Schema>> | undefined
@@ -370,6 +371,16 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return withDrafts(await (loader ? fromLoader : fromFolder)())
   }
+  // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
+  const ended = (entry: Entry<Data> | undefined) => {
+    if (entry === undefined || unpublishAt === undefined || (draft !== undefined && isDraft(draft, entry)))
+      return false
+
+    const live = publishAt === undefined ? undefined : publishTime(publishAt, entry)
+    const down = publishTime(unpublishAt, entry)
+
+    return down !== undefined && down <= Date.now() && !(live !== undefined && live > Date.now())
+  }
   const scheduled = (entry: Entry<Data>) => {
     const now = Date.now()
     const live = publishAt === undefined ? undefined : publishTime(publishAt, entry)
@@ -415,6 +426,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const fallback = localeState()?.settings.defaultLocale
 
       const found = wanted === undefined ? shown(bySlug.get(slug)) : shown(byLocale.get(wanted)?.get(slug)) ?? (fallback === undefined ? undefined : shown(byLocale.get(fallback)?.get(slug)))
+
+      if (found === undefined && !contentMode().dev && !previewing() && (wanted === undefined ? [bySlug.get(slug)] : [byLocale.get(wanted)?.get(slug), fallback === undefined ? undefined : byLocale.get(fallback)?.get(slug)]).some(ended))
+        noteEndedEntry()
 
       return found && editableEntries(name, [found])[0]
     },

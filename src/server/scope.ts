@@ -3,6 +3,7 @@ import type { QueryRules } from '../runtime/query-param'
 import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setRequestOutcome } from '../runtime/action'
+import { setEndedEntryNote } from '../runtime/ended-entry'
 import { readParam } from '../runtime/query-param'
 import { setServerScope } from '../runtime/reactive'
 import { requestCookies } from './cookies'
@@ -42,6 +43,25 @@ setRequestOutcome(() => outcomes.getStore()?.())
 // Answers a request whose form post, if any, `read` gives: an action's `failed()` and `succeeded()` read it in its loads and templates alike.
 export function withOutcome<T>(read: () => Outcome | null, run: () => T): T {
   return outcomes.run(read, run)
+}
+
+const endedEntries = new AsyncLocalStorage<{ asked: boolean }>()
+
+setEndedEntryNote(() => {
+  const found = endedEntries.getStore()
+
+  if (found)
+    found.asked = true
+})
+
+// Runs a page render that notes when it asked for an entry whose end date passed.
+export function withEndedEntries<T>(run: () => T): T {
+  return endedEntries.run({ asked: false }, run)
+}
+
+// Whether the render asked for an entry whose end date passed.
+export function askedForEndedEntry(): boolean {
+  return endedEntries.getStore()?.asked === true
 }
 
 export const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i

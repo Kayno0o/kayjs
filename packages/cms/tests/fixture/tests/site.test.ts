@@ -419,6 +419,28 @@ test('saving a file entry hands the file kay wrote to the saver, as a commit by 
   expect(saved[0]?.author).toEqual({ name: 'Fixture editor', email: 'editor@example.com' })
 })
 
+test('a save through the route lands in the test site\'s copy of a loaded collection, the app\'s own store untouched, and a reset drops it', async () => {
+  const titleOf = async () => {
+    const response = await site.fetch('/api/cms/entries/ledger/first')
+
+    return response.ok ? ((await response.json()) as { entry?: { data: { name: string } } }).entry?.data.name : undefined
+  }
+
+  await site.content.seed('ledger', [{ slug: 'first', data: { name: 'Seeded', note: null } }])
+
+  try {
+    expect(await titleOf()).toBe('Seeded')
+    expect((await send('POST', 'ledger/first', { data: { name: 'Edited', note: null }, version: await versionOf('ledger/first') })).answer).toHaveProperty('saved', true)
+    expect(await titleOf()).toBe('Edited')
+    expect(ledgerRows).toEqual([])
+  }
+  finally {
+    await site.content.reset()
+  }
+
+  expect(await titleOf()).toBeUndefined()
+})
+
 test('a save refused comes back as issues and nothing is written, a body showing code is kept', async () => {
   saved.length = 0
 

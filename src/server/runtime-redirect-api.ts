@@ -11,6 +11,8 @@ import { requestUrl } from './request-url'
 import { answerFor } from './runtime-redirects'
 
 const NOT_FOUND = 404
+// A page whose entry ended answers it, which an editor's redirect for the path still wins over.
+const GONE = 410
 const DOT_SEGMENT = /\.[^/]+$/
 const QUERY_OR_HASH = /[?#]/
 const TRAILING_SLASHES = /\/+$/
@@ -164,7 +166,7 @@ export function missingRedirector(options: { file?: string | undefined, trailing
         const answered = responseValue instanceof Response ? responseValue : undefined
         const status = answered ? answered.status : set.status
 
-        if (status !== NOT_FOUND || (route && !isPageRequest(request)) || answered?.headers.get('content-type')?.includes('json') === true)
+        if ((status !== NOT_FOUND && status !== GONE) || (route && !isPageRequest(request)) || answered?.headers.get('content-type')?.includes('json') === true)
           return undefined
 
         return answer(request)

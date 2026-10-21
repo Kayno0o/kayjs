@@ -133,7 +133,7 @@ describe('a prerendered site with a scheduled entry', () => {
     })
   })
 
-  it('takes an ending entry down at its time from the listing, its prerendered page, the sitemap and the feed, the page then answering what the app chose', async () => {
+  it('takes an ending entry down at its time from the listing, its prerendered page, the sitemap and the feed, the page then answering 410 Gone', async () => {
     await build(async (scratch) => {
       schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: '2999-01-01' }]
       await scratch.prerender(OPTIONS)
@@ -153,7 +153,7 @@ describe('a prerendered site with a scheduled entry', () => {
       }
 
       expect(text).not.toContain('Ending')
-      expect((await visit(app, '/talks/ending')).status).toBe(404)
+      expect((await visit(app, '/talks/ending')).status).toBe(410)
       expect((await visit(app, '/talks/now')).status).toBe(200)
       expect((await visit(app, '/sitemap.xml')).text).not.toContain('/talks/ending')
       expect((await visit(app, '/talks.xml')).text).not.toContain('Ending')
@@ -171,7 +171,7 @@ describe('a prerendered site with a scheduled entry', () => {
       const app = await serve(scratch)
 
       expect((await visit(app, '/talks')).text).not.toContain('Ending')
-      expect((await visit(app, '/talks/ending')).status).toBe(404)
+      expect((await visit(app, '/talks/ending')).status).toBe(410)
     })
   })
 

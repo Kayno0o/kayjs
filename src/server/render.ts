@@ -63,7 +63,7 @@ import { reportServerError } from './report'
 import { RequestRead } from './request-read'
 import { guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
-import { inServerScope, markPrivate, readPersonally, wasReadPersonally, withOutcome } from './scope'
+import { askedForEndedEntry, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
 import { formChecks, renderBlock, renderStatic, settle, streamDocument } from './stream'
@@ -236,7 +236,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, pa
 
   rendering.guarded = options.guarded ?? route.guards.length > 0
 
-  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options))))
+  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => withEndedEntries(async () => renderRoute(route, rendering, client, withEditor(route, options)))))
   const { pathname, search } = rendering.ctx.url
 
   // The ids a page draws only have to differ from those of the page it is swapped for, so its route and URL give them: a page rendering the same bytes for every visitor is compressed once, not once per visit.
@@ -840,7 +840,8 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (!notFound && !denied)
     reportServerError(error, rendering.ctx.request, options.onError)
 
-  const pageError = pageErrorOf(error, options.dev)
+  // A page that found no entry because its end date passed answers that it is gone for good.
+  const pageError: PageError = notFound && askedForEndedEntry() ? { status: 410, message: 'Gone' } : pageErrorOf(error, options.dev)
   const page = (notFound || (denied && error.status === 404) ? special.notFound : undefined) ?? special.error
 
   rendering.status = pageError.status
@@ -859,7 +860,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 
   rendering.headers.set('content-type', TEXT['content-type'])
 
-  return respond(rendering, notFound ? 'Not Found' : pageError.message)
+  return respond(rendering, pageError.message)
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.

@@ -102,7 +102,9 @@ export const offers = collection('src/content/offers', {
 
 From that time the entry is left out of `all()`, `get()`, the sitemap, the feed and the pages built from it. An entry with no end date never ends. The two options work together, so an entry can have a window. `kay dev` and preview mode keep showing it. The date is read like the publish date, in UTC unless you write an offset.
 
-The server builds again the pages that read the collection when the date passes, the same way as for `publishAt`, and does it as it starts when it was down at that time. The page of the ended entry is rendered again too, so its URL answers what its code does when `get()` finds nothing: `?? ctx.notFound()` answers 404, and `?? ctx.redirect('/offers')` sends visitors to the list.
+The server builds again the pages that read the collection when the date passes, the same way as for `publishAt`, and does it as it starts when it was down at that time. The page of the ended entry is rendered again too, so its URL answers what its code does when `get()` finds nothing: `?? ctx.notFound()` answers 410 Gone for an ended entry (404 for a slug that never existed, and for a draft or an entry not yet published), and `?? ctx.redirect('/offers')` sends visitors to the list.
+
+A redirect from the path, in `redirects` or added from the Missing pages screen, wins over the 410.
 
 A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start. kayjs-cms shows `Ends` or `Ended` beside the entry's date field and can clear the date.
 
