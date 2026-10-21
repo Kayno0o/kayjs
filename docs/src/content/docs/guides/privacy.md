@@ -130,7 +130,10 @@ analytics({
 })
 ```
 
-The notice names the tool from your config, for example "with Plausible", so you write no wording for it. If you word the text yourself, write `{provider}` where the name goes. Add `policyUrl: '/privacy'` (a path written without your `base`, or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
+The notice names the tool from your config, for example "with Plausible", so you write no wording for it.
+
+It reads in English, or in French on a page whose `lang` is `fr`; strings you write in `consent` win over both.
+ If you word the text yourself, write `{provider}` where the name goes. Add `policyUrl: '/privacy'` (a path written without your `base`, or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
 
 The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
 
@@ -154,7 +157,7 @@ The page title is not sent unless you write `titles: true`, since a title can na
 
 ### Counting without asking
 
-Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
+Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. It reads in English, or in French on a page whose `lang` is `fr`. Word it yourself with `info: { text, ok, optOut }`, each a string or one per language, which wins over both. If your site already informs visitors and lets them object, write `info: false`.
 
 To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself, but kay still shows the information line with an opt-out, for Google Analytics, Fathom, Cloudflare and a custom tracker alike.
 

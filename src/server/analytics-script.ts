@@ -1,3 +1,5 @@
+import { SHIPPED_WORDS } from './analytics-words'
+
 // The tracker every page loads: a page view on load and on each page swap, sent to the app's own origin, behind the consent gate when the app set one, or until the visitor opts out.
 // Plain JavaScript in a string because the browser loads it as a file the server serves, and it must stay small: every page pays for it.
 export const ANALYTICS_SCRIPT = `(() => {
@@ -145,6 +147,8 @@ export const NOTICE_SCRIPT = `(() => {
   const api = window.kayAnalytics
   const { data, scope } = api
   const texts = data.texts ? JSON.parse(data.texts) : {}
+  // The words kay ships, for a language the page's tag holds none of: the provider is named here, as the tag names it in the ones it holds.
+  const shipped = Object.fromEntries(Object.entries(${JSON.stringify(SHIPPED_WORDS)}[data.consent !== undefined ? 'consent' : 'info']).map(([language, entry]) => [language, { ...entry, text: entry.text.replace('{provider}', data.provider ?? '') }]))
   let banner
   let opener
 
@@ -182,7 +186,7 @@ export const NOTICE_SCRIPT = `(() => {
       return
 
     const lang = document.documentElement.lang.split('-')[0]
-    const words = texts[lang] ?? texts[Object.keys(texts)[0]] ?? {}
+    const words = texts[lang] ?? shipped[lang] ?? texts[Object.keys(texts)[0]] ?? shipped.en
     const make = (tag, text) => Object.assign(document.createElement(tag), { textContent: text })
     const button = (text, value) => {
       const element = make('button', text)

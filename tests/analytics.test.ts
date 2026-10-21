@@ -175,6 +175,30 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(html).not.toContain('{provider}')
   })
 
+  const textsOf = (html: string) => JSON.parse((/data-texts="([^"]*)"/).exec(html)![1]!.replaceAll('&quot;', '"')) as Record<string, { text: string, agree: string, refuse: string, policy: string }>
+
+  it('leaves French to the script when the app wrote no string, and names the provider for it', async () => {
+    const html = await page(plausible())
+
+    expect(Object.keys(textsOf(html))).toEqual(['en'])
+    expect(html).toContain('data-provider="Plausible"')
+  })
+
+  it('words a language the app writes only some strings of from the shipped words of that language', async () => {
+    const texts = textsOf(await page(plausible({ info: { optOut: { fr: 'Stop' } } })))
+
+    expect(texts.fr).toMatchObject({ agree: 'OK', refuse: 'Stop', policy: 'Politique de confidentialité' })
+    expect(texts.fr!.text).toContain('Nous comptons les visites pour améliorer ce site avec Plausible')
+    expect(texts.en).toMatchObject({ agree: 'OK', refuse: 'Opt out' })
+  })
+
+  it('lets a plain string of the app win for every language, French included', async () => {
+    const texts = textsOf(await page(plausible({ consent: { agree: 'Yes' } })))
+
+    expect(texts.fr).toMatchObject({ agree: 'Yes', refuse: 'Refuser' })
+    expect(texts.en).toMatchObject({ agree: 'Yes', refuse: 'Refuse' })
+  })
+
   it('links the policy the app names, in the notice and in the information line', async () => {
     expect(await page(plausible({ policyUrl: '/privacy' }))).toContain('data-policy="/privacy"')
     expect(await page(plausible({ consent: true, policyUrl: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')

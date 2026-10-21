@@ -1,8 +1,10 @@
 import type { KayExtension } from '../config'
 import type { HeadTag } from '../runtime/head'
+import type { Words } from './analytics-words'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
+import { SHIPPED_WORDS } from './analytics-words'
 
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
@@ -181,14 +183,15 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   const info = typeof options.info === 'object' ? options.info : {}
   const name = options.provider === 'custom' ? URL.parse(options.endpoint)?.hostname ?? 'a statistics tool' : PROVIDER_NAMES[options.provider]!
   const words = asking
-    ? noticeOf(given, { text: `We count visits to improve this site with {provider}, without cookies that follow you. Do you agree?`, agree: 'Agree', refuse: 'Refuse', policy: 'Privacy policy' })
-    : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, { text: `We count visits to improve this site with {provider}, without cookies that follow you. You can opt out.`, agree: 'OK', refuse: 'Opt out', policy: 'Privacy policy' })
+    ? noticeOf(given, SHIPPED_WORDS.consent)
+    : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, SHIPPED_WORDS.info)
 
   const named = Object.fromEntries(Object.entries(words).map(([language, entry]) => [language, { ...entry, text: entry.text.replaceAll('{provider}', name) }]))
 
   const gate = (asking || informs) && {
     ...asking ? { 'data-consent': '', ...given.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
     'data-texts': JSON.stringify(named),
+    'data-provider': name,
     'data-max-age': String(given.maxAge ?? CONSENT_MAX_AGE),
     ...options.policyUrl !== undefined && { 'data-policy': options.policyUrl },
   }
@@ -250,19 +253,24 @@ function cspOf(options: FathomOptions | CloudflareOptions): Record<string, strin
   return { 'script-src': ['\'self\'', 'https://static.cloudflareinsights.com'], 'connect-src': ['\'self\'', 'https://cloudflareinsights.com'] }
 }
 
-interface Words { text: string, agree: string, refuse: string, policy: string }
-
-// One entry per language the notice is written in, `en` alone when every text is a plain string; a text a language lacks falls back to the English default.
-function noticeOf(consent: Partial<Record<keyof Words, AnalyticsText | undefined>>, defaults: Words): Record<string, Words> {
-  const given = [consent.text, consent.agree, consent.refuse, consent.policy].flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
+// One entry per language the notice is written in: `en`, every language a text is given in, and the shipped ones too when a text is a plain string, which holds for each of them. A language none of these names reads the shipped words in the browser, English by default.
+function noticeOf(consent: Partial<Record<keyof Words, AnalyticsText | undefined>>, shipped: Record<string, Words>): Record<string, Words> {
+  const values = [consent.text, consent.agree, consent.refuse, consent.policy]
+  const given = values.flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
+  const plain = values.some(value => typeof value === 'string')
   const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : value?.[language] ?? fallback
+  const languages = new Set(['en', ...given, ...plain ? Object.keys(shipped) : []])
 
-  return Object.fromEntries((given.length === 0 ? ['en'] : [...new Set(given)]).map(language => [language, {
-    text: read(consent.text, language, defaults.text),
-    agree: read(consent.agree, language, defaults.agree),
-    refuse: read(consent.refuse, language, defaults.refuse),
-    policy: read(consent.policy, language, defaults.policy),
-  }]))
+  return Object.fromEntries([...languages].map((language) => {
+    const defaults = shipped[language] ?? shipped.en!
+
+    return [language, {
+      text: read(consent.text, language, defaults.text),
+      agree: read(consent.agree, language, defaults.agree),
+      refuse: read(consent.refuse, language, defaults.refuse),
+      policy: read(consent.policy, language, defaults.policy),
+    }]
+  }))
 }
 
 function checked(options: AnalyticsOptions): void {

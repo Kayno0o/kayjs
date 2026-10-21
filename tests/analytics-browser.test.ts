@@ -830,3 +830,110 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
     }
   }, 60_000)
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice and the information line in the page\'s language, in a browser', () => {
+  let words: TestSite
+  let opened: TestPage
+
+  const NOTICE = 'section[aria-labelledby]'
+  // The page's language as a localized layout writes it on <html>, then the notice opened as the settings control does.
+  const noticeIn = async (lang: string) => {
+    await opened.evaluate((language) => {
+      document.documentElement.lang = language
+      document.getElementById('settings')?.remove()
+
+      const link = document.createElement('button')
+
+      link.setAttribute('data-analytics-consent', '')
+      link.id = 'settings'
+      document.body.prepend(link)
+    }, lang)
+    await opened.click('#settings')
+    await opened.waitFor(`${NOTICE} button`)
+
+    return opened.evaluate(() => ({ text: document.getElementById('kay-analytics-notice')!.textContent, buttons: [...document.querySelectorAll('section[aria-labelledby] button')].map(button => button.textContent) }))
+  }
+  const close = async () => {
+    await opened.click(`${NOTICE} button:first-of-type`)
+  }
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    words = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true })],
+    })
+    opened = await words.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await words?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('words the notice in French on a French page, its region included, and in English on any other', async () => {
+    await opened.waitFor(`${NOTICE} button`)
+
+    expect(await noticeIn('en')).toEqual({ text: 'We count visits to improve this site with Plausible, without cookies that follow you. Do you agree?', buttons: ['Agree', 'Refuse'] })
+    await close()
+    expect(await noticeIn('fr')).toEqual({ text: 'Nous comptons les visites pour améliorer ce site avec Plausible, sans cookie qui vous suit. Êtes-vous d\'accord ?', buttons: ['Accepter', 'Refuser'] })
+    await close()
+    expect((await noticeIn('fr-CA')).buttons).toEqual(['Accepter', 'Refuser'])
+    await close()
+    expect((await noticeIn('de')).buttons).toEqual(['Agree', 'Refuse'])
+    expect(opened.errors).toEqual([])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an app\'s own wording beside the shipped French, in a browser', () => {
+  let own: TestSite
+  let opened: TestPage
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    own = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })],
+    })
+    opened = await own.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await own?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('keeps the strings the app wrote on a French page and words the rest in French', async () => {
+    await opened.waitFor('section[aria-labelledby] button')
+    await opened.click('section[aria-labelledby] button:first-of-type')
+    await opened.evaluate(() => {
+      document.documentElement.lang = 'fr'
+
+      const link = document.createElement('button')
+
+      link.setAttribute('data-analytics-consent', '')
+      link.id = 'settings'
+      document.body.prepend(link)
+    })
+    await opened.click('#settings')
+    await opened.waitFor('section[aria-labelledby] button')
+
+    const shown = await opened.evaluate(() => ({ text: document.getElementById('kay-analytics-notice')!.textContent, buttons: [...document.querySelectorAll('section[aria-labelledby] button')].map(button => button.textContent) }))
+
+    expect(shown.buttons).toEqual(['OK', 'Stop'])
+    expect(shown.text).toContain('Nous comptons les visites')
+    expect(shown.text).toContain('avec Plausible')
+  })
+})
