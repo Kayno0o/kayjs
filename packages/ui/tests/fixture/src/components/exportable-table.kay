@@ -1,0 +1,18 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Row {
+  id: number
+  name: string
+  moons: number
+}
+
+const { exportable = true, filterParam } = props<{ exportable?: boolean | string, filterParam?: string }>()
+
+const rows = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: '=Earth', moons: 1 }, { id: 3, name: 'Venus', moons: 0 }]
+const columns: Column<Row>[] = [{ key: 'name', header: 'Name', sortValue: true }, { key: 'moons', header: 'Moons', sortValue: true, defaultDirection: 'asc' }]
+---
+Table(columns={columns} rows={rows} rowKey="id" filter={['name']} filterParam={filterParam} exportable={exportable} exportName="planets.csv")
+  @cell(row)
+    | {row.name}

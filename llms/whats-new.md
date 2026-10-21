@@ -18,6 +18,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: a SaveForm over signal state takes `dirty` and `onSave` instead of `action`, and `status` for the bar ([Forms](../packages/ui/llms/forms.md)).
 - An extension's `check` hands `kay check` and the editor the problems with how the app configured it, with no server started; kayjs-cms reports its collection and layout warnings through it ([Component libraries](component-libraries.md)).
 - The libraries throw a `config-invalid` `KayError` for a setting they refuse at boot, worded as kay's, and every error class they export ends in `Error` with a `code`; kay's own (`HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`) do too, the old names kept as `@deprecated` aliases ([Upgrading](upgrading.md)).
+- kayjs-ui: `Table(exportable)` downloads the rows on screen as CSV, `Table(virtual)` and `VirtualList` draw only the rows in view ([Tables](../packages/ui/llms/tables-navigation-and-layout.md), [Lists](../packages/ui/llms/charts-drag-and-media.md)).
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
 - `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
 - `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).

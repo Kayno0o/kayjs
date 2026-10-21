@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows } from '../src/table'
+import { cellText, csvField, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -88,4 +88,44 @@ test('rowLabel names a row by its first column with any text, or its key', () =>
   expect(rowLabel(planets[0]!, [name, moons], 'id')).toBe('Mars')
   expect(rowLabel({ id: 4, name: '', moons: null }, [name, moons], 'id')).toBe('4')
   expect(rowLabel({ id: 4, name: '', moons: 7 }, [name, moons], row => `p${row.id}`)).toBe('7')
+})
+
+describe('toCsv', () => {
+  const columns: Column<Planet>[] = [name, moons, { key: 'id', header: 'Id' }]
+
+  test('writes the headers and each row\'s own values with CRLF line ends and a byte order mark', () => {
+    expect(toCsv(planets, columns)).toBe('﻿Name,Moons,Id\r\nMars,2,1\r\nEarth,1,2\r\nVenus,,3\r\n')
+  })
+
+  test('quotes a field holding a comma, a quote or a line break', () => {
+    expect(csvField('a, b')).toBe('"a, b"')
+    expect(csvField('say "hi"')).toBe('"say ""hi"""')
+    expect(csvField('one\ntwo')).toBe('"one\ntwo"')
+  })
+
+  test('escapes a text a spreadsheet would run as a formula, and leaves a negative number alone', () => {
+    for (const text of ['=SUM(A1)', '+1', '-1', '@cmd', '\tx', '\rx'])
+      expect(csvField(text)).toBe(csvField(`'${text}`))
+
+    expect(csvField('=1+1')).toBe('\'=1+1')
+    expect(csvField('=HYPERLINK("x","y")')).toBe('"\'=HYPERLINK(""x"",""y"")"')
+    expect(csvField(-5)).toBe('-5')
+    expect(toCsv([{ id: 1, name: '=cmd', moons: -2 }], columns)).toBe('﻿Name,Moons,Id\r\n\'=cmd,-2,1\r\n')
+    expect(toCsv([], [{ key: 'a', header: '=bad' }])).toBe('﻿\'=bad\r\n')
+  })
+
+  test('writes dates as ISO text and booleans and missing values plainly', () => {
+    expect(csvField(new Date(0))).toBe('1970-01-01T00:00:00.000Z')
+    expect(csvField(true)).toBe('true')
+    expect(csvField(null)).toBe('')
+    expect(csvField(undefined)).toBe('')
+  })
+})
+
+describe('exportHref', () => {
+  test('adds the sort and the typed text to the address, keeping the query and hash it has', () => {
+    expect(exportHref('/planets.csv', { key: 'moons', direction: 'desc' }, 'q', 'ma rs')).toBe('/planets.csv?sort=moons&direction=desc&q=ma+rs')
+    expect(exportHref('/planets.csv?team=a#top', undefined, 'q', '  ')).toBe('/planets.csv?team=a#top')
+    expect(exportHref('/planets.csv?q=old', undefined, 'q', 'new')).toBe('/planets.csv?q=new')
+  })
 })

@@ -1,0 +1,36 @@
+--- <Item>
+import type { JSX } from 'kay'
+import { memo, onCleanup, onMount } from 'kay'
+import { virtualRows } from './virtual'
+
+const { items, item, itemKey, estimate = 48, overscan = 4, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex'> & {
+  items: Item[]
+  // Draws a row, from the `@item(item, index)` block.
+  item: (item: Item, index: number) => JSX.Element
+  // Tells a row from another, so the height measured for it follows it when the list shifts; the row's index without one.
+  itemKey?: ((item: Item, index: number) => unknown) | undefined
+  // The height assumed for a row until it is measured, in pixels: the closer to the rows' own, the less the scroll bar moves as they are.
+  estimate?: number | undefined
+  // The rows drawn beyond the visible ones on each side.
+  overscan?: number | undefined
+  // Names the list, which is read out when it takes the focus.
+  label?: string | undefined
+  class?: string | undefined
+}>()
+
+const keyOf = (row: Item, index: number) => itemKey === undefined ? index : itemKey(row, index)
+const list = virtualRows({ items: () => items, keyOf, estimate, overscan })
+const entries = memo(() => list.rows().map((row, position) => ({ row, index: list.start() + position })))
+let box: HTMLElement | undefined
+let content: HTMLElement | undefined
+
+onMount(() => {
+  onCleanup(list.attach(box!, content!))
+})
+---
+// Only the rows in view are drawn, between two stretches of room standing for the others. The box takes the focus to scroll by keyboard; find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window is gone with its focus.
+.kui-virtual-list({...rest} ref={element => box = element} class={className} role="list" tabindex="0" aria-label={label})
+  div(ref={element => content = element} role="presentation" style={`padding-block: ${list.before()}px ${list.after()}px`})
+    for entry of entries() key={keyOf(entry.row, entry.index)}
+      div(role="listitem" data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})
+        | {item(entry.row, entry.index)}

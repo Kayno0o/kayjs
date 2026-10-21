@@ -40,6 +40,6 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.sidePanel.*`: `closeLabel` (`Close`)
 - `ui.siteNav.*`: `menuLabel` (`Menu`)
 - `ui.splitLayout.*`: `backLabel` (`Back`), `resizeLabel` (`Resize list`)
-- `ui.table.*`: `filterLabel` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAllLabel` (`Select all`), `selectRowLabel` (`Select {row}`), `selectedLabel` (`{count} selected`)
+- `ui.table.*`: `exportLabel` (`Export CSV`), `filterLabel` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAllLabel` (`Select all`), `selectRowLabel` (`Select {row}`), `selectedLabel` (`{count} selected`)
 - `ui.toaster.*`: `dismissLabel` (`Dismiss notification`)
 - `ui.zoomPane.*`: `fitLabel` (`Fit`), `zoomInLabel` (`Zoom in`), `zoomOutLabel` (`Zoom out`)

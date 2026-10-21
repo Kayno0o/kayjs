@@ -121,3 +121,45 @@ export function nextSort<Row>(sort: SortState | undefined, column: Column<Row>):
     ? { key: column.key, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
     : { key: column.key, direction: column.defaultDirection ?? 'desc' }
 }
+
+const FORMULA_START = /^[=+\-@\t\r]/
+const CSV_QUOTED = /[",\r\n]/
+
+// One CSV field: quoted when it holds a comma, a quote or a line break. A text a spreadsheet would run as a formula (starting with `=`, `+`, `-`, `@`, a tab or a carriage return) gets a leading apostrophe, while a number is written as it is, so a negative one stays a number.
+export function csvField(value: unknown): string {
+  if (value === undefined || value === null)
+    return ''
+
+  let text = value instanceof Date ? value.toISOString() : String(value)
+
+  if (typeof value !== 'number' && FORMULA_START.test(text))
+    text = `'${text}`
+
+  return CSV_QUOTED.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+// The rows as CSV, one column each at the row's own value at `key` whatever a `@cell` block draws, with the headers on top, CRLF line ends and a byte order mark so a spreadsheet reads the UTF-8. For a table's `exportable` endpoint to answer with.
+export function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string {
+  const lines = [columns.map(column => csvField(column.header)), ...rows.map(row => columns.map(column => csvField(valueAt(row, column.key))))]
+
+  return `\uFEFF${lines.map(line => line.join(',')).join('\r\n')}\r\n`
+}
+
+// The address of a table's CSV endpoint for what is on screen: the sort as `sort` and `direction`, and the typed filter text under `param`, in the query the address already has.
+export function exportHref(href: string, sort: SortState | undefined, param: string, text: string): string {
+  const hash = href.indexOf('#')
+  const [path = '', query = ''] = (hash === -1 ? href : href.slice(0, hash)).split('?')
+  const params = new URLSearchParams(query)
+
+  if (sort) {
+    params.set('sort', sort.key)
+    params.set('direction', sort.direction)
+  }
+
+  if (text.trim() !== '')
+    params.set(param, text)
+
+  const search = params.toString()
+
+  return `${path}${search === '' ? '' : `?${search}`}${hash === -1 ? '' : href.slice(hash)}`
+}

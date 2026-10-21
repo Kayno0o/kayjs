@@ -1,0 +1,17 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Row {
+  id: number
+  name: string
+}
+
+const { count, filter = false } = props<{ count: number, filter?: boolean }>()
+
+const rows = Array.from({ length: count }, (_, index) => ({ id: index, name: `Row ${index}` }))
+const columns: Column<Row>[] = [{ key: 'name', header: 'Name', sortValue: true }, { key: 'id', header: 'Id' }]
+---
+Table(columns={columns} rows={rows} rowKey="id" virtual filter={filter ? ['name'] : undefined})
+  @cell(row)
+    | {row.name}

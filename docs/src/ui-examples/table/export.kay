@@ -1,0 +1,22 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Moon {
+  id: number
+  name: string
+  radius: number
+}
+
+const moons: Moon[] = [
+  { id: 1, name: 'Io', radius: 1822 },
+  { id: 2, name: 'Europa', radius: 1561 },
+  { id: 3, name: 'Amalthea', radius: 84 },
+]
+
+const columns: Column<Moon>[] = [
+  { key: 'name', header: 'Name', sortValue: true },
+  { key: 'radius', header: 'Radius (km)', numeric: true },
+]
+---
+Table(columns={columns} rows={moons} rowKey="id" filter={['name']} exportable exportName="moons.csv")

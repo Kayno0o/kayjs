@@ -1,0 +1,8 @@
+---
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+
+const messages = Array.from({ length: 2_000 }, (_, index) => ({ id: index + 1, text: `Message ${index + 1}` }))
+---
+VirtualList(items={messages} itemKey={message => message.id} label="Messages" estimate={32})
+  @item(message)
+    p.px-3.py-1 {message.text}

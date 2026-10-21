@@ -32,6 +32,22 @@ A `filter` adds a search box. `filterLabel` names it, `Filter` by default, and `
 
 `countLabel(count)` words how many rows the filter keeps, as screen readers hear it. `noMatch` is shown in place of the rows when the filter hides every one, and `empty` otherwise.
 
+## Exporting
+
+`exportable` adds an Export CSV button that downloads the rows as they are on screen, with the filter and the sort applied. Each column writes the row's own value at its `key`, headers first, and a text a spreadsheet would run as a formula (starting with `=`, `+`, `-` or `@`) gets a leading apostrophe. `exportLabel` and `exportName` replace the button's text and the file's name.
+
+<Demo name="table/export" />
+
+When the page holds only a part of the rows, give `exportable` an address: the button links it with the sort as `sort` and `direction` and the typed filter text under `filterParam` (`q` without one), and your endpoint answers with `toCsv(rows, columns)`, which the package exports.
+
+## Many rows
+
+`virtual` draws only the rows in view, with room above and below standing for the others, so ten thousand rows and more stay light. The table scrolls in a box of its own, 70vh tall unless `--kui-table-height` says otherwise, with its headers kept on top. Rows are measured as they draw, stacked cards included, and the table tells screen readers its real row count and each row's position.
+
+<Demo name="table/virtual" />
+
+The box takes the focus to scroll by keyboard. Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus, so pair a long table with `filter`.
+
 ## Narrow screens
 
 Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labelled by their headers. Set `narrow="scroll"` to scroll the table sideways instead.

@@ -17,6 +17,7 @@ export type { AxisScale, AxisTick, BarListRow, ChartSeries, ScatterAxis, Scatter
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
+export { csvField, exportHref, toCsv } from './table'
 export type { Column, RowFilter, RowKey, RowKeyValue, SortDirection, SortState } from './table'
 export * from './toast'
 export type { TreeId, TreeNode } from './tree'

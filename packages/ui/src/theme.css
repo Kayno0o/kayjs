@@ -1192,6 +1192,16 @@
     @apply flex flex-wrap items-center gap-3 py-2 text-sm text-kui-error;
   }
 
+  /* A long list drawing the rows in view: the box scrolls, 70vh tall unless the app sets a height. */
+  .kui-virtual-list {
+    @apply max-h-[70vh] overflow-y-auto;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: -2px;
+    }
+  }
+
   .kui-masonry {
     @apply grid items-start;
     grid-template-columns: repeat(auto-fill, minmax(min(var(--kui-masonry-min), 100%), 1fr));
@@ -1935,6 +1945,21 @@
 
     &:where([data-narrow='stack']) {
       container: kui-table / inline-size;
+    }
+  }
+
+  /* A virtual table scrolls in its own box, its headers kept on top. */
+  .kui-table-wrap:where([data-virtual]) {
+    @apply overflow-y-auto;
+    max-height: var(--kui-table-height, 70vh);
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: -2px;
+    }
+
+    & .kui-table-head-cell {
+      @apply sticky top-0 bg-kui-surface0;
     }
   }
 

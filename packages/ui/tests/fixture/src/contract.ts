@@ -58,6 +58,7 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
 import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
@@ -134,6 +135,7 @@ export const COMPONENTS = {
   'toggle': Toggle,
   'tooltip-host': TooltipHost,
   'tree-view': TreeView,
+  'virtual-list': VirtualList,
   'when-visible': WhenVisible,
   'widget': Widget,
   'zoom-pane': ZoomPane,
@@ -200,6 +202,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'toggle': { label: 'Digest' },
   'tooltip-host': {},
   'tree-view': { nodes: tree, label: 'Planets', selected: 'phobos' },
+  'virtual-list': { items: [1, 2, 3], item: (row: number) => String(row), label: 'Numbers' },
   'when-visible': { onVisible: noop },
   'widget': { title: 'Visits', children: '42' },
   'zoom-pane': { label: 'Map', children: 'Picture' },

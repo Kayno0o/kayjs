@@ -109,6 +109,7 @@ export default defineMessages({
     siteNav: { menuLabel: 'Menu' },
     splitLayout: { backLabel: 'Retour', resizeLabel: 'Redimensionner la liste' },
     table: {
+      exportLabel: 'Exporter en CSV',
       filterLabel: 'Filtrer',
       rowCount: { one: '{count} ligne', other: '{count} lignes' },
       selectAllLabel: 'Tout sélectionner',

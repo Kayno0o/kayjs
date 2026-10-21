@@ -1,0 +1,10 @@
+---
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+
+const { count } = props<{ count: number }>()
+
+const rows = Array.from({ length: count }, (_, index) => ({ id: index, name: `Row ${index}` }))
+---
+VirtualList(items={rows} itemKey={row => row.id} label="Rows" estimate={20} overscan={2})
+  @item(row)
+    p.cell {row.name}

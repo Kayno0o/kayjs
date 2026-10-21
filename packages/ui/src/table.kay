@@ -1,13 +1,15 @@
 --- <Row, Key extends RowKey<Row>>
 import type { JSX } from 'kay'
 import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, persisted, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, signal } from 'kay'
+import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
-import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
+import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from './table'
+import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filterLabel', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAllLabel', 'Select all'), selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filterLabel', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAllLabel', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.exportLabel', 'Export CSV'), exportName = 'table.csv', virtual = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: Key
@@ -48,6 +50,14 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   selectedLabel?: ((count: number) => string) | undefined
   // Names a row's box: `Select <first column's text>`.
   selectRowLabel?: ((row: Row) => string) | undefined
+  // A button above the rows downloading them as CSV, the headers on top and the cells as the rows hold them, with the filter and the sort on screen applied. A string is the address of an endpoint to download from instead, for rows the page holds only a part of: it gets the sort as `sort` and `direction` and the typed filter text under `filterParam` (`q` without one), and answers with `toCsv(rows, columns)`.
+  exportable?: boolean | string | undefined
+  // Names the export button.
+  exportLabel?: string | undefined
+  // The file name the download is saved as.
+  exportName?: string | undefined
+  // Draws only the rows in view, between room standing for the others, so a table of ten thousand rows and more stays as light as a short one. The table scrolls in a box of its own (`--kui-table-height`, 70vh by default) with its headers kept on top. Find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window loses its focus.
+  virtual?: boolean | undefined
   class?: string | undefined
 }>()
 
@@ -104,6 +114,33 @@ function pickAll(on: boolean) {
 const shown = memo(() => serverSort ? kept() : sortedRows(kept(), columns(), current()))
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
+const endpoint = memo(() => {
+  const value = exportable
+
+  return typeof value === 'string' ? value : undefined
+})
+
+// Without `virtual` every row is drawn; with it the others stand for room above and below.
+const windowed = virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: 48, overscan: 8 }) : undefined
+const drawn = memo(() => windowed ? windowed.rows() : shown())
+let box: HTMLElement | undefined
+let body: HTMLElement | undefined
+
+onMount(() => {
+  if (windowed)
+    onCleanup(windowed.attach(box!, body!))
+})
+
+function download() {
+  const url = URL.createObjectURL(new Blob([toCsv(shown(), columns())], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = exportName
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url))
+}
+
 function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)
 
@@ -118,7 +155,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   return current()?.direction === 'asc' ? 'ascending' : 'descending'
 }
 ---
-.kui-table-wrap({...rest} data-narrow={narrow} class={className})
+.kui-table-wrap({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={virtual ? '0' : undefined} class={className})
   if filter
     label.kui-table-filter
       span.kui-label-text {filterLabel}
@@ -131,9 +168,15 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
       if chosen().length > 0 && bulk
         .kui-table-bulk
           | {bulk(chosen(), () => commit([]))}
-  table.kui-table
+  if exportable
+    .kui-table-selection
+      if endpoint() as address
+        Button(href={exportHref(address, current(), filterParam ?? 'q', typed())} download={exportName} label={exportLabel} variant="ghost" size="sm")
+      else
+        Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
+  table.kui-table(aria-rowcount={virtual ? shown().length + 1 : undefined})
     thead
-      tr
+      tr(aria-rowindex={virtual ? 1 : undefined})
         if selectable
           th.kui-table-head-cell.kui-table-select-cell(scope="col")
             span.kui-table-select-text {selectAllLabel}
@@ -146,9 +189,12 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
                   Icon(icon="chevron" class="kui-table-sort-icon")
             else
               | {column.header}
-    tbody
-      for row of shown() key={rowKeyOf(row, rowKey)}
-        tr.kui-table-row(data-selected={chosenSet().has(rowKeyOf(row, rowKey)) ? '' : undefined})
+    tbody(ref={element => body = element})
+      if windowed && windowed.before() > 0
+        tr(aria-hidden="true" style={`height: ${windowed.before()}px`})
+          td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
+      for row, position of drawn() key={rowKeyOf(row, rowKey)}
+        tr.kui-table-row(data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} data-selected={chosenSet().has(rowKeyOf(row, rowKey)) ? '' : undefined})
           if selectable
             td.kui-table-cell.kui-table-select-cell
               .kui-table-cell-body
@@ -171,3 +217,6 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
           tr
             td.kui-table-empty-cell(colspan={given.length + (selectable ? 1 : 0)})
               | {empty}
+      if windowed && windowed.after() > 0
+        tr(aria-hidden="true" style={`height: ${windowed.after()}px`})
+          td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
