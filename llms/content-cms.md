@@ -1,4 +1,4 @@
-# Loaded collections, preview mode and the CMS editor
+# Loaded collections and preview mode
 
 ## Common tasks
 

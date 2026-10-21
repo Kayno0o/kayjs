@@ -315,7 +315,7 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         if (!tracked(target, key))
           return read
 
-        if ((typeof read === 'string' && !BLANK.test(read)) || typeof read === 'number')
+        if ((typeof read === 'string' && !BLANK.test(read)) || typeof read === 'number' || read instanceof Date)
           note(marks.read, name, [...path, key])
 
         return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
@@ -359,6 +359,9 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
           waiting.push({ ref: field, epoch: marks.renders })
         }
       }
+
+      if (read instanceof Date)
+        note(marks.read, name, [...path, key])
 
       return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
     },

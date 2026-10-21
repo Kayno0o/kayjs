@@ -21,8 +21,9 @@ import { saveShortcut } from './shortcut'
 const { entry, focus, unclickable = [] } = props<{ entry: EntryRef, focus?: FieldPath | undefined, unclickable?: Unclickable[] }>()
 
 // Named by what the page cannot mark: a value it transforms or shows in an island, and the fields of a frozen object.
-const unmarked = () => unclickable.filter(field => field.frozen !== true).map(field => field.path).join(', ')
-const frozen = () => unclickable.filter(field => field.frozen === true).map(field => field.path).join(', ')
+const named = (isFrozen: boolean) => unclickable.filter(field => (field.frozen === true) === isFrozen).map(field => field.path).join(', ')
+const unmarked = memo(() => named(false))
+const frozen = memo(() => named(true))
 
 const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },

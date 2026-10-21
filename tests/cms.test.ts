@@ -1383,15 +1383,16 @@ describe('preview mode', () => {
     expect(unclickable((await get('/marks/launch', edit)).html)).toEqual([])
   })
 
-  it('names the fields of a frozen object and of the head, and none a marked list covers', () => {
+  it('names a computed number, a date and the fields of a frozen object, and none a marked list covers', () => {
     inPreview(() => {
       const marks = editMarks()!
-      const entry = editableEntry(marks, 'crew', { slug: 'a', locale: 'fr', data: { name: 'Delphine', tags: ['a', 'b'], seo: Object.freeze({ title: 'Seo' }), age: 38 }, Content: () => renderedHtml('') })
-      const html = withFieldMarks(marks, () => `<ul>${loop(entry.data.tags, tag => `<li>${child((tag as string).toUpperCase())}</li>`)}</ul><p>${child(entry.data.name)}</p><p>${child(entry.data.seo.title)}</p>${child(entry.data.age + 1)}`)
+      const entry = editableEntry(marks, 'crew', { slug: 'a', locale: 'fr', data: { name: 'Delphine', tags: ['a', 'b'], seo: Object.freeze({ title: 'Seo' }), age: 38, at: new Date(0) }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => `<ul>${loop(entry.data.tags, tag => `<li>${child((tag as string).toUpperCase())}</li>`)}</ul><p>${child(entry.data.name)}</p><p>${child(entry.data.seo.title)}</p>${child(entry.data.age + 1)}${child(entry.data.at.getFullYear())}`)
       const placed = placeFieldMarks(html, marks)
 
       expect(unclickableFields(marks, placed)).toEqual([
         { collection: 'crew', slug: 'a', locale: 'fr', path: 'age' },
+        { collection: 'crew', slug: 'a', locale: 'fr', path: 'at' },
         { collection: 'crew', slug: 'a', locale: 'fr', path: 'seo.title', frozen: true },
       ])
     }, true)
