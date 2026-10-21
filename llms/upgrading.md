@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### The `identity-key` lint is gone
 
-Delete `// kay-allow identity-key` comments and an `identity-key` entry in `lints` (`kay check` reports them as an unknown lint): a `for` over objects with no `id` needs no `key`, as the runtime keeps each row through immutable edits ([Templates](templates.md)).
+`kay upgrade` removes the `// kay-allow identity-key` comments and the `identity-key` entry in `lints` (the `deprecated-identity-key` lint, kept three minors), which would otherwise go unrecognised. A `for` over objects with no `id` needs no `key`, as the runtime keeps each row through immutable edits ([Templates](templates.md)).
 
 ## 1.65.0
 

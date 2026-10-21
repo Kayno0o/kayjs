@@ -518,11 +518,27 @@ export const LINTS = {
     wrong: 'head\n  meta(name="robots" content="noindex")',
     right: '--- server\nexport const page = { noindex: true }\n---',
   },
+  'deprecated-identity-key': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.69',
+    site: true,
+    summary: 'A `// kay-allow identity-key` comment, or an `identity-key` entry in `lints`: the lint is gone in 1.69, as a `for` over objects with no `id` keeps its rows through immutable edits with no key. The fix removes the name, and the comment or the entry when it names nothing else. Found in the project\'s `.kay` files and in `kay.config.ts`.',
+    wrong: '// kay-allow identity-key\nfor post of posts\n  li {post.title}',
+    right: 'for post of posts\n  li {post.title}',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
 
-export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>>
+// Lints that are gone, whose names `// kay-allow` and `lints` still take while `deprecated-identity-key` reports them.
+export const RETIRED_LINTS = ['identity-key'] as const
+
+export type LintLevels = Partial<Record<LintName | LintGroup | typeof RETIRED_LINTS[number], LintLevel>>
+
+export function isRetiredLint(name: string | undefined): boolean {
+  return (RETIRED_LINTS as readonly (string | undefined)[]).includes(name)
+}
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -621,7 +637,7 @@ function unknownLints(source: string): Diagnostic[] {
     const listStart = comment.index + comment[0].length - comment[1]!.length
 
     for (const name of comment[1]!.matchAll(LINT_NAME)) {
-      if (!isLint(name[0])) {
+      if (!isLint(name[0]) && !isRetiredLint(name[0])) {
         const start = listStart + name.index
 
         unknown.push({ start, end: start + name[0].length, code: 'unknown-lint', message: `Unknown lint \`${name[0]}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })

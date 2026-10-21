@@ -104,6 +104,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
+| `deprecated-identity-key` | warn | deprecated | A `kay-allow identity-key` comment or an `identity-key` entry in `lints`, from the lint dropped in 1.69 |
 
 ## Errors
 

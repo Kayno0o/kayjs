@@ -2857,6 +2857,28 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
+      'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
+      expect(output).not.toContain('unknown-lint')
+      expect(output).not.toContain('no lint or group')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   describe('secret-prop', () => {
     const island = '---\nimport { signal } from \'kay\'\n\nconst { data } = props<{ data: unknown }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open.set(open() + 1)}) {JSON.stringify(data)} {open()}\n'
     const types = [

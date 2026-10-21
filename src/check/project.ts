@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
-import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
+import { isLaunchLint, isLint, isLintGroup, isRetiredLint, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
@@ -101,7 +101,7 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
   if (diagnostic.file !== join(root, CONFIG_FILE) || !LINT_TYPE_ERRORS.has(diagnostic.code ?? ''))
     return false
 
-  return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
+  return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) && !isRetiredLint(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
 // The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches, or by a component the build promotes to an island.
@@ -229,6 +229,9 @@ function lintConfigProblems(root: string, lints: Record<string, string> = {}): C
 
   return Object.entries(lints).flatMap(([name, level]) => {
     const at = { file, ...locate(['lints', name]) }
+
+    if (isRetiredLint(name))
+      return []
 
     if (!isLint(name) && !isLintGroup(name))
       return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]
