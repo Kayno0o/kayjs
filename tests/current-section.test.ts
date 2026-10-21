@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { pages } from '../src/server'
+
+const routes = 'tests/fixtures/current-section/src/routes'
+const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
+const MARKED = /<a class="(\w+)"[^>]*? aria-current="(page|true)"/g
+
+// The classes of the links a page marks, each with its mark.
+async function marks(site: Elysia, path: string): Promise<string[]> {
+  const html = await (await site.handle(new Request(`http://localhost${path}`))).text()
+
+  return [...html.matchAll(MARKED)].map(([, name, mark]) => `${name}:${mark}`)
+}
+
+describe('a link to a section of the page', () => {
+  it('is marked true on the pages below it, never the home link, nor one that only starts like it', async () => {
+    const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false }))
+
+    expect(await marks(site, '/')).toEqual(['home:page'])
+    expect(await marks(site, '/docs')).toEqual(['docs:page'])
+    expect(await marks(site, '/docs/guide')).toEqual(['docs:true', 'guide:page'])
+    expect(await marks(site, '/docs-old')).toEqual(['old:page'])
+  })
+
+  it('holds under a base, with a trailing slash either way', async () => {
+    for (const trailingSlash of ['always', 'never'] as const) {
+      const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, base: '/repo', trailingSlash }))
+      const slash = trailingSlash === 'always' ? '/' : ''
+
+      expect(await marks(site, `/docs/guide${slash}`)).toEqual(['docs:true', 'guide:page'])
+      expect(await marks(site, `/docs${slash}`)).toEqual(['docs:page'])
+      expect(await marks(site, '/')).toEqual(['home:page'])
+    }
+  })
+
+  it('holds under a locale prefix, whose own home is not a section', async () => {
+    for (const prefixDefault of [true, false]) {
+      const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault } }))
+      const french = prefixDefault ? '/fr' : ''
+
+      expect(await marks(site, `${french}/docs/guide`)).toEqual(['docs:true', 'guide:page'])
+      expect(await marks(site, `${french}/docs`)).toEqual(['docs:page'])
+      expect(await marks(site, '/en/docs/guide')).toEqual(['docs:true', 'guide:page'])
+      expect(await marks(site, '/en/docs-old')).toEqual(['old:page'])
+      expect(await marks(site, '/en/docs')).toEqual(['docs:page'])
+      expect(await marks(site, '/en')).toEqual(['home:page'])
+    }
+  })
+})

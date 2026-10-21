@@ -130,15 +130,20 @@ export function localLinks(markup: string): string {
 }
 
 // ` aria-current="page"` on a link to the page being rendered: the same path, a trailing slash or not; a link with a query or a fragment leads elsewhere on it.
+// ` aria-current="true"` on a link to a section the page is below, `/docs` on `/docs/guide`, but never the site's home, which every page is below: `/`, or the page's locale's own.
 export function currentPage(href: unknown): string {
   const path = currentServerScope()?.path
 
   if (path === undefined || typeof href !== 'string' || !href.startsWith('/') || href.startsWith('//') || href.includes('?') || href.includes('#'))
     return ''
 
-  const linked = PLAIN_PATH.test(href) && !href.includes('/.') ? href : new URL(href, 'http://localhost').pathname
+  const linked = (PLAIN_PATH.test(href) && !href.includes('/.') ? href : new URL(href, 'http://localhost').pathname).replace(NON_ROOT_TRAILING_SLASH, '')
+  const current = path.replace(NON_ROOT_TRAILING_SLASH, '')
 
-  return linked.replace(NON_ROOT_TRAILING_SLASH, '') === path.replace(NON_ROOT_TRAILING_SLASH, '') ? ' aria-current="page"' : ''
+  if (linked === current)
+    return ' aria-current="page"'
+
+  return linked !== '/' && current.startsWith(`${linked}/`) && linked !== String(localHref('/')).replace(NON_ROOT_TRAILING_SLASH, '') ? ' aria-current="true"' : ''
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
