@@ -52,6 +52,11 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   // Set by a save's refusal, so a render scheduled before it leaves those issues be; the next edit clears it.
   let reported = false
 
+  function keepSaved(key: string, entry: DraftEntry): void {
+    saved.set(key, entry)
+    savedText.set(key, JSON.stringify(entry))
+  }
+
   function changed(): DraftEntry[] {
     return [...current().entries()].filter(([key, entry]) => entry !== saved.get(key)).map(([, entry]) => entry)
   }
@@ -167,7 +172,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       if (saved.has(key)) {
         // An entry offered again with a copy or version it was not offered before, as on returning to it, shows that copy with no edits; edits keep the version they were made from, so their save meets any conflict. The same offer again, as when an effect reruns, changes nothing, a save of this page's included.
         if (offered.get(key) !== offer && current().get(key) === saved.get(key)) {
-          saved.set(key, entry)
+          keepSaved(key, entry)
           versions.set(key, version)
           current.set(new Map(current()).set(key, entry))
         }
@@ -181,8 +186,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
       const start = recover(key, entry, version)
 
-      saved.set(key, entry)
-      savedText.set(key, JSON.stringify(entry))
+      keepSaved(key, entry)
       versions.set(key, version)
       current.set(new Map(current()).set(key, start))
 
@@ -219,8 +223,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void {
       const key = entryKey(ref)
 
-      saved.set(key, sent)
-      savedText.set(key, JSON.stringify(sent))
+      keepSaved(key, sent)
       versions.set(key, version)
       recreated.delete(key)
       current.set(new Map(current()))
@@ -254,7 +257,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
       forget(key)
       recreated.delete(key)
-      saved.set(key, entry)
+      keepSaved(key, entry)
       versions.set(key, version)
       current.set(new Map(current()).set(key, entry))
       persist(key)
