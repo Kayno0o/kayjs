@@ -1,0 +1,16 @@
+title: Intro
+steps: [Open, Edit]
+sections:
+  - type: hero
+    heading: Welcome
+  - type: text
+    body: Some words
+  - type: quote
+    author: Ada
+columns:
+  - title: Left
+    cells: [L1, L2]
+  - title: Right
+    cells: [R1]
+empty: []
+limited: [A, B]

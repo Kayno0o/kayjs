@@ -1,7 +1,7 @@
 import type { Drafts } from '../drafts'
 import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
-import type { MarkedField } from '../markers'
+import type { FieldMarker, MarkedField } from '../markers'
 import { checkField, fieldsOf, itemAt } from '../fields'
 import { BODY, entryKey, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
@@ -169,16 +169,37 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
   }
 }
 
-// The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.
-export function markedLabel({ marker }: MarkedField, drafts: Drafts): string | undefined {
-  const { path } = marker
+// The fields of a schema, read once for as long as the form holds the schema.
+const fieldsBySchema = new WeakMap<object, Field[]>()
 
-  if (path === BODY)
+// The form's field a marker names, none while its form has not loaded or for the Markdown body.
+export function fieldOfMarker(marker: FieldMarker, drafts: Drafts): Field | undefined {
+  if (marker.path === BODY)
     return undefined
 
   const collection = sources.get(entryKey(marker))?.collection()
 
-  return collection ? fieldAtPath(fieldsOf(collection.schema), drafts.entry(marker)?.data, path)?.label : undefined
+  if (!collection)
+    return undefined
+
+  let fields = fieldsBySchema.get(collection.schema)
+
+  if (!fields) {
+    fields = fieldsOf(collection.schema)
+    fieldsBySchema.set(collection.schema, fields)
+  }
+
+  return fieldAtPath(fields, drafts.entry(marker)?.data, marker.path)
+}
+
+// Whether a save holds the entry's fields still.
+export function isBusy(marker: FieldMarker): boolean {
+  return sources.get(entryKey(marker))?.busy() === true
+}
+
+// The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.
+export function markedLabel({ marker }: MarkedField, drafts: Drafts): string | undefined {
+  return fieldOfMarker(marker, drafts)?.label
 }
 
 // Gives each marked element, an attribute's or a text's, a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text, and says what it edits. An element holding only the text of one field gets the button role too, which a Markdown body, a list or an attribute's element never does, as a link, a control or an element with a role of its own keeps what it has. The page renders again and may drop them.

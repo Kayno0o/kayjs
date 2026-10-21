@@ -68,7 +68,8 @@ effect(() => {
   if (path === undefined || !source.value() || !box)
     return
 
-  const selector = path === BODY ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"]`
+  // A group, such as a list item, has no control of its own: its first field stands for it.
+  const selector = path === BODY ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"], [data-kcms-path^="${CSS.escape(`${path}.`)}"]`
   const field = box.querySelector(selector)
 
   if (field)

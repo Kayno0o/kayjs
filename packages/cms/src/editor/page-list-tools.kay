@@ -1,0 +1,26 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import arrowDown from '~icons/tabler/arrow-down'
+import arrowUp from '~icons/tabler/arrow-up'
+import plus from '~icons/tabler/plus'
+import trash from '~icons/tabler/trash'
+import { wording } from 'kay/words'
+import type { ListBar } from './page-lists'
+import type { Direction } from './reorder'
+import './editor.css'
+
+// The buttons beside the item of a list under the pointer or the focus on the page, and the Add of an empty list.
+const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar: ListBar, direction: Direction) => void, onAdd: (bar: ListBar, event: MouseEvent) => void, onRemove: (bar: ListBar) => void }>()
+---
+.kcms-page-lists
+  for bar of bars key={bar.key}
+    if bar.index === undefined
+      .kcms-list-start(style={bar.style})
+        Button(label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} icon="plus" size="sm" disabled={!bar.add} onClick={event => onAdd(bar, event)})
+    else
+      .kcms-list-bar(role="toolbar" style={bar.style} aria-label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })})
+        IconButton(icon={arrowUp} label={wording('cms.reorder.up', 'Move {item} up', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.up} onClick={() => onMove(bar, 'up')})
+        IconButton(icon={arrowDown} label={wording('cms.reorder.down', 'Move {item} down', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.down} onClick={() => onMove(bar, 'down')})
+        IconButton(icon={plus} label={wording('cms.pageList.addAfter', 'Add after {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.add} aria-haspopup={bar.blocks ? 'menu' : undefined} onClick={event => onAdd(bar, event)})
+        IconButton(icon={trash} label={wording('cms.field.removeItem', 'Remove {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.remove} onClick={() => onRemove(bar)})

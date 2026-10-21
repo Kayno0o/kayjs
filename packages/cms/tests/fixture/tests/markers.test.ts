@@ -104,7 +104,11 @@ test('a screen with no hover has the outlines on until the editor turns them off
   const noHover = await page.evaluate(() => matchMedia('(hover: none)').matches)
 
   expect(await page.evaluate(() => document.querySelector('button[aria-pressed]')?.getAttribute('aria-pressed') === 'true')).toBe(noHover)
-  expect(await page.count('.kcms-mark') > 0).toBe(noHover)
+
+  if (noHover)
+    await page.waitUntil(() => document.querySelectorAll('.kcms-mark').length > 0)
+  else
+    expect(await page.count('.kcms-mark')).toBe(0)
 }, 60_000)
 
 test('marked elements are tab stops that say what they edit, and a plain text one is a button', async () => {

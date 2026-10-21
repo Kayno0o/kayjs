@@ -338,6 +338,14 @@ export default defineMessages({
     page: {
       edit: 'Modifier cette page',
     },
+    pageList: {
+      actions: 'Que faire de {item} ?',
+      add: 'Ajouter à {list}',
+      addAfter: 'Ajouter après {item}',
+      addBefore: 'Ajouter avant {item}',
+      empty: '{list} : aucun élément, Entrée en ajoute un',
+      item: '{item}, de {list}',
+    },
     redirects: {
       added: 'Redirection ajoutée',
       addFailure: 'Impossible d\'ajouter la redirection',

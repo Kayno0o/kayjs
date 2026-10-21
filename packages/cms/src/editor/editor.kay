@@ -4,6 +4,8 @@ import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import type { Dock, Layout } from './dock'
 import type { Marks } from './marks'
+import type { Choice, ListBar, ListTarget, Removed } from './page-lists'
+import type { Direction } from './reorder'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
@@ -13,17 +15,21 @@ import layoutBottom from '~icons/tabler/layout-bottombar'
 import layoutSide from '~icons/tabler/layout-sidebar-right'
 import browse from '~icons/tabler/pointer'
 import outline from '~icons/tabler/scan'
+import { announce } from '@kaynooo/kayjs-ui/announce'
 import { call, guardLeave, listen, refresh, untrack } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
-import { inlineTargetOf, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
+import { inlineTargetOf, isBusy, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
+import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, OWN, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
+import type { PageListWatch } from './page-lists'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
 import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
+import PageListTools from './page-list-tools.kay'
 import './editor.css'
 
 // Where across the window the top is probed for a header, and the positions that hold one there.
@@ -35,6 +41,8 @@ const COLLAPSED_GAP = 16
 const MENU_WIDTH = 256
 // What a one-line item of that choice takes of the height, which a tap near the bottom of the window keeps inside it. The placement reserves one item more for the menu's padding and border, and the menu is measured once shown, so an item that wraps still fits.
 const MENU_ITEM = 44
+// How long a change of a list waits for the page to show it before the editor takes new ones again.
+const SETTLE_LIMIT = 4000
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
 const { entries, unclickable } = props<EditorProps>()
@@ -56,8 +64,12 @@ const ready = signal(false)
 const browsing = signal(false)
 // Whether every marked field is outlined, else only the one under the pointer.
 const marking = signal(false)
-// The fields of the element a click or an Enter reached, when it holds several and the editor asks which one, and where the menu opens.
-const choosing = signal<{ fields: MarkedField[], x: number, y: number, back?: HTMLElement }>()
+// What the editor asks the person to choose among next to a click or under an element a key reached: the fields of an element holding several, the block types of a list, the actions on a list item.
+const choosing = signal<{ label: string, choices: Choice[], x: number, y: number, back?: HTMLElement }>()
+// The bars of the list items and empty lists on the page, the item taken out last (which Undo puts back), and whether a change of a list waits for the page to show it.
+const bars = signal<ListBar[]>([])
+const removed = signal<Removed>()
+const settling = signal(false)
 const room = signal({ width: 0, height: 0 })
 // What the dev tool's docked drawer holds along the right and bottom edges, and how far down a fixed header holds the top of the window.
 const held = signal({ right: 0, bottom: 0 })
@@ -67,6 +79,10 @@ let shownPath = ''
 let panel: HTMLElement | undefined
 let menu: HTMLElement | undefined
 let marks: Marks | undefined
+let lists: PageListWatch | undefined
+// Where the focus goes once the page shows the list changed, and whether a render has begun since.
+let pending: { target: ListTarget, index: number, form: boolean } | undefined
+let rendered = false
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = 0
 let frame = 0
@@ -302,7 +318,20 @@ function stopHover(): void {
   hoverFrame = 0
   pointer = undefined
   marks?.hover(undefined)
+  lists?.hover(undefined)
 }
+
+function inBars(node: Node | undefined): boolean {
+  return (node instanceof Element ? node : node?.parentElement)?.closest('.kcms-page-lists') != null
+}
+
+// A touch has no hover, so the item it presses is the one whose bar shows.
+listen(() => document, 'pointerdown', (event) => {
+  const node = event.target instanceof Node ? event.target : undefined
+
+  if (event.pointerType !== 'mouse' && open() && !browsing() && node && !inBars(node) && !panel?.contains(node) && !menu?.contains(node))
+    lists?.hover(node, { x: event.clientX, y: event.clientY })
+}, { passive: true, capture: true })
 
 listen(() => document, 'pointermove', (event) => {
   pointer = event
@@ -314,8 +343,13 @@ listen(() => document, 'pointermove', (event) => {
     hoverFrame = 0
 
     const node = pointer && open() && !browsing() ? clickedNode(pointer) : undefined
+    const own = node !== undefined && (panel?.contains(node) === true || menu?.contains(node) === true)
 
-    marks?.hover(node && !panel?.contains(node) && !menu?.contains(node) ? fieldsAt(node) : undefined)
+    marks?.hover(node && !own ? fieldsAt(node) : undefined)
+
+    // The bars of a list item stay while the pointer is on them.
+    if (!inBars(node))
+      lists?.hover(node && !own ? node : undefined, pointer && { x: pointer.clientX, y: pointer.clientY })
   })
 }, { passive: true })
 listen(() => document.documentElement, 'pointerleave', stopHover)
@@ -329,8 +363,60 @@ function focusedFields(): MarkedField[] | undefined {
   return found.length > 0 ? found : undefined
 }
 
-listen(() => document, 'focusin', () => marks?.focus(focusedFields()))
-listen(() => document, 'focusout', () => marks?.focus(undefined))
+// The element holding the focus, unless it is the editor's own.
+function focusedElement(): Element | undefined {
+  const element = document.activeElement
+
+  return element && element !== document.body && !panel?.contains(element) && !menu?.contains(element) && !inBars(element) ? element : undefined
+}
+
+listen(() => document, 'focusin', () => {
+  marks?.focus(focusedFields())
+  lists?.focus(focusedElement())
+})
+listen(() => document, 'focusout', () => {
+  marks?.focus(undefined)
+  lists?.focus(undefined)
+})
+
+// Alt and Shift with an arrow moves the list item holding the focus, with Delete takes it out, with Enter asks what to do with it; Enter on an empty list adds its first item.
+listen(() => document, 'keydown', (event) => {
+  const element = event.target instanceof HTMLElement ? event.target : undefined
+
+  if (!open() || browsing() || event.isComposing || !element || element.isContentEditable || element.closest(OWN) || event.ctrlKey || event.metaKey)
+    return
+
+  const empty = event.key === 'Enter' && !event.altKey && !event.shiftKey ? emptyListAt(element, drafts) : undefined
+
+  if (empty?.element === element) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    addTo(empty.target, 0, { element })
+
+    return
+  }
+
+  if (!event.altKey || !event.shiftKey)
+    return
+
+  const [hit] = itemsAround(element, drafts)
+  const direction = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : undefined
+
+  if (!hit || (direction === undefined && event.key !== 'Delete' && event.key !== 'Backspace' && event.key !== 'Enter'))
+    return
+
+  event.preventDefault()
+  event.stopImmediatePropagation()
+
+  const { target } = hit.list
+
+  if (direction)
+    moveOne(target, hit.index, direction)
+  else if (event.key === 'Enter')
+    itemMenu(target, hit.index, { element })
+  else
+    removeOne(target, hit.index)
+}, { capture: true })
 
 // Enter on a marked element reached by the keyboard edits its field as a click on it does.
 listen(() => document, 'keydown', (event) => {
@@ -373,10 +459,34 @@ effect(() => {
   })
 })
 
-// Stepping away from the editor or the page closes the question of which field.
+// Keeps the bars of the list items and the empty lists of the page while the editor is open.
 effect(() => {
   if (!open() || browsing())
+    return
+
+  const watched = watchLists(drafts, found => bars = found)
+
+  lists = watched
+  onCleanup(() => {
+    watched.destroy()
+    lists = undefined
+  })
+})
+
+// The bars follow the drafts: a form that has loaded names its lists, and an edit changes their length.
+effect(() => {
+  for (const entry of entries)
+    drafts.entry(entry)
+
+  untrack(() => lists?.refresh())
+})
+
+// Stepping away from the editor or the page closes the question of which field.
+effect(() => {
+  if (!open() || browsing()) {
     choosing = undefined
+    removed = undefined
+  }
 })
 
 // The first field of the menu takes the focus, so the keyboard answers at once.
@@ -408,6 +518,11 @@ function closeMenu(): void {
   choosing = undefined
 }
 
+// Asks next to (`x`, `y`), or under the element a key reached when it is `back`, with the placement keeping the menu inside the window.
+function ask(label: string, choices: Choice[], x: number, y: number, back?: HTMLElement): void {
+  choosing = { label, choices, x: Math.max(0, Math.min(x, window.innerWidth - MENU_WIDTH)), y: Math.max(0, Math.min(y, window.innerHeight - choices.length * MENU_ITEM - MENU_ITEM)), back }
+}
+
 function menuKey(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     event.preventDefault()
@@ -435,11 +550,173 @@ function leaveMenu(event: FocusEvent): void {
     choosing = undefined
 }
 
-function choose(field: MarkedField): void {
-  const at = choosing()
-
+function choose(choice: Choice): void {
   choosing = undefined
-  edit(field, at?.x, at?.y, at?.back)
+  choice.run()
+}
+
+// Where a menu for a list opens: under the button or element it was asked from.
+function below(from: { element?: HTMLElement, event?: Event }): { x: number, y: number, back: HTMLElement | undefined } {
+  const element = from.element ?? (from.event?.currentTarget instanceof HTMLElement ? from.event.currentTarget : undefined)
+  const box = element?.getBoundingClientRect()
+
+  return { x: box?.left ?? 0, y: box?.bottom ?? 0, back: element }
+}
+
+// A change of a list is shown by the page rendering the draft again: until then the page's items are not the draft's, so no other change is made, and the focus goes to the item once they match.
+function settle(target: ListTarget, index: number, form = false): void {
+  pending = { target, index, form }
+  rendered = false
+  settling = true
+  setTimeout(() => {
+    if (pending?.target === target) {
+      pending = undefined
+      settling = false
+    }
+  }, SETTLE_LIMIT)
+}
+
+effect(() => {
+  const busy = drafts.rendering()
+
+  if (!pending)
+    return
+
+  if (busy) {
+    rendered = true
+
+    return
+  }
+
+  if (!rendered)
+    return
+
+  requestAnimationFrame(() => {
+    if (!pending)
+      return
+
+    const { target, index, form } = pending
+
+    pending = undefined
+    settling = false
+    lists?.reach()
+
+    // A new item the page cannot mark, as an empty text is, has no element to take the focus: its field in the form does.
+    if (focusItem(target, index) !== 'item' && form)
+      showInForm({ ...target, path: `${target.path}.${index}` })
+
+    lists?.refresh()
+  })
+})
+
+// Brings a field up in the form, even when it was the last one brought up.
+function showInForm(marker: FieldMarker): void {
+  focused = undefined
+  requestAnimationFrame(() => focused = marker)
+}
+
+function addTo(target: ListTarget, at: number, from: { element?: HTMLElement, event?: Event }): void {
+  if (settling() || isBusy(target))
+    return
+
+  const blocks = blockChoices(target, drafts)
+
+  if (blocks.length === 0) {
+    addOne(target, at)
+
+    return
+  }
+
+  const { x, y, back } = below(from)
+
+  ask(wording('cms.blocks.add', 'Add a block to {list}', { list: listFieldOf(target, drafts)?.label ?? '' }), blocks.map(block => ({ key: block.type, label: block.label, run: () => addOne(target, at, block.type) })), x, y, back)
+}
+
+function addOne(target: ListTarget, at: number, type?: string): void {
+  if (settling() || isBusy(target))
+    return
+
+  const place = addItem(drafts, target, at, type)
+
+  if (place === undefined)
+    return
+
+  removed = undefined
+  settle(target, place, true)
+}
+
+function moveOne(target: ListTarget, from: number, direction: Direction): void {
+  if (settling() || isBusy(target))
+    return
+
+  const title = titleOf(drafts, target, from)
+  const to = moveItem(drafts, target, from, direction)
+
+  if (to === undefined)
+    return
+
+  removed = undefined
+  announce(movedWords(title, to, itemsOf(drafts, target).length))
+  settle(target, to)
+}
+
+function removeOne(target: ListTarget, at: number): void {
+  if (settling() || isBusy(target))
+    return
+
+  const gone = removeItem(drafts, target, at)
+
+  if (!gone)
+    return
+
+  removed = gone
+  announce(wording('cms.list.removed', '{item} removed', { item: gone.title }))
+  settle(target, Math.min(at, itemsOf(drafts, target).length - 1))
+}
+
+function undoRemoval(): void {
+  const gone = removed()
+
+  if (!gone || settling() || isBusy(gone.target))
+    return
+
+  const place = restoreItem(drafts, gone)
+
+  if (place === undefined)
+    return
+
+  removed = undefined
+  settle(gone.target, place)
+}
+
+// What can be done with an item: put one before or after it, move it, take it out.
+function itemMenu(target: ListTarget, index: number, from: { element?: HTMLElement, event?: Event }): void {
+  if (settling() || isBusy(target))
+    return
+
+  const count = itemsOf(drafts, target).length
+  const item = titleOf(drafts, target, index)
+  const field = listFieldOf(target, drafts)
+  const full = field?.maxItems !== undefined && count >= field.maxItems
+  const choices: Choice[] = []
+  const { x, y, back } = below(from)
+
+  if (!full) {
+    choices.push({ key: 'before', label: wording('cms.pageList.addBefore', 'Add before {item}', { item }), run: () => addTo(target, index, { element: back }) })
+    choices.push({ key: 'after', label: wording('cms.pageList.addAfter', 'Add after {item}', { item }), run: () => addTo(target, index + 1, { element: back }) })
+  }
+
+  if (index > 0)
+    choices.push({ key: 'up', label: wording('cms.reorder.up', 'Move {item} up', { item }), run: () => moveOne(target, index, 'up') })
+
+  if (index < count - 1)
+    choices.push({ key: 'down', label: wording('cms.reorder.down', 'Move {item} down', { item }), run: () => moveOne(target, index, 'down') })
+
+  if (field?.minItems === undefined || count > field.minItems)
+    choices.push({ key: 'remove', label: wording('cms.field.removeItem', 'Remove {item}', { item }), run: () => removeOne(target, index) })
+
+  if (choices.length > 0)
+    ask(wording('cms.pageList.actions', 'What to do with {item}?', { item }), choices, x, y, back)
 }
 
 // What a click, or an Enter on a field reached by the keyboard, does at `node`.
@@ -466,7 +743,7 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
     const box = field.element.getBoundingClientRect()
     const back = at ? undefined : field.element as HTMLElement
 
-    choosing = { fields: found, x: Math.min(at?.x ?? box.left, window.innerWidth - MENU_WIDTH), y: Math.max(0, Math.min(at?.y ?? box.bottom, window.innerHeight - found.length * MENU_ITEM - MENU_ITEM)), back }
+    ask(wording('cms.marker.choose', 'Edit which field?'), found.map(each => ({ key: formatMarker(each.marker) + (each.attribute ?? ''), label: describe(each), run: () => edit(each, at?.x, at?.y, back) })), at?.x ?? box.left, at?.y ?? box.bottom, back)
 
     return
   }
@@ -581,6 +858,10 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
   if open()
     .kcms-editor-body
       .kcms-editor-status(role="status" aria-live="polite")
+        if removed() as gone
+          .kcms-editor-undo
+            span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
+            Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={settling()} onClick={undoRemoval})
         if drafts.rendering()
           p {wording('cms.editor.rendering', 'Updating the page…')}
         if drafts.stale().length > 0
@@ -594,8 +875,9 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
       else
         p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 if choosing() as question
-  .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={wording('cms.marker.choose', 'Edit which field?')} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey} onFocusOut={leaveMenu})
-    for field of question.fields key={formatMarker(field.marker) + (field.attribute ?? '')}
-      button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(field)}) {describe(field)}
+  .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={question.label} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey} onFocusOut={leaveMenu})
+    for choice of question.choices key={choice.key}
+      button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(choice)}) {choice.label}
+PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

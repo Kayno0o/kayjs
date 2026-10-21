@@ -111,6 +111,16 @@ Tab reaches each field, and a screen reader says what it edits. When an element 
 
 The "Browse the page" button next to it lets the page's links, menus and tabs work with the editor still open. Press it again to go back to editing.
 
+### Lists on the page
+
+When the page shows a list, such as the tags of a post or the blocks of a home page, point at one of its items and a small toolbar appears at its top right corner. It moves the item up or down, adds a new one after it and removes it. For a list of blocks, Add asks which kind of block. A list inside an item has its own toolbar, stacked above the toolbar of the item that holds it. An empty list has an "Add to" button where its items would be.
+
+Everything has a keyboard way. Tab to a field in the item, then press Alt and Shift with the up or down arrow to move the item, Alt and Shift with Delete to remove it, or Alt and Shift with Enter to open a menu of what you can do with it. Tab reaches an empty list, and Enter adds its first item.
+
+The change goes into the entry's draft, the same one the form beside the page edits, so the form and the page agree. A removal shows "Undo" in the editor, and a screen reader is told where an item went. A list at its most items cannot grow, and one at its least cannot shrink.
+
+The focus follows the item that moved or was added. A new item whose text is still empty cannot be seen on the page, so its field in the form takes the focus. A list of an entry whose form has not loaded, or whose draft is not valid yet, is changed in the form.
+
 An entry has such a link when a page shows it. That is the page listing its collection in `prerender` or `sitemap`. For an entry read by its slug, such as a section of the home page, it is the first page without params that reads it. The cms finds that page by rendering those pages once in edit mode, the first time it needs one, and keeps the answer for a few minutes. An entry no page shows has no link.
 
 ### Edit this page

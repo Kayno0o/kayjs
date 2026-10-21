@@ -1,5 +1,5 @@
 import { s } from 'kay'
-import { collection, customField, fieldInput, imageField } from 'kay/content'
+import { blocks as blockList, collection, customField, fieldInput, imageField } from 'kay/content'
 import { sqliteLoader } from '../../../src/loaders/sqlite'
 import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
@@ -105,6 +105,19 @@ export const ledger = collection({
 // A loaded collection in SQLite, which keeps the history of its entries.
 export const journal = collection(sqliteLoader({ name: 'journal', database: ':memory:' }), {
   schema: s.Object({ title: s.String({ minLength: 1 }) }),
+})
+
+// A localized collection of lists: plain, block and nested ones, and an empty one, which the page shows for the editor to reorder, add to and remove from.
+export const guides = collection('content/guides', {
+  schema: s.Object({
+    title: s.String({ minLength: 1 }),
+    steps: s.Array(s.String(), { default: [] }),
+    sections: blockList({ hero: s.Object({ heading: s.String() }), text: s.Object({ body: s.String() }), quote: s.Object({ author: s.String() }) }),
+    columns: s.Array(s.Object({ title: s.String(), cells: s.Array(s.String(), { default: [] }) }), { default: [] }),
+    empty: s.Array(s.String(), { default: [] }),
+    limited: s.Array(s.String(), { default: [], minItems: 1, maxItems: 2 }),
+  }),
+  localized: true,
 })
 
 // A loaded collection in SQLite that opts out of the history, the trash and the activity log.

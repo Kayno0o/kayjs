@@ -1,0 +1,32 @@
+--- server
+import { guides } from '../content.config'
+
+const guide = await guides.get('intro') ?? ctx.notFound()
+---
+h1 {guide.data.title}
+ol.steps
+  for step of guide.data.steps
+    li {step}
+.sections
+  for section of guide.data.sections
+    if section.type === 'hero'
+      header.hero
+        h2 {section.heading}
+    else if section.type === 'text'
+      p.text {section.body}
+    else
+      blockquote {section.author}
+.columns
+  for column of guide.data.columns
+    section.column
+      h2 {column.title}
+      ul.cells
+        for cell of column.cells
+          li {cell}
+ul.empty
+  for item of guide.data.empty
+    li {item}
+ul.limited
+  for item of guide.data.limited
+    li {item}
+.room(style="height: 30rem")
