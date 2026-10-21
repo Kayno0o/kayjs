@@ -601,3 +601,34 @@ describe('kay/eslint messages over template expressions', () => {
     expect(message!.suggestions![0]!.fix.text).toBe('String(list.length)')
   })
 })
+
+describe('kay/eslint over a line a fix breaks in a fence', () => {
+  const tsParser = import('@typescript-eslint/parser')
+  const stylistic = import('@stylistic/eslint-plugin')
+  const SERVER = '--- server\ntry {\n  await Promise.resolve()\n} catch (e) {\n  console.error(e)\n}\n---\np hi\n'
+  const NESTED = '---\nfunction run() {\n  try {\n    go()\n  } catch (e) {\n    stop(e)\n  }\n}\n---\np hi\n'
+
+  async function fixed(text: string): Promise<string> {
+    const { default: parser } = await tsParser
+    const { default: plugin } = await stylistic
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: plugin }, rules: { 'style/brace-style': ['error', 'stroustrup'] } },
+    ] as never
+    const [result] = await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix: true }).lintText(text, { filePath: FILE })
+
+    return result!.output ?? text
+  }
+
+  it('indents the line a fix breaks as the line it breaks, at the top level and nested', async () => {
+    expect(await fixed(SERVER)).toBe('--- server\ntry {\n  await Promise.resolve()\n}\ncatch (e) {\n  console.error(e)\n}\n---\np hi\n')
+    expect(await fixed(NESTED)).toBe('---\nfunction run() {\n  try {\n    go()\n  }\n  catch (e) {\n    stop(e)\n  }\n}\n---\np hi\n')
+  })
+
+  it('leaves the indentation of code already broken alone', async () => {
+    const broken = NESTED.replace('} catch (e) {', '}\n  catch (e) {')
+
+    expect(await fixed(broken)).toBe(broken)
+  })
+})

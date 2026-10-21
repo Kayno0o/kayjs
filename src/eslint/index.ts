@@ -132,6 +132,7 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
 const ARROW_PARENS = /(?:^|\/)arrow-parens$/
 const SLOT_HEAD_OPEN = /@[\w-]+\($/
 const COMPILED_PROPS = /\b__props\./g
+const HORIZONTAL_SPACE = /^[ \t]*/
 const PLAIN_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A slot's one plain parameter, `@about(text)`: kay writes it bare in the shadow, so a rule about the parentheses around it would report, and fix, text the .kay file holds as the slot's own syntax.
@@ -176,5 +177,20 @@ function mapFix(entry: ShadowFile, fix: LintFix, classes: boolean): LintFix | un
     return edit && { range: [edit.start, edit.end], text: edit.text }
   }
 
-  return !fix.text.includes('\n') || inFences(entry, span.start, span.end) ? { range: [span.start, span.end], text: fix.text } : undefined
+  if (!fix.text.includes('\n'))
+    return { range: [span.start, span.end], text: fix.text }
+
+  if (!inFences(entry, span.start, span.end))
+    return undefined
+
+  return fix.text.endsWith('\n') ? lineBroken(entry.source, span, fix.text) : { range: [span.start, span.end], text: fix.text }
+}
+
+// A fix ending on a line break leaves the new line to the indent rule, which fixes it in a later pass; here it takes the indentation of the line it breaks, in place of what already follows the break.
+function lineBroken(source: string, span: { start: number, end: number }, text: string): LintFix {
+  const lineStart = source.lastIndexOf('\n', span.start - 1) + 1
+  const indent = HORIZONTAL_SPACE.exec(source.slice(lineStart))![0]
+  const following = HORIZONTAL_SPACE.exec(source.slice(span.end))![0]
+
+  return { range: [span.start, span.end + following.length], text: text + indent }
 }
