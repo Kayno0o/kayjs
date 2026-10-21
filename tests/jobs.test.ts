@@ -455,7 +455,7 @@ describe('schedule', () => {
       }
     })
 
-    // Each row restarts within the rounded slot the boot run used to be locked under, minutes after the first start.
+    // Each row restarts minutes after the first start, which one rounded slot of the schedule would have covered.
     it.each([
       ['15m', '15m', '11:28:00', '11:34:00', '11:34:20'],
       ['1h', '1h', '11:10:00', '11:20:00', '11:20:20'],

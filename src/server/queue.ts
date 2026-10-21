@@ -265,7 +265,7 @@ export function sqliteJobs(path: string): JobStore {
       const { lock, pruneLocks } = open(true)!
       const won = lock.run(name, slot).changes === 1
 
-      // A slot is a minute, so a day of them is far past any process still deciding one.
+      // A slot is a minute or less, so a day of them is far past any process still deciding one.
       pruneLocks.run(name, slot - 1440)
 
       return won

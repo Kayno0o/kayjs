@@ -18,7 +18,7 @@ export interface ScheduleOptions {
   lock?: string | false | undefined
   // Where the lock is taken: the queues' default store unless given.
   store?: JobStore | undefined
-  // Runs each job once as the server starts too, without waiting for the first time it comes: processes starting within a minute of each other run it once, a restart later runs it again.
+  // Runs each job once as the server starts too, without waiting for the first time it comes: processes starting within the same minute run it once, a restart later runs it again.
   boot?: boolean | undefined
   // How long a run may take: past it, the run is logged as failed, its signal aborts and the schedule goes on without it. 10 minutes by default, `false` for no limit.
   timeout?: Duration | false | undefined

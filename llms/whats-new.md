@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- A schedule's `boot: true` runs again on a restart minutes after the previous boot, replicas starting within a minute still running it once ([Production](production.md)).
+- A schedule's `boot: true` runs again on a restart minutes after the previous boot, replicas starting within the same minute still running it once ([Production](production.md)).
 - kayjs-auth's `auth.signInAs(site, { email, username })` signs a test site in as a member, making them when none exists, with no form round trip, and `auth.signOut(site)` signs it out; a second call switches member ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
 - A test waits for a queued mail with one call, `outbox.waitFor(address, { site, find })`, which runs the site's queues until it is delivered and fails naming the mails the outbox holds, and reads a link's token with `outbox.token(mail, path)` or the link itself with `outbox.link(mail, path)`, no polling and no regex ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing), [Testing](testing.md)).
 - A test database for each test file needs no declaration: `kay/test/preload` copies the database a `pg-orm.config.ts` describes, seeded by the default export of `tests/seed.ts` when there is one, so an app deletes its `tests/database.ts` and its `bunfig.toml` line; and `sqliteStore` keeps its sessions in memory under `bun test`, so the `NODE_ENV === 'test'` switch in `src/session.ts` goes ([Test databases and setup](testing-setup.md#databases-and-setup)).
