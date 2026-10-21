@@ -277,7 +277,7 @@ describe('links from the root', () => {
     const html = compileKay('a(href="//cdn.example/x") X\na(href=" /y") Y\na(href="x,/y") Z\na(href="&#47;docs") D\n', 'page.kay', { output: 'html' }).tsx
     const dom = compileKay(`${ISLAND}a(href="//cdn.example/x") X\na(href="&#47;docs") D\nimg(srcset="/a.png 1x, /b.png 2x" alt="")\n`, 'page.kay', { output: 'dom' }).tsx
 
-    expect(html).toContain('<a href=\\"//cdn.example/x\\">X</a>')
+    expect(html).toContain('<a href=\\"//cdn.example/x\\"" + KayOutsideLink("//cdn.example/x") + ">X</a>')
     expect(html).toContain('<a href=\\" /y\\">Y</a>')
     expect(html).toContain('<a href=\\"x,/y\\">Z</a>')
     expect(html).toContain('KayAttribute("href", KayLocalHref("/docs"))')
@@ -285,6 +285,40 @@ describe('links from the root', () => {
     expect(dom).toContain('<a href=\\"//cdn.example/x\\">X</a>')
     expect(dom).toContain('"href", "/docs");')
     expect(dom).toContain('"srcset", "/a.png 1x, /b.png 2x");')
+  })
+})
+
+describe('links leaving the site', () => {
+  const ISLAND = '---\nconst n = signal(0)\nconst href = \'/x\'\n---\n'
+  const STATIC = ['/about', 'about', '#top', '?q=1', 'mailto:a@b.example', 'tel:+33123', 'javascript:void(0)', 'ftp://files.example/a']
+  const MAYBE = ['https://other.example/a', 'HTTP://other.example', '//evil.example', '/\\evil.example', ' https://other.example', 'ht\ttps://other.example']
+
+  it('answers a static href at compile time: nothing is called for what cannot leave, the runtime asked for the rest', () => {
+    for (const href of STATIC) {
+      expect(compileKay(`a(href="${href}") x\n`, 'page.kay', { output: 'html' }).tsx, href).not.toContain('KayOutsideLink(')
+      expect(compileKay(`${ISLAND}a(href="${href}") x\n`, 'page.kay', { output: 'dom' }).tsx, href).not.toContain('KayOutside(')
+    }
+
+    for (const href of MAYBE) {
+      expect(compileKay(`a(href="${href}") x\n`, 'page.kay', { output: 'html' }).tsx, href).toContain('KayOutsideLink(')
+      expect(compileKay(`${ISLAND}a(href="${href}") x\n`, 'page.kay', { output: 'dom' }).tsx, href).toContain('KayOutside(')
+    }
+  })
+
+  it('asks for a dynamic href and a spread, and for nothing when the link sets its own target', () => {
+    expect(compileKay('a(href={href}) x\n', 'page.kay', { output: 'html' }).tsx).toContain('KayLinkHref(')
+    expect(compileKay('a({...props}) x\n', 'page.kay', { output: 'html' }).tsx).not.toContain('KayLinkHref(')
+    expect(compileKay(`${ISLAND}a(href={href}) x\n`, 'page.kay', { output: 'dom' }).tsx).toContain('KayOutside(')
+    expect(compileKay(`${ISLAND}a({...{ href }}) x\n`, 'page.kay', { output: 'dom' }).tsx).toContain('KayOutsides(')
+
+    for (const link of ['a(href={href} target="_self") x', 'a(href="https://other.example" target="") x', 'a(href={href} target={n}) x']) {
+      expect(compileKay(`${link}\n`, 'page.kay', { output: 'html' }).tsx, link).not.toMatch(/KayLinkHref\(|KayOutsideLink\(/)
+      expect(compileKay(`${ISLAND}${link}\n`, 'page.kay', { output: 'dom' }).tsx, link).not.toContain('KayOutside(')
+    }
+  })
+
+  it('leaves any other element alone', () => {
+    expect(compileKay('link(href="https://other.example/x.css" rel="stylesheet")\nform(action="https://other.example/x")\n', 'page.kay', { output: 'html' }).tsx).not.toMatch(/Outside(Link)?\(/)
   })
 })
 

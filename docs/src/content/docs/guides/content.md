@@ -234,6 +234,8 @@ div(innerHTML={snippet})
 
 `renderMarkdown(text, { highlight })` does the same for a whole text, such as a note, and resolves with `{ html, headings }`. Its HTML is the writer's, so a user's goes through `sanitizeHtml` before it is rendered.
 
+A link in an entry's Markdown that leaves your site opens in a new tab, as it does in a template ([Links to other sites](/essentials/templates#links-to-other-sites)).
+
 ## Feeds
 
 Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute. The feed carries an ETag, so a reader that already holds the current version gets a short 304 instead of the whole file.

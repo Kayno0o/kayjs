@@ -45,6 +45,8 @@ interface Row {
   more?: number | undefined
 }
 
+// A link marked `external` opens in a new tab whatever it points at; one leaving the site does by itself, so no `target` is written for the others.
+const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' }
 const id = uid()
 const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.resultsLabel', count === 1 ? '1 result' : '{count} results', { count }))
 const countedMore = siteSearchMore ?? ((count: number) => wording('ui.commandPalette.siteSearchMore', count === 1 ? '1 more match' : '{count} more matches', { count }))
@@ -187,7 +189,7 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
             .kui-heading-section.kui-command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a.kui-command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
+              a.kui-command-palette-option(href={link.href} {...link.external ? EXTERNAL : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
                 if link.icon as icon
                   Icon(icon={icon})
                 if row.snippet as snippet

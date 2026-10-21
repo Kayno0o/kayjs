@@ -1,6 +1,7 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
+import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
@@ -10,7 +11,7 @@ import { SUBJECT } from './names'
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
 export function htmlHelperImport(): string {
   return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
@@ -489,12 +490,18 @@ export class HtmlTemplate extends TemplateWriter {
         case 'text':
           markup.text(attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
 
+          if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
+            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''})`))
+
           break
         case 'rooted':
           if (attribute.name === 'href' && this.localLink(element))
             markup.dynamic(() => b.add(`${helperName('attribute')}("href", ${helperName('localHref')}(${JSON.stringify(attribute.text)}))`))
           else
             markup.text(` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
+
+          if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
+            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''})`))
 
           break
         case 'class':
@@ -516,6 +523,14 @@ export class HtmlTemplate extends TemplateWriter {
           break
         case 'selected':
         case 'value':
+          if (written === 'href' && this.leavingLink(element)) {
+            markup.dynamic(() => {
+              b.add(`${helperName('linkHref')}((`).addSource(attribute.expression).add(`), ${this.localLink(element)}, ${this.named(element, 'rel')})`)
+            })
+
+            break
+          }
+
           markup.dynamic(() => {
             b.add(`${helperName('attribute')}(${JSON.stringify(written)}, `)
 
@@ -719,6 +734,11 @@ export class HtmlTemplate extends TemplateWriter {
 
       this.b.add(')')
     })
+  }
+
+  // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.
+  private leavingLink(element: ElementNode): boolean {
+    return element.name === 'a' && !this.named(element, 'target')
   }
 
   // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.

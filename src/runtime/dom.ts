@@ -6,6 +6,7 @@ import { rebasedAttribute } from './base'
 import { frenchText, frenchTree } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
+import { leavesSite } from './outside'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
@@ -1316,6 +1317,42 @@ export function attribute(element: Element, name: string, value: unknown, writte
     element.setAttribute(name, '')
   else
     element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizeHref(given) : given)))
+}
+
+let keepsSameTab: boolean | undefined
+
+function leavesInBrowser(href: unknown): boolean {
+  keepsSameTab ??= document.querySelector('meta[name="kay-same-tab-links"]') !== null
+
+  return !keepsSameTab && leavesSite(href, location.origin)
+}
+
+// A link leaving the site opens in a new tab, as the server writes it: `target="_blank" rel="noopener"` follow the `href`, `ownRel` for a link writing its own `rel`. Returns the href, for the effect setting it.
+export function outside<T>(element: Element, href: T, ownRel = false): T {
+  if (leavesInBrowser(href)) {
+    element.setAttribute('target', '_blank')
+
+    if (!ownRel)
+      element.setAttribute('rel', 'noopener')
+  }
+  else {
+    element.removeAttribute('target')
+
+    if (!ownRel)
+      element.removeAttribute('rel')
+  }
+
+  return href
+}
+
+// The sources of a link's spread, with the `target` and `rel` of a link leaving the site after them, unless one writes its own.
+export function outsides(sources: readonly object[]): readonly object[] {
+  const props = merge(...sources)
+
+  if (Object.hasOwn(props, 'target') || !leavesInBrowser(props.href))
+    return sources
+
+  return [...sources, Object.hasOwn(props, 'rel') ? { target: '_blank' } : { target: '_blank', rel: 'noopener' }]
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.

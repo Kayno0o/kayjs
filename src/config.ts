@@ -101,6 +101,8 @@ export interface KayConfig {
   i18n?: I18nConfig | undefined
   // Where the site is mounted when not at its host's root, `/docs`: the links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
   base?: string | undefined
+  // Where a link leaving the site opens: kay adds `target="_blank" rel="noopener"` to an `a` whose href is another origin, in templates, islands, Markdown and content bodies, unless the element sets its own `target`. `{ outside: 'same-tab' }` writes none.
+  links?: { outside?: 'new-tab' | 'same-tab' | undefined } | undefined
   // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
   trailingSlash?: TrailingSlash | undefined
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.

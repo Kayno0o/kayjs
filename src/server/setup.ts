@@ -113,7 +113,7 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   if (source.embedded)
     await dropOpenCache()
 
-  setSite(site, config.trailingSlash, prerendering)
+  setSite(site, config.trailingSlash, prerendering, config.links?.outside === 'same-tab')
   setContentMode(mode, paths.output)
 
   // A build may run without the server's secrets, the preview one included.

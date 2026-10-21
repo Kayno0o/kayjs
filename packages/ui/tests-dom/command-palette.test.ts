@@ -68,6 +68,19 @@ describe('CommandPalette', () => {
     expect(seen.open).toEqual([true, false])
   })
 
+  test('opens a link marked external in a new tab and writes no target for the others', async () => {
+    const { root, dialog } = await palette()
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    expect(dialog.open).toBe(true)
+
+    const targets = [...root.querySelectorAll<HTMLAnchorElement>('a.kui-command-palette-option')].map(link => [link.querySelector('.kui-command-palette-label')?.textContent, link.getAttribute('target'), link.getAttribute('rel')])
+
+    expect(targets.find(([label]) => label === 'Docs')).toEqual(['Docs', '_blank', 'noopener noreferrer'])
+    expect(targets.filter(([label]) => label !== 'Docs').every(([, target, rel]) => target === null && rel === null)).toBe(true)
+  })
+
   test('matches its hotkey whatever its case', async () => {
     const { dialog } = await palette({ hotkey: 'P' })
 

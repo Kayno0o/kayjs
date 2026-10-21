@@ -116,7 +116,7 @@ export function offlineOf(config: Pick<KayConfig, 'offline'>, mode: Pick<Mode, '
   return config.offline !== undefined && config.offline !== false && !mode.dev
 }
 
-type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'onError' | 'base' | 'images' | 'offline' | 'lateStyles' | 'typography'>
+type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'links' | 'onError' | 'base' | 'images' | 'offline' | 'lateStyles' | 'typography'>
 
 // `images.widths` sorted, or undefined for the default ladder, which the islands need not be told.
 function customWidths(widths: number[] | undefined): number[] | undefined {
@@ -130,7 +130,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
+  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

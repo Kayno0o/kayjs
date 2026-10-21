@@ -1,0 +1,35 @@
+---
+const away = 'https://other.example/dynamic'
+const same = 'https://x.example/inside'
+const spread = { href: 'https://other.example/spread' }
+const ownTarget = { href: 'https://other.example/own', target: '_self' }
+const ownRel = { href: 'https://other.example/rel', rel: 'author' }
+---
+main
+  a.static(href="https://other.example/a") Away
+  a.upper(href="HTTPS://Other.Example/a") Upper
+  a.plain(href="http://other.example") Plain
+  a.same(href="https://x.example/a") Same origin
+  a.root(href="/about") Root
+  a.relative(href="about") Relative
+  a.hash(href="#top") Hash
+  a.mail(href="mailto:me@other.example") Mail
+  a.tel(href="tel:+33123456789") Tel
+  a.script(href="javascript:void(0)") Script
+  a.slashes(href="//evil.example/x") Slashes
+  a.backslash(href="/\evil.example/x") Backslash
+  a.target(href="https://other.example/a" target="_self") Own target
+  a.empty(href="https://other.example/a" target="") Empty target
+  a.rel(href="https://other.example/a" rel="author") Own rel
+  a.hreflang(href="https://other.example/fr" hreflang="fr") Hreflang
+  a.dynamic(href={away}) Dynamic away
+  a.dynamicSame(href={same}) Dynamic same
+  a.dynamicRoot(href={'/x'}) Dynamic root
+  a.dynamicTarget(href={away} target="_self") Dynamic own target
+  a.dynamicRel(href={away} rel="author") Dynamic own rel
+  a.spread({...spread}) Spread
+  a.spreadTarget({...ownTarget}) Spread own target
+  a.spreadRel({...ownRel}) Spread own rel
+  a.spreadTargetAfter({...spread} target="_self") Spread then target
+  markdown
+    [Md away](https://other.example/md) and [Md home](/about) and [Md same](https://x.example/md)

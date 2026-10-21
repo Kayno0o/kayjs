@@ -28,6 +28,10 @@ A page's CSS reading `--kay-dev-bar-bottom` reads `--kay-dev-bar-bottom-left` or
 
 kayjs-cms pairs a field named `alt` with the first image beside it that names no `alt` of its own, so the field is the image's alt text and no longer a field of the form (`EntryField` throws for it). A text that is not the image's alt text takes another name, or the image names its own: `imageField({ alt: 'caption' })` ([kayjs-cms](../packages/cms/llms/uploads.md)).
 
+### A link leaving the site opens in a new tab
+
+An `a` whose `href` is another origin (an absolute `http(s)` URL, or one starting `//`) now gets `target="_blank" rel="noopener"`, in templates, islands, `renderMarkdown` and a collection's Markdown bodies. A link writing its own `target` is untouched, and one writing its own `rel` keeps it and gets the `target`. To keep such links in the same tab, set `links: { outside: 'same-tab' }` in `kay.config.ts` or `pages()`; a link that must stay in the tab writes `target="_self"`. Hand-written `target="_blank" rel="noopener"` on a link that always leaves the site can go. A test comparing the markup of such a link needs the two attributes. No check can tell the old form, a link without a `target` being valid.
+
 ## 1.62.0
 
 ### kayjs-cms's admin leaves the site's layouts

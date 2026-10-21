@@ -2,6 +2,7 @@ import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode,
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
+import { mayLeaveSite } from '../runtime/outside'
 import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
@@ -10,7 +11,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'outsides', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -423,9 +424,15 @@ export class DomTemplate extends TemplateWriter {
           case 'text':
             html += attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`
 
+            if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
+              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''});`))
+
             break
           case 'rooted':
             own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attribute.name)}, ${JSON.stringify(attribute.text)}${this.writtenLink(element, attribute.name) ? ', true' : ''});`))
+
+            if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
+              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''});`))
 
             break
           case 'class':
@@ -452,6 +459,8 @@ export class DomTemplate extends TemplateWriter {
 
               if (attribute.action)
                 b.add('KayFormAction((').addSource(attribute.expression).add('))')
+              else if (attribute.name === 'href' && this.leavingLink(element))
+                b.add(`KayOutside(${variable(node)}, (`).addSource(attribute.expression).add(`)${this.named(element, 'rel') ? ', true' : ''})`)
               else
                 b.add('(').addSource(attribute.expression).add(')')
 
@@ -634,12 +643,14 @@ export class DomTemplate extends TemplateWriter {
     if (element.name === 'form')
       b.add(`${helperName('holdSubmits')}(); `)
 
-    b.add(`KaySpread(${variable}, () => [`)
+    const link = element.name === 'a'
+
+    b.add(`KaySpread(${variable}, () => ${link ? 'KayOutsides(' : ''}[`)
     this.leadingImageDefaults(element)
     this.sources(element, false)
     this.formDefaults(element)
 
-    b.add(`]${content ? ', true' : ''});`)
+    b.add(`]${link ? ')' : ''}${content ? ', true' : ''});`)
   }
 
   private component(element: ElementNode): void {
@@ -673,6 +684,11 @@ export class DomTemplate extends TemplateWriter {
     }
 
     return undefined
+  }
+
+  // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.
+  private leavingLink(element: ElementNode): boolean {
+    return element.name === 'a' && !this.named(element, 'target')
   }
 
   // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.

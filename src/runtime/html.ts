@@ -17,9 +17,11 @@ import { islandCheckpoint } from './island.server'
 import { localeState } from './locale-state'
 import { kayLog } from './log'
 import { FAILED } from './markers'
+import { leavesSite, OUTSIDE_ATTRIBUTES, OUTSIDE_TARGET } from './outside'
 import { currentServerScope, scope } from './reactive'
 import { isRendered, html as renderedHtml } from './rendered'
 import { ISLAND_PARAM } from './server-islands'
+import { configuredSite, keepsSameTab } from './site'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes as keepAttributes, styleText } from './values'
@@ -52,6 +54,8 @@ const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>'
 const LINK_TAG = /<a\s[^>]*>/gi
 const LINK_HREF = /(\shref=")([^"]*)"/i
 const HREFLANG = /\shreflang=/i
+const LINK_TARGET = /\starget(?=[\s=/>])/i
+const LINK_REL = /\srel(?=[\s=/>])/i
 
 // A spread onto an element in edit mode: the fields it drops, handlers and `innerHTML`, are read unmarked, as a text no one renders would wait to mark a later equal one.
 export function spreadAttributes<T>(source: T): T {
@@ -129,12 +133,43 @@ export function localHref(href: unknown): unknown {
   return state === undefined || state.implicit || typeof href !== 'string' ? href : localizedLink(state.settings, href, state.locale, state.host)
 }
 
-// The links of markup the page did not compile, such as a Markdown entry's, in its locale, but those carrying `hreflang`.
+// A link leaving the site opens in a new tab: ` target="_blank" rel="noopener"`, nothing for any other href or under `links: { outside: 'same-tab' }`. `ownRel` is for a link writing its own `rel`, which stays.
+export function outsideLink(href: unknown, ownRel = false): string {
+  if (keepsSameTab() || !leavesSite(href, configuredSite()?.origin))
+    return ''
+
+  return ownRel ? OUTSIDE_TARGET : OUTSIDE_ATTRIBUTES
+}
+
+// A link's ` href` with what `outsideLink` adds, for an `href` read at render time.
+export function linkHref(href: unknown, localize: boolean, ownRel: boolean): string {
+  return attribute('href', localize ? localHref(href) : href) + outsideLink(href, ownRel)
+}
+
+// The links of markup the page did not compile, such as a Markdown entry's, in its locale, but those carrying `hreflang`, and opening in a new tab those leaving the site.
 export function localLinks(markup: string): string {
-  if (localeState() === undefined)
+  const localized = localeState() !== undefined
+
+  if (!localized && keepsSameTab())
     return markup
 
-  return markup.replace(LINK_TAG, tag => HREFLANG.test(tag) ? tag : tag.replace(LINK_HREF, (_, start: string, href: string) => `${start}${escapeAttribute(localHref(decode(href)) as string)}"`))
+  return markup.replace(LINK_TAG, tag => outsideTag(localized && !HREFLANG.test(tag) ? tag.replace(LINK_HREF, (_, start: string, href: string) => `${start}${escapeAttribute(localHref(decode(href)) as string)}"`) : tag))
+}
+
+// The links of markup the page did not compile, such as Markdown's, leaving the site opening in a new tab.
+export function outsideLinks(markup: string): string {
+  return keepsSameTab() ? markup : markup.replace(LINK_TAG, outsideTag)
+}
+
+// A link tag written with an `href` leaving the site and no `target` of its own.
+function outsideTag(tag: string): string {
+  if (LINK_TARGET.test(tag))
+    return tag
+
+  const href = LINK_HREF.exec(tag)?.[2]
+  const added = href === undefined ? '' : outsideLink(decode(href), LINK_REL.test(tag))
+
+  return added === '' ? tag : `${tag.slice(0, -1)}${added}>`
 }
 
 // ` aria-current="page"` on a link to the page being rendered: the same path, a trailing slash or not; a link with a query or a fragment leads elsewhere on it.
@@ -176,6 +211,10 @@ const DESCRIBED_FIELDS = new Set(['input', 'select', 'textarea'])
 export const UNREQUIRABLE_TYPES = new Set(['radio', 'range', 'file', 'color'])
 
 export const UNDESCRIBED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
+
+function hasSource(sources: readonly object[], name: string): boolean {
+  return sources.some(source => source != null && Object.hasOwn(source, name))
+}
 
 function lastValue(sources: readonly object[], name: string): unknown {
   const source = sources.findLast(source => source != null && Object.hasOwn(source, name)) as Record<string, unknown> | undefined
@@ -253,6 +292,9 @@ export function element(tag: string, sources: readonly object[], content?: () =>
         markup += attribute(name, value)
     }
   }
+
+  if (tag === 'a' && !hasSource(sources, 'target'))
+    markup += outsideLink(lastValue(sources, 'href'), hasSource(sources, 'rel'))
 
   if (field) {
     markup += attribute('aria-describedby', fieldDescription(described))

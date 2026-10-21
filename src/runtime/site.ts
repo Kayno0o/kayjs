@@ -2,10 +2,13 @@
 let configured: { origin: string, slashed: boolean } | undefined
 // While `kay build` prerenders with no site, a page reading it renders against a stand-in, counted so the server renders that page again once it runs for a site.
 let standIn: { reads: number } | undefined
+// Whether `links: { outside: 'same-tab' }` keeps a link leaving the site in the same tab.
+let sameTab = false
 
 const STAND_IN = { origin: 'http://localhost', slashed: false }
 
-export function setSite(origin: string | undefined, trailingSlash?: 'never' | 'always' | 'ignore', prerendering = false): void {
+export function setSite(origin: string | undefined, trailingSlash?: 'never' | 'always' | 'ignore', prerendering = false, keepSameTab = false): void {
+  sameTab = keepSameTab
   configured = origin === undefined ? undefined : { origin, slashed: trailingSlash === 'always' }
   standIn = origin === undefined && prerendering ? { reads: 0 } : undefined
 }
@@ -26,4 +29,8 @@ export function renderedSite(): { origin: string, slashed: boolean } | undefined
 
 export function standInReads(): number {
   return standIn?.reads ?? 0
+}
+
+export function keepsSameTab(): boolean {
+  return sameTab
 }

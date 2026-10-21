@@ -115,6 +115,12 @@ kay turns the Markdown into the same elements you would have written, while it b
 
 A link is a template link: `kay check` tests it, and it gets the `base` and the locale of the page. A component is written like in a collection's Markdown, with JSON props, and imported in the script. A problem is reported on the `markdown` line, except a problem inside a `{expr}`, which is reported where you wrote it. `kay fmt` leaves the lines as they are.
 
+## Links to other sites
+
+A link to another site opens in a new tab, and a link inside yours stays in the same one. kay adds `target="_blank" rel="noopener"` to an `a` whose `href` is on another origin, in templates, in islands, in a `markdown` block and in the Markdown of a collection's entries or `renderMarkdown`. The server compares with the origin you set as `site`, an island with the page's own origin. Without a `site`, every absolute `http` or `https` link counts as another site.
+
+A path, a `#hash`, `mailto:` and `tel:` are left alone, and so is a link that writes its own `target`, even an empty one. A link writing its own `rel` keeps it, and only gets the `target`. To keep every link in the same tab, set `links: { outside: 'same-tab' }` in `kay.config.ts`.
+
 ## Conditions and lists
 
 ```kay

@@ -163,6 +163,8 @@ export interface RenderOptions {
   typography?: boolean | undefined
   // `false` serves every visitor the same page, as the `saveData` config key says; else a visitor asking for less data gets one without font preloads and speculation rules.
   saveData?: boolean | undefined
+  // `links: { outside: 'same-tab' }`: islands leave a link leaving the site in the same tab, the page telling them so.
+  sameTabLinks?: boolean | undefined
   // The stylesheet declaring the fonts, which a visitor asking for less data gets with each face shown only when cached.
   fontCss?: string | undefined
   // The chunks only islands need, which a page preloads for its eager islands and a visitor asking for less data does not, their islands waiting for the viewport; `wait` is the code waiting for it, which that visitor's page preloads in their place.
@@ -1040,7 +1042,7 @@ function headStart(head: RenderedHead): string {
 
 // What the islands read off the page: the mount point, and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '')
+  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '')
 
   if (!hasIslands)
     return base

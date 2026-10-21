@@ -1,6 +1,7 @@
 // Markdown entries compiled once into what renders them: the HTML around the kay components they use, plus their headings.
 import type { SafeHtml } from '../runtime/checks'
 import { escape, escapeAttribute } from '../runtime/escape'
+import { outsideLinks } from '../runtime/html'
 import { MARKDOWN_OPTIONS } from '../runtime/markdown'
 import { vouch } from '../runtime/safe-html'
 
@@ -99,7 +100,7 @@ export function splitFrontmatter(source: string): { frontmatter: string | undefi
 // Component tags are swapped for placeholder elements first, so Markdown passes them through whatever their attributes hold, and code never holds one.
 export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true): Promise<CompiledMarkdown> {
   const { text, components } = extractComponents(body, bodyLine)
-  const { html, headings } = await renderMarkdown(text, { highlight, headingLinks })
+  const { html, headings } = await renderedMarkdown(text, { highlight, headingLinks })
 
   return { segments: componentSegments(html, components), headings, words: countWords(html) }
 }
@@ -118,7 +119,7 @@ export function countWords(html: string): number {
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
 export async function bodyHtml(body: string): Promise<string> {
   const { text, components } = extractComponents(body, 1)
-  const { html } = await renderMarkdown(text)
+  const { html } = await renderedMarkdown(text)
 
   componentSegments(html, components)
 
@@ -132,8 +133,16 @@ export interface RenderedMarkdown {
 
 // Markdown text rendered as a collection's entries are, headings anchored (linked to themselves unless `headingLinks` is false) and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
+// A link leaving the site opens in a new tab, as in templates, unless the config keeps the same tab.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
+  const rendered = await renderedMarkdown(markdown, options)
+
+  return { html: outsideLinks(rendered.html), headings: rendered.headings }
+}
+
+// The HTML of `renderMarkdown` before its links leaving the site are written: an entry's body compiles once, and its links are written as each page renders against its site.
+async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
   const links = options.headingLinks !== false
   // Always rendered with anchors, which tell Markdown's headings from raw `<h2 id>` tags; they are taken off after when `headingLinks` is false.
   let html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }))
