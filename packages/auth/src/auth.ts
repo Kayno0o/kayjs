@@ -81,14 +81,6 @@ export const SIGNED_IN_HINT = 'kay_user'
 const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
 
-// What createCore builds on the site's origin, once it has one.
-interface SiteBound {
-  url: string | undefined
-  oauth: Core['oauth']
-  refreshers: Core['refreshers']
-  site: string
-  passkeys: Core['passkeys']
-}
 const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const DEFAULT_GUEST_MAX_AGE = 30 * 24 * 60 * 60
@@ -1674,6 +1666,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
 
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
   let bound: SiteBound | undefined
+  // What a core with no origin yet builds: with nothing to build on it is the same each time, so it is kept until an origin turns up.
+  let waiting: SiteBound | undefined
 
   // What depends on the site's origin: `url` if given, else the `site` of kay.config.ts or SITE_URL, which a server knows once it set up. An auth made while the app's modules load asks again when first used, and keeps what it built once it has an origin.
   const bind = (): SiteBound => {
@@ -1684,6 +1678,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
 
     if (needsUrl && url === undefined)
       throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or `url` in createAuth')
+
+    if (url === undefined && waiting)
+      return waiting
 
     const clients: Core['oauth'] = new Map()
 
@@ -1700,7 +1697,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
         : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
     }
 
-    if (url !== undefined)
+    if (url === undefined)
+      waiting = made
+    else
       bound = made
 
     refreshersFor(made)
