@@ -42,7 +42,7 @@ A page whose own rules are still over the size links a copy of the stylesheet in
 
 Some classes come from a value kay cannot read: `classList.add(name)`, `el.className = name`, or a class that arrives from your data. The page has no rule for them, so the element shows unstyled. A production build warns about the ones it spots, with the island, the line and the pages that reach it.
 
-A value picked from an object of class names you write out (`GLASS[tone]`), also one imported from another module of your app, needs no listing. Neither does a call to a function whose every `return` is a class name or a choice between some.
+A value picked from an object of class names you write out (`GLASS[tone]`), also one imported from another module of your app, needs no listing. Neither does a call to a function whose every `return` is a class name or a choice between some. In both, `undefined`, `null` and `false` (as in `on && 'active'`) count as no class.
 
 A value read back from the element (`el.className = el.className`), a name that only ever holds classes the file writes out, and `cn(...)`, `clsx(...)` or `twMerge(...)` of such values need no listing.
 
