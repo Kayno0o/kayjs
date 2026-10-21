@@ -1,0 +1,12 @@
+---
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+const { onChange } = props<{ onChange: (value: number) => unknown }>()
+
+const plans = [{ value: 1, label: 'Free', description: 'Up to 3 sites' }, { value: 2, label: 'Pro', disabled: true }, { value: 3, label: 'Team' }] as const
+---
+form#form
+  FormField(label="Plan" name="plan" issue="Pick a plan" group)
+    RadioGroup(name="plan" options={plans} value={1 as 1 | 2 | 3} onChange={onChange})
+  button#reset(type="reset") Reset

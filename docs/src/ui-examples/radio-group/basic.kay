@@ -1,0 +1,13 @@
+---
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+
+const plan = signal('free')
+const plans = [
+  { value: 'free', label: 'Free', description: 'Up to 3 sites.' },
+  { value: 'pro', label: 'Pro', description: 'Unlimited sites and a custom domain.' },
+  { value: 'team', label: 'Team', description: 'Coming soon.', disabled: true },
+] as const
+---
+.flex.flex-col.items-start.gap-2
+  RadioGroup(label="Plan" name="plan" options={plans} value={plan()} onChange={plan.set})
+  p The {plan()} plan.

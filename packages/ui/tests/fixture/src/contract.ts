@@ -38,6 +38,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
@@ -119,6 +120,7 @@ export const COMPONENTS = {
   'rating': Rating,
   'save-form': SaveForm,
   'scatter-chart': ScatterChart,
+  'radio-group': RadioGroup,
   'segmented': Segmented,
   'select': Select,
   'side-panel': SidePanel,
@@ -186,6 +188,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'rating': { value: 4.5 },
   'save-form': { action, failure: 'Failed' },
   'scatter-chart': { points: [{ key: 'a', label: 'Hades', x: 1, y: 2 }], label: 'Games' },
+  'radio-group': { label: 'Planet', options, value: 'mars' },
   'segmented': { label: 'Range', options, value: 'mars' },
   'select': { 'aria-label': 'Planet', options, 'value': 'mars' },
   'side-panel': { open: false, title: 'Detail', onOpenChange: noop },

@@ -580,6 +580,45 @@
     @apply text-xs text-kui-subtext0;
   }
 
+  .kui-radio-group {
+    @apply flex flex-col gap-2;
+  }
+
+  .kui-radio {
+    @apply flex flex-col;
+  }
+
+  .kui-radio-choice {
+    @apply inline-flex cursor-pointer items-center gap-2 self-start;
+
+    &:where(:has(.kui-radio-input:disabled)) {
+      @apply cursor-not-allowed opacity-50;
+    }
+  }
+
+  /* On the choices, whose own pointer cursor would cover the group's. */
+  .kui-radio-group:where([aria-busy='true']) .kui-radio-choice {
+    @apply cursor-progress;
+  }
+
+  .kui-radio-input {
+    @apply m-0 size-4 shrink-0 cursor-[inherit];
+    accent-color: var(--color-kui-accent);
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-radio-label {
+    @apply text-sm text-kui-text;
+  }
+
+  .kui-radio-description {
+    @apply pl-6 text-xs text-kui-subtext0;
+  }
+
   .kui-chip-group {
     @apply flex flex-wrap gap-2;
   }

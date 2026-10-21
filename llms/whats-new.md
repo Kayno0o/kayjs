@@ -38,6 +38,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai: the dev tool has an AI tab with `ai()` in `extensions`, showing the provider, the limits and the last 50 asks with tokens, time and outcome ([Testing and errors](../packages/ai/llms/testing-and-errors.md#the-dev-tool-tab)).
 - `kay new --with auth` (the `app` preset) writes kayjs-auth as `kay add auth` does, in place of the demo sign-in: no `Member` table, `src/session.ts`, login page or migration, and `postgres` holds kayjs-auth's tables ([Scaffold with kay new and kay add](project-new-and-add.md)).
 - `kay add auth` writes `tables: [...authTables]`, `site: 'Name'` and `async () => import(...)`, which type-check and lint as written ([Setup](../packages/auth/llms/setup.md)).
+- kayjs-ui: a `RadioGroup` form control, a labelled list of real radios with a description per option ([Forms](../packages/ui/llms/forms.md#radiogroup)).
 
 ## 1.69.0
 

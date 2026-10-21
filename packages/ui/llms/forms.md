@@ -52,6 +52,11 @@
   - The selection draws the chosen icon once a search found it; a `value` no search returned yet shows its name alone.
 - MultiSelect and Menu draw their popover's id as Popover does, or take an `id`. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop, Menu and IconPicker take functions, so they render inside an island.
 
+### RadioGroup
+
+- `RadioGroup(options={[{ value: 'free', label: 'Free', description: 'Up to 3 sites' }, { value: 'pro', label: 'Pro' }]} value="free" name="plan" label="Plan" onChange={plan.set})`: a labelled list of real radios, so the arrow keys move between options and the group posts as `name` without JavaScript. Options are `{ value, label, description?, disabled? }`, values strings or numbers; a `description` sits under its label and is read after it. `value` starts the pick (`null` for none), and a parent passing another follows it. `onChange` may return a promise, as Segmented's may: the group is busy until it settles and a refused change is put back. A form reset goes back to the start. Use Segmented for a compact toggle row.
+- A field error comes from the FormField around it: `FormField(label="Plan" name="plan" group)` shows the message refused for `plan` and marks each radio invalid. Omit `label` there (or pass `aria-label`), the legend names the group.
+
 ### MarkdownEditor
 
 - `MarkdownEditor(value={body()} onInput={body.set} onImage={upload} name="body")`: a markdown `textarea` that writes like an editor, in an island.
