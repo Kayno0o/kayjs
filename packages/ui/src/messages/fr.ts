@@ -99,6 +99,7 @@ export default defineMessages({
       cleanLabel: 'Aucune modification non enregistrée.',
       dirtyLabel: 'Modifications non enregistrées.',
       discardLabel: 'Abandonner',
+      failure: 'Échec de l’enregistrement.',
       saveLabel: 'Enregistrer',
       savingLabel: 'Enregistrement…',
     },

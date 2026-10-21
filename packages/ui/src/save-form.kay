@@ -7,11 +7,17 @@ import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
-const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s', class: className } = props<{
-  // The page's action the form calls with its fields, as FormDialog does.
-  action: Action<never, Output>
-  // Toasted when the call fails other than on a field.
-  failure: string
+const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s', class: className } = props<{
+  // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
+  action?: Action<never, Output> | undefined
+  // Toasted when the call fails other than on a field, or when \`onSave\` rejects.
+  failure?: string | undefined
+  // Whether the editor holds unsaved changes, when its state is the app's own signals rather than named fields: the bar, the leave guard and Save follow it instead of the fields, so `dirty={isNew || changed()}` lets a new item save with no change.
+  dirty?: boolean | undefined
+  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection toasts `failure`; `false` is a refusal the app shows itself, and either leaves the bar unsaved. The app clears `dirty` once it has saved.
+  onSave?: (() => Promise<unknown>) | undefined
+  // Replaces the status line, whatever the form's state.
+  status?: string | undefined
   // What a refusal of the action's handler says, as FormDialog's `refused`.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // Toasted as a success once the action has run.
@@ -32,7 +38,8 @@ const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = wordin
 }>()
 
 const issues = signal<Record<string, string>>({})
-const dirty = signal(false)
+const changed = signal(false)
+const saving = signal(false)
 let form: HTMLFormElement | undefined
 // What the controls held when they were last clean, as text.
 let baseline = ''
@@ -84,8 +91,11 @@ function values(): () => void {
   }
 }
 
+const isDirty = () => dirty ?? changed()
+const busy = () => saving() || action?.pending() === true
+
 function check() {
-  dirty.set(snapshot() !== baseline)
+  changed.set(snapshot() !== baseline)
 }
 
 let queued = false
@@ -106,7 +116,7 @@ function checkSoon() {
 onFormReset(() => form, check, true)
 
 // Leaving asks while there are unsaved changes, but not while a save is under way: it may be what takes the page elsewhere.
-guardLeave(() => dirty() && !action.pending())
+guardLeave(() => isDirty() && !busy())
 
 // A control added or removed changes what the form holds without an input event.
 onMount(() => {
@@ -121,7 +131,32 @@ onMount(() => {
 async function submit(event: SubmitEvent) {
   event.preventDefault()
 
-  if (action.pending() || !form || snapshot() === baseline)
+  if (busy() || !form || !(dirty ?? snapshot() !== baseline))
+    return
+
+  if (onSave) {
+    saving.set(true)
+
+    try {
+      if (await onSave() === false)
+        return
+    }
+    catch {
+      toast.error(failure)
+
+      return
+    }
+    finally {
+      saving.set(false)
+    }
+
+    if (saved)
+      toast.success(saved)
+
+    return
+  }
+
+  if (!action)
     return
 
   // Edits made while the save is under way stay unsaved.
@@ -144,7 +179,7 @@ async function submit(event: SubmitEvent) {
 }
 
 function discard() {
-  if (action.pending())
+  if (busy())
     return
 
   form?.reset()
@@ -161,8 +196,8 @@ form.kui-save-form(class={className} ref={element => form = element} onSubmit={s
     slot
   .kui-save-bar
     // Announced as it changes, so a screen reader hears the changes pile up, the save start and the form come back clean.
-    p.kui-save-bar-status(role="status" data-dirty={dirty() || undefined}) {action.pending() ? savingLabel : dirty() ? dirtyLabel : cleanLabel}
+    p.kui-save-bar-status(role="status" data-dirty={isDirty() || undefined}) {status ?? (busy() ? savingLabel : isDirty() ? dirtyLabel : cleanLabel)}
     .kui-save-bar-actions
       // `aria-disabled` rather than `disabled`, so the button pressed keeps the focus as the form turns clean.
-      Button(label={discardLabel} aria-disabled={!dirty() || action.pending() || undefined} onClick={discard})
-      Button(label={saveLabel} type="submit" tone="accent" busy={action.pending()} aria-disabled={!dirty() || action.pending() || undefined})
+      Button(label={discardLabel} aria-disabled={!isDirty() || busy() || undefined} onClick={discard})
+      Button(label={saveLabel} type="submit" tone="accent" busy={busy()} aria-disabled={!isDirty() || busy() || undefined})

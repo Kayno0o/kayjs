@@ -34,7 +34,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.pagination.*`: `label` (`Pagination`), `nextLabel` (`Next`), `previousLabel` (`Previous`)
 - `ui.rangeInput.*`: `fromLabel` (`{label} from`), `toLabel` (`{label} to`)
 - `ui.rating.*`: `label` (`{value} out of {max}`)
-- `ui.saveForm.*`: `cleanLabel` (`No unsaved change.`), `dirtyLabel` (`Unsaved changes.`), `discardLabel` (`Discard`), `saveLabel` (`Save`), `savingLabel` (`Saving…`)
+- `ui.saveForm.*`: `cleanLabel` (`No unsaved change.`), `dirtyLabel` (`Unsaved changes.`), `discardLabel` (`Discard`), `failure` (`Could not save.`), `saveLabel` (`Save`), `savingLabel` (`Saving…`)
 - `ui.scatterChart.*`: `emptyLabel` (`No data yet.`)
 - `ui.select.*`: `loadingLabel` (`Loading…`)
 - `ui.sidePanel.*`: `closeLabel` (`Close`)

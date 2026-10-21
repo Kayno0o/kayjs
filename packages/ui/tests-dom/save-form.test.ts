@@ -401,3 +401,111 @@ describe('SaveForm', () => {
     expect(searches()).toEqual(['', ''])
   })
 })
+
+describe('SaveForm driven by signals', () => {
+  async function editor(save: (input: { name: string }) => Promise<boolean | undefined>, props: { isNew?: boolean, status?: string } = {}) {
+    mounted = await mountComponent('src/components/save-form-signals.kay', { save, onDiscard: () => discarded++, ...props })
+
+    return mounted.root
+  }
+
+  const edit = async (root: HTMLElement) => {
+    root.querySelector<HTMLButtonElement>('#edit')!.click()
+    await settle()
+  }
+
+  test('follows the dirty the app gives, saves through onSave and is clean once the app is', async () => {
+    const calls: string[] = []
+    const root = await editor(async (input) => {
+      calls.push(input.name)
+
+      return undefined
+    })
+
+    expect(status(root)).toBe('No unsaved change.')
+    await edit(root)
+    expect(status(root)).toBe('Unsaved changes.')
+    expect(leaves()).toBe(true)
+
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(calls).toEqual(['Grace'])
+    expect(status(root)).toBe('No unsaved change.')
+    expect(root.querySelector('.kui-toast')?.textContent).toContain('Saved.')
+    expect(leaves()).toBe(false)
+  })
+
+  test('a clean editor calls nothing, a new one saves with no change', async () => {
+    let calls = 0
+    const save = async () => {
+      calls++
+
+      return undefined
+    }
+    const clean = await editor(save)
+
+    clean.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(calls).toBe(0)
+    mounted?.unmount()
+
+    const fresh = await editor(save, { isNew: true })
+
+    expect(buttons(fresh)[1]!.getAttribute('aria-disabled')).toBeNull()
+    fresh.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(calls).toBe(1)
+  })
+
+  test('a refusal the app shows itself leaves the bar unsaved, and so does a rejection with the failure toasted', async () => {
+    const refused = await editor(async () => false)
+
+    await edit(refused)
+    refused.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(status(refused)).toBe('Unsaved changes.')
+    expect(refused.querySelector('.kui-toast')).toBeNull()
+    mounted?.unmount()
+
+    const failed = await editor(async () => {
+      throw new Error('down')
+    })
+
+    await edit(failed)
+    failed.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(status(failed)).toBe('Unsaved changes.')
+    expect(failed.querySelector('.kui-toast')?.textContent).toContain('Could not save.')
+  })
+
+  test('shows the saving text while onSave runs, and the status the app sets', async () => {
+    let finish: () => void = () => undefined
+    const root = await editor(async () => new Promise<undefined>((resolve) => {
+      finish = () => resolve(undefined)
+    }))
+
+    await edit(root)
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(status(root)).toBe('Saving…')
+    finish()
+    await settle()
+    mounted?.unmount()
+
+    const custom = await editor(async () => undefined, { status: 'Draft' })
+
+    expect(status(custom)).toBe('Draft')
+  })
+
+  test('Discard calls onDiscard', async () => {
+    const root = await editor(async () => undefined)
+
+    await edit(root)
+    click(buttons(root)[0]!)
+    await settle()
+
+    expect(discarded).toBe(1)
+    expect(status(root)).toBe('No unsaved change.')
+  })
+})

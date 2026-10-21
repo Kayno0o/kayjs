@@ -1,0 +1,25 @@
+---
+import { signal } from 'kay'
+import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// An editor whose state is signals and whose save takes an object: `save` stands in for the server and answers false for a refusal the editor shows itself.
+const { save, isNew = false, status, onDiscard } = props<{ save: (input: { name: string }) => Promise<boolean | undefined>, isNew?: boolean, status?: string | undefined, onDiscard: () => void }>()
+
+const name = signal('Ada')
+const saved = signal('Ada')
+const changed = () => isNew || name() !== saved()
+
+async function onSave() {
+  const accepted = await save({ name: name() })
+
+  if (accepted !== false)
+    saved.set(name())
+
+  return accepted
+}
+---
+SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} onDiscard={() => { name.set(saved()); onDiscard() }})
+  button#edit(type="button" onClick={() => name.set('Grace')}) Edit
+  p#name {name()}
+Toaster

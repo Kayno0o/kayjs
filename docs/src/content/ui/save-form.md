@@ -34,6 +34,17 @@ A failure keeps the bar dirty. A refused field shows its message on its [FormFie
 
 A save toasts `saved` when given, calls `onSaved` with what the action returned and leaves the form clean.
 
+## Editors driven by signals
+
+An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and an `onSave` returning the call's promise, in place of `action`.
+
+```kay
+SaveForm(dirty={isNew || changed()} onSave={() => save({ name: name(), config: config() })} saved="Saved.")
+  // the editor
+```
+
+The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` toasts `failure`, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. The page clears `dirty` once it has saved, and `status` replaces the status line.
+
 ## Discarding
 
 Discard puts the controls back to their initial values, or to the saved ones once a save has run, and clears the messages.
