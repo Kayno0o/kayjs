@@ -155,9 +155,12 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
 
 // Gives each marked element a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text; the page renders again and may drop it.
 export function reachMarked(): () => void {
+  const given = new WeakSet<HTMLElement>()
   const mark = () => {
-    for (const element of document.querySelectorAll<HTMLElement>(`[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`))
+    for (const element of document.querySelectorAll<HTMLElement>(`[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`)) {
       element.tabIndex = 0
+      given.add(element)
+    }
   }
   const observer = new MutationObserver(mark)
 
@@ -166,8 +169,10 @@ export function reachMarked(): () => void {
 
   return () => {
     observer.disconnect()
-    for (const element of document.querySelectorAll<HTMLElement>('[data-kay-field][tabindex="0"]'))
-      element.removeAttribute('tabindex')
+    for (const element of document.querySelectorAll<HTMLElement>('[data-kay-field][tabindex="0"]')) {
+      if (given.has(element))
+        element.removeAttribute('tabindex')
+    }
   }
 }
 

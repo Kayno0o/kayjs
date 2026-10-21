@@ -276,7 +276,7 @@ listen(() => document, 'click', (event) => {
 listen(() => document, 'keydown', (event) => {
   const element = event.target instanceof HTMLElement ? event.target : undefined
 
-  if (!open() || event.key !== 'Enter' || event.isComposing || !element?.hasAttribute('data-kay-field') || element.isContentEditable)
+  if (!open() || event.key !== 'Enter' || event.isComposing || !element?.hasAttribute('data-kay-field') || element.isContentEditable || element.matches('button, summary, input, select, textarea, label, a[href]'))
     return
 
   act(event, element)

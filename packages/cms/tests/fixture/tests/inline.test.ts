@@ -174,5 +174,5 @@ test('the title takes a tab stop, and Enter on it starts the edit', async () => 
   await page.press('Enter')
   await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)
   await page.type('!')
-  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLInputElement).value.endsWith('!'), undefined, FORM_TITLE)
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLInputElement).value === 'Hello world!', undefined, FORM_TITLE)
 }, 60_000)
