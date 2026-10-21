@@ -3,6 +3,7 @@ import { appendFile, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { clientDir } from '../src/build/assets'
 import { fixtureCopy } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -21,7 +22,8 @@ async function build(...args: string[]): Promise<void> {
 }
 
 async function stylesheets(): Promise<string> {
-  const dir = join(root, '.kay', 'client', 'dist')
+  // The build it spawns inherits this worker of `bun test --parallel`, so it writes where this process would.
+  const dir = clientDir(root)
 
   return (await Promise.all((await readdir(dir)).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(dir, name)).text()))).join('\n')
 }
