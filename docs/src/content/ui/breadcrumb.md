@@ -12,7 +12,7 @@ From four items on, a narrow screen shows the first item, an ellipsis and the la
 
 ## Search engines
 
-Pass `structured` to also describe the trail as a `BreadcrumbList` in the head. Each `href` is made absolute by `site` in kay.config.ts, which it then needs. The current page is listed without a URL, as search engines accept.
+Pass `structured` to also describe the trail as a `BreadcrumbList` in the head. Each `href` is made absolute by `site` in kay.config.ts, which it then needs. Use it on one Breadcrumb per page. The current page is listed without a URL, as search engines accept.
 
 ```kay
 Breadcrumb(items={trail} label="Breadcrumb" structured)
