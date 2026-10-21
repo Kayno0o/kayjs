@@ -303,7 +303,7 @@ async function planCore(dir: string, core: readonly Feature[], libraryAuth = fal
     return plan
 
   const wanted = new Set([...current, ...core])
-  const implied = wanted.has('postgres') && !wanted.has('auth') && !current.has('postgres')
+  const implied = wanted.has('postgres') && !wanted.has('auth') && !current.has('postgres') && manifest.dependencies?.['@kaynooo/kayjs-auth'] === undefined
 
   if (implied)
     wanted.add('auth')
@@ -324,13 +324,16 @@ async function planCore(dir: string, core: readonly Feature[], libraryAuth = fal
   const named = join(dirname(dir), manifest.name ?? basename(dir))
   const host = await hostOf(dir)
   const runner = await runnerOf(dir, host)
-  const [old, next] = await Promise.all([projectFiles(named, current, kay, {}, host, runner), projectFiles(named, wanted, kay, {}, host, runner)])
+  // With kayjs-auth beside, the demo's pages are the files the project would have without its auth.
+  const bare = libraryAuth && implied ? new Set([...wanted].filter(feature => feature !== 'auth')) : undefined
+  const [old, next, without] = await Promise.all([projectFiles(named, current, kay, {}, host, runner), projectFiles(named, wanted, kay, {}, host, runner), bare && projectFiles(named, bare, kay, {}, host, runner)])
 
-  for (const [path, content] of Object.entries(next)) {
+  for (const [path, planned] of Object.entries(next)) {
     const disk = await read(join(dir, path))
     const was = old[path]
+    const content = without !== undefined && DEMO_AUTH_PAGES.has(path) ? without[path] : planned
 
-    if (libraryAuth && DEMO_AUTH_PAGES.has(path) && !current.has('auth'))
+    if (content === undefined)
       continue
 
     if (path === 'package.json') {

@@ -725,3 +725,19 @@ it('adds kayjs-auth over the Postgres database postgres sets up, with no demo si
     await rm(join(dir, '..'), { recursive: true, force: true })
   }
 })
+
+it('writes the server beside kayjs-auth and postgres, and leaves a kayjs-auth project\'s sign-in alone', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, PRESETS.site.features, ['auth', 'ui'])
+    await addFeatures(dir, ['server', 'auth', 'postgres'], { install: false })
+
+    expect(await Bun.file(join(dir, 'src/server.ts')).text()).not.toContain('session')
+    expect(existsSync(join(dir, 'src/routes/login.kay'))).toBe(false)
+    expect((await addFeatures(dir, ['postgres'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
