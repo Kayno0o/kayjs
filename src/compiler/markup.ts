@@ -159,8 +159,8 @@ export abstract class TemplateWriter {
       if (name === 'img' && attributeName === NO_PLACEHOLDER)
         continue
 
-      // Read by `currentLink` on the server, and never written.
-      if (attribute === section)
+      // Read by `currentLink` on the server, and never written, a repeat of it included.
+      if (section !== undefined && attributeName === 'section' && (attribute.kind === 'boolean' || attribute.kind === 'expression'))
         continue
 
       if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {

@@ -1,0 +1,4 @@
+---
+throw new Error('failed to render')
+---
+p never

@@ -1120,6 +1120,20 @@ describe('section link', () => {
     }
   })
 
+  it('type-checks the expression of a section on a link with its own aria-current, and writes a repeated section once and never', () => {
+    for (const link of ['a(href="/docs" aria-current="page" section={active}) Docs', 'a(href="/docs" section={active} aria-current="page") Docs']) {
+      const checked = compileKay(`---\nconst active = 5\n---\n${link}\n`, 'test.kay', { check: true })
+
+      expect(checked.tsx).toContain('section={active}')
+    }
+
+    for (const output of ['html', 'dom'] as const) {
+      const result = compileKay('---\nconst active = true\n---\na(href="/docs" section section={active}) Docs\n', 'test.kay', { output })
+
+      expect(result.tsx).not.toContain('section')
+    }
+  })
+
   it('hands the server the expression of a section, true for a bare one', () => {
     const tsx = (link: string) => compileKay(`---\nconst active = true\n---\n${link}\n`, 'test.kay', { output: 'html' }).tsx
 

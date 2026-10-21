@@ -1,0 +1,13 @@
+---
+import Count from '../components/count.kay'
+import Fail from '../components/fail.kay'
+---
+head
+  title Rolled back
+h1 Rolled back
+Count(name="load" hydrate="load")
+try
+  Count(name="gone")
+  Fail
+catch
+  p.fallback Fallback

@@ -1,0 +1,21 @@
+--- server
+async function slow(): Promise<string> {
+  await Bun.sleep(20)
+
+  return 'late'
+}
+
+const later = slow()
+--- script
+import Count from '../components/count.kay'
+---
+head
+  title Streamed
+h1 Streamed
+Count(name="default")
+Count(name="load" hydrate="load")
+// kay-allow uncaught-await
+await later
+  p Waiting
+then text
+  Count(name="streamed")

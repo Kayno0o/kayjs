@@ -121,6 +121,42 @@ describe.each([
     }
   })
 
+  it('preloads the code waiting for the viewport once for a component used both ways, on a streamed page and under a mount point too', async () => {
+    for (const [config, route, prefix] of [[{}, '/both', ''], [{}, '/streamed', ''], [{ base: '/docs' }, '/both', '/docs'], [{ base: '/docs' }, '/streamed', '/docs']] as const) {
+      const { app, remove } = await served(config)
+
+      try {
+        const full = preloads(await read(app, route))
+        const saving = preloads(await read(app, route, ON))
+
+        expect(full.some(href => WHEN.test(href))).toBe(false)
+        expect(saving.some(href => WHEN.test(href))).toBe(true)
+        expect(saving.filter(href => !WHEN.test(href))).toEqual(full)
+        expect(new Set(saving).size).toBe(saving.length)
+        expect(saving.every(href => href.startsWith(`${prefix}/`))).toBe(true)
+      }
+      finally {
+        await remove()
+      }
+    }
+  })
+
+  it('leaves the waiting code out for an island only a failed try block rendered by default', async () => {
+    const { app, remove } = await served()
+
+    try {
+      const full = preloads(await read(app, '/rolled-back'))
+      const html = await read(app, '/rolled-back', ON)
+
+      expect(html).toContain('Fallback')
+      expect(preloads(html)).toEqual(full)
+      expect(html).not.toContain('data-wait')
+    }
+    finally {
+      await remove()
+    }
+  })
+
   it.each([
     ['off', { 'save-data': 'off' }],
     ['absent', {}],
