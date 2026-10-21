@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { blocks, collection } from '../src/content'
-import { dataIssues } from '../src/content/validate'
+import { dataIssues, withDefaults } from '../src/content/validate'
 
 const sections = blocks({
   hero: t.Object({ heading: t.String({ minLength: 1 }), image: t.Optional(t.String()) }, { title: 'Hero banner' }),
@@ -37,6 +37,27 @@ describe('blocks', () => {
   it('names the field of the block that fails, not the item', () => {
     expect(dataIssues(page, { title: 'x', sections: [{ type: 'hero', heading: '' }, { type: 'text' }] }).map(issue => issue.path)).toEqual(['sections.0.heading', 'sections.1.body'])
     expect(dataIssues(page, { title: 'x', sections: [{ type: 'video' }, {}] }).map(issue => issue.path)).toEqual(['sections.0', 'sections.1'])
+  })
+
+  it('fills the defaults of a block by its type, however deep', () => {
+    const rows = t.Object({ rows: blocks({ cell: t.Object({ align: t.String({ default: 'left' }), tags: t.Array(t.Object({ tone: t.String({ default: 'plain' }) })) }), gap: t.Object({ size: t.Number({ default: 2 }) }) }) })
+
+    expect(withDefaults({ rows: [{ type: 'cell', tags: [{}] }, { type: 'gap' }, { type: 'gap', size: 5 }, { type: 'zzz' }, 'x'] }, rows)).toEqual({ rows: [{ type: 'cell', align: 'left', tags: [{ tone: 'plain' }] }, { type: 'gap', size: 2 }, { type: 'gap', size: 5 }, { type: 'zzz' }, 'x'] })
+    expect(dataIssues(rows, { rows: [{ type: 'cell', tags: [] }, { type: 'gap' }] })).toEqual([])
+  })
+
+  it('names the field of a block inside a block, in a nullable list and in an optional one', () => {
+    const nested = t.Object({ columns: blocks({ column: t.Object({ cells: blocks({ cell: t.Object({ text: t.String({ minLength: 1 }) }) }) }) }), maybe: t.Union([sections, t.Null()]), optional: t.Optional(sections) })
+    const column = { type: 'column', cells: [{ type: 'cell', text: 'a' }, { type: 'cell', text: '' }] }
+
+    expect(dataIssues(nested, { columns: [column], maybe: [{ type: 'hero', heading: '' }], optional: [{ type: 'hero', heading: '' }] }).map(issue => issue.path)).toEqual(['columns.0.cells.1.text', 'maybe.0.heading', 'optional.0.heading'])
+    expect(dataIssues(nested, { columns: [], maybe: null }).map(issue => issue.path)).toEqual([])
+  })
+
+  it('leaves a hand-written discriminated union reported as the one value it is', () => {
+    const union = t.Object({ shape: t.Union([t.Object({ type: t.Literal('a'), x: t.String() }), t.Object({ type: t.Literal('b') })]) })
+
+    expect(dataIssues(union, { shape: { type: 'a' } }).map(issue => issue.path)).toEqual(['shape'])
   })
 
   it('keeps a lone type a block list too', () => {

@@ -1,4 +1,3 @@
-import type { TArray, TLiteral, TObject, TUnion } from '@sinclair/typebox'
 import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
@@ -347,12 +346,14 @@ export function tagsField(options?: NonNullable<Parameters<typeof t.Array>[1]>):
 }
 
 // The schema of a list of blocks: an object per declared type, each carrying its `type` key.
-type BlockOf<Name extends string, Block extends TObject> = TObject<{ type: TLiteral<Name> } & Block['properties']>
-type BlockVariants<Types extends Record<string, TObject>> = { [Name in keyof Types & string]: BlockOf<Name, Types[Name]> }[keyof Types & string]
+type AnyObject = ReturnType<typeof t.Object>
+type BlockOf<Name extends string, Block extends AnyObject> = ReturnType<typeof t.Object<{ type: ReturnType<typeof t.Literal<Name>> } & Block['properties']>>
+type BlockVariants<Types extends Record<string, AnyObject>> = { [Name in keyof Types & string]: BlockOf<Name, Types[Name]> }[keyof Types & string]
+type BlocksOf<Types extends Record<string, AnyObject>> = ReturnType<typeof t.Array<ReturnType<typeof t.Union<BlockVariants<Types>[]>>>>
 
 // A list whose items are of several declared types, `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })`, each stored as an object with a `type` key naming its type: `{ type: 'hero', ... }`.
 // The typed read is the union of the blocks discriminated on `type`, and a CMS adds an item by choosing its type, each type showing its own fields. A block's `title` labels its type.
-export function blocks<const Types extends Record<string, TObject>>(types: Types, options?: Omit<NonNullable<Parameters<typeof t.Array>[1]>, 'x-kay'>): TArray<TUnion<BlockVariants<Types>[]>> {
+export function blocks<const Types extends Record<string, AnyObject>>(types: Types, options?: Omit<NonNullable<Parameters<typeof t.Array>[1]>, 'x-kay'>): BlocksOf<Types> {
   const variants = Object.entries(types).map(([name, block]) => {
     if (name === '')
       throw new KayError('content-api-misuse', 'kay: blocks() names a block type with an empty string, which `type` would store as nothing')
@@ -369,7 +370,7 @@ export function blocks<const Types extends Record<string, TObject>>(types: Types
   if (variants.length === 0)
     throw new KayError('content-api-misuse', 'kay: blocks() declares no block type')
 
-  return t.Array(t.Union(variants), { ...options, 'x-kay': { kind: 'blocks' } }) as unknown as TArray<TUnion<BlockVariants<Types>[]>>
+  return t.Array(t.Union(variants, { 'x-kay': { kind: 'block' } }), { ...options, 'x-kay': { kind: 'blocks' } }) as unknown as BlocksOf<Types>
 }
 
 // A call to action: the words of a link and where it goes, a path or an http(s) address.

@@ -52,15 +52,24 @@ function* withoutBlockUnions(issues: Iterable<ValueError>): Generator<ValueError
 }
 
 interface Variant {
-  properties?: { type?: { const?: unknown } }
+  'properties'?: { type?: { const?: unknown } }
+  'x-kay'?: { kind?: unknown }
 }
 
 function variantOf(issue: ValueError): Iterable<ValueError> | undefined {
-  const kind = (issue.value as { type?: unknown } | null | undefined)?.type
   const variants = issue.errors as Iterable<ValueError>[] | undefined
-  const schema = issue.schema as { anyOf?: Variant[] }
+  const schema = issue.schema as Variant & { anyOf?: Variant[] }
 
-  if (typeof kind !== 'string' || !Array.isArray(variants) || schema.anyOf === undefined)
+  if (!Array.isArray(variants) || schema.anyOf === undefined)
+    return undefined
+
+  // A nullable list of blocks fails as the union of the list and null: the list's own errors say which block.
+  if (Array.isArray(issue.value))
+    return variants[schema.anyOf.findIndex(variant => variant['x-kay']?.kind === 'blocks')]
+
+  const kind = (issue.value as { type?: unknown } | null | undefined)?.type
+
+  if (schema['x-kay']?.kind !== 'block' || typeof kind !== 'string')
     return undefined
 
   return variants[schema.anyOf.findIndex(variant => variant.properties?.type?.const === kind)]

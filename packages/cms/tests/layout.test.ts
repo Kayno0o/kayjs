@@ -262,6 +262,13 @@ describe('whenProblems', () => {
     ])
   })
 
+  test('names the block a waiting field is in', () => {
+    const block = (type: string, properties: Record<string, unknown>) => ({ type: 'object', properties: { type: { type: 'string', const: type }, ...properties } })
+    const sections = { 'type': 'array', 'x-kay': { kind: 'blocks' }, 'items': { anyOf: [block('hero', { href: { type: 'string' }, text: when('href') }), block('text', { text: when('href') })] } }
+
+    expect(whenProblems([page({ sections })])).toEqual(['pages: sections[text].text waits for href (fieldInput `when`), which is no field beside it, so it stays hidden'])
+  })
+
   test('counts the alt text an image takes as a sibling', () => {
     const lines = whenProblems([page({
       photo: { 'type': 'string', 'x-kay': { kind: 'image', alt: 'alt' } },

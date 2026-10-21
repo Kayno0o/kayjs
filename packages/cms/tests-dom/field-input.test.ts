@@ -907,3 +907,40 @@ test('a blocks list adds a block at the top from a menu of its types', async () 
   await settle()
   expect(drafted()).toEqual([{ type: 'hero', heading: '' }, { type: 'text', body: 'Hi' }])
 })
+
+test('picking the same type again at the top adds another, and the jump menu of a long blocks list resets on its own', async () => {
+  const { drafted, root } = await openField(SECTIONS, Array.from({ length: 8 }, (_, at) => ({ type: 'text', body: `n${at}` })))
+  const top = () => root.querySelector<HTMLSelectElement>('select[data-kcms-block-menu]')!
+  const jump = () => root.querySelector<HTMLSelectElement>('select[data-kcms-jump]')!
+  const pick = async (menu: HTMLSelectElement, value: string) => {
+    menu.value = value
+    menu.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+  }
+
+  await pick(top(), 'hero')
+  expect(top().value).toBe('')
+  await pick(top(), 'hero')
+  expect((drafted() as { type: string }[]).slice(0, 3).map(item => item.type)).toEqual(['hero', 'hero', 'text'])
+  await pick(jump(), '3')
+  expect(jump().value).toBe('')
+})
+
+test('blocks sharing a field key keep the list bounds of their own when they swap places', async () => {
+  const list = (maxItems?: number): Field => ({ key: 'items', label: 'Items', hint: undefined, required: false, kind: 'list', numbered: true, maxItems, item: text('0', 'Item') })
+  const field: Field = { ...SECTIONS, blocks: [{ type: 'b', label: 'B', fields: [list()] }, { type: 'd', label: 'D', fields: [list(1)] }] }
+  const { root, click } = await openField(field, [{ type: 'b', items: ['y'] }, { type: 'd', items: ['z'] }])
+  const adds = () => [...root.querySelector('.kcms-list-items')!.querySelectorAll(':scope > [data-kcms-row]')].map(row => row.querySelectorAll('.kcms-item-body [data-kcms-add]').length)
+
+  expect(adds()).toEqual([1, 0])
+  await click('[data-kcms-move="down"]', 0)
+  expect(adds()).toEqual([0, 1])
+  expect(root.querySelectorAll('[data-kcms-block-menu]').length).toBe(1)
+})
+
+test('a blocks list at maxItems offers no type to add', async () => {
+  const { root } = await openField({ ...SECTIONS, maxItems: 1 }, [{ type: 'text', body: 'Hi' }])
+
+  expect(root.querySelector('[data-kcms-add]')).toBeNull()
+  expect(root.querySelector('select[data-kcms-block-menu]')).toBeNull()
+})

@@ -25,9 +25,12 @@ export class ContentError extends Error {
 }
 
 interface FieldSchema {
-  default?: unknown
-  properties?: Record<string, FieldSchema>
-  items?: FieldSchema
+  'default'?: unknown
+  'properties'?: Record<string, FieldSchema>
+  'items'?: FieldSchema
+  'anyOf'?: FieldSchema[]
+  'const'?: unknown
+  'x-kay'?: { kind?: unknown }
 }
 
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
@@ -195,12 +198,17 @@ function filled(data: unknown, schema: FieldSchema): unknown {
   if (Array.isArray(data))
     return schema.items === undefined ? data : data.map(item => filled(item, schema.items!))
 
-  if (typeof data !== 'object' || data === null || !PLAIN.has(Object.getPrototypeOf(data) as object | null) || schema.properties === undefined)
+  if (typeof data !== 'object' || data === null || !PLAIN.has(Object.getPrototypeOf(data) as object | null))
+    return data
+
+  const properties = schema.properties ?? blockOf(data as Record<string, unknown>, schema)?.properties
+
+  if (properties === undefined)
     return data
 
   const copy = { ...data as Record<string, unknown> }
 
-  for (const [name, field] of Object.entries(schema.properties)) {
+  for (const [name, field] of Object.entries(properties)) {
     if (copy[name] === undefined) {
       if (field.default !== undefined)
         copy[name] = structuredClone(field.default)
@@ -211,6 +219,11 @@ function filled(data: unknown, schema: FieldSchema): unknown {
   }
 
   return copy
+}
+
+// The schema of the block a `blocks()` item is, by its `type`.
+function blockOf(item: Record<string, unknown>, schema: FieldSchema): FieldSchema | undefined {
+  return schema['x-kay']?.kind === 'block' ? schema.anyOf?.find(variant => variant.properties?.type?.const === item.type) : undefined
 }
 
 export function unknownComponents(segments: Segment[], components: Record<string, unknown>, found: ComponentSegment[] = []): ComponentSegment[] {

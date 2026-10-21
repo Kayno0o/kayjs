@@ -16,7 +16,7 @@ import { guardLeave, uid } from 'kay'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { today } from '../datetime'
-import { checkField, emptyBlock, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
+import { blockOf, checkField, emptyBlock, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
 import { markdownOptions } from './markdown-options'
 import { previewMarkdown } from './preview'
@@ -259,8 +259,12 @@ function jump(at: number): void {
   focusItem(rows, at)
   rows?.querySelectorAll(':scope > [data-kcms-row]')[at]?.scrollIntoView({ block: 'nearest' })
 
-  // The menu goes back to its prompt, so picking the same item again changes it.
-  const menu = box?.querySelector<HTMLSelectElement>('.kcms-list-tools select')
+  resetMenu('[data-kcms-jump]')
+}
+
+// A menu goes back to its prompt, so picking the same entry again changes it.
+function resetMenu(selector: string): void {
+  const menu = box?.querySelector<HTMLSelectElement>(`.kcms-list-tools select${selector}`)
 
   if (menu)
     menu.value = ''
@@ -418,16 +422,17 @@ function leaveJson(): void {
             .kcms-list-tools
               if !atMax()
                 if current.blocks
-                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstLabel', 'Add a block at the top of {list}', { list: current.label })} onChange={(type) => { if (type !== '') prepend(type) }})
+                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstLabel', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
                 else
                   Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" onClick={() => prepend()})
               if count() >= JUMP_FROM
-                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} aria-label={wording('cms.list.jumpLabel', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
+                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpLabel', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
           .kcms-list-items(ref={element => rows = element})
             for item, i of items() key={i}
               .kcms-list-item(data-kcms-row data-compact={isCompact(current) ? '' : undefined} onKeyDown={event => itemKey(event, i)})
                 const title = itemTitle(current, item, i)
                 const itemField = itemAt(current, i, item)
+                const blockType = blockOf(current, item)?.type ?? ''
                 if isCompact(current)
                   FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
                   .kcms-item-controls
@@ -448,7 +453,7 @@ function leaveJson(): void {
                     if itemField.kind === 'group'
                       if drafts.issues(entry, joinPath(path, i))[0] as own
                         p.kcms-item-error(role="alert") {own.message}
-                      for child of itemField.fields key={child.key}
+                      for child of itemField.fields key={`${blockType}:${child.key}`}
                         FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(joinPath(path, i), child.key)})
                     else
                       FieldInput(drafts={drafts} entry={entry} field={itemField} path={joinPath(path, i)})
@@ -457,9 +462,9 @@ function leaveJson(): void {
               span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
               Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={atMax()} onClick={undo})
           if !atMax() && current.blocks
-            .kcms-block-add(role="group" aria-label={wording('cms.blocks.add', 'Add a block')})
+            .kcms-block-add(role="group" aria-label={wording('cms.blocks.add', 'Add a block to {list}', { list: current.label })})
               for block of current.blocks key={block.type}
-                Button(label={wording('cms.blocks.addType', 'Add {block}', { block: block.label })} icon="plus" variant="ghost" data-kcms-add onClick={() => append(emptyBlock(block))})
+                Button(label={wording('cms.blocks.addType', 'Add {block}', { block: block.label })} icon="plus" data-kcms-add onClick={() => append(emptyBlock(block))})
           else if !atMax()
             if current.item.kind === 'image' || current.item.kind === 'file'
               FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} upload={current.item.kind === 'image' || current.item.kind === 'file' ? current.item.upload : undefined} many onChange={path => append(path)})

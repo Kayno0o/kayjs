@@ -493,6 +493,11 @@ export function itemFields(list: Field & { kind: 'list' }): Field[] {
   return list.blocks?.flatMap(block => block.fields) ?? [list.item]
 }
 
+// The field one item of the list is read through, for a walk that has no place to number it by.
+export function itemOf(list: Field & { kind: 'list' }, value: unknown): Field {
+  return list.blocks === undefined ? list.item : itemAt(list, 0, value)
+}
+
 // The block a list's item is of, by its `type`.
 export function blockOf(list: Field & { kind: 'list' }, value: unknown): Block | undefined {
   const type = typeof value === 'object' && value !== null ? (value as { type?: unknown }).type : undefined

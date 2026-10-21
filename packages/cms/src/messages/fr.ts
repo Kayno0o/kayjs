@@ -37,7 +37,7 @@ export default defineMessages({
       statusScheduled: 'Programmées',
     },
     blocks: {
-      add: 'Ajouter un bloc',
+      add: 'Ajouter un bloc à {list}',
       addFirst: 'Ajouter en tête…',
       addFirstLabel: 'Ajouter un bloc en tête de {list}',
       addType: 'Ajouter {block}',

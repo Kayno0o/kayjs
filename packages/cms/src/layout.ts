@@ -288,7 +288,7 @@ export function whenProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]):
         walk(`${at}.`, field.fields)
       }
       else if (field.kind === 'list' && field.blocks !== undefined) {
-        for (const block of field.blocks) walk(`${at}.`, block.fields)
+        for (const block of field.blocks) walk(`${at}[${block.type}].`, block.fields)
       }
       else if (field.kind === 'list' && field.item.kind === 'group') {
         walk(`${at}.`, field.item.fields)
