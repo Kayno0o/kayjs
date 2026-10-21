@@ -59,7 +59,7 @@ interface SuiteServerOptions<In extends 'ignore' | 'pipe', Err extends 'ignore' 
   stderr?: Err
 }
 
-// Starts a process a whole suite shares, started in a `beforeAll`. Bun SIGTERMs every process still running when a test times out, the suite's with it (one handling SIGTERM exits), and the tests after fail on a refused connection: it runs under a shell that ignores the signal, so a timed-out test fails alone. It ends as it would have, when its stdin closes or it exits on its own; `stopSuiteServer` ends one that does not.
+// Starts a process a whole suite shares, started in a `beforeAll`. Bun SIGTERMs every process still running when a test times out (oven-sh/bun#46373), the suite's with it (one handling SIGTERM exits), and the tests after fail on a refused connection: it runs under a shell that ignores the signal, so a timed-out test fails alone. It ends as it would have, when its stdin closes or it exits on its own; `stopSuiteServer` ends one that does not.
 export function spawnSuiteServer<In extends 'ignore' | 'pipe' = 'ignore', Err extends 'ignore' | 'pipe' = 'pipe'>(command: string[], options: SuiteServerOptions<In, Err> = {}): Bun.Subprocess<In, 'pipe', Err> {
   const { stdin = 'ignore', stderr = 'pipe', ...rest } = options
 

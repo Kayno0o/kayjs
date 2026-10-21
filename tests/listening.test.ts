@@ -69,18 +69,35 @@ it('still reaches the server', async () => {
 })
 `
 
-it('keeps the server of a suite alive when one of its tests times out', async () => {
+async function runSuite(suite: string): Promise<string> {
   const file = join(await scratchDir('suite-server-'), 'shared.test.ts')
 
-  await Bun.write(file, SHARED_SERVER_SUITE)
+  await Bun.write(file, suite)
 
   const run = Bun.spawn([process.execPath, 'test', file], { stdout: 'pipe', stderr: 'pipe' })
   const [output, errors] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
-  const report = output + errors
+
+  return output + errors
+}
+
+it('keeps the server of a suite alive when one of its tests times out', async () => {
+  const report = await runSuite(SHARED_SERVER_SUITE)
 
   expect(report).toContain('(fail) times out')
   expect(report).toContain(' 1 pass')
   expect(report).toContain(' 1 fail')
+}, 30_000)
+
+// oven-sh/bun#46373: once this fails, Bun no longer kills a beforeAll server on a timeout, and `spawnSuiteServer` can go.
+it('still loses a plainly spawned suite server when one test times out, on this Bun', async () => {
+  const plain = SHARED_SERVER_SUITE
+    .replace('spawnSuiteServer([', 'Bun.spawn([')
+    .replace(`${JSON.stringify(LOGGING)}])`, `${JSON.stringify(LOGGING)}], { stdout: 'pipe', stderr: 'pipe' })`)
+    .replace('stopSuiteServer(server)', 'server.kill()')
+  const report = await runSuite(plain)
+
+  expect(report).toContain('killed 1 dangling process')
+  expect(report).toContain(' 2 fail')
 }, 30_000)
 
 it('starts a suite server that ignores SIGTERM and goes with stopSuiteServer', async () => {
