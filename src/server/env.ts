@@ -1,6 +1,5 @@
 import type { Elysia, Static, TSchema } from 'elysia'
 import type { EnvSchemaRecord } from './env-state'
-import type { ServedPaths } from './served-paths'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -198,9 +197,8 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
 const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
 
 // Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
-export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSchema): void {
-  served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay', exported: true })
-
+// The boot claims its path before any build.
+export function servePublicEnv(app: Elysia, schema: EnvSchema): void {
   const values = defineEnv(schema) as Record<string, unknown>
   const exposed = Object.keys(values).filter(name => SERVER_ONLY.test(name))
 

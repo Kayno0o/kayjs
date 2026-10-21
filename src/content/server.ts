@@ -226,15 +226,12 @@ function collectionFeed(collection: Collection<unknown>): CollectionFeed {
 
 // Serves each collection's feed at its path; one stays cached for an hour in production, then revalidates by its ETag, answering 304 while unchanged.
 // A localized collection's feed lists only the entries written in its locale, linking each at its path there.
-export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n, trailingSlash?: TrailingSlash): void {
+export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string, dev = false, i18n?: I18n, trailingSlash?: TrailingSlash): void {
   for (const collection of collections) {
     const { feed } = collection.options
 
     if (!feed)
       continue
-
-    if (origin === undefined)
-      throw feedNeedsSite(collection)
 
     const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8` }
     const cache = dev ? 'no-cache' : 'public, max-age=3600'

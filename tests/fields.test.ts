@@ -8,7 +8,6 @@ import { defineEnv } from '../src/server'
 import { publicEnvModule, servePublicEnv } from '../src/server/env'
 import { buildingWithoutEnv } from '../src/server/env-state'
 import { queryRules, queryScript, readQuery } from '../src/server/query'
-import { ServedPaths } from '../src/server/served-paths'
 import { Denied } from '../src/server/signals'
 
 const schema = t.Object({
@@ -99,7 +98,7 @@ describe('defineEnv', () => {
 
 describe('servePublicEnv', () => {
   it('stops the boot naming a public variable missing, and serves only the declared ones', async () => {
-    expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
+    expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
     expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
   })
 
@@ -109,10 +108,10 @@ describe('servePublicEnv', () => {
     Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', ...Object.fromEntries(names.map(name => [name, 'sk'])) })
 
     try {
-      expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))).not.toThrow()
+      expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))).not.toThrow()
 
       for (const name of names)
-        expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String(), [name]: t.String() })), name).toThrow(`kay: publicEnv declares ${name}, which every visitor reads`)
+        expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MAP_KEY: t.String(), [name]: t.String() })), name).toThrow(`kay: publicEnv declares ${name}, which every visitor reads`)
     }
     finally {
       for (const name of ['KAY_TEST_MAP_KEY', ...names])

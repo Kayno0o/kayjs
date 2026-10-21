@@ -8,8 +8,11 @@ import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { Unmatched } from './page-routes'
+import type { ClaimedFile } from './public'
 import type { Publishing } from './publishing'
+import type { Redirect } from './redirects'
 import type { ServedPage } from './render'
+import type { RouteTable } from './route-table'
 import type { Claim } from './served-paths'
 import type { PageSetup, Scanned } from './setup'
 import { join, resolve } from 'node:path'
@@ -44,7 +47,7 @@ import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
 import { PUBLIC_ENV_PATH } from './env-state'
 import { serveErrorReports } from './errors'
-import { FAVICON_DIR, faviconSource, manifestJson, serveFavicons } from './favicon'
+import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
@@ -69,7 +72,7 @@ import { claimRedirects, readRedirects, redirectStatus, serveRedirects } from '.
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
-import { refuseClashes, routeMatch, routeTable } from './route-table'
+import { routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
@@ -103,8 +106,8 @@ export interface PagesOptions extends KayConfig {
 }
 
 // The routes with their guards loaded.
-async function servedRoutes({ routes }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
-  return Promise.all(routes.map(async route => loadGuards(route, required)))
+async function servedRoutes({ routes }: PageSetup, pages: ServedRoute[], required: boolean | undefined): Promise<ServedRoute[]> {
+  return Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
 }
 
 // What the server's options refuse by themselves, before the project is read.
@@ -119,22 +122,37 @@ function refuseOptions(options: PagesOptions): void {
     corsRule(options.cors)
 }
 
+// What the boot claimed before any client build, which the rest of it goes on from.
+interface Claimed {
+  served: ServedPaths
+  // The routes with their guards not loaded yet, which `servedRoutes` fills in place so the table keeps holding them.
+  routes: ServedRoute[]
+  table: RouteTable
+  publicServed: ClaimedFile[]
+  redirects: Redirect[]
+  mcpAt: string | undefined
+}
+
 // What the server refuses once the routes, public files, endpoints and collections are read, which is all of it that needs no build, so a refused config starts none.
-// Claims run in the order the server makes them, on a table of their own; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
-function refuseScanned({ root, config, paths }: Project<PagesOptions>, { routes, files, endpoints, collections, i18n, site, base, ownManifest }: Scanned): void {
+// Claims run in the order the server makes them; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
+function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files, endpoints, collections, i18n, site, base }: Scanned): Claimed {
   if (i18n)
     refuseLocaleClashes(i18n, routes)
 
   const served = new ServedPaths()
-
-  refuseClashes(paths.routes, routes, served, i18n)
+  const pages: ServedRoute[] = routes.map(route => ({ ...route, guards: [] }))
+  const table = routeTable(pages, i18n, served)
 
   if (config.publicEnv)
-    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay' })
+    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay', exported: true })
 
-  claimPublic(served, files)
+  const publicServed = claimPublic(served, files)
+
   claimEndpoints(served, endpoints, root)
-  claimRedirects(served, readRedirects(config.redirects ?? {}))
+
+  const redirects = readRedirects(config.redirects ?? {})
+
+  claimRedirects(served, redirects)
 
   const mcpAt = mcpPath(config.mcp)
 
@@ -143,8 +161,11 @@ function refuseScanned({ root, config, paths }: Project<PagesOptions>, { routes,
 
   refuseFeedsWithoutSite(collections, site)
 
-  if (!ownManifest && faviconSource(root, config.favicon, config.manifest) !== undefined)
+  // A manifest something else serves is not made, so its settings are not checked either.
+  if (!served.heldByApp(MANIFEST) && faviconSource(root, config.favicon, config.manifest) !== undefined)
     manifestJson(undefined, undefined, config.manifest, base)
+
+  return { served, routes: pages, table, publicServed, redirects, mcpAt }
 }
 
 // The routes under `/_kay/files/` carry the security headers themselves, as the build's files and the image route do.
@@ -299,10 +320,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   refuseOptions(options)
 
   const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned))
-  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints, appManifest, extensions, api: apiImport } = setup
-  const routes = await servedRoutes(setup, options.requireGuards)
-  const served = new ServedPaths()
-  const table = routeTable(routes, i18n?.settings, served)
+  const { served, table, publicServed, redirects, mcpAt } = setup.claimed
+  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, endpoints, appManifest, extensions, api: apiImport } = setup
+  const routes = await servedRoutes(setup, setup.claimed.routes, options.requireGuards)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const pageMatch = routeMatch(table, matchers, options.trailingSlash)
 
@@ -324,7 +344,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     asksConsent: options.extensions?.some(extension => extension.asksConsent === true) ?? false,
   })
 
-  const writes = countWrites(app, [mcpPath(options.mcp)].filter(path => path !== undefined))
+  const writes = countWrites(app, [mcpAt].filter(path => path !== undefined))
   // Hashed as they go out, under the mount point.
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'
   // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
@@ -389,7 +409,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   }
 
   if (options.publicEnv)
-    servePublicEnv(app, served, options.publicEnv)
+    servePublicEnv(app, options.publicEnv)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)
@@ -423,10 +443,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0
-  const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
 
-  claimEndpoints(served, endpoints, root)
   await serveEndpoints(app, endpoints, actionOptions)
 
   // The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
@@ -454,7 +472,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   }
 
   // Claimed before kay's own files, which give way to them; registered last, before the pages.
-  const redirects = readRedirects(options.redirects ?? {})
   const openapi = openApiSettings(options.openapi)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
 
@@ -467,15 +484,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
     base,
   })
-  claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
   const metadataPaths: string[] = []
-  const mcpAt = mcpPath(options.mcp)
 
   if (mcpAt !== undefined) {
-    served.claim({ path: mcpAt, owner: '`mcp`', kind: 'kay', method: 'ALL' })
-
     // Offered, not claimed: an app serving its own protected resource metadata keeps it, as it keeps the authorization server one.
     for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${mcpAt}`]) {
       if (served.offer({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
@@ -517,7 +530,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveFiles(app, security)
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
-  serveFeeds(app, served, collections, site, mode.dev, i18n, options.trailingSlash)
+
+  // A collection with a feed has the site, which the boot refused a config without before any build.
+  if (site !== undefined)
+    serveFeeds(app, served, collections, site, mode.dev, i18n, options.trailingSlash)
+
   const editSite = { urls: entryUrls(routes, base, options.trailingSlash, i18n?.settings, async request => (await appRef.deref()?.handle(request)) ?? new Response(null, { status: 503 })), locales: i18n?.settings.locales, defaultLocale: i18n?.settings.defaultLocale }
 
   registerEditSite(editSite)

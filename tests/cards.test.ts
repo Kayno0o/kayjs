@@ -231,13 +231,11 @@ describe('share cards', () => {
     expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
   })
 
-  it('takes its face, background and colour from images.card, and refuses one it cannot use', async () => {
+  it('takes its face, background and colour from images.card', async () => {
     const themed = await pages({ ...config, images: { card: { background: '#fff', color: '#000000', font: { family: 'Archivo Black', weight: 900 } } } })
     const pixel = await pixelsOf(await (await themed.handle(new Request(`http://localhost${await cardPath('/plain', themed)}`))).bytes())
 
     expect(pixel(20, 20).every(channel => channel > 245)).toBe(true)
-    await expect(pages({ ...config, images: { card: { background: 'white' } } })).rejects.toThrow('images.card.background is white, which is no #rrggbb colour')
-    await expect(pages({ ...config, images: { card: { font: { family: 'Inter' } } } })).rejects.toThrow('images.card.font names Inter')
   })
 
   it('draws images.card.logo at the top left, an SVG or a raster image, on a card with or without an image', async () => {
@@ -261,7 +259,6 @@ describe('share cards', () => {
   })
 
   it.each([
-    ['missing', 'none.svg', `images.card.logo names ${join(FIXTURE, 'src/none.svg')}, which does not exist`],
     ['not square', 'hero.png', 'is 1000x600; it has to be square'],
     ['no image', 'fonts/archivo-black-latin-400-normal.woff', 'which is no SVG, PNG, JPEG or WebP kay can draw'],
   ])('refuses a logo that is %s', async (_name, file, message) => {

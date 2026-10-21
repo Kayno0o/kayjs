@@ -28,7 +28,7 @@ import { setupPreview } from './preview'
 import { dropOpenCache, privateDir } from './private-dir'
 import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
-import { routeMounts, styleChains } from './routes'
+import { refuseRouteNames, routeMounts, styleChains } from './routes'
 import { islandOnlyChunks } from './save-data'
 import { allowsStyleAttributes } from './security'
 import { configHead, siteWithBase } from './seo'
@@ -46,7 +46,6 @@ export interface Scanned {
   i18n: LocaleSettings | undefined
   site: string | undefined
   base: string
-  ownManifest: boolean
 }
 
 export interface PageSetup {
@@ -79,7 +78,8 @@ export interface PageSetup {
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
 // It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode and the locales, with the preview secret, the tracer and the file store when serving, as a build traces nothing, previews nothing and an export links its files itself.
-export async function setupPages(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false, redirectSpelling?: RenderOptions['redirectSpelling'], refuse?: (scanned: Scanned) => void): Promise<PageSetup> {
+// `refuse` is the check a server passes to refuse the config before the build starts, and what it claimed comes back as `claimed` for the server to go on from.
+export async function setupPages<Claimed = undefined>(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false, redirectSpelling?: RenderOptions['redirectSpelling'], refuse?: (scanned: Scanned) => Claimed): Promise<PageSetup & { claimed: Claimed }> {
   let loading: Promise<ClientBuild> | undefined
 
   try {
@@ -93,7 +93,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   }
 }
 
-async function setupWith(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling'], refuse: ((scanned: Scanned) => void) | undefined): Promise<PageSetup> {
+async function setupWith<Claimed>(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling'], refuse: ((scanned: Scanned) => Claimed) | undefined): Promise<PageSetup & { claimed: Claimed }> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
   const source = projectSource()
@@ -111,7 +111,12 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   const routes = await source.routes(paths.routes, mounts)
 
-  refuseClashes(paths.routes, routes)
+  // A server's check claims the routes itself, once the locales are known.
+  if (refuse)
+    refuseRouteNames(paths.routes, routes)
+  else
+    refuseClashes(paths.routes, routes)
+
   const [matchers, i18n] = await Promise.all([loadMatchers(paths.routes, routes), config.i18n && loadI18n(root, config.i18n, config.extensions)])
 
   if (i18n)
@@ -160,7 +165,7 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   const collections = await loadingCollections
 
-  refuse?.({ routes, files, endpoints, collections, i18n: i18n?.settings, site, base, ownManifest })
+  const claimed = refuse?.({ routes, files, endpoints, collections, i18n: i18n?.settings, site, base }) as Claimed
 
   // Started once every refusal that needs no build is behind, those of the config (images, markdown, i18n, matchers, base, preview, the cards) and of the scanned project, the server's own among them; only what needs the built client or the routes' guards (the font faces of a Fontsource family, API modules, extension routes) still follows it.
   // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
@@ -192,5 +197,5 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
 }

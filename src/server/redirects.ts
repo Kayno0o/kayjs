@@ -16,7 +16,7 @@ const LEADING_SLASHES = /^\/{2,}/
 // What the target names from the old path: a `:name`, or the `*`.
 const TARGET_PART = /:([A-Z_$][\w$]*)|\*/gi
 
-interface Redirect {
+export interface Redirect {
   // The old path as the router registers it, params named by position as pages are.
   path: string
   // The router's name for each param the old path names.

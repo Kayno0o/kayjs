@@ -1,8 +1,10 @@
 import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import { describe, expect, it } from 'bun:test'
+import { t } from 'elysia'
 import { resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
+import { MANIFEST } from '../src/server/favicon'
 import { scratchDir } from './scratch'
 
 const routes = 'tests/fixtures/i18n/src/routes'
@@ -47,6 +49,7 @@ describe('a refused config', () => {
     ['an i18n path another page takes', { i18n: { ...i18n, paths: { '/about': { en: '/' } } } }, 'are both served at / in en'],
     ['a content config that is missing', { content: 'tests/fixtures/content/src/missing.config.ts' }, 'there is no such file'],
     ['a feed without the site', { routes: 'tests/fixtures/content/src/routes', content }, 'has a feed, whose links need the site\'s URL'],
+    ['an mcp path a page serves', { routes: 'tests/fixtures/mcp-clash/src/routes', mcp: true }, '`mcp` both serve /mcp'],
     ['images.card.background', { ...cards, images: { card: { background: 'white' } } }, 'images.card.background is white'],
     ['images.card.font', { ...cards, images: { card: { font: { family: 'Inter' } } } }, 'images.card.font names Inter'],
     ['images.card.logo', { ...cards, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } }, 'which does not exist'],
@@ -74,5 +77,69 @@ describe('a refused config naming a file of the project', () => {
 
     expect(taken.message).toContain('/old and the redirect from /old both serve /old')
     expect(taken.builds).toBe(0)
+  })
+})
+
+describe('a refused config naming files of the project', () => {
+  it('starts no client build for a public file on the public env module, or an endpoint a public file or a page serves', async () => {
+    const dir = await scratchDir('refused-claims-')
+
+    await Bun.write(`${dir}/public/_kay/env.js`, '')
+    await Bun.write(`${dir}/public/llms.txt`, 'plain')
+
+    const env = await refusal({ publicDir: `${dir}/public`, publicEnv: t.Object({}) })
+
+    expect(env.message).toContain('`publicEnv` and')
+    expect(env.message).toContain('both serve /_kay/env.js')
+    expect(env.builds).toBe(0)
+
+    const file = await refusal({ routes: 'tests/fixtures/endpoints/src/routes', publicDir: `${dir}/public` })
+
+    expect(file.message).toContain('llms.txt.ts and the public file')
+    expect(file.builds).toBe(0)
+
+    await Bun.write(`${dir}/routes/data.json.kay`, 'h1 Data\n')
+    await Bun.write(`${dir}/routes/data.json.ts`, 'export function GET() { return {} }\n')
+
+    const page = await refusal({ routes: `${dir}/routes` })
+
+    expect(page.message).toContain('data.json.kay and')
+    expect(page.message).toContain('data.json.ts both serve /data.json')
+    expect(page.builds).toBe(0)
+  })
+
+  it('refuses an endpoint the router cannot answer, and a page name first when both scans reject', async () => {
+    const dir = await scratchDir('refused-scans-')
+
+    await Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n')
+    await Bun.write(`${dir}/routes/[...rest].json.ts`, 'export function GET() { return {} }\n')
+
+    const endpoint = await refusal({ routes: `${dir}/routes` })
+
+    expect(endpoint.message).toContain('answers one path per set of params')
+    expect(endpoint.builds).toBe(0)
+
+    await Bun.write(`${dir}/routes/a:b.kay`, 'h1 Colon\n')
+
+    const both = await refusal({ routes: `${dir}/routes` })
+
+    expect(both.message).toContain('has a :, * or \' in its name')
+    expect(both.builds).toBe(0)
+  })
+
+  it('checks the manifest only where nothing else serves it', async () => {
+    const dir = await scratchDir('refused-manifest-')
+
+    await Bun.write(`${dir}/public/${MANIFEST.slice(1)}`, '{}')
+
+    const favicon = 'tests/fixtures/cards/src/logo.svg'
+    const held = await refusal({ publicDir: `${dir}/public`, favicon, manifest: { startUrl: 'notes' } })
+    const redirected = await refusal({ favicon, redirects: { [MANIFEST]: '/about' }, manifest: { startUrl: 'notes' } })
+    const made = await refusal({ favicon, manifest: { startUrl: 'notes' } })
+
+    expect(held.message).toBe('a build started')
+    expect(redirected.message).toBe('a build started')
+    expect(made.message).toContain('the manifest\'s startUrl is a path of the site')
+    expect(made.builds).toBe(0)
   })
 })
