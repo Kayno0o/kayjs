@@ -1,8 +1,9 @@
 ---
 import type { EditorProps } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
-import type { FieldMarker, FieldPath } from '../markers'
+import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import type { Dock, Layout } from './dock'
+import type { Marks } from './marks'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
@@ -10,11 +11,14 @@ import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
 import layoutBottom from '~icons/tabler/layout-bottombar'
 import layoutSide from '~icons/tabler/layout-sidebar-right'
+import browse from '~icons/tabler/pointer'
+import outline from '~icons/tabler/scan'
 import { call, guardLeave, listen, refresh } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
-import { entryKey, fieldsAt } from '../markers'
-import { inlineTargetOf, isTypingInline, reachMarked, startInline } from './inline'
+import { BODY, entryKey, fieldsAt, markersOf } from '../markers'
+import { inlineTargetOf, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
+import { createMarks, readMarking, writeMarking } from './marks'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
@@ -27,6 +31,8 @@ const PROBES = [0.25, 0.5, 0.75]
 const PINNED = new Set(['fixed', 'sticky'])
 // The collapsed button's distance from the window's right edge, which what keeps off it counts too.
 const COLLAPSED_GAP = 16
+// The widest the choice of field is, which a click near the window's right edge keeps inside it.
+const MENU_WIDTH = 256
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
 const { entries, unclickable } = props<EditorProps>()
@@ -44,6 +50,12 @@ const chosen = signal<Dock>()
 const side = signal<number>()
 const bottom = signal<number>()
 const ready = signal(false)
+// Browsing lets the page's links, menus and tabs work with the editor open, as a click edits nothing then.
+const browsing = signal(false)
+// Whether every marked field is outlined, else only the one under the pointer.
+const marking = signal(false)
+// The fields of the element a click or an Enter reached, when it holds several and the editor asks which one, and where the menu opens.
+const choosing = signal<{ fields: MarkedField[], x: number, y: number, back?: HTMLElement }>()
 const room = signal({ width: 0, height: 0 })
 // What the dev tool's docked drawer holds along the right and bottom edges, and how far down a fixed header holds the top of the window.
 const held = signal({ right: 0, bottom: 0 })
@@ -51,6 +63,8 @@ const clear = signal(0)
 // The page the edits were last shown on: a render of the drafts swaps the page as well, which leaves its path as it was.
 let shownPath = ''
 let panel: HTMLElement | undefined
+let menu: HTMLElement | undefined
+let marks: Marks | undefined
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = 0
 let frame = 0
@@ -122,6 +136,7 @@ onMount(() => {
   side = kept.side
   bottom = kept.bottom
   measure()
+  marking = readMarking(browserStorage()) ?? matchMedia('(hover: none)').matches
   ready = true
 
   shownPath = location.pathname + location.search
@@ -267,28 +282,116 @@ function clickedNode(event: MouseEvent): Node | undefined {
 
 // While the editor is open, a click on a marked element edits its field instead of following a link or a button there: a one-line text is typed in on the page, any other field is brought up in the form.
 listen(() => document, 'click', (event) => {
-  const node = open() ? clickedNode(event) : undefined
+  const node = open() && !browsing() ? clickedNode(event) : undefined
+
+  if (choosing() && !(node && menu?.contains(node)))
+    choosing = undefined
 
   act(event, node, { x: event.clientX, y: event.clientY })
 }, { capture: true })
+
+// The fields under the pointer are outlined, whichever way the page marks them.
+listen(() => document, 'pointermove', (event) => {
+  const node = open() && !browsing() ? clickedNode(event) : undefined
+
+  marks?.hover(node && !panel?.contains(node) && !menu?.contains(node) ? fieldsAt(node) : undefined)
+}, { passive: true })
+listen(() => document.documentElement, 'pointerleave', () => marks?.hover(undefined))
 
 // Enter on a marked element reached by the keyboard edits its field as a click on it does.
 listen(() => document, 'keydown', (event) => {
   const element = event.target instanceof HTMLElement ? event.target : undefined
 
-  if (!open() || event.key !== 'Enter' || event.isComposing || !element?.hasAttribute('data-kay-field') || element.isContentEditable || element.matches('button, summary, input, select, textarea, label, a[href]'))
+  const pressed = event.key === 'Enter' || (event.key === ' ' && element?.getAttribute('role') === 'button')
+
+  if (!open() || browsing() || !pressed || event.isComposing || !element || markersOf(element).length === 0 || element.isContentEditable || element.matches('button, summary, input, select, textarea, label, a[href]'))
     return
 
   act(event, element)
 }, { capture: true })
 
-// Keeps marked fields on the tab order while the editor is open.
+// What names a field to the editor: the form's label for it, the attribute it renders in beside it.
+function describe(field: MarkedField): string {
+  const name = field.marker.path === BODY ? wording('cms.marker.body', 'Body') : markedLabel(field, drafts) ?? field.marker.path
+
+  return field.attribute ? wording('cms.marker.attribute', '{field} ({attribute})', { field: name, attribute: field.attribute }) : name
+}
+
+// Keeps marked fields on the tab order while the editor is open, with a name saying what they edit.
 effect(() => {
-  if (!open())
+  if (!open() || browsing())
     return
 
-  onCleanup(reachMarked())
+  onCleanup(reachMarked(found => wording('cms.marker.edit', 'Edit {fields}', { fields: found.map(describe).join(', ') })))
 })
+
+// Outlines the marked fields while the editor is open, all of them or the one under the pointer.
+effect(() => {
+  if (!open() || browsing())
+    return
+
+  const made = createMarks(marking())
+
+  marks = made
+  onCleanup(() => {
+    made.destroy()
+    marks = undefined
+  })
+})
+
+effect(() => {
+  if (ready())
+    writeMarking(browserStorage(), marking())
+})
+
+// Stepping away from the editor or the page closes the question of which field.
+effect(() => {
+  if (!open() || browsing())
+    choosing = undefined
+})
+
+// The first field of the menu takes the focus, so the keyboard answers at once.
+effect(() => {
+  if (!choosing())
+    return
+
+  const frame = requestAnimationFrame(() => menu?.querySelector('button')?.focus())
+
+  onCleanup(() => cancelAnimationFrame(frame))
+})
+
+function closeMenu(): void {
+  choosing()?.back?.focus()
+  choosing = undefined
+}
+
+function menuKey(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    closeMenu()
+
+    return
+  }
+
+  const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+
+  if (step === 0 || !menu)
+    return
+
+  const items = [...menu.querySelectorAll('button')]
+  const next = items[(items.indexOf(document.activeElement as HTMLButtonElement) + step + items.length) % items.length]
+
+  event.preventDefault()
+  next?.focus()
+}
+
+function choose(field: MarkedField): void {
+  const at = choosing()
+
+  choosing = undefined
+  edit(field, at?.x, at?.y, at?.back)
+}
 
 // What a click, or an Enter on a field reached by the keyboard, does at `node`.
 function act(event: Event, node: Node | undefined, at?: { x: number, y: number }): void {
@@ -300,7 +403,7 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
     return
   }
 
-  const found = node && !panel?.contains(node) ? fieldsAt(node) : []
+  const found = node && !panel?.contains(node) && !menu?.contains(node) ? fieldsAt(node) : []
   const [field] = found
 
   if (!field)
@@ -309,17 +412,32 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
   event.preventDefault()
   event.stopPropagation()
 
-  const inline = inlineTargetOf(found, drafts)
+  // An element with several fields asks which one, next to the click or under the element a key reached.
+  if (found.length > 1) {
+    const box = field.element.getBoundingClientRect()
+    const back = at ? undefined : field.element as HTMLElement
+
+    choosing = { fields: found, x: Math.min(at?.x ?? box.left, window.innerWidth - MENU_WIDTH), y: at?.y ?? box.bottom, back }
+
+    return
+  }
+
+  edit(field, at?.x, at?.y)
+}
+
+// Types in a field on the page when it is a one-line text, else brings it up in the form.
+function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement): void {
+  const inline = inlineTargetOf([field], drafts)
 
   if (inline && !inline.busy()) {
-    startInline(inline, drafts, at)
-    reveal(inline.element, at?.y)
+    startInline(inline, drafts, back || x === undefined || y === undefined ? undefined : { x, y })
+    reveal(inline.element, y)
 
     return
   }
 
   focused = field.marker
-  reveal(field.element, at?.y)
+  reveal(field.element, y)
 }
 
 // What the head's button does: leaves at once, or with edits not saved shows the question, which only its own two buttons answer.
@@ -352,7 +470,8 @@ async function stopEditing(): Promise<void> {
 // The page outlines its fields while the editor is open. The Toaster and TooltipHost below give way to a site page's own.
 effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
-  onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
+  document.documentElement.classList.toggle('kcms-browsing', browsing())
+  onCleanup(() => document.documentElement.classList.remove('kcms-editing', 'kcms-browsing'))
 })
 
 // The collapsed button is a panel too, so the dev tool's bar and a floating drawer at the bottom right keep off it.
@@ -398,6 +517,9 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
       Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
     if open() && dock() && canSide(room().width)
       IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
+    if open()
+      IconButton(icon={outline} label={marking() ? wording('cms.editor.markingOff', 'Stop outlining every field') : wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={() => marking = !marking()})
+      IconButton(icon={browse} label={browsing() ? wording('cms.editor.browseOff', 'Edit the page again') : wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
     IconButton(icon={open() ? 'close' : 'menu'} label={open() ? wording('cms.editor.hide', 'Hide the editor') : wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = !open()})
   if open() && dock() as at
     .kcms-editor-grip(role="separator" tabindex="0" aria-label={wording('cms.editor.resize', 'Resize the editor')} aria-orientation={at === 'side' ? 'vertical' : 'horizontal'} aria-valuenow={size(at)} aria-valuemin={at === 'side' ? SIDE.min : BOTTOM.min} aria-valuemax={clampSize(at, Number.MAX_SAFE_INTEGER, room(), taken(at))} onPointerDown={startResize} onKeyDown={resizeByKey})
@@ -422,5 +544,9 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         EntryForm(entry={entry} focus={focusIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
       else
         p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
+if choosing() as question
+  .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={wording('cms.marker.choose', 'Edit which field?')} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey})
+    for field of question.fields key={describe(field)}
+      button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(field)}) {describe(field)}
 Toaster
 TooltipHost

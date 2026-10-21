@@ -79,7 +79,8 @@ export function fieldsAt(node: Node): MarkedField[] {
   return []
 }
 
-function markersOf(element: Element): MarkedField[] {
+// The markers an element carries in its own attributes.
+export function markersOf(element: Element): MarkedField[] {
   const found: MarkedField[] = []
 
   for (const { name, value } of element.attributes) {
@@ -108,4 +109,55 @@ function openingComment(node: Node): Comment | undefined {
   }
 
   return undefined
+}
+
+// Every marked field of the page: each element's own markers, then each comment pair's, in document order.
+export function allMarked(root: Node = document.body): MarkedField[] {
+  const found: MarkedField[] = []
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT)
+
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      found.push(...markersOf(node as Element))
+
+      continue
+    }
+
+    const [, kind, value] = (node as Comment).data.trim().match(OPEN_COMMENT) ?? []
+    const marker = value === undefined ? undefined : parseMarker(value, kind === 'body')
+
+    if (marker && node.parentElement)
+      found.push({ marker, element: node.parentElement, start: node as Comment })
+  }
+
+  return found
+}
+
+// Where a marked field shows on the page: its element's box, or for a comment pair the box around what sits between the two comments. None when nothing of it is shown.
+export function markedBox(field: MarkedField): DOMRect | undefined {
+  let box: DOMRect
+
+  if (field.start) {
+    const range = document.createRange()
+    let end: Node | undefined
+
+    for (let sibling = field.start.nextSibling; sibling && !end; sibling = sibling.nextSibling) {
+      if (sibling.nodeType === Node.COMMENT_NODE && CLOSE_COMMENT.test((sibling as Comment).data.trim()))
+        end = sibling
+    }
+
+    range.setStartAfter(field.start)
+
+    if (end)
+      range.setEndBefore(end)
+    else
+      range.setEndAfter(field.start.parentNode?.lastChild ?? field.start)
+
+    box = range.getBoundingClientRect()
+  }
+  else {
+    box = field.element.getBoundingClientRect()
+  }
+
+  return box.width > 0 && box.height > 0 ? box : undefined
 }

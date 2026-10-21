@@ -103,6 +103,14 @@ Tab reaches a marked text and Enter starts the edit. The form beside the page sh
 
 This works for a text that is the whole content of its element, in an entry, a group, a block or a list of texts, in any locale. A field the page shows inside a longer text, in an attribute, with other formatting around it or as a Markdown body is still brought up in the form by a click, as is any other kind of field. The schema's length and pattern show their message under the text as you type, and a screen reader reads it out. The editor's code is only sent in edit mode.
 
+### Finding the fields
+
+Hover a field on the page and a dashed box shows it, whether the page shows it as a text, in an attribute such as an image's `src`, or inside a longer text. The "Outline every field of the page" button in the editor's header draws a dotted box around all of them at once. On a phone, where there is no hover, the boxes are on from the start. The editor remembers your choice.
+
+Tab reaches each field, and a screen reader says what it edits. When an element holds two fields, such as a text and a link's address, a click asks which one you want, next to where you clicked. Arrow keys move through the choice, Enter picks and Escape closes it.
+
+The "Browse the page" button next to it lets the page's links, menus and tabs work with the editor still open. Press it again to go back to editing.
+
 An entry has such a link when a page shows it. That is the page listing its collection in `prerender` or `sitemap`. For an entry read by its slug, such as a section of the home page, it is the first page without params that reads it. The cms finds that page by rendering those pages once in edit mode, the first time it needs one, and keeps the answer for a few minutes. An entry no page shows has no link.
 
 ### Edit this page

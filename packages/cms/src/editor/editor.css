@@ -250,11 +250,63 @@ html.kcms-dock-bottom .kcms-editor-grip {
   outline: 2px solid var(--color-kui-accent);
 }
 
-html.kcms-editing [data-kay-field]:hover,
-html.kcms-editing [data-kay-body]:hover {
-  outline: 2px dashed var(--color-kui-accent);
-  outline-offset: 2px;
+html.kcms-editing:not(.kcms-browsing) [data-kay-field]:hover,
+html.kcms-editing:not(.kcms-browsing) [data-kay-body]:hover {
   cursor: pointer;
+}
+
+/* The layer of outlines over the page, below the editor: the field under the pointer dashed, every field with the toggle on dotted. */
+.kcms-marks {
+  position: fixed;
+  z-index: 2147482999;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kcms-mark {
+  position: fixed;
+  box-sizing: border-box;
+  border: 1px dotted color-mix(in srgb, var(--color-kui-accent) 80%, transparent);
+  border-radius: 0.125rem;
+  background: color-mix(in srgb, var(--color-kui-accent) 8%, transparent);
+}
+
+.kcms-mark[data-hover] {
+  border: 2px dashed var(--color-kui-accent);
+  background: color-mix(in srgb, var(--color-kui-accent) 14%, transparent);
+}
+
+/* The choice among the fields of one element, next to the click. */
+.kcms-marker-menu {
+  position: fixed;
+  z-index: 2147483001;
+  display: grid;
+  min-width: 12rem;
+  max-width: 16rem;
+  padding: 0.25rem;
+  color: var(--color-kui-text);
+  background: var(--color-kui-mantle);
+  border: 1px solid var(--color-kui-surface2);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.25);
+  font: 0.875rem/1.3 system-ui, sans-serif;
+}
+
+.kcms-marker-item {
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 0.25rem;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.kcms-marker-item:hover,
+.kcms-marker-item:focus-visible {
+  background: color-mix(in srgb, var(--color-kui-accent) 18%, transparent);
+  outline: none;
 }
 
 html.kcms-editing [data-kay-field][contenteditable] {

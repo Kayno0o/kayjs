@@ -3,7 +3,7 @@ import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { MarkedField } from '../markers'
 import { checkField, fieldsOf, itemAt } from '../fields'
-import { BODY, entryKey } from '../markers'
+import { BODY, entryKey, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
 
 // What the editor asks of an entry's form to type in a field on the page: its collection once loaded, and whether a save holds the fields still.
@@ -23,8 +23,8 @@ export interface InlineTarget {
 const sources = new Map<string, InlineSource>()
 // Elements whose own keys and clicks act on a page, left to the form.
 const CONTROLS = 'button, summary, input, select, textarea, label'
-// A marked element the editor gives a tab stop: not a control, nor a link, and with no tabindex of its own.
-const UNREACHED = `[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`
+// The elements that mean nothing by themselves, which the editor gives the button role once it makes them a tab stop.
+const GENERIC = new Set(['div', 'span', 'p', 'li', 'strong', 'em', 'small', 'b', 'i', 'td', 'th', 'dt', 'dd', 'blockquote', 'figcaption'])
 const LINE_BREAKS = /[\r\n]+/g
 const EDGE_BREAKS = /^[\r\n]+|[\r\n]+$/g
 
@@ -169,18 +169,47 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
   }
 }
 
-// Gives each marked element a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text; the page renders again and may drop it.
-export function reachMarked(): () => void {
-  const given = new WeakSet<HTMLElement>()
-  const give = (root: Element) => {
-    const found = root.matches(UNREACHED) ? [root, ...root.querySelectorAll(UNREACHED)] : root.querySelectorAll(UNREACHED)
+// The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.
+export function markedLabel({ marker }: MarkedField, drafts: Drafts): string | undefined {
+  const { path } = marker
 
-    for (const element of found) {
+  if (path === BODY)
+    return undefined
+
+  const collection = sources.get(entryKey(marker))?.collection()
+
+  return collection ? fieldAtPath(fieldsOf(collection.schema), drafts.entry(marker)?.data, path)?.label : undefined
+}
+
+// Gives each marked element, an attribute's or a text's, a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text, and says what it edits. A plain text element gets the button role too, as a link, a control or an element with a role of its own keeps what it has. The page renders again and may drop them.
+export function reachMarked(describe: (found: MarkedField[]) => string): () => void {
+  const given = new Map<HTMLElement, string[]>()
+  const set = (element: HTMLElement, name: string, value: string) => {
+    if (element.hasAttribute(name))
+      return
+
+    element.setAttribute(name, value)
+    given.set(element, [...given.get(element) ?? [], name])
+  }
+  const give = (root: Element) => {
+    for (const element of [root, ...root.querySelectorAll('*')]) {
       if (!(element instanceof HTMLElement))
         continue
 
-      element.tabIndex = 0
-      given.add(element)
+      const found = markersOf(element)
+
+      if (found.length === 0)
+        continue
+
+      const reached = element.matches(`[tabindex], ${CONTROLS}, a[href]`)
+
+      set(element, 'aria-description', describe(found))
+
+      if (!reached)
+        set(element, 'tabindex', '0')
+
+      if (!reached && GENERIC.has(element.localName))
+        set(element, 'role', 'button')
     }
   }
   // Only what changed is looked at, and not the text being typed in, whose every keystroke is a mutation.
@@ -190,7 +219,8 @@ export function reachMarked(): () => void {
         continue
 
       if (record.type === 'attributes') {
-        give(record.target as Element)
+        if (record.attributeName?.startsWith('data-kay-') || record.attributeName === 'tabindex')
+          give(record.target as Element)
 
         continue
       }
@@ -203,13 +233,13 @@ export function reachMarked(): () => void {
   })
 
   give(document.documentElement)
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'data-kay-field'] })
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
 
   return () => {
     observer.disconnect()
-    for (const element of document.querySelectorAll<HTMLElement>('[data-kay-field][tabindex="0"]')) {
-      if (given.has(element))
-        element.removeAttribute('tabindex')
+    for (const [element, names] of given) {
+      for (const name of names)
+        element.removeAttribute(name)
     }
   }
 }
@@ -229,6 +259,8 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
   const before = valueAt(drafts.entry(entry)?.data, path)
   const beforeText = element.textContent
   const note = createIssueNote(element)
+  // The attributes the element had before, which the edit puts back when it ends: a tab stop's role and description are not the edit's to take away.
+  const prior = EDIT_ATTRIBUTES.map(name => [name, element.getAttribute(name)] as const)
   let gone: MutationObserver | undefined
   let emptied = false
   let cancelled = false
@@ -240,8 +272,12 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
     controller.abort()
     gone?.disconnect()
     note.remove()
-    for (const name of EDIT_ATTRIBUTES)
-      element.removeAttribute(name)
+    for (const [name, value] of prior) {
+      if (value === null)
+        element.removeAttribute(name)
+      else
+        element.setAttribute(name, value)
+    }
 
     if (cancelled) {
       element.textContent = beforeText

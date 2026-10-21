@@ -58,7 +58,7 @@ test('the dev tool bar at the bottom sits above the bottom sheet, not over it', 
 test('the dev tool bar at the top right leaves the header of the editor at the side reachable', async () => {
   const page = await open(1280, 800, 'top-right')
 
-  expect(await reachable(page)).toEqual([true, true, true])
+  expect(await reachable(page)).toEqual([true, true, true, true, true])
 })
 
 test('the dev tool bar at the bottom right leaves the collapsed editor button reachable', async () => {
