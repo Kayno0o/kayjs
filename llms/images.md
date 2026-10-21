@@ -220,7 +220,7 @@ The tag is the `svg` spreading the icon, `svg({...Home} class="size-5")`, which 
 - `kay check` declares every icon of the installed sets in `.kay/types/kay-icons.d.ts`, so a misspelt name is reported as a module it cannot find; a bundle naming one fails with the set and the name.
 - kay reads `@iconify-json/<prefix>` packages, not the all-in-one `@iconify/json`: each icon of an installed set is one declaration there and one virtual module the server registers at boot (Tabler, 6,400 icons, takes about 10 ms).
 
-An icon known only at runtime, such as one a user picks from a search, is built from the set's JSON the app imports, which a compiled server carries too. `iconProps(set, name)` from `kay/icons` gives the same props an import gives, aliases, flips and rotations applied, or `undefined` for a name the set lacks; `iconNames(set)` lists its icons and aliases:
+An icon known only at runtime, such as one a user picks from a search, is built from the set's JSON the app imports, which a compiled server carries too. `iconProps(set, name)` from `kay/icons` gives the same props an import gives, aliases, flips and rotations applied, or `undefined` for a name the set lacks; the name may carry the set's prefix, `tabler:home`, as `iconField` stores it; `iconNames(set)` lists its icons and aliases:
 
 ```ts
 import tabler from '@iconify-json/tabler/icons.json'

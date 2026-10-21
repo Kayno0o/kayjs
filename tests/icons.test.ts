@@ -111,6 +111,12 @@ describe('icons', () => {
     expect(setIconProps(tabler, '123')).toEqual(setIconProps(tabler, 'number-123'))
     expect(setIconProps(tabler, 'nothing')).toBeUndefined()
     expect(iconNames(tabler)).toEqual(expect.arrayContaining(['home', '123']))
+    // The name `iconField` stores, `prefix:name`, draws the same, aliases included; another set's prefix draws nothing.
+    expect(setIconProps(tabler, 'tabler:home')).toEqual(setIconProps(tabler, 'home'))
+    expect(setIconProps(tabler, 'tabler:123')).toEqual(setIconProps(tabler, 'number-123'))
+    expect(setIconProps(tabler, 'tabler:home')).toBeDefined()
+    expect(setIconProps(tabler, 'mdi:home')).toBeUndefined()
+    expect(setIconProps(tabler, 'tabler:nothing')).toBeUndefined()
   })
 
   it('declares each installed icon as a module, so kay check reports a misspelt one', async () => {

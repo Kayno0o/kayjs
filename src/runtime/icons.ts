@@ -39,9 +39,10 @@ export function iconNames(set: IconSet): string[] {
   return [...Object.keys(set.icons), ...Object.keys(set.aliases ?? {})]
 }
 
-// The props an `svg` spreads to draw `name` of an iconify set, its box from the set and its markup inlined, aliases, flips and rotations applied: for an icon picked at runtime, from the set's JSON the app imports. Undefined when the set has no such icon.
+// The props an `svg` spreads to draw `name` of an iconify set, its box from the set and its markup inlined, aliases, flips and rotations applied: for an icon picked at runtime, from the set's JSON the app imports. The name is bare or prefixed with the set's own, as `iconField` stores it. Undefined when the set has no such icon.
 export function iconProps(set: IconSet, name: string): IconProps | undefined {
-  const icon = resolveIcon(set, name, 0)
+  const own = `${set.prefix}:`
+  const icon = resolveIcon(set, name.startsWith(own) ? name.slice(own.length) : name, 0)
 
   if (icon?.body === undefined || icon.body === '')
     return undefined

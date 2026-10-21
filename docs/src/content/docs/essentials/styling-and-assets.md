@@ -359,7 +359,7 @@ An icon without text beside it needs `role="img"` and an `aria-label`.
 
 ### An icon known at runtime
 
-An icon a user picks from a search has no import. Import the set's JSON instead, and `iconProps(set, name)` from `kay/icons` gives the props to spread on an `svg`. It gives `undefined` for a name the set lacks. `iconNames(set)` lists the names.
+An icon a user picks from a search has no import. Import the set's JSON instead, and `iconProps(set, name)` from `kay/icons` gives the props to spread on an `svg`. The name may carry the set's own prefix, `tabler:home`, as a CMS icon field stores it. It gives `undefined` for a name the set lacks. `iconNames(set)` lists the names.
 
 ```ts
 import tabler from '@iconify-json/tabler/icons.json'
