@@ -331,6 +331,8 @@ In a site with two locales or more, an entry's screen lists its locales. A local
 
 Under a text still equal to the default locale's, or empty while the default has one, the field says so. The Translations screen at `<prefix>/translations` lists, per collection, the entries missing a locale and the texts not translated yet. A field with a `format`, or wrapped in `untranslated()`, is never asked for.
 
+Every upload goes to one folder shared by all collections, named by the hash of its file, so sending the same file twice stores it once. The media library at `<prefix>/media` lists them with a preview, the size, who sent it and the entries using it, and lets you rename one (the name shown there, never the file's address) or delete one nothing uses.
+
 Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
 
 Check each upload before you confirm. A URL written by hand in a page, or a file outside the collections, is not seen as a use.
@@ -600,7 +602,7 @@ The date and time input shows the time of the editor's own time zone, whatever t
 
 Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. The cms guard still runs before your page. With `prefix: '/'` the path is under the group, `src/routes/(admin)/collections/shop/[...slug].kay`.
 
-The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
+The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages, Media and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
 
 Give the header a logo with `cms({ logo: '/logo.svg' })`, a file of `public/` or an https URL, shown before the name. The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 

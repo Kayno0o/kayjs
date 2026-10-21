@@ -105,6 +105,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.list.undo',
   'cms.locales.empty',
   'cms.locales.same',
+  'cms.media.renameFailure',
+  'cms.media.renamed',
   'cms.missing.dismissFailure',
   'cms.missing.dismissed',
   'cms.redirects.addFailure',

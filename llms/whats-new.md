@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.64.0
 
+- kayjs-cms keeps every upload in one folder, named by the hash of its file so a file sent twice is stored once, and has a media library at `<prefix>/media` listing them with a preview, size and the entries using each, to rename or delete; `files.put(file, { id })` names a key ([kayjs-cms](../packages/cms/llms/uploads.md), [Files](files.md)).
 - kayjs-cms's entries list shows Last modified and Author columns that sort, the content list shows a collection's last edit and its `icon`, and a new entry has Cancel and Create and add another ([kayjs-cms](../packages/cms/llms/screens.md)).
 - `site.runJobs()` waits for a `queue.enqueue()` or a kayjs-mail `send`/`enqueue` an action left unawaited, with nothing declared ([Testing](testing.md)).
 - A text field replaced by a query `navigate()`, such as a live search box whose island gets the new value, keeps its caret, selection and the keys typed while the page was fetched instead of restarting at 0 ([Navigation](navigation.md)).

@@ -38,7 +38,8 @@ const content: Partial<typeof Content> = {
 
 void mock.module('../src/kay/content', () => content)
 
-const { deleteUnusedUploads, unusedUploads } = await import('../src/orphans')
+const { deleteUnusedUploads, libraryUploads, unusedUploads } = await import('../src/orphans')
+const { storeUpload } = await import('../src/media')
 
 const PIXEL = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
 const upload = async (folder: string) => files.put(new File([PIXEL], 'pixel.png', { type: 'image/png' }), { folder })
@@ -208,4 +209,29 @@ test('lists a coloured upload by its key id, used or not', async () => {
   stored = { posts: [entry('a', { photo: files.url(used) })], products: [] }
   aged()
   expect(await unusedKeys()).toEqual([stray])
+})
+
+test('the library lists every upload with the entries using it, its record and whether it may be deleted', async () => {
+  const shared = await storeUpload(new File([PIXEL], 'team.png', { type: 'image/png' }), 'Ada')
+  const legacy = await upload('posts')
+
+  stored = { posts: [entry('a', { photo: files.url(shared) }), entry('b', {}, { body: `![](${files.url(shared)})` })], products: [] }
+
+  const fresh = await libraryUploads()
+
+  if ('blocked' in fresh)
+    throw new Error(fresh.blocked.join('; '))
+
+  expect(fresh.uploads.map(found => found.key).toSorted()).toEqual([shared, legacy].toSorted())
+  expect(fresh.uploads.find(found => found.key === shared)).toMatchObject({ name: 'team.png', by: 'Ada', size: PIXEL.length, width: 1, height: 1, usedIn: ['posts/a', 'posts/b'], deletable: false })
+  expect(fresh.uploads.find(found => found.key === legacy)).toMatchObject({ name: legacy.split('/').at(-1), usedIn: [], deletable: false })
+
+  aged()
+
+  const old = await libraryUploads()
+
+  expect('uploads' in old && old.uploads.filter(found => found.deletable).map(found => found.key)).toEqual([legacy])
+
+  stored = { posts: [] }
+  expect(await libraryUploads()).toEqual({ blocked: ['products cannot be read'] })
 })

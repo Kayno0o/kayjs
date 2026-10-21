@@ -2,7 +2,7 @@ import { files } from 'kay/server'
 import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
 import { log } from './log'
-import { forgetUploads, MEDIA_FOLDER } from './media'
+import { forgetUploads, MEDIA_FOLDER, mediaIndex } from './media'
 import { uploadFolder } from './uploads'
 
 export interface UnusedUpload {
@@ -26,20 +26,30 @@ const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
 // Every window of 20 hex digits, so an id inside a longer run of them is found too.
 const IDS = /(?=([\da-f]{20}))/g
 
-// The uploads of the CMS's folders, the shared one and each collection's older one, that no entry of any collection, locale or draft mentions.
-// An upload modified less than a day ago, or that the store dates not at all, is held back.
-// A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
-export async function unusedUploads(): Promise<UploadScan> {
+interface Stored {
+  key: string
+  modified?: Date | undefined
+}
+
+interface Read {
+  stored: Stored[]
+  // The entries mentioning each upload's id, as `collection/slug`.
+  usedBy: Map<string, Set<string>>
+}
+
+const idOf = (key: string) => KEY_ID.exec(key)?.[1]
+
+// Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
+async function readUploads(): Promise<Read | { blocked: string[] }> {
   const blocked: string[] = []
   // Only the names: a loaded collection's loader runs once, in `entries`, and not again to count its entries.
   const listed = await collections({ counts: false })
   const folders = [...new Set([MEDIA_FOLDER, ...listed.map(collection => uploadFolder(collection.name))])].filter(folder => !PRIVATE_FOLDER.test(folder))
-  const stored: string[] = []
-  const now = Date.now()
+  const stored: Stored[] = []
 
   try {
     for (const folder of folders)
-      stored.push(...(await files.list({ folder })).filter(file => file.modified !== undefined && now - file.modified.getTime() >= GRACE).map(file => file.key))
+      stored.push(...await files.list({ folder }))
   }
   catch (error) {
     log.error('listing the uploads failed', error)
@@ -47,7 +57,7 @@ export async function unusedUploads(): Promise<UploadScan> {
     return { blocked: [wording('cms.uploads.listFailure', 'The files cannot be listed: {reason}', { reason: error instanceof Error ? error.message : String(error) })] }
   }
 
-  const referenced = new Set<string>()
+  const usedBy = new Map<string, Set<string>>()
 
   for (const collection of listed) {
     try {
@@ -59,8 +69,12 @@ export async function unusedUploads(): Promise<UploadScan> {
         }
 
         for (const text of [JSON.stringify(entry.data, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value), entry.body ?? '']) {
-          for (const match of text.toLowerCase().matchAll(IDS))
-            referenced.add(match[1]!)
+          for (const match of text.toLowerCase().matchAll(IDS)) {
+            const users = usedBy.get(match[1]!) ?? new Set<string>()
+
+            users.add(`${collection.name}/${entry.slug}`)
+            usedBy.set(match[1]!, users)
+          }
         }
       }
     }
@@ -70,18 +84,84 @@ export async function unusedUploads(): Promise<UploadScan> {
     }
   }
 
-  if (blocked.length > 0)
-    return { blocked }
+  return blocked.length > 0 ? { blocked } : { stored, usedBy }
+}
 
-  const orphans = stored.toSorted().filter((key) => {
-    const id = KEY_ID.exec(key)?.[1]
+// The uploads of the CMS's folders, the shared one and each collection's older one, that no entry of any collection, locale or draft mentions.
+// An upload modified less than a day ago, or that the store dates not at all, is held back.
+// A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
+export async function unusedUploads(): Promise<UploadScan> {
+  const read = await readUploads()
 
-    return id !== undefined && !referenced.has(id)
-  })
+  if ('blocked' in read)
+    return read
+
+  const now = Date.now()
+  const orphans = read.stored.filter((file) => {
+    const id = idOf(file.key)
+
+    return id !== undefined && !read.usedBy.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
+  }).map(file => file.key).toSorted()
   const variants = await files.variants(orphans)
   const unused = orphans.map(key => ({ key, url: files.url(key), variants: variants.get(key) ?? [] }))
 
   return { unused }
+}
+
+// An upload as the library shows it.
+export interface LibraryUpload {
+  key: string
+  url: string
+  name: string
+  size: number | undefined
+  width: number | undefined
+  height: number | undefined
+  by: string | undefined
+  // When it was last written, in ms, when the store knows.
+  at: number | undefined
+  // The entries mentioning it, as `collection/slug`.
+  usedIn: string[]
+  // Whether the unused-uploads rules let it be deleted: no entry mentions it and it is over a day old.
+  deletable: boolean
+  // The files the image route made of it, deleted with it; read for the deletable ones only.
+  variants: string[]
+}
+
+const DIMENSIONS = /\.(\d+)x(\d+)(?:-[\da-f]{6})?\.[a-z\d]{1,10}$/
+
+// Every upload, the newest first, with the entries using it and what the index knows of it, or why they cannot be told.
+export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | { blocked: string[] }> {
+  const read = await readUploads()
+
+  if ('blocked' in read)
+    return read
+
+  const index = await mediaIndex()
+  const now = Date.now()
+  const found = read.stored.filter(file => idOf(file.key) !== undefined).toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0))
+  const unusedKeys = found.filter(file => !read.usedBy.has(idOf(file.key)!)).map(file => file.key)
+  const variants = await files.variants(unusedKeys)
+  const uploads = found.map((file): LibraryUpload => {
+    const usedIn = [...read.usedBy.get(idOf(file.key)!) ?? []].toSorted()
+    const record = index[file.key]
+    const [, width, height] = DIMENSIONS.exec(file.key) ?? []
+
+    return {
+      key: file.key,
+      url: files.url(file.key),
+      name: record?.name ?? file.key.split('/').at(-1)!,
+      size: record?.size,
+      width: width === undefined ? undefined : Number(width),
+      height: height === undefined ? undefined : Number(height),
+      by: record?.by,
+      at: file.modified?.getTime(),
+      usedIn,
+      deletable: usedIn.length === 0 && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
+      variants: variants.get(file.key) ?? [],
+    }
+  })
+
+  return { uploads }
 }
 
 // Deletes the uploads asked for that are still unused, with their variants; `kept` holds those that a rescan found referenced, or that are no unused upload of the CMS's folders.

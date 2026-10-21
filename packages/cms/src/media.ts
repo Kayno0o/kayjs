@@ -87,9 +87,16 @@ export async function storeUpload(file: File, by?: string): Promise<string> {
   return key
 }
 
+// A key the CMS's folders hold: never a private one, and with the 20 hex digits of an id.
+const UPLOAD_KEY = /^(?!private\/)(?:[\w-]+\/)+[\da-f]{20}(?:\.\d+x\d+(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/i
+
+export function isUploadKey(key: string): boolean {
+  return UPLOAD_KEY.test(key)
+}
+
 // Renames what the library shows for an upload, a legacy one with no record included; the key, and so every reference to it, is unchanged. False when no such file is stored.
 export async function renameUpload(key: string, name: string): Promise<boolean> {
-  const stored = await files.get(key)
+  const stored = isUploadKey(key) ? await files.get(key) : undefined
 
   if (stored === undefined)
     return false

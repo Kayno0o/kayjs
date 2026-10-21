@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
 import { setupStorage } from '../../../src/server/storage'
-import { forgetUploads, MEDIA_FOLDER, mediaIndex, renameUpload, storeUpload } from '../src/media'
+import { forgetUploads, isUploadKey, MEDIA_FOLDER, mediaIndex, renameUpload, storeUpload } from '../src/media'
 import { uploadFolders } from '../src/uploads'
 
 const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
@@ -56,4 +56,17 @@ test('a missing or unreadable index reads as empty', async () => {
   await files.put(new Blob(['not json'], { type: 'application/json' }), { private: true, id: 'cms-media-index' })
 
   expect(await mediaIndex()).toEqual({})
+})
+
+test('a rename takes only a key of the CMS folders', async () => {
+  setupStorage(memoryFiles(), '.kay/cache')
+
+  const secret = await files.put(png('s.png'), { private: true })
+
+  expect(isUploadKey(secret)).toBe(false)
+  expect(isUploadKey('Private/aaaaaaaaaaaaaaaaaaaa.png')).toBe(false)
+  expect(isUploadKey('../aaaaaaaaaaaaaaaaaaaa.png')).toBe(false)
+  expect(isUploadKey('posts/2026/aaaaaaaaaaaaaaaaaaaa.1x1-000000.png')).toBe(true)
+  expect(await renameUpload(secret, 'x')).toBe(false)
+  expect(await renameUpload('../x', 'x')).toBe(false)
 })

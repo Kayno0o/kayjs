@@ -1,0 +1,113 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { Denials } from '../access'
+import type { LibraryUpload } from '../orphans'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import pencil from '~icons/tabler/pencil'
+import { refresh, signal } from 'kay'
+import { sizeText, wording } from 'kay/words'
+import { deleteUnusedUploads, renameMedia } from '../editor/save'
+import { shipWords } from '../editor/words'
+import { entryPath } from '../listing'
+import EntryEdited from './entry-edited.kay'
+import Refused from './refused.kay'
+
+// `denied`, from `denials`, disables the deletions when the signed-in person's role may not delete.
+const { uploads, prefix, denied = {} } = props<{ uploads: LibraryUpload[], prefix: string, denied?: Denials }>()
+
+// How many entries a row names before the rest are counted.
+const NAMED = 3
+const IMAGE = /\.(?:png|jpe?g|webp|gif|avif)$/i
+
+// Looks up what a deletion or a rename says once the page has loaded, so the page sends it.
+shipWords()
+
+// The upload whose name is being typed, and what is typed.
+const renaming = signal<string>()
+const typed = signal('')
+
+const columns: Column<LibraryUpload>[] = [
+  { key: 'preview', header: wording('cms.media.preview', 'Preview'), cell: true },
+  { key: 'name', header: wording('cms.media.name', 'Name'), cell: true, sortValue: upload => upload.name },
+  { key: 'size', header: wording('cms.media.size', 'Size'), cell: true, sortValue: upload => upload.size ?? 0 },
+  { key: 'usedIn', header: wording('cms.media.usedIn', 'Used in'), cell: true, sortValue: upload => upload.usedIn.length },
+  { key: 'at', header: wording('cms.media.sent', 'Sent'), cell: true, sortValue: upload => upload.at ?? 0 },
+  { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
+]
+
+function startRename(upload: LibraryUpload): void {
+  typed = upload.name
+  renaming = upload.key
+}
+
+async function rename(upload: LibraryUpload): Promise<void> {
+  const name = typed().trim()
+
+  if (name === '' || name === upload.name) {
+    renaming = undefined
+
+    return
+  }
+
+  if (await renameMedia(upload.key, name)) {
+    renaming = undefined
+    await refresh()
+  }
+}
+
+async function remove(upload: LibraryUpload): Promise<void> {
+  if (await deleteUnusedUploads([upload.key]))
+    await refresh()
+}
+
+const dimensions = (upload: LibraryUpload) => upload.width !== undefined && upload.height !== undefined ? `${upload.width} x ${upload.height}` : undefined
+---
+Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key} filter={['name', 'key']} filterParam="q" filterLabel={wording('cms.media.filter', 'Search the uploads')})
+  @cell(row, column)
+    if column.key === 'preview'
+      if IMAGE.test(row.key) && row.width !== undefined && row.height !== undefined
+        a(href={row.url} target="_blank" rel="noopener" aria-label={wording('cms.file.open', 'Open {name} in a new tab', { name: row.name })})
+          img.kcms-media-thumb(src={row.url} width={row.width} height={row.height} sizes="64px" alt="" loading="lazy" decoding="async")
+      else
+        a.kcms-media-file(href={row.url} target="_blank" rel="noopener") {row.key.split('.').at(-1)}
+    else if column.key === 'name'
+      if renaming() === row.key
+        form.kcms-media-rename(onSubmit={(event) => { event.preventDefault(); void rename(row) }})
+          TextInput(value={typed()} onInput={text => typed = text} aria-label={wording('cms.media.renameLabel', 'New name of {name}', { name: row.name })} size={24})
+          IconButton(icon="success" label={wording('cms.media.rename', 'Rename')} type="submit" variant="ghost" size="sm")
+          IconButton(icon="close" label={wording('cms.media.cancel', 'Cancel')} variant="ghost" size="sm" onClick={() => renaming = undefined})
+      else
+        span {row.name}
+        if dimensions(row) as size
+          span.kcms-entry-subtitle  {size}
+    else if column.key === 'size'
+      span {row.size === undefined ? '' : sizeText(row.size)}
+    else if column.key === 'usedIn'
+      if row.usedIn.length === 0
+        span {wording('cms.media.unused', 'Not used')}
+      else
+        ul.kcms-media-used
+          for entry of row.usedIn.slice(0, NAMED) key={entry}
+            li
+              a(href={entryPath(prefix, { collection: entry.slice(0, entry.indexOf('/')), slug: entry.slice(entry.indexOf('/') + 1) })}) {entry}
+          if row.usedIn.length > NAMED
+            li {wording('cms.media.more', '{count} more', { count: row.usedIn.length - NAMED })}
+    else if column.key === 'at'
+      if row.at as at
+        EntryEdited(at={at}) 
+      if row.by as by
+        span.kcms-entry-subtitle  {by}
+    else
+      IconButton(icon={pencil} label={wording('cms.media.renameLabel', 'New name of {name}', { name: row.name })} variant="ghost" size="sm" onClick={() => startRename(row)})
+      if denied.delete !== undefined
+        Refused(icon="delete" label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.name })} reason={denied.delete} size="sm" variant="ghost")
+      else if row.deletable
+        ConfirmDelete(message={wording('cms.media.deleteOne', 'Delete {name}? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { name: row.name })} label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.name })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove(row) }})
+      else
+        Refused(icon="delete" label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.name })} reason={row.usedIn.length > 0 ? wording('cms.media.inUse', 'Used by an entry: remove it there first') : wording('cms.media.tooNew', 'Uploaded less than a day ago: a save the site has not rebuilt from may use it')} size="sm" variant="ghost")
+  @empty
+    EmptyState(title={wording('cms.media.empty', 'No uploads yet')} description={wording('cms.media.emptyHint', 'Files sent from an image or file field appear here.')})

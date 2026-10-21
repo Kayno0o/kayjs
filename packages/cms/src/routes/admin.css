@@ -287,3 +287,27 @@ body {
   color: var(--color-kui-muted);
   cursor: not-allowed;
 }
+
+.kcms-media-thumb {
+  display: block;
+  inline-size: 4rem;
+  block-size: auto;
+  max-block-size: 4rem;
+  object-fit: contain;
+}
+
+.kcms-media-file {
+  text-transform: uppercase;
+}
+
+.kcms-media-rename {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.kcms-media-used {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

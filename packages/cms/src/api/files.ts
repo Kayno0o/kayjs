@@ -2,7 +2,7 @@ import { s } from 'kay'
 import { api, files, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
-import { storeUpload } from '../media'
+import { renameUpload, storeUpload } from '../media'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
@@ -48,6 +48,15 @@ export default api({ bodyLimit: uploadBodyLimit })
 
     return { path, ...sizeOfPath(path) }
   }, { body: s.Object({ file: s.File() }) })
+  // Changes the name the library shows for an upload; the key, and so every reference to it, stays.
+  .post('/media/rename', async ({ body, status }) => {
+    const name = body.name.trim()
+
+    if (name === '')
+      return status(400, wording('cms.media.nameEmpty', 'The name is empty'))
+
+    return await renameUpload(body.key, name) ? { name } : status(404, wording('cms.media.notFound', '{key} is not an upload', { key: body.key }))
+  }, { body: s.Object({ key: s.String({ maxLength: 300 }), name: s.String({ maxLength: 200 }) }) })
   // Only whom the app's guard admits may delete, since an edit cookie is tied to no user; a file referenced since the screen was drawn is kept.
   .post('/unused/delete', async ({ body, status }) => {
     if (!settings().guard)

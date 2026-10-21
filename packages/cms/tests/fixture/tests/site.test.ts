@@ -112,7 +112,7 @@ test('a single collection that cannot be read keeps its list address, which says
 })
 
 test('the screens have their own chrome, none of the site\'s header, footer or head, in each locale and on every screen', async () => {
-  for (const path of ['/admin', '/fr/admin', '/admin/not-found', '/admin/uploads', '/admin/collections/posts', '/admin/collections/posts/hello', '/admin/new/posts']) {
+  for (const path of ['/admin', '/fr/admin', '/admin/not-found', '/admin/uploads', '/admin/media', '/admin/collections/posts', '/admin/collections/posts/hello', '/admin/new/posts']) {
     const page = await site.visit(path)
 
     expect(page.status, path).toBe(200)
@@ -135,7 +135,7 @@ test('the admin\'s nav keeps every screen in view, marks the current one, and le
   const links = page.find('nav.kcms-admin-nav a')
 
   expect(page.find('nav.kcms-admin-nav')[0]?.attributes['aria-label']).toBe('Content admin')
-  expect(links.map(link => [link.text, link.attributes.href])).toEqual([['Content', '/admin'], ['Missing pages', '/admin/not-found'], ['Unused uploads', '/admin/uploads']])
+  expect(links.map(link => [link.text, link.attributes.href])).toEqual([['Content', '/admin'], ['Missing pages', '/admin/not-found'], ['Media', '/admin/media'], ['Unused uploads', '/admin/uploads']])
   expect(links.filter(link => 'aria-current' in link.attributes).map(link => link.text)).toEqual(['Unused uploads'])
   expect(page.find('a.kcms-admin-site')[0]?.attributes.href).toBe('/')
   expect((await site.visit('/fr/admin')).find('a.kcms-admin-site')[0]?.attributes.href).toBe('/fr')
@@ -257,7 +257,7 @@ test('a part asked for a field the schema lacks throws, naming the schema\'s fie
 test('the extension\'s guard covers an app page standing in for a screen, and the screens themselves', async () => {
   const denied = { headers: { 'x-deny': '1' } }
 
-  for (const path of ['/admin', '/admin/collections/shop', '/admin/collections/shop/lamp', '/admin/new/shop', '/admin/uploads', '/admin/not-found', '/admin/page?path=/blog/hello'])
+  for (const path of ['/admin', '/admin/collections/shop', '/admin/collections/shop/lamp', '/admin/new/shop', '/admin/uploads', '/admin/media', '/admin/not-found', '/admin/page?path=/blog/hello'])
     expect((await site.fetch(path, denied)).status).toBe(403)
 
   expect((await site.fetch('/admin/collections/shop/lamp')).status).toBe(200)
@@ -609,7 +609,7 @@ test('a Markdown file whose frontmatter does not parse opens with its body kept'
 // A 1x1 PNG, which kay's storage reads the size of.
 const PIXEL = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
 
-test('an upload is stored in its collection\'s folder, answered by the path that serves it, a type not taken refused', async () => {
+test('an upload is stored in the folder every collection shares, named by its hash, answered by the path that serves it, a type not taken refused', async () => {
   const form = new FormData()
 
   form.append('file', new File([PIXEL], 'pixel.png', { type: 'image/png' }))
@@ -617,7 +617,7 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
   const { path } = await response.json() as { path: string }
 
-  expect(path).toMatch(/^\/_kay\/files\/products\/\w+\.1x1(?:-[\da-f]{6})?\.png$/)
+  expect(path).toMatch(/^\/_kay\/files\/cms-media\/\w+\.1x1(?:-[\da-f]{6})?\.png$/)
   expect(new Uint8Array(await (await site.fetch(path)).arrayBuffer())).toEqual(PIXEL)
   expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
 
@@ -683,7 +683,7 @@ test('the editor is told the types and the size an upload may have', async () =>
 })
 
 test('an upload whose bytes are not its name\'s type is refused 415 and stored nowhere, in any case of the name', async () => {
-  const stored = async () => (await files.list({ folder: 'products' })).length
+  const stored = async () => (await files.list({ folder: 'cms-media' })).length
   const before = await stored()
 
   for (const [name, content] of [['x.png', '<!doctype html><script>alert(1)</script>'], ['X.PNG', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'], ['x.html.png', 'GIF89a']] as const) {
@@ -767,14 +767,15 @@ test('the API refusals come back in the locale of the page that called, English 
 })
 
 test('the unused-uploads screen lists an upload no entry mentions, and deleting one removes it, a referenced one staying', async () => {
-  const upload = async () => {
+  // Each upload has bytes of its own: identical files share one key.
+  const upload = async (salt: number) => {
     const form = new FormData()
 
-    form.append('file', new File([PIXEL], 'pixel.png', { type: 'image/png' }))
+    form.append('file', new File([PIXEL, new Uint8Array([salt])], 'pixel.png', { type: 'image/png' }))
 
     return ((await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
   }
-  const [used, stray] = [await upload(), await upload()]
+  const [used, stray] = [await upload(1), await upload(2)]
   const keyOf = (path: string) => path.slice('/_kay/files/'.length)
   const remove = async (keys: string[]) => site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys }) })
 
@@ -801,6 +802,37 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
     setSystemTime()
     outage.message = undefined
     products.splice(products.findIndex(product => product.slug === 'cup'), 1)
+  }
+})
+
+test('the media library lists an upload with its name, size and the entries using it, and a rename changes the name only', async () => {
+  const form = new FormData()
+
+  form.append('file', new File([PIXEL, new Uint8Array([4])], 'team photo.png', { type: 'image/png' }))
+
+  const { path } = await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
+  const key = path.slice('/_kay/files/'.length)
+  const rename = async (name: string, at = key) => site.fetch('/api/cms/files/media/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: at, name }) })
+
+  products.push({ slug: 'team', data: { name: 'Team', photo: path } as { name: string } })
+
+  try {
+    const rows = async () => (await site.visit('/admin/media')).find('.kcms-media tbody tr').map(row => row.text)
+
+    expect((await rows()).find(row => row.includes('team photo.png'))).toContain('products/team')
+    expect((await rename('  Our team.png ')).status).toBe(200)
+    expect((await rows()).some(row => row.includes('Our team.png'))).toBe(true)
+    expect((await site.fetch(path)).status).toBe(200)
+    expect((await rename('')).status).toBe(400)
+    expect((await rename('x', 'private/aaaaaaaaaaaaaaaaaaaa.txt')).status).toBe(404)
+    expect((await rename('x', '../etc.png')).status).toBe(404)
+
+    outage.message = 'down'
+    expect((await site.visit('/admin/media')).text('main')).toContain('Uploads cannot be listed')
+  }
+  finally {
+    outage.message = undefined
+    products.splice(products.findIndex(product => product.slug === 'team'), 1)
   }
 })
 
@@ -912,7 +944,7 @@ async function paste(page: Awaited<ReturnType<typeof site.open>>, selector: stri
   }, selector, name, type, [...bytes])
 }
 
-test('an image pasted into the Markdown body is uploaded to the collection\'s folder and embedded where the cursor is, and the save keeps it', async () => {
+test('an image pasted into the Markdown body is uploaded to the shared folder and embedded where the cursor is, and the save keeps it', async () => {
   saved.length = 0
 
   const built = await browser()
@@ -922,10 +954,10 @@ test('an image pasted into the Markdown body is uploaded to the collection\'s fo
 
   await page.click(body)
   await paste(page, body, 'moon.png', 'image/png', PIXEL)
-  await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('[data-kcms-body] textarea')!.value.includes('![](/_kay/files/posts/'))
+  await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('[data-kcms-body] textarea')!.value.includes('![](/_kay/files/cms-media/'))
 
   const text = (await page.value(body))!
-  const path = (/!\[\]\((\/_kay\/files\/posts\/\w+\.1x1(?:-[\da-f]{6})?\.png)\)/).exec(text)![1]!
+  const path = (/!\[\]\((\/_kay\/files\/cms-media\/\w+\.1x1(?:-[\da-f]{6})?\.png)\)/).exec(text)![1]!
 
   expect(text).not.toContain('Uploading')
   expect(new Uint8Array(await (await built.fetch(path)).arrayBuffer())).toEqual(PIXEL)
@@ -1042,7 +1074,7 @@ test('an upload stored before can be picked again from the field, and fills it',
 const PHONE = { width: 375, height: 700 }
 // WCAG 2.5.8's minimum target size.
 const TAP = 24
-const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts?q=garden', '/admin/collections/posts?q=zzz', '/admin/collections/posts/hello', '/admin/collections/posts/notes/garden', '/admin/new/posts', '/admin/collections/products/mug', '/admin/collections/shop', '/admin/new/shop', '/admin/collections/shop/lamp', '/admin/uploads']
+const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts?q=garden', '/admin/collections/posts?q=zzz', '/admin/collections/posts/hello', '/admin/collections/posts/notes/garden', '/admin/new/posts', '/admin/collections/products/mug', '/admin/collections/shop', '/admin/new/shop', '/admin/collections/shop/lamp', '/admin/uploads', '/admin/media']
 
 // What a 375 px screen gets wrong: it scrolls sideways, a control spills past the screen or its own scrolling table, or one is too short to tap.
 async function phoneProblems(path: string): Promise<string[]> {
@@ -1129,7 +1161,7 @@ test('a list with the tools row keeps it inside a 375 px phone, wrapped and not 
 test('the unused-uploads screen fits a 375 px phone with an upload to delete', async () => {
   const form = new FormData()
 
-  form.append('file', new File([PIXEL], 'phone.png', { type: 'image/png' }))
+  form.append('file', new File([PIXEL, new Uint8Array([3])], 'phone.png', { type: 'image/png' }))
 
   const built = await browser()
   const key = ((await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path.slice('/_kay/files/'.length)

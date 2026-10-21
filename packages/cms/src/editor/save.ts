@@ -226,6 +226,18 @@ export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
   return true
 }
 
+// Renames what the media library shows for an upload and says how it went; true once renamed.
+export async function renameMedia(key: string, name: string): Promise<boolean> {
+  const result = await attempt(async () => call(filesApi, '/media/rename', { method: 'post', body: { key, name } }), wording('cms.media.renameFailure', 'Could not rename'))
+
+  if (!result)
+    return false
+
+  toast.success(wording('cms.media.renamed', 'Renamed'))
+
+  return true
+}
+
 // Turns a draft entry public and says how it went; true once published.
 export async function publishSaved(ref: EntryRef): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/publish', {

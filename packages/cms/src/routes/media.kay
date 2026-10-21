@@ -1,0 +1,26 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { wording } from 'kay/words'
+import MediaLibrary from '../components/media-library.kay'
+import { denials } from '../access'
+import { adminTitle } from '../listing'
+import { libraryUploads } from '../orphans'
+import { screenPath } from '../paths'
+import { settings } from '../settings'
+
+const { prefix } = settings()
+const scan = await libraryUploads()
+const denied = await denials(ctx)
+---
+head
+  title {adminTitle(wording('cms.admin.media', 'Media'))}
+PageSection(title={wording('cms.admin.media', 'Media')} level={1})
+  @actions
+    Button(href={screenPath(prefix)} label={wording('cms.admin.content', 'Content')})
+    Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
+  if 'blocked' in scan
+    EmptyState(title={wording('cms.media.blocked', 'Uploads cannot be listed')} description={wording('cms.uploads.blockedHint', '{reasons}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.', { reasons: scan.blocked.join('; ') })})
+  else
+    MediaLibrary(uploads={scan.uploads} prefix={prefix} denied={denied})

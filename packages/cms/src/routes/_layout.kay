@@ -39,6 +39,7 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
         span.kcms-admin-refused(data-tooltip={reason} tabindex="0" aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
       else
         a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
+      a(href={screenPath(prefix, '/media')}) {wording('cms.admin.media', 'Media')}
       a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
     a.kcms-admin-site(href={localize('/')}) {wording('cms.admin.viewSite', 'View the site')}
     if member
