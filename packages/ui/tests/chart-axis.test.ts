@@ -80,8 +80,9 @@ describe('chart axis', () => {
 
   test('heads a date in full, its time only when it has one and its seconds only when points sit under a minute apart', () => {
     expect(headings(['2026-10-21', '2026-10-22'], null)).toEqual(['21 Oct 2026', '22 Oct 2026'])
-    expect(headings(['2026-10-21T16:12:00', '2026-10-21T17:12:00'], null)).toEqual(['21 Oct 2026, 16:12', '21 Oct 2026, 17:12'])
-    expect(headings(['2026-10-21T16:12:00', '2026-10-21T16:12:10'], null)).toEqual(['21 Oct 2026, 16:12:00', '21 Oct 2026, 16:12:10'])
+    // Rendered with no window, as on the server, a time names the zone it is in.
+    expect(headings(['2026-10-21T16:12:00', '2026-10-21T17:12:00'], null).map(text => text.replace(/ \S+$/, ''))).toEqual(['21 Oct 2026, 16:12', '21 Oct 2026, 17:12'])
+    expect(headings(['2026-10-21T16:12:00', '2026-10-21T16:12:10'], null).map(text => text.replace(/ \S+$/, ''))).toEqual(['21 Oct 2026, 16:12:00', '21 Oct 2026, 16:12:10'])
     expect(headings(['Mon', '2026-10-21', 'Wed'], null)).toEqual(['Mon', '21 Oct 2026', 'Wed'])
     expect(headings([], null)).toEqual([])
   })

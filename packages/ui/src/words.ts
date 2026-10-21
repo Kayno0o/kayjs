@@ -28,5 +28,11 @@ export function timeOfDay(date: Date, seconds: boolean): string {
 export function fullDate(date: Date, time: false | 'minutes' | 'seconds'): string {
   const day = date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
 
-  return time === false ? day : `${day}, ${timeOfDay(date, time === 'seconds')}`
+  if (time === false)
+    return day
+
+  // The server cannot know the viewer's timezone, so what it renders names its own until the island writes the viewer's local time.
+  const zone = typeof window === 'undefined' ? ` ${date.toLocaleTimeString(dateLocale(), { timeZoneName: 'short' }).split(' ').at(-1)}` : ''
+
+  return `${day}, ${timeOfDay(date, time === 'seconds')}${zone}`
 }

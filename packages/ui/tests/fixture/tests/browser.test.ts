@@ -140,6 +140,43 @@ inBrowser('LineChart tooltip', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart in another timezone', () => {
+  test('words a timed label in the server\'s zone with its name, then in the viewer\'s own zone once hydrated, with no error', async () => {
+    const before = process.env.TZ
+
+    process.env.TZ = 'UTC'
+
+    try {
+      const site = await shared()
+      const served = (await site.visit('/chart-tooltip')).html.match(/id="seconds"[\s\S]*?aria-valuetext="([^"]*)"/)?.[1]
+
+      expect(served).toMatch(/^21 Oct 2026, 16:\d\d:\d\d UTC: /)
+
+      await using page = await site.open('/')
+
+      await page.cdp('Emulation.setTimezoneOverride', { timezoneId: 'Asia/Tokyo' })
+      await page.goto('/chart-tooltip')
+      await page.waitFor('#seconds .kui-line-chart-plot svg')
+
+      const valuetext = () => page.evaluate(() => document.querySelector('#seconds .kui-line-chart-overlay')!.getAttribute('aria-valuetext'))
+
+      await page.waitUntil(() => !document.querySelector('#seconds .kui-line-chart-overlay')!.getAttribute('aria-valuetext')!.includes('UTC'))
+      expect(await valuetext()).toMatch(/^22 Oct 2026, 01:\d\d:\d\d: /)
+
+      await page.evaluate(() => document.querySelector('#hours .kui-line-chart-overlay')!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 5, clientY: 300 })))
+      await page.waitFor('#hours .kui-line-chart-tooltip')
+      expect(await page.text('#hours .kui-line-chart-tooltip-label')).toMatch(/^21 Oct 2026, 09:00$/)
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.TZ
+      else
+        process.env.TZ = before
+    }
+  }, 120_000)
+})
+
 inBrowser('FormField in an island', () => {
   test('ConfirmDelete words its dialog in the French kayjs-ui ships, a prop winning over it, English on an English page', async () => {
     const site = await shared()
