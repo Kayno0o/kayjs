@@ -71,6 +71,30 @@ A long list of options (more than 12) picked with a union of literals or an `enu
 
 How other schema types show: a `s.Date()` is a date input (use `format: 'date-time'` text for a time), a `t.Transform` is entered as the type it decodes from, and a `t.BigInt()` has no control, so it is edited as JSON: prefer `s.Integer()`.
 
+## Blocks
+
+A page made of mixed sections is a list of items of several declared types, `blocks()` from `kay/content`:
+
+```ts
+import { blocks } from 'kay/content'
+
+s.Object({
+  sections: blocks({
+    hero: s.Object({ heading: s.String({ minLength: 1 }), image: s.Optional(imageField()) }, { title: 'Hero banner' }),
+    text: s.Object({ body: markdownField() }),
+    gallery: s.Object({ images: s.Array(imageField()) }),
+  }),
+})
+```
+
+- Each key is a block type and its object the fields of an item of it. An item is stored as an object with a `type` key naming its type, `{ type: 'hero', heading: 'Welcome' }`, so a Markdown or JSON file holds a plain array.
+- The typed read is the union of the blocks discriminated on `type`: `section.type === 'hero'` narrows to `section.heading`. A block may not declare a `type` field of its own, and `blocks()` throws saying so; it also throws for no block, an empty type name or a block that is not an object.
+- A block's `title` is its label in the editor, else its key humanized (`hero` gives `Hero`). `blocks(types, { minItems, maxItems })` takes a list's own options, and `s.Optional(blocks(...))` makes the list optional.
+- The editor adds a block by its type: an `Add <type>` button for each at the end of the list and a menu of the types to add at the top. Each item shows the fields of its own type, headed by its label then its first filled text (`Hero banner: Welcome`), and folds, moves (across types), duplicates and removes with Undo as any list item does. `fieldsOf` gives a `list` field with `blocks`, each `{ type, label, fields }`, and `itemAt(list, index, value)` the group of one item.
+- An item saved with an unknown `type` shows as `Unknown block` with no field, left to be removed, and the save refuses it.
+- A block failing its schema is refused at its own field (`sections.1.heading`), the issue worded with that field's label. `withDefaults` fills the defaults of a block by its type, and a reference inside a block is checked like any other.
+- The texts of the editor are the `cms.blocks.*` messages ([Texts and languages](words.md)).
+
 ## Field kinds of your own
 
 A field the admin should edit another way, a colour, a map point, a rating, is declared once in the schema and given a component, with nothing to register:

@@ -259,6 +259,25 @@ s.Object({
 
 A colour is picked or typed as `#rrggbb`. Money is a number with the currency's symbol beside the box. Tags are words typed into one box, added with Enter or a comma. A link is a label and an address, a place a latitude and a longitude. An icon is picked from a grid with search, and the icon set stays on the server. A select with many options opens on a search box, and a date has Today and Clear buttons.
 
+## Blocks
+
+A page made of different sections is a list whose items are of several types. Declare each type once with `blocks()` from `kay/content`:
+
+```ts
+import { blocks, imageField, markdownField } from 'kay/content'
+
+s.Object({
+  sections: blocks({
+    hero: s.Object({ heading: s.String({ minLength: 1 }), image: s.Optional(imageField()) }, { title: 'Hero banner' }),
+    text: s.Object({ body: markdownField() }),
+  }),
+})
+```
+
+Each key is a block type, and its object holds the fields of that block. An item is stored with a `type` key naming its block, like `{ type: 'hero', heading: 'Welcome' }`. When you read the entry, `section.type === 'hero'` narrows the item to a hero, so `section.heading` is typed.
+
+The editor adds a block by its type, with an Add button for each type at the end of the list and a menu at the top. Each block shows the fields of its own type. Blocks move up and down across types, and can be duplicated or removed, as the items of any list can. A block may not have a field named `type`, since kay keeps it for the block's name.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.
