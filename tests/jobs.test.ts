@@ -9,7 +9,7 @@ import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
-import { drainQueues } from '../src/server/queue'
+import { drainQueues, forgetQueue } from '../src/server/queue'
 import { reportBackgroundError, useAppOnError } from '../src/server/report'
 
 const dirs: string[] = []
@@ -970,6 +970,48 @@ describe('queue', () => {
     finally {
       await shutdown(app)
     }
+  })
+
+  it('runs every queue again once a job a worker took ends, for the jobs it enqueued on another queue', async () => {
+    const log: string[] = []
+    // Made first and served by no worker, so drainQueues looks at it before the queue whose job enqueues on it.
+    const later = queue('later', (step: string) => void log.push(step), { store: memoryJobs() })
+    const work = queue('work', async (step: string) => {
+      log.push(step)
+      await Bun.sleep(50)
+      await later.enqueue(`after ${step}`)
+    }, { store: memoryJobs() })
+    const app = new Elysia().use(work).listen(0)
+
+    try {
+      await work.enqueue('a')
+      await until(() => log.length > 0)
+      await drainQueues()
+      expect(log).toEqual(['a', 'after a'])
+    }
+    finally {
+      await shutdown(app)
+      forgetQueue(later)
+      forgetQueue(work)
+    }
+  })
+
+  it('does not wait for its own run when a job awaits a drain', async () => {
+    const log: string[] = []
+    const work = queue('work', async (step: string) => {
+      log.push(step)
+
+      if (step === 'a') {
+        await work.enqueue('b')
+        await work.drain()
+        log.push('a drained')
+      }
+    }, { store: memoryJobs() })
+
+    await work.enqueue('a')
+    await work.drain()
+    expect(log).toEqual(['a', 'b', 'a drained'])
+    forgetQueue(work)
   })
 
   it('runs each job in one of the processes sharing the store', async () => {

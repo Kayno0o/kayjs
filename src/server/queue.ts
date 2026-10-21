@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
@@ -177,6 +178,8 @@ export function retryLater(wait: Duration, reason = 'it asked to run again later
 
 // What drains each queue made, for `kay/test` to run them all.
 const drains = new Set<() => Promise<number>>()
+// Set while a job runs, so a drain the job awaits does not wait for the run awaiting it.
+const inJob = new AsyncLocalStorage<true>()
 let defaultStore: JobStore | undefined
 
 // Jobs kept in a SQLite file: they survive restarts and deploys, and every process of the machine opening it shares them, each job running in one of them.
@@ -706,7 +709,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   const running = new Set<Promise<boolean>>()
 
   const runNext = async (): Promise<boolean> => {
-    const run = runOne()
+    const run = inJob.run(true, runOne)
 
     running.add(run)
 
@@ -882,11 +885,14 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
         while (await runNext())
           ran++
 
-        if (running.size === 0)
+        if (running.size === 0 || inJob.getStore())
           return ran
 
-        // A job a worker holds may enqueue another, so the queue is looked at again once it ends.
-        await Promise.allSettled(running)
+        // A job a worker holds may enqueue another, so the queue is looked at again once it ends, and counts as run, so `drainQueues` looks at every queue again too.
+        for (const settled of await Promise.allSettled(running)) {
+          if (settled.status === 'fulfilled' && settled.value)
+            ran++
+        }
       }
     },
     failed: async () => {
