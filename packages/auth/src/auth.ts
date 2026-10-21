@@ -68,7 +68,7 @@ import { createRoleHierarchy } from './roles'
 import { normalizeEmail, normalizeUsername, PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
-import { userDataRules } from './userData'
+import { mergedData, userDataRules } from './userData'
 
 export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
@@ -1113,6 +1113,30 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 // Where `kay dev` answers the dev tool's Auth tab with the session's user.
 const DEV_PATH = '/_kay/auth'
 
+// Throws when the member `signInAs` found holds other values than the fields it was given.
+function signInAsMismatch(core: Core, user: BareUser, given: { email: string | undefined, username: string | undefined, roles: string[] | undefined, data: object | undefined }): void {
+  const differs: string[] = []
+
+  if (given.email !== undefined && given.email !== user.email)
+    differs.push('email')
+
+  if (given.username !== undefined && (user.username === null || given.username.toLowerCase() !== user.username.toLowerCase()))
+    differs.push('username')
+
+  if (given.roles !== undefined && !given.roles.every(role => user.roles.includes(role)))
+    differs.push('roles')
+
+  if (given.data !== undefined) {
+    const wanted = core.userData && mergedData(core.userData, user.data, given.data)
+
+    if (wanted === undefined || JSON.stringify(wanted) !== JSON.stringify(user.data))
+      differs.push('data')
+  }
+
+  if (differs.length > 0)
+    throw new Error(`kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
+}
+
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
 export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
@@ -1279,7 +1303,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     signedInCookies.delete(cookies)
   }
 
-  const mintSessionCookie = async (userId: string, secure: boolean | undefined): Promise<string> => {
+  // The Set-Cookie lines of a new session signed in as `userId`.
+  const mintSetCookies = async (userId: string, secure: boolean | undefined): Promise<string[]> => {
     let failure: unknown
     const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
       try {
@@ -1294,11 +1319,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     if (failure !== undefined)
       throw failure
 
-    // `name=value` off each Set-Cookie line, its attributes dropped.
-    return response.headers.getSetCookie().map((line) => {
-      const end = line.indexOf(';')
+    return response.headers.getSetCookie()
+  }
 
-      return end === -1 ? line : line.slice(0, end)
+  // `name=value` off each Set-Cookie line, its attributes dropped.
+  const mintSessionCookie = async (userId: string, secure: boolean | undefined): Promise<string> => {
+    return (await mintSetCookies(userId, secure)).map((line) => {
+      const cookie = Bun.Cookie.parse(line)
+
+      return `${cookie.name}=${cookie.value}`
     }).join('; ')
   }
 
@@ -1326,36 +1355,46 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return mintSessionCookie(userId, cookieOptions.secure)
     },
 
-    // Signs a test site in as a member, making them first when no user has their email or username, with no form round trip: `createUser`'s fields (`email`, `username`, `password`, `roles`, `emailVerified`, `locale`) for a new member, an existing one signed in as they are. It sets the session cookie in the site's cookie jar, so a second call switches member; returns the user.
-    async signInAs(site: { cookies: Bun.CookieMap }, who: CreateUserInput): Promise<BareUser> {
-      const email = who.email === undefined ? undefined : normalizeEmail(who.email)
-      const username = who.username === undefined ? undefined : normalizeUsername(who.username)
+    // Signs a test site in as a member, making them first when no user has their email or username, with no form round trip: `createUser`'s fields (`email`, `username`, `password`, `roles`, `emailVerified`, `locale`) for a new member, and the app's own user `data` fields. An existing member is signed in as they are, and throws when the email, username, roles or data given differ from theirs. It sets the session cookie in the site's cookie jar, so a second call switches member; returns the user.
+    async signInAs(site: { cookies: Bun.CookieMap }, who: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined, data?: { [Field in keyof UserData]?: UserData[Field] | undefined } | undefined }): Promise<BareUser> {
+      const { data, ...fields } = who
+      const email = fields.email === undefined ? undefined : normalizeEmail(fields.email)
+      const username = fields.username === undefined ? undefined : normalizeUsername(fields.username)
       const found = (email === undefined ? undefined : await core.store.users.findByEmail(email)) ?? (username === undefined ? undefined : await core.store.users.findByUsername(username))
       let user: BareUser
 
       if (found) {
         user = publicUser(found)
+        signInAsMismatch(core, user, { email, username, roles: fields.roles, data })
       }
       else {
-        const created = await createUser(core, who)
+        const created = await createUser(core, fields)
 
         if (!created.ok)
           throw new Error(`kayjs-auth: signInAs could not make the member: ${JSON.stringify(created.errors)}`)
 
         user = created.user
+
+        if (data !== undefined) {
+          const merged = core.userData && mergedData(core.userData, undefined, data)
+
+          if (merged === undefined)
+            throw new Error(`kayjs-auth: signInAs could not set the member's data: ${core.userData ? 'it does not fit the `user` schema' : 'createAuth has no `user` schema'}`)
+
+          user = publicUser((await core.store.users.update(user.id, { data: merged }))!)
+        }
       }
 
-      const minted = (await mintSessionCookie(user.id, undefined)).split('; ')
+      const lines = await mintSetCookies(user.id, undefined)
+      const names: string[] = []
 
       dropSession(site.cookies)
 
-      const names: string[] = []
+      for (const line of lines) {
+        const cookie = Bun.Cookie.parse(line)
 
-      for (const piece of minted) {
-        const split = piece.indexOf('=')
-
-        site.cookies.set(piece.slice(0, split), piece.slice(split + 1))
-        names.push(piece.slice(0, split))
+        site.cookies.set(cookie.name, cookie.value)
+        names.push(cookie.name)
       }
 
       signedInCookies.set(site.cookies, names)

@@ -2,6 +2,7 @@ import { Database } from '@kaynooo/pg-orm'
 import { afterAll, expect, test } from 'bun:test'
 import { memoryStore } from '../src/memoryStore'
 import { authTables, pgStore } from '../src/pg'
+import { signInAsContract } from './helpers/signInAsContract'
 import { storeContract } from './helpers/storeContract'
 
 const opened: Database[] = []
@@ -13,6 +14,17 @@ afterAll(async () => {
 storeContract('memoryStore', async () => memoryStore())
 
 storeContract('pgStore on SQLite', async () => {
+  const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
+
+  opened.push(db)
+  await db.sync({ allowDestructive: true })
+
+  return pgStore(db)
+})
+
+signInAsContract('memoryStore', async () => memoryStore())
+
+signInAsContract('pgStore on SQLite', async () => {
   const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
 
   opened.push(db)

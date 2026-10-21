@@ -2,6 +2,7 @@ import { Database } from '@kaynooo/pg-orm'
 import { afterAll, expect, test } from 'bun:test'
 import { authTables, pgStore } from '../src/pg'
 import { userRecord } from './helpers/app'
+import { signInAsContract } from './helpers/signInAsContract'
 import { storeContract } from './helpers/storeContract'
 
 // The database `docker compose up -d` starts; another with KAYJS_AUTH_TEST_DATABASE_URL.
@@ -19,6 +20,12 @@ if (reachable) {
   await db.sync({ allowDestructive: true })
 
   storeContract('pgStore', async () => {
+    await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
+
+    return pgStore(db)
+  })
+
+  signInAsContract('pgStore', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
     return pgStore(db)
