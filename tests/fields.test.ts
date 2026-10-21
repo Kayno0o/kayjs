@@ -7,7 +7,7 @@ import { formInput, nativeConstraints } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
-import { publicEnvModule, servePublicEnv } from '../src/server/env'
+import { holdPublicEnv, publicEnvModule, servePublicEnv } from '../src/server/env'
 import { buildingWithoutEnv } from '../src/server/env-state'
 import { queryRules, queryScript, readQuery } from '../src/server/query'
 import { Denied } from '../src/server/signals'
@@ -163,6 +163,14 @@ describe('s.Public', () => {
     expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({})
     expect(await (await other.handle(new Request('http://localhost/_kay/env.js'))).text()).toBe('export default {}\n')
     expect(await (await own.handle(new Request('http://localhost/_kay/env.js'))).text()).toContain('"KAY_TEST_BOOT_ONE":"one"')
+  })
+
+  it('holds the values as the modules ran, before the app is set up', () => {
+    defineEnv(s.Object({ KAY_TEST_EARLY: s.Public(s.String()) }), { KAY_TEST_EARLY: 'soon' })
+    holdPublicEnv([import.meta.path])
+    expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toMatchObject({ KAY_TEST_EARLY: 'soon' })
+    holdPublicEnv([])
+    expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({})
   })
 
   it('forgets what the build could not read once another boot does not name its module', async () => {

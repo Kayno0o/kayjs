@@ -46,7 +46,7 @@ import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
-import { servePublicEnv } from './env'
+import { holdPublicEnv, servePublicEnv } from './env'
 import { PUBLIC_ENV_PATH, publicEnvFiles } from './env-state'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
@@ -324,6 +324,7 @@ async function loadPublicModules(root: string): Promise<string[]> {
   const paths = files.map(file => join(root, file))
 
   await Promise.all(paths.map(async (path): Promise<void> => void await import(path)))
+  holdPublicEnv(paths)
 
   return paths
 }

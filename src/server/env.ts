@@ -195,29 +195,16 @@ function publicOf(schema: EnvSchema, values: Record<string, unknown>, owner: str
   return found
 }
 
-function registerPublic(schema: EnvSchema, values: Record<string, unknown>): void {
-  const found = publicOf(schema, values, 's.Public')
+function declaredOf(files: readonly string[]): PublicDeclared[] {
+  const own = new Set(files)
 
-  if (found !== undefined)
-    declaredPublic.push({ file: callerFile(defineEnv), ...found })
+  return declaredPublic.filter(({ file }) => file === undefined || own.has(file))
 }
 
-// Reads the `publicEnv` of kay.config.ts as `defineEnv` reads the server's, and serves the module the browser loads with it and every `s.Public` field the modules at `files` declared, the values of this boot alone.
-// The boot claims its path before any build.
-export function servePublicEnv(app: Elysia, schema: EnvSchema, files: readonly string[] = []): void {
-  const own = new Set(files)
-  const declared = declaredPublic.filter(({ file }) => file === undefined || own.has(file))
+// Makes `declared` the values `publicEnv` reads on the server, replacing those of any earlier boot.
+function holdPublic(declared: readonly PublicDeclared[]): { values: Record<string, unknown>, unread: Set<string> } {
   const values: Record<string, unknown> = {}
   const unread = new Set<string>()
-
-  if (Object.keys(schema.properties).length > 0) {
-    kayLog('warn', 'publicEnv in kay.config.ts is read until 1.73 only: mark the fields s.Public in defineEnv instead')
-
-    const found = publicOf(schema, defineEnv(schema) as Record<string, unknown>, 'publicEnv', true)
-
-    if (found !== undefined)
-      declared.push({ file: undefined, ...found })
-  }
 
   for (const found of declared) {
     Object.assign(values, found.values)
@@ -230,6 +217,37 @@ export function servePublicEnv(app: Elysia, schema: EnvSchema, files: readonly s
   }
 
   ;(globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV] = values
+
+  return { values, unread }
+}
+
+// The `s.Public` values of the modules at `files`, held as soon as they ran, for what a page reads while the app is being set up.
+export function holdPublicEnv(files: readonly string[]): void {
+  holdPublic(declaredOf(files))
+}
+
+function registerPublic(schema: EnvSchema, values: Record<string, unknown>): void {
+  const found = publicOf(schema, values, 's.Public')
+
+  if (found !== undefined)
+    declaredPublic.push({ file: callerFile(defineEnv), ...found })
+}
+
+// Reads the `publicEnv` of kay.config.ts as `defineEnv` reads the server's, and serves the module the browser loads with it and every `s.Public` field the modules at `files` declared, the values of this boot alone.
+// The boot claims its path before any build.
+export function servePublicEnv(app: Elysia, schema: EnvSchema, files: readonly string[] = []): void {
+  const declared = declaredOf(files)
+
+  if (Object.keys(schema.properties).length > 0) {
+    kayLog('warn', 'publicEnv in kay.config.ts is read until 1.73 only: mark the fields s.Public in defineEnv instead')
+
+    const found = publicOf(schema, defineEnv(schema) as Record<string, unknown>, 'publicEnv', true)
+
+    if (found !== undefined)
+      declared.push({ file: undefined, ...found })
+  }
+
+  const { values, unread } = holdPublic(declared)
 
   let reply: ReturnType<typeof fixedReply> | undefined
 
