@@ -8,7 +8,7 @@ import { resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
-import { collectionTitle } from '../listing'
+import { collectionTitle, SINGLE_SLUG } from '../listing'
 import { BODY, entryKey } from '../markers'
 import { drafts } from './drafts'
 import { registerInline } from './inline'
@@ -35,8 +35,9 @@ const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },
   query: entry.locale === undefined ? {} : { locale: entry.locale },
 })
-// A single collection's entry is the collection: no slug under its title, its locale still shown. Nothing is shown until the collection is known, so a single one's slug never flashes.
-const subtitle = memo(() => source.value() === undefined ? undefined : source.value()?.collection.single === true ? entry.locale : entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`)
+// A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
+const isSingle = () => { const loaded = source.value(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
+const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`)
 // The page editor asks no author, so its editors are counted, and named ones are told of them.
 const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
