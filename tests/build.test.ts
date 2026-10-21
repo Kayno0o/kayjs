@@ -34,6 +34,7 @@ import { serveBuildFiles } from '../src/server/build-files'
 import { browserStackMapper } from '../src/server/error-maps'
 import { compileErrorPage } from '../src/server/overlay'
 import { encodePng } from '../src/server/png'
+import { kayBuild, kayBuildSpawned } from './check-helper'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -680,8 +681,7 @@ describe('kay build', () => {
 
   it('bundles the islands for production and writes the manifest a server boots from', async () => {
     try {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+      const { report, code } = await kayBuild([root, '--no-check'], {})
       const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
       const entryFile = join(outputDir(root), 'dist', manifest.entry.slice('/_kay/'.length))
       const entry = await Bun.file(entryFile).text()
@@ -789,7 +789,8 @@ describe('kay.config.ts', () => {
     await symlink(root, link)
 
     try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', link, '--no-check', '--static'], { stdout: 'pipe', stderr: 'pipe' }))
+      const { report: out, output, code } = await kayBuild([link, '--no-check', '--static'], {})
+      const report = out + output
       const html = await Bun.file(join(root, 'dist/index.html')).text()
       const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { islands: Record<string, string[]> }
 
@@ -891,21 +892,24 @@ const tsconfig = JSON.stringify({
 })
 
 describe('kay build checks the project first', () => {
-  const build = async (root: string, ...args: string[]) => {
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
-    const [report, code] = await printed(child)
+  // Run in this process; a build that ends it, as a page calling `process.exit` does, goes to a process of its own.
+  const buildIn = (run: typeof kayBuild) => async (root: string, ...args: string[]) => {
+    const { report, output, code } = await run([root, ...args], {})
 
-    return { report, code }
+    return { report: report + output, code }
   }
+  const build = buildIn(kayBuild)
+  const buildSpawned = buildIn(kayBuildSpawned)
 
-  const documented = async (root: string, ...args: string[]) => {
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
-    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const documentedIn = (run: typeof kayBuild) => async (root: string, ...args: string[]) => {
+    const { report: stdout, output: stderr, code } = await run([root, ...args], {})
 
     expect(stdout.trimEnd().split('\n'), stderr).toHaveLength(1)
 
     return { document: JSON.parse(stdout) as { errors: number, warnings: number, failed?: { stage: string }, built?: unknown, problems: { file?: string, severity: string, code: string | null, message: string }[] }, stdout, stderr, code }
   }
+  const documented = documentedIn(kayBuild)
+  const documentedSpawned = documentedIn(kayBuildSpawned)
 
   it('lints the heads of the pages it prerenders on a public site, failing on a lint the config denies', async () => {
     const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: ${lints} }\n`
@@ -1047,14 +1051,14 @@ describe('kay build checks the project first', () => {
       })
 
       try {
-        const { report, code } = await build(root)
+        const { report, code } = await buildSpawned(root)
 
         expect(code).toBe(3)
         expect(report).toContain('warning[skipped-heading]')
         expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
 
         // The same project as a document: the check is cached, and what the page logs goes to stderr to leave stdout one document.
-        const { document, stderr, code: exited } = await documented(root, '--format', 'json')
+        const { document, stderr, code: exited } = await documentedSpawned(root, '--format', 'json')
 
         expect(exited).toBe(3)
         expect(stderr).toContain('logged')
@@ -1097,7 +1101,7 @@ describe('kay build checks the project first', () => {
       })
 
       try {
-        const { document, code } = await documented(root, '--no-check', '--format', 'json')
+        const { document, code } = await documentedSpawned(root, '--no-check', '--format', 'json')
 
         expect(code).toBe(1)
         expect(document.failed).toEqual({ stage: 'bundle' })
@@ -1123,8 +1127,7 @@ describe('kay build checks the project first', () => {
       })
 
       try {
-        const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--format', 'github'], { stdout: 'pipe', stderr: 'pipe' })
-        const [stdout, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+        const { report: stdout, code } = await kayBuild([root, '--no-check', '--format', 'github'], {})
 
         expect(code).toBe(1)
         expect(stdout).toBe(`::error file=${relative(process.cwd(), join(root, 'src/routes/index.kay'))},line=2,col=1,endLine=2,endColumn=5,title=template-syntax::\`each\` is pug syntax kay does not have%0Ahelp: kay loops with \`for item of list\`\n`)

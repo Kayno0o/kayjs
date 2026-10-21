@@ -8,6 +8,7 @@ import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { browse, browserPath } from '../src/test'
+import { kayBuild } from './check-helper'
 import { listeningPort } from './listening'
 import { pages } from './shared-pages'
 
@@ -66,11 +67,10 @@ let sites: Site[] = []
 const roots: string[] = []
 
 async function build(root: string, ...args: string[]): Promise<void> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', ...args], { stdout: 'pipe', stderr: 'pipe' })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { code, report, output } = await kayBuild([root, '--no-check', ...args], {})
 
   if (code !== 0)
-    throw new Error(out + err)
+    throw new Error(report + output)
 }
 
 async function project(config: string, i18n = false, only?: Record<string, string>): Promise<string> {

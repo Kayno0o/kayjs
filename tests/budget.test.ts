@@ -1,12 +1,11 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { budgetLints, checkBudget } from '../src/build/budget'
 import { byteSize } from '../src/runtime/byte-size'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
@@ -37,9 +36,8 @@ async function project(config: string): Promise<string> {
 }
 
 async function built(root: string, ...args: string[]) {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--format', 'json', ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-  const document = JSON.parse(out) as { problems: { code: string, message: string, note?: string, severity?: string }[], built?: { sizes?: { islands: { modules?: unknown }[] } } }
+  const { code, report, output: err } = await kayBuild([root, '--no-check', '--format', 'json', ...args])
+  const document = JSON.parse(report) as { problems: { code: string, message: string, note?: string, severity?: string }[], built?: { sizes?: { islands: { modules?: unknown }[] } } }
 
   return { code, err, document, over: document.problems.filter(problem => problem.code === 'over-budget') }
 }
@@ -124,8 +122,7 @@ describe('kay build with a budget', () => {
 
     await Bun.write(join(root, 'src/routes/clicks.kay'), 'p Press <kbd>Ctrl</kbd>\n')
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--deny-warnings'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [err, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+    const { code, output: err } = await kayBuild([root, '--deny-warnings'])
 
     expect(err).toContain('failing under --deny-warnings')
     expect(code).toBe(1)

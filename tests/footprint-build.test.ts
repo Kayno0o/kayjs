@@ -1,12 +1,11 @@
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { gzipSize } from '../src/build/report'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
 const FIXTURES = join(import.meta.dir, 'fixtures')
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
@@ -68,12 +67,12 @@ async function project(config: string, extra: Record<string, string | Uint8Array
   return root
 }
 
+// `kay build` run in this process, answered as the CLI's child process answered.
 async function built(root: string, ...args: string[]): Promise<Result> {
   const json = !args.includes('--text')
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', ...json ? ['--format', 'json'] : [], ...args.filter(arg => arg !== '--text')], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { code, report, output } = await kayBuild([root, '--no-check', ...json ? ['--format', 'json'] : [], ...args.filter(arg => arg !== '--text')])
 
-  return { code, out, err, document: json ? JSON.parse(out) : { problems: [] } }
+  return { code, out: report, err: output, document: json ? JSON.parse(report) : { problems: [] } }
 }
 
 const sizeOf = async (path: string) => Bun.file(path).size

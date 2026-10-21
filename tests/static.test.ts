@@ -2,15 +2,14 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { headersFile, nginxHeaders } from '../src/build/header-files'
 import { IMAGE_LINK } from '../src/server/prerender'
+import { kayBuild } from './check-helper'
 import { expectEagerJsWithin, lazyChunks } from './eager-js'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
-const CLI = resolve('src/cli.ts')
 const BASE = '/repo'
 // The gzipped JS a page with one small island loads before anything is clicked, as measured, with `EAGER_JS_SLACK` of margin added by `expectEagerJsWithin`: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
 // The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
@@ -27,10 +26,9 @@ const remoteHost = Bun.serve({ port: 0, fetch: () => new Response(Bun.file(join(
 
 // Under NODE_ENV=development too, as a shell left set for `kay dev` runs it, the build exports production pages.
 async function exportSite(outdir: string, root = FIXTURE): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development', KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
-  const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+  const { code, output } = await kayBuild([root, '--no-check', '--static', '--outdir', outdir], { NODE_ENV: 'development', KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` })
 
-  return { code, errors }
+  return { code, errors: output }
 }
 
 // A plain file server, as a static host is: the site under its mount point, `about` found as `about.html` or `about/index.html`, and `404.html` for the rest.

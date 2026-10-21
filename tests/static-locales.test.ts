@@ -1,15 +1,14 @@
 import type { I18nConfig } from '../src/config'
 import { readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import { join } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { Elysia } from 'elysia'
+import { kayBuild } from './check-helper'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
 setDefaultTimeout(60_000)
 
-const CLI = resolve('src/cli.ts')
 const SITE = 'https://x.example'
 const HREF = /<a\b[^>]*?\shref="([^"]*)"/g
 const PAGES = ['/about', '/news/hello', '/news/launch']
@@ -56,8 +55,7 @@ describe('kay build --static localizes links as the server render does', () => {
 
       await Bun.write(join(copy, 'kay.config.ts'), config)
 
-      const child = Bun.spawn([process.execPath, CLI, 'build', copy, '--no-check', '--static', '--outdir', join(copy, 'dist')], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      const { code, output: errors } = await kayBuild([copy, '--no-check', '--static', '--outdir', join(copy, 'dist')], { NODE_ENV: 'development' })
 
       expect(errors).toBe('')
       expect(code).toBe(0)
