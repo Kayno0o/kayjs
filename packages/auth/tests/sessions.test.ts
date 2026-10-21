@@ -38,7 +38,7 @@ describe('sessions', () => {
 
     await signedIn('10.0.0.2', IPHONE)
 
-    const sessions = await laptop.call('sessions')
+    const sessions = await laptop.call('listSessions')
 
     expect(sessions).toHaveLength(2)
     // Listing from no address of its own moved this one's.
@@ -50,28 +50,40 @@ describe('sessions', () => {
     const { signedIn } = await setup()
     const laptop = await signedIn()
     const phone = await signedIn('10.0.0.2', IPHONE)
-    const other = (await laptop.call('sessions'))[1]!
+    const other = (await laptop.call('listSessions'))[1]!
 
     expect(await phone.json('/me')).toMatchObject({ id: 'u1' })
-    expect(await laptop.call('endSession', other.id)).toBe(true)
+    expect(await laptop.call('revokeSession', other.id)).toEqual({ ok: true })
     expect(await phone.json('/me')).toBe('anonymous')
     expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
-    expect(await laptop.call('sessions')).toHaveLength(1)
+    expect(await laptop.call('listSessions')).toHaveLength(1)
+  })
+
+  test('the old names of the renamed methods still answer as they did', async () => {
+    const { signedIn } = await setup()
+    const laptop = await signedIn()
+    const phone = await signedIn('10.0.0.2', IPHONE)
+    const other = (await laptop.call('sessions'))[1]!
+
+    expect(await laptop.call('listSessions')).toEqual(await laptop.call('sessions'))
+    expect(await laptop.call('endSession', other.id)).toBe(true)
+    expect(await laptop.call('endSession', other.id)).toBe(false)
+    expect(await phone.json('/me')).toBe('anonymous')
   })
 
   test('ending this session signs out, and a session of someone else is not ended', async () => {
     const { signedIn, store, browser } = await setup()
     const laptop = await signedIn()
-    const own = (await laptop.call('sessions'))[0]!
+    const own = (await laptop.call('listSessions'))[0]!
 
     await store.users.create(userRecord({ id: 'u2' }))
     const bob = browser()
 
     await bob.fetch('/sign-in/u2', { method: 'POST' })
 
-    expect(await bob.call('endSession', own.id)).toBe(false)
+    expect(await bob.call('revokeSession', own.id)).toEqual({ ok: false, error: 'not-found' })
     expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
-    expect(await laptop.call('endSession', own.id)).toBe(true)
+    expect(await laptop.call('revokeSession', own.id)).toEqual({ ok: true })
     expect(await laptop.json('/me')).toBe('anonymous')
     expect(await store.sessions.get(own.id)).toBeUndefined()
   })
@@ -94,7 +106,7 @@ describe('sessions', () => {
 
     await laptop.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
 
-    expect(await laptop.call('sessions')).toMatchObject([{ current: true }])
+    expect(await laptop.call('listSessions')).toMatchObject([{ current: true }])
     expect(await phone.json('/me')).toBe('anonymous')
   })
 
@@ -109,7 +121,7 @@ describe('sessions', () => {
     setSystemTime(new Date(Date.now() + 20 * 60 * 1000))
 
     try {
-      expect(await laptop.call('sessions')).toMatchObject([{ current: true }])
+      expect(await laptop.call('listSessions')).toMatchObject([{ current: true }])
       expect(await store.sessions.listByUser('u1')).toHaveLength(1)
       expect(await phone.json('/me')).toBe('anonymous')
     }
@@ -169,18 +181,18 @@ describe('sessions', () => {
 
     await signedIn('10.0.0.2', IPHONE)
 
-    expect((await laptop.call('sessions')).map((session: { place: string | null }) => session.place)).toEqual(['Lyon, France', null])
+    expect((await laptop.call('listSessions')).map((session: { place: string | null }) => session.place)).toEqual(['Lyon, France', null])
   })
 
   test('a bearer token sees no sessions and ends none', async () => {
     const { signedIn, app } = await setup()
     const laptop = await signedIn()
-    const own = (await laptop.call('sessions'))[0]!
+    const own = (await laptop.call('listSessions'))[0]!
     const { token } = await laptop.callOk('createToken', {}, 'CLI')
     const call = async (method: string, ...args: unknown[]): Promise<unknown> => (await app.handle(new Request(`http://localhost/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) }))).json()
 
-    expect(await call('sessions')).toEqual([])
-    expect(await call('endSession', own.id)).toBe(false)
+    expect(await call('listSessions')).toEqual([])
+    expect(await call('revokeSession', own.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
   })
 
@@ -254,7 +266,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
         expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
 
         if (kept === ada)
-          expect(await ada.call('sessions')).toMatchObject([{ current: true }])
+          expect(await ada.call('listSessions')).toMatchObject([{ current: true }])
       }
     }
 
@@ -312,7 +324,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
       await app.ada.call('registerPasskey', await device.create(options), 'Laptop')
       const ended = await app.otherWaysIn()
 
-      expect(await app.ada.call('removePasskey', device.credentials[0]!.id, { password: PASSWORD })).toEqual({ ok: true })
+      expect(await app.ada.call('revokePasskey', device.credentials[0]!.id, { password: PASSWORD })).toEqual({ ok: true })
       await ended()
     }],
     ['turning on the second factor', async (app) => {

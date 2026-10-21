@@ -595,7 +595,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The apps the signed-in user approved to act as them.
-  async oauthClients(): Promise<ApprovedClient[]> {
+  async listOAuthClients(): Promise<ApprovedClient[]> {
     return approvedClients(this[STATE])
   }
 
@@ -625,7 +625,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The providers the signed-in user has linked.
-  async identities(): Promise<string[]> {
+  async listIdentities(): Promise<string[]> {
     const record = await this.record()
 
     return record ? (await this.core.store.identities.listByUser(record.id)).map(identity => identity.provider) : []
@@ -742,25 +742,25 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Where the signed-in user is signed in, this browser marked `current`; empty for a bearer token.
-  async sessions(): Promise<UserSession[]> {
+  async listSessions(): Promise<UserSession[]> {
     return listSessions(this[STATE])
   }
 
-  // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out. False when they have none with that id.
-  async endSession(id: string): Promise<boolean> {
+  // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out. Refused with `not-found` when they have none with that id, and `signed-out` through a bearer token.
+  async revokeSession(id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
     const record = await this.record()
     const signedIn = await this.session.get('auth')
 
     if (!record || this.source !== 'session')
-      return false
+      return { ok: false, error: 'signed-out' }
 
     if (signedIn?.session === id) {
       await this.signOut()
 
-      return true
+      return { ok: true }
     }
 
-    return this.core.store.sessions.delete(record.id, id)
+    return (await this.core.store.sessions.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
   }
 
   // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
@@ -773,7 +773,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return registerPasskey(this[STATE], response, name)
   }
 
-  async passkeys(): Promise<Passkey[]> {
+  async listPasskeys(): Promise<Passkey[]> {
     return listPasskeys(this[STATE])
   }
 
@@ -781,7 +781,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return renamePasskey(this[STATE], id, name)
   }
 
-  async removePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
+  async revokePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
     return removePasskey(this[STATE], id, proof)
   }
 
@@ -812,7 +812,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
-  async auditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
+  async listAuditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
     const record = await this.record()
 
     return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
@@ -852,7 +852,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Everyone's audit log, or `userId`'s, newest first.
-  async adminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+  async listAdminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
     return adminAuditLog(this[STATE], query)
   }
 
@@ -940,12 +940,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The organizations the signed-in user belongs to, with their roles in each.
-  async organizations(): Promise<Membership<OrgRole>[]> {
+  async listOrganizations(): Promise<Membership<OrgRole>[]> {
     return listMemberships(this[STATE]) as Promise<Membership<OrgRole>[]>
   }
 
   // The organization `ref` names, by id or slug, with the user's roles there; null unless they are a member.
-  async organization(ref: string): Promise<Membership<OrgRole> | null> {
+  async getOrganization(ref: string): Promise<Membership<OrgRole> | null> {
     return getMembership(this[STATE], ref) as Promise<Membership<OrgRole> | null>
   }
 
@@ -967,7 +967,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Every member, oldest first, for any member to see.
-  async members(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+  async listMembers(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
     return listMembers(this[STATE], ref) as Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
   }
 
@@ -977,7 +977,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // For members holding `manage`, of a member holding no role above theirs.
-  async removeMember(ref: string, userId: string): Promise<MemberResult> {
+  async deleteMember(ref: string, userId: string): Promise<MemberResult> {
     return removeMember(this[STATE], ref, userId)
   }
 
@@ -993,7 +993,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The organization's open invitations, for members holding `manage`.
-  async invitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+  async listInvitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
     return listInvitations(this[STATE], ref) as Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
   }
 
@@ -1002,12 +1002,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The invitations open to the signed-in user's verified address.
-  async myInvitations(): Promise<Invitation<OrgRole>[]> {
+  async listMyInvitations(): Promise<Invitation<OrgRole>[]> {
     return myInvitations(this[STATE]) as Promise<Invitation<OrgRole>[]>
   }
 
   // What the invitation link's page shows; null once revoked, accepted or expired.
-  async invitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
+  async getInvitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
     return getInvitation(this[STATE], invitationId) as Promise<Invitation<OrgRole> | null>
   }
 
@@ -1021,12 +1021,92 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The signed-in user's bearer tokens, without the tokens themselves.
-  async tokens(): Promise<BearerToken[]> {
+  async listTokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
   }
 
   async revokeToken(id: string): Promise<boolean> {
     return revokeToken(this[STATE], id)
+  }
+
+  /** @deprecated Renamed `listSessions`, kept three minors. */
+  async sessions(): Promise<UserSession[]> {
+    return this.listSessions()
+  }
+
+  /** @deprecated Renamed `listPasskeys`, kept three minors. */
+  async passkeys(): Promise<Passkey[]> {
+    return this.listPasskeys()
+  }
+
+  /** @deprecated Renamed `listTokens`, kept three minors. */
+  async tokens(): Promise<BearerToken[]> {
+    return this.listTokens()
+  }
+
+  /** @deprecated Renamed `listMembers`, kept three minors. */
+  async members(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+    return this.listMembers(ref)
+  }
+
+  /** @deprecated Renamed `listOrganizations`, kept three minors. */
+  async organizations(): Promise<Membership<OrgRole>[]> {
+    return this.listOrganizations()
+  }
+
+  /** @deprecated Renamed `getOrganization`, kept three minors. */
+  async organization(ref: string): Promise<Membership<OrgRole> | null> {
+    return this.getOrganization(ref)
+  }
+
+  /** @deprecated Renamed `listInvitations`, kept three minors. */
+  async invitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+    return this.listInvitations(ref)
+  }
+
+  /** @deprecated Renamed `listMyInvitations`, kept three minors. */
+  async myInvitations(): Promise<Invitation<OrgRole>[]> {
+    return this.listMyInvitations()
+  }
+
+  /** @deprecated Renamed `getInvitation`, kept three minors. */
+  async invitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
+    return this.getInvitation(invitationId)
+  }
+
+  /** @deprecated Renamed `listOAuthClients`, kept three minors. */
+  async oauthClients(): Promise<ApprovedClient[]> {
+    return this.listOAuthClients()
+  }
+
+  /** @deprecated Renamed `listIdentities`, kept three minors. */
+  async identities(): Promise<string[]> {
+    return this.listIdentities()
+  }
+
+  /** @deprecated Renamed `listAuditLog`, kept three minors. */
+  async auditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
+    return this.listAuditLog(options)
+  }
+
+  /** @deprecated Renamed `listAdminAuditLog`, kept three minors. */
+  async adminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+    return this.listAdminAuditLog(query)
+  }
+
+  /** @deprecated Renamed `revokePasskey`, kept three minors. */
+  async removePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
+    return this.revokePasskey(id, proof)
+  }
+
+  /** @deprecated Renamed `deleteMember`, kept three minors. */
+  async removeMember(ref: string, userId: string): Promise<MemberResult> {
+    return this.deleteMember(ref, userId)
+  }
+
+  /** @deprecated Renamed `revokeSession`, which answers `{ ok }`; kept three minors. */
+  async endSession(id: string): Promise<boolean> {
+    return (await this.revokeSession(id)).ok
   }
 
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.

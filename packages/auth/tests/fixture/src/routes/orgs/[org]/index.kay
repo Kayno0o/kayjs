@@ -9,7 +9,7 @@ export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), a
   return result.ok ? result.organization.name : ctx.fail(400, { error: result.error })
 })
 
-const membership = (await ctx.locals.auth.organization(ctx.params.org))!
+const membership = (await ctx.locals.auth.getOrganization(ctx.params.org))!
 ---
 h1#organization {membership.organization.name}
 form#rename(action={rename})

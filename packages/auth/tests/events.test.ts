@@ -165,12 +165,12 @@ describe('the audit log', () => {
 
     await bob.call('register', { email: 'bob@example.com', password: PASSWORD })
 
-    const log = await ada.call('auditLog')
+    const log = await ada.call('listAuditLog')
 
     expect(log.map((entry: { event: string }) => entry.event)).toEqual(['password-changed', 'signed-in'])
     expect(log[0]).toMatchObject({ detail: null, ip: 'unknown', actorId: null })
-    expect(await ada.call('auditLog', { limit: 1 })).toHaveLength(1)
-    expect(await browser().call('auditLog')).toEqual([])
+    expect(await ada.call('listAuditLog', { limit: 1 })).toHaveLength(1)
+    expect(await browser().call('listAuditLog')).toEqual([])
   })
 
   test('pages by the last entry of a page, also after a JSON hop', async () => {
@@ -181,13 +181,13 @@ describe('the audit log', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
 
-    const first = (await ada.call('auditLog', { limit: 1 }))[0]!
-    const next = await ada.call('auditLog', { limit: 1, before: JSON.parse(JSON.stringify(first)) })
+    const first = (await ada.call('listAuditLog', { limit: 1 }))[0]!
+    const next = await ada.call('listAuditLog', { limit: 1, before: JSON.parse(JSON.stringify(first)) })
 
     expect(first.event).toBe('password-changed')
     expect(next.map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
-    expect(await ada.call('auditLog', { before: JSON.parse(JSON.stringify(next[0])) })).toEqual([])
-    expect((await ada.call('auditLog', { before: JSON.parse(JSON.stringify(new Date(first.at))) })).map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
+    expect(await ada.call('listAuditLog', { before: JSON.parse(JSON.stringify(next[0])) })).toEqual([])
+    expect((await ada.call('listAuditLog', { before: JSON.parse(JSON.stringify(new Date(first.at))) })).map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
   })
 
   test('answers an empty page for a cursor that is no date', async () => {
@@ -228,7 +228,7 @@ describe('the audit log', () => {
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('auditLog')).toEqual([])
+    expect(await ada.call('listAuditLog')).toEqual([])
     expect(await store.audit!.list({ limit: 10 })).toEqual([])
   })
 
@@ -289,6 +289,6 @@ describe('impersonation', () => {
     expect(await root.call('deleteOrganization', membership.organization.id)).toEqual({ ok: false, error: 'impersonating' })
     expect(await root.call('exportData')).toEqual({ ok: false, error: 'impersonating' })
     expect((await root.fetch('/auth/export')).status).toBe(403)
-    expect(await ada.call('organization', membership.organization.id)).toMatchObject({ organization: { name: 'Acme' } })
+    expect(await ada.call('getOrganization', membership.organization.id)).toMatchObject({ organization: { name: 'Acme' } })
   })
 })

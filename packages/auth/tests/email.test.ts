@@ -448,7 +448,7 @@ describe('magic links', () => {
     const signIn = await stranger.call('passkeySignInOptions')
 
     expect(await stranger.call('signInWithPasskey', await device.get(signIn))).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('passkeys')).toEqual([])
+    expect(await ada.call('listPasskeys')).toEqual([])
   })
 
   test('a link for an address the account has since left is spent for nothing', async () => {

@@ -271,14 +271,14 @@ describe('unlinking a provider', () => {
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(await ada.call('identities')).toEqual(['discord'])
+    expect(await ada.call('listIdentities')).toEqual(['discord'])
     expect(await ada.call('unlink', 'github', {})).toEqual({ ok: false, error: 'not-linked' })
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
 
     await ada.call('changePassword', {}, 'a first password')
 
     expect(await ada.call('unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
-    expect(await ada.call('identities')).toEqual([])
+    expect(await ada.call('listIdentities')).toEqual([])
   })
 })
 

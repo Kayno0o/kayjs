@@ -174,7 +174,7 @@ describe('lists', () => {
     expect(log.calls.filter(call => call.name === 'users.get').map(call => call.args[0])).not.toContain('b@example.com')
 
     log.reset()
-    expect(await owner.call('organizations')).toHaveLength(2)
+    expect(await owner.call('listOrganizations')).toHaveLength(2)
     expect(log.count('organizations.getMany')).toBe(1)
     expect(log.count('organizations.get')).toBe(0)
 
@@ -209,7 +209,7 @@ describe('lists', () => {
     await store.members!.add({ organizationId: organization.id, userId: 'b', roles: ['member'], createdAt: new Date() })
 
     expect((await owner.callOk('members', organization.id)).members).toHaveLength(2)
-    expect(await owner.call('organizations')).toHaveLength(1)
+    expect(await owner.call('listOrganizations')).toHaveLength(1)
   })
 })
 

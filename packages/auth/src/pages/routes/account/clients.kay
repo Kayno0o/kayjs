@@ -10,7 +10,7 @@ export const revoke = action(schemas.oauthClient, async ({ id }, ctx) => {
   return await ctx.locals.auth.revokeOAuthClient(id) ? 'revoked' : ctx.fail(404, { error: 'not-found' })
 })
 
-const clients = await ctx.locals.auth.oauthClients()
+const clients = await ctx.locals.auth.listOAuthClients()
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---
 PageSection(title={t('auth.account.clients.title')})

@@ -301,7 +301,7 @@ if (result.ok)
 
 Control characters are removed from a token's label and from a passkey's name.
 
-`tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
+`listTokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
 For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `expiresIn: null` to keep an old device working. Only `null` means never: do not forward a client's value into `expiresIn` unchecked.
 
@@ -334,7 +334,7 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 `passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
-A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `passkeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
+A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `listPasskeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
 
 ## Passkeys in an island
 
@@ -420,7 +420,7 @@ With `audit: true`, the same events are kept in the store for a year. Pass `audi
 
 Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address.
 
-Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.listAuditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 
@@ -444,7 +444,7 @@ if (found.ok) {
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
 - `deleteUser(id)` deletes the user as `deleteAccount` does. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
 - `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
-- `adminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
+- `listAdminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
 
@@ -479,14 +479,14 @@ if (made.ok)
   await auth.invite(made.membership.organization.id, 'grace@example.com', ['member'])
 ```
 
-- `organizations()` lists the user's memberships and `organization(ref)` gives one, by id or slug.
-- `members(ref)`, `setMemberRoles(ref, userId, roles)`, `removeMember(ref, userId)` and `leaveOrganization(ref)` manage who is in it.
+- `listOrganizations()` lists the user's memberships and `getOrganization(ref)` gives one, by id or slug.
+- `listMembers(ref)`, `setMemberRoles(ref, userId, roles)`, `deleteMember(ref, userId)` and `leaveOrganization(ref)` manage who is in it.
 - `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
-`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`. It needs a mailer. The page reads `invitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
+`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
 
-`myInvitations()` lists those open to the user, and `declineInvitation(id)` turns one down. `invitations(ref)` and `revokeInvitation(ref, id)` are for managers.
+`listMyInvitations()` lists those open to the user, and `declineInvitation(id)` turns one down. `listInvitations(ref)` and `revokeInvitation(ref, id)` are for managers.
 
 `auth.memberOf('admin')` is a requirement met by a member holding that role in the organization the route's `org` param names.
 

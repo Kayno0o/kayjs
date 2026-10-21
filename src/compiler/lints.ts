@@ -579,6 +579,15 @@ export const LINTS = {
     wrong: 'infiniteList(first, { size: 20, load })',
     right: 'infiniteList(first, { pageSize: 20, load })',
   },
+  'deprecated-auth-method': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'A kayjs-auth method called on `auth` by its old name: `sessions()`, `passkeys()`, `tokens()`, `members()`, `organizations()`, `invitations()`, `oauthClients()`, `identities()` and `auditLog()` are `list*`, `organization()` and `invitation()` are `get*`, `removePasskey()` is `revokePasskey()`, `removeMember()` is `deleteMember()` and `endSession()` is `revokeSession()`, which answers `{ ok }`; the old names work three minors. The fix renames the call, and `await auth.endSession(id)` becomes `(await auth.revokeSession(id)).ok`; any other use of `endSession` is reported with no fix.',
+    wrong: 'const open = await auth.sessions()',
+    right: 'const open = await auth.listSessions()',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

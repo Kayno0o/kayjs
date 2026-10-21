@@ -9,9 +9,9 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 // Ending this device's own session signs it out, so it leaves the account pages.
 export const end = action(schemas.id, async ({ id }, ctx) => {
   const auth = ctx.locals.auth
-  const current = (await auth.sessions()).find(session => session.current)?.id === id
+  const current = (await auth.listSessions()).find(session => session.current)?.id === id
 
-  await auth.endSession(id)
+  await auth.revokeSession(id)
 
   return current ? ctx.redirect(localize(auth.features().pages?.home ?? '/')) : 'ended'
 })
@@ -22,7 +22,7 @@ export const endOthers = action(async (ctx) => {
   return 'ended'
 })
 
-const sessions = await ctx.locals.auth.sessions()
+const sessions = await ctx.locals.auth.listSessions()
 const describe = (session: (typeof sessions)[number]) => [session.device.browser, session.device.os].filter(Boolean).join(', ') || t('auth.account.sessions.unknown')
 ---
 PageSection(title={t('auth.account.sessions.title')})

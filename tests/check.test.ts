@@ -2903,6 +2903,43 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports the old names of kayjs-auth methods called on auth, and --fix renames them, endSession through its answer', async () => {
+    const root = await scratchProject({
+      'src/a.ts': [
+        'export async function a(ctx: { locals: { auth: any } }, auth: any, rooms: any) {',
+        '  const open = await auth.sessions()',
+        '  const mine = await ctx.locals.auth.organization("acme")',
+        '  await rooms.members("lobby")',
+        '  await auth.removePasskey(id, { password: "x" })',
+        '  const ended = await auth.endSession(open[0].id)',
+        '  return auth.endSession(mine.id)',
+        '}',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-auth-method/g)).toHaveLength(5)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe([
+        'export async function a(ctx: { locals: { auth: any } }, auth: any, rooms: any) {',
+        '  const open = await auth.listSessions()',
+        '  const mine = await ctx.locals.auth.getOrganization("acme")',
+        '  await rooms.members("lobby")',
+        '  await auth.revokePasskey(id, { password: "x" })',
+        '  const ended = (await auth.revokeSession(open[0].id)).ok',
+        '  return auth.endSession(mine.id)',
+        '}',
+        '',
+      ].join('\n'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({

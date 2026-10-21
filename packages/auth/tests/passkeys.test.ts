@@ -71,7 +71,7 @@ describe('registering passkeys', () => {
     const added = await ada.callOk('registerPasskey', await device.create(options), '  Phone  ')
 
     expect(added).toMatchObject({ ok: true, passkey: { name: 'Phone', multiDevice: true, backedUp: true, lastUsedAt: null } })
-    expect(await ada.call('passkeys')).toMatchObject([{ id: device.credentials[0]!.id, name: 'Phone' }])
+    expect(await ada.call('listPasskeys')).toMatchObject([{ id: device.credentials[0]!.id, name: 'Phone' }])
     expect(app.events.at(-1)).toMatchObject({ event: 'passkey-added', name: 'Phone' })
 
     const second = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
@@ -122,7 +122,7 @@ describe('registering passkeys', () => {
     const proof = await ada.callOk('passkeyProofOptions')
 
     expect(await addPasskey(ada, authenticator(), undefined, { passkey: await device.get(proof.options) })).toMatchObject({ added: { ok: true } })
-    expect(await ada.call('passkeys')).toHaveLength(2)
+    expect(await ada.call('listPasskeys')).toHaveLength(2)
   })
 
   test('a passkey made for another site, or answering another challenge, is refused', async () => {
@@ -135,7 +135,7 @@ describe('registering passkeys', () => {
     const second = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
 
     expect(await ada.call('registerPasskey', await authenticator().create({ ...second.options, challenge: first.options.challenge }))).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('passkeys')).toEqual([])
+    expect(await ada.call('listPasskeys')).toEqual([])
   })
 })
 
@@ -154,7 +154,7 @@ describe('signing in with a passkey', () => {
     expect(options.userVerification).toBe('required')
     expect(await visitor.call('signInWithPasskey', await device.get(options), { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect((await visitor.call('passkeys'))[0]!.lastUsedAt).not.toBeNull()
+    expect((await visitor.call('listPasskeys'))[0]!.lastUsedAt).not.toBeNull()
   })
 
   test('a replayed answer, one without user verification, or one from a cloned authenticator signs nobody in', async () => {
@@ -257,7 +257,7 @@ describe('a passkey as second factor and as proof', () => {
     const { device } = await addPasskey(ada, authenticator(), 'Laptop')
     const id = device.credentials[0]!.id
 
-    expect(await ada.call('removePasskey', id, { password: 'wrong' })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('revokePasskey', id, { password: 'wrong' })).toEqual({ ok: false, error: 'proof' })
 
     const { options } = await ada.callOk('passkeyProofOptions')
 
@@ -265,8 +265,8 @@ describe('a passkey as second factor and as proof', () => {
 
     const again = await ada.callOk('passkeyProofOptions')
 
-    expect(await ada.call('removePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: true })
-    expect(await ada.call('passkeys')).toEqual([])
+    expect(await ada.call('revokePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: true })
+    expect(await ada.call('listPasskeys')).toEqual([])
     expect(app.events.at(-1)).toMatchObject({ event: 'passkey-removed', name: 'Laptop' })
   })
 
@@ -280,7 +280,7 @@ describe('a passkey as second factor and as proof', () => {
 
     const { options } = await ada.callOk('passkeyProofOptions')
 
-    expect(await ada.call('removePasskey', device.credentials[0]!.id, { passkey: await device.get(options) })).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('revokePasskey', device.credentials[0]!.id, { passkey: await device.get(options) })).toEqual({ ok: false, error: 'last-way-in' })
   })
 
   test('a passkey that never proved user verification is no way in, and is listed as such', async () => {
@@ -294,9 +294,9 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.identities.create({ provider: 'discord', providerId: '1', userId: user!.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
     await app.store.passkeys.update(id, { userVerified: false })
 
-    expect(await ada.call('passkeys')).toMatchObject([{ userVerified: false }])
+    expect(await ada.call('listPasskeys')).toMatchObject([{ userVerified: false }])
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
-    expect(await ada.call('removePasskey', id, {})).toEqual({ ok: true })
+    expect(await ada.call('revokePasskey', id, {})).toEqual({ ok: true })
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
   })
 
@@ -310,8 +310,8 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.users.update(user!.id, { passwordHash: null })
     await app.store.passkeys.update(id, { userVerified: false })
 
-    expect(await ada.call('removePasskey', id, {})).toEqual({ ok: false, error: 'last-way-in' })
-    expect(await ada.call('passkeys')).toHaveLength(1)
+    expect(await ada.call('revokePasskey', id, {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('listPasskeys')).toHaveLength(1)
   })
 
   test('a user-verified sign-in proves a stored passkey, which then counts as a way in', async () => {
@@ -327,11 +327,11 @@ describe('a passkey as second factor and as proof', () => {
     const { options } = await ada.callOk('passkeyProofOptions')
 
     expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
-    expect(await ada.call('passkeys')).toMatchObject([{ userVerified: true }])
+    expect(await ada.call('listPasskeys')).toMatchObject([{ userVerified: true }])
 
     const again = await ada.callOk('passkeyProofOptions')
 
-    expect(await ada.call('removePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('revokePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: false, error: 'last-way-in' })
   })
 
   test('a passkey is renamed by its owner only', async () => {
@@ -344,7 +344,7 @@ describe('a passkey as second factor and as proof', () => {
     expect(await bob.call('renamePasskey', id, 'Mine')).toBe(false)
     expect(await ada.call('renamePasskey', id, ' ')).toBe(false)
     expect(await ada.call('renamePasskey', id, 'Work laptop')).toBe(true)
-    expect(await ada.call('passkeys')).toMatchObject([{ name: 'Work laptop' }])
+    expect(await ada.call('listPasskeys')).toMatchObject([{ name: 'Work laptop' }])
   })
 })
 
@@ -371,7 +371,7 @@ describe('passkey options', () => {
     const registration = await lax.callOk('passkeyRegistrationOptions', { password: PASSWORD })
 
     expect(await lax.call('registerPasskey', await authenticator().create(registration.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
-    expect(await lax.call('passkeys')).toEqual([])
+    expect(await lax.call('listPasskeys')).toEqual([])
   })
 
   test('required refuses a passkey made without user verification and a second factor answered without it', async () => {

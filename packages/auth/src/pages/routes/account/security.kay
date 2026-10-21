@@ -65,7 +65,7 @@ export const renamePasskey = action(schemas.renamePasskey, async ({ id, name }, 
 })
 
 export const removePasskey = action(schemas.removePasskey, async (input, ctx) => {
-  const result = await ctx.locals.auth.removePasskey(input.id, proofOf(input))
+  const result = await ctx.locals.auth.revokePasskey(input.id, proofOf(input))
 
   return result.ok ? 'removed' : ctx.fail(400, { error: result.error, id: input.id })
 })
@@ -80,7 +80,7 @@ const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
 const twoFactorError = ctx.failed(setUp)?.data?.error ?? ctx.failed(enable)?.data?.error ?? ctx.failed(regenerate)?.data?.error ?? ctx.failed(disable)?.data?.error
 const recoveryCodes = ctx.succeeded(enable)?.data ?? ctx.succeeded(regenerate)?.data
 const codesLeft = user.twoFactor ? await auth.recoveryCodesLeft() : 0
-const passkeys = features.passkeys ? await auth.passkeys() : []
+const passkeys = features.passkeys ? await auth.listPasskeys() : []
 const removeRefused = ctx.failed(removePasskey)?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---

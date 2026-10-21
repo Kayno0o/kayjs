@@ -66,10 +66,10 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
 
     try {
       setSystemTime(new Date(Date.now() + 5 * DAY * 1000))
-      expect(await ada.call('sessions')).toHaveLength(1)
+      expect(await ada.call('listSessions')).toHaveLength(1)
       setSystemTime(new Date(Date.now() + 6 * DAY * 1000))
       expect(await ada.json('/me')).toBe('anonymous')
-      expect(await app.browser().call('sessions')).toEqual([])
+      expect(await app.browser().call('listSessions')).toEqual([])
     }
     finally {
       setSystemTime()

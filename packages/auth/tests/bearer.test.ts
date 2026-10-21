@@ -31,7 +31,7 @@ describe('bearer tokens', () => {
 
   test('are listed without the token, and stop working once revoked', async () => {
     const { ada, browser, bearer, minted } = await withToken()
-    const tokens = await ada.call('tokens')
+    const tokens = await ada.call('listTokens')
 
     expect(tokens).toEqual([{ id: minted.id, label: 'Phone', scopes: null, createdAt: expect.any(String), lastUsedAt: null, expiresAt: expect.any(String), expired: false }])
     expect(JSON.stringify(tokens)).not.toContain(minted.token)
@@ -67,7 +67,7 @@ describe('bearer tokens', () => {
     expect(await post('tokens')).toEqual([])
     expect(await post('revokeToken', minted.id)).toBe(false)
     expect(await post('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'signed-out' })
-    expect(await ada.call('tokens')).toHaveLength(1)
+    expect(await ada.call('listTokens')).toHaveLength(1)
   })
 
   test('cannot set up, disable or reset two-factor, even with the proof', async () => {
@@ -104,7 +104,7 @@ describe('bearer tokens', () => {
 
     const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Lap\ntop\u202E\u0000')
 
-    expect((await ada.call('tokens') as { id: string, label: string }[]).find(token => token.id === minted.id)?.label).toBe('Laptop')
+    expect((await ada.call('listTokens') as { id: string, label: string }[]).find(token => token.id === minted.id)?.label).toBe('Laptop')
   })
 
   test('pass a gate, and a websocket handshake can check one', async () => {
@@ -196,7 +196,7 @@ describe('scoped and expiring tokens', () => {
 
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
     expect(await auth.userFromToken(minted.token)).toBeNull()
-    expect(await ada.call('tokens')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
+    expect(await ada.call('listTokens')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
   })
 })
 

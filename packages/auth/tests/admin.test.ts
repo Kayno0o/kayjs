@@ -63,7 +63,7 @@ describe('admin', () => {
     expect(await ada.browser.call('banUser', admin.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('deleteUser', admin.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('impersonate', admin.id)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await ada.browser.call('adminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await ada.browser.call('listAdminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
   })
 
   test('an admin\'s bearer token manages no one, whatever it may do elsewhere', async () => {
@@ -331,7 +331,7 @@ describe('admin', () => {
     expect(await ada.browser.call('impersonator')).toBeFalsy()
     expect(await admin.browser.call('reprove', { password: PASSWORD })).toEqual({ ok: false, error: 'impersonating' })
     expect(await admin.browser.call('listUsers')).toEqual({ ok: false, error: 'forbidden' })
-    expect(await ada.browser.call('sessions')).toHaveLength(2)
+    expect(await ada.browser.call('listSessions')).toHaveLength(2)
 
     expect(await admin.browser.call('stopImpersonating')).toBe(true)
     expect(await admin.browser.json('/me')).toMatchObject({ email: 'root@example.com' })
