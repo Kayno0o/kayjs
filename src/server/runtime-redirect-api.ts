@@ -36,7 +36,7 @@ export function configuredRedirects(): { from: string, to: string, status: Redir
 }
 
 // The pages the running site serves, for a screen to offer as a redirect's target: none before the server knows them.
-// Sorted once per set of pages: a box asking on each keystroke reads the kept answer while the pages are the same.
+// The sort is redone only when the pages differ from the last call's (`pages` returns a new array each time, so they are compared, and the answer is copied so a caller cannot change the kept one).
 export function sitePaths(): string[] {
   if (!pagesOf)
     return []

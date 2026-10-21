@@ -631,6 +631,16 @@ test('the refusal of an image\'s hidden width or height shows beside the image, 
   expect(root.querySelector('#w')).not.toBeNull()
 })
 
+test('the refusal of an image\'s width and height in the drafts reaches the field beside the image through FieldInput', async () => {
+  const drafts = createDrafts({ show: async () => ({}) })
+
+  drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
+  drafts.report([{ ...ENTRY, path: 'width', message: 'Width is required' }, { ...ENTRY, path: 'height', message: 'Height is required' }])
+  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: PHOTO({ width: sibling('width'), height: sibling('height') }) })
+  await settle()
+  expect([...mounted.root.querySelectorAll('.kcms-file-error')].map(item => item.textContent)).toEqual(['Width is required', 'Height is required'])
+})
+
 test('a picker that could not list the uploads says so and not that nothing was uploaded, and asks again when opened again', async () => {
   const listing = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('down', { status: 500 })) as unknown as typeof fetch)
 
@@ -663,8 +673,7 @@ test('the zone of a list keeps what each refused file was told', async () => {
 
     const told = root.querySelector('.kcms-file-error')?.textContent ?? ''
 
-    expect(told).toContain('a.png is refused')
-    expect(told).toContain('b.png is refused')
+    expect(told.split('\n')).toEqual([expect.stringContaining('a.png is refused'), expect.stringContaining('b.png is refused')])
   }
   finally {
     Object.assign(globalThis, { XMLHttpRequest: request })
@@ -841,4 +850,13 @@ test('a new list item under a minLength is not flagged before it is touched', as
 
   await click('[data-kcms-add]')
   expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(0)
+
+  // The same item flags the limit once it is touched, so the zero above is the touch rule and not a limit nothing checks.
+  const added = root.querySelectorAll<HTMLInputElement>('[data-kcms-row] input')[1]!
+
+  added.value = 'ab'
+  added.dispatchEvent(new Event('input', { bubbles: true }))
+  added.dispatchEvent(new Event('blur'))
+  await settle()
+  expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(1)
 })

@@ -20,6 +20,10 @@ A page with `prerender` or `sitemap` of a collection on a one-param route now wr
 
 A page's CSS reading `--kay-dev-bar-bottom` reads `--kay-dev-bar-bottom-left` or `--kay-dev-bar-bottom-right` instead, for the corner the bar is in; `--kay-dev-bar-top` is no longer published. With kayjs-cms's `pageLink: false`, the guard and the check no longer set `kay_editor`, so an app loading the module itself sets the hint.
 
+### A text field called `alt` beside an image leaves the form
+
+kayjs-cms pairs a field named `alt` with the first image beside it that names no `alt` of its own, so the field is the image's alt text and no longer a field of the form (`EntryField` throws for it). A text that is not the image's alt text takes another name, or the image names its own: `imageField({ alt: 'caption' })` ([kayjs-cms](../packages/cms/llms/uploads.md)).
+
 ## 1.62.0
 
 ### kayjs-cms's admin leaves the site's layouts

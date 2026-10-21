@@ -1055,6 +1055,11 @@ test('a list with the tools row keeps it inside a 375 px phone, wrapped and not 
     })
 
     expect(spill).toBe(0)
+
+    // Wrapped onto their own lines, the select and the button keep the same left edge.
+    const lefts = await page.evaluate(() => ['.kcms-list-tools select', '.kcms-list-tools button'].map(selector => document.querySelector(selector)!.getBoundingClientRect().left))
+
+    expect(Math.abs(lefts[0]! - lefts[1]!)).toBeLessThanOrEqual(1)
   }
   finally {
     page.close()

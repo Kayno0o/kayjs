@@ -138,7 +138,10 @@ test('the target box sends one request for several keystrokes typed within the p
   for (const text of ['a', 'ab', 'abo'])
     await type(root, text)
 
-  await Bun.sleep(300)
+  // Each keystroke restarts the pause, so an earlier request would have been sent before the last one's.
+  for (let waited = 0; asked.length === 0 && waited < 3000; waited += 10)
+    await Bun.sleep(10)
+
   await settle()
   expect(asked).toEqual(['abo'])
 })

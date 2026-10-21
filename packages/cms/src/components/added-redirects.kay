@@ -6,7 +6,7 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
 import { wording } from 'kay/words'
-import { addMissingRedirect, removeAddedRedirects } from '../editor/save'
+import { addMissingRedirect, removeAddedRedirects, removeAddedRedirectsOrThrow } from '../editor/save'
 import { shipWords } from '../editor/words'
 import AddRedirect from './add-redirect.kay'
 
@@ -16,15 +16,18 @@ const { redirects } = props<{ redirects: AddedRedirect[] }>()
 // Looks up what an edit or a removal says once the page has loaded, so the page sends it.
 shipWords()
 
-// A bulk removal is confirmed, so its failure is thrown to the confirm, which words it and stays open.
-async function remove(froms: string[], throws = false): Promise<boolean> {
-  const done = await removeAddedRedirects(froms, throws)
+async function removed(removal: Promise<boolean>): Promise<boolean> {
+  const done = await removal
 
   if (done)
     await refresh()
 
   return done
 }
+
+// A bulk removal is confirmed, so its failure is thrown to the confirm, which words it and stays open.
+const remove = async (froms: string[]) => removed(removeAddedRedirects(froms))
+const removeConfirmed = async (froms: string[]) => removed(removeAddedRedirectsOrThrow(froms))
 
 async function save(from: string, to: string, status: RedirectStatus): Promise<void> {
   if (await addMissingRedirect(from, to, status))
@@ -41,7 +44,7 @@ const columns: Column<AddedRedirect>[] = [
 ---
 Table.kcms-missing.kcms-redirects(columns={columns} rows={redirects} rowKey={row => row.from} selectable)
   @bulk(keys, clear)
-    ConfirmDelete(message={wording('cms.redirects.removeMany', keys.length === 1 ? 'Remove 1 redirect? Its path answers 404 again.' : 'Remove {count} redirects? Their paths answer 404 again.', { count: keys.length })} label={wording('cms.redirects.removeSelected', 'Remove {count} selected', { count: keys.length })} failure={wording('cms.redirects.removeFailure', 'Could not remove the redirect')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String), true)) clear() }})
+    ConfirmDelete(message={wording('cms.redirects.removeMany', keys.length === 1 ? 'Remove 1 redirect? Its path answers 404 again.' : 'Remove {count} redirects? Their paths answer 404 again.', { count: keys.length })} label={wording('cms.redirects.removeSelected', 'Remove {count} selected', { count: keys.length })} failure={wording('cms.redirects.removeFailure', 'Could not remove the redirect')} size="sm" variant="ghost" onConfirm={async () => { if (await removeConfirmed(keys.map(String))) clear() }})
   @cell(row, column)
     if column.key === 'actions'
       AddRedirect(path={row.from} editing to={row.to} status={row.status} onAdd={save})

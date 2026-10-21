@@ -270,28 +270,43 @@ export async function addMissingRedirect(from: string, to: string, status: Redir
   return done !== undefined
 }
 
-// Runs a change and toasts `done` once it went through. A failure is toasted as `failure`, or with `throws` thrown instead, for a confirm that words it itself and stays open.
-async function runOrThrow(run: () => Promise<unknown>, throws: boolean, failure: string, done: string): Promise<boolean> {
-  const outcome = throws ? await run() : await attempt(run, failure)
+const removeRedirectsCall = async (froms: string[]) => call(redirectsApi, '/remove', { method: 'post', body: { froms } })
+const dismissCall = async (paths?: string[]) => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' })
 
-  if (outcome === undefined && !throws)
+// Removes redirects added from the screen, so their paths answer 404 again; true once removed, a failure toasted.
+export async function removeAddedRedirects(froms: string[]): Promise<boolean> {
+  if (await attempt(async () => removeRedirectsCall(froms), wording('cms.redirects.removeFailure', 'Could not remove the redirect')) === undefined)
     return false
 
-  toast.success(done)
+  toast.success(wording('cms.redirects.removed', 'Redirect removed'))
 
   return true
 }
 
-// Removes redirects added from the screen, so their paths answer 404 again; true once removed.
-// With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
-export async function removeAddedRedirects(froms: string[], throws = false): Promise<boolean> {
-  return runOrThrow(async () => call(redirectsApi, '/remove', { method: 'post', body: { froms } }), throws, wording('cms.redirects.removeFailure', 'Could not remove the redirect'), wording('cms.redirects.removed', 'Redirect removed'))
+// Removes them as `removeAddedRedirects` does, but a failure is thrown, for a confirm that words it itself and stays open.
+export async function removeAddedRedirectsOrThrow(froms: string[]): Promise<boolean> {
+  await removeRedirectsCall(froms)
+  toast.success(wording('cms.redirects.removed', 'Redirect removed'))
+
+  return true
 }
 
-// Forgets missing paths, all of them when none is named; true once done. They are listed again if a visitor asks for them again.
-// With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
-export async function dismissMissingPaths(paths?: string[], throws = false): Promise<boolean> {
-  return runOrThrow(async () => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' }), throws, wording('cms.missing.dismissFailure', 'Could not dismiss the paths'), wording('cms.missing.dismissed', 'Dismissed'))
+// Forgets missing paths, all of them when none is named; true once done, a failure toasted. They are listed again if a visitor asks for them again.
+export async function dismissMissingPaths(paths?: string[]): Promise<boolean> {
+  if (await attempt(async () => dismissCall(paths), wording('cms.missing.dismissFailure', 'Could not dismiss the paths')) === undefined)
+    return false
+
+  toast.success(wording('cms.missing.dismissed', 'Dismissed'))
+
+  return true
+}
+
+// Forgets them as `dismissMissingPaths` does, but a failure is thrown, for a confirm that words it itself and stays open.
+export async function dismissMissingPathsOrThrow(paths?: string[]): Promise<boolean> {
+  await dismissCall(paths)
+  toast.success(wording('cms.missing.dismissed', 'Dismissed'))
+
+  return true
 }
 
 // The paths of the site holding the text typed, for a redirect's target box; none when they cannot be read, as the box takes any path typed.

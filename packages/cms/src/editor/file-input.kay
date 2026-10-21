@@ -79,7 +79,7 @@ let leftOut: string | undefined
 
 // Dropped files the picker's types miss, which FileDrop would otherwise ignore without a word.
 function reject(files: File[]): void {
-  const told = files.map(file => wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file.name || wording('cms.upload.theFile', 'The file'), type: file.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' })).join(' ')
+  const told = files.map(file => wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file.name || wording('cms.upload.theFile', 'The file'), type: file.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' })).join('\n')
 
   problem = told
   leftOut = told
@@ -117,7 +117,7 @@ async function send(files: File[]): Promise<void> {
 
         // A list's zone takes several files and keeps what each refused one said.
         failures.push(error instanceof Error && error.message !== '' ? error.message : wording('cms.file.failure', 'Could not upload'))
-        problem = failures.join(' ')
+        problem = failures.join('\n')
       }
     }
   }

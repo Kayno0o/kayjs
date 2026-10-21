@@ -8,7 +8,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
 import { wording } from 'kay/words'
-import { addMissingRedirect, dismissMissingPaths } from '../editor/save'
+import { addMissingRedirect, dismissMissingPaths, dismissMissingPathsOrThrow } from '../editor/save'
 import { shipWords } from '../editor/words'
 import AddRedirect from './add-redirect.kay'
 
@@ -23,15 +23,18 @@ async function add(from: string, to: string, status: RedirectStatus): Promise<vo
     await refresh()
 }
 
-// Without paths, the whole list. The confirmed one throws its failure to the confirm, which words it and stays open.
-async function dismiss(paths?: string[], throws = false): Promise<boolean> {
-  const done = await dismissMissingPaths(paths, throws)
+async function dismissed(dismissal: Promise<boolean>): Promise<boolean> {
+  const done = await dismissal
 
   if (done)
     await refresh()
 
   return done
 }
+
+// Without paths, the whole list. The confirmed one throws its failure to the confirm, which words it and stays open.
+const dismiss = async (paths?: string[]) => dismissed(dismissMissingPaths(paths))
+const dismissConfirmed = async (paths?: string[]) => dismissed(dismissMissingPathsOrThrow(paths))
 
 const columns: Column<MissingRow>[] = [
   { key: 'path', header: wording('cms.missing.path', 'Path'), sortValue: true, cell: true },
@@ -44,7 +47,7 @@ const columns: Column<MissingRow>[] = [
 ---
 if rows.length > 0
   .kcms-missing-clear
-    ConfirmDelete(message={wording('cms.missing.clearMessage', 'Forget all the paths listed? They are listed again as visitors ask for them.')} label={wording('cms.missing.clear', 'Clear the list')} trigger="button" failure={wording('cms.missing.dismissFailure', 'Could not dismiss the paths')} size="sm" variant="ghost" onConfirm={async () => { await dismiss(undefined, true) }})
+    ConfirmDelete(message={wording('cms.missing.clearMessage', 'Forget all the paths listed? They are listed again as visitors ask for them.')} label={wording('cms.missing.clear', 'Clear the list')} trigger="button" failure={wording('cms.missing.dismissFailure', 'Could not dismiss the paths')} size="sm" variant="ghost" onConfirm={async () => { await dismissConfirmed() }})
 Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={{ key: 'hits', direction: 'desc' }} selectable)
   @bulk(keys, clear)
     Button(label={wording('cms.missing.dismissSelected', 'Dismiss {count} selected', { count: keys.length })} size="sm" variant="ghost" onClick={async () => { if (await dismiss(keys.map(String))) clear() }})

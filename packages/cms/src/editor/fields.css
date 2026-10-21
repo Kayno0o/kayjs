@@ -196,6 +196,7 @@
 .kcms-file-error,
 .kcms-file-broken {
   margin: 0;
+  white-space: pre-line;
   color: var(--color-kui-error);
   font-size: 0.85rem;
 }
