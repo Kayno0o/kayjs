@@ -1,7 +1,8 @@
 import type { DevTool } from 'kay/dev-tool'
 
 // The dev tool's CMS tab, a browser module kay loads on dev pages: whether this visitor is in edit mode, with a toggle for the page they are on.
-const STATE_URL = '/_kay/cms'
+const PLACEHOLDER = /\{(\w+)\}/g
+const STATE_URL = '/api/cms/dev'
 
 interface CmsState {
   editing: boolean
@@ -44,7 +45,7 @@ export default function cmsDevTool(tool: DevTool): void {
   let asked = 0
   let words = ENGLISH
 
-  const say = (key: string, values: Record<string, string> = {}) => (words[key] ?? ENGLISH[key]!).replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
+  const say = (key: string, values: Record<string, string> = {}) => (words[key] ?? ENGLISH[key]!).replace(PLACEHOLDER, (whole, name: string) => values[name] ?? whole)
   const reason = (error: unknown) => error instanceof Error ? error.message : String(error)
   const tab = tool.tab({ id: 'cms', label: 'CMS', icon: 'pencil', shown: () => void show() })
   const empty = (text: string) => {

@@ -368,7 +368,7 @@ describe('the libraries\' dev tool tabs', () => {
     let editing = false
     const posted: string[] = []
     const fetching = answering({
-      'GET /_kay/cms': () => Response.json({ editing, prefix: '/studio', exit: '/api/cms/preview/exit' }),
+      'GET /api/cms/dev': () => Response.json({ editing, prefix: '/studio', exit: '/api/cms/preview/exit' }),
       'POST /api/cms/preview/exit': () => {
         posted.push('exit')
 
@@ -402,7 +402,7 @@ describe('the libraries\' dev tool tabs', () => {
     let status = 200
     const words = { editing: 'Vous êtes en mode édition.', notEditing: 'Pas en mode édition.', edit: 'Modifier cette page', leave: 'Quitter', guard: 'La garde décide.', screens: 'Ouvrir les écrans', readFailure: 'Lecture impossible : {failure}', leaveFailure: 'Sortie impossible : {failure}', answered: 'le serveur a répondu {status}', unavailable: 'Seulement sous kay dev.' }
     const fetching = answering({
-      'GET /_kay/cms': () => status === 200 ? Response.json({ editing: false, prefix: '/admin', exit: '/api/cms/preview/exit', words }) : new Response(null, { status }),
+      'GET /api/cms/dev': () => status === 200 ? Response.json({ editing: false, prefix: '/admin', exit: '/api/cms/preview/exit', words }) : new Response(null, { status }),
     })
 
     tool = startDevTool()

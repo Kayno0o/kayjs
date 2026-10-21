@@ -97,30 +97,8 @@ describe('cms()', () => {
   })
 })
 
-describe('the dev tool\'s CMS tab', () => {
-  const ask = async (): Promise<Response> => {
-    const { server } = cms({ prefix: '/studio' })
-    const plugin = typeof server === 'function' ? await server() : server!
-
-    return plugin.handle(new Request('http://localhost/_kay/cms'))
-  }
-
-  test('names its browser module, and answers whether the visitor is editing under kay dev', async () => {
-    process.env.KAY_DEV_CODE = '0'
-
-    expect(existsSync(cms().devTool!.module)).toBe(true)
-
-    const response = await ask()
-
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(await response.json()).toMatchObject({ editing: false, prefix: '/studio', exit: '/api/cms/preview/exit', words: { editing: 'You are in edit mode on this site.', edit: 'Edit this page', readFailure: 'Could not read the edit mode: {failure}' } })
-  })
-
-  test('answers nothing outside kay dev', async () => {
-    delete process.env.KAY_DEV_CODE
-
-    expect((await ask()).status).toBe(404)
-  })
+test('names a browser module for the dev tool\'s CMS tab, which exists', () => {
+  expect(existsSync(cms().devTool!.module)).toBe(true)
 })
 
 describe('cms() missing field kinds', () => {

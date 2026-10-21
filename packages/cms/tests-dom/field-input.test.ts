@@ -831,7 +831,8 @@ test('a list of eight items or more offers a menu to jump to an item', async () 
   menu.value = '5'
   menu.dispatchEvent(new Event('change', { bubbles: true }))
   await settle()
-  expect(root.contains(document.activeElement)).toBe(true)
+  expect(document.activeElement?.closest('[data-kcms-row]')).toBe(root.querySelectorAll('[data-kcms-row]')[5])
+  expect(menu.value).toBe('')
 })
 
 test('a new list item under a minLength is not flagged before it is touched', async () => {

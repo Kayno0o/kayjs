@@ -12,7 +12,7 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import copy from '~icons/tabler/copy'
-import { uid } from 'kay'
+import { guardLeave, uid } from 'kay'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { checkField, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
@@ -24,7 +24,7 @@ import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
 import Reorder from './reorder.kay'
 import { announceMove, focusItem, followFocus, reordered, reorderKey } from './reorder'
-import { uploadFile } from './upload'
+import { uploadFile, uploading } from './upload'
 import './fields.css'
 
 const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
@@ -36,6 +36,10 @@ const kinds = import.meta.glob<Component<CustomFieldProps>>('/src/cms/fields/*.k
 const development = process.env.NODE_ENV === 'development'
 
 // What a box with limits has been left once: its limits are checked from then on, as it is typed, not while the editor is still on the first letters.
+// An image dropped or pasted into a Markdown box is an upload the page must not be left over.
+if (field.kind === 'markdown')
+  guardLeave(uploading)
+
 const touched = signal(false)
 // The text of a JSON box while it is edited, which the draft's value is formatted from once the box is left.
 const jsonText = signal<string>()
@@ -102,7 +106,9 @@ const filled = (found: unknown) => found !== undefined && found !== null && foun
 // Once the refusal is gone and the focus has left it, the field waits for its sibling again. A refusal of the body or of the slug names no field.
 const surfaced = signal(false)
 const inside = signal(false)
-const refused = () => drafts.issues(entry).some(found => found.body !== true && found.key === undefined && (found.path === path || found.path.startsWith(`${path}.`)))
+// Whether an issue is on `at` or one of its children.
+const within = (at: string, found: { path: string }) => found.path === at || found.path.startsWith(`${at}.`)
+const refused = () => drafts.issues(entry).some(found => found.body !== true && found.key === undefined && within(path, found))
 const shown = () => field.when === undefined || surfaced() || filled(drafts.value(entry, joinPath(parent, field.when)))
 
 effect(() => {
@@ -153,8 +159,8 @@ const addButton = () => box?.querySelector('[data-kcms-add]')
 const JUMP_FROM = 8
 const titles = () => list ? items().map((item, at) => ({ value: at, label: `${at + 1}. ${itemTitle(list, item, at)}` })) : []
 
-// The refusals inside an item, its own and its fields', which a folded item has no field showing.
-const itemIssues = (at: number) => drafts.issues(entry).filter(found => found.body !== true && found.key === undefined && (found.path === joinPath(path, at) || found.path.startsWith(`${joinPath(path, at)}.`)))
+// The refusals inside an item, its own and its fields', and the texts in it that do not parse, which a folded item has no field showing.
+const itemIssues = (at: number) => [...drafts.issues(entry).filter(found => found.body !== true && found.key === undefined), ...drafts.blocked(entry)].filter(found => within(joinPath(path, at), found))
 
 // What a list says of its size: how many items it holds, and the bounds its schema sets.
 function countText(): string {
@@ -206,6 +212,12 @@ function prepend(): void {
 function jump(at: number): void {
   focusItem(rows, at)
   rows?.querySelectorAll(':scope > [data-kcms-row]')[at]?.scrollIntoView({ block: 'nearest' })
+
+  // The menu goes back to its prompt, so picking the same item again changes it.
+  const menu = box?.querySelector<HTMLSelectElement>('.kcms-list-tools select')
+
+  if (menu)
+    menu.value = ''
 }
 
 function duplicate(at: number): void {

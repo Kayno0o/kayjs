@@ -1,14 +1,18 @@
 ---
 import type { FormScope } from '../form'
+import { guardLeave } from 'kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { wording } from 'kay/words'
-import { uploadFile } from '../editor/upload'
+import { uploadFile, uploading } from '../editor/upload'
 import { BODY } from '../markers'
 import { fieldId } from '../paths'
 
 // The Markdown body of an entry whose collection has one.
 const { form } = props<{ form: FormScope }>()
+
+// An image dropped or pasted into the body is an upload too.
+guardLeave(uploading)
 
 effect(() => {
   onCleanup(form.shown.add('#body'))

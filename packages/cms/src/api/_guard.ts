@@ -14,6 +14,8 @@ const ENTRY = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
 const UPLOAD_RULES = /\/api\/cms\/files\/rules$/
 // The module an editor's browser loads on each page, which holds nothing private.
 const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
+// What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
+const DEV_STATE = /\/api\/cms\/dev$/
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext): boolean {
@@ -45,7 +47,7 @@ export default guard(async (ctx) => {
   const { guard: admits, author } = settings()
   const { method } = ctx.request
 
-  if (method === 'GET' && PAGE_LINK_MODULE.test(ctx.url.pathname))
+  if (method === 'GET' && (PAGE_LINK_MODULE.test(ctx.url.pathname) || DEV_STATE.test(ctx.url.pathname)))
     return
 
   const editing = editRequested(ctx.request)

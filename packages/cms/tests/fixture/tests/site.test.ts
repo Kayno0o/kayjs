@@ -1184,3 +1184,27 @@ test('saveEntry stores a null for a required field that allows it, and refuses t
   expect(await saveEntry('ledger', { slug: 'second', data: { name: 'Second' } })).toMatchObject({ issues: [{ collection: 'ledger', slug: 'second', path: 'note' }] })
   expect(ledgerRows).toHaveLength(1)
 })
+
+test('the dev tool\'s CMS tab state answers under kay dev alone, in the language of the page it is read from', async () => {
+  const before = process.env.KAY_DEV_CODE
+
+  try {
+    process.env.KAY_DEV_CODE = '0'
+
+    const english = await (await site.fetch('/api/cms/dev')).json() as { editing: boolean, prefix: string, words: Record<string, string> }
+    const french = await (await site.fetch('/api/cms/dev', { headers: { referer: 'http://localhost/fr/' } })).json() as { words: Record<string, string> }
+
+    expect(english).toMatchObject({ editing: false, prefix: '/admin', words: { editing: 'You are in edit mode on this site.', readFailure: 'Could not read the edit mode: {failure}' } })
+    expect(french.words.editing).not.toBe(english.words.editing)
+    expect(french.words.readFailure).toContain('{failure}')
+
+    delete process.env.KAY_DEV_CODE
+    expect((await site.fetch('/api/cms/dev')).status).toBe(404)
+  }
+  finally {
+    if (before === undefined)
+      delete process.env.KAY_DEV_CODE
+    else
+      process.env.KAY_DEV_CODE = before
+  }
+})
