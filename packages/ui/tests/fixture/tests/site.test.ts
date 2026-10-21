@@ -384,10 +384,12 @@ describe('data', () => {
 
   test('CopyButton is a plain button saying what it copies, beside a status saying it copied, taking Button\'s variants', async () => {
     expect((await find('/data', '#copy button, #copy [role="status"], #copy-accent button')).map(found => [found.tag, found.text, attr(found, 'type'), found.attributes.class!.includes('kui-btn-accent')])).toEqual([
-      ['button', 'Copy link', 'button', false],
+      ['button', 'Copy linkCopied!', 'button', false],
       ['span', '', null, false],
-      ['button', 'Copy link', 'button', true],
+      ['button', 'Copy linkCopied!', 'button', true],
     ])
+    // Both labels are in the button so it keeps the wider width, the one not showing aria-hidden.
+    expect((await find('/data', '#copy .kui-copy-btn-text span')).map(found => [found.text, attr(found, 'aria-hidden')])).toEqual([['Copy link', null], ['Copied!', 'true']])
   })
 })
 

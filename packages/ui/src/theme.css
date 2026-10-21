@@ -655,6 +655,18 @@
     @apply px-1.5 py-0.5;
   }
 
+  .kui-copy-btn-text {
+    @apply inline-grid justify-items-center;
+
+    > * {
+      grid-area: 1 / 1;
+    }
+
+    > [aria-hidden='true'] {
+      visibility: hidden;
+    }
+  }
+
   .kui-copy-btn-live {
     @apply sr-only;
   }

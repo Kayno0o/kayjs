@@ -744,3 +744,38 @@ inBrowser('a Select with submit on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a CopyButton on a served page', () => {
+  test('CopyButton keeps its width through the copy, in every size and variant, and reads only the label showing', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/copy-width')
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write: async () => undefined, writeText: async () => undefined } })
+    })
+    const ids = ['short', 'longer', 'shorter', 'ghost-xs', 'inline-lg']
+    const widths = async () => page.evaluate((list: string[]) => list.map(id => document.getElementById(id)!.getBoundingClientRect().width), ids)
+    // The names Chromium gives the buttons, which leave out what is aria-hidden or invisible.
+    const names = async () => {
+      const { nodes } = await page.cdp<{ nodes: { role?: { value: string }, name?: { value: string } }[] }>('Accessibility.getFullAXTree')
+
+      return nodes.filter(node => node.role?.value === 'button').map(node => node.name?.value)
+    }
+    const before = await widths()
+
+    expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+
+    for (const id of ids)
+      await page.click(`#${id}`)
+
+    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 5)
+
+    expect(await widths()).toEqual(before)
+    expect(await names()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'])
+    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 0, { timeout: 5000 })
+
+    expect(await widths()).toEqual(before)
+    expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
