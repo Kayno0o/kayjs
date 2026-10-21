@@ -534,9 +534,20 @@ test('a single collection\'s entry shows no slug under its title in the editor',
 
   opened.push(page)
   await page.evaluate(() => localStorage.clear())
+  // Records a slug heading the moment it is ever drawn, which a check made once loaded would miss.
+  await page.initScript(() => {
+    const w = window as unknown as { slugSeen: boolean }
+
+    w.slugSeen = false
+    new MutationObserver(() => {
+      if (document.querySelector('.kcms-entry-slug'))
+        w.slugSeen = true
+    }).observe(document, { childList: true, subtree: true })
+  })
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-entry-title')?.textContent === 'Welcome page')
 
+  expect(await page.evaluate(() => (window as unknown as { slugSeen: boolean }).slugSeen)).toBe(false)
   expect(await page.evaluate(() => document.querySelector('.kcms-entry-slug'))).toBeNull()
   expect(page.errors).toEqual([])
 })
