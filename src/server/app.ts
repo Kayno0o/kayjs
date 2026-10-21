@@ -121,13 +121,13 @@ function refuseOptions(options: PagesOptions): void {
 
 // What the server refuses once the routes, public files, endpoints and collections are read, which is all of it that needs no build, so a refused config starts none.
 // Claims run in the order the server makes them, on a table of their own; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
-function refuseScanned({ root, config, paths }: Project<PagesOptions>, { routes, files, endpoints, collections, declared, site, base, ownManifest }: Scanned): void {
-  if (declared)
-    refuseLocaleClashes(declared, routes)
+function refuseScanned({ root, config, paths }: Project<PagesOptions>, { routes, files, endpoints, collections, i18n, site, base, ownManifest }: Scanned): void {
+  if (i18n)
+    refuseLocaleClashes(i18n, routes)
 
   const served = new ServedPaths()
 
-  refuseClashes(paths.routes, routes, served, declared)
+  refuseClashes(paths.routes, routes, served, i18n)
 
   if (config.publicEnv)
     served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay' })

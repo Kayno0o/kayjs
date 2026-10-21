@@ -43,8 +43,7 @@ export interface Scanned {
   files: PublicFile[]
   endpoints: Endpoint[]
   collections: Collection<unknown>[]
-  // The locales' settings as the config declares them, before the pages told them of their routes.
-  declared: LocaleSettings | undefined
+  i18n: LocaleSettings | undefined
   site: string | undefined
   base: string
   ownManifest: boolean
@@ -107,14 +106,13 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   await source.prepare(root, config.settings)
   // Scanned beside the routes, which the refusals before the build need.
   const scanning = Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
-  const routes = await source.routes(paths.routes, mounts)
 
   void Promise.allSettled([scanning])
 
+  const routes = await source.routes(paths.routes, mounts)
+
   refuseClashes(paths.routes, routes)
   const [matchers, i18n] = await Promise.all([loadMatchers(paths.routes, routes), config.i18n && loadI18n(root, config.i18n, config.extensions)])
-
-  const declared = i18n?.settings
 
   if (i18n)
     i18n.settings = routedSettings(i18n.settings, routes)
@@ -162,7 +160,7 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   const collections = await loadingCollections
 
-  refuse?.({ routes, files, endpoints, collections, declared, site, base, ownManifest })
+  refuse?.({ routes, files, endpoints, collections, i18n: i18n?.settings, site, base, ownManifest })
 
   // Started once every refusal that needs no build is behind, those of the config (images, markdown, i18n, matchers, base, preview, the cards) and of the scanned project, the server's own among them; only what needs the built client or the routes' guards (the font faces of a Fontsource family, API modules, extension routes) still follows it.
   // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
@@ -170,7 +168,7 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   void Promise.allSettled([loadingClient])
 
-  // Imported while the client builds; the content place and collections are not installed yet, so an extension or API module reading them at import time is not supported.
+  // Imported while the client builds; the content config is already imported, so an extension or API module may read the collections at import time.
   const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
