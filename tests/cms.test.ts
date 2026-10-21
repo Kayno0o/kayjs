@@ -1590,6 +1590,26 @@ describe('preview mode', () => {
       expect(placed(({ label, value }) => `<span${attribute('role', 'meter')}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span role="meter" aria-label="Speed" data-kay-field-aria-label="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
     })
 
+    it('keeps its mark in an attribute after a literal number one, which no field gave and no loop computed', () => {
+      expect(placed(({ label, value }) => `<span${attribute('aria-valuemin', 0, true)}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span aria-valuemin="0" aria-label="Speed" data-kay-field-aria-label="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
+      expect(placed(({ value }) => `<span${attribute('aria-valuemin', 0, true)}${attribute('aria-valuemax', 100, true)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span aria-valuemin="0" aria-valuemax="100" aria-valuenow="4" ${marked(VALUE)}></span>`)
+    })
+
+    it('still forgets a number read after a number no field gave that is not a literal', () => {
+      expect(placed(({ value }) => `<span${attribute('aria-valuemin', 0)}${attribute('aria-valuenow', value)}></span>`)).toBe('<span aria-valuemin="0" aria-valuenow="4"></span>')
+    })
+
+    it('takes a computed number for the field when it equals a stale read after a text no field gave', () => {
+      // The residue of keeping the reads across a text: nothing tells a computed 4 from the rendered one.
+      const html = placed((rating) => {
+        const { value } = rating
+
+        return `${attribute('role', 'meter')}${attribute('data-position', value === 4 ? 4 : 0)}`
+      })
+
+      expect(html).toBe(` role="meter" data-position="4" data-kay-field-data-position="${VALUE}"`)
+    })
+
     it('keeps its mark in an attribute after another field\'s attribute, and in a text after another field\'s text', () => {
       expect(placed(({ label, value }) => `<span${attribute('title', label)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span title="Speed" data-kay-field-title="${LABEL}" aria-valuenow="4" ${marked(VALUE)}></span>`)
       expect(placed(({ label, value }) => `<p>${child(label)} ${child(value)}</p>`)).toBe(`<p><!--kay-field ${LABEL}-->Speed<!--/kay-field--> <!--kay-field ${VALUE}-->4<!--/kay-field--></p>`)

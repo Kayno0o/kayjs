@@ -1208,3 +1208,16 @@ describe('image placeholder', () => {
     expect(errors(page('img(src={hero} no-placeholder alt="")'))).toEqual([])
   })
 })
+
+describe('a number attribute in server markup', () => {
+  it('tells the helper a number the template wrote is no computed one', () => {
+    const { tsx } = compileKay('---\nconst { value, max } = props\n---\nspan(aria-valuemin={0} aria-valuenow={value} aria-valuemax={max} data-step={-1.5} data-next={value + 1} aria-valuetext={"0"})\n', 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('KayAttribute("aria-valuemin", (0), true)')
+    expect(tsx).toContain('KayAttribute("data-step", (-1.5), true)')
+    expect(tsx).toContain('KayAttribute("aria-valuenow", (value))')
+    expect(tsx).toContain('KayAttribute("aria-valuemax", (max))')
+    expect(tsx).toContain('KayAttribute("data-next", (value + 1))')
+    expect(tsx).toContain('KayAttribute("aria-valuetext", ("0"))')
+  })
+})

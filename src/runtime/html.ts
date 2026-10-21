@@ -112,7 +112,7 @@ function rendered(value: object): string {
 }
 
 // ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`; an ARIA state takes a boolean as `"true"` or `"false"`.
-export function attribute(name: string, value: unknown): string {
+export function attribute(name: string, value: unknown, literal = false): string {
   if (typeof value === 'function')
     return ''
 
@@ -123,7 +123,7 @@ export function attribute(name: string, value: unknown): string {
 
   const markup = given === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, given))}"`
 
-  return fieldMarks.marking === undefined ? markup : markup + markedAttribute(name, value)
+  return fieldMarks.marking === undefined ? markup : markup + markedAttribute(name, value, literal)
 }
 
 // A link of the site in the locale of the page rendering it; see `localizedLink`.

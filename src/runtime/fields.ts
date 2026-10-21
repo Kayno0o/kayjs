@@ -165,9 +165,9 @@ export function markedText(value: string | number, markup: string, part = false)
   return ref === undefined ? markup : fenced(fieldMarks.marking!, 'field', ref, markup)
 }
 
-// ` data-kay-field-<name>="..."` beside an attribute whose value a field gave.
-export function markedAttribute(name: string, value: unknown): string {
-  const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value, true) : undefined
+// ` data-kay-field-<name>="..."` beside an attribute whose value a field gave; `literal` is a number the template wrote, which no loop computed.
+export function markedAttribute(name: string, value: unknown, literal = false): string {
+  const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value, true, literal) : undefined
 
   return ref === undefined ? '' : ` ${ATTRIBUTE.field}-${name}="${fieldMarks.marking!.refs[ref]!}"`
 }
@@ -238,14 +238,14 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
 
 const anyRead = () => true
 
-function fieldOf(value: string | number, part = false): number | undefined {
+function fieldOf(value: string | number, part = false, literal = false): number | undefined {
   const marks = fieldMarks.marking!
   const ref = typeof value === 'string' ? claim(marks.unrendered.get(value), anyRead) : claim(marks.numbers, read => read.value === value)
 
   marks.renders++
 
-  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field, but a text no field gave in a tag, a `role` say, forgets nothing, as it is no sign a number is computed. A stale read survives such texts, so a computed number equal to it rendered later is still taken for the field.
-  if (ref === undefined && !(part && typeof value === 'string'))
+  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field, but a text no field gave in a tag, a `role` say, or a number the template wrote (`literal`), forgets nothing, as it is no sign a number is computed. A stale read survives such texts, so a computed number equal to it rendered later is still taken for the field.
+  if (ref === undefined && !literal && !(part && typeof value === 'string'))
     marks.numbers.length = 0
 
   return ref

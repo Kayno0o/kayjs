@@ -10,6 +10,8 @@ import { SUBJECT } from './names'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
+// A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
+const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
@@ -540,6 +542,10 @@ export class HtmlTemplate extends TemplateWriter {
               b.add(`${helperName('localHref')}((`).addSource(attribute.expression).add('))')
             else
               b.add('(').addSource(attribute.expression).add(')')
+
+            // A number the template wrote is no loop's, so edit mode keeps the reads before it.
+            if (attribute.kind === 'value' && NUMBER_LITERAL.test(this.source(attribute.expression)))
+              b.add(', true')
 
             b.add(')')
           })
