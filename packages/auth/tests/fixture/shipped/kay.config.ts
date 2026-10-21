@@ -1,7 +1,7 @@
 import { defineConfig } from 'kay/server'
-import { authPages } from '../../../src/pages'
+import { auth } from '../../../src/pages'
 
 export default defineConfig({
-  extensions: [authPages({ server: async () => (await import('../src/auth')).auth.plugin })],
+  extensions: [auth({ server: async () => (await import('../src/auth')).auth.plugin })],
   i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },
 })

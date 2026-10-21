@@ -33,6 +33,9 @@ export interface Inferred {}
 
 // The server plugins a config's extensions hand `pages()`, each awaited out of the function giving it.
 export type ExtensionServersOf<Config> = Config extends { extensions?: readonly (infer Extension)[] | undefined } ? ServersOf<Extension> : never
+// The server plugin a module exports under `Name`, as an extension's `serverModule` names it: the plugin, a function building it, or an object carrying it as `plugin`.
+export type ServerOfModule<Module, Name extends string> = Module extends Record<Name, infer Value> ? Typed<Carried<Value extends (...args: never[]) => infer Built ? Awaited<Built> : Value>> : never
+type Carried<Value> = Value extends AnyElysia ? Value : Value extends { plugin: infer Plugin } ? Plugin : Value
 type ServersOf<Extension> = Extension extends { server?: infer Server } ? Typed<Server extends (...args: never[]) => infer Built ? Awaited<Built> : Server> : never
 // An extension annotated `KayExtension` with no type argument holds `AnyElysia`, which knows no locals or routes and would turn every local and link `any`, so it is left out.
 type Typed<Server> = Server extends AnyElysia ? 0 extends 1 & Server['~Singleton'] ? never : Server : never

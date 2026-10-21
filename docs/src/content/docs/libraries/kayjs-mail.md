@@ -19,7 +19,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Setup
 
-In a kay project, `kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` that reads SMTP from the environment, and lists `mailExtension('./src/mail')` in `kay.config.ts`. Set `from` and `lang` there as below.
+In a kay project, `kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` that reads SMTP from the environment, and lists `mail({ module: './src/mail' })` in `kay.config.ts`. Set `from` and `lang` there as below.
 
 `src/mail.ts` creates the mailer. `from` is your own address. A visitor's address goes in `replyTo`.
 
@@ -32,11 +32,11 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'en' })
 List it in `kay.config.ts`. The server then runs the queue and, under `kay dev`, serves the outbox at `/_kay/mail`.
 
 ```ts
-import { mailExtension } from '@kaynooo/kayjs-mail'
+import { mail } from '@kaynooo/kayjs-mail'
 
 export default defineConfig({
   extensions: [
-    mailExtension('./src/mail'),
+    mail({ module: './src/mail' }),
   ],
 })
 ```
@@ -293,7 +293,7 @@ A form collecting personal data often needs a consent checkbox. Set `consent: tr
 
 A mailer that is `optional` and not set up answers 503. A mail that fails to send answers 502. Each comes with a refusal the form shows, and `reach` adds how else to reach the site, such as `hello@example.com` or a phone number.
 
-The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with the package, so a kay app that installs kayjs-mail reads them with or without `mailExtension`; a plain Elysia app with `.use(mail)` reads English. The mail itself is written in the page's language, not the recipient's.
+The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with the package, so a kay app that installs kayjs-mail reads them with or without `mail()` in `kay.config.ts`; a plain Elysia app with `.use(mail)` reads English. The mail itself is written in the page's language, not the recipient's.
 
 The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message, consent }` to replace the field messages with a text or a function. ContactForm's label props replace its labels.
 
@@ -349,7 +349,7 @@ it('welcomes a new account', async () => {
 
 ## With kayjs-auth
 
-`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails through your mailer, themed by your mail settings. Those are verification, reset, magic links and security notices. It needs `mailExtension` in `kay.config.ts`, as above.
+`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails through your mailer, themed by your mail settings. Those are verification, reset, magic links and security notices. It needs `mail({ module })` in `kay.config.ts`, as above.
 
 A view written from scratch can take its default wording from `authWords(mail)`. It throws for a `mail.kind` kayjs-auth does not send.
 

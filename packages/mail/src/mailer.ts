@@ -286,17 +286,33 @@ function relay(options: MailerOptions): Relay {
   }
 }
 
+export interface MailExtensionOptions {
+  // The file exporting the app's mailer as `mail`, as a path from the project root: `'./src/mail'`. kay imports it as `pages()` builds the app and bakes it into an executable.
+  module?: string | undefined
+  // Any other way to load the mailer, in place of `module`.
+  server?: (() => Promise<Mailer>) | undefined
+}
+
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`, and brings the `mail.auth` messages `authMailer` writes in and the `mail.contact` ones of `contactForm`.
 // It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
-// Given the path of the module that exports the mailer as `mail`, kay imports it then and bakes it into an executable; given a function, that function loads it.
-export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {
+export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
+  const { module, server } = options
+
+  if (module === undefined === (server === undefined))
+    throw new Error('kayjs-mail: mail() takes the path of the module exporting the mailer as `mail`, such as mail({ module: \'./src/mail\' })')
+
   const messages = `${import.meta.dir}/messages`
 
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
 
   const env = smtpEnv({ listed: true })
 
-  return typeof from === 'string' ? { name: '@kaynooo/kayjs-mail', serverModule: { path: from, export: 'mail' }, messages, devTool, env } : { name: '@kaynooo/kayjs-mail', server: from, messages, devTool, env }
+  return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, messages, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, messages, devTool, env }
+}
+
+// Superseded by `mail({ module })`, which `kay check` rewrites it to.
+export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {
+  return typeof from === 'string' ? mail({ module: from }) : mail({ server: from })
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.

@@ -20,10 +20,10 @@ The library hands the app one value to list in `extensions`, see [Extensions](#e
 
 ```ts
 // The app's kay.config.ts
-import { authPages } from '@kaynooo/kayjs-auth'
+import { auth } from '@kaynooo/kayjs-auth'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [authPages()] })
+export default defineConfig({ extensions: [auth()] })
 ```
 
 ## Reference
@@ -63,7 +63,7 @@ A library hands the app one value to list in `extensions` in `kay.config.ts`, ty
 // The library's index.ts
 import type { KayExtension } from 'kay/server'
 
-export function authPages({ prefix = '/auth' } = {}): KayExtension {
+export function auth({ prefix = '/auth' } = {}): KayExtension {
   return {
     name: '@kaynooo/kayjs-auth',
     routes: { dir: `${import.meta.dir}/routes`, prefix },
@@ -94,8 +94,8 @@ export function authPages({ prefix = '/auth' } = {}): KayExtension {
 - `server` hands kay an Elysia plugin that `pages()` uses before the pages, actions and API modules, so the app's `src/server.ts` needs no `.use(...)` of its own and none at all works.
 - What the `server` plugin decorates, or derives `as: 'scoped'` or `'global'`, reaches their `ctx.locals`, and `kay check` types those locals and lets links point at its routes with no `Register` declaration of the app's, adding to the locals the app registers. A derive with no `as` reaches only the plugin's own routes.
 - Given as a function, `server: async () => (await import('./server')).plugin`, it runs only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on the app's database or its server environment, or one whose module imports `.kay` files, as one imported while `kay.config.ts` loads comes before kay compiles any, and resolves to its path.
-- `serverModule: { path: './src/auth', export: 'auth' }` names the module exporting the plugin instead, `default` when `export` is left out, a path relative to the project root: kay imports it as it does a function `server`, and `kay build --compile` bakes it into the executable, which a path a library builds at run time cannot. The export is the plugin or a function building it, called with no argument. A library helper that takes a path types its result `KayExtension<typeof plugin>` as well, as `mailExtension('./src/mail')` does.
-- The library types it `KayExtension<typeof plugin>` so its locals reach the app; typed a bare `KayExtension`, its plugin adds no locals and no routes to the check, and the app's own stay typed. A static export leaves it out.
+- `serverModule: { path: './src/auth', export: 'auth' }` names the module exporting the plugin instead, `default` when `export` is left out, a path relative to the project root: kay imports it as it does a function `server`, and `kay build --compile` bakes it into the executable, which a path a library builds at run time cannot. The export is the plugin, a function building it, called with no argument, or an object carrying the plugin as `plugin`, as a `createAuth` result does. `kay check` types the locals and links off the module itself, so a library taking the app's module needs no type of its own; `prepare: (exported) => ...` runs with the export before the plugin is taken from it, for a library to hand it what the extension was given (kayjs-auth's `prefix` and `home`), and a throw stops the server.
+- A library that takes the app's module is named for the library and takes the path as `module`, `auth({ module: './src/auth' })` and `mail({ module: './src/mail' })`, built on `serverModule`. A plugin the library builds itself is typed `KayExtension<typeof plugin>` so its locals reach the app; typed a bare `KayExtension`, its plugin adds no locals and no routes to the check, and the app's own stay typed. A static export leaves it out.
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `env` is a `defineEnv`-shaped schema of the variables the library reads, which `kay env` lists with the app's own, so a deploy script knows them with nothing wired in the app; it is not enforced at boot, and a field with `requiredInProduction: true` marks what production needs.

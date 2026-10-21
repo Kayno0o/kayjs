@@ -73,4 +73,4 @@ Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps e
 
 ## Dev tool
 
-- Under `kay dev`, the dev tool every dev page carries has an Auth tab, brought by `authPages` and `authExtension` with nothing to add in the app: the session's user (id, email, roles, how they signed in, password, two-factor) with a Sign out button that posts to the pages' `/auth/sign-out`. It reads `/_kay/auth`, a route mounted under `kay dev` alone.
+- Under `kay dev`, the dev tool every dev page carries has an Auth tab, brought by `auth()` with nothing to add in the app: the session's user (id, email, roles, how they signed in, password, two-factor) with a Sign out button that posts to the pages' `/auth/sign-out`. It reads `/_kay/auth`, a route mounted under `kay dev` alone.

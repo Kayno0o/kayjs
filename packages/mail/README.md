@@ -28,9 +28,9 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 
 ```ts
 // kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail under kay dev
-import { mailExtension } from '@kaynooo/kayjs-mail'
+import { mail } from '@kaynooo/kayjs-mail'
 
-export default defineConfig({ extensions: [mailExtension('./src/mail')] })
+export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
 ```
 
 ```kay

@@ -480,6 +480,43 @@ describe('an extension naming its server plugin by module', () => {
   })
 })
 
+describe('an extension naming a module that exports an object carrying the plugin', () => {
+  it('takes its plugin, after prepare ran with the export, and refuses a throw of prepare', async () => {
+    const root = await scratchDir('extension-module-carried-')
+
+    await Bun.write(join(root, 'carried.ts'), 'import { Elysia } from \'elysia\'\n\nconst plugin = new Elysia({ name: \'carried\' })\n\nexport const carried = { plugin }\nexport default plugin\n')
+
+    const seen: unknown[] = []
+    const [carried, whole] = await extensionServers([{ name: 'a', serverModule: { path: './carried', export: 'carried', prepare: (exported) => {
+      seen.push(exported)
+    } } }, { name: 'b', serverModule: { path: './carried' } }], root)
+
+    expect(carried?.server).toBe(whole?.server)
+    expect(seen).toEqual([{ plugin: carried?.server }])
+    await expect(extensionServers([{ name: 'c', serverModule: { path: './carried', export: 'carried', prepare: () => {
+      throw new Error('refused by prepare')
+    } } }], root)).rejects.toThrow('refused by prepare')
+  })
+
+  it('has kay check type the plugin\'s locals off the module, the extension carrying no type', async () => {
+    const root = await scratchDir('extension-module-untyped-')
+    const files: Record<string, string> = {
+      'package.json': JSON.stringify({ name: 'app' }),
+      'tsconfig.json': TSCONFIG,
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } }] })\n',
+      'src/own.ts': 'import { Elysia } from \'elysia\'\n\nexport const own = { plugin: new Elysia({ name: \'own\' }).derive({ as: \'global\' }, () => ({ label: \'own\' })) }\n',
+      'src/routes/index.kay': '--- server\nconst label: number = ctx.locals.label\n---\np {label}\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const { code, stdout, stderr } = await checkIn(root)
+
+    expect(`${stdout}${stderr}`).toMatch(/Type 'string' is not assignable to type 'number'/)
+    expect(code).toBe(1)
+  })
+})
+
 describe('an extension naming its server plugin by a module importing a .kay file', () => {
   it('has kay check type the plugin\'s locals, the module reached through the config\'s type alone', async () => {
     const root = await scratchDir('extension-module-kay-')

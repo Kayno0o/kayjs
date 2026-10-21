@@ -46,15 +46,15 @@ With the default, the TOTP secrets and stored provider tokens are sealed with a 
 Then declare it in `kay.config.ts`. The module loads only when the server starts, so the config never loads your database.
 
 ```ts
-import { authPages } from '@kaynooo/kayjs-auth'
+import { auth } from '@kaynooo/kayjs-auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  extensions: [authPages({ auth: () => import('./src/auth') })],
+  extensions: [auth({ module: './src/auth' })],
 })
 ```
 
-Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `authPages` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
+Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth()` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
@@ -70,7 +70,7 @@ A magic link carries the choice of the browser that asked for it, so opened in a
 createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
 ```
 
-To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page, which `auth.guard()` and `requireUser()` then send visitors to, with `?redirect=` back. List `authExtension(() => import('./src/auth'))` instead of `authPages`.
+To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page, which `auth.guard()` and `requireUser()` then send visitors to, with `?redirect=` back. Give `auth({ module: './src/auth', pages: false })` in `kay.config.ts` to serve the plugin alone.
 
 ### Postgres
 
@@ -545,11 +545,11 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 </Callout>
 
-The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails. `authMailer` comes from kayjs-mail and needs its `mailExtension` in `kay.config.ts`.
+The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails. `authMailer` comes from kayjs-mail and needs its `mail({ module })` in `kay.config.ts`.
 
 Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.expires` changes any of them, such as a week for invited users: `email: { expires: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `expires.link` and `expires.code`, and `lifetime(seconds, locale)` words them.
 
-The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `authPages`, `mailExtension` and `authMailer`, and no sign-in page of its own.
+The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `auth`, `mail` and `authMailer`, and no sign-in page of its own.
 
 ## Guarding other sites
 
@@ -609,7 +609,7 @@ For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?r
 
 ## Letting an AI agent sign in
 
-An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `authPages()` and a store that keeps OAuth data (`memoryStore` and `pgStore` do), your app is its own OAuth authorization server.
+An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryStore` and `pgStore` do), your app is its own OAuth authorization server.
 
 The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. Once the user allows it, the agent gets a token.
 

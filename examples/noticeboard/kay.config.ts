@@ -1,5 +1,5 @@
-import { authPages } from '@kaynooo/kayjs-auth'
-import { mailExtension } from '@kaynooo/kayjs-mail'
+import { auth } from '@kaynooo/kayjs-auth'
+import { mail } from '@kaynooo/kayjs-mail'
 import tailwind from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
 
@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [tailwind],
   seo: { name: 'Noticeboard', titleTemplate: '%s | Noticeboard', description: 'A club noticeboard, made with kay and its libraries' },
   extensions: [
-    authPages({ auth: () => import('./src/auth') }),
-    mailExtension('./src/mail'),
+    auth({ module: './src/auth' }),
+    mail({ module: './src/mail' }),
   ],
 })

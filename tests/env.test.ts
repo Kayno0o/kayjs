@@ -223,7 +223,7 @@ describe('kay env', () => {
 
   it('lists a mailer built at import time once, under the module that builds it and as the mailer is set up, and finds a caller whose path says defineEnv', async () => {
     const root = await project({
-      'kay.config.ts': 'import { mailExtension } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mailExtension(\'./src/defineEnv-mail/mail.ts\')] }\n',
+      'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/defineEnv-mail/mail.ts\' })] }\n',
       'src/defineEnv-mail/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ OWN: s.String() }))\nexport const mail = mailer({ optional: true })\n',
     })
     const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root)

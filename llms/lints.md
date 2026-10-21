@@ -148,6 +148,7 @@ kay check --only seo
 | `broken-canonical` | warn | seo | A prerendered page whose canonical link points at a page the build rendered as a 404 or a redirect, or at a path `redirects` sends elsewhere; reported by `kay build` alone. |
 | `one-way-hreflang` | warn | seo | An alternate (`hreflang`) of a page that does not point back at it from the page it names, or names a page that is not a 200; reported by `kay build` alone, at the page lacking the link back. |
 | `redirect-chain` | warn | seo | A redirect in `redirects` or a prerendered redirect whose target redirects again, naming the target to send it to directly; `kay check` reads `redirects` (at the redirect's line in kay.config.ts), `kay build` the redirects it rendered. |
+| `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, since 1.70: libraries register with `auth({ module })` and `mail({ module })`. `kay upgrade` rewrites the calls and the import where the module is a literal path. Found in `kay.config.ts`. |
 | `deprecated-identity-key` | warn | deprecated | A `// kay-allow identity-key` comment or an `identity-key` entry in `lints`, since 1.69: the lint is gone, as a `for` over objects with no `id` needs no key. `kay upgrade` removes it. Found in `.kay` files and `kay.config.ts`. |
 
 ### SEO lints

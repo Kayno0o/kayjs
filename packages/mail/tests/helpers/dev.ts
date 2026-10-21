@@ -7,7 +7,7 @@ const RESTARTED = /: restarted in /g
 const CLI = join(import.meta.dir, '../../../../src/cli.ts')
 
 const FILES: Record<string, string> = {
-  'kay.config.ts': `import { mailExtension } from '@kaynooo/kayjs-mail'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ extensions: [mailExtension('./src/mail')] })\n`,
+  'kay.config.ts': `import { mail } from '@kaynooo/kayjs-mail'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ extensions: [mail({ module: './src/mail' })] })\n`,
   'src/mail.ts': `import { mailer } from '@kaynooo/kayjs-mail'\n\nexport const mail = mailer({ from: 'Dev <dev@example.com>' })\n`,
   'src/server.ts': `import { Elysia } from 'elysia'\nimport { pages } from 'kay/server'\nimport { mail } from './mail'\n\nexport const app = new Elysia().get('/send/:n', async ({ params }) => {\n  await mail.send({ to: 'ada@example.com', subject: \`Mail \${params.n}\`, text: 'Hello' })\n\n  return 'sent'\n}).use(await pages()).listen(Number(process.env.PORT))\n`,
   'src/routes/index.kay': `---\n---\nh1 Home\na.other(href="/other") Other\n`,

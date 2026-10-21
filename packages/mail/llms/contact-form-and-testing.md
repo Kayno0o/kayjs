@@ -19,7 +19,7 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 - More than `maxLinks` links (3) is refused with 422. `protection` replaces the defaults: `rateLimit` 30 posts and 5 that went through every 10 minutes, `minTime` `'3s'`; the honeypot is the `website` field, with `pretend`, which `honeypot: 'nectar'` renames (a name no autofill knows; the form renders it by itself, and `website` is then free as a field of yours).
 - `consent: true` adds a required `consent` checkbox for a form collecting personal data: an unticked or missing one is refused with the `mail.contact.errors.consent` message (`errors.consent` replaces it), it is checked by the server and left out of the mail. `ContactForm` draws it for this field only (not for an extra field of yours named `consent`; its `consent` prop forces the box), with a `privacy="/privacy"` link; a form of your own writes `input(field="consent" type="checkbox")`.
 - `MailNotConfigured` answers 503 and any other send failure 502, as a refusal the form shows through `contact.error()`; the cause is logged, by the mailer for a delivery that failed and by the form for a mail that never got to it (not configured, a view that does not render). `reach` is named in the 503, the 502 and the rate-limit refusal.
-- The refusals, subject and mail footer read the `mail.contact` messages, which the package declares in its package.json, so every kay app installing it reads them, `mailExtension` or not (an Elysia app not run through kay reads English), in the page's language (English and French shipped), overridden key by key in the app's `src/messages`. The mail is written in the page's language, not the recipient's. The schema's field messages (`mail.contact.errors`) and `ContactForm`'s labels (`mail.contact.form`, with `consent` and `privacy`, read when the messages exist, else English) are in the page's language too, English and French shipped. `errors: { name, email, message, consent }` replaces the field messages with a text or a `() => string`, and ContactForm's label props replace its labels.
+- The refusals, subject and mail footer read the `mail.contact` messages, which the package declares in its package.json, so every kay app installing it reads them, `mail()` or not (an Elysia app not run through kay reads English), in the page's language (English and French shipped), overridden key by key in the app's `src/messages`. The mail is written in the page's language, not the recipient's. The schema's field messages (`mail.contact.errors`) and `ContactForm`'s labels (`mail.contact.form`, with `consent` and `privacy`, read when the messages exist, else English) are in the page's language too, English and French shipped. `errors: { name, email, message, consent }` replaces the field messages with a text or a `() => string`, and ContactForm's label props replace its labels.
 
 ## Testing
 
@@ -78,7 +78,7 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ## kayjs-auth
 
-`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security, invitation and account-exists mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs `mailExtension` in `kay.config.ts`'s `extensions`, which brings its wording:
+`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security, invitation and account-exists mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs `mail({ module })` in `kay.config.ts`'s `extensions`, which brings its wording:
 
 ```ts
 // src/auth.ts
@@ -133,4 +133,4 @@ AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
 
 ## Dev tool
 
-- `mailExtension` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent, with a Clear button. It reads `/_kay/mail.json`.
+- `mail()` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent, with a Clear button. It reads `/_kay/mail.json`.

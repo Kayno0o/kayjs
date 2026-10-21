@@ -1,4 +1,4 @@
-import { mailExtension } from '@kaynooo/kayjs-mail'
+import { mail } from '@kaynooo/kayjs-mail'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, settings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }, extensions: [mailExtension('./src/mail')] })
+export default defineConfig({ i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, settings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }, extensions: [mail({ module: './src/mail' })] })

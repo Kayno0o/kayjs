@@ -4,7 +4,7 @@ import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { authMailer } from '../src/auth'
-import { mailer, mailExtension } from '../src/mailer'
+import { mailer, mail as mailExtensionOf } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { startSmtp } from './helpers/smtp'
 
@@ -67,7 +67,7 @@ describe('the development outbox page', () => {
 
   it('is served by an app listing the mailer as an extension, with no .use of its own', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension(async () => mail)] })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ server: async () => mail })] })
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the app', text: 'Hello' })
 
@@ -75,7 +75,7 @@ describe('the development outbox page', () => {
   })
 
   it('is served by an app naming the module that exports the mailer, kay importing it', async () => {
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension('./src/extension-mail')] })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ module: './src/extension-mail' })] })
     const { mail } = await import('./fixture/src/extension-mail')
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the module', text: 'Hello' })
@@ -85,7 +85,7 @@ describe('the development outbox page', () => {
 
   it('serves every page of the dev pages through an app, the page fallback not answering for them', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension(async () => mail)] })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ server: async () => mail })] })
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the app', html: '<p>Hi</p>' })
 
@@ -230,7 +230,7 @@ describe('the mail samples page', () => {
 
   it('serves its pages through an app too', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: '.', extensions: [mailExtension(async () => mail)] })
+    const site = await testSite({ root: '.', extensions: [mailExtensionOf({ server: async () => mail })] })
 
     expect((await site.fetch('/_kay/mail/samples')).status).toBe(200)
     expect((await site.fetch('/_kay/mail/samples?mail=welcome.kay')).status).toBe(200)

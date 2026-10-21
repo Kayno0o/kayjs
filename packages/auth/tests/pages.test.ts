@@ -7,7 +7,7 @@ import { createAuth } from '../src/auth'
 import { log } from '../src/log'
 import { memoryStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
-import { authExtension, authPages } from '../src/pages'
+import { auth, authExtension, authPages } from '../src/pages'
 import { scopeLabel } from '../src/pages/forms'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
@@ -70,7 +70,7 @@ describe('authPages and createAuth share the prefix and home', () => {
     try {
       expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account', home: '/panel' })).toMatchObject({ prefix: '/account', home: '/panel' })
       expect(warn).toHaveBeenCalledTimes(1)
-      expect(String(warn.mock.calls[0]![0])).toContain('authPages({ home: \'/dashboard\' }) and createAuth({ pages: { home: \'/panel\' } }) differ')
+      expect(String(warn.mock.calls[0]![0])).toContain('auth({ home: \'/dashboard\' }) and createAuth({ pages: { home: \'/panel\' } }) differ')
 
       await loaded({ home: '/panel' }, make, { home: '/panel' })
       await loaded({}, make, { home: '/panel' })
@@ -84,8 +84,8 @@ describe('authPages and createAuth share the prefix and home', () => {
   })
 
   test('a prefix in createAuth that authPages does not serve stops the server, also when authPages gave none', async () => {
-    await expect(loaded({ prefix: '/account' }, make, { prefix: '/profile' })).rejects.toThrow('authPages serves the pages under \'/account\' and createAuth({ pages: { prefix: \'/profile\' } })')
-    await expect(loaded({}, make, { prefix: '/account' })).rejects.toThrow('Give authPages({ prefix: \'/account\' })')
+    await expect(loaded({ prefix: '/account' }, make, { prefix: '/profile' })).rejects.toThrow('auth() serves the pages under \'/account\' and createAuth({ pages: { prefix: \'/profile\' } })')
+    await expect(loaded({}, make, { prefix: '/account' })).rejects.toThrow('Give auth({ prefix: \'/account\' })')
   })
 
   test('an auth module made before authPages loaded it follows it or is checked against it, and createAuth without pages is left alone', async () => {
@@ -114,6 +114,56 @@ describe('authPages and createAuth share the prefix and home', () => {
     const { browser } = testApp({ pages: true })
 
     expect(await browser().call('features')).toMatchObject({ pages: { prefix: '/auth', home: '/' } })
+  })
+})
+
+describe('auth({ module }) registers the app\'s auth module', () => {
+  const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
+  const make = (pages?: Record<string, unknown> | boolean) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
+
+  // What `features().pages` says once `prepare` handed the module's `auth` the extension's prefix and home, as kay does before it takes the plugin.
+  async function adopted(options: Parameters<typeof auth>[0], pages: Record<string, unknown> | boolean | undefined) {
+    const exported = make(pages)
+
+    await auth({ module: './src/auth', ...options }).serverModule!.prepare!(exported)
+
+    const app = new Elysia().use(exported.plugin).get('/features', context => (context as unknown as { auth: { features: () => unknown } }).auth.features())
+
+    return (await (await app.handle(new Request('http://localhost/features'))).json() as { pages: unknown }).pages
+  }
+
+  test('names the module and the export kay takes the plugin from, with the pages, the dev tool and the command', () => {
+    const extension = auth({ module: './src/auth' })
+
+    expect(extension).toMatchObject({ name: '@kaynooo/kayjs-auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
+    expect(extension.messages).toBeDefined()
+    expect(extension.devTool).toEqual(authPages().devTool)
+    expect(extension.commands).toEqual(authPages().commands)
+  })
+
+  test('pages: false serves the plugin alone', () => {
+    const extension = auth({ module: './src/auth', pages: false })
+
+    expect(extension.routes).toBeUndefined()
+    expect(extension.messages).toBeUndefined()
+    expect(extension.serverModule?.export).toBe('auth')
+  })
+
+  test('hands createAuth the prefix and home, as authPages did', async () => {
+    expect(await adopted({ prefix: '/account', home: '/dashboard' }, true)).toMatchObject({ prefix: '/account', home: '/dashboard' })
+    expect(await adopted({}, true)).toMatchObject({ prefix: '/auth', home: '/' })
+    expect(await adopted({ prefix: '/account' }, { home: '/dashboard' })).toMatchObject({ prefix: '/account', home: '/dashboard' })
+    await expect(adopted({ prefix: '/account' }, { prefix: '/profile' })).rejects.toThrow('auth() serves the pages under \'/account\'')
+  })
+
+  test('a module exporting no auth is told how to export it', () => {
+    expect(async () => auth({ module: './src/auth' }).serverModule!.prepare!(undefined)).toThrow('./src/auth exports no `auth`')
+    expect(auth({ module: './src/auth', pages: false }).serverModule!.prepare!(undefined)).toBeUndefined()
+  })
+
+  test('takes a module or a server, not both', () => {
+    expect(() => auth({ module: './src/auth', server: () => new Elysia() })).toThrow('takes `module` or `server`')
+    expect(auth({ server: () => new Elysia() }).serverModule).toBeUndefined()
   })
 })
 

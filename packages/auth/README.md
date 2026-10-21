@@ -38,15 +38,15 @@ kay.config.ts hands kay the plugin, imported only when the server builds the app
 
 ```ts
 // kay.config.ts
-import { authPages } from '@kaynooo/kayjs-auth'
+import { auth } from '@kaynooo/kayjs-auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+  extensions: [auth({ module: './src/auth' })],
 })
 ```
 
-`authPages` also serves the prebuilt pages below; an app keeping its own lists `{ name: 'auth', server: async () => (await import('./src/auth')).auth.plugin }` instead. A plain Elysia server uses the plugin before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers its types in kay's `Register`, as llms.txt shows.
+`auth()` also serves the prebuilt pages below; an app keeping its own gives `pages: false`. A plain Elysia server uses the plugin before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers its types in kay's `Register`, as llms.txt shows.
 
 ## A first page
 
@@ -72,7 +72,7 @@ export default auth.guard({ redirect: '/login' })
 
 ## Prebuilt pages
 
-`authPages()` in kay.config.ts serves them. With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
+`auth()` in kay.config.ts serves them. With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
 
 ## Reference
 

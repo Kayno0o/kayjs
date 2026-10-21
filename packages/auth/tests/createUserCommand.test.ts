@@ -7,7 +7,7 @@ import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
 import { memoryStore } from '../src/memoryStore'
-import { authExtension, authPages } from '../src/pages'
+import { authExtension, auth as authFrom, authPages } from '../src/pages'
 import { SECRET } from './helpers/app'
 
 const FIXTURE = `${import.meta.dir}/fixture`
@@ -49,6 +49,14 @@ describe('the command is reached from the extension', () => {
 
     expect(symbols).toHaveLength(1)
     expect(await (viaPlugin as unknown as Record<symbol, () => Promise<unknown>>)[symbols[0]!]!()).toBe(auth)
+  })
+
+  test('auth({ module }) answers the auth its module exports, found from the project root', async () => {
+    const viaModule = authFrom({ module: './src/auth' })
+    const [symbol] = Object.getOwnPropertySymbols(viaModule)
+    const found = await (viaModule as unknown as Record<symbol, (root: string) => Promise<unknown>>)[symbol!]!(FIXTURE)
+
+    expect(found).toBe((await import('./fixture/src/auth')).auth)
   })
 
   test('a plugin that is not a createAuth result is told', async () => {
@@ -114,7 +122,7 @@ describe('kay auth create-user', () => {
   test('refuses a second email or username, and an app with no kayjs-auth extension', async () => {
     expect((await run(['a@example.com', '--email', 'b@example.com'])).refused).toContain('two emails')
     expect((await run(['both', '--username', 'other'])).refused).toContain('two usernames')
-    expect((await run(['nobody'], PASSWORD, { extensions: [] })).said).toContain('lists no authPages()')
+    expect((await run(['nobody'], PASSWORD, { extensions: [] })).said).toContain('lists no auth()')
   })
 })
 

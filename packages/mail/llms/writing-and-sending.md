@@ -2,7 +2,7 @@
 
 ## Setup
 
-`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mailExtension('./src/mail')` in `kay.config.ts`; the files below add `from` and `lang`.
+`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mail({ module: './src/mail' })` in `kay.config.ts`; the files below add `from` and `lang`.
 
 kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
 
@@ -15,21 +15,21 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 
 ```ts
 // kay.config.ts
-import { mailExtension } from '@kaynooo/kayjs-mail'
+import { mail } from '@kaynooo/kayjs-mail'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [mailExtension('./src/mail')] })
+export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
 ```
 
-- `mailExtension(module)` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `module` is the path of the file exporting the mailer as `mail`, relative to the project root, and kay imports it, and bakes it into an executable `kay build --compile` makes, only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a function `async () => (await import('./src/mail')).mail` in its place loads it the same way, and a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in and the `mail.contact` ones of `contactForm`, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
+- `mail({ module })` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `module` is the path of the file exporting the mailer as `mail`, relative to the project root, and kay imports it, and bakes it into an executable `kay build --compile` makes, only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: `mail({ server: async () => (await import('./src/mail')).mail })` in its place loads it the same way, and a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in and the `mail.contact` ones of `contactForm`, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
 - An Elysia app not served by `pages()` uses it as a plugin instead: `new Elysia().use(mail)`.
 
-- `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.
+- `mailer(options)` returns an Elysia plugin: the server using it, through `mail({ module })` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.
 - Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `to`, the recipient of a mail naming none, `MAIL_TO` when left out, read from the environment in development too; `lang`, the language mails are written in, which a message's own `lang` replaces: the locale their component renders `t()` in and the `<html lang>`, the site's default locale (or the request's) when neither is set; `transport`, where mails go in place of the default; `smtp: { name, timeout, maxConnections, rateLimit }`, merged over the SMTP built from the environment (`name` is the sender's domain by default, `timeout` a duration such as `'30s'`, 10 seconds by default, `maxConnections` 5), the options left out keeping the defaults, a broken one stopping the boot, and refused next to a `transport`, whose `smtp()` takes them; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment; `logRecipients: true` logs each mail's recipients in full rather than their count and domains, and `logSubjects: true` logs each mail's subject, which the log leaves out.
 
 ## Environment
 
-In production the mailer reads, as the server boots, through kay's `defineEnv`; `mailExtension` lists them for `kay env`, `SMTP_HOST` and `SMTP_FROM` as required in production, with nothing wired in the app:
+In production the mailer reads, as the server boots, through kay's `defineEnv`; `mail()` lists them for `kay env`, `SMTP_HOST` and `SMTP_FROM` as required in production, with nothing wired in the app:
 
 | Variable | |
 | --- | --- |

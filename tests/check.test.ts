@@ -2884,6 +2884,73 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a library registered the old way, and --fix rewrites the calls and the import together where it can', async () => {
+    const root = await scratchProject({
+      'src/auth.ts': 'export const auth = 1\n',
+      'kay.config.ts': 'import { authExtension, authPages } from \'@kaynooo/kayjs-auth\'\nimport { mailExtension } from \'@kaynooo/kayjs-mail\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [authPages({ auth: () => import(\'./src/auth\'), prefix: \'/account\' }), mailExtension(\'./src/mail\')] })\nvoid authExtension\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-library-registration/g)).toHaveLength(2)
+      // authExtension is read by something other than a call this rewrites, so its import stays; the others go together.
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { authExtension, auth } from \'@kaynooo/kayjs-auth\'\nimport { mail } from \'@kaynooo/kayjs-mail\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ module: \'./src/auth\', prefix: \'/account\' }), mail({ module: \'./src/mail\' })] })\nvoid authExtension\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-library-registration')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rewrites authExtension to a module with no pages, both auth forms to one import, and leaves a function it cannot read', async () => {
+    const root = await scratchProject({
+      'src/auth.ts': 'const auth = 1\n\nexport { auth }\n',
+      'kay.config.ts': 'import { authExtension, authPages } from \'@kaynooo/kayjs-auth\'\nimport { mailExtension } from \'@kaynooo/kayjs-mail\'\nimport { defineConfig } from \'kay/server\'\n\nconst load = async () => (await import(\'./src/mail\')).mail\n\nexport default defineConfig({ extensions: [authExtension(() => import(\'./src/auth\')), authPages(), mailExtension(load)] })\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-library-registration/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\nimport { mailExtension } from \'@kaynooo/kayjs-mail\'\nimport { defineConfig } from \'kay/server\'\n\nconst load = async () => (await import(\'./src/mail\')).mail\n\nexport default defineConfig({ extensions: [auth({ module: \'./src/auth\', pages: false }), auth(), mailExtension(load)] })\n')
+      expect((await runCheck(root)).output.match(/deprecated-library-registration/g)).toHaveLength(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves an old authPages alone where its module exports no named auth', async () => {
+    const source = 'import { authPages } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [authPages({ auth: () => import(\'./src/auth\') })] })\n'
+    const root = await scratchProject({ 'kay.config.ts': source, 'src/auth.ts': 'const auth = 1\n\nexport default auth\n' })
+
+    try {
+      expect((await runCheck(root)).output).toContain('deprecated-library-registration')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(source)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the old registration alone where a name the new form takes is already in use', async () => {
+    const source = 'import { authPages } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nconst auth = 1\n\nexport default defineConfig({ extensions: [authPages()], publicEnv: { auth } })\n'
+    const root = await scratchProject({ 'kay.config.ts': source })
+
+    try {
+      expect((await runCheck(root)).output).toContain('deprecated-library-registration')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(source)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',

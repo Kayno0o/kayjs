@@ -396,8 +396,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
   server?: Server | (() => Server | Promise<Server>) | undefined
-  // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. Its type is the one the extension's `Server` argument gives, so a library's helper types its locals; used beside `server`, the module wins. A path is relative to the project root.
-  serverModule?: { path: string, export?: string | undefined } | undefined
+  // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `createAuth` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
+  serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
   config?: Omit<KayConfig, 'extensions'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
@@ -436,11 +436,15 @@ export function extensionServerModules(root: string, extensions: KayExtension[] 
   return (extensions ?? []).flatMap(({ serverModule }) => serverModule === undefined ? [] : [resolve(root, serverModule.path)])
 }
 
-// The plugin a module exports, or what a function it exports builds; an executable reads it from the copy it holds, keyed by where the build found the file.
-async function serverFromModule(name: string, { path, export: exported = 'default' }: NonNullable<KayExtension['serverModule']>, root: string): Promise<AnyElysia> {
+// The plugin a module exports, what a function it exports builds, or the `plugin` of an object it exports; an executable reads it from the copy it holds, keyed by where the build found the file.
+async function serverFromModule(name: string, { path, export: exported = 'default', prepare }: NonNullable<KayExtension['serverModule']>, root: string): Promise<AnyElysia> {
   const file = resolve(bundled()?.root ?? root, path)
   const value = (await importModule<Record<string, unknown>>(file))[exported]
-  const server = typeof value === 'function' ? await (value as () => unknown)() : value
+
+  await prepare?.(value)
+
+  const built = typeof value === 'function' ? await (value as () => unknown)() : value
+  const server = typeof built === 'object' && built !== null && !('handle' in built) && 'plugin' in built ? built.plugin : built
 
   if (typeof server !== 'object' || server === null || !('handle' in server))
     throw new KayError('config-invalid', `kay: the extension ${name} takes its server from ${path}, which does not export an Elysia plugin as \`${exported}\``)

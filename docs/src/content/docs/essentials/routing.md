@@ -299,10 +299,10 @@ The rewritten request goes through the whole app again, guards included, and see
 A library can serve pages of its own, such as the sign-in and sign-up of kayjs-auth. List it once in `extensions`.
 
 ```ts
-import { authPages } from '@kaynooo/kayjs-auth'
+import { auth } from '@kaynooo/kayjs-auth'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [authPages()] })
+export default defineConfig({ extensions: [auth()] })
 ```
 
 Its pages serve under their prefix, such as `/auth/login`, inside your layouts and guards, unless the library's own layout sets `layouts: false`, as kayjs-cms's admin does to draw its own header instead of your site's. To change one, put your own file at the same path, `src/routes/auth/login.kay`. It replaces that page alone.

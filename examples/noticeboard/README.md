@@ -4,7 +4,7 @@ A club noticeboard running kay with its libraries together. Members join and sig
 
 ## How it is wired
 
-`kay.config.ts` lists `authPages` and `mailExtension`, and that is all the wiring: they add kayjs-auth's and kayjs-mail's plugins before the pages, so `src/server.ts` mounts only the queue, and they bring the sign-in, register, reset, verify and account pages and the mails' wording. `src/auth.ts` sets `pages: true` and sends its mails through `authMailer(mail.enqueue)`. The example keeps no sign-in page of its own: the shipped ones cover every flow it had, so a member picks a name on the account page and the tests drive the shipped pages' actions, which `tests/pages.ts` imports.
+`kay.config.ts` lists `auth` and `mail`, and that is all the wiring: they add kayjs-auth's and kayjs-mail's plugins before the pages, so `src/server.ts` mounts only the queue, and they bring the sign-in, register, reset, verify and account pages and the mails' wording. `src/auth.ts` sets `pages: true` and sends its mails through `authMailer(mail.enqueue)`. The example keeps no sign-in page of its own: the shipped ones cover every flow it had, so a member picks a name on the account page and the tests drive the shipped pages' actions, which `tests/pages.ts` imports.
 
 ## Run it
 

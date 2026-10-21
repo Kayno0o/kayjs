@@ -4,7 +4,7 @@ import type { KayLibrary } from '../build/libraries'
 import type { Route } from '../server/routes'
 import type { ServedProject } from './shadow-types'
 import { existsSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { ASSET_EXTENSIONS } from '../build/assets'
 import { TS_FILE, TSX_FILE } from '../build/files'
 import { componentName } from '../compiler'
@@ -94,6 +94,18 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
   const app = await exportsApp(paths.entry) ? modulePath(paths.entry) : undefined
   const servers = (options.extensions ?? []).some(extension => extension.server !== undefined || extension.serverModule !== undefined)
+  // The modules extensions take their server plugin from, which the check types the locals off, skipping one that does not resolve (the build reports it).
+  const serverModules = (options.extensions ?? []).flatMap(({ serverModule }) => {
+    if (serverModule === undefined)
+      return []
+
+    try {
+      return [{ module: modulePath(Bun.resolveSync(resolve(root, serverModule.path), root)), name: serverModule.export ?? 'default' }]
+    }
+    catch {
+      return []
+    }
+  })
   const content = existsSync(paths.content) ? modulePath(paths.content) : undefined
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
   const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG
@@ -106,11 +118,11 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // What `route()` takes: each page as its file names it, a catch-all as `*name`.
   const named = [...new Set(routes.map(route => route.catchAll === undefined ? route.pattern : route.pattern.replace(CATCH_ALL, `/*${route.catchAll}`)))]
 
-  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS], named)
+  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named)
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, endpoints: string[] = [], named: string[] = []): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, serverModules: { module: string, name: string }[] = [], endpoints: string[] = [], named: string[] = []): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
@@ -125,11 +137,11 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
   const inferred = [
     ...app === undefined ? [] : [`app: typeof import(${importSpecifier(app)}).app`, `locals: LocalsOf<typeof import(${importSpecifier(app)}).app>`],
-    ...!servers || config === undefined ? [] : [`extensions: ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`],
+    ...!servers || config === undefined ? [] : [`extensions: ${[`ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`, ...serverModules.map(({ module, name }) => `ServerOfModule<typeof import(${importSpecifier(module)}), ${JSON.stringify(name)}>`)].join(' | ')}`],
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, LocalsOf, PublicEnvOf, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, LocalsOf, PublicEnvOf, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',

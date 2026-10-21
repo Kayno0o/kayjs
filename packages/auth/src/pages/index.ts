@@ -5,6 +5,7 @@ import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
+import { resolve } from 'node:path'
 import { pickLocale } from '../locale'
 
 export interface AuthPagesOptions {
@@ -155,7 +156,7 @@ export interface PagesHandle {
 // Set on the plugin of a `createAuth` result, so what has the plugin alone finds the `auth` it came from.
 export const AUTH_OF = Symbol('kayjs-auth.auth')
 
-// Set on the extensions kayjs-auth gives, answering the app's `auth` for the commands.
+// Set on the extensions kayjs-auth gives, answering the app's `auth` for the commands, given the project root.
 export const LOAD_AUTH = Symbol('kayjs-auth.load')
 
 // Set on the `createAuth` result, answering what `createUser` would refuse a login for.
@@ -201,6 +202,7 @@ async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>, 
   return auth.plugin as PluginOf<Module>
 }
 
+// Superseded by `auth({ module, pages: false })`, which `kay check` rewrites it to.
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
 export function authExtension<Module extends AuthModule>(load: () => Promise<Module>): KayExtension<PluginOf<Module>> {
   const extension: KayExtension<PluginOf<Module>> = { name: 'auth', server: async () => pluginIn(load), devTool: DEV_TOOL, commands: COMMANDS }
@@ -208,6 +210,7 @@ export function authExtension<Module extends AuthModule>(load: () => Promise<Mod
   return Object.assign(extension, { [LOAD_AUTH]: async () => authOfModule(await load()) as unknown as UserMaker })
 }
 
+// Superseded by `auth({ module })`, which `kay check` rewrites it to.
 // The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. With `auth`, `createAuth({ pages: true })` takes this `prefix` and `home`; one given in both places must match for the prefix.
 // `auth` loads the app's `auth` as `authExtension` does, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes; `server` hands `pages()` any other plugin carrying it.
 export function authPages<Module extends AuthModule>(options: AuthPagesOptions & { auth: () => Promise<Module> }): AuthPages<PluginOf<Module>>
@@ -225,6 +228,47 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
   }
 
   return Object.assign(extension, { [LOAD_AUTH]: options.auth ? async () => authOfModule(await options.auth!()) as unknown as UserMaker : async () => authOfServer(options.server) })
+}
+
+export interface AuthExtensionOptions extends AuthPagesOptions {
+  // The file exporting the app's `auth`, the `createAuth` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
+  module?: string | undefined
+  // Any other plugin carrying a `createAuth` result, as a function, in place of `module`.
+  server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
+  // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
+  pages?: boolean | undefined
+}
+
+// The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
+function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHandle | undefined } {
+  if (typeof exported !== 'object' || exported === null || !('plugin' in exported))
+    throw new Error(`kayjs-auth: ${module} exports no \`auth\`: export the \`createAuth\` result as \`export const auth = createAuth(...)\``)
+
+  return exported as { [PAGES_OF]?: PagesHandle | undefined }
+}
+
+// kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `createAuth`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `createAuth({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
+export function auth(options: AuthExtensionOptions = {}): AuthPages {
+  const { module, server, pages = true, prefix = DEFAULT_PREFIX, home } = options
+
+  if (module !== undefined && server !== undefined)
+    throw new Error('kayjs-auth: auth() takes `module` or `server`, not both')
+
+  const given = { prefix: options.prefix, home }
+  const extension: AuthPages = {
+    name: '@kaynooo/kayjs-auth',
+    ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
+    ...module === undefined && server !== undefined && { server },
+    ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix }, messages: `${import.meta.dir}/messages` },
+    devTool: DEV_TOOL,
+    commands: COMMANDS,
+    prefix,
+    home: home ?? '/',
+  }
+
+  const load = async (root: string): Promise<UserMaker> => module === undefined ? authOfServer(server) : authOfModule(await import(resolve(root, module)) as Parameters<typeof authOfModule>[0]) as unknown as UserMaker
+
+  return Object.assign(extension, { [LOAD_AUTH]: load })
 }
 
 // The prefix and home `createAuth` reads off its `pages` option.

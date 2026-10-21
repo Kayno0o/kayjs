@@ -1532,12 +1532,12 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
         return
 
       if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
-        throw new Error(`kayjs-auth: authPages serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give authPages({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
+        throw new Error(`kayjs-auth: auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
 
       if (own.home === undefined && given.home !== undefined)
         pages.home = given.home
       else if (own.home !== undefined && given.home !== undefined && own.home !== given.home)
-        log.warn(`authPages({ home: '${given.home}' }) and createAuth({ pages: { home: '${own.home}' } }) differ, and createAuth's wins: users go to '${own.home}'. Give home once, or the same in both`)
+        log.warn(`auth({ home: '${given.home}' }) and createAuth({ pages: { home: '${own.home}' } }) differ, and createAuth's wins: users go to '${own.home}'. Give home once, or the same in both`)
 
       if (own.prefix !== undefined || given.prefix === undefined || given.prefix === pages.prefix)
         return
