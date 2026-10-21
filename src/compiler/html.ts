@@ -541,11 +541,7 @@ export class HtmlTemplate extends TemplateWriter {
             else if (written === 'href' && this.localLink(element))
               b.add(`${helperName('localHref')}((`).addSource(attribute.expression).add('))')
             else
-              b.add('(').addSource(attribute.expression).add(')')
-
-            // A number the template wrote is no loop's, so edit mode keeps the reads before it.
-            if (attribute.kind === 'value' && NUMBER_LITERAL.test(this.source(attribute.expression)))
-              b.add(', true')
+              b.add('(').addSource(attribute.expression).add(NUMBER_LITERAL.test(this.source(attribute.expression)) ? '), true' : ')')
 
             b.add(')')
           })

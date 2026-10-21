@@ -1595,6 +1595,11 @@ describe('preview mode', () => {
       expect(placed(({ value }) => `<span${attribute('aria-valuemin', 0, true)}${attribute('aria-valuemax', 100, true)}${attribute('aria-valuenow', value)}></span>`)).toBe(`<span aria-valuemin="0" aria-valuemax="100" aria-valuenow="4" ${marked(VALUE)}></span>`)
     })
 
+    it('never takes a literal number for the field, even equal to the value read', () => {
+      expect(placed(({ value }) => `<span${attribute('aria-valuemin', 0, true)}${attribute('aria-valuenow', value)}></span>`, [{ label: 'Speed', value: 0 }])).toBe(`<span aria-valuemin="0" aria-valuenow="0" ${marked(VALUE)}></span>`)
+      expect(placed(({ value }) => `<span${attribute('aria-valuemax', 100, true)}${attribute('aria-valuenow', value)}></span>`, [{ label: 'Speed', value: 100 }])).toBe(`<span aria-valuemax="100" aria-valuenow="100" ${marked(VALUE)}></span>`)
+    })
+
     it('still forgets a number read after a number no field gave that is not a literal', () => {
       expect(placed(({ value }) => `<span${attribute('aria-valuemin', 0)}${attribute('aria-valuenow', value)}></span>`)).toBe('<span aria-valuemin="0" aria-valuenow="4"></span>')
     })

@@ -165,7 +165,7 @@ export function markedText(value: string | number, markup: string, part = false)
   return ref === undefined ? markup : fenced(fieldMarks.marking!, 'field', ref, markup)
 }
 
-// ` data-kay-field-<name>="..."` beside an attribute whose value a field gave; `literal` is a number the template wrote, which no loop computed.
+// ` data-kay-field-<name>="..."` beside an attribute whose value a field gave; `literal` is a number the template wrote, never a field's and no loop's.
 export function markedAttribute(name: string, value: unknown, literal = false): string {
   const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value, true, literal) : undefined
 
@@ -240,12 +240,21 @@ const anyRead = () => true
 
 function fieldOf(value: string | number, part = false, literal = false): number | undefined {
   const marks = fieldMarks.marking!
+
+  // A number the template wrote is never a field's, whatever it equals, and no sign a number is computed.
+  if (literal) {
+    marks.renders++
+
+    return undefined
+  }
+
   const ref = typeof value === 'string' ? claim(marks.unrendered.get(value), anyRead) : claim(marks.numbers, read => read.value === value)
 
   marks.renders++
 
-  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field, but a text no field gave in a tag, a `role` say, or a number the template wrote (`literal`), forgets nothing, as it is no sign a number is computed. A stale read survives such texts, so a computed number equal to it rendered later is still taken for the field.
-  if (ref === undefined && !literal && !(part && typeof value === 'string'))
+  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field, but a text no field gave in a tag, a `role` say, forgets nothing, as it is no sign a number is computed.
+  // A stale read survives such texts, so a computed number equal to it rendered later is still taken for the field.
+  if (ref === undefined && !(part && typeof value === 'string'))
     marks.numbers.length = 0
 
   return ref
