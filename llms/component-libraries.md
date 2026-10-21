@@ -99,6 +99,7 @@ export function auth({ prefix = '/auth' } = {}): KayExtension {
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `env` is a `defineEnv`-shaped schema of the variables the library reads, which `kay env` lists with the app's own, so a deploy script knows them with nothing wired in the app; it is not enforced at boot, and a field with `requiredInProduction: true` marks what production needs.
+- `check` returns the problems with how the app configured the extension, `{ message, file?, severity?, help? }[]` (a warning at `kay.config.ts` by default), for what its server would otherwise only log or refuse once it listens: `kay check` and the editor call it with the content config read and its collections registered, never `server`, and a throw shows as an error. Name the collection and field path in each message; the boot keeps its own log or refusal.
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](prerendering.md#page-hooks).
 - `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the pages its own `routes` serve, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content-cms.md#preview-mode).
 - `commands` adds commands to `kay`, by a name of one word or more, `{ 'i18n translate': `${import.meta.dir}/translate.ts` }`: each module, absolute or relative to the project root, default-exports a `KayCommand` from `kay/library`, `{ usage, options, positionals, run(parsed, refuse, { root, config }) }`, `usage` its line after `kay ` and `options` as `node:util`'s `parseArgs` takes them; `refuse(reason)` prints the reason and the usage and answers 1, and `run` answers the exit code.
@@ -148,8 +149,8 @@ How kay and its libraries name the same idea, written before the renames land: a
 - A switch is `false` to turn off what is on by default and `true` to turn on what is off by default, with an object where it takes options; the default is the first line of its doc. `optional` on mail is reviewed against this (#1694).
 
 **Errors**
-- A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through the one message helper kay exports (#1684).
-- A runtime error class ends in `Error`, extends `Error`, and carries `code` (`kind` and bare `status` become `code`). Exported classes named otherwise keep their old name as an alias for three minors (#1684).
+- A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through `configError(option, value, takes)` from `kay/library`, or `configError(message)` for a problem of another shape; a reader that also runs in the browser throws a plain `Error` and its server caller wraps it in `asConfigError(() => ...)`.
+- A runtime error class ends in `Error`, extends `Error`, and carries `code` (`AiError.kind` is also its `code`; an HTTP `status` stays beside it). A renamed export keeps its old name as an alias for three minors.
 
 **Prefixes**
 - Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api` (#1691).

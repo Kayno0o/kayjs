@@ -16,6 +16,13 @@ With Tailwind, classes merged from the shorthand, `class`, a spread and a compon
 ### Rate limits are `rateLimit` and `key`
 
 kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `ask(messages, { visitor })` are `key`, and kayjs-auth's `createAuth({ limits })` is `rateLimit`, as kay's actions and API routes already name theirs. The old names still work for three minors (the `deprecated-rate-limit` lint), and `kay upgrade` renames them. kayjs-mail's `smtp({ rateLimit: 5 })` and `mailer({ smtp: { rateLimit: 5 } })` are `{ max: 5, window: '1s' }`, and `SMTP_RATE_LIMIT` reads `5/1s` (a bare `5` still means 5 a second). A `limit`, `limits` or number held in a variable is not found: change the option where it is passed.
+### Runtime error classes end in `Error` and carry a `code`
+
+kayjs-cms's `SaveConflict` is `SaveConflictError` and kayjs-mail's `MailNotConfigured` is `MailNotConfiguredError`; the old names stay as aliases three minors, and `kay upgrade` renames the imports and their uses (the `deprecated-renamed-export` lint). Every error class a library exports has a `code` (`'save-conflict'`, `'mail-not-configured'`, `'oauth-exchange'`, `'forge-refused'`), and `AiError` has `code` beside `kind`, the same value.
+
+### Boot config errors of the libraries are `KayError`s
+
+A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
 
 ## 1.69.0
 

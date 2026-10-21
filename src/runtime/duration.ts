@@ -12,21 +12,21 @@ function inSeconds(amount: number, unit: string): number {
   return unit === 'ms' ? amount / 1000 : amount * UNIT_SECONDS[unit as keyof typeof UNIT_SECONDS]
 }
 
-// The seconds a positive duration stands for; `what` names the option in the error anything else throws, and `owner` the package whose option it is.
-export function durationSeconds(value: unknown, what: string, owner = 'kay'): number {
+// The seconds a positive duration stands for; `what` names the option in the error anything else throws.
+export function durationSeconds(value: unknown, what: string): number {
   const text = typeof value === 'string' ? DURATION_TEXT.exec(value) : null
   const parsed = text ? inSeconds(Number(text[1]), text[2]!) : Number.NaN
   const seconds = typeof value === 'number' ? value : parsed
 
   if (!Number.isFinite(seconds) || seconds <= 0)
-    throw new Error(`${owner}: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'`)
+    throw new Error(`kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'`)
 
   return seconds
 }
 
 // The same rounded up to whole seconds, for a header or a cookie that takes an integer: `'250ms'` is 1, never `0.25` nor 0.
-export function wholeSeconds(value: unknown, what: string, owner = 'kay'): number {
-  return Math.ceil(durationSeconds(value, what, owner))
+export function wholeSeconds(value: unknown, what: string): number {
+  return Math.ceil(durationSeconds(value, what))
 }
 
 // The milliseconds a duration written with its unit stands for, `'250ms'` or `'3s'`; a bare number throws, as it would read as seconds elsewhere and as milliseconds here before 1.56.
@@ -41,11 +41,11 @@ export function durationMs(value: DurationText): number {
 }
 
 // The same for a server or library option: a bare number throws naming the option, and a string must be a positive duration or it throws too.
-export function optionMs(value: DurationText, what: string, owner = 'kay'): number {
+export function optionMs(value: DurationText, what: string): number {
   if (typeof value !== 'string')
-    throw new Error(`${owner}: ${what} is ${String(value)}; it takes a duration with its unit, such as '3s' or '250ms'`)
+    throw new Error(`kay: ${what} is ${String(value)}; it takes a duration with its unit, such as '3s' or '250ms'`)
 
-  durationSeconds(value, what, owner)
+  durationSeconds(value, what)
 
   return durationMs(value)
 }

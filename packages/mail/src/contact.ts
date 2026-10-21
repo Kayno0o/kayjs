@@ -4,10 +4,11 @@ import type { Mailer } from './mailer'
 import type { Address, Field } from './types'
 import { s } from 'kay'
 import { t } from 'kay/i18n'
+import { configError } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { wording } from 'kay/words'
 import { log } from './log'
-import { MailNotConfigured, wasLogged } from './mailer'
+import { MailNotConfiguredError, wasLogged } from './mailer'
 
 // What the view of a contact mail is given: the visitor's answers as `fields` (the name and email first, the message apart), the `subject` and the site's `origin`.
 export interface ContactMailProps {
@@ -78,10 +79,10 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   const reserved = [...RESERVED, honeypot, ...consent ? ['consent'] : []].filter(key => key in fields)
 
   if (honeypot === '' || RESERVED.has(honeypot) || (consent && honeypot === 'consent'))
-    throw new Error(`kayjs-mail: contactForm cannot use \`${honeypot}\` as its honeypot, a field the form already has`)
+    throw configError(`contactForm cannot use \`${honeypot}\` as its honeypot, a field the form already has`)
 
   if (reserved.length > 0)
-    throw new Error(`kayjs-mail: contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
+    throw configError(`contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
 
   const words = { reach: reach ?? '' }
 
@@ -125,7 +126,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     }
     catch (error) {
       // The mailer logs a delivery that fails after it is queued; what stops before that (not configured, a view that does not render) is logged here.
-      if (error instanceof MailNotConfigured) {
+      if (error instanceof MailNotConfiguredError) {
         log.error(error.message, error)
 
         return ctx.fail(503, reach === undefined ? t('mail.contact.notConfigured') : t('mail.contact.notConfiguredReach', words))

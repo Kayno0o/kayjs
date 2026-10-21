@@ -194,7 +194,7 @@ describe('the "Send for real" switch', () => {
     delete process.env.SMTP_USER
 
     expect(outbox.mails.map(each => [each.subject, each.relayed])).toEqual([['First', undefined], ['Second', undefined]])
-    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringContaining('the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to me@example.com: kayjs-mail: SMTP_USER and SMTP_PASS go together')]])
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringContaining('the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to me@example.com: kay: SMTP_USER and SMTP_PASS go together')]])
   })
 
   it('refuses a post from another site, an address that is not one, and several addresses', async () => {

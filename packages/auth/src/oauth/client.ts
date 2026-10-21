@@ -1,5 +1,6 @@
 import type { JWTVerifyGetKey } from 'jose'
 import type { OAuthClientConfig, OAuthEndpoints, OAuthProvider, OAuthTokens, OpenIdCheck } from './types'
+import { configError } from 'kay/library'
 import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 // How far apart the provider's clock and this one may be when an ID token's times are read.
@@ -24,6 +25,8 @@ function redactBody(text: string): string {
 
 /** Thrown when the provider rejects the token exchange or user fetch, a bad or expired authorization code or the provider being down. `status` is the upstream HTTP status, so a caller can answer a client's bad code with a 4xx and a provider outage with a 502. */
 export class OAuthExchangeError extends Error {
+  readonly code = 'oauth-exchange'
+
   constructor(readonly status: number, message: string) {
     super(message)
     this.name = 'OAuthExchangeError'
@@ -36,7 +39,7 @@ function requireSecureEndpoints(endpoints: OAuthEndpoints, provider: string): vo
 
   for (const [name, url] of Object.entries(urls)) {
     if (url !== undefined && new URL(url).protocol !== 'https:')
-      throw new Error(`kayjs-auth: the ${provider} provider's ${name} ${url} is not https, which a site at https refuses`)
+      throw configError(`the ${provider} provider's ${name} ${url} is not https, which a site at https refuses`)
   }
 }
 
@@ -75,7 +78,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     const url = (await endpoints())[name]
 
     if (url === undefined)
-      throw new Error(`kayjs-auth: the ${provider.name} provider has no ${name}`)
+      throw configError(`the ${provider.name} provider has no ${name}`)
 
     return url
   }
@@ -93,7 +96,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
 
   const userInfo = async (accessToken: string, userUrl: string | undefined): Promise<Record<string, unknown>> => {
     if (userUrl === undefined)
-      throw new Error(`kayjs-auth: the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
+      throw configError(`the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
 
     const { res, text } = await askProvider(provider.name, 'user fetch', userUrl, {
       headers: {

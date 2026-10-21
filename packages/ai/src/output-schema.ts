@@ -1,5 +1,7 @@
 // What a provider's JSON-schema output takes of a kay schema: the shape (types, properties, required, items, unions, enums) and every object closed to other fields.
 // A bound it cannot hold (lengths, ranges, formats, patterns) moves into the description for the model to read, and kayjs-ai checks it on the answer.
+import { configError } from 'kay/library'
+
 const KEPT = new Set(['type', 'properties', 'required', 'items', 'anyOf', 'enum', 'const', 'description', 'title'])
 // Marks of kay's own that tell a model nothing.
 const DROPPED = new Set(['error', 'default', 'examples', '$id', '$schema', 'additionalProperties'])
@@ -19,7 +21,7 @@ function simplify(value: unknown): unknown {
 
   for (const key of UNSUPPORTED) {
     if (key in value)
-      throw new TypeError('kayjs-ai: a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
+      throw configError('a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
   }
 
   const out: Node = {}

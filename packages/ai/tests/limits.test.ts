@@ -699,6 +699,6 @@ describe('maxInputChars', () => {
     await ask([{ role: 'user', content: 'x'.repeat(50_000) }], { system: 'y'.repeat(10_000) })
     expect((await failure(ask([{ role: 'user', content: 'x'.repeat(30) }, { role: 'assistant', content: 'y'.repeat(30) }], { maxInputChars: 59 }))).kind).toBe('too-long')
     await ask([{ role: 'user', content: 'x'.repeat(200_000) }], { maxInputChars: Infinity })
-    expect(() => ask('a', { maxInputChars: 0 })).toThrow(TypeError)
+    expect(() => ask('a', { maxInputChars: 0 })).toThrow(expect.objectContaining({ code: 'config-invalid' }))
   })
 })

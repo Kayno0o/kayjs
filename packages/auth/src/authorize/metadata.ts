@@ -1,5 +1,5 @@
 import type { Core } from '../core'
-import { configuredSite } from 'kay/library'
+import { configError, configuredSite } from 'kay/library'
 
 export const AUTHORIZATION_SERVER_PATH = '/.well-known/oauth-authorization-server'
 export const OPENID_CONFIGURATION_PATH = '/.well-known/openid-configuration'
@@ -18,7 +18,7 @@ export function siteRoot(core: Core, request: Request): string {
   const fixed = configuredSite()?.origin ?? core.url
 
   if (!rootUsable(core))
-    throw new Error('kayjs-auth: the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or `url` in createAuth, as the Host header cannot name the issuer')
+    throw configError('the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or `url` in createAuth, as the Host header cannot name the issuer')
 
   return (fixed ?? new URL(request.url).origin).replace(TRAILING_SLASH, '')
 }

@@ -8,13 +8,13 @@ import { recordActivity } from './activity'
 import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
 import { fieldsOf } from './fields'
-import { fileVersion, ForgeError, SaveConflict } from './files'
+import { fileVersion, ForgeError, SaveConflictError } from './files'
 import { hiddenOf } from './hidden'
 import { collectionInfo, entries, entryFile, entryPage, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
-import { missingReferences, pointReferences, referrersWith, UnreadReferrers } from './references'
+import { missingReferences, pointReferences, referrersWith, UnreadReferrersError } from './references'
 import { moveRevisions, openTrail } from './revisions'
 import { settings } from './settings'
 import { pairKey } from './translations'
@@ -31,7 +31,10 @@ export interface VersionRule {
   required?: boolean | undefined
 }
 
-export class UnknownCollection extends Error {}
+export class UnknownCollectionError extends Error {
+  override readonly name = 'UnknownCollectionError'
+  readonly code = 'unknown-collection'
+}
 
 // The collection as the screens read it, with the layout `cms({ collections })` gave it.
 export async function findCollection(name: string): Promise<ScreenCollection | undefined> {
@@ -55,7 +58,7 @@ export async function collectionNamed(name: string): Promise<CollectionInfo> {
   const found = await bareCollection(name)
 
   if (!found)
-    throw new UnknownCollection(wording('cms.store.noCollection', 'No collection {name}', { name }))
+    throw new UnknownCollectionError(wording('cms.store.noCollection', 'No collection {name}', { name }))
 
   return found
 }
@@ -671,7 +674,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     plan = await pointings(collection, ref, slug)
   }
   catch (error) {
-    if (!(error instanceof UnreadReferrers))
+    if (!(error instanceof UnreadReferrersError))
       throw error
 
     const unread = error.names.length === 0 ? wording('cms.store.renameUnlisted', 'The collections could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug }) : wording('cms.store.renameUnread', '{names} could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug, names: error.names.join(', ') })
@@ -791,10 +794,10 @@ async function renameFile(collection: CollectionInfo, existing: StoredEntry, tar
   }
   catch (error) {
     // An entry naming this one was saved since it was read: the rename is tried again.
-    if (error instanceof SaveConflict && error.at !== undefined)
+    if (error instanceof SaveConflictError && error.at !== undefined)
       return refused(target, wording('cms.store.renameStale', 'An entry naming {slug} was saved while it was renamed: try again', { slug: existing.slug }), 'slug')
 
-    if (error instanceof SaveConflict)
+    if (error instanceof SaveConflictError)
       return { ...refused(target, error.message), ...error.creating || error.current === undefined ? {} : { conflict: { version: error.current } } }
 
     if (!(error instanceof ForgeError))
@@ -878,7 +881,7 @@ async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit
     return { commit: await settings().files.save(change) }
   }
   catch (error) {
-    if (error instanceof SaveConflict)
+    if (error instanceof SaveConflictError)
       return { ...refused(ref, error.message), ...error.creating || error.current === undefined ? {} : { conflict: { version: error.current } } }
 
     if (!(error instanceof ForgeError))

@@ -6,7 +6,7 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
-import { escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
+import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -64,7 +64,7 @@ export interface MailerOptions {
   logRecipients?: boolean | undefined
   // Names each mail's subject in the log, which says `A mail` otherwise: a subject can hold a visitor's name or an organization's.
   logSubjects?: boolean | undefined
-  // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
+  // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
 
@@ -76,8 +76,9 @@ export function wasLogged(error: unknown): boolean {
 }
 
 // Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.
-export class MailNotConfigured extends Error {
-  override name = 'MailNotConfigured'
+export class MailNotConfiguredError extends Error {
+  override readonly name = 'MailNotConfiguredError'
+  readonly code = 'mail-not-configured'
 
   constructor(readonly missing: string[]) {
     super(`${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0]} must be set to send mail`)
@@ -85,7 +86,7 @@ export class MailNotConfigured extends Error {
 }
 
 export type Mailer = Elysia & {
-  // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfigured`.
+  // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
   configured: boolean
   // Renders the message and sends it now, throwing when the server refuses it or cannot be reached.
   send: <P extends object>(message: Message<P>) => Promise<Delivery>
@@ -236,10 +237,10 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
   if ((env.SMTP_USER === undefined) !== (env.SMTP_PASS === undefined))
-    throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+    throw configError('SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
 
   if ((env.SMTP_DKIM_SELECTOR === undefined) !== (env.SMTP_DKIM_PRIVATE_KEY === undefined))
-    throw new Error('kayjs-mail: SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
+    throw configError('SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
 
   // A `.env` file often holds the key on one line, its line breaks written `\\n`.
   const dkimKey = env.SMTP_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
@@ -324,7 +325,7 @@ export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtens
 export function mailer(options: MailerOptions = {}): Mailer {
   if (options.smtp !== undefined) {
     if (options.transport !== undefined)
-      throw new Error('kayjs-mail: mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
+      throw configError('mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
 
     // Even where mails go to the outbox, so a broken option fails in development rather than in production.
     checkOptions(options.smtp, 'mailer({ smtp })')
@@ -342,7 +343,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       defineEnv(s.Object({ SMTP_FROM: s.String({ pattern: SENDER }) }))
     }
     catch (error) {
-      throw new Error(`kayjs-mail: a mailer with a custom transport needs a sender in production: set \`from\` in mailer() or SMTP_FROM\n${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      throw configError(`a mailer with a custom transport needs a sender in production: set \`from\` in mailer() or SMTP_FROM\n${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
   }
 
@@ -366,14 +367,14 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const missing = [...configured?.missing() ?? [], ...senderless ? ['SMTP_FROM'] : [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
 
     if (missing.length > 0)
-      throw new MailNotConfigured(missing)
+      throw new MailNotConfiguredError(missing)
   }
 
   const render = async <P extends object>(message: Message<P>): Promise<Mail> => {
     const to = recipients(message)
 
     if (to === undefined)
-      throw new MailNotConfigured(['MAIL_TO'])
+      throw new MailNotConfiguredError(['MAIL_TO'])
 
     if (to.length === 0)
       throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)

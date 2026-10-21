@@ -1,6 +1,6 @@
 import type { AuthMail } from './auth'
 import { t } from 'kay/i18n'
-import { durationWords } from 'kay/library'
+import { configError, durationWords } from 'kay/library'
 import { isLinkKind, isNoticeKind } from './auth'
 
 export interface AuthWords {
@@ -23,7 +23,7 @@ export function authWords(mail: AuthMail): AuthWords {
   const { kind } = mail
 
   if (!isLinkKind(kind) && !isNoticeKind(kind))
-    throw new Error(`kayjs-mail: ${kind} is no kind of mail kayjs-auth sends`)
+    throw configError(`${kind} is no kind of mail kayjs-auth sends`)
 
   const of = (line: 'subject' | 'lead' | 'ending'): string => t(`mail.auth.${kind}.${line}`, { site: mail.site, email: mail.to, detail: mail.detail ?? '', what: t(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.

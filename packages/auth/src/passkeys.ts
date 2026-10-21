@@ -5,6 +5,7 @@ import type { PasskeyRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { localPath } from 'kay'
+import { configError } from 'kay/library'
 import { banned, homeOf } from './core'
 import { readDevice } from './device'
 import { report } from './events'
@@ -302,7 +303,7 @@ export function userHandle(userId: string): string {
 
 export function relyingParty(core: Core): Relying {
   if (!core.passkeys)
-    throw new Error('kayjs-auth: passkeys need `url`, the site\'s public origin, which names who they are made for')
+    throw configError('passkeys need `url`, the site\'s public origin, which names who they are made for')
 
   return core.passkeys
 }

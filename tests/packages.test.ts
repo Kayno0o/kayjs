@@ -217,12 +217,13 @@ describe('the naming conventions', () => {
   it('end the name of an error class a library exports with Error', () => {
     const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends (\w+)/g)].filter(([, name, base]) => base!.endsWith('Error') && !name!.endsWith('Error')).map(([, name]) => name!)
 
-    expect(drift(find, [
-      { library: 'cms', match: /^SaveConflict$/, issue: '#1684' },
-      { library: 'cms', match: /^UnreadReferrers$/, issue: '#1684' },
-      { library: 'cms', match: /^UnknownCollection$/, issue: '#1684' },
-      { library: 'mail', match: /^MailNotConfigured$/, issue: '#1684' },
-    ])).toEqual([])
+    expect(drift(find, [])).toEqual([])
+  })
+
+  it('give the error class a library exports a code, as kay\'s KayError carries one', () => {
+    const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends \w*Error \{\n([\s\S]*?)\n\}/g)].filter(([, , body]) => !(/\bcode\b/).test(body!)).map(([, name]) => name!)
+
+    expect(drift(find, [])).toEqual([])
   })
 })
 

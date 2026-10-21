@@ -166,7 +166,7 @@ export const ERRORS = {
   },
   'config-invalid': {
     group: 'build',
-    summary: 'A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold.',
+    summary: 'A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, a file store asked for what it does not hold, or an option of a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai) that it refuses at boot.',
     fix: { file: 'llms/project.md', heading: 'Project setup' },
   },
   'export-private-file': {

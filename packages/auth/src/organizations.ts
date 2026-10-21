@@ -3,7 +3,7 @@ import type { BareUser, Core } from './core'
 import type { RequestState } from './state'
 import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import type { Requirement } from './types'
-import { durationSeconds } from 'kay/library'
+import { configError, durationSeconds } from 'kay/library'
 import { publicUser } from './core'
 import { impersonatorOf, report } from './events'
 import { spend, typedKey } from './limits'
@@ -66,7 +66,7 @@ export function organizationsCore<OrgRole extends string, Role extends string>(o
     defaultRoles: [...options.defaultRoles ?? []],
     param: options.param ?? 'org',
     invitationPage: options.invitationPage,
-    invitationMaxAge: options.invitationMaxAge === undefined ? DEFAULT_INVITATION_MAX_AGE : durationSeconds(options.invitationMaxAge, 'organizations.invitationMaxAge', 'kayjs-auth'),
+    invitationMaxAge: options.invitationMaxAge === undefined ? DEFAULT_INVITATION_MAX_AGE : durationSeconds(options.invitationMaxAge, 'organizations.invitationMaxAge'),
   }
 }
 
@@ -126,10 +126,10 @@ export function organizationsOf(core: Core): { config: OrganizationsCore, store:
   const { organizations, members, invitations } = core.store
 
   if (!config)
-    throw new Error('kayjs-auth: organizations need the `organizations` option')
+    throw configError('organizations need the `organizations` option')
 
   if (!organizations || !members || !invitations)
-    throw new Error('kayjs-auth: the `organizations` option needs a store keeping organizations, members and invitations, as memoryStore and pgStore do')
+    throw configError('the `organizations` option needs a store keeping organizations, members and invitations, as memoryStore and pgStore do')
 
   return { config, store: { organizations, members, invitations } }
 }

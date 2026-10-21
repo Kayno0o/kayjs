@@ -2,6 +2,7 @@ import type { AnthropicOptions } from './anthropic'
 import type { Provider } from './types'
 import process from 'node:process'
 import { s } from 'kay'
+import { configError } from 'kay/library'
 import { defineEnv } from 'kay/server'
 import { anthropic } from './anthropic'
 import { fakeAi } from './fake'
@@ -51,18 +52,18 @@ export function choose(): Chosen {
   const kind = env.AI_PROVIDER ?? implied(base, anthropicKey, openaiKey)
 
   if (kind === undefined)
-    throw new Error('kayjs-ai: ANTHROPIC_API_KEY and OPENAI_API_KEY are both set; set AI_PROVIDER to anthropic or openai, or unset one')
+    throw configError('ANTHROPIC_API_KEY and OPENAI_API_KEY are both set; set AI_PROVIDER to anthropic or openai, or unset one')
 
   if (kind === 'none') {
     if (process.env.NODE_ENV === 'development')
       return { provider: fakeAi, model: fakeAi.model }
 
-    throw new Error('kayjs-ai: no provider is configured; set ANTHROPIC_API_KEY, OPENAI_API_KEY, or AI_BASE_URL for an OpenAI-compatible server such as Ollama')
+    throw configError('no provider is configured; set ANTHROPIC_API_KEY, OPENAI_API_KEY, or AI_BASE_URL for an OpenAI-compatible server such as Ollama')
   }
 
   if (kind === 'anthropic') {
     if (anthropicKey === undefined)
-      throw new Error('kayjs-ai: AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
+      throw configError('AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
 
     const options: AnthropicOptions = { apiKey: anthropicKey, ...base === undefined ? {} : { baseUrl: base } }
 

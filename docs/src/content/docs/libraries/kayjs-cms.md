@@ -588,7 +588,7 @@ Any `{ save(change) }` is a saver. `change` has the file's `repoPath`, its new `
 
 ```ts
 import type { FileSaver } from '@kaynooo/kayjs-cms'
-import { fileVersion, SaveConflict } from '@kaynooo/kayjs-cms'
+import { fileVersion, SaveConflictError } from '@kaynooo/kayjs-cms'
 
 const saver: FileSaver = {
   async save({ absolute, text, base }) {
@@ -596,7 +596,7 @@ const saver: FileSaver = {
     const current = await file.exists() ? fileVersion(await file.bytes()) : null
 
     if (base !== undefined && base !== current)
-      throw new SaveConflict(current)
+      throw new SaveConflictError(current)
 
     if (text === undefined)
       await file.delete()
@@ -608,11 +608,11 @@ const saver: FileSaver = {
 }
 ```
 
-`base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflict`, which the editor shows with its Keep my edits button.
+`base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflictError`, which the editor shows with its Keep my edits button.
 
 A saver may also have `move(move)`, which renames an entry's file. `move.from` and `move.to` hold the `repoPath` and `absolute` path of each, `move.text` is the text the file has at `to`, `move.base` is the version of `from`, and `move.message` and `move.author` are as in a save.
 
-It writes `to`, then removes `from`; `forgejo()` does both in one commit. It throws `SaveConflict` when `from` is at another version or gone, or when `to` exists (`new SaveConflict(undefined, true)`). `workingTree()` does it in place. A saver without `move` cannot rename entries.
+It writes `to`, then removes `from`; `forgejo()` does both in one commit. It throws `SaveConflictError` when `from` is at another version or gone, or when `to` exists (`new SaveConflictError(undefined, true)`). `workingTree()` does it in place. A saver without `move` cannot rename entries.
 
 ## The entries API
 

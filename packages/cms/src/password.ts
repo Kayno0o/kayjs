@@ -2,7 +2,7 @@ import type { Guard } from 'kay'
 import type { LazyGuard } from 'kay/library'
 import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
 import { guard } from 'kay'
-import { durationSeconds } from 'kay/library'
+import { configError, durationSeconds } from 'kay/library'
 import { wording } from 'kay/words'
 
 // The cookie holding a password sign-in: `<role>.<expires>.<signature>`, signed with a key made from that role's password.
@@ -41,20 +41,20 @@ export class Passwords {
   private lastIssued = 0
 
   constructor(passwords: Record<string, string>, maxAge: string | number, secret = '') {
-    this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`', 'kayjs-cms')
+    this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
     const entries = Object.entries(passwords)
 
     if (entries.length === 0)
-      throw new Error('kayjs-cms: `passwordGuard()` takes a password, or an object of passwords by role')
+      throw configError('`passwordGuard()` takes a password, or an object of passwords by role')
 
     for (const [role, password] of entries) {
       if (!ROLE.test(role))
-        throw new Error(`kayjs-cms: \`passwordGuard()\` names the role ${JSON.stringify(role)}; a role is letters, digits, \`_\` and \`-\``)
+        throw configError(`\`passwordGuard()\` names the role ${JSON.stringify(role)}; a role is letters, digits, \`_\` and \`-\``)
 
       // An unset environment variable reads as an empty string, which must not open the admin.
       if (typeof password !== 'string' || password.trim() === '')
-        throw new Error(`kayjs-cms: \`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
+        throw configError(`\`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
 
       this.digests.set(role, digest(password))
       // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed.

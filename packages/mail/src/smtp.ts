@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
-import { durationSeconds } from 'kay/library'
+import { configError, durationSeconds } from 'kay/library'
 
 // Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
 export interface DkimSettings {
@@ -52,7 +52,7 @@ export function checkKey(key: string, what: string): void {
     createPrivateKey(key)
   }
   catch {
-    throw new Error(`kayjs-mail: ${what} is no private key; it takes one in PEM, as 'openssl genrsa' writes it`)
+    throw configError(`${what} is no private key; it takes one in PEM, as 'openssl genrsa' writes it`)
   }
 }
 
@@ -74,7 +74,7 @@ export function nodemailerMessage(mail: Mail) {
 
 function positiveInteger(what: string, name: string, value: number | undefined): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1))
-    throw new Error(`kayjs-mail: ${what}'s ${name} is ${value}; it takes a whole number of at least 1`)
+    throw configError(`${what}'s ${name}`, value, 'a whole number of at least 1')
 }
 
 const WHOLE_NUMBER = /^\d+$/
@@ -113,18 +113,18 @@ export function rateFromText(text: string | undefined): { max: number, window: D
 // Throws naming `what` for a name, a timeout or a count that cannot be used, so one fails where it is given rather than at the first mail.
 export function checkOptions(settings: SmtpOverrides, what: string): number | undefined {
   if (settings.name !== undefined && !GREETING.test(settings.name))
-    throw new Error(`kayjs-mail: ${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
+    throw configError(`${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
 
   positiveInteger(what, 'maxConnections', settings.maxConnections)
   rateOf(settings.rateLimit, what)
 
-  return settings.timeout === undefined ? undefined : durationSeconds(settings.timeout, `${what}'s timeout`, 'kayjs-mail') * 1000
+  return settings.timeout === undefined ? undefined : durationSeconds(settings.timeout, `${what}'s timeout`) * 1000
 }
 
 // Sends over SMTP, connecting on the first mail rather than when made, so a module making one at import never opens a socket.
 export function smtp(settings: SmtpSettings): Transport {
   if ((settings.user === undefined) !== (settings.pass === undefined))
-    throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+    throw configError('SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
 
   if (settings.dkim !== undefined)
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')

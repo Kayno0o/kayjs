@@ -55,13 +55,16 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
 }
 
 // A collection that could hold references to the target failed to read, so the entries naming it are not all known. `names` is empty when the list of collections itself failed.
-export class UnreadReferrers extends Error {
+export class UnreadReferrersError extends Error {
+  override readonly name = 'UnreadReferrersError'
+  readonly code = 'unread-referrers'
+
   constructor(readonly names: string[]) {
     super(`${names.join(', ')} failed to read for the references to be found`)
   }
 }
 
-// The entries behind `referrersOf`, with their collection. `strict` throws an `UnreadReferrers` when a collection fails to read, instead of leaving it out.
+// The entries behind `referrersOf`, with their collection. `strict` throws an `UnreadReferrersError` when a collection fails to read, instead of leaving it out.
 export async function referrersWith(target: string, slugs: Iterable<string>, { strict = false }: { strict?: boolean } = {}): Promise<Map<string, Referrer[]>> {
   const wanted = new Set(slugs)
   const result = new Map<string, Referrer[]>()
@@ -78,7 +81,7 @@ export async function referrersWith(target: string, slugs: Iterable<string>, { s
     log.error(`the collections failed to read for the references to ${target}`, error)
 
     if (strict)
-      throw new UnreadReferrers([])
+      throw new UnreadReferrersError([])
 
     return result
   }
@@ -99,7 +102,7 @@ export async function referrersWith(target: string, slugs: Iterable<string>, { s
   }
 
   if (strict && unread.length > 0)
-    throw new UnreadReferrers(unread)
+    throw new UnreadReferrersError(unread)
 
   return result
 }

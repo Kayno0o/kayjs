@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto'
-import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from 'kay/library'
+import { configError, GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from 'kay/library'
 
 const KEY_BYTES = 32
 
@@ -18,7 +18,7 @@ export function deriveKeys(secret: string | string[]): Keys {
   const secrets = [secret].flat()
 
   if (weakSecrets(secrets))
-    throw new Error(`kayjs-auth: a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
+    throw configError(`a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
 
   const derive = (purpose: string) => secrets.map(value => Buffer.from(hkdfSync('sha256', value, '', `kayjs-auth ${purpose}`, KEY_BYTES)))
   const encryption = derive('encryption')

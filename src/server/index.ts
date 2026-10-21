@@ -9,7 +9,7 @@ import { bootFailure } from './dev'
 import { recordBootFailure, trackDevErrors } from './dev-errors'
 import { projectSource } from './source'
 
-export type { KayConfig, KayExtension } from '../config'
+export type { ExtensionProblem, KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
 export type { PreviewScope } from '../runtime/preview'
 export { s } from '../runtime/schema'

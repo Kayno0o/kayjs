@@ -27,7 +27,7 @@ it('asks for the summary', async () => {
 
 ## Errors
 
-`AiError` has a `kind`, a `status` when the provider answered, `retryAfter` (seconds) on a rate limit, `partial` (the text received) on a failure mid-reply and `fields` on a `schema` one:
+`AiError` has a `kind` (also its `code`), a `status` when the provider answered, `retryAfter` (seconds) on a rate limit, `partial` (the text received) on a failure mid-reply and `fields` on a `schema` one:
 
 | kind | when |
 | --- | --- |

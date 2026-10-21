@@ -3,6 +3,7 @@ import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
+import { configError } from 'kay/library'
 import { truncatedAddress } from './address'
 import { linkedUser } from './core'
 import { log } from './log'
@@ -242,7 +243,7 @@ function validDate(value: unknown): Date | null {
 
 function audit(core: Core): NonNullable<Core['store']['audit']> {
   if (!core.store.audit)
-    throw new Error('kayjs-auth: the `audit` option needs a store keeping an audit log, as memoryStore and pgStore do')
+    throw configError('the `audit` option needs a store keeping an audit log, as memoryStore and pgStore do')
 
   return core.store.audit
 }

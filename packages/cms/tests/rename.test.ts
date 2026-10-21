@@ -10,7 +10,7 @@ import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { knowRuntimeRules } from '../../../src/server/runtime-redirect-api'
-import { fileVersion, SaveConflict, workingTree } from '../src/files'
+import { fileVersion, SaveConflictError, workingTree } from '../src/files'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
@@ -376,7 +376,7 @@ describe('renaming an entry other entries refer to', () => {
         move: tree.move,
         async save(change) {
           if (change.repoPath.includes('engine'))
-            throw new SaveConflict('other')
+            throw new SaveConflictError('other')
 
           return tree.save(change)
         },

@@ -60,11 +60,11 @@ describe('credential rules', () => {
   })
 
   test('a range no value fits, or a bad limit, fails at boot naming it', () => {
-    expect(() => testApp({ rules: { password: { min: 20, max: 10 } } })).toThrow('kayjs-auth: rules.password.min is 20, over rules.password.max 10')
-    expect(() => testApp({ rules: { username: { min: 0 } } })).toThrow('kayjs-auth: rules.username.min is 0')
-    expect(() => testApp({ rules: { password: { max: 1.5 } } })).toThrow('kayjs-auth: rules.password.max is 1.5')
-    expect(() => testApp({ rules: { password: { max: 5000 } } })).toThrow('kayjs-auth: rules.password.max is 5000, over the 1024')
-    expect(() => testApp({ rules: { username: { max: 500 } } })).toThrow('kayjs-auth: rules.username.max is 500, over the 128')
+    expect(() => testApp({ rules: { password: { min: 20, max: 10 } } })).toThrow('kay: rules.password.min is 20, over rules.password.max 10')
+    expect(() => testApp({ rules: { username: { min: 0 } } })).toThrow('kay: rules.username.min is 0')
+    expect(() => testApp({ rules: { password: { max: 1.5 } } })).toThrow('kay: rules.password.max is 1.5')
+    expect(() => testApp({ rules: { password: { max: 5000 } } })).toThrow('kay: rules.password.max is 5000, over the 1024')
+    expect(() => testApp({ rules: { username: { max: 500 } } })).toThrow('kay: rules.username.max is 500, over the 128')
   })
 
   test('the island-side functions take the same rules, or features().rules, and default to the built-in ones', async () => {

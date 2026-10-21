@@ -49,7 +49,7 @@ describe('cms()', () => {
     expect(() => {
       if (typeof server === 'function')
         void server()
-    }).toThrow('kayjs-cms: a production server saves no edit to the working tree')
+    }).toThrow('kay: a production server saves no edit to the working tree')
   })
 
   test('boots a production server told where files go, and any server outside production', () => {
@@ -122,6 +122,24 @@ describe('cms() missing field kinds', () => {
     finally {
       await app.stop()
       warned.mockRestore()
+      registerCollections(before)
+    }
+  })
+
+  test('hands the same line to kay check, without starting the server', async () => {
+    const { check, server } = cms({ files: workingTree(), guard: () => undefined })
+    const { registerCollections } = await import('../../../src/content/edit')
+    const { setContentPlace } = await import('../../../src/content/load')
+    const config = await import('./fixture/src/content.config') as Record<string, unknown>
+    const before = registerCollections(Object.entries(config) as Parameters<typeof registerCollections>[0])
+
+    try {
+      setContentPlace(`${import.meta.dir}/fixture`, `${import.meta.dir}/fixture/src`)
+
+      expect(typeof server).toBe('function')
+      expect(await check!()).toEqual([{ message: 'no editor for the mood kind that products uses: add src/cms/fields/mood.kay, until then it is edited as JSON' }])
+    }
+    finally {
       registerCollections(before)
     }
   })

@@ -1,6 +1,6 @@
 import type { KayExtension } from 'kay/server'
 import type { CmsOptions } from './settings'
-import { serverRoot, underKayDev } from 'kay/library'
+import { configError, serverRoot, underKayDev } from 'kay/library'
 import { api } from 'kay/server'
 import { collectionInfo, collections } from './kay/content'
 import { hintProblems, missingKindLines } from './kinds'
@@ -16,6 +16,20 @@ export const API_PREFIX = 'cms'
 // Where a cms at the root prefix mounts its screens: a group, which adds nothing to a URL but keeps the screens' layout and guard from being the app's own at the top of the routes, where an app root layout would win over the cms's and the cms's would wrap and guard every page of the app.
 const ROOT_MOUNT = '/(admin)'
 
+// A body worded on a collection with none is a mistake to fix, so it stops the boot rather than logging; only the collections wording one are read for their body, as a loader runs for it.
+async function bodyProblem(): Promise<string | undefined> {
+  const worded = [...settings().layouts].filter(([, layout]) => layout.form?.body !== undefined).map(([name]) => name)
+
+  return bodylessLayout((await Promise.all(worded.map(async name => collectionInfo(name)))).filter(found => found !== undefined), settings().layouts)
+}
+
+// The lines naming a collection and a field path that the editor would misshow: a kind with no component, a hint or layout naming what the schema lacks, a `when` waiting for none.
+async function setupWarnings(): Promise<string[]> {
+  const listed = await collections({ counts: false })
+
+  return [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)]
+}
+
 // The one line an app adds to kay.config.ts. `editor` is the island kay renders at the end of every page in edit mode only.
 export function cms(options: CmsOptions = {}): KayExtension {
   const { prefix } = configure(options)
@@ -28,10 +42,16 @@ export function cms(options: CmsOptions = {}): KayExtension {
     // An editor's browser, marked once the guard let it into the screens, finds an "Edit this page" link on the pages it reads; any other browser loads nothing more than this line.
     ...options.pageLink !== false && { config: { head: [{ tag: 'script', props: { children: pageLinkLoader() } }] } },
     devTool: { module: `${import.meta.dir}/devTool.ts` },
+    // What the server logs or stops at as it listens, for `kay check` and the editor to show without one.
+    check: async () => {
+      const stop = await bodyProblem()
+
+      return [...stop === undefined ? [] : [{ message: stop, severity: 'error' as const }], ...(await setupWarnings()).map(message => ({ message }))]
+    },
     // Run as the server boots, never by `kay build` or `kay check`.
     server: () => {
       if (options.files === undefined && process.env.NODE_ENV === 'production')
-        throw new Error('kayjs-cms: a production server saves no edit to the working tree, which the next deploy replaces: set cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy')
+        throw configError('a production server saves no edit to the working tree, which the next deploy replaces: set cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy')
 
       if (options.guard === undefined && !underKayDev())
         log.warn('no cms({ guard }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ guard }) to let editors write')
@@ -40,9 +60,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
 
       // Once the server listens, the content config is registered.
       plugin.onStart(async () => {
-        const worded = [...settings().layouts].filter(([, layout]) => layout.form?.body !== undefined).map(([name]) => name)
-        // A body worded on a collection with none is a mistake to fix, so it stops the boot rather than logging; only those collections are read for their body, as a loader runs for it.
-        const problem = bodylessLayout((await Promise.all(worded.map(async name => collectionInfo(name)))).filter(found => found !== undefined), settings().layouts)
+        const problem = await bodyProblem()
 
         // A throw here would be an unhandled rejection of a hook nobody awaits, leaving the server up, so the process ends itself.
         if (problem !== undefined) {
@@ -51,9 +69,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
         }
 
         try {
-          const listed = await collections({ counts: false })
-
-          for (const line of [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)])
+          for (const line of await setupWarnings())
             log.warn(line)
         }
         catch (error) {

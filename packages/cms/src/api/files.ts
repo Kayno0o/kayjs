@@ -6,7 +6,7 @@ import { collections } from '../kay/content'
 import { MEDIA_FOLDER, mediaIndex, movedKeys, renameUpload, storeUpload } from '../media'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
-import { collectionNamed, UnknownCollection } from '../store'
+import { collectionNamed, UnknownCollectionError } from '../store'
 import { emptyFile, sizeOfPath, tooLarge } from '../upload-text'
 import { uploadBodyLimit, uploadFolder, uploadFolders, uploadRefusal, uploadRules } from '../uploads'
 
@@ -20,7 +20,7 @@ async function ownFolders(): Promise<Set<string>> {
 // Stores an upload public, in the folder every collection shares and named by its hash, and answers the path a page renders it from, which the field keeps, and the size of an image.
 // Read when kay mounts the route, as `cms()` has run by then and an import before it does not throw.
 export default api({ bodyLimit: uploadBodyLimit })
-  .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
+  .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
   .get('/rules', () => uploadRules())
   // The shared uploads and those an older release kept in the collection's folder, for a field to pick one again; `images` leaves out the others.

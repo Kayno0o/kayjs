@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { countEntries } from '../src/counts'
-import { fileVersion, ForgeError, SaveConflict } from '../src/files'
+import { fileVersion, ForgeError, SaveConflictError } from '../src/files'
 import { configure } from '../src/settings'
 import { contentVersion } from '../src/version'
 
@@ -109,7 +109,7 @@ void mock.module('../src/kay/content', () => content)
 // Imported once the mock is in place, so the store reads it.
 const { default: entriesApi } = await import('../src/api/entries')
 const { leavesPublication } = await import('../src/publishing')
-const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
+const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollectionError } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -173,9 +173,9 @@ describe('saveEntry', () => {
 
   test('refuses a save over someone else\'s, and one the forge failed, as an issue the editor shows', async () => {
     configure({ files: { save: async () => {
-      throw new SaveConflict()
+      throw new SaveConflictError()
     } } })
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })).toHaveProperty('issues.0.message', new SaveConflict().message)
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })).toHaveProperty('issues.0.message', new SaveConflictError().message)
 
     configure({ files: { save: async () => {
       throw new ForgeError(504, 'Forgejo did not answer within 15 s')
@@ -185,12 +185,12 @@ describe('saveEntry', () => {
 
   test('hands the editor the version another save left, to write over it, but none for a new entry whose slug is taken', async () => {
     configure({ files: { save: async () => {
-      throw new SaveConflict('f00d')
+      throw new SaveConflictError('f00d')
     } } })
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })).toMatchObject({ conflict: { version: 'f00d' } })
 
     configure({ files: { save: async () => {
-      throw new SaveConflict('f00d', true)
+      throw new SaveConflictError('f00d', true)
     } } })
     expect(await saveEntry({ collection: 'posts', slug: 'fresh', data: { title: 'Hi' } }, { create: true })).not.toHaveProperty('conflict')
   })
@@ -247,7 +247,7 @@ describe('saveEntry', () => {
   })
 
   test('throws for a collection kay does not list', async () => {
-    await expect(saveEntry({ collection: 'nope', slug: 'a', data: {} })).rejects.toBeInstanceOf(UnknownCollection)
+    await expect(saveEntry({ collection: 'nope', slug: 'a', data: {} })).rejects.toBeInstanceOf(UnknownCollectionError)
   })
 })
 
@@ -576,7 +576,7 @@ describe('moveEntry', () => {
   test('stops at the first save that is refused', async () => {
     stored.shelf = [place('shelf', 'a', 1), place('shelf', 'b', 2)]
     configure({ files: { save: async () => {
-      throw new SaveConflict('f00d')
+      throw new SaveConflictError('f00d')
     } } })
 
     expect(await moveEntry({ collection: 'shelf', slug: 'b' }, 'up')).toHaveProperty('issues.0.message')

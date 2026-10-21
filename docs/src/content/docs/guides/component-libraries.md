@@ -94,6 +94,7 @@ An extension may set these fields. Only `name` is required.
 - `staticFiles`: files a static export writes into the site, by path, for what the extension's server would otherwise serve, such as a script every page loads.
 - `layout`: one `.kay` layout, alone in its directory, wrapping every page outside the app's layouts. It renders its `slot` and then what the library mounts on every page, such as a toaster; its stylesheet comes before the app's, and a page setting `layouts: false` starts afresh without it.
 - `editor`: a `.kay` island rendered last on every page in edit mode.
+- `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.
 - `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
 

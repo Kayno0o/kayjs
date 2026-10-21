@@ -6,6 +6,7 @@ import type { CodedLink, CodeMode } from '../email'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
 import { resolve } from 'node:path'
+import { configError } from 'kay/library'
 import { pickLocale } from '../locale'
 
 export interface AuthPagesOptions {
@@ -177,7 +178,7 @@ function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyEl
   const auth = module.auth ?? module.default
 
   if (!auth)
-    throw new Error('kayjs-auth: the auth module exports no `auth`, the `createAuth` result')
+    throw configError('the auth module exports no `auth`, the `createAuth` result')
 
   return auth
 }
@@ -188,7 +189,7 @@ async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | und
   const auth = plugin?.[AUTH_OF]
 
   if (!auth)
-    throw new Error('kayjs-auth: the `server` of auth() is not the `plugin` of a `createAuth` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
+    throw configError('the `server` of auth() is not the `plugin` of a `createAuth` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
 
   return auth
 }

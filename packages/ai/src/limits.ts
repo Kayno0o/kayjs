@@ -3,7 +3,7 @@ import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { durationSeconds, keyedDigest, userOf } from 'kay/library'
+import { configError, durationSeconds, keyedDigest, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -104,7 +104,7 @@ function memoryFor(memories: Map<string, RateStore>, name: string): RateStore {
 
 function wholeNumber(value: unknown, what: string): number {
   if (!Number.isInteger(value) || (value as number) < 1)
-    throw new TypeError(`kayjs-ai: ${what} is ${String(value)}; it takes a whole number of at least 1`)
+    throw configError(what, value, 'a whole number of at least 1')
 
   return value as number
 }
@@ -118,16 +118,16 @@ function settingsOf({ rateLimit, limit: oldLimit, budget, key, visitor }: AiOpti
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
   if (chosenLimit !== undefined && chosenLimit !== false)
-    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window', 'kayjs-ai') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
+    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
 
   if (chosenBudget !== undefined && chosenBudget !== false) {
     if (chosenBudget.store !== undefined && chosenBudget.store.peek === undefined)
-      throw new TypeError('kayjs-ai: ai({ budget }).store has no peek(key), which the budget reads before an ask without counting it; add it or use memoryRates() or sqliteRates()')
+      throw configError('ai({ budget }).store has no peek(key), which the budget reads before an ask without counting it; add it or use memoryRates() or sqliteRates()')
 
     settings.budget = {
       tokens: wholeNumber(chosenBudget.tokens, 'ai({ budget }).tokens'),
       total: chosenBudget.total === undefined ? undefined : wholeNumber(chosenBudget.total, 'ai({ budget }).total'),
-      ms: durationSeconds(chosenBudget.window, 'ai({ budget }).window', 'kayjs-ai') * 1000,
+      ms: durationSeconds(chosenBudget.window, 'ai({ budget }).window') * 1000,
       store: chosenBudget.store ?? memoryFor(memories, 'budget'),
     }
   }

@@ -108,6 +108,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, from the registration 1.70 replaced |
 | `deprecated-identity-key` | warn | deprecated | A `kay-allow identity-key` comment or an `identity-key` entry in `lints`, from the lint dropped in 1.69 |
 | `deprecated-rate-limit` | warn | deprecated | `limit`, `visitor` and `limits` of kayjs-ai and kayjs-auth, now `rateLimit` and `key`, and kayjs-mail's `rateLimit: 5`, now `{ max, window }` |
+| `deprecated-renamed-export` | warn | deprecated | An import of `SaveConflict` or `MailNotConfigured`, renamed in 1.70 to end in `Error` |
 
 ## Errors
 
@@ -150,7 +151,7 @@ No level applies to an error and no `// kay-allow` comment reaches it. Errors ka
 | `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title. | [Draw a share card for a page](/essentials/styling-and-assets) |
 | `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](/essentials/styling-and-assets) |
 | `env-invalid` | build | The environment does not match its schema. | [Environment](/guides/sessions-and-guards) |
-| `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold. | [Project setup](/reference/cli) |
+| `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, a file store asked for what it does not hold, or an option of a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai) that it refuses at boot. | [Project setup](/reference/cli) |
 | `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](/guides/static-export) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](/essentials/head-and-seo) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](/reference/cli) |

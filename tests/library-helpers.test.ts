@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { createCipheriv, randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { acceptedLocales, checkAnswer, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, userOf, weakSecrets } from 'kay/library'
+import { acceptedLocales, asConfigError, checkAnswer, configError, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, userOf, weakSecrets } from 'kay/library'
 import { escape, escapeAttribute } from '../src/runtime/escape'
 
 const KEY = new Uint8Array(32).fill(7)
@@ -68,9 +68,19 @@ describe('kay/library', () => {
     expect(matchLocale(['en', 'fr'], ['de'])).toBeUndefined()
   })
 
-  it('names the library a wrong duration comes from', () => {
+  it('words a boot config error as kay does, with its code', () => {
+    expect(configError('cms({ pageSize })', 0, 'a positive whole number')).toMatchObject({ code: 'config-invalid', message: 'kay: cms({ pageSize }) is 0; it takes a positive whole number' })
+    expect(configError('mailer() takes smtp or transport, not both')).toMatchObject({ code: 'config-invalid', message: 'kay: mailer() takes smtp or transport, not both' })
+    expect(configError('a sender is missing', { cause: 'x' }).cause).toBe('x')
+    expect(() => asConfigError(() => {
+      throw new Error('kay: rules.min is 0')
+    })).toThrow(expect.objectContaining({ code: 'config-invalid', message: 'kay: rules.min is 0' }))
+  })
+
+  it('raises a library\'s wrong duration as a config-invalid KayError', () => {
     expect(durationSeconds('2m', 'retry')).toBe(120)
-    expect(() => durationSeconds('soon', 'retry', 'kayjs-mail')).toThrow(/^kayjs-mail:/)
+    expect(() => durationSeconds('soon', 'retry')).toThrow(/^kay: retry is 'soon'/)
+    expect(() => durationSeconds('soon', 'retry')).toThrow(expect.objectContaining({ code: 'config-invalid' }))
   })
 
   it('answers the user a library named for a request, the first to name one, and none for another request', async () => {

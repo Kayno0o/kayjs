@@ -7,7 +7,7 @@ import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
-import { durationSeconds, trackDetached } from 'kay/library'
+import { configError, durationSeconds, trackDetached } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, banned, homeOf, withBack } from './core'
@@ -40,13 +40,13 @@ export function tokenLifetimes(expires: EmailOptions['expires']): Record<TokenTy
   const unknown = Object.keys(expires ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
-    throw new Error(`kayjs-auth: email.expires.${unknown} is no link or code of kayjs-auth`)
+    throw configError(`email.expires.${unknown} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
     const wanted = expires?.[type]
 
     if (wanted !== undefined)
-      lifetimes[type] = durationSeconds(wanted, `email.expires.${type}`, 'kayjs-auth')
+      lifetimes[type] = durationSeconds(wanted, `email.expires.${type}`)
   }
 
   return lifetimes

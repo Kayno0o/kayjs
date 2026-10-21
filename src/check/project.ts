@@ -1,6 +1,7 @@
 // What `kay check` finds across the project beside each file's compile and type errors, shared with the editor, which reports it on save.
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { ExtensionProblem } from '../config'
 import type { CollectionFeed } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -14,7 +15,7 @@ import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, isRetiredLint, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
-import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
+import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
 import { configLocator } from './config-keys'
@@ -54,7 +55,7 @@ export interface ContentChecks {
 
 // The collections read, in a process of their own, and the props their entries give components written to the module tsgo types them in.
 export async function contentChecks(root: string, options: CheckOptions, memory?: ProbeMemory): Promise<ContentChecks> {
-  const content = await checkContent(root, options.content, options.site !== undefined, memory)
+  const content = await checkContent(root, options.content, options.site !== undefined, memory, options.extensions?.some(({ check }) => check !== undefined))
   const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
 
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
@@ -189,6 +190,11 @@ function problemsOf(root: string, problems: ContentProblem[] = []): CheckDiagnos
   return problems.map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message, ...problem.code !== undefined && { code: problem.code } }))
 }
 
+// What the extensions' `check` found, at kay.config.ts unless a problem names its file.
+function extensionProblemsOf(root: string, problems: ExtensionProblem[] = []): CheckDiagnostic[] {
+  return problems.map(({ message, file, severity, help }) => ({ file: resolve(root, file ?? CONFIG_FILE), line: 1, column: 1, message, severity: severity ?? 'warning', ...help !== undefined && { help } }))
+}
+
 // Each locale's messages against the default locale's, and the drafts they hold.
 async function checkMessages(root: string, { i18n: config, extensions = [], lints }: CheckOptions, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
   if (!config)
@@ -210,8 +216,8 @@ async function checkMessages(root: string, { i18n: config, extensions = [], lint
 }
 
 // The collections' entries that fail to compile or to match their schema, the components their entries use and the feeds they serve.
-export async function checkContent(root: string, config: string | undefined, site: boolean, memory?: ProbeMemory): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
-  if (config === undefined && !existsSync(projectPaths(root).content))
+export async function checkContent(root: string, config: string | undefined, site: boolean, memory?: ProbeMemory, extensionChecks = false): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
+  if (config === undefined && !extensionChecks && !existsSync(projectPaths(root).content))
     return { problems: [], uses: [], feeds: [] }
 
   const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', memory)
@@ -219,7 +225,7 @@ export async function checkContent(root: string, config: string | undefined, sit
   if ('failed' in read)
     return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [] }
 
-  return { problems: problemsOf(root, read.marked(PROBLEMS_MARKER)), uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [] }
+  return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [] }
 }
 
 // A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed, reported at its entry in kay.config.ts.

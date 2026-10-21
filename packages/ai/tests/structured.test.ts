@@ -126,9 +126,9 @@ describe('ask with a schema', () => {
   })
 
   it('asks for an object: a schema of any other shape throws at the call', () => {
-    expect(() => ask('x', { schema: s.String() as never })).toThrow(TypeError)
+    expect(() => ask('x', { schema: s.String() as never })).toThrow(expect.objectContaining({ code: 'config-invalid' }))
     expect(() => ask('x', { schema: s.Array(s.String()) as never })).toThrow('s.Object')
-    expect(() => ask('x', { schema: {} as never })).toThrow(TypeError)
+    expect(() => ask('x', { schema: {} as never })).toThrow(expect.objectContaining({ code: 'config-invalid' }))
   })
 
   it('refuses a record or an intersection, which a model would be told is empty', () => {
@@ -523,7 +523,7 @@ describe('limits around a structured reply', () => {
   })
 
   it('throws at the call for a maxInputChars that is no number', () => {
-    expect(() => ask('x', { schema: verdict, maxInputChars: 0 })).toThrow(TypeError)
+    expect(() => ask('x', { schema: verdict, maxInputChars: 0 })).toThrow(expect.objectContaining({ code: 'config-invalid' }))
   })
 })
 

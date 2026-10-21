@@ -78,7 +78,7 @@ export function resolveLimits(old: LimitsOption | undefined, given: LimitsOption
 function applyLimits(limits: Limits, option: LimitsOption | undefined, from: string): void {
   for (const [name, limit] of Object.entries(option ?? {}) as [keyof Limits, LimitOption | undefined][]) {
     if (limit)
-      limits[name] = { max: limit.max, window: durationSeconds(limit.window, `${from}.${name}.window`, 'kayjs-auth') }
+      limits[name] = { max: limit.max, window: durationSeconds(limit.window, `${from}.${name}.window`) }
   }
 }
 

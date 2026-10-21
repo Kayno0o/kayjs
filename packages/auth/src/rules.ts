@@ -76,7 +76,7 @@ function limit(value: number | undefined, fallback: number, name: string): numbe
     return fallback
 
   if (!Number.isInteger(value) || value < 1)
-    throw new Error(`kayjs-auth: rules.${name} is ${value}, a whole number of at least 1`)
+    throw new Error(`kay: rules.${name} is ${value}, a whole number of at least 1`)
 
   return value
 }
@@ -87,16 +87,16 @@ export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
   const username = { min: limit(rules.username?.min, USERNAME_MIN_LENGTH, 'username.min'), max: limit(rules.username?.max, USERNAME_MAX_LENGTH, 'username.max') }
 
   if (password.max > FORM_PASSWORD_MAX)
-    throw new Error(`kayjs-auth: rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
+    throw new Error(`kay: rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
 
   if (username.max > FORM_USERNAME_MAX)
-    throw new Error(`kayjs-auth: rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
+    throw new Error(`kay: rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
 
   if (password.min > password.max)
-    throw new Error(`kayjs-auth: rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
+    throw new Error(`kay: rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
 
   if (username.min > username.max)
-    throw new Error(`kayjs-auth: rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
+    throw new Error(`kay: rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
 
   return { password, username }
 }

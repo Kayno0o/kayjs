@@ -1,5 +1,6 @@
 import type { Action } from 'kay'
 import type { TestSite, Visit } from 'kay/test'
+import { configError } from 'kay/library'
 import { HINT_COOKIE } from './page-link'
 import { activePasswords, SESSION_COOKIE } from './password'
 import { settings } from './settings'
@@ -17,7 +18,7 @@ async function passwordsOf(site: Pick<TestSite, 'cookies' | 'fetch'>) {
   const passwords = activePasswords()
 
   if (!passwords)
-    throw new Error('kayjs-cms: the site\'s `cms({ guard })` is not a `passwordGuard()`')
+    throw configError('the site\'s `cms({ guard })` is not a `passwordGuard()`')
 
   return passwords
 }
@@ -29,7 +30,7 @@ export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, rol
   const chosen = role ?? (roles.length === 1 ? roles[0] : undefined)
 
   if (chosen === undefined || !roles.includes(chosen))
-    throw new Error(`kayjs-cms: cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
+    throw configError(`cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
 
   const cookie = passwords.issue(chosen, false)
 

@@ -384,6 +384,16 @@ export interface I18nConfig {
   messages?: string | undefined
 }
 
+// A problem an extension finds in how the app configured it, shown by `kay check` and the editor beside kay's own.
+export interface ExtensionProblem {
+  message: string
+  // The file it is found in, absolute or relative to the project root; `kay.config.ts` by default.
+  file?: string | undefined
+  // `'warning'` by default.
+  severity?: 'warning' | 'error' | undefined
+  help?: string | undefined
+}
+
 // What a library hands the app to list in `extensions`: pages it serves, the texts they show, the config it needs and the server plugin they run on, as if they were the app's own.
 export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
@@ -417,6 +427,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   devTool?: { module: string } | undefined
   // Commands it adds to `kay`, by a name of one word or more, `{ 'i18n translate': `${import.meta.dir}/translate.ts` }`: each a module, absolute or relative to the project root, whose default export is a `KayCommand` from `kay/library`, loaded only when it runs or `kay --help` lists it. A name kay has, or one another extension gives, stops the command.
   commands?: Record<string, string> | undefined
+  // Called by `kay check` and the editor, with the content config read and its collections registered, in place of running `server`: returns the problems with how the app configured the extension that the server would otherwise only log or refuse once it listens. Name the collection and the field path in each message.
+  check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
 }

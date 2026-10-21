@@ -10,6 +10,9 @@ export const USES_MARKER = 'kay-content-uses:'
 // Starts the line `kay check` reads the collections' feeds from, which it claims their paths for as the server does.
 export const FEEDS_MARKER = 'kay-content-feeds:'
 
+// Starts the line `kay check` reads the problems the extensions' `check` found from.
+export const EXTENSIONS_MARKER = 'kay-extension-problems:'
+
 // A collection's feed, by the collection's name.
 export interface CollectionFeed {
   collection: string

@@ -44,7 +44,7 @@ export interface TokenOptions<Scope extends string = string> {
 // The seconds a token lives, undefined for a value that is no positive duration.
 function expirySeconds(expiresIn: Duration): number | undefined {
   try {
-    return durationSeconds(expiresIn, 'expiresIn', 'kayjs-auth')
+    return durationSeconds(expiresIn, 'expiresIn')
   }
   catch {
     return undefined

@@ -196,7 +196,7 @@ describe('organizations', () => {
       expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(2 * 24 * 60 * 60 * 1000)
     }
 
-    await expect(setup({ invitationMaxAge: 'soon' as Duration })).rejects.toThrow('kayjs-auth: organizations.invitationMaxAge is \'soon\'')
+    await expect(setup({ invitationMaxAge: 'soon' as Duration })).rejects.toThrow('kay: organizations.invitationMaxAge is \'soon\'')
   })
 
   test('invitations are listed for managers, replaced when sent again, revoked, declined and expire', async () => {

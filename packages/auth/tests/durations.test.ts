@@ -20,8 +20,8 @@ describe('time options take a Duration', () => {
       expect((await store.sessions.listByUser((await ada.json('/me') as { id: string }).id))[0]!.maxAge).toBe(45 * 24 * 60 * 60)
     }
 
-    expect(() => testApp({ rememberMaxAge: '3 weeks' as Duration })).toThrow('kayjs-auth: rememberMaxAge is \'3 weeks\'')
-    expect(() => testApp({ rememberMaxAge: 0 })).toThrow('kayjs-auth: rememberMaxAge is 0')
+    expect(() => testApp({ rememberMaxAge: '3 weeks' as Duration })).toThrow('kay: rememberMaxAge is \'3 weeks\'')
+    expect(() => testApp({ rememberMaxAge: 0 })).toThrow('kay: rememberMaxAge is 0')
   })
 
   test('a sub-second rememberMaxAge is stored as whole seconds, rounded up', async () => {
@@ -77,7 +77,7 @@ describe('time options take a Duration', () => {
     await ada.fetch('/sign-out', { method: 'POST' })
 
     expect((await store.audit!.list({ limit: 10 })).map(entry => entry.event)).toEqual(['signed-out'])
-    expect(() => testApp({ audit: { maxAge: 'a year' as Duration } })).toThrow('kayjs-auth: audit.maxAge is \'a year\'')
+    expect(() => testApp({ audit: { maxAge: 'a year' as Duration } })).toThrow('kay: audit.maxAge is \'a year\'')
   })
 
   test('a limit window takes a string, handed to the store in seconds, and a bad one names its limit', async () => {
@@ -108,7 +108,7 @@ describe('time options take a Duration', () => {
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     expect(windows).toContain(3 * 60 * 60)
     expect(windows).not.toContain(2 * 60 * 60)
-    expect(() => testApp({ limits: { signIn: { max: 1, window: '-5m' } } })).toThrow('kayjs-auth: limits.signIn.window is \'-5m\'')
+    expect(() => testApp({ limits: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: limits.signIn.window is \'-5m\'')
   })
 
   test('a token\'s expiresIn takes a string, and a bad one answers expiry', async () => {

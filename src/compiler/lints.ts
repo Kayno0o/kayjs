@@ -552,6 +552,15 @@ export const LINTS = {
     wrong: 'ai({ limit: { max: 10, window: \'1m\' }, visitor: request => request.headers.get(\'x-user\') ?? undefined })',
     right: 'ai({ rateLimit: { max: 10, window: \'1m\' }, key: request => request.headers.get(\'x-user\') ?? undefined })',
   },
+  'deprecated-renamed-export': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'An import of an export a library renamed in 1.70 so its error class ends in `Error`: `SaveConflict` of kayjs-cms is `SaveConflictError`, `MailNotConfigured` of kayjs-mail `MailNotConfiguredError`. The old name stays an alias three minors. The fix renames the import and its uses in the file. Found in the project\'s `.kay` files and scripts.',
+    wrong: 'import { MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfigured) retry()',
+    right: 'import { MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfiguredError) retry()',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

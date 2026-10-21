@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { configError } from 'kay/library'
 
 const COMMENT = /\/\*[\s\S]*?\*\//g
 const DECLARATION = /(?<![\w-])(--[\w-]+)\s*:([^;{}]*)/g
@@ -14,7 +15,7 @@ function read(path: string): string {
     return readFileSync(path, 'utf8')
   }
   catch {
-    throw new Error(`kayjs-mail: the mail settings take their colours from ${path}, which cannot be read; a server built with \`kay build --compile\` carries no source file, so import the stylesheet's text with \`with { type: 'text' }\` instead`)
+    throw configError(`the mail settings take their colours from ${path}, which cannot be read; a server built with \`kay build --compile\` carries no source file, so import the stylesheet's text with \`with { type: 'text' }\` instead`)
   }
 }
 
@@ -25,7 +26,7 @@ export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (
 
   // A string was a file's path before kayjs-mail 0.8, and a stylesheet declaring custom properties holds a rule.
   if (typeof stylesheet === 'string' && !RULE.test(css))
-    throw new Error(`kayjs-mail: the mail settings take their colours from ${JSON.stringify(css)}, which is no stylesheet; give its text, imported with \`with { type: 'text' }\`, or its file as a URL`)
+    throw configError(`the mail settings take their colours from ${JSON.stringify(css)}, which is no stylesheet; give its text, imported with \`with { type: 'text' }\`, or its file as a URL`)
 
   const declared = new Map<string, string>()
 
@@ -43,10 +44,10 @@ export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (
     const value = declared.get(property)
 
     if (value === undefined)
-      throw new Error(`kayjs-mail: ${[...seen, property].join(' -> ')} is not declared in ${named}`)
+      throw configError(`${[...seen, property].join(' -> ')} is not declared in ${named}`)
 
     if (seen.includes(property))
-      throw new Error(`kayjs-mail: ${[...seen, property].join(' -> ')} in ${named} refers to itself`)
+      throw configError(`${[...seen, property].join(' -> ')} in ${named} refers to itself`)
 
     return expand(value, [...seen, property])
   }
@@ -56,10 +57,10 @@ export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (
     const rgba = Bun.color(value, '[rgba]')
 
     if (rgba === null)
-      throw new Error(`kayjs-mail: ${property} in ${named} is ${value}, which is no colour`)
+      throw configError(`${property} in ${named} is ${value}, which is no colour`)
 
     if (rgba[3] !== OPAQUE)
-      throw new Error(`kayjs-mail: ${property} in ${named} is ${value}, a colour seen through, which mail clients show unevenly; give the mail an opaque one`)
+      throw configError(`${property} in ${named} is ${value}, a colour seen through, which mail clients show unevenly; give the mail an opaque one`)
 
     return Bun.color(value, 'hex')!
   }

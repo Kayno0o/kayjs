@@ -5,19 +5,19 @@ import { wording } from 'kay/words'
 import { authors } from '../authors'
 import { SINGLE_SLUG } from '../listing'
 import { withHold } from '../publishing'
-import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, shareLink, UnknownCollection, unpublishEntry } from '../store'
+import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, shareLink, UnknownCollectionError, unpublishEntry } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
 const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional(s.String()) })
 
 export default api()
-  .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
+  .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .get('/:collection', async ({ params }) => referenceChoices(params.collection))
   .get('/:collection/:slug', async ({ params, query, status }) => {
     const screen = await entryScreen({ collection: params.collection, slug: params.slug, locale: query.locale })
 
     if (!screen)
-      throw new UnknownCollection(wording('cms.store.noCollection', 'No collection {name}', { name: params.collection }))
+      throw new UnknownCollectionError(wording('cms.store.noCollection', 'No collection {name}', { name: params.collection }))
 
     if (screen.collection.problem !== undefined)
       return status(500, screen.collection.problem)

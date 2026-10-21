@@ -36,7 +36,7 @@ void mock.module('../src/kay/content', () => ({
   },
 }))
 
-const { referrersOf, referrersWith, missingReferences, UnreadReferrers } = await import('../src/references')
+const { referrersOf, referrersWith, missingReferences, UnreadReferrersError } = await import('../src/references')
 
 describe('referrersOf', () => {
   test('names the entries pointing at a slug through a field, a list or a group, in any collection', async () => {
@@ -74,7 +74,7 @@ describe('referrersWith, strict', () => {
     listing = false
 
     try {
-      await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toBeInstanceOf(UnreadReferrers)
+      await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toBeInstanceOf(UnreadReferrersError)
       await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toMatchObject({ names: [] })
       expect((await referrersWith('people', ['ada'])).size).toBe(0)
     }

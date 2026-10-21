@@ -1,7 +1,7 @@
 import type { DurationText } from 'kay'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { optionMs } from 'kay/library'
+import { configError, optionMs } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -32,7 +32,7 @@ export interface FileMove {
   author?: Identity | undefined
   // The version of the file at `from` the move is made from, as `fileVersion` gives it; undefined to move whatever is there. `to` must not exist yet.
   base?: string | undefined
-  // Other files rewritten in the same commit, the entries that named the renamed one. Each has a `base`, and one at another version refuses the whole move with a `SaveConflict` naming its path in `at`.
+  // Other files rewritten in the same commit, the entries that named the renamed one. Each has a `base`, and one at another version refuses the whole move with a `SaveConflictError` naming its path in `at`.
   also?: (FileChange & { text: string })[] | undefined
 }
 
@@ -42,8 +42,8 @@ export interface Commit {
 }
 
 // Where a folder entry's file goes once saved: a commit, or the working tree.
-// A saver given a `base` throws a `SaveConflict` when the file is no longer at that version.
-// `move` renames an entry's file; a saver without it refuses to rename entries. A move throws a `SaveConflict` when `from` is not at its `base`, is gone, or `to` exists.
+// A saver given a `base` throws a `SaveConflictError` when the file is no longer at that version.
+// `move` renames an entry's file; a saver without it refuses to rename entries. A move throws a `SaveConflictError` when `from` is not at its `base`, is gone, or `to` exists.
 // `together` says `move` writes the move's `also` files with it; without it the entries that named the renamed one are saved one by one after the move.
 export interface FileSaver {
   save: (change: FileChange) => Promise<Commit | undefined>
@@ -54,7 +54,10 @@ export interface FileSaver {
 // A save made from a version of the file another save has replaced since, or a new file where one already is.
 // `current` is the version the file is at, null once deleted, undefined when the saver could not tell.
 // `at` is the repository path of the file refused, when a move refuses one that is not the one moved.
-export class SaveConflict extends Error {
+export class SaveConflictError extends Error {
+  override readonly name = 'SaveConflictError'
+  readonly code = 'save-conflict'
+
   constructor(readonly current?: string | null, readonly creating = false, readonly at?: string) {
     super(creating ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : wording('cms.store.conflict', 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it'))
   }
@@ -69,7 +72,7 @@ export function fileVersion(bytes: Uint8Array | string): string {
 
 function checkBase(base: string | null | undefined, current: string | undefined, at?: string): void {
   if (base !== undefined && base !== (current ?? null))
-    throw new SaveConflict(current ?? null, base === null, at)
+    throw new SaveConflictError(current ?? null, base === null, at)
 }
 
 // The last write of each file in the working tree, which the next one waits for, so two saves never both pass the version check.
@@ -120,12 +123,12 @@ async function moveFile({ from, to, text, base, also = [] }: FileMove): Promise<
   const source = Bun.file(from.absolute)
 
   if (!await source.exists())
-    throw new SaveConflict(null)
+    throw new SaveConflictError(null)
 
   checkBase(base, fileVersion(await source.bytes()))
 
   if (await Bun.file(to.absolute).exists())
-    throw new SaveConflict(undefined, true)
+    throw new SaveConflictError(undefined, true)
 
   // Every version is checked before the first write, so a refused referrer leaves the tree as it was.
   for (const change of also) {
@@ -178,6 +181,9 @@ export interface ForgejoOptions {
 }
 
 export class ForgeError extends Error {
+  override readonly name = 'ForgeError'
+  readonly code = 'forge-refused'
+
   constructor(readonly status: number, message: string, options?: ErrorOptions) {
     super(message, options)
   }
@@ -203,12 +209,12 @@ function requireSecure(url: string): void {
   const parsed = URL.parse(url)
 
   if (parsed === null || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK.test(parsed.hostname))))
-    throw new Error(`kayjs-cms: forgejo url is '${url}', which must be https:, or http: on localhost`)
+    throw configError(`forgejo url is '${url}', which must be https:, or http: on localhost`)
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
 export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch: request = fetch }: ForgejoOptions): FileSaver {
-  const timeout = optionMs(wait, 'forgejo timeout', 'kayjs-cms')
+  const timeout = optionMs(wait, 'forgejo timeout')
 
   requireSecure(url)
   const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
@@ -238,7 +244,7 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     // Another save landed between the read and the commit.
     if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await response.clone().text())))
       // The read of the version the conflict reports has its own time, as the save's may be all but spent on the commit that was refused.
-      throw new SaveConflict(await conflictVersion(async () => currentSha(conflictAt, AbortSignal.timeout(timeout))), creating)
+      throw new SaveConflictError(await conflictVersion(async () => currentSha(conflictAt, AbortSignal.timeout(timeout))), creating)
 
     const { commit } = await answer<{ commit: { sha: string, html_url?: string } }>(response)
 
@@ -266,10 +272,10 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     checkBase(base, sha)
 
     if (sha === undefined)
-      throw new SaveConflict(null)
+      throw new SaveConflictError(null)
 
     if (taken !== undefined)
-      throw new SaveConflict(undefined, true)
+      throw new SaveConflictError(undefined, true)
 
     const files: object[] = [{ operation: 'delete', path: from.repoPath, sha }, { operation: 'create', path: to.repoPath, content: Buffer.from(text).toString('base64') }]
 
@@ -277,7 +283,7 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
       checkBase(change.base, held[i], change.repoPath)
 
       if (held[i] === undefined)
-        throw new SaveConflict(null, false, change.repoPath)
+        throw new SaveConflictError(null, false, change.repoPath)
 
       files.push({ operation: 'update', path: change.repoPath, sha: held[i], content: Buffer.from(change.text).toString('base64') })
     }
@@ -287,13 +293,13 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     }
     catch (error) {
       // The forge refuses the commit without saying which file it found changed: when it is not the moved one, a referrer saved since is named.
-      if (!(error instanceof SaveConflict) || error.at !== undefined || (error.current !== undefined && error.current !== sha))
+      if (!(error instanceof SaveConflictError) || error.at !== undefined || (error.current !== undefined && error.current !== sha))
         throw error
 
       const now = await Promise.all(also.map(async change => conflictVersion(async () => currentSha(change.repoPath, AbortSignal.timeout(timeout)))))
       const changed = also.findIndex((_, i) => now[i] !== undefined && now[i] !== held[i])
 
-      throw changed < 0 ? error : new SaveConflict(now[changed], false, also[changed]!.repoPath)
+      throw changed < 0 ? error : new SaveConflictError(now[changed], false, also[changed]!.repoPath)
     }
   }
 
@@ -305,7 +311,7 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
       return await run(AbortSignal.timeout(timeout), () => posted = true)
     }
     catch (error) {
-      if (error instanceof SaveConflict || error instanceof ForgeError)
+      if (error instanceof SaveConflictError || error instanceof ForgeError)
         throw error
 
       const unsure = posted ? ': the save may still have gone through, so check the repository before saving again' : ''

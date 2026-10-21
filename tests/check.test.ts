@@ -2969,32 +2969,76 @@ describe.concurrent('kay check, unused code', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
-
-  it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
+  it('shows the problems an extension\'s check finds in the config, without running its server', async () => {
     const root = await scratchProject({
-      'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
-      'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+      'kay.config.ts': 'const marker = new URL(\'./server-ran\', import.meta.url).pathname\nexport default {\n  extensions: [\n    { name: \'lib\', server: () => { require(\'node:fs\').writeFileSync(marker, \'\'); return new (require(\'elysia\').Elysia)() }, check: () => [{ message: \'posts: title has an x-kay hint to fix\' }, { message: \'posts: the layout names a field it lacks\', severity: \'error\', help: \'rename it\' }] },\n    { name: \'broken\', check: () => { throw new Error(\'boom\') } },\n  ],\n}\n',
+      'src/routes/index.kay': 'h1 Hi\n',
     })
 
     try {
-      const { output } = await runCheck(root)
+      const { code, output } = await runCheck(root)
 
-      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
-      expect(output).not.toContain('unknown-lint')
-      expect(output).not.toContain('no lint or group')
-      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
-      expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
-      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
-      expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+      expect(output).toContain('posts: title has an x-kay hint to fix')
+      expect(output).toContain('posts: the layout names a field it lacks')
+      expect(output).toContain('rename it')
+      expect(output).toContain('broken\'s check failed: boom')
+      expect(code).toBe(1)
+      expect(await Bun.file(join(root, 'server-ran')).exists()).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('reports an import of a renamed library export, and --fix renames the import and its uses, keeping an alias', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/mail.ts': 'import { mailer, MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nexport const refused = (error: unknown) => error instanceof MailNotConfigured\nexport const note = \'MailNotConfigured is a word\'\nexport const seen = (error: { MailNotConfigured?: boolean }) => error.MailNotConfigured\nexport { mailer }\n',
+      'src/save.ts': 'import type { SaveConflict as Conflict } from \'@kaynooo/kayjs-cms\'\n\nexport type Seen = Conflict\n',
+      'src/reexport.ts': 'import { SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n',
+      'src/other.ts': 'import { MailNotConfigured } from \'./mine\'\n\nexport const same = MailNotConfigured\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/reexport.ts')).text()).toBe('import { SaveConflictError as SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n')
+      expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe('import { mailer, MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nexport const refused = (error: unknown) => error instanceof MailNotConfiguredError\nexport const note = \'MailNotConfigured is a word\'\nexport const seen = (error: { MailNotConfigured?: boolean }) => error.MailNotConfigured\nexport { mailer }\n')
+      expect(await Bun.file(join(root, 'src/save.ts')).text()).toBe('import type { SaveConflictError as Conflict } from \'@kaynooo/kayjs-cms\'\n\nexport type Seen = Conflict\n')
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toContain('MailNotConfigured }')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
+  const root = await scratchProject({
+    'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
+    'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+  })
+
+  try {
+    const { output } = await runCheck(root)
+
+    expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
+    expect(output).not.toContain('unknown-lint')
+    expect(output).not.toContain('no lint or group')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
+    expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
+    await runCheck(root, '--fix')
+    expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
+    expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
     const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { mailer, smtp } from \'@kaynooo/kayjs-mail\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const sent = smtp({ host: \'mail.test\', rateLimit: 5 })\nexport const nested = mailer({ smtp: { rateLimit: 2 } })\nexport const done = smtp({ host: \'mail.test\', rateLimit: { max: 5, window: \'1s\' } })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'

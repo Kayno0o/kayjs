@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { scratchDir } from 'kay/test'
-import { fileVersion, ForgeError, forgejo, SaveConflict, workingTree } from '../src/files'
+import { fileVersion, ForgeError, forgejo, SaveConflictError, workingTree } from '../src/files'
 
 interface Sent {
   url: string
@@ -96,8 +96,8 @@ describe('forgejo', () => {
   test('refuses a change made from a version the branch no longer holds, and a new file the branch already holds', async () => {
     const { sent, saver } = forge({ 'content/posts/hello.md': 'b10b' })
 
-    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'a11ce' })).rejects.toBeInstanceOf(SaveConflict)
-    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: null })).rejects.toBeInstanceOf(SaveConflict)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'a11ce' })).rejects.toBeInstanceOf(SaveConflictError)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: null })).rejects.toBeInstanceOf(SaveConflictError)
     expect(sent.map(({ method }) => method)).toEqual(['GET', 'GET'])
 
     await saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'b10b' })
@@ -122,16 +122,16 @@ describe('forgejo', () => {
     const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.05 s')
-    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 50 as never })).toThrow('kayjs-cms: forgejo timeout is 50')
-    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kayjs-cms: forgejo timeout is \'soon\'')
+    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 50 as never })).toThrow('kay: forgejo timeout is 50')
+    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kay: forgejo timeout is \'soon\'')
   })
 
   test('refuses a plain http address outside localhost, since the token travels in every request', () => {
     const make = (url: string) => () => forgejo({ url, repo: 'me/site', token: 't0k' })
 
-    expect(make('http://git.example.com')).toThrow('kayjs-cms: forgejo url is \'http://git.example.com\'')
-    expect(make('git.example.com')).toThrow('kayjs-cms: forgejo url')
-    expect(make('ftp://git.example.com')).toThrow('kayjs-cms: forgejo url')
+    expect(make('http://git.example.com')).toThrow('kay: forgejo url is \'http://git.example.com\'')
+    expect(make('git.example.com')).toThrow('kay: forgejo url')
+    expect(make('ftp://git.example.com')).toThrow('kay: forgejo url')
     expect(make('http://localhost:3000')).not.toThrow()
     expect(make('http://127.0.0.1:3000')).not.toThrow()
     expect(make('http://[::1]:3000')).not.toThrow()
@@ -250,8 +250,8 @@ describe('workingTree', () => {
     const saver = workingTree()
 
     await saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'first', base: null })
-    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'again', base: null })).rejects.toBeInstanceOf(SaveConflict)
-    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'stale', base: fileVersion('older') })).rejects.toBeInstanceOf(SaveConflict)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'again', base: null })).rejects.toBeInstanceOf(SaveConflictError)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'stale', base: fileVersion('older') })).rejects.toBeInstanceOf(SaveConflictError)
     await saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'second', base: fileVersion('first') })
 
     expect(await Bun.file(absolute).text()).toBe('second')
@@ -279,22 +279,22 @@ describe('moving a file', () => {
   })
 
   test('forgejo refuses a move over a file at the new path, from a version that changed, or from a file that is gone', async () => {
-    const taken = await failureOf<SaveConflict>(forge({ 'content/posts/old.md': 'b10b', 'content/posts/new.md': 'beef' }).saver.move!(move))
+    const taken = await failureOf<SaveConflictError>(forge({ 'content/posts/old.md': 'b10b', 'content/posts/new.md': 'beef' }).saver.move!(move))
 
-    expect(taken).toBeInstanceOf(SaveConflict)
+    expect(taken).toBeInstanceOf(SaveConflictError)
     expect(taken.creating).toBe(true)
 
     const stale = forge({ 'content/posts/old.md': 'b10b' })
 
-    expect((await failureOf<SaveConflict>(stale.saver.move!({ ...move, base: 'other' }))).current).toBe('b10b')
+    expect((await failureOf<SaveConflictError>(stale.saver.move!({ ...move, base: 'other' }))).current).toBe('b10b')
     expect(stale.sent.some(request => request.method === 'POST')).toBe(false)
-    expect((await failureOf<SaveConflict>(forge({}).saver.move!(move))).current).toBeNull()
+    expect((await failureOf<SaveConflictError>(forge({}).saver.move!(move))).current).toBeNull()
   })
 
   test('forgejo reports a move another commit raced as a conflict', async () => {
     const { saver } = forge({ 'content/posts/old.md': 'b10b' }, Response.json({ message: 'sha does not match' }, { status: 422 }))
 
-    expect(await failureOf(saver.move!(move))).toBeInstanceOf(SaveConflict)
+    expect(await failureOf(saver.move!(move))).toBeInstanceOf(SaveConflictError)
   })
 
   test('the working tree moves the file, and refuses a taken path or a stale version', async () => {
@@ -304,7 +304,7 @@ describe('moving a file', () => {
 
     await Bun.write(join(dir, 'old.md'), 'before')
 
-    const stale = await failureOf<SaveConflict>(saver.move!({ ...move, from: at('old.md'), to: at('deep/new.md'), base: fileVersion('else') }))
+    const stale = await failureOf<SaveConflictError>(saver.move!({ ...move, from: at('old.md'), to: at('deep/new.md'), base: fileVersion('else') }))
 
     expect(stale.current).toBe(fileVersion('before'))
     expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(true)
@@ -314,8 +314,8 @@ describe('moving a file', () => {
     expect(await Bun.file(join(dir, 'deep/new.md')).text()).toBe('moved')
 
     await Bun.write(join(dir, 'other.md'), 'x')
-    expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('other.md'), to: at('deep/new.md') }))).creating).toBe(true)
-    expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('gone.md'), to: at('free.md') }))).current).toBeNull()
+    expect((await failureOf<SaveConflictError>(saver.move!({ ...move, from: at('other.md'), to: at('deep/new.md') }))).creating).toBe(true)
+    expect((await failureOf<SaveConflictError>(saver.move!({ ...move, from: at('gone.md'), to: at('free.md') }))).current).toBeNull()
   })
 
   test('forgejo commits the files that named the moved one in the same commit, and writes nothing when one changed', async () => {
@@ -326,7 +326,7 @@ describe('moving a file', () => {
     expect(sent.filter(each => each.method === 'POST')[0]?.body).toMatchObject({ files: [{ operation: 'delete' }, { operation: 'create' }, { operation: 'update', path: 'content/books/engine.md', sha: 'a1', content: Buffer.from('pointed').toString('base64') }] })
 
     const stale = forge({ 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a2' })
-    const conflict = await failureOf<SaveConflict>(stale.saver.move!({ ...move, also: [also] }))
+    const conflict = await failureOf<SaveConflictError>(stale.saver.move!({ ...move, also: [also] }))
 
     expect(conflict.at).toBe('content/books/engine.md')
     expect(stale.sent.filter(each => each.method === 'POST')).toEqual([])
@@ -337,12 +337,12 @@ describe('moving a file', () => {
     const files: Record<string, string> = { 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a1' }
     const referrer = forge(files, Response.json({ message: 'conflict' }, { status: 409 }), () => files['content/books/engine.md'] = 'a2')
 
-    expect((await failureOf<SaveConflict>(referrer.saver.move!({ ...move, also: [also] }))).at).toBe('content/books/engine.md')
+    expect((await failureOf<SaveConflictError>(referrer.saver.move!({ ...move, also: [also] }))).at).toBe('content/books/engine.md')
 
     const moved: Record<string, string> = { 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a1' }
     const own = forge(moved, Response.json({ message: 'conflict' }, { status: 409 }), () => moved['content/posts/old.md'] = 'b20b')
 
-    expect((await failureOf<SaveConflict>(own.saver.move!({ ...move, also: [also] }))).at).toBeUndefined()
+    expect((await failureOf<SaveConflictError>(own.saver.move!({ ...move, also: [also] }))).at).toBeUndefined()
   })
 
   test('forgejo reads the versions of a move and its referrers together, under the one timeout', async () => {
@@ -370,7 +370,7 @@ describe('moving a file', () => {
     await Bun.write(join(dir, 'old.md'), 'before')
     await Bun.write(join(dir, 'book.md'), 'book')
 
-    const stale = await failureOf<SaveConflict>(saver.move!({ ...move, from: at('old.md'), to: at('new.md'), also: [{ ...at('book.md'), text: 'pointed', message: 'm', base: fileVersion('else') }] }))
+    const stale = await failureOf<SaveConflictError>(saver.move!({ ...move, from: at('old.md'), to: at('new.md'), also: [{ ...at('book.md'), text: 'pointed', message: 'm', base: fileVersion('else') }] }))
 
     expect(stale.at).toBe('posts/book.md')
     expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(true)

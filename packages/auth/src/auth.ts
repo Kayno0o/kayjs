@@ -29,7 +29,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { asConfigError, configError, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -1282,7 +1282,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   if (core.forward) {
     if (!rootUsable(core))
-      throw new Error('kayjs-auth: forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts or `url` in createAuth')
+      throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts or `url` in createAuth')
 
     serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
   }
@@ -1504,7 +1504,7 @@ function withPluginOwner<Auth extends { plugin: object }>(auth: Auth): Auth {
 
 // The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.
 function wholeSeconds(value: Duration, what: string): number {
-  return Math.ceil(durationSeconds(value, what, 'kayjs-auth'))
+  return Math.ceil(durationSeconds(value, what))
 }
 
 // Seconds an account never verified is kept: only where unverified accounts cannot sign in, as one that can is an account in use.
@@ -1534,7 +1534,7 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
         return
 
       if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
-        throw new Error(`kayjs-auth: auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
+        throw configError(`auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
 
       if (own.home === undefined && given.home !== undefined)
         pages.home = given.home
@@ -1559,7 +1559,7 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
 }
 
 function noSecret(): never {
-  throw new Error('kayjs-auth: `secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
+  throw configError('`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
 }
 
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
@@ -1573,7 +1573,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const paths = pages && pagePaths(pages.prefix)
 
   if ((oauthApps.length > 0 || options.email) && url === undefined)
-    throw new Error('kayjs-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
+    throw configError('OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
 
   for (const [name, app] of oauthApps)
     oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
@@ -1590,7 +1590,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: resolveLimits(options.limits, options.rateLimit),
     rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
-    rules: resolveRules(options.rules),
+    rules: asConfigError(() => resolveRules(options.rules)),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     securityPage: paths?.security,
     locate: options.locate,
@@ -1659,12 +1659,12 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
     return undefined
 
   if (!pages || !options.store.oauth)
-    throw new Error('kayjs-auth: `oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryStore` and `pgStore` have')
+    throw configError('`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryStore` and `pgStore` have')
 
   const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
 
   if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
-    throw new Error('kayjs-auth: `oauthServer.defaultScopes` names a scope that `scopes` does not declare')
+    throw configError('`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
 
   return { fetchDocument: documentFetcher(typeof wanted === 'object' ? wanted.fetch : undefined), documents: new Map(), defaultScopes }
 }
@@ -1687,7 +1687,7 @@ function emailLinks(links: Partial<Record<LinkType, string>> | undefined, pages:
   const missing = LINK_TYPES.filter(type => merged[type] === undefined)
 
   if (missing.length > 0)
-    throw new Error(`kayjs-auth: email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
+    throw configError(`email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
 
   return merged as Record<LinkType, string>
 }

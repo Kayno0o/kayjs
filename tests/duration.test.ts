@@ -21,7 +21,7 @@ describe('durations', () => {
 
   it('refuses a string that is no duration for an option taking milliseconds, naming it', () => {
     for (const value of ['soon', '0ms', '-5s', '5', '5 ms', ''] as DurationText[])
-      expect(() => optionMs(value, 'wait', 'kayjs-cms')).toThrow(/^kayjs-cms: wait is '.*'; it takes a positive duration/)
+      expect(() => optionMs(value, 'wait')).toThrow(/^kay: wait is '.*'; it takes a positive duration/)
   })
 
   it('keeps the seconds of a fractional minute, hour or day exact, as headers carry them', () => {
@@ -45,7 +45,7 @@ describe('a bare number where milliseconds were taken', () => {
   it('is refused by durationMs and optionMs', () => {
     expect(() => durationMs(3000 as never)).toThrow('takes its unit')
     expect(() => optionMs(3000 as never, '`every` interval')).toThrow('`every` interval is 3000')
-    expect(() => optionMs(3000 as never, 'forgejo timeout', 'kayjs-cms')).toThrow('kayjs-cms: forgejo timeout is 3000')
+    expect(() => optionMs(3000 as never, 'forgejo timeout')).toThrow('kay: forgejo timeout is 3000')
   })
 })
 

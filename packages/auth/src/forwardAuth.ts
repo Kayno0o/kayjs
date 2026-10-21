@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { BareUser, Core } from './core'
+import { configError } from 'kay/library'
 import { siteRoot } from './authorize/metadata'
 import { homeOf } from './core'
 
@@ -36,14 +37,14 @@ export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefine
   const listed = (typeof domains === 'string' ? [domains] : domains).map(domain => domain.trim().toLowerCase())
 
   if (listed.length === 0)
-    throw new Error('kayjs-auth: `forwardAuth` needs at least one domain: `forwardAuth: \'example.com\'`')
+    throw configError('`forwardAuth` needs at least one domain: `forwardAuth: \'example.com\'`')
 
   for (const domain of listed) {
     const labels = domain.split('.')
     const parsed = labels.length > 1 && labels.every(label => label !== '') ? URL.parse(`https://${domain}`) : null
 
     if (parsed === null || parsed.hostname !== domain)
-      throw new Error(`kayjs-auth: \`forwardAuth\` domain '${domain}' is not a hostname such as 'example.com': no scheme, port or path, and at least two labels`)
+      throw configError(`\`forwardAuth\` domain '${domain}' is not a hostname such as 'example.com': no scheme, port or path, and at least two labels`)
   }
 
   return { domains: listed, requireTwoFactor }

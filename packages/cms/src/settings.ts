@@ -3,7 +3,7 @@ import type { ByteSize, LazyGuard } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout } from './kay/contract'
 import type { Action } from './roles'
-import { byteSize, lazily, optionMs } from 'kay/library'
+import { asConfigError, byteSize, configError, lazily, optionMs } from 'kay/library'
 import { workingTree } from './files'
 import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
@@ -117,16 +117,16 @@ let current: CmsSettings | undefined
 
 export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
-    throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
+    throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
 
   if (logo !== undefined && !LOGO.test(logo))
-    throw new Error(`kayjs-cms: \`cms({ logo })\` is ${JSON.stringify(logo)}; it takes a path of the site such as '/logo.svg', or an https URL`)
+    throw configError('`cms({ logo })`', logo, 'a path of the site such as \'/logo.svg\', or an https URL')
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections), history: checkHistory(history) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history) }
 
   return current
 }
@@ -138,9 +138,9 @@ function checkHistory(history: CmsOptions['history']): HistorySettings | undefin
   const { revisions = DEFAULT_REVISIONS, trash = DEFAULT_TRASH } = history ?? {}
 
   if (!Number.isInteger(revisions) || revisions < 1)
-    throw new Error(`kayjs-cms: \`cms({ history: { revisions } })\` is ${JSON.stringify(revisions)}; it takes a positive whole number of saves to keep per entry`)
+    throw configError('`cms({ history: { revisions } })`', revisions, 'a positive whole number of saves to keep per entry')
 
-  return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`', 'kayjs-cms') }
+  return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`') }
 }
 
 // The bytes `uploads.maxSize` stands for, whole and positive, else the default; a size that is none throws as kay.config.ts loads.
@@ -151,10 +151,10 @@ function uploadSize(maxSize: ByteSize | undefined): number {
   const bytes = byteSize(maxSize, '`cms({ uploads: { maxSize } })`')
 
   if (!Number.isInteger(bytes))
-    throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
+    throw configError(`\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
 
   if (bytes > LARGEST_MAX_SIZE)
-    throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
+    throw configError(`\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
 }
@@ -162,7 +162,7 @@ function uploadSize(maxSize: ByteSize | undefined): number {
 // What `cms()` in kay.config.ts was given.
 export function settings(): CmsSettings {
   if (!current)
-    throw new Error('kayjs-cms is not set up: list cms() in the extensions of kay.config.ts')
+    throw configError('cms() is not set up: list it in the extensions of kay.config.ts')
 
   return current
 }

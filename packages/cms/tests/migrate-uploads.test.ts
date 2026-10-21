@@ -9,7 +9,7 @@ import { registerCollections, registerEditSite } from '../../../src/content/edit
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { encodePng } from '../../../src/server/png'
 import { setupStorage } from '../../../src/server/storage'
-import { SaveConflict, workingTree } from '../src/files'
+import { SaveConflictError, workingTree } from '../src/files'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { MEDIA_FOLDER, mediaIndex, renameUpload } from '../src/media'
 import { migrateUploads } from '../src/migrate-uploads'
@@ -133,7 +133,7 @@ test('an entry changed since it was read keeps its older upload pending, and the
     if (refuse) {
       refuse = false
 
-      throw new SaveConflict('0'.repeat(40))
+      throw new SaveConflictError('0'.repeat(40))
     }
 
     return saver.save(change)

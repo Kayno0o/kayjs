@@ -45,7 +45,9 @@ export interface AiErrorDetails {
 
 export class AiError extends Error {
   override readonly name = 'AiError'
+  // The same as `code`, the name every error of kay and its libraries carries it under.
   readonly kind: AiErrorKind
+  readonly code: AiErrorKind
   readonly status: number | undefined
   readonly retryAfter: number | undefined
   // Which limit refused the ask, for a `limited` error.
@@ -59,6 +61,7 @@ export class AiError extends Error {
   constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }: AiErrorDetails = {}) {
     super(`kayjs-ai: ${message}`, { cause })
     this.kind = kind
+    this.code = kind
     this.status = status
     this.retryAfter = retryAfter
     this.partial = partial

@@ -42,7 +42,7 @@
 | `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title. | [Draw a share card for a page](images.md#draw-a-share-card-for-a-page) |
 | `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](images.md#responsive-images) |
 | `env-invalid` | build | The environment does not match its schema. | [Environment](environment.md#environment) |
-| `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold. | [Project setup](project.md#project-setup) |
+| `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, a file store asked for what it does not hold, or an option of a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai) that it refuses at boot. | [Project setup](project.md#project-setup) |
 | `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](prerendering.md#static-export) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](sitemap-search-fonts.md#site-search) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](project.md#project-setup) |

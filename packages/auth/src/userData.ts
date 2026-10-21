@@ -2,6 +2,7 @@ import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
 import { Buffer } from 'node:buffer'
 import { TypeCompiler } from 'elysia/type-system'
+import { configError } from 'kay/library'
 
 // What a user's app data is held to: the top-level fields the app's schema declares, and the schema's check.
 export interface UserDataRules {
@@ -16,7 +17,7 @@ export function userDataRules(schema: TSchema): UserDataRules {
   const properties = (schema as { properties?: Record<string, unknown> }).properties
 
   if (properties === undefined)
-    throw new Error('kayjs-auth: `user` is an object schema, such as `s.Object({ avatar: s.Optional(s.String()) })`')
+    throw configError('`user` is an object schema, such as `s.Object({ avatar: s.Optional(s.String()) })`')
 
   return { keys: Object.keys(properties), check: TypeCompiler.Compile(schema) }
 }

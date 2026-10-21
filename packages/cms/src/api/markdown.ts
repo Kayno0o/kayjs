@@ -3,7 +3,7 @@ import { api } from 'kay/server'
 import { bodyHtml, MarkdownError } from '../kay/content'
 import { setCodeAside } from '../preview-code'
 import { folderImage, imagesFromFolder } from '../preview-images'
-import { UnknownCollection } from '../store'
+import { UnknownCollectionError } from '../store'
 
 // Where bodyHtml stands a component, which the preview shows as the content it wraps; the sanitizer does not read a tag name with a hyphen, and a heading's anchor points nowhere in the screens.
 const COMPONENT_TAGS = /<kay-component\b[^>]*>|<\/kay-component>/g
@@ -15,7 +15,7 @@ const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attri
 
 // A Markdown text rendered by the site's own parser, for the editor's Preview: its structure, with a component shown as its content, code highlighted by the site's highlighter, and an image written as a path in the entry's folder shown from there. The HTML is sanitized, as it is shown inside the screens, which a `<script>` in a text must not run in; a link opens in a new tab so a click never leaves a draft.
 export default api()
-  .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
+  .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .post('/', async ({ body, status }) => {
     try {
       const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')

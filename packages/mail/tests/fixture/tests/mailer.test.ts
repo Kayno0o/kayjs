@@ -1,6 +1,6 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
-import { darkPalette, defaults, mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
+import { darkPalette, defaults, mailer, MailNotConfiguredError, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mail } from '../src/mail'
 import ContactForm from '../src/mails/contact-form.kay'
@@ -434,7 +434,7 @@ describe('configuration', () => {
     }
   })
 
-  it('lets an optional mailer boot without its settings, each send then throwing MailNotConfigured before anything is queued', async () => {
+  it('lets an optional mailer boot without its settings, each send then throwing MailNotConfiguredError before anything is queued', async () => {
     process.env.NODE_ENV = 'production'
     delete process.env.SMTP_HOST
     delete process.env.SMTP_FROM
@@ -453,8 +453,8 @@ describe('configuration', () => {
       refusal = error
     }
 
-    expect(refusal).toBeInstanceOf(MailNotConfigured)
-    expect((refusal as MailNotConfigured).missing).toEqual(['SMTP_HOST', 'SMTP_FROM'])
+    expect(refusal).toBeInstanceOf(MailNotConfiguredError)
+    expect((refusal as MailNotConfiguredError).missing).toEqual(['SMTP_HOST', 'SMTP_FROM'])
     await expect(optional.enqueue({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('SMTP_HOST and SMTP_FROM must be set to send mail')
     expect(await optional.drain()).toBe(0)
 
@@ -463,7 +463,7 @@ describe('configuration', () => {
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
   })
 
-  it('sends a mail naming no recipient to the mailer\'s own, `to` or else MAIL_TO, and throws MailNotConfigured naming MAIL_TO without one', async () => {
+  it('sends a mail naming no recipient to the mailer\'s own, `to` or else MAIL_TO, and throws MailNotConfiguredError naming MAIL_TO without one', async () => {
     delete process.env.MAIL_TO
 
     const team = mailer({ from: 'site@example.com', to: 'team@example.com', queue: { name: 'team-mail' } })

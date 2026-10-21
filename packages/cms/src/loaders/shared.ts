@@ -1,6 +1,6 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
 import { contentKey } from 'kay/content'
-import { durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
+import { configError, durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
 export interface SeedEntry {
@@ -45,7 +45,7 @@ export function tableOf(table: string | undefined): string {
   const name = table ?? DEFAULT_TABLE
 
   if (!IDENTIFIER.test(name))
-    throw new Error(`kayjs-cms: the loader's table ${JSON.stringify(name)} is not a plain identifier`)
+    throw configError(`the loader's table ${JSON.stringify(name)} is not a plain identifier`)
 
   return `"${name}"`
 }
@@ -108,7 +108,7 @@ const running = new Map<string, () => void>()
 
 // Looks at a `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit. Each process finds a change by itself, so the drop is not broadcast; one a save here or a broadcast from another process already dropped is taken as known, not found again. `force` asks for a reading even where the database says nothing moved. `scope` tells databases apart that hold collections of one name.
 export function watcher(name: string, scope: string, watch: LoaderOptions['watch'], fallback: string, signature: (force: boolean) => string | Promise<string>): Watcher {
-  const every = watch === false ? undefined : Math.min(MAX_INTERVAL_MS, Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`, 'kayjs-cms') * 1000))
+  const every = watch === false ? undefined : Math.min(MAX_INTERVAL_MS, Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`) * 1000))
   const id = `${scope}\u0000${name}`
   let known: string | undefined
   let timer: ReturnType<typeof setInterval> | undefined
