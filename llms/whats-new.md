@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.61.0
 
-- A library layout whose `page` sets `layouts: false` starts its own chain, and kayjs-cms's admin now does: it draws its own chrome (skip link, nav with Missing pages and Uploads, a link back to the site, `Content admin` in every title, `noindex`, kayjs-ui's theme in light or dark) instead of rendering inside the site's header and footer ([Libraries](component-libraries.md), [kayjs-cms](../packages/cms/llms/screens.md)).
+- kayjs-cms's admin sets `layouts: false` on its layout, which a library layout can do to start its own chain: it draws its own chrome (skip link, nav with Missing pages and Uploads, a link back to the site, `Content admin` in every title, `noindex`, kayjs-ui's theme in light or dark) instead of rendering inside the site's header and footer ([Libraries](component-libraries.md), [kayjs-cms](../packages/cms/llms/screens.md)).
 - `kay dev` follows a `.env` edit for a value that expands another (`A=$HOME/x`, `B=${A}`), which kept its first value, and the process loading `kay.config.ts` for the editor types reads the new `.env` values as the server does ([Dev server](dev-server.md)).
 - A post behind a proxy that ends TLS swaps its page in place: the redirect back is a path, so the browser no longer reads `http:` against its own `https:` and loads the page in full ([Actions](actions.md#forms)).
 - Edit mode in kayjs-cms marks every field a page renders from an entry, also one a component reads from data its page handed down (`Crew({...data})`), and each part of a mixed child like `{age} ans`: [Edit mode](content-cms.md#edit-mode).

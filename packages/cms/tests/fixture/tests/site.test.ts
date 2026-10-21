@@ -92,6 +92,7 @@ test('the admin\'s nav keeps every screen in view, marks the current one, and le
   expect(links.filter(link => 'aria-current' in link.attributes).map(link => link.text)).toEqual(['Unused uploads'])
   expect(page.find('a.kcms-admin-site')[0]?.attributes.href).toBe('/')
   expect((await site.visit('/fr/admin')).find('a.kcms-admin-site')[0]?.attributes.href).toBe('/fr')
+  expect((await site.visit('/admin/collections/posts/hello')).find('nav.kcms-admin-nav a').filter(link => 'aria-current' in link.attributes).map(link => link.text)).toEqual(['Content'])
   expect(page.find('a.kcms-skip')[0]?.attributes.href).toBe('#kcms-main')
   expect(page.find('main#kcms-main')).toHaveLength(1)
 })

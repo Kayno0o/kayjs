@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.61.0
 
+### kayjs-cms's admin leaves the site's layouts
+
+The screens no longer render inside the app's root layout, so the site's header, footer, CSS and `@theme` no longer reach them: they draw their own chrome with kayjs-ui's default theme, and kayjs-cms now lists `tailwindcss` as a peer. To keep the old look, write `src/routes/admin/_layout.kay` (at your prefix) without `layouts: false`, rendering the Content link, `Toaster` and `TooltipHost` and importing `@kaynooo/kayjs-cms/admin.css` ([kayjs-cms](../packages/cms/llms/screens.md)).
+
 ### kayjs-cms's delete confirmation names the entry
 
 `cms.entry.deleteMessage` takes `{title}` now, as `cms.table.deleteMessage` does, so the entry screen asks `Delete {title}?`. A catalog wording it without `{title}` still works but names no entry, and `kay check` reports the message as lacking `{title}` ([texts](../packages/cms/llms/words.md)). No deprecated lint is needed: no key is renamed, and `kay check` already finds the old text.

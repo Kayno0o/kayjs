@@ -310,7 +310,9 @@ The date and time input shows the time of the editor's own time zone, whatever t
 
 Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. The cms guard still runs before your page.
 
-The screens have a chrome of their own, with none of your site's layouts, header or footer around them: a skip link, a nav with Content, Missing pages and Unused uploads, a link back to the site, a title ending in `Content admin` (word `cms.admin.brand`), `noindex`, and the theme of kayjs-ui in light or dark as the device is. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
+The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
+
+There is no logo slot, so a logo means your own `_layout.kay`. The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 
 A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
 
