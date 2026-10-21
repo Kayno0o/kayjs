@@ -280,3 +280,30 @@
 .kcms-field select {
   padding-inline-start: calc(var(--spacing-kui-field-x) - 0.25rem);
 }
+
+.kcms-field[hidden] {
+  display: none;
+}
+
+/* A word before or after a control, such as a currency, beside it on one line. */
+.kcms-adorned {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kcms-adorned > .kui-field-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kcms-adorn {
+  flex: none;
+  color: var(--color-kui-subtext0);
+}
+
+/* A text given its rows starts at them and grows with what is typed. */
+textarea[data-kcms-grow] {
+  field-sizing: content;
+  min-height: calc(var(--kcms-rows) * 1lh + 1rem);
+}

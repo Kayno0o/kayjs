@@ -88,6 +88,7 @@ export default defineMessages({
     },
     field: {
       add: 'Ajouter',
+      counter: '{count} / {max}',
       invalidJson: '{field} n\'est pas du JSON valide',
       item: 'Élément {n}',
       noKind: 'Aucun éditeur pour le type {kind} : ajoutez src/cms/fields/{kind}.kay. En attendant, il se modifie en JSON.',

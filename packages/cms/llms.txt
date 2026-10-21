@@ -52,36 +52,9 @@ The screens fit a 375 px phone: no sideways scroll, lists stacked as cards, cont
 - `<prefix>/page?path=`: opens the page in edit mode.
 - A page of the app at a screen's path replaces it, and `<prefix>/_layout.kay` of the app replaces the cms's layout (its own chrome with a nav and a link back to the site, `Toaster`, `TooltipHost`, `@kaynooo/kayjs-cms/admin.css`); the screens set `layouts: false` and `noindex: true`, so the site's header, footer, layout CSS and head tags never reach them, their titles end in `Content admin` (`cms.admin.brand`), and words `cms.admin.skip`, `cms.admin.navigation`, `cms.admin.viewSite` are new; the parts the screens are made of are exported: see [Arranging and replacing the screens](llms/screens.md).
 
-## Field kinds of your own
-
-A field the admin should edit another way, a colour, a map point, a rating, is declared once in the schema and given a component, with nothing to register:
-
-```ts
-import { customField } from 'kay/content'
-
-s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))) })
-```
-
-```kay
----
-// src/cms/fields/color.kay
-import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
-
-const { value, onChange, label } = props<CustomFieldProps>()
----
-label {label}
-  input(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})
-```
-
-- The kind's name is the file's name in `src/cms/fields/`: the editor bundles every file there, so adding one needs no config. A file added or removed while `kay dev` runs is picked up on the next reload. A kind named like a built-in one (`text`, `textarea`, `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json`, `reference`) is refused by `customField`, as the built-in editor would win.
-- The component gets `CustomFieldProps`: `value` (`undefined` while unset), `onChange(next)`, `label`, `hint`, `issue` (why the last save refused it) and `required`. It renders in the admin form and in the editor on the page, in a list or a group too.
-- A save validates the value by the schema given to `customField` alone, so a `pattern`, a range or a union refuses a bad value as for any field; `customField` keeps the schema's own type.
-- A kind with no file there is edited as JSON, with a hint naming the file to add that shows in development and test only. The server logs a warning at boot for each such kind, naming the collections that use it, when the project has a `src` folder.
-- The list of entries shows a title, never a field, and the value on the page is read by the page as for any field.
-
 ## API
 
-- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea` (a string whose `maxLength` is over 120), `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json` (any shape without a control), `select` (an enum or a union of literals, with `options`, each `{ value, label, raw }`; a literal's `title` is its label: `s.Literal('new', { title: 'Nouveau' })`), `reference` (with `collection`), `list` (with `item`, `minItems`, `maxItems`; a list of single controls shows one label, then compact rows, a list of groups, lists or files heads each item with its own title (the first filled `text` field of a group, else `Item N` or the item schema's title) that folds it away; each item has up, down, duplicate and remove buttons, and Alt+Shift with an arrow key moves the item in focus (not from a textarea, where macOS selects a paragraph with it); a move is said to screen readers as `Moved {item} to {position} of {count}`, a numbered item named by the place it left; the list shows its item count and `minItems`/`maxItems`, Add and Duplicate stop at the maximum and Remove at the minimum; a new item starts as the item schema's `default`, else blank, a select staying unpicked; removing an item offers Undo, and focus lands on the item that took its place, or on the new item after Add) and `group` (with `fields`), and `custom` (with `name`, a kind the app's `customField` names). kay's `x-kay: { kind }` hint wins over the type. A `datetime` (an `s.Date()` is one) is shown and typed on the wall clock of the editor's browser zone (UTC on the server render and until the browser mounts), with a hint naming it, `Time in Europe/Paris`, and stores the instant it names as a full UTC date, so the entry says the same at any editor's zone; a time the zone's clocks skip is stored an hour on, as a `Date` reads it, and one they repeat at its first turn; clearing a date field stores nothing. A nullable field is optional. `s.Integer()`, `s.Numeric()`, `s.BooleanString()` and `s.Date()`, which accept a string too, are read as their plain kind.
+- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea`, `lines`, `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json`, `select` (an enum or a union of literals, with `options`, each `{ value, label, raw }`; a literal's `title` is its label), `reference` (with `collection`), `list` (with `item`, `minItems`, `maxItems`; a list of single controls shows one label, then compact rows, a list of groups, lists or files heads each item with its own title (the first filled `text` field of a group, else `Item N` or the item schema's title) that folds it away; each item has up, down, duplicate and remove buttons, and Alt+Shift with an arrow key moves the item in focus (not from a textarea, where macOS selects a paragraph with it); a move is said to screen readers as `Moved {item} to {position} of {count}`, a numbered item named by the place it left; the list shows its item count and `minItems`/`maxItems`, Add and Duplicate stop at the maximum and Remove at the minimum; a new item starts as the item schema's `default`, else blank, a select staying unpicked; removing an item offers Undo, and focus lands on the item that took its place, or on the new item after Add) and `group` (with `fields`), and `custom` (with `name`, a kind the app's `customField` names). kay's `x-kay: { kind }` hint wins over the type. A `datetime` (an `s.Date()` is one) is shown and typed on the wall clock of the editor's browser zone (UTC on the server render and until the browser mounts), with a hint naming it, `Time in Europe/Paris`, and stores the instant it names as a full UTC date, so the entry says the same at any editor's zone; a time the zone's clocks skip is stored an hour on, as a `Date` reads it, and one they repeat at its first turn; clearing a date field stores nothing. A nullable field is optional. `s.Integer()`, `s.Numeric()`, `s.BooleanString()` and `s.Date()`, which accept a string too, are read as their plain kind.
 - `fieldOf(key, schema, required)`: the one field a property's JSON Schema makes, as `fieldsOf` makes each, `key` a number for a list item (labelled `Item 1`, `Item 2`).
 - `humanize(key)`: a key as words for a label, `publishedAt` as `Published at`, an acronym keeping its capitals, `seoURL` as `Seo URL`, `_` and `-` only separating words, as the screens title a collection with no `title`.
 - `emptyValue(field)`: what a new list item starts as.
@@ -99,4 +72,5 @@ label {label}
 - [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions; an app's page at a screen's path; `createEntryForm` and the entry parts to build an entry screen
 - [Uploads and image fields](llms/uploads.md): what a file or image field does, the upload route and its limits, the picker, alt text and sizes kept beside an image, and the unused-uploads screen
 - [Edit this page link](llms/page-links.md): the link an editor's browser finds on each page, `pageLink: false`, a link of your own, and how an entry finds its page
+- [Field kinds and entering a field](llms/fields.md): `fieldInput` (placeholder, unit, rows, labels, lines, when), what the schema sets, `customField`
 - [Texts and languages](llms/words.md): the `cms.*` messages that word every text of the screens and the editor

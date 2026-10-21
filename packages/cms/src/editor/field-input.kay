@@ -17,6 +17,7 @@ import { wording } from 'kay/words'
 import { checkField, emptyValue, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
 import { sizeOfPath } from '../upload-text'
+import Adorned from './adorned.kay'
 import DatetimeInput from './datetime-input.kay'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
@@ -67,6 +68,36 @@ function set(next: unknown, typing = false): void {
 
   if (!typing)
     touched = true
+}
+
+// Emptying an optional text unsets it, as emptying a number does, instead of storing an empty string.
+function typed(next: string): void {
+  set(next === '' && !field.required ? undefined : next, true)
+}
+
+// A field waiting for a sibling shows once that holds a value.
+const parent = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : ''
+const filled = (found: unknown) => found !== undefined && found !== null && found !== '' && found !== false && !(Array.isArray(found) && found.length === 0)
+const shown = () => field.when === undefined || filled(drafts.value(entry, joinPath(parent, field.when)))
+
+// What a limited text says of its length.
+const counter = () => field.limits?.maxLength === undefined ? undefined : wording('cms.field.counter', '{count} / {max}', { count: text().length, max: field.limits.maxLength })
+
+// An integer takes digits and a minus: the keys that would write a decimal or an exponent are refused, and a pasted decimal is cut to its whole part.
+const NOT_INTEGER = new Set(['.', ',', 'e', 'E', '+'])
+
+function entered(next: number | null): void {
+  set(next === null ? undefined : field.kind === 'integer' ? Math.trunc(next) : next, true)
+}
+
+// The wheel over a focused number box changes its figure unasked: it leaves the box instead.
+function wheel(event: WheelEvent): void {
+  (event.currentTarget as HTMLInputElement).blur()
+}
+
+function digits(event: KeyboardEvent): void {
+  if (field.kind === 'integer' && NOT_INTEGER.has(event.key))
+    event.preventDefault()
 }
 
 const list = field.kind === 'list' ? field : undefined
@@ -234,11 +265,17 @@ function leaveJson(): void {
 }
 
 ---
-.kcms-field(data-kcms-path={path} id={fieldId(entry, `f:${path}`)})
+.kcms-field(data-kcms-path={path} id={fieldId(entry, `f:${path}`)} hidden={!shown()})
   const current = field
   match current.kind
     when 'boolean'
-      Toggle(label={current.label} checked={value() === true} onChange={set})
+      Toggle(label={current.label} checked={value() === true} aria-describedby={current.hint || issue() ? `kcms-note-${path}` : undefined} onChange={set})
+      if current.hint || issue()
+        .kui-form-field-issues(id={`kcms-note-${path}`} aria-live="polite")
+          if current.hint
+            span.kui-form-field-hint {current.hint}
+          if issue()
+            span.kui-form-field-issue {issue()}
     when 'list'
       FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
         .kcms-list(ref={element => box = element})
@@ -278,15 +315,19 @@ function leaveJson(): void {
       FormField.kcms-group(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for child of current.fields key={child.key}
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
-    when 'textarea'
+    when 'lines'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Textarea(rows="4" value={text()} onInput={next => set(next, true)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
+        Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={next => set(next.split('\n').map(line => line.trim()).filter(line => line !== ''), true)} onBlur={() => touched = true})
+    when 'textarea'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
+        Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} data-kcms-grow={current.rows === undefined ? undefined : ''} style={current.rows === undefined ? undefined : `--kcms-rows: ${current.rows}`} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        MarkdownEditor(value={text()} onInput={next => set(next, true)} onImage={async file => (await uploadFile(entry.collection, file)).path})
+        MarkdownEditor(value={text()} onInput={typed} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} value={text()} onInput={next => set(next ?? undefined, true)} onBlur={() => touched = true})
+        Adorned(prefix={current.prefix} suffix={current.suffix})
+          TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} inputmode={current.kind === 'integer' ? 'numeric' : 'decimal'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} placeholder={current.placeholder} value={text()} onInput={entered} onKeyDown={digits} onWheel={wheel} onBlur={() => touched = true})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="date" required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
@@ -309,5 +350,6 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
         Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     else
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(value={text()} onInput={next => set(next, true)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={current.limits?.pattern})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
+        Adorned(prefix={current.prefix} suffix={current.suffix})
+          TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={current.limits?.pattern})

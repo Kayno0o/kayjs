@@ -51,6 +51,27 @@ export interface FieldHint {
   [hint: string]: DataValue
 }
 
+// How a CMS enters a field, which `fieldInput(schema, options)` reports as `x-kay-input`: each option is the editor's own, the schema's keywords (`format`, `maxLength`, `minimum`, `enum`) already shaping the control.
+export interface FieldInputOptions {
+  // Shown in the empty control.
+  placeholder?: string | undefined
+  // Shown before and after a text or number control, such as a currency or a unit: a price of `600 €` is a number with `suffix: '€'`.
+  prefix?: string | undefined
+  suffix?: string | undefined
+  // A string field entered in a multi-line box of that many rows, growing with its text.
+  rows?: number | undefined
+  // The kind of input of a one-line string, which `format: 'email'` and `'uri'` already choose.
+  type?: 'text' | 'email' | 'url' | 'tel' | 'search' | undefined
+  // The label of each value of an `enum`, by value.
+  labels?: Record<string, string> | undefined
+  // A list of strings entered in one box, a line each.
+  lines?: boolean | undefined
+  // The field of a list's object items whose text heads an item.
+  titleField?: string | undefined
+  // A sibling field this one is shown only once it holds a value.
+  when?: string | undefined
+}
+
 // A collection's schema as JSON Schema, the keywords a CMS reads typed and the others kept, a field of a kind kay knows carrying `x-kay`.
 export interface JsonSchema {
   'type'?: string | string[] | undefined
@@ -65,7 +86,8 @@ export interface JsonSchema {
   'default'?: DataValue
   'format'?: string | undefined
   'x-kay'?: FieldHint | undefined
-  [keyword: string]: DataValue | JsonSchema | JsonSchema[] | Record<string, JsonSchema>
+  'x-kay-input'?: FieldInputOptions | undefined
+  [keyword: string]: DataValue | FieldInputOptions | JsonSchema | JsonSchema[] | Record<string, JsonSchema>
 }
 
 export interface CollectionInfo {
@@ -73,6 +95,8 @@ export interface CollectionInfo {
   name: string
   // The collection's `title`, which the screens show instead of the name humanized.
   title?: string | undefined
+  // The collection's `description`, which a CMS shows an editor above its entries and its form.
+  description?: string | undefined
   kind: 'folder' | 'loaded'
   // The schema as JSON Schema, a field of a kind kay knows carrying `x-kay: { kind, collection? }`.
   schema: JsonSchema
@@ -290,6 +314,11 @@ export function customField<Schema extends TSchema>(kind: string, schema: Schema
   return { ...schema, 'x-kay': { kind } }
 }
 
+// A field of any schema with options for how a CMS enters it: a placeholder, a prefix or suffix, the rows of a text, the labels of an enum, a list's title field, a sibling it waits for. Its kind and every other keyword are kept.
+export function fieldInput<Schema extends TSchema>(schema: Schema, options: FieldInputOptions): Schema {
+  return { ...schema, 'x-kay-input': options }
+}
+
 // A field of any schema whose value no other entry of the collection, of its locale in a localized one, holds: saving an entry that repeats it is refused.
 export function unique<Schema extends TSchema>(schema: Schema): Schema {
   return { ...schema, 'x-kay-unique': true }
@@ -317,7 +346,7 @@ export async function collectionInfo(name: string, { counts = true }: { counts?:
 }
 
 async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
-  const { draft, localized = false, order, publishAt, schema, title } = collection.options
+  const { description, draft, localized = false, order, publishAt, schema, title } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
   const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
   const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
@@ -325,6 +354,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
   return {
     name,
     ...title !== undefined && { title },
+    ...description !== undefined && { description },
     kind: dir === undefined ? 'loaded' : 'folder',
     schema: jsonSchema(schema),
     ...body && { body: { kind: 'markdown' } },

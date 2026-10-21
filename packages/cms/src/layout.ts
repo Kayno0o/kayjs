@@ -9,7 +9,7 @@ const ACTIONS = new Set<string>(ROW_ACTIONS)
 // What a field named `#body` stands for, and `body` too unless the schema has a data field of that name.
 export const BODY_ID = '#body'
 // The kinds a list can show in a cell: not those holding structure.
-const UNSHOWN = new Set<Field['kind']>(['list', 'group', 'json', 'custom'])
+const UNSHOWN = new Set<Field['kind']>(['list', 'lines', 'group', 'json', 'custom'])
 
 // The longest text a cell shows.
 export const CELL_LIMIT = 80

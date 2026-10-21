@@ -23,8 +23,8 @@ import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, writeBack } from './migrate'
 import { ContentError, decodeEntries, validEntries } from './validate'
 
-export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
-export { collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, unique, untranslated } from './edit'
+export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
+export { collectionInfo, collections, customField, entries, entryFile, entrySource, fieldInput, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
@@ -111,6 +111,8 @@ type DateField<Data> = { [Name in keyof Data]-?: Data[Name] extends Date | null 
 export interface CollectionOptions<Schema extends TSchema> {
   // The name a CMS screen titles the collection with, `Produits`; the export's name, humanized, when left out. The name still keeps the URLs, the markers and the upload folder.
   title?: string | undefined
+  // A line telling an editor what the collection holds, which a CMS shows above its entries and its form.
+  description?: string | undefined
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
   schema: Schema
   // Steps carrying stored entries over when the schema changes, each taking an entry's data in the shape it had and giving the new one: `[renameField('cost', 'price'), convertField('price', Number)]`. They run, in order, only on an entry the schema refuses, until it accepts it; a loader's entry that changed is written back through its `save` once, a folder's entry is migrated as read, the file kept until a CMS saves it. Write a step to leave data in the new shape as it is.

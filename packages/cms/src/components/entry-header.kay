@@ -17,4 +17,6 @@ header.kcms-entry-header
     h1.kcms-entry-name {title}
     if subtitle
       p.kcms-entry-subtitle {subtitle}
+    if collection.description
+      p.kcms-entry-subtitle {collection.description}
   slot

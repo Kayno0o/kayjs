@@ -104,6 +104,8 @@ export const produits = collection('src/content/produits', { schema, title: 'Pro
 
 The name keeps naming the collection's URL, its markers and its upload folder.
 
+A `description` option adds a line under the title, on the collection's list and on its entries, to tell an editor what the collection holds.
+
 ## A collection of one entry
 
 Some content is one entry, such as the texts of a home page. Declare the collection `single`, and the admin shows it as that page, not as a list of one row:
@@ -158,6 +160,26 @@ An array field is a list of items. A list of single values, such as strings, sho
 A new item starts from the `default` of the item's schema, and a select with no default stays unpicked.
 
 Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields, a multi-line text excepted. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
+
+## How a field is entered
+
+The schema already shapes each control. A string with `format: 'email'` or `'uri'` gets an input of that type and stays on one line, whatever its `maxLength`. A `maxLength` limits the box and shows a counter such as `12 / 254`. `minimum` and `maximum` set the limits of a number. An `integer` takes no decimal point, and the mouse wheel over a number box leaves it instead of changing the figure. Emptying an optional text unsets the field, and a toggle shows its description and its issue.
+
+For what a schema cannot say, wrap the field in `fieldInput()` from `kay/content`:
+
+```ts
+import { fieldInput } from 'kay/content'
+
+s.Object({
+  price: fieldInput(s.Number({ minimum: 0 }), { suffix: '€', placeholder: '600' }),
+  bio: fieldInput(s.String(), { rows: 6 }),
+  status: fieldInput(s.Union([s.Literal('draft'), s.Literal('live')]), { labels: { draft: 'Brouillon', live: 'En ligne' } }),
+  tags: fieldInput(s.Array(s.String()), { lines: true }),
+  linkLabel: fieldInput(s.Optional(s.String()), { when: 'link' }),
+})
+```
+
+The price is a number, stored as `600`, with the euro sign beside the box. `rows` makes a text a box of that many rows that grows as you type. `labels` names the values of an enum. `lines` enters a list of strings in one box, a line each. `when` shows a field only once a field next to it has a value; use it on an optional field. `placeholder`, `prefix`, `suffix` and `type` (`'tel'` say) shape a one-line box, and `titleField` names the field of a list's items that heads each one.
 
 ## Field kinds of your own
 

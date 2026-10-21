@@ -94,6 +94,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   setField: 'free',
   convertField: 'free',
   unique: 'free',
+  fieldInput: 'free',
   isPaginated: 'free',
   collections: 'request',
   collectionInfo: 'request',

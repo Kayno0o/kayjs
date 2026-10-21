@@ -26,6 +26,8 @@ PageSection(title={title} level={1})
   @actions
     if collection.problem === undefined
       Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" tone="accent")
+  if collection.description
+    p.kcms-entry-subtitle {collection.description}
   if collection.problem as problem
     EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
   else

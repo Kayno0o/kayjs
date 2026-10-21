@@ -601,3 +601,102 @@ test('an image field built without upload hints, as an app\'s own code may, work
   await settle()
   expect(drafts.value(ENTRY, 'tags')).toBe('')
 })
+
+const base = { hint: undefined, required: false }
+
+test('a text shows its placeholder, takes its prefix and suffix beside it and counts its length against maxLength', async () => {
+  const { root } = await openField({ ...base, key: 'tags', label: 'Price', kind: 'number', placeholder: '600', suffix: '€' }, undefined)
+  const input = root.querySelector<HTMLInputElement>('input')!
+
+  expect(input.placeholder).toBe('600')
+  expect(root.querySelector('.kcms-adorned')?.textContent?.trim()).toBe('€')
+
+  const mail = await openField({ ...base, key: 'tags', label: 'Mail', kind: 'text', inputType: 'email', maxLength: 254 }, 'a@b.fr')
+  const box = mail.root.querySelector<HTMLInputElement>('input')!
+
+  expect(box.type).toBe('email')
+  expect(box.maxLength).toBe(254)
+  expect(mail.root.textContent).toContain('6 / 254')
+})
+
+test('an integer refuses the keys of a decimal, cuts a pasted one and leaves the box on a wheel turn', async () => {
+  const { root, drafted } = await openField({ ...base, key: 'tags', label: 'Stock', kind: 'integer', min: 0 }, 3)
+  const input = root.querySelector<HTMLInputElement>('input')!
+  const key = new KeyboardEvent('keydown', { key: '.', bubbles: true, cancelable: true })
+
+  input.dispatchEvent(key)
+  expect(key.defaultPrevented).toBe(true)
+  expect(input.min).toBe('0')
+  expect(input.getAttribute('inputmode')).toBe('numeric')
+
+  input.value = '4.7'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(drafted()).toBe(4)
+
+  input.focus()
+  input.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true }))
+  expect(document.activeElement).not.toBe(input)
+})
+
+test('emptying an optional text unsets it, a required one keeping the empty string for the schema to refuse', async () => {
+  const optional = await openField({ ...base, key: 'tags', label: 'Note', kind: 'text' }, 'x')
+  const input = optional.root.querySelector<HTMLInputElement>('input')!
+
+  input.value = ''
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(optional.drafted()).toBe(null)
+  mounted?.unmount()
+
+  const required = await openField({ ...base, required: true, key: 'tags', label: 'Note', kind: 'text' }, 'x')
+  const box = required.root.querySelector<HTMLInputElement>('input')!
+
+  box.value = ''
+  box.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(required.drafted()).toBe('')
+})
+
+test('a text with rows is a growing textarea of that many rows, and a list of lines is one box a line each', async () => {
+  const text = await openField({ ...base, key: 'tags', label: 'Bio', kind: 'textarea', rows: 6 }, '')
+  const area = text.root.querySelector<HTMLTextAreaElement>('textarea')!
+
+  expect(area.getAttribute('rows')).toBe('6')
+  expect(area.hasAttribute('data-kcms-grow')).toBe(true)
+  mounted?.unmount()
+
+  const lines = await openField({ ...base, key: 'tags', label: 'Tags', kind: 'lines' }, ['a', 'b'])
+  const box = lines.root.querySelector<HTMLTextAreaElement>('textarea')!
+
+  expect(box.value).toBe('a\nb')
+  box.value = 'a\n\nb\n c '
+  box.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(lines.drafted()).toEqual(['a', 'b', 'c'])
+})
+
+test('a field with a `when` stays hidden until its sibling holds a value', async () => {
+  const group: Field = { ...base, key: 'tags', label: 'Link', kind: 'group', fields: [
+    { ...base, key: 'url', label: 'Url', kind: 'text' },
+    { ...base, key: 'label', label: 'Label', kind: 'text', when: 'url' },
+  ] }
+  const { root } = await openField(group, {})
+  const label = () => root.querySelector<HTMLElement>('[data-kcms-path="tags.label"]')!
+
+  expect(label().hidden).toBe(true)
+
+  const url = root.querySelector<HTMLInputElement>('[data-kcms-path="tags.url"] input')!
+
+  url.value = 'https://a.fr'
+  url.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(label().hidden).toBe(false)
+})
+
+test('a toggle keeps its hint and its issue', async () => {
+  const { root } = await openField({ ...base, key: 'tags', label: 'Featured', kind: 'boolean', hint: 'Shown on the home page' }, false)
+
+  expect(root.textContent).toContain('Shown on the home page')
+  expect(root.querySelector('input')!.getAttribute('aria-describedby')).toBe('kcms-note-tags')
+})

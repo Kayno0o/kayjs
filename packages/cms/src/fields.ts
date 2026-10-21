@@ -1,4 +1,4 @@
-import type { FieldHint, JsonSchema } from './kay/contract'
+import type { FieldHint, FieldInputOptions, JsonSchema } from './kay/contract'
 import { wording } from 'kay/words'
 
 // The limits a schema puts on a field's text or figure, which the control states as attributes and the form checks as it is typed.
@@ -18,6 +18,16 @@ interface FieldBase {
   // What the schema starts the field as, which a new list item takes.
   default?: unknown
   limits?: Limits | undefined
+  // How the control is entered, from the schema's keywords and the `fieldInput` options; absent when the schema says nothing.
+  placeholder?: string
+  prefix?: string
+  suffix?: string
+  // The type of a one-line text: `email` and `url` for those formats.
+  inputType?: 'text' | 'email' | 'url' | 'tel' | 'search'
+  // The rows a multi-line text starts at, which it grows from.
+  rows?: number
+  // The sibling this field waits for a value in.
+  when?: string
 }
 
 // `value` is what the select posts, `raw` what the entry holds, a number for a numeric enum.
@@ -43,7 +53,9 @@ export type Field
     | FieldBase & { kind: 'image' | 'file', upload?: UploadHints | undefined }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
-    | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined }
+    | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined, titleField?: string }
+    // A list of strings entered one per line.
+    | FieldBase & { kind: 'lines' }
     | FieldBase & { kind: 'group', fields: Field[] }
     // A kind the app names with `customField`, edited by `src/cms/fields/<name>.kay`.
     | FieldBase & { kind: 'custom', name: string }
@@ -53,6 +65,9 @@ type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' |
 const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'json'] satisfies Hinted[])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
+// The formats of a string that are a single line by nature, entered in an input of the type they name.
+const LINE_FORMATS: Record<string, FieldBase['inputType']> = { email: 'email', uri: 'url', url: 'url', hostname: 'text', uuid: 'text' }
+const MIN_ROWS = 2
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
 const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
 
@@ -110,6 +125,10 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     default: inner.default ?? schema.default,
     ...limits && { limits },
   }
+  const entering = enteringOf(inner, schema)
+
+  Object.assign(base, entering.base)
+
   const hint = inner['x-kay']
 
   if (hint?.kind === 'reference')
@@ -121,7 +140,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
   if (hint !== undefined)
     return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Hinted } : { ...base, kind: 'custom', name: hint.kind }
 
-  const options = choicesOf(inner)
+  const options = choicesOf(inner, entering.options.labels)
 
   if (options !== undefined)
     return { ...base, kind: 'select', options }
@@ -134,7 +153,10 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       if (inner.format === 'date-time')
         return { ...base, kind: 'datetime' }
 
-      return { ...base, kind: typeof inner.maxLength === 'number' && inner.maxLength > LONG_TEXT ? 'textarea' : 'text' }
+      if (entering.options.rows !== undefined && entering.options.rows >= MIN_ROWS)
+        return { ...base, kind: 'textarea', rows: entering.options.rows }
+
+      return { ...base, kind: base.inputType === undefined && typeof inner.maxLength === 'number' && inner.maxLength > LONG_TEXT ? 'textarea' : 'text' }
     case 'Date':
       return { ...base, kind: 'date' }
     case 'number':
@@ -145,7 +167,13 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       return { ...base, kind: 'boolean' }
     case 'array':
       // A tuple, items listed one schema per place, is edited as JSON.
-      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems) }
+      if (inner.items === undefined || Array.isArray(inner.items))
+        return { ...base, kind: 'json' }
+
+      if (entering.options.lines === true && typeOf(withoutNull(inner.items).schema) === 'string')
+        return { ...base, kind: 'lines' }
+
+      return { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems), ...entering.options.titleField !== undefined && { titleField: entering.options.titleField } }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     case undefined:
@@ -222,6 +250,22 @@ function matches(pattern: string, value: string): boolean {
   }
 }
 
+// What the schema's keywords and its `fieldInput` options say of how the control is entered, only what they say.
+function enteringOf(inner: JsonSchema, outer: JsonSchema): { base: Partial<FieldBase>, options: FieldInputOptions } {
+  const options = inner['x-kay-input'] ?? outer['x-kay-input'] ?? {}
+  const format = typeof inner.format === 'string' ? LINE_FORMATS[inner.format] : undefined
+  const entered: Record<string, unknown> = {
+    placeholder: options.placeholder,
+    prefix: options.prefix,
+    suffix: options.suffix,
+    inputType: options.type ?? format,
+    when: options.when,
+    rows: options.rows,
+  }
+
+  return { base: Object.fromEntries(Object.entries(entered).filter(([, value]) => value !== undefined)), options }
+}
+
 function bound(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined
 }
@@ -239,6 +283,11 @@ export function itemTitle(list: Field & { kind: 'list' }, value: unknown, index:
 
   if (list.item.kind !== 'group' || typeof value !== 'object' || value === null)
     return label
+
+  const named = list.titleField === undefined ? undefined : (value as Record<string, unknown>)[list.titleField]
+
+  if (typeof named === 'string' && named.trim() !== '')
+    return named.trim()
 
   for (const child of list.item.fields) {
     const text = child.kind === 'text' ? (value as Record<string, unknown>)[String(child.key)] : undefined
@@ -319,14 +368,16 @@ function withoutNull(schema: JsonSchema): { schema: JsonSchema, nullable: boolea
 }
 
 // A union of literals, or an enum, is picked from a list; a literal's `title` labels its option, the value staying what is stored.
-function choicesOf(schema: JsonSchema): Choice[] | undefined {
+function choicesOf(schema: JsonSchema, labels: Record<string, string> = {}): Choice[] | undefined {
+  const named = (value: unknown, fallback: string) => Object.hasOwn(labels, String(value)) ? labels[String(value)]! : fallback
+
   if (schema.enum)
-    return schema.enum.map(raw => ({ value: String(raw), label: String(raw), raw }))
+    return schema.enum.map(raw => ({ value: String(raw), label: named(raw, String(raw)), raw }))
 
   if (schema.anyOf?.every(variant => 'const' in variant) !== true)
     return undefined
 
-  return schema.anyOf.map(variant => ({ value: String(variant.const), label: variant.title ?? String(variant.const), raw: variant.const }))
+  return schema.anyOf.map(variant => ({ value: String(variant.const), label: named(variant.const, variant.title ?? String(variant.const)), raw: variant.const }))
 }
 
 // What a new list item starts as: the schema's default, else blank text, an unset number or select, an empty group or list.
@@ -343,6 +394,7 @@ export function emptyValue(field: Field): unknown {
     case 'custom':
       return undefined
     case 'list':
+    case 'lines':
       return []
     case 'group':
       return Object.fromEntries(field.fields.map(child => [child.key, emptyValue(child)]))

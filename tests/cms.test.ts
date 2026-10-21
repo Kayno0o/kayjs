@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, removeEntry, saveEntry } from '../src/content'
+import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, fieldInput, fileField, imageField, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -218,7 +218,7 @@ describe('the collections a CMS edits', () => {
 
     expect(found.map(each => each.name)).toEqual(['articles', 'news', 'notes', 'pages'])
     expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false, count: 2 })
-    expect(found[2]).toEqual({ name: 'notes', title: 'Notes de service', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, count: 2 })
+    expect(found[2]).toEqual({ name: 'notes', title: 'Notes de service', description: 'What the team needs to know before opening.', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, count: 2 })
     expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', count: 2 })
     expect(articles).not.toHaveProperty('title')
     expect(articles).not.toHaveProperty('repoRoot')
@@ -275,6 +275,15 @@ describe('the collections a CMS edits', () => {
     expect(TypeCompiler.Compile(color).Check('green')).toBe(false)
     expect(() => customField('a/b', t.String())).toThrow('names a kind outside letters')
     expect(() => customField('', t.String())).toThrow('names a kind outside letters')
+  })
+
+  it('reports how a field is entered as x-kay-input beside the schema it wraps, its kind and keywords kept', () => {
+    const price = fieldInput(t.Number({ minimum: 0 }), { suffix: '€', placeholder: '600' })
+
+    expect(JSON.parse(JSON.stringify(price))).toEqual({ 'type': 'number', 'minimum': 0, 'x-kay-input': { suffix: '€', placeholder: '600' } })
+    expect(TypeCompiler.Compile(price).Check(600)).toBe(true)
+    expect(TypeCompiler.Compile(price).Check(-1)).toBe(false)
+    expect(fieldInput(customField('color', t.String()), { when: 'tinted' })['x-kay']).toEqual({ kind: 'color' })
   })
 
   it('refuses a custom field kind named like a built-in one, listing them', () => {

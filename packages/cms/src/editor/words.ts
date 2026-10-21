@@ -30,6 +30,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.entry.unsaved',
   'cms.entry.viewLive',
   'cms.field.add',
+  'cms.field.counter',
   'cms.field.invalidJson',
   'cms.field.item',
   'cms.field.noKind',

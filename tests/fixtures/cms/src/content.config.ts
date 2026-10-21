@@ -39,4 +39,5 @@ export const notes = collection({
   schema: t.Object({ title: t.String() }),
   localized: true,
   title: 'Notes de service',
+  description: 'What the team needs to know before opening.',
 })
