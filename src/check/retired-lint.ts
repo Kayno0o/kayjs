@@ -12,6 +12,7 @@ import { walk } from './ast'
 const KAY_FILE = /\.kay$/
 const ALLOW = /\/\/[ \t]*kay-allow(?:-file)?[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
 const NAME = /[\w-]+/g
+const LEADING_COMMA = /^\s*,/
 
 interface Edit {
   start: number
@@ -91,7 +92,9 @@ function configEntries(source: string, name: string): { start: number, end: numb
 
       const next = properties[index + 1]
       const previous = properties[index - 1]
-      const edit = next === undefined && previous !== undefined ? { start: previous.end!, end: property.end!, text: '' } : { start: property.start!, end: next?.start ?? property.end!, text: '' }
+      // The only entry goes with its trailing comma, if any.
+      const lone = (/^\s*,/).exec(source.slice(property.end!))?.[0].length ?? 0
+      const edit = next === undefined && previous !== undefined ? { start: previous.end!, end: property.end!, text: '' } : { start: property.start!, end: next?.start ?? property.end! + lone, text: '' }
 
       found.push({ start: property.key.start!, end: property.end!, edit })
     }
