@@ -123,7 +123,7 @@ export async function denials(ctx: GuardContext): Promise<Denials> {
   return deniedTo(settings().roles === undefined ? undefined : await memberOf(ctx))
 }
 
-// The same for a request the api guard has read the person of (it does for every request when the app lists roles), as an API route has no guard context.
+// The same for a request the api guard has read the person of (it does for `/editor/can`, the one route that asks), as an API route has no guard context.
 export async function denialsOf(request: Request): Promise<Denials> {
   return deniedTo(await members.get(request))
 }
