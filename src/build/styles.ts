@@ -12,7 +12,9 @@ import { globbedFiles } from './glob'
 import { importsOf, libraryOf } from './libraries'
 
 const ABSOLUTE_URL = /^\//
-const FONT_FILE = /\.(?:woff2?|ttf|otf)$/i
+const FONT_FILE = /\.(?:woff2?|ttf|otf)(?:[?#].*)?$/i
+const FONT_SUFFIX = /[?#].*$/
+const URL_SCHEME = /^[a-z][\w+.-]*:/i
 // `import css from './x.css' with { type: 'text' }` and its dynamic form: the file's text, read by the module, which no stylesheet build follows.
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g
 const ANY = /.*/
@@ -164,9 +166,13 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
       build.onResolve({ filter: ABSOLUTE_URL }, ({ path, importer }) => CSS_FILE.test(importer) ? { path, external: true } : undefined)
       // A font a stylesheet names is written as an asset and linked, where the bundler would inline it as a data URL in every page's stylesheet.
       build.onResolve({ filter: FONT_FILE }, async ({ path, importer }) => {
-        const file = CSS_FILE.test(importer) ? resolveFrom(path, importer) : undefined
+        if (!CSS_FILE.test(importer) || URL_SCHEME.test(path))
+          return undefined
 
-        return file === undefined ? undefined : { path: await writeAsset(file, root, dist), external: true }
+        const suffix = FONT_SUFFIX.exec(path)?.[0] ?? ''
+        const file = resolveFrom(path.slice(0, path.length - suffix.length), importer)
+
+        return file === undefined || !statSync(file, { throwIfNoEntry: false })?.isFile() ? undefined : { path: `${await writeAsset(file, root, dist)}${suffix}`, external: true }
       })
     },
   }

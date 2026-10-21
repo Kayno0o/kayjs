@@ -186,11 +186,14 @@ function mapFix(entry: ShadowFile, fix: LintFix, classes: boolean): LintFix | un
   return fix.text.endsWith('\n') ? lineBroken(entry.source, span, fix.text) : { range: [span.start, span.end], text: fix.text }
 }
 
-// A fix ending on a line break leaves the new line to the indent rule, which fixes it in a later pass; here it takes the indentation of the line it breaks, in place of what already follows the break.
+// A fix ending on a line break that code follows indents it as the line it breaks, and takes the space that followed the break; a bare blank line is left as it is.
 function lineBroken(source: string, span: { start: number, end: number }, text: string): LintFix {
   const lineStart = source.lastIndexOf('\n', span.start - 1) + 1
   const indent = HORIZONTAL_SPACE.exec(source.slice(lineStart))![0]
   const following = HORIZONTAL_SPACE.exec(source.slice(span.end))![0]
+
+  if ((/^(?:\r?\n|$)/).test(source.slice(span.end + following.length)))
+    return { range: [span.start, span.end], text }
 
   return { range: [span.start, span.end + following.length], text: text + indent }
 }

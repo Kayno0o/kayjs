@@ -330,11 +330,11 @@ export default defineConfig({
 })
 ```
 
+A stylesheet that names font files, such as `import '@fontsource/inter/400.css'`, links each as an asset instead of inlining it into the CSS. `fonts` serves the same family in less CSS.
+
 The fallback is Arial or Roboto, Times New Roman or Noto Serif, or Courier New, whichever the device has, resized with `size-adjust` and the `ascent-override`, `descent-override` and `line-gap-override` that fit your font. A family with no Latin letters gets none. On Android a monospace family stays unfitted, as only Courier New is listed. Where kay does not rewrite the stack, such as a `style` element or an inline attribute, list `"Inter Fallback"` yourself.
 
 <Callout type="note">
-
-A stylesheet importing a font file, such as `import '@fontsource/inter/400.css'`, links each file it names as an asset, never inlined into the CSS, though `fonts` keeps the page's CSS smaller.
 
 Faces load once the page uses them. `preload: true` fetches one with the page, on a Fontsource entry too, but can hold back the first paint on a slow phone.
 

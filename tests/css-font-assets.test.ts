@@ -47,4 +47,25 @@ describe('a font file a stylesheet names', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('links a file named with a query or a hash, and leaves a remote one alone', async () => {
+    const dir = resolve(await fixtureCopy('cards'))
+
+    try {
+      await Bun.write(join(dir, 'src/routes/index.kay'), '---\nimport \'./icons.css\'\n---\nh1 Hello\n')
+      await Bun.write(join(dir, 'src/routes/icons.css'), '@font-face { font-family: A; src: url(../fonts/archivo-black-latin-400-normal.woff2?v=1) format("woff2"), url("../fonts/archivo-black-latin-400-normal.woff#iefix") format("woff"), url(https://fonts.example/remote.woff2) }\n')
+
+      const client = await buildClient(dir)
+      const sheet = [...client.styles.values()].find(url => url.includes('index'))!
+      const built = await Bun.file(join(client.dir, sheet.slice('/_kay/'.length))).text()
+
+      expect(built).not.toContain('data:')
+      expect(built).toMatch(/url\("?\/_kay\/assets\/archivo-black-latin-400-normal-\w+\.woff2\?v=1"?\)/)
+      expect(built).toMatch(/url\("?\/_kay\/assets\/archivo-black-latin-400-normal-\w+\.woff#iefix"?\)/)
+      expect(built).toContain('https://fonts.example/remote.woff2')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

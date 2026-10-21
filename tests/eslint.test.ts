@@ -608,13 +608,13 @@ describe('kay/eslint over a line a fix breaks in a fence', () => {
   const SERVER = '--- server\ntry {\n  await Promise.resolve()\n} catch (e) {\n  console.error(e)\n}\n---\np hi\n'
   const NESTED = '---\nfunction run() {\n  try {\n    go()\n  } catch (e) {\n    stop(e)\n  }\n}\n---\np hi\n'
 
-  async function fixed(text: string): Promise<string> {
+  async function fixed(text: string, rules: Record<string, unknown> = { 'style/brace-style': ['error', 'stroustrup'] }): Promise<string> {
     const { default: parser } = await tsParser
     const { default: plugin } = await stylistic
     const { ESLint } = await import('eslint')
     const overrideConfig = [
       { files: ['**/*.kay'], processor },
-      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: plugin }, rules: { 'style/brace-style': ['error', 'stroustrup'] } },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: plugin }, rules },
     ] as never
     const [result] = await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix: true }).lintText(text, { filePath: FILE })
 
@@ -624,6 +624,12 @@ describe('kay/eslint over a line a fix breaks in a fence', () => {
   it('indents the line a fix breaks as the line it breaks, at the top level and nested', async () => {
     expect(await fixed(SERVER)).toBe('--- server\ntry {\n  await Promise.resolve()\n}\ncatch (e) {\n  console.error(e)\n}\n---\np hi\n')
     expect(await fixed(NESTED)).toBe('---\nfunction run() {\n  try {\n    go()\n  }\n  catch (e) {\n    stop(e)\n  }\n}\n---\np hi\n')
+  })
+
+  it('leaves a blank line a fix inserts without indentation', async () => {
+    const text = '---\nfunction run() {\n  const a = 1\n  return a\n}\n---\np hi\n'
+
+    expect(await fixed(text, { 'style/padding-line-between-statements': ['error', { blankLine: 'always', prev: '*', next: 'return' }] })).toBe('---\nfunction run() {\n  const a = 1\n\n  return a\n}\n---\np hi\n')
   })
 
   it('leaves the indentation of code already broken alone', async () => {
