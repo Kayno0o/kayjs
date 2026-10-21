@@ -254,7 +254,7 @@ inBrowser('LineChart long axis labels', () => {
       expect(labels.filter(label => !label.inside || label.lines !== 1)).toEqual([])
     }
 
-    // An app's own offset wins: the axis keeps its 50 px and the labels may overflow it.
+    // An app's own offset wins: a label's box is the offset less 10 px, so 40, and the labels may overflow it.
     await page.waitFor('#long-axis-own .kui-line-chart-plot svg .ct-line')
     expect(await page.evaluate(() => Number(document.querySelector('#long-axis-own .ct-label.ct-vertical')!.parentElement!.getAttribute('width')))).toBe(40)
     expect(page.errors).toEqual([])
