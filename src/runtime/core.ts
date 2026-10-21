@@ -6,7 +6,7 @@ import type { Duration, DurationText } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
-import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
+import { createSignal, effect, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 import { tabVisible } from './visibility'
 
 // Writes a value, or what a function makes of the current one.
@@ -257,7 +257,7 @@ export function selection<Key extends string | number>(initial?: Key): Selection
     return held.read()
   }
 
-  return Object.assign(read, { set, is })
+  return markSignal(Object.assign(read, { set, is }))
 }
 
 // What every request kay answers reads and does the same way, in a page, a layout, a guard, an endpoint and an action: who asks, where, in which locale, and how to stop with a redirect, a denial or a 404.

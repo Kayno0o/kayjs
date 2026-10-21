@@ -258,7 +258,7 @@ describe('control flow', () => {
     expect(dom).toContain('KayUntrack(() => todo().id)')
     expect(dom).toContain('KayUntrack(() => todo().id).toFixed()')
     expect(dom).toContain('todo().title')
-    expect(dom).toContain('KayUpdateTo(todo(), "id", (KayCurrent) => KayCurrent + 1, true)')
+    expect(dom).toContain('KayUpdateTo(todo(), "id", (KayCurrent) => ++KayCurrent, "post")')
     expect(compileKay('for row of rows key={row}\n  p {row}', 'test.kay', { output: 'dom' }).tsx).toContain('KayUntrack(() => row())')
   })
 

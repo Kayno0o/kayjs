@@ -1,6 +1,6 @@
 import type { Signal } from './core'
 import { TRAILING_SLASH, withBase } from './base'
-import { createSignal, currentServerScope } from './reactive'
+import { createSignal, currentServerScope, markSignal } from './reactive'
 
 // The visitor's answer to analytics: `'yes'`, `'no'`, or `''` while they have not chosen.
 export type Consent = 'yes' | 'no' | ''
@@ -60,7 +60,7 @@ function save(value: Consent): void {
 
 // The visitor's answer to `analytics({ consent })`, for an app's own cookie banner or settings page: read `consent()`, answer with `consent.set('yes')`, `'no'`, or `''` to ask again.
 // A page renders with the answer in the request's `kay_analytics` cookie, the one kay's own notice writes, so the two never disagree; setting it is for the browser, since the server has no response to write to there.
-export const consent: Signal<Consent> = Object.assign(
+export const consent: Signal<Consent> = markSignal(Object.assign(
   (): Consent => {
     return typeof document === 'undefined' ? answer(currentServerScope()?.cookie(COOKIE)) : browserState().read()
   },
@@ -79,4 +79,4 @@ export const consent: Signal<Consent> = Object.assign(
       save(value)
     },
   },
-)
+))

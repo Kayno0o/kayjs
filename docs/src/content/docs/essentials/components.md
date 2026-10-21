@@ -168,6 +168,8 @@ Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal 
 
 Assigning works on a signal held in a `const`, an import, a `let`, an object's property, an array element or a `Signal<boolean>` prop: `box.count = 1`, `list[2]++`. Where kay cannot tell a signal from a plain value, the runtime does, writing a signal and assigning anything else, and `kay check` types the write by what the target holds, so `box.count = 'x'` is a type error for a `Signal<number>`.
 
+A field of `this`, a write beside an `await` or another write, and a `let` update whose value is read stay plain assignments, so write the signal there with `.set`.
+
 ## Derived and selected state
 
 `linked(() => source)` is a signal an island can edit, that takes the source's value again whenever the source changes. It suits a prop you edit locally. The edit is dropped once a refresh or the next page brings a new value.

@@ -831,7 +831,80 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2345'], [34, 'TS2345']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2769'], [34, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves plain code as typed: generics, a private field, a narrowed let and a logical assignment', async () => {
+    const box = [
+      'export function makeBox() {',
+      '  return { maybe: undefined as string | undefined, row: null as { id: number } | null, either: 1 as string | number }',
+      '}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { makeBox } from \'../box\'',
+      '',
+      'class Counter {',
+      '  private hits = 0',
+      '',
+      '  bump() {',
+      '    this.hits++',
+      '    this.hits += 2',
+      '  }',
+      '}',
+      '',
+      'function put<T>(list: T[], at: number, value: T) {',
+      '  list[at] = value',
+      '}',
+      '',
+      'function store<T>(map: Record<string, T>, key: string, value: T) {',
+      '  map[key] = value',
+      '}',
+      '',
+      'function swap<T>(list: T[], a: number, b: number) {',
+      '  const held = list[a]!',
+      '',
+      '  list[a] = list[b]!',
+      '  list[b] = held',
+      '}',
+      '',
+      'function narrowed() {',
+      '  let a = makeBox().maybe',
+      '  let row = makeBox().row',
+      '  let either = makeBox().either',
+      '  let s = makeBox().maybe',
+      '',
+      '  a = \'x\'',
+      '  row = { id: 1 }',
+      '  either = 5',
+      '  s ??= \'d\'',
+      '',
+      '  return a.length + row.id + either.toFixed().length + s.length',
+      '}',
+      '',
+      'function logical() {',
+      '  const box = { name: makeBox().maybe }',
+      '',
+      '  box.name ||= \'x\'',
+      '  box.name ??= \'y\'',
+      '}',
+      '---',
+      'button(onClick={() => { narrowed(); new Counter().bump() }}) go',
+      'button(onClick={logical}) logic',
+      'button(onClick={() => { put([1], 0, 2); store({}, \'a\', 1); swap([1, 2], 0, 1) }}) more',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

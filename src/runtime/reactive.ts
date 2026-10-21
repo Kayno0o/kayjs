@@ -779,6 +779,13 @@ export function isSignal(value: unknown): value is Signal<unknown> {
   return typeof value === 'function' && signals.has(value)
 }
 
+// A function with a `set` of its own that is a signal all the same, as a selection is.
+export function markSignal<T extends object>(value: T): T {
+  signals.add(value)
+
+  return value
+}
+
 // A read function given the `set` of a signal, which takes a value or a function of the current one.
 export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
   const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)

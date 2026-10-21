@@ -20,10 +20,18 @@ const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persist
 // What a constant is set to that is never a signal: a literal, an object, an array, a function, a class, an instance or an operation.
 const HOLDS_NO_SIGNAL = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'RegExpLiteral', 'TemplateLiteral', 'ObjectExpression', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'BinaryExpression', 'UnaryExpression'])
 const SPACE = /\s/
+const HANDLER = /^on[A-Z]/
+// What a write cannot sit beside in one expression, and the functions its text stops at.
+const NESTED = new Set(['AssignmentExpression', 'UpdateExpression', 'AwaitExpression', 'YieldExpression'])
+const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassDeclaration', 'ClassExpression'])
+// The compound assignments that write only when the value changes.
+const LOGICAL = new Set(['||', '&&', '??'])
 // What `new` makes that holds no signal of its own: a collection, a typed array, a date.
 const PLAIN_CLASSES = /^(?:Array|Map|Set|WeakMap|WeakSet|Date|URL|URLSearchParams|FormData|Headers|Image|Audio|ArrayBuffer|DataView|(?:Big)?(?:Int|Uint|Float)(?:8|16|32|64)(?:Clamped)?Array)$/
 // The annotations of a `let` that no signal has.
-const PLAIN_TYPES = new Set(['TSNumberKeyword', 'TSStringKeyword', 'TSBooleanKeyword', 'TSBigIntKeyword', 'TSSymbolKeyword', 'TSArrayType', 'TSLiteralType', 'TSTupleType', 'TSTemplateLiteralType'])
+const PLAIN_TYPES = new Set(['TSNumberKeyword', 'TSStringKeyword', 'TSBooleanKeyword', 'TSBigIntKeyword', 'TSSymbolKeyword', 'TSNullKeyword', 'TSUndefinedKeyword', 'TSLiteralType', 'TSTemplateLiteralType'])
+// The generic types that hold only what their arguments are.
+const PLAIN_GENERICS = new Set(['Array', 'ReadonlyArray', 'Record', 'Partial', 'Readonly', 'Map', 'Set', 'ReadonlyMap', 'ReadonlySet'])
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
@@ -726,6 +734,10 @@ class RewriteFinder {
 
       this.dispatched.add(at)
 
+      // Another write, an `await` or a `yield` inside it would land its text where this one's opens or closes, or leave the arrow it becomes.
+      if (nestsEffects(node))
+        continue
+
       const target = node.type === 'AssignmentExpression' ? node.left : node.argument
 
       if (target.type === 'MemberExpression')
@@ -751,7 +763,7 @@ class RewriteFinder {
     const { code } = this.input
     const { rewrites, writes } = this
 
-    if (target.extra?.parenthesized === true || object.type === 'Super' || property.type === 'PrivateName' || holdsNoSignalRoot(path, object))
+    if (target.extra?.parenthesized === true || object.type === 'Super' || object.type === 'ThisExpression' || property.type === 'PrivateName' || holdsNoSignalRoot(path, object))
       return
 
     // Where the property is reached: the `.` before its name, or the `[` and `]` around its key.
@@ -777,8 +789,7 @@ class RewriteFinder {
       return
 
     if (node.type === 'UpdateExpression') {
-      const update = `${node.operator === '++' ? '+' : '-'} 1`
-      const tail = `(${CURRENT}) => ${CURRENT} ${update}${node.prefix ? '' : ', true'})`
+      const tail = `(${CURRENT}) => ${node.operator}${CURRENT}${node.prefix ? '' : ', "post"'})`
 
       if (node.prefix)
         rewrites.set(start, { replace: `${WRITE_HELPERS.update}(`, end: from })
@@ -815,7 +826,7 @@ class RewriteFinder {
       rewrites.set(opening, { replace: `, ${key}${head}`, end: rightFrom })
     }
 
-    this.insert(last + 1, compound ? '))' : ')')
+    this.insert(last + 1, LOGICAL.has(operator) ? '), "logical")' : `)${compound ? ')' : ''}`)
     writes.add(compound ? 'update' : 'to')
   }
 
@@ -843,7 +854,7 @@ class RewriteFinder {
       if (!valueUnused(path))
         return
 
-      const update = `(${CURRENT}) => ${CURRENT} ${node.operator === '++' ? '+' : '-'} 1`
+      const update = `(${CURRENT}) => ${node.operator}${CURRENT}`
 
       if (node.prefix) {
         rewrites.set(start, { replace: '', end: from })
@@ -897,24 +908,24 @@ function nextNonSpace(code: string, at: number, skipped: string): number {
   return index
 }
 
-// Whether a literal holds nothing that could be a signal: literals, functions and containers of them.
-function plainLiteral(node: t.Node | null | undefined): boolean {
+// Whether a literal holds nothing that could be a signal: literals, functions and containers of them. An empty container is filled later, so it counts only when `typed` as one no signal goes in.
+function plainLiteral(node: t.Node | null | undefined, typed = false): boolean {
   if (!node)
     return false
 
   if (node.type === 'ObjectExpression')
-    return node.properties.every(property => property.type === 'ObjectMethod' || (property.type === 'ObjectProperty' && !property.computed && plainLiteral(property.value)))
+    return node.properties.length === 0 ? typed : node.properties.every(property => property.type === 'ObjectMethod' || (property.type === 'ObjectProperty' && !property.computed && plainLiteral(property.value)))
 
   if (node.type === 'ArrayExpression')
-    return node.elements.every(element => element !== null && element.type !== 'SpreadElement' && plainLiteral(element))
+    return node.elements.length === 0 ? typed : node.elements.every(element => element !== null && element.type !== 'SpreadElement' && plainLiteral(element))
 
   if (node.type === 'NewExpression')
     return node.callee.type === 'Identifier' && PLAIN_CLASSES.test(node.callee.name)
 
-  if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
-    return plainLiteral(node.expression)
+  if (node.type === 'TSAsExpression')
+    return plainLiteral(node.expression, plainType(node.typeAnnotation))
 
-  return HOLDS_NO_SIGNAL.has(node.type)
+  return node.type === 'TSSatisfiesExpression' ? plainLiteral(node.expression, typed) : HOLDS_NO_SIGNAL.has(node.type)
 }
 
 // Whether the root of a target, `box` in `box.list[0].count`, is a binding set to a literal holding no signal, so none of its properties can be one.
@@ -927,21 +938,57 @@ function holdsNoSignalRoot(path: NodePath, object: t.Node): boolean {
   const binding = root.type === 'Identifier' ? path.scope.getBinding(root.name) : undefined
   const declarator = binding?.path.node
 
-  return declarator?.type === 'VariableDeclarator' && declarator.id.type === 'Identifier' && plainLiteral(declarator.init)
+  // A root set again could hold anything by then.
+  return binding?.constant === true && declarator?.type === 'VariableDeclarator' && declarator.id.type === 'Identifier' && plainLiteral(declarator.init, holdsNoSignalType(declarator.id))
 }
 
 // Whether a declaration is annotated with a type no signal has: `let total: number`.
 function holdsNoSignalType(id: t.Identifier): boolean {
-  const annotation = id.typeAnnotation?.type === 'TSTypeAnnotation' ? id.typeAnnotation.typeAnnotation.type : undefined
-
-  return annotation !== undefined && PLAIN_TYPES.has(annotation)
+  return id.typeAnnotation?.type === 'TSTypeAnnotation' && plainType(id.typeAnnotation.typeAnnotation)
 }
 
-// Whether an update's value is dropped: a statement, an arrow's body or a `for` loop's last part.
+// Whether a type is built of values no signal is among: keywords, literals and the containers and objects of them.
+function plainType(type: t.TSType): boolean {
+  if (PLAIN_TYPES.has(type.type))
+    return true
+
+  if (type.type === 'TSArrayType')
+    return plainType(type.elementType)
+
+  if (type.type === 'TSUnionType' || type.type === 'TSIntersectionType')
+    return type.types.every(plainType)
+
+  if (type.type === 'TSParenthesizedType')
+    return plainType(type.typeAnnotation)
+
+  if (type.type === 'TSTypeLiteral')
+    return type.members.every(member => member.type === 'TSPropertySignature' && member.typeAnnotation?.typeAnnotation !== undefined && plainType(member.typeAnnotation.typeAnnotation))
+
+  return type.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && PLAIN_GENERICS.has(type.typeName.name) && (type.typeParameters?.params.every(plainType) ?? false)
+}
+
+// Whether an update's value is dropped: a statement, a `for` loop's last part or the body of an event handler. Any other arrow's body is returned, and may be read.
 function valueUnused(path: NodePath): boolean {
   const { parent, node } = path
 
-  return parent.type === 'ExpressionStatement' || (parent.type === 'ArrowFunctionExpression' && parent.body === node) || (parent.type === 'ForStatement' && parent.update === node)
+  if (parent.type === 'ExpressionStatement' || (parent.type === 'ForStatement' && parent.update === node))
+    return true
+
+  const attribute = parent.type === 'ArrowFunctionExpression' && parent.body === node ? path.parentPath?.parentPath?.parent : undefined
+
+  return attribute?.type === 'JSXAttribute' && attribute.name.type === 'JSXIdentifier' && HANDLER.test(attribute.name.name)
+}
+
+// Whether a write, an `await` or a `yield` sits inside a node, outside the functions it holds.
+function nestsEffects(node: t.Node, root = true): boolean {
+  if (!root && (NESTED.has(node.type) || FUNCTIONS.has(node.type)))
+    return NESTED.has(node.type)
+
+  return Object.values(node).some((child: unknown) => Array.isArray(child) ? child.some(item => isNode(item) && nestsEffects(item, false)) : isNode(child) && nestsEffects(child, false))
+}
+
+function isNode(value: unknown): value is t.Node {
+  return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string'
 }
 
 // What leaves the value it wraps as it is; a cast may make a signal of anything, so it is left to the type checker.

@@ -1,7 +1,7 @@
 import * as parser from '@babel/parser'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
-import { signal } from '../src/runtime/core'
+import { selection, signal } from '../src/runtime/core'
 import { updateBack, updateTo, writeBack, writeTo } from '../src/runtime/internal'
 import { isSignal, memo } from '../src/runtime/reactive'
 
@@ -24,18 +24,18 @@ describe('assignments the runtime tells from a write', () => {
       expect(code).toContain('KayWriteTo(box, "count", 1)')
       expect(code).toContain('KayWriteTo(box.list, 2, 3)')
       expect(code).toContain('KayUpdateTo(box, "count", (KayCurrent) => KayCurrent + (2))')
-      expect(code).toContain('KayUpdateTo(box, "count", (KayCurrent) => KayCurrent + 1, true)')
-      expect(code).toContain('KayUpdateTo(box.list, 0, (KayCurrent) => KayCurrent - 1)')
+      expect(code).toContain('KayUpdateTo(box, "count", (KayCurrent) => ++KayCurrent, "post")')
+      expect(code).toContain('KayUpdateTo(box.list, 0, (KayCurrent) => --KayCurrent)')
       expect(code).toContain('picked = KayWriteBack(picked, 4)')
       expect(code).toContain('picked = KayUpdateBack(picked, (KayCurrent) => KayCurrent * (2))')
-      expect(code).toContain('picked = KayUpdateBack(picked, (KayCurrent) => KayCurrent + 1)')
+      expect(code).toContain('picked = KayUpdateBack(picked, (KayCurrent) => ++KayCurrent)')
       expect(code).toMatch(/import \{ writeTo as KayWriteTo, updateTo as KayUpdateTo, writeBack as KayWriteBack, updateBack as KayUpdateBack \} from 'kay\/internal'/)
     }
   })
 
   it('write from a handler in the template', () => {
     for (const code of [compiled(SCRIPT, 'dom'), compiled(SCRIPT, undefined, true)])
-      expect(code).toContain('=> KayUpdateTo(box, "count", (KayCurrent) => KayCurrent + 1, true)')
+      expect(code).toContain('=> KayUpdateTo(box, "count", (KayCurrent) => ++KayCurrent, "post")')
   })
 
   it('leave a target plainly holding no signal as written, and import nothing for it', () => {
@@ -63,7 +63,7 @@ describe('assignments the runtime tells from a write', () => {
     expect(code).toContain('KayWriteTo(target.rows, at + 1, (5))')
     expect(code).toContain('KayUpdateTo(target.rows,  (at) , (KayCurrent) => KayCurrent + ((2)))')
     expect(code).toContain(';KayUpdateTo((target as { value: string }), "value", (KayCurrent) => KayCurrent + (\'!\'))')
-    expect(code).toContain('KayUpdateTo(target.rows, at, (KayCurrent) => KayCurrent + 1)')
+    expect(code).toContain('KayUpdateTo(target.rows, at, (KayCurrent) => ++KayCurrent)')
   })
 
   it('leave an update whose value is read, or a target the helper cannot spell, as written', () => {
@@ -71,7 +71,7 @@ describe('assignments the runtime tells from a write', () => {
 
     expect(code).toContain('const before = n++')
     expect(code).toContain('super.x = v')
-    expect(code).toContain('KayWriteTo(this, "y", v)')
+    expect(code).toContain('this.y = v')
     expect(code).toContain(';(box.count) = 1')
     expect(code).toContain('box.count!++')
   })
@@ -91,7 +91,7 @@ describe('assignments the runtime tells from a write', () => {
     // The server renders no handler, so only the browser and the types read these.
     for (const code of [compiled(template, 'dom'), compiled(template, undefined, true)]) {
       expect(code).toMatch(/KayWriteTo\(.*item.*, "done", !/)
-      expect(code).toMatch(/KayUpdateTo\(.*item.*, "hits", \(KayCurrent\) => KayCurrent \+ 1, true\)/)
+      expect(code).toMatch(/KayUpdateTo\(.*item.*, "hits", \(KayCurrent\) => \+\+KayCurrent, "post"\)/)
     }
 
     const page = compileKay('--- server\nconst store: Record<string, number> = {}\nstore.visits = 1\nlet cache = makeCache()\ncache = makeCache()\n---\np x\n', 'src/routes/index.kay', { output: 'html', includeServer: true })
@@ -105,6 +105,48 @@ describe('assignments the runtime tells from a write', () => {
     const code = compiled('---\nconst names = signal([\'a\'])\nconst box = makeBox()\n;(globalThis as { rows?: unknown }).rows = names\n;(box as { n: number }).n = 1\nbox.n = 2;(box as { n: number }).n = 3\n---\np {names()}\n', 'dom')
 
     expect(code).toContain(';KayWriteTo((globalThis as { rows?: unknown }), "rows", names)\n;KayWriteTo((box as { n: number }), "n", 1)\nKayWriteTo(box, "n", 2);KayWriteTo((box as { n: number }), "n", 3)')
+  })
+})
+
+describe('assignments left as written', () => {
+  it('keep a write that awaits, or holds another write, whole', () => {
+    const code = compiled('---\nimport { makeBox } from \'./box\'\nconst box = makeBox()\nlet n = makeBox().n\nasync function f() {\n  box.total += await load()\n  n += await load()\n  box.a ??= await load()\n  n = ++box.y\n  n = box.x++\n  box.b = box.c = 1\n  box.d = (n = 2)\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('box.total += await load()')
+    expect(code).toContain('n += await load()')
+    expect(code).toContain('box.a ??= await load()')
+    expect(code).toContain('n = KayUpdateTo(box, "y", (KayCurrent) => ++KayCurrent)')
+    expect(code).toContain('n = KayUpdateTo(box, "x", (KayCurrent) => ++KayCurrent, "post")')
+    expect(code).toContain('box.b = KayWriteTo(box, "c", 1)')
+    expect(code).toContain('box.d = (n = KayWriteBack(n, 2))')
+  })
+
+  it('leave a field of this, and a postfix a function returns, as written', () => {
+    const code = compiled('---\nimport { makeBox } from \'./box\'\nlet n = makeBox().n\nclass Child {\n  private hits = 0\n  bump() {\n    this.hits++\n    this.hits += 1\n  }\n}\nconst next = () => n++\nfunction f() {\n  for (let i = 0; i < 2; i++) n++\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('this.hits++\n    this.hits += 1')
+    expect(code).toContain('const next = () => n++')
+    expect(code).toContain('n = KayUpdateBack(n, (KayCurrent) => ++KayCurrent)')
+    expect(code).toContain('i++')
+  })
+
+  it('write a logical assignment as one that writes only when the value changes', () => {
+    const code = compiled('---\nimport { makeBox } from \'./box\'\nconst box = makeBox()\nlet n = makeBox().n\nfunction f() {\n  box.a ||= 2\n  box.b &&= 3\n  box.c ??= 4\n  n ??= 5\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('KayUpdateTo(box, "a", (KayCurrent) => KayCurrent || (2), "logical")')
+    expect(code).toContain('KayUpdateTo(box, "b", (KayCurrent) => KayCurrent && (3), "logical")')
+    expect(code).toContain('KayUpdateTo(box, "c", (KayCurrent) => KayCurrent ?? (4), "logical")')
+    expect(code).toContain('n = KayUpdateBack(n, (KayCurrent) => KayCurrent ?? (5))')
+  })
+
+  it('wrap an empty container, which a signal may be put into, unless it is typed as holding none, and a root set again', () => {
+    const code = compiled('---\nimport { makeBox } from \'./box\'\nconst loose = {}\nconst list = []\nconst seen: Record<string, number> = {}\nconst rows: Record<string, Signal<number>> = {}\nlet again = {}\nagain = makeBox()\nfunction f() {\n  loose.a = 1\n  list[0] = 1\n  seen.a = 1\n  rows.a = 1\n  again.x = 1\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('KayWriteTo(loose, "a", 1)')
+    expect(code).toContain('KayWriteTo(list, 0, 1)')
+    expect(code).toContain('seen.a = 1')
+    expect(code).toContain('KayWriteTo(rows, "a", 1)')
+    expect(code).toContain('KayWriteTo(again, "x", 1)')
   })
 })
 
@@ -149,15 +191,72 @@ describe('the runtime helpers', () => {
     expect(box.lookalike as unknown).toBe(4)
   })
 
+  it('read nothing a plain assignment does not, so an accessor runs once or not at all', () => {
+    let reads = 0
+    let writes = 0
+    const element = { get scrollTop() {
+      reads++
+
+      return 0
+    }, set scrollTop(value: number) {
+      writes += value
+    } }
+
+    writeTo(element, 'scrollTop', 5)
+    updateTo(element, 'scrollTop', current => current + 1)
+    expect(reads).toBe(1)
+    expect(writes).toBe(6)
+
+    const count = signal(1)
+    const exposed = { get count() {
+      return count
+    }, set: 1 }
+
+    writeTo(exposed as unknown as { count: number }, 'count', 4)
+    expect(count()).toBe(4)
+  })
+
+  it('answer a postfix with the number it read, and a coerced operand as ++ does', () => {
+    const element = { data: '5' as unknown as number }
+
+    expect(updateTo(element, 'data', current => ++current, 'post')).toBe(5)
+    expect(element.data).toBe(6)
+  })
+
+  it('write a logical assignment only when it changes the value', () => {
+    const frozen = Object.freeze({ a: 1, b: 0 })
+
+    expect(updateTo(frozen, 'a', current => current || 2, 'logical')).toBe(1)
+    expect(() => updateTo(frozen, 'b', current => current || 2, 'logical')).toThrow(TypeError)
+
+    const box = { count: signal(1) }
+    let writes = 0
+
+    box.count.set = () => {
+      writes++
+    }
+    updateTo(box, 'count', current => current || 2, 'logical')
+    expect(writes).toBe(0)
+  })
+
+  it('count a selection as a signal', () => {
+    const picked = selection<string>('a')
+    const box = { picked }
+
+    writeTo(box, 'picked', 'b' as never)
+    expect(picked()).toBe('b')
+    expect(box.picked).toBe(picked)
+  })
+
   it('update a signal or a value from its current one, answering the new or the old', () => {
     const count = signal(1)
     const box = { count, n: 1, list: [signal(5)] }
 
     expect(updateTo(box, 'count', current => current + 1)).toBe(2)
-    expect(updateTo(box, 'count', current => current + 1, true)).toBe(2)
+    expect(updateTo(box, 'count', current => current + 1, 'post')).toBe(2)
     expect(count()).toBe(3)
     expect(updateTo(box, 'n', current => current + 1)).toBe(2)
-    expect(updateTo(box, 'n', current => current + 1, true)).toBe(2)
+    expect(updateTo(box, 'n', current => current + 1, 'post')).toBe(2)
     expect(box.n).toBe(3)
     expect(updateTo(box.list, 0, current => current * 2)).toBe(10)
     expect(box.list[0]!()).toBe(10)
