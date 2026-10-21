@@ -549,7 +549,7 @@ describe('the collections a CMS edits', () => {
     const home = collection({ name: 'seeded', load: () => [] }, { schema: t.Object({ title: t.String(), tags: t.Array(t.String()) }), single: true, seed: { title: 'Welcome', tags: ['a', 'b'] } })
 
     await inPreview(async () => {
-      const data = (await home.one())!
+      const data = await home.one()
       const marks = editMarks()!
 
       expect(placeFieldMarks(withFieldMarks(marks, () => `<h1>${child(data.title)}</h1><ul>${loop(data.tags, tag => `<li>${child(tag)}</li>`)}</ul>`), marks)).toBe('<h1 data-kay-field="seeded:index:title">Welcome</h1><ul data-kay-list="seeded:index:tags"><li data-kay-field="seeded:index:tags.0">a</li><li data-kay-field="seeded:index:tags.1">b</li></ul>')
