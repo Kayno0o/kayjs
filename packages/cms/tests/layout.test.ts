@@ -1,4 +1,5 @@
-import type { CollectionInfo, ScreenCollection } from '../src/kay/contract'
+import type { ToolbarAction as UiToolbarAction } from '../../ui/src/markdown-edit'
+import type { CollectionInfo, ScreenCollection, ToolbarAction } from '../src/kay/contract'
 import { describe, expect, test } from 'bun:test'
 import { TOOLBAR_ACTIONS } from '../../ui/src/markdown-edit'
 import { fieldsOf } from '../src/fields'
@@ -142,7 +143,11 @@ describe('rowActions', () => {
 
 describe('the form\'s Markdown settings', () => {
   test('are checked as the config loads, and name the buttons kayjs-ui has', () => {
-    expect([...TOOLBAR_BUTTONS]).toEqual([...TOOLBAR_ACTIONS])
+    // Each name of one list types as a name of the other.
+    const fromUi: ToolbarAction[] = [...TOOLBAR_ACTIONS]
+    const fromCms: UiToolbarAction[] = [...TOOLBAR_BUTTONS]
+
+    expect(fromCms).toEqual(fromUi)
     expect(checkLayouts({ posts: { form: { body: { label: 'Article', hint: 'Plain text' }, toolbar: ['bold', 'link'] } } }).get('posts')?.form).toMatchObject({ body: { label: 'Article', hint: 'Plain text' }, toolbar: ['bold', 'link'] })
     expect(checkLayouts({ posts: { form: { toolbar: false } } }).get('posts')?.form?.toolbar).toBe(false)
     expect(() => checkLayouts({ posts: { form: { toolbar: ['bold', 'underline'] } } })).toThrow('underline')

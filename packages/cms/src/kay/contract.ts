@@ -1,9 +1,11 @@
 // The shapes kayjs-cms passes around: kay's own from kay/content, and the entry references and issues its forms and API share.
-import type { ToolbarAction } from '@kaynooo/kayjs-ui'
 import type { CollectionInfo, SourceEntry } from 'kay/content'
 import type { IconProps } from 'kay/icons'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, FieldHint, FieldInputOptions, JsonSchema, SourceEntry, TranslationIndex } from 'kay/content'
+
+// The buttons of a Markdown box's toolbar, as kayjs-ui's MarkdownEditor names them; declared here so the config types do not import its components (tests/layout.test.ts holds the two lists equal).
+export type ToolbarAction = 'bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image'
 
 // How a collection's form is arranged: `fields` first, in that order, an inner array being one row of columns, then the others in the schema's order unless hidden; the Markdown body is `body`, or `#body` when a data field has that name.
 export interface FormLayout {
