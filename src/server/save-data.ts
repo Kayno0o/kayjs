@@ -7,7 +7,7 @@ import { speculationRules } from './speculation'
 const SAVING = /^\s*on\s*$/i
 const FONT_PRELOAD = /<link\s[^>]*?\brel="preload"[^>]*?\bas="font"[^>]*>/g
 const VARY_ALL = new Set(['save-data', '*'])
-const MODULE_PRELOAD = /<link rel="modulepreload" href="([^"]*)">/g
+const MODULE_PRELOAD = /<link rel="modulepreload" href="([^"]*)"( data-load)?( data-wait)?>/g
 const FONT_DISPLAY = /font-display:[a-z-]+/g
 const HEAD_END = Buffer.from('</head>')
 
@@ -77,23 +77,27 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   }
 }
 
-// The head without the preloads of the chunks only islands need, the code waiting for the viewport preloaded in the first one's place when the page did not already.
+// The head without the preloads of the chunks only islands need, the code waiting for the viewport preloaded in the first one's place when the page did not already, or after a kept one (`data-wait`) that an island waiting for the viewport needs too.
 function withoutIslandPreloads(head: string, chunks: RenderOptions['islandPreloads']): string {
   if (chunks === undefined || chunks.drop.size === 0)
     return head
 
-  let dropped = false
+  let placed = false
 
-  return head.replace(MODULE_PRELOAD, (link, href: string) => {
-    if (!chunks.drop.has(href))
-      return link
-
-    if (dropped)
+  const waiting = () => {
+    if (placed)
       return ''
 
-    dropped = true
+    placed = true
 
     return chunks.wait.filter(chunk => !head.includes(`href="${chunk}"`)).map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')
+  }
+
+  return head.replace(MODULE_PRELOAD, (link, href: string, load: string | undefined, wait: string | undefined) => {
+    if (load !== undefined)
+      return wait === undefined ? link : link + waiting()
+
+    return chunks.drop.has(href) ? waiting() : link
   })
 }
 

@@ -103,6 +103,24 @@ describe.each([
     }
   })
 
+  it('preloads the code waiting for the viewport on a page using one component both ways, keeping its chunks for that visitor alone', async () => {
+    const { app, remove } = await served()
+
+    try {
+      const full = await read(app, '/both')
+      const saving = await read(app, '/both', ON)
+
+      expect(preloads(full).some(href => WHEN.test(href))).toBe(false)
+      expect(preloads(saving).some(href => WHEN.test(href))).toBe(true)
+      expect(preloads(saving).filter(href => !WHEN.test(href))).toEqual(preloads(full))
+      expect(new Set(preloads(saving)).size).toBe(preloads(saving).length)
+      expect(saving).toContain('data-load')
+    }
+    finally {
+      await remove()
+    }
+  })
+
   it.each([
     ['off', { 'save-data': 'off' }],
     ['absent', {}],

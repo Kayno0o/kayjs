@@ -1,0 +1,8 @@
+---
+import Count from '../components/count.kay'
+---
+head
+  title Both
+h1 Both
+Count(name="default")
+Count(name="load" hydrate="load")

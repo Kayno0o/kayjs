@@ -16,7 +16,7 @@ import { SWAP_CALL, SWAP_SCRIPT } from './swap'
 import { workScript } from './work'
 
 const encoder = new TextEncoder()
-const EMPTY: Rendered = { html: '', islands: { eager: new Set(), immediate: new Set(), lazy: 0, count: 0, messages: new Set() }, deferred: [] }
+const EMPTY: Rendered = { html: '', islands: { eager: new Set(), immediate: new Set(), waiting: new Set(), lazy: 0, count: 0, messages: new Set() }, deferred: [] }
 
 export interface Rendered {
   html: string
