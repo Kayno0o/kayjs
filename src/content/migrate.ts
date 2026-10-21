@@ -3,7 +3,7 @@ import type { ContentLoader, LoadedEntry } from './index'
 import type { RawEntry } from './load'
 import { kayLog } from '../runtime/log'
 import { compiledCheck } from '../server/schema-check'
-import { inTurn } from './turns'
+import { takeFreeTurn } from './turns'
 import { ContentError, withDefaults } from './validate'
 
 // One step carrying a stored entry's data from the shape it had to a newer one; it gets a copy to change or replace.
@@ -134,27 +134,46 @@ export function migrateLoaded(name: string, given: unknown[], schema: TSchema, m
   return { items, carried }
 }
 
-// Hands the migrated entries to the loader's `save` once, so the next read finds them in the new shape. It runs in the collection's turn, so an editor's save in this process cannot interleave, and an entry the loader no longer holds as it was read, because someone saved it meanwhile, is left to that save. A save that fails is logged, the entry staying migrated for this read and tried again at the next.
+// Hands the migrated entries to the loader's `save` once, so the next read finds them in the new shape. It holds the collection's turn, so an editor's save in this process cannot interleave; while a save or remove holds it, the write-back is left to the next read, as that save may be reading the collection. An entry the loader no longer holds as it was read, because someone saved it meanwhile, is left to that save. A save that fails is logged, the entry staying migrated for this read and tried again at the next.
 export async function writeBack(loader: ContentLoader, carried: Carried[], localized: boolean, preview: boolean): Promise<void> {
   if (loader.save === undefined || carried.length === 0)
     return
 
-  await inTurn(loader.name, async () => writeCarried(loader, carried, localized, preview))
+  const turn = takeFreeTurn(loader.name)
+
+  if (turn === undefined)
+    return
+
+  try {
+    await writeCarried(loader, carried, localized, preview)
+  }
+  finally {
+    turn.done()
+  }
 }
 
 async function writeCarried(loader: ContentLoader, carried: Carried[], localized: boolean, preview: boolean): Promise<void> {
   const { save } = loader
-  let written = 0
   let held: LoadedEntry[] | undefined
+
+  // A loader without `get` is read once for every carried entry, not once per entry.
+  if (!loader.get) {
+    try {
+      held = await loader.load({ preview })
+    }
+    catch (error) {
+      kayLog('warn', `kay: ${loader.name} could not be read to write its migrated entries back`, error)
+
+      return
+    }
+  }
+
+  let written = 0
 
   for (const { entry, was } of carried) {
     const split = localized ? entry.slug.indexOf('/') : -1
 
     try {
-      // A loader without `get` is read once for every carried entry, not once per entry.
-      if (!loader.get)
-        held ??= await loader.load({ preview })
-
       const current = loader.get ? await loader.get(entry.slug, { preview }) : held!.find(each => each.slug === entry.slug)
 
       if (JSON.stringify(current?.data) !== JSON.stringify(was))

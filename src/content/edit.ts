@@ -16,7 +16,7 @@ import { isDraft } from './drafts'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
-import { holdingTurn, takeTurn } from './turns'
+import { takeTurn } from './turns'
 import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './validate'
 
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
@@ -555,10 +555,6 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
 // `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves and removes run in turn, so two creates here never both find the slug free.
 export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
-  return holdingTurn(collectionNamed(name).name, async () => saveInTurn(name, entry, options))
-}
-
-async function saveInTurn(name: string, entry: WrittenEntry, options: { create?: boolean | undefined }): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
   const turn = takeTurn(collection.name)
@@ -600,10 +596,6 @@ async function saveInTurn(name: string, entry: WrittenEntry, options: { create?:
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
 export async function removeEntry(name: string, slug: string, locale?: string): Promise<{ issues?: DraftIssue[] }> {
-  return holdingTurn(collectionNamed(name).name, async () => removeInTurn(name, slug, locale))
-}
-
-async function removeInTurn(name: string, slug: string, locale?: string): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const remove = writer(name, collection, 'remove')
   const at = { collection: name, slug, ...locale !== undefined && { locale } }

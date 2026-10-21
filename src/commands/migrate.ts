@@ -1,3 +1,4 @@
+import type { RewrittenCollection } from '../content/rewrite'
 import type { Command, ProblemFormat } from './command'
 import { statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -94,7 +95,7 @@ export const migrate: Command = {
 async function migrateContent(root: string, format: ProblemFormat, quiet: boolean): Promise<number> {
   buildingWithoutEnv()
 
-  let migrated: Awaited<ReturnType<typeof import('../content/rewrite').migrateFolders>>
+  let migrated: { collections: RewrittenCollection[], declared: number }
 
   try {
     migrated = await (await import('../content/rewrite')).migrateFolders(root)

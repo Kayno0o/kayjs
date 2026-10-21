@@ -73,7 +73,13 @@ export async function migrateFolders(root: string): Promise<{ collections: Rewri
         if (!changed)
           continue
 
-        await writeFile(path, rewrittenSource(name, source, data))
+        const text = rewrittenSource(name, source, data)
+
+        // A value the format cannot hold, such as a Date in YAML, would damage the file: it is left as it was.
+        if (JSON.stringify(parseEntry(name, text).data) !== JSON.stringify(data))
+          throw new Error('holds a value its format cannot write back as it is')
+
+        await writeFile(path, text)
         result.rewritten.push(file)
       }
       catch (error) {

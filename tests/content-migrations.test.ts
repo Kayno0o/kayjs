@@ -60,6 +60,12 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
   return undefined
 }
 
+// Polls until the condition holds, for a step another task takes at its own pace.
+async function waitFor(done: () => boolean): Promise<void> {
+  for (let tries = 0; !done() && tries < 500; tries++)
+    await Bun.sleep(10)
+}
+
 const MODES = [{ dev: false, prebuilt: false }, { dev: true, prebuilt: false }]
 
 describe('a stored entry the schema refuses', () => {
@@ -245,35 +251,40 @@ describe('migrations', () => {
     expect(loads).toBe(2)
   })
 
-  it('write back in the collection\'s turn, behind an editor\'s save already under way and without deadlocking a save that loads it', async () => {
+  it('leave the write-back to the next read while an editor\'s save is under way, whose own save reads the collection', async () => {
     const { loader } = store('migrated-turn', [{ slug: 'old', data: { name: 'Old', price: 1 } }])
     const order: string[] = []
     const release = Promise.withResolvers<void>()
+    let packs!: ReturnType<typeof collection<typeof schema>>
     const slow = { ...loader, save: async (entry: Parameters<typeof loader.save>[0]) => {
       order.push(`save ${entry.slug}`)
 
       if (entry.slug === 'editor') {
+        // The editor's save reads the collection, which meets the migrated entry waiting to be written back.
+        await packs.all()
         await release.promise
         order.push('done editor')
       }
 
       loader.save(entry)
     } }
-    const packs = collection(slow, { schema, migrations: steps })
+
+    packs = collection(slow, { schema, migrations: steps })
+
     const before = registerCollections([['turns', packs]])
 
     try {
       const editing = saveEntry('turns', { slug: 'editor', data: { title: 'Editor', price: 2, visible: true } })
 
-      await Bun.sleep(20)
-
-      const reading = packs.all()
-
-      await Bun.sleep(20)
+      await waitFor(() => order.includes('save editor'))
+      expect((await packs.all()).map(entry => entry.slug)).toEqual(['old'])
       expect(order).toEqual(['save editor'])
       release.resolve()
       expect(await editing).toEqual({})
-      expect((await reading).map(entry => entry.slug)).toEqual(['old'])
+
+      // Nothing waited, and the next read writes the entry back.
+      packs.invalidate()
+      await packs.all()
       expect(order).toEqual(['save editor', 'done editor', 'save old'])
     }
     finally {

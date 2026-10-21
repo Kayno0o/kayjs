@@ -13,6 +13,7 @@ const schema = t.Object({ title: t.String(), price: t.Integer(), visible: t.Bool
 
 export const packs = collection('content/packs', { schema, migrations: steps })
 export const notes = collection('content/notes', { schema, migrations: steps })
+export const dated = collection('content/dated', { schema: t.Object({ at: t.Date() }), migrations: [convertField('at', value => value === false ? new Date(0) : value)] })
 export const plain = collection('content/plain', { schema: t.Object({ title: t.String() }) })
 `
 
@@ -101,6 +102,24 @@ describe('kay migrate content', () => {
       expect(JSON.parse(out)).toMatchObject({ rewritten: ['src/content/packs/old.json'], failed: [{ file: 'src/content/packs/broken.json' }] })
       expect(err).toBe('')
       expect(await Bun.file(join(root, 'src/content/packs/old.json')).json()).toEqual({ price: 1, title: 'Old', visible: true })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('leaves a file whose migrated value its format cannot hold as it was, and writes it where it can', async () => {
+    const root = await project()
+
+    try {
+      await Bun.write(join(root, 'src/content/dated/a.yaml'), 'at: false\n')
+      await Bun.write(join(root, 'src/content/dated/b.json'), '{"at":false}')
+
+      const { out, code } = await migrate(root, '--format', 'json')
+
+      expect(code).toBe(1)
+      expect(JSON.parse(out)).toMatchObject({ rewritten: ['src/content/dated/b.json'], failed: [{ file: 'src/content/dated/a.yaml' }] })
+      expect(await Bun.file(join(root, 'src/content/dated/a.yaml')).text()).toBe('at: false\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })
