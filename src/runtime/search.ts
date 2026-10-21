@@ -154,15 +154,30 @@ function arrivalHref(href: string, terms: string[]): string {
   return `${path}?${ARRIVAL_PARAM}=${encodeURIComponent(words).replaceAll('%20', '+')}${at === -1 ? '' : href.slice(at)}`
 }
 
-// The singular of a term ending in `s`, so `links` also finds `link`; a short term, or one in `ss` such as `access`, has none.
-function singular(term: string): string | undefined {
-  return term.length > 3 && term.endsWith('s') && !term.endsWith('ss') ? term.slice(0, -1) : undefined
+// Words ending in `s` that are no plural of the word without it.
+const NOT_PLURAL = new Set(['news', 'lens', 'series', 'species', 'does', 'goes', 'ours', 'yours', 'this', 'thus', 'plus', 'bonus', 'status', 'canvas', 'alias', 'atlas', 'bias', 'gas', 'always', 'perhaps', 'across', 'its', 'has', 'was', 'his', 'yes'])
+
+const NOT_PLURAL_END = /(?:ss|us|is)$/
+
+// The words a plural term may come from, so `links` also finds `link`, `entries` `entry` and `classes` `class`; a short term, one in `ss`, `us` or `is`, and a few such as `news` have none.
+function singulars(term: string): string[] {
+  if (term.length <= 3 || !term.endsWith('s') || NOT_PLURAL.has(term) || NOT_PLURAL_END.test(term))
+    return []
+
+  const found = [term.slice(0, -1)]
+
+  if (term.endsWith('ies'))
+    found.push(`${term.slice(0, -3)}y`)
+  else if (term.endsWith('es'))
+    found.push(term.slice(0, -2))
+
+  return found.filter(word => word.length >= 3)
 }
 
 // Each section holding a word the term starts, or its singular, scored by the best such word.
 async function termScores(dir: string, shards: Set<string>, term: string): Promise<Map<number, number>> {
   const scores = new Map<number, number>()
-  const bare = singular(term)
+  const bare = new Set(singulars(term))
   const two = searchShard(term)
   const longer = [...shards].filter(shard => shard.startsWith(`${two}-`))
   // A term of three letters or more needs only the file of its first three when two letters were split; one of two needs them all.
@@ -176,7 +191,7 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
   for (const [word, postings] of found.flatMap(words => Object.entries(words))) {
     const prefix = word.startsWith(term)
 
-    if (!prefix && word !== bare)
+    if (!prefix && !bare.has(word))
       continue
 
     let factor = SINGULAR_FACTOR
@@ -261,10 +276,10 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
   }
 
   const hits: [number, number][] = []
-  const singulars = new Set(terms.flatMap(term => singular(term) ?? []))
+  const bare = new Set(terms.flatMap(singulars))
 
   for (const word of folded.matchAll(WORD)) {
-    const length = matched(word[0], terms, singulars)
+    const length = matched(word[0], terms, bare)
 
     if (length !== undefined)
       hits.push([from[word.index]!, from[word.index + length - 1]! + 1])
@@ -274,13 +289,13 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
 }
 
 // How much of a word a term marks: as much as the term when the word starts with it, all of it when the word is the term's singular.
-function matched(word: string, terms: string[], singulars: Set<string>): number | undefined {
+function matched(word: string, terms: string[], bare: Set<string>): number | undefined {
   const term = terms.find(term => word.startsWith(term))
 
   if (term !== undefined)
     return term.length
 
-  return singulars.has(word) ? word.length : undefined
+  return bare.has(word) ? word.length : undefined
 }
 
 // The text from `start` to `end` in parts, the hits within it marked.

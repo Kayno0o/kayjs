@@ -468,6 +468,19 @@ describe('the search index', () => {
     expect((await search(dir, 'tabs')).hits.map(hit => bare(hit.href))).toEqual(['/templates#outside'])
   })
 
+  it('folds es and ies plurals to their singular, and leaves words that are no plural alone', async () => {
+    const dir = await index([
+      { path: '/a', html: '<main><h1>A</h1><h2 id="c">The class</h2><h2 id="e">An entry</h2><h2 id="b">One box</h2><h2 id="n">Something new</h2><h2 id="l">The len</h2></main>' },
+    ])
+    const found = async (query: string) => (await search(dir, query)).hits.map(hit => hit.heading)
+
+    expect(await found('classes')).toEqual(['The class'])
+    expect(await found('entries')).toEqual(['An entry'])
+    expect(await found('boxes')).toEqual(['One box'])
+    expect(await found('news')).toEqual([])
+    expect(await found('lens')).toEqual([])
+  })
+
   it('drops the hits of the last query when the search of the next one fails', async () => {
     const dir = await index([{ path: '/x', html: '<main><h1>X</h1><h2 id="a">Alpha</h2><p>Beta.</p></main>' }])
     const { result } = await inBrowser(dir, 'en', async () => {
