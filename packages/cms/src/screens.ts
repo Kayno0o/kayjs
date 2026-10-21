@@ -277,16 +277,20 @@ export interface ActivityScreen {
   pages: number
 }
 
-// Whether the entry still holds the slug and locale an event names; a collection that cannot be read links nothing rather than failing the screen.
-async function holds(event: Activity): Promise<boolean> {
+// The slugs and locales a collection holds now, for deciding which events still name an entry; undefined for a collection that cannot be read, which links nothing rather than failing the screen.
+async function heldBy(collection: string): Promise<Set<string> | undefined> {
   try {
-    return (await entries(event.collection, { slug: event.slug, locale: event.locale })).length > 0
+    return new Set((await entries(collection, {})).map(entry => heldKey(entry)))
   }
   catch (error) {
-    log.error(`${event.collection}/${event.slug} could not be read for the activity log`, error)
+    log.error(`${collection} could not be read for the activity log`, error)
 
-    return false
+    return undefined
   }
+}
+
+function heldKey({ slug, locale }: { slug: string, locale?: string | undefined }): string {
+  return `${locale ?? ''}\0${slug}`
 }
 
 // What the activity log reads, every collection's events together and paged; undefined when no collection keeps any.
@@ -301,7 +305,9 @@ export async function activityScreen(page: number | undefined): Promise<Activity
   const shown = pageOf(events, page ?? 1, pageSize)
 
   // An entry renamed, deleted or in the trash since holds no such slug: its earlier rows link nowhere.
-  const rows = await Promise.all(shown.rows.map(async ({ event, title }) => ({ ...event, title, href: await holds(event) ? entryPath(prefix, event) : undefined })))
+  const names = [...new Set(shown.rows.map(({ event }) => event.collection))]
+  const held = new Map(await Promise.all(names.map(async name => [name, await heldBy(name)] as const)))
+  const rows = shown.rows.map(({ event, title }) => ({ ...event, title, href: held.get(event.collection)?.has(heldKey(event)) === true ? entryPath(prefix, event) : undefined }))
 
   return { prefix, page: shown.page, pages: shown.pages, rows }
 }

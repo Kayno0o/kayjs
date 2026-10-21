@@ -108,6 +108,28 @@ describe('activity', () => {
     expect(await hrefs()).toEqual([['restore', 'second', '/admin/collections/notes/second'], ['delete', 'second', '/admin/collections/notes/second'], ['rename', 'second', '/admin/collections/notes/second'], ['add', 'first', undefined]])
   })
 
+  test('reads a collection once for all its rows on a page', async () => {
+    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_reads` })
+    let reads = 0
+
+    restore = registerCollections([['notes', collection({ ...inner, load: async (...args) => {
+      reads++
+
+      return inner.load(...args)
+    } }, { schema })]])
+
+    for (let n = 0; n < 12; n++)
+      await saveEntry({ collection: 'notes', slug: `n${n}`, data: { title: String(n) } }, { create: true })
+
+    reads = 0
+
+    const screen = await activityScreen(1)
+
+    expect(screen?.rows.length).toBe(12)
+    expect(screen?.rows.every(row => row.href !== undefined)).toBe(true)
+    expect(reads).toBeLessThanOrEqual(1)
+  })
+
   test('records the rename above the updates it caused to the entries naming it', async () => {
     restore = registerCollections([
       ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_n` }), { schema, draft: 'draft' })],
