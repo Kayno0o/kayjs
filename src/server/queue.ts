@@ -897,10 +897,13 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
         // A job a worker holds may enqueue another, so the queue is looked at again once it ends, and counts as run, so `drainQueues` looks at every queue again too.
         const waited = [...running]
+        const settled = await Promise.allSettled(waited)
 
-        for (const [at, settled] of (await Promise.allSettled(waited)).entries()) {
-          if (settled.status === 'fulfilled' && settled.value && !counted.has(waited[at]!)) {
-            counted.add(waited[at]!)
+        for (const [at, run] of waited.entries()) {
+          const result = settled[at]
+
+          if (result?.status === 'fulfilled' && result.value && !counted.has(run)) {
+            counted.add(run)
             ran++
           }
         }
