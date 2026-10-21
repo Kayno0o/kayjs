@@ -1,7 +1,6 @@
 ---
-import type { EditorProps } from 'kay/edit'
+import type { DraftEntry, EditorProps } from 'kay/edit'
 import { signal } from 'kay'
-import type { DraftEntry } from 'kay/edit'
 import { showDraft } from 'kay/edit'
 import './draft-editor.css'
 

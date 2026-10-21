@@ -1,3 +1,6 @@
+import { signal } from 'kay'
+import { browserStorage } from './dock'
+
 // A save to a forge shows on the live site only once it has rebuilt, which the editor cannot see end: it remembers when the last such save went through, so the notice outlives leaving edit mode and reloading the page.
 const KEY = 'kcms:rebuilding'
 
@@ -21,4 +24,25 @@ export function rebuildingFor(storage: Pick<Storage, 'getItem'> | undefined, now
   catch {
     return 0
   }
+}
+
+const waiting = signal(false)
+let expiry: ReturnType<typeof setTimeout> | undefined
+
+// Whether a save the site shows only once it has rebuilt went through lately, read again from the browser's storage by `watchRebuild`.
+export const rebuilding = () => waiting()
+
+export function watchRebuild(): void {
+  const left = rebuildingFor(browserStorage())
+
+  clearTimeout(expiry)
+  waiting.set(left > 0)
+
+  if (left > 0)
+    expiry = setTimeout(() => waiting.set(false), left)
+}
+
+export function rebuildStarted(): void {
+  markRebuilding(browserStorage())
+  watchRebuild()
 }

@@ -15,7 +15,8 @@ import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
-import { drafts, rebuilding, watchRebuild } from './drafts'
+import { drafts } from './drafts'
+import { rebuilding, watchRebuild } from './rebuild'
 import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
 import './editor.css'
@@ -349,8 +350,8 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
       .kcms-editor-status(role="status" aria-live="polite")
         if drafts.rendering()
           p {wording('cms.editor.rendering', 'Updating the page…')}
-        else if drafts.stale().length > 0
-          p.kcms-editor-failure {wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => entry.slug).join(', ') })}
+        if drafts.stale().length > 0
+          p.kcms-editor-failure {wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })}
         if rebuilding()
           p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
       if drafts.failure() as failure

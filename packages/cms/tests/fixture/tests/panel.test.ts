@@ -356,3 +356,36 @@ test('the entry header stays on one line on a phone, its buttons reachable', asy
   expect(new Set(head.buttons.map(([top]) => top)).size).toBe(1)
   expect(Math.max(...head.buttons.map(([, right]) => right!))).toBeLessThanOrEqual(390)
 })
+
+test('the editor says a forge save may still be rebuilding, and shows the edits again once the page changes', async () => {
+  const page = await open(1280, 800)
+
+  expect(await page.evaluate(() => document.querySelector('.kcms-editor-status')?.getAttribute('role'))).toBe('status')
+  expect(await page.count('.kcms-editor-status p')).toBe(0)
+  await page.evaluate(() => localStorage.setItem('kcms:rebuilding', String(Date.now())))
+  await page.reload()
+  await page.waitUntil(() => document.querySelector('.kcms-editor-status p') !== null)
+
+  const field = '.kcms-editor input[type="text"]'
+
+  await page.waitUntil(() => document.querySelector('.kcms-editor input[type="text"]') !== null)
+  await page.click(field)
+  await page.type('Edited')
+  await page.evaluate(() => {
+    const posts = { count: 0 }
+    const request = window.fetch.bind(window)
+
+    window.fetch = Object.assign((...args: Parameters<typeof fetch>) => {
+      if (String(args[0]).endsWith('/_kay/draft'))
+        posts.count++
+
+      return request(...args)
+    }, { preconnect: request.preconnect })
+    ;(window as unknown as { posts: typeof posts }).posts = posts
+  })
+  await page.evaluate(() => {
+    history.pushState(null, '', `${location.pathname}${location.search}&again=1`)
+    document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: location.href } }))
+  })
+  await page.waitUntil(() => (window as unknown as { posts: { count: number } }).posts.count > 0)
+})
