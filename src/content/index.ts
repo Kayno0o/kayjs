@@ -276,7 +276,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     if (problems.length > 0) {
       const left = new Set(problems.map(problem => problem.file)).size
 
-      kayLog('warn', `kay: ${left === 1 ? 'a stored entry' : `${left} stored entries`} of ${name} ${left === 1 ? 'does' : 'do'} not match its schema and ${left === 1 ? 'is' : 'are'} left out until fixed, in the CMS${hasSteps(migrations) ? '' : ' or with `migrations` on the collection'}\n${problems.map(problem => `  ${problem.file} ${problem.message}`).join('\n')}`)
+      kayLog('warn', `${left === 1 ? 'a stored entry' : `${left} stored entries`} of ${name} ${left === 1 ? 'does' : 'do'} not match its schema and ${left === 1 ? 'is' : 'are'} left out until fixed, in the CMS${hasSteps(migrations) ? '' : ' or with `migrations` on the collection'}\n${problems.map(problem => `  ${problem.file} ${problem.message}`).join('\n')}`)
     }
 
     return entries

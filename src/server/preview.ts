@@ -281,7 +281,7 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
     return reads
   }
   catch (error) {
-    kayLog('warn', `kay: the page at ${url} could not be rendered to find the entries it shows: ${error instanceof Error ? error.message : String(error)}`)
+    kayLog('warn', `the page at ${url} could not be rendered to find the entries it shows: ${error instanceof Error ? error.message : String(error)}`)
 
     return undefined
   }

@@ -1016,7 +1016,7 @@ console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
       // In a process of its own, as a file run before in this one may have set the app's secret, which leaves the key file alone.
       expect(await isolated(`import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
 console.log(JSON.stringify(sqliteRates(${JSON.stringify(path)}).hit('a', 60_000).count))
-`, `[kay] kay: ${path}.key held no rate-limit key and was replaced\n`)).toBe(1)
+`, `[kay] ${path}.key held no rate-limit key and was replaced\n`)).toBe(1)
       expect((await Bun.file(`${path}.key`).text()).length).toBe(43)
       expect((await readdir(dir)).filter(name => name.includes('.key'))).toEqual(['rates.sqlite.key'])
     }

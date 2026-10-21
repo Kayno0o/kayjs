@@ -93,7 +93,7 @@ export function migrateEntries(name: string, entries: RawEntry[], schema: TSchem
     const { data, changed, error } = migrateData(schema, migrations, entry.data)
 
     if (error !== undefined)
-      kayLog('warn', `kay: a migration of ${name} threw on ${entry.file}`, error)
+      kayLog('warn', `a migration of ${name} threw on ${entry.file}`, error)
 
     return changed ? { ...entry, data } : entry
   })
@@ -118,7 +118,7 @@ export function migrateLoaded(name: string, given: unknown[], schema: TSchema, m
     const { data, changed, error } = migrateData(schema, migrations, entry.data)
 
     if (error !== undefined)
-      kayLog('warn', `kay: a migration of ${name} threw on ${String(entry.slug)}`, error)
+      kayLog('warn', `a migration of ${name} threw on ${String(entry.slug)}`, error)
 
     if (changed) {
       const migrated = { ...entry, data } as LoadedEntry
@@ -162,7 +162,7 @@ async function writeCarried(loader: ContentLoader, carried: Carried[], localized
       held = await loader.load({ preview })
     }
     catch (error) {
-      kayLog('warn', `kay: ${loader.name} could not be read to write its migrated entries back`, error)
+      kayLog('warn', `${loader.name} could not be read to write its migrated entries back`, error)
 
       return
     }
@@ -183,10 +183,10 @@ async function writeCarried(loader: ContentLoader, carried: Carried[], localized
       written++
     }
     catch (error) {
-      kayLog('warn', `kay: ${loader.name}'s save could not write the migrated entry ${entry.slug} back`, error)
+      kayLog('warn', `${loader.name}'s save could not write the migrated entry ${entry.slug} back`, error)
     }
   }
 
   if (written > 0)
-    kayLog('info', `kay: ${written === 1 ? 'an entry' : `${written} entries`} of ${loader.name} carried over by its migrations`)
+    kayLog('info', `${written === 1 ? 'an entry' : `${written} entries`} of ${loader.name} carried over by its migrations`)
 }

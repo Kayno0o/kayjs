@@ -86,7 +86,7 @@ async function entryLocale(root: string): Promise<LocaleState | undefined> {
     return await defaultLocaleState(root, await loadConfig(root))
   }
   catch (error) {
-    kayLog('warn', 'kay: the config failed to load, so an entry\'s refusal is worded in English', error)
+    kayLog('warn', 'the config failed to load, so an entry\'s refusal is worded in English', error)
 
     return undefined
   }

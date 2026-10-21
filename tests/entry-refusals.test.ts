@@ -221,7 +221,7 @@ describe('kay build and kay check', () => {
 
     try {
       expect(await defaultLocaleState(resolve(broken), await loadConfig(resolve(broken)))).toBeUndefined()
-      expect(logged).toEqual(['kay: the site\'s catalogs failed to load, so an entry\'s refusal is worded in English'])
+      expect(logged).toEqual(['the site\'s catalogs failed to load, so an entry\'s refusal is worded in English'])
     }
     finally {
       if (previous)

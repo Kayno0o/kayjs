@@ -204,7 +204,7 @@ export async function devToolFile(file: string): Promise<Response> {
     return new Response(text, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
   }
   catch (error) {
-    kayLog('error', `kay: the dev tool module ${file} could not be served: ${error instanceof Error ? error.message : String(error)}`)
+    kayLog('error', `the dev tool module ${file} could not be served: ${error instanceof Error ? error.message : String(error)}`)
 
     return new Response(null, { status: 404 })
   }

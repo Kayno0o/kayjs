@@ -197,7 +197,7 @@ function ratesKeyFile(path: string): Buffer {
     if (won)
       return won
 
-    kayLog('warn', `kay: ${file} held no rate-limit key and was replaced`)
+    kayLog('warn', `${file} held no rate-limit key and was replaced`)
     renameSync(temp, file)
 
     return key

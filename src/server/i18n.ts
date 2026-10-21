@@ -288,7 +288,7 @@ export async function defaultLocaleState(root: string, config: Pick<KayConfig, '
     return stateFor(i18n, i18n.settings.defaultLocale, '/', new Request('http://localhost/'))
   }
   catch (error) {
-    kayLog('warn', 'kay: the site\'s catalogs failed to load, so an entry\'s refusal is worded in English', error)
+    kayLog('warn', 'the site\'s catalogs failed to load, so an entry\'s refusal is worded in English', error)
 
     return undefined
   }
