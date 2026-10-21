@@ -2,10 +2,9 @@
 import type { KayCommand } from 'kay/library'
 import type { UserMaker } from './pages'
 import process from 'node:process'
-import { setSite } from 'kay/library'
+import { setSite, siteWithBase } from 'kay/library'
 import { CHECK_USER, LOAD_AUTH } from './pages'
 
-const TRAILING_SLASH = /\/$/
 const END_OF_INPUT = '\u0004'
 const INTERRUPT = '\u0003'
 const BACKSPACE = new Set(['\u007F', '\b'])
@@ -147,8 +146,18 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       const roles = values.role as string[] | undefined
 
       // The site the app's auth reads while it loads, as the server sets it before it does.
-      if (config.site !== undefined)
-        setSite(config.site.replace(TRAILING_SLASH, '') + (config.base ?? '').replace(TRAILING_SLASH, ''), config.trailingSlash)
+      // A site or base the server refuses is refused here too, through the same reading.
+      try {
+        const site = siteWithBase(config.site, config.base)
+
+        if (site !== undefined)
+          setSite(site, config.trailingSlash)
+      }
+      catch (error) {
+        console.error(`kay auth create-user: ${error instanceof Error ? error.message : String(error)}`)
+
+        return 1
+      }
 
       try {
         // The app's auth loads, and the login is checked, before a password is asked twice for a user that cannot be made.

@@ -248,6 +248,38 @@ describe('the command in production', () => {
   })
 })
 
+describe('the site the command sets', () => {
+  const siteIn = async (site: string, base?: string) => {
+    const before = configuredSite()
+    let seen: string | undefined
+
+    try {
+      const config: KayConfig = { site, ...base !== undefined && { base }, extensions: [authPages({ auth: async () => {
+        seen = configuredSite()?.origin
+
+        return { auth }
+      } })] }
+      const result = await run(['site@example.com'], PASSWORD, config)
+
+      return { ...result, seen }
+    }
+    finally {
+      setSite(before?.origin)
+    }
+  }
+
+  test('is the origin and the mount point the server sets, a base with a trailing slash included', async () => {
+    expect(await siteIn('https://site.example.test', '/docs/')).toMatchObject({ code: 0, seen: 'https://site.example.test/docs' })
+  })
+
+  test('is refused as the server refuses it, when the site carries a path', async () => {
+    const result = await siteIn('https://site.example.test/docs')
+
+    expect(result.code).toBe(1)
+    expect(result.said).toContain('site is the origin the site is public at')
+  })
+})
+
 describe('the kay command line', () => {
   test('lists the command and runs it on a piped password in the project of the current directory', async () => {
     const cli = `${import.meta.dir}/../../../src/cli.ts`

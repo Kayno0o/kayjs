@@ -30,7 +30,7 @@ import { refuseClashes } from './route-table'
 import { routeMounts, styleChains } from './routes'
 import { islandOnlyChunks } from './save-data'
 import { allowsStyleAttributes } from './security'
-import { configHead, siteOrigin } from './seo'
+import { configHead, siteWithBase } from './seo'
 import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
@@ -105,7 +105,7 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   serveLocales(root, locales)
   const base = basePath(config.base)
   const maxDensity = applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
-  const site = config.site === undefined ? undefined : siteOrigin(config.site) + base
+  const site = siteWithBase(config.site, config.base)
 
   // Holds copies of private files and their variants, so only this user may enter it.
   const imageCache = await privateDir(source.imageCache(root))

@@ -221,6 +221,11 @@ export function siteOrigin(site: string): string {
   return url.origin
 }
 
+// The site as `setSite` takes it: the origin and the mount point of `base`, `undefined` for a config with no `site`.
+export function siteWithBase(site: string | undefined, base: string | undefined): string | undefined {
+  return site === undefined ? undefined : siteOrigin(site) + basePath(base)
+}
+
 function meta(key: 'name' | 'property', name: string, content: string): HeadTag {
   return { tag: 'meta', props: { [key]: name, content } }
 }
