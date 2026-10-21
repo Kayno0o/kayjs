@@ -31,7 +31,7 @@ onMount(() => {
   nav.scrollLeft += tab.left - bar.left - (bar.width - tab.width) / 2
 })
 ---
-// Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll`), except a link to a `#section`, which scrolls to it.
-nav.kui-tab-nav(data-keep-scroll={links.some(link => link.href.includes('#')) ? undefined : ''} {...rest} ref={element => nav = element} aria-label={label} class={className})
+// Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll` on the link), except a link to a `#section`, which scrolls to it.
+nav.kui-tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
   for link of links key={link.href}
-    a.kui-tab-nav-link(href={keptHref(link.href, current, keep)} aria-current={link.href === marked() ? 'page' : undefined}) {link.label}
+    a.kui-tab-nav-link(data-keep-scroll={link.href.includes('#') ? undefined : ''} href={keptHref(link.href, current, keep)} aria-current={link.href === marked() ? 'page' : undefined}) {link.label}

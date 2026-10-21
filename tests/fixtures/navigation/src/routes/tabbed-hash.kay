@@ -4,4 +4,4 @@ import TabNav from '../../../../../packages/ui/src/tab-nav.kay'
 head
   title Tabbed hash
 h1 Tabbed hash
-TabNav(links={[{ href: '/tabbed-hash#one', label: 'One' }, { href: '/tabbed-hash#two', label: 'Two' }]} current="/tabbed-hash#one" label="Sections")
+TabNav(links={[{ href: '/tabbed-hash#one', label: 'One' }, { href: '/tabbed-two', label: 'Page' }]} current="/tabbed-hash#one" label="Mixed")
