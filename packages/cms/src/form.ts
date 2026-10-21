@@ -1,14 +1,18 @@
 import type { Signal } from 'kay'
 import type { Drafts } from './drafts'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
-import { guardLeave, navigate, signal } from 'kay'
+import type { SlugReport } from './slug'
+import { call, effect, guardLeave, navigate, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
+import slugsApi from './api/slugs'
 import { publishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
 import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
+import { fieldsOf } from './fields'
 import { collectionPath, collectionTitle, entryPath, entryTitle, SINGLE_SLUG } from './listing'
+import { checkSlug, slugify } from './slug'
 
 // What the parts of an entry's form read: the drafts, the entry they edit, its collection, and which fields the screen renders.
 export interface FormScope {
@@ -35,6 +39,14 @@ export interface EntryForm extends FormScope {
   // A new entry's slug and locale, typed in the form.
   slug: Signal<string>
   newLocale: Signal<string>
+  // Whether a new entry's slug is written from its title as the title is typed, which typing in the slug box turns off and clearing it turns on again; a saved entry's slug is never touched, nor a loaded collection's.
+  suggestsSlug: Signal<boolean>
+  // Reads the slugs the collection holds, once the screen has loaded, for `slugReport`.
+  readSlugs: () => Promise<void>
+  // Takes the text typed in the slug box, cleaned the way a folder entry's slug is (accents, spaces and case).
+  typeSlug: (text: string) => void
+  // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single.
+  slugReport: () => SlugReport | undefined
   saving: Signal<boolean>
   // Whether the entry has edits not saved yet.
   dirty: () => boolean
@@ -104,6 +116,56 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
+  // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
+  const cleans = collection.kind === 'folder'
+  const suggestsSlug = signal(!first && !collection.single && cleans)
+  const known = signal<{ slug: string, locale?: string | undefined }[]>()
+  const titleKey = fieldsOf(collection.schema).find(field => field.kind === 'text')?.key.toString()
+
+  // The slugs only flag a taken one and a folder typo: the server decides, so a list that cannot be read changes nothing.
+  async function readSlugs(): Promise<void> {
+    if (first || collection.single)
+      return
+
+    try {
+      known.set(await call(slugsApi, '/:collection', { params: { collection: collection.name } }))
+    }
+    catch {
+      known.set(undefined)
+    }
+  }
+
+  // The slug follows the title until the slug is typed in.
+  effect(() => {
+    if (!suggestsSlug() || titleKey === undefined)
+      return
+
+    const title = drafts.value(ref, titleKey)
+
+    untrack(() => {
+      slug.set(typeof title === 'string' ? slugify(title, { final: true }) : '')
+      drafts.dismissWhere(ref, issue => issue.key === 'slug')
+    })
+  })
+
+  function typeSlug(text: string): void {
+    const typed = cleans ? slugify(text) : text
+
+    slug.set(typed)
+    suggestsSlug.set(cleans && typed === '')
+    drafts.dismissWhere(ref, issue => issue.key === 'slug')
+  }
+
+  const slugReport = () => {
+    const list = known()
+
+    if (first || collection.single || list === undefined)
+      return undefined
+
+    const locale = collection.localized ? newLocale() : undefined
+
+    return checkSlug(slug(), list.filter(entry => entry.locale === locale).map(entry => entry.slug))
+  }
 
   drafts.open({ ...ref, data: first?.data ?? collection.seed ?? {}, body: first?.body }, first?.version)
   guardLeave(() => !saving() && drafts.changed(ref))
@@ -150,7 +212,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
       if (first)
         return await saveDraft(drafts, ref, { onSaved })
 
-      const created = { collection: collection.name, slug: slug().trim(), locale: collection.localized ? newLocale() : undefined }
+      const created = { collection: collection.name, slug: cleans ? slugify(slug(), { final: true }) : slug().trim(), locale: collection.localized ? newLocale() : undefined }
 
       if (!await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true, onSaved }))
         return false
@@ -213,6 +275,10 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     },
     slug,
     newLocale,
+    suggestsSlug,
+    readSlugs,
+    typeSlug,
+    slugReport,
     saving,
     dirty: () => drafts.changed(ref) || drafts.blocked(ref).length > 0,
     canSave,

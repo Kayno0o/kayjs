@@ -1,9 +1,11 @@
 ---
 import type { EntryForm } from '../form'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
+import { fieldsOf } from '../fields'
 import { fieldId } from '../paths'
 
 // A new entry's slug and, in a localized collection, its locale. Renders nothing for a saved entry.
@@ -11,6 +13,34 @@ const { form } = props<{ form: EntryForm }>()
 
 // The slug and the locale of a new entry may be refused, as when the slug is taken: each shows its own issue, and an edit of one answers it alone.
 const issueOf = (key: 'slug' | 'locale') => form.drafts.issues(form.entry, '').find(issue => issue.key === key)?.message
+
+// A folder entry's slug can be written from the title, a text field the collection has.
+const writable = form.collection.kind === 'folder' && fieldsOf(form.collection.schema).some(field => field.kind === 'text')
+
+// What the slug typed says of the folders it names, else the standing hint.
+function hintOf(): string | undefined {
+  if (form.collection.kind !== 'folder')
+    return undefined
+
+  const report = form.slugReport()
+  const folder = (path: string) => report?.inside ? `${report.inside}/${path}` : path
+
+  if (report?.near && report.created)
+    return wording('cms.slug.near', 'No folder {folder} yet: did you mean {near}?', { folder: folder(report.created), near: report.near })
+
+  if (report?.created)
+    return wording('cms.slug.creates', 'Creates the folder {folder}', { folder: folder(report.created) })
+
+  if (report?.inside)
+    return wording('cms.slug.inside', 'In the folder {folder}', { folder: report.inside })
+
+  return wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders')
+}
+
+// A slug the collection holds already is flagged as it is typed, and the server refuses it all the same.
+const slugIssue = () => issueOf('slug') ?? (form.slugReport()?.taken ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : undefined)
+
+onMount(() => { void form.readSlugs() })
 
 effect(() => {
   if (form.stored)
@@ -23,8 +53,10 @@ effect(() => {
 ---
 if !form.stored && !form.collection.single
   .kcms-field(id={fieldId(form.entry, 's')})
-    FormField(label={wording('cms.entry.slug', 'Slug')} hint={form.collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} issue={issueOf('slug')} required)
-      TextInput(value={form.slug()} onInput={text => { form.slug.set(text); form.drafts.dismissWhere(form.entry, issue => issue.key === 'slug') }} required)
+    FormField(label={wording('cms.entry.slug', 'Slug')} hint={hintOf()} issue={slugIssue()} required)
+      TextInput(value={form.slug()} onInput={form.typeSlug} required)
+    if writable
+      Checkbox.kcms-slug-suggest(checked={form.suggestsSlug()} onChange={on => form.suggestsSlug.set(on)} label={wording('cms.slug.suggest', 'Write it from the title')})
   if form.collection.localized
     .kcms-field(id={fieldId(form.entry, 'l')})
       FormField(label={wording('cms.entry.locale', 'Locale')} issue={issueOf('locale')} required)

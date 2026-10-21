@@ -211,6 +211,12 @@ export default defineMessages({
       saved: 'Enregistré',
       uploading: 'Un envoi est en cours : enregistrez une fois terminé',
     },
+    slug: {
+      creates: 'Crée le dossier {folder}',
+      inside: 'Dans le dossier {folder}',
+      near: 'Aucun dossier {folder} pour l\'instant : vouliez-vous {near} ?',
+      suggest: 'L\'écrire d\'après le titre',
+    },
     store: {
       changed: 'Cette entrée a changé depuis que vous l\'avez ouverte, par une autre personne ou par le site',
       conflict: 'Cette entrée a été enregistrée depuis que vous l\'avez ouverte, par un autre enregistrement ou par le vôtre avant que le site ne soit reconstruit',

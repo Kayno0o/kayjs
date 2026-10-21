@@ -285,6 +285,11 @@
   display: none;
 }
 
+/* The option under the slug, tall enough to tap on a phone. */
+.kcms-slug-suggest {
+  min-height: 1.5rem;
+}
+
 /* A word before or after a control, such as a currency, beside it on one line. */
 .kcms-adorned {
   display: flex;

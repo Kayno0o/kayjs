@@ -385,6 +385,14 @@ The form also checks as you type. A field with a minimum or maximum length, a pa
 
 A JSON box that does not parse blocks the save. It says `Meta is not valid JSON` under the box, and nothing is sent until you fix it. A slug that is already taken is marked on the slug field, and typing another one clears it.
 
+### Writing the slug
+
+On a new entry of a folder collection, the slug writes itself from the title as you type it, so `Été à la ferme` becomes `ete-a-la-ferme`. Typing in the slug box takes over and turns that off. The checkbox under the box turns it on again, and so does clearing the box.
+
+What you type in the slug box is cleaned as you type: accents go, spaces become dashes and capitals become lowercase. A `/` stays, to put the entry in a folder. A loaded collection keeps the slug as typed.
+
+The slug is marked as taken the moment the collection holds it. Under the box the form says which folder the entry lands in, which folder it creates, and when a new folder looks like a typo of an existing one (`No folder guidse yet: did you mean guides?`). It reads the slugs from `GET /api/cms/slugs/:collection`, for signed-in editors only.
+
 ## Arranging a collection
 
 The screens read each collection's schema. To change how one looks, name it in `cms({ collections })`:

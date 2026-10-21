@@ -86,6 +86,8 @@ describe('the API guard', () => {
       expect(await admitted(context('GET', '/entries/posts/other', 'posts/hello'))).toBe(false)
       expect(await admitted(context('HEAD', '/entries/orders/42', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/orders/42', ''))).toBe(false)
+      // The slugs of a collection are no entry the pages read.
+      expect(await admitted(context('GET', '/slugs/posts', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/posts%2Forders/42', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/%E0%A4%A/42', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/posts/a/b', 'posts/hello'))).toBe(false)

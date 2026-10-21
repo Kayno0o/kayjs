@@ -19,14 +19,14 @@ const talks: ScreenCollection = { name: 'talks', kind: 'folder', localized: fals
 const ahead = new Date(Date.now() + 86_400_000).toISOString()
 const talk = (data: Record<string, unknown>) => ({ slug: 'talk', data, draft: false, version: 'v1', url: '/talks/talk' }) as StoredEntry
 
-interface Sent { method: string, body: { data: Record<string, unknown>, version?: string } }
+interface Sent { method: string, url: string, body: { data: Record<string, unknown>, version?: string } }
 
 // The entries API answering after `wait` with `answer`, recording what was sent.
 function server(answer: (count: number) => unknown, wait = 10) {
   const sent: Sent[] = []
 
-  spyOn(globalThis, 'fetch').mockImplementation((async (_input: string | URL | Request, init?: RequestInit) => {
-    sent.push({ method: init?.method ?? 'GET', body: init?.body === undefined ? {} : JSON.parse(String(init.body)) } as Sent)
+  spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request, init?: RequestInit) => {
+    sent.push({ method: init?.method ?? 'GET', url: String(input instanceof Request ? input.url : input), body: init?.body === undefined ? {} : JSON.parse(String(init.body)) } as Sent)
     await Bun.sleep(wait)
 
     return Response.json(answer(sent.length))
@@ -52,6 +52,18 @@ describe('Save', () => {
     form.reset()
     expect([form.dirty(), form.canSave()]).toEqual([false, false])
     expect(createEntryForm({ prefix: '/admin', collection: talks }).canSave()).toBe(true)
+  })
+
+  test('creates a new entry under its slug cleaned of accents, spaces and case, or written from its title', async () => {
+    const sent = server(() => ({ saved: true, version: 'v1' }))
+    const typed = createEntryForm({ prefix: '/admin', collection: talks })
+
+    typed.drafts.set(typed.entry, 'title', 'Été à la ferme')
+    await Bun.sleep(5)
+    expect(typed.slug()).toBe('ete-a-la-ferme')
+    typed.typeSlug(' Notes / Œufs du Marché ')
+    await typed.save()
+    expect(sent.map(each => decodeURIComponent(each.url))).toEqual(['/api/cms/entries/talks/notes/oeufs-du-marche'])
   })
 
   test('sends nothing when asked with nothing to save', async () => {
