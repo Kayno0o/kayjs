@@ -9,7 +9,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
-import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
+import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutput, readClientSources, writeClasses } from '../build/client'
 import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
@@ -58,6 +58,8 @@ interface Built {
   styleUses?: StyleUses | undefined
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
+  // The class table the islands were built with, as JSON.
+  classTable: string | undefined
   // The manifest as written: another one in its place, as a server building its own client writes, means building everything again.
   manifest: string
 }
@@ -157,7 +159,9 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     // By real path, as the bundler names its inputs.
     const files = (changed ?? []).map(file => join(realRoot, file))
     const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file))
+    const classTable = await classTableOf(root, sources)
+    const classTableText = classTable && JSON.stringify(classTable)
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file)) || previous.classTable !== classTableText
     const stylesAgain = !previous || await stylesChanged(previous, sources, texts)
 
     // A rewrite still going stops after the map it is on, so it never writes over the maps of the build that is starting.
@@ -176,8 +180,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
     await writeClasses(root, sources.classes)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
-    const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...(styles ? styles.uses : previous!.styleUses) && { styleUses: (styles ? styles.uses : previous!.styleUses)! }, problems: sources.problems, options: key }
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options, classTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...(styles ? styles.uses : previous!.styleUses) && { styleUses: (styles ? styles.uses : previous!.styleUses)! }, problems: sources.problems, options: key }
     const text = JSON.stringify(manifest)
 
     await Bun.write(join(output, MANIFEST), text)
@@ -214,6 +218,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       styleUses: styles ? styles.uses : previous!.styleUses,
       read: styles ? readInputs(styleInputs, signatures, words) : Promise.resolve(),
       classes: styles ? undefined : previous!.classes,
+      classTable: classTableText,
       manifest: text,
     }
 

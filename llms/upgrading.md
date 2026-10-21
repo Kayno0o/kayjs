@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.70.0
+
+### A later Tailwind class overrides an earlier one
+
+With Tailwind, classes merged from the shorthand, `class`, a spread and a component's `class` prop no longer both stay when they set the same property under the same variants: the later one wins, so a `twMerge` or `cn` around a component's class can go. An element that relied on both staying, `.p-4(class="p-6")`, now has `p-6` alone; nothing for `kay upgrade` to rewrite, as the old form is a CSS-order accident ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
+
 ## 1.69.0
 
 ### `guards` and `layouts` held in a variable, and a spread in an endpoint or `api()`, are errors

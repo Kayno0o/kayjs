@@ -2,6 +2,7 @@ import type { ClientOptions } from '../build/client'
 import type { SizeReport } from '../build/report'
 import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
+import type { ClassTable } from '../runtime/class-table'
 import type { ServerIslandMode } from '../runtime/html'
 import type { FixedText } from './compress'
 import type { DictionaryRef } from './dictionary'
@@ -13,6 +14,7 @@ import { pruneUnescaped, styledClassNames } from '../build/class-rules'
 import { writeIfChanged } from '../build/files'
 import { parse, print } from '../build/supports'
 import { joinBase, NOWHERE } from '../runtime/base'
+import { installClassTable } from '../runtime/class-table'
 import { kayLog } from '../runtime/log'
 import { unrebaseCss } from './base'
 
@@ -32,6 +34,8 @@ export interface ClientManifest {
   styles: Record<string, string>
   // Which classes the stylesheets style each of them names.
   styleUses?: StyleUses
+  // Which Tailwind classes another overrides, for the merge of a class list on the server and in the islands.
+  classTable?: ClassTable
   // The pages `kay build` rendered, by URL path.
   pages?: Record<string, PrerenderedPage>
   // The site they were rendered for, its origin and base: a server running for another renders them again.
@@ -576,6 +580,8 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
 }
 
 export function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {
+  installClassTable(manifest.classTable)
+
   return {
     ...manifest,
     dir,

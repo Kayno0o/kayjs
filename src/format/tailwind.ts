@@ -4,19 +4,24 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles } from '../build/files'
 import { stylesheetPath, TAILWIND_IMPORT } from '../dev/tailwind'
 
-interface Design {
+export interface Design {
   getClassOrder: (classes: string[]) => [string, bigint | null][]
+  // The CSS each class compiles to, or null for one Tailwind does not know.
+  candidatesToCss: (classes: string[]) => (string | null)[]
 }
 
 type LoadDesign = (css: string, options: object) => Promise<Design>
 
 // Where the entry stylesheet usually is, tried before the others.
 const ENTRY = 'src/app.css'
+// The imports of Tailwind's parts, which an app writing its layers by hand uses in place of the whole.
+const PARTS_IMPORT = /@import\s+(?:url\(\s*)?['"]tailwindcss\/(?:theme|utilities)\.css['"]/
 const PACKAGE_NAME = /^(?:@[^/]+\/)?[^/]+/
 
 // A design system and every stylesheet it read with the time each was last changed, so an edit to any of them loads it again.
 interface Loaded {
   sorter: ClassSorter | undefined
+  design: Design | undefined
   files: Map<string, number>
 }
 
@@ -25,44 +30,56 @@ const loads = new Map<string, { entry: string, loaded: Promise<Loaded> }>()
 // Tailwind's own order for a class list, from the design system of the app's `tailwindcss` and its entry stylesheet, as `eslint-plugin-better-tailwindcss` orders a class string: unknown classes first as written, then by Tailwind's index.
 // Undefined when the app does not use Tailwind or its design system does not load, which leaves the classes as written; a design system that did not load is tried again on the next call.
 export async function tailwindSorter(root: string): Promise<ClassSorter | undefined> {
-  const entry = await tailwindEntry(root)
+  return (await tailwindLoad(root, false))?.sorter
+}
+
+// The design system of the app's Tailwind, loaded as the sorter's is and kept while no stylesheet it read changes; undefined when the app does not use Tailwind or it does not load.
+export async function tailwindDesign(root: string): Promise<Design | undefined> {
+  return (await tailwindLoad(root, true))?.design
+}
+
+async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | undefined> {
+  const entry = await tailwindEntry(root, parts)
+  const key = `${root}\0${parts}`
 
   if (entry === undefined)
     return undefined
 
-  const known = loads.get(root)
+  const known = loads.get(key)
 
   if (known?.entry === entry) {
-    const { sorter, files } = await known.loaded
+    const loaded = await known.loaded
 
-    if (sorter && [...files].every(([file, stamp]) => Bun.file(file).lastModified === stamp))
-      return sorter
+    if (loaded.sorter && [...loaded.files].every(([file, stamp]) => Bun.file(file).lastModified === stamp))
+      return loaded
   }
 
   const loaded = loadDesign(entry)
 
-  loads.set(root, { entry, loaded })
+  loads.set(key, { entry, loaded })
 
-  return (await loaded).sorter
+  return loaded
 }
 
-async function tailwindEntry(root: string): Promise<string | undefined> {
+async function tailwindEntry(root: string, parts: boolean): Promise<string | undefined> {
   const preferred = join(root, ENTRY)
 
-  if (await importsTailwind(preferred))
+  if (await importsTailwind(preferred, parts))
     return preferred
 
   for (const file of (await findProjectFiles(root, CSS_FILE, { project: true, ownKayOnly: true })).toSorted()) {
-    if (await importsTailwind(file))
+    if (await importsTailwind(file, parts))
       return file
   }
 
   return undefined
 }
 
-async function importsTailwind(file: string): Promise<boolean> {
+async function importsTailwind(file: string, parts: boolean): Promise<boolean> {
   try {
-    return TAILWIND_IMPORT.test(await Bun.file(file).text())
+    const text = await Bun.file(file).text()
+
+    return TAILWIND_IMPORT.test(text) || (parts && PARTS_IMPORT.test(text))
   }
   catch {
     return false
@@ -93,12 +110,13 @@ function assertResolvable(id: string, from: string): void {
 
 async function loadDesign(entry: string): Promise<Loaded> {
   const files = new Map([[entry, Bun.file(entry).lastModified]])
+  const design = await loadDesignSystem(entry, files)
 
-  return { sorter: await designSorter(entry, files), files }
+  return { sorter: design && (classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)), design, files }
 }
 
 // Runs the project's own Tailwind plugin and config modules, as its build does, so the order holds for the utilities they add; none that is not installed.
-async function designSorter(entry: string, files: Map<string, number>): Promise<ClassSorter | undefined> {
+async function loadDesignSystem(entry: string, files: Map<string, number>): Promise<Design | undefined> {
   try {
     const base = dirname(entry)
 
@@ -126,10 +144,7 @@ async function designSorter(entry: string, files: Map<string, number>): Promise<
       },
     })
 
-    if (design === undefined)
-      return undefined
-
-    return classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)
+    return design
   }
   catch {
     return undefined

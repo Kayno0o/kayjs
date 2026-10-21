@@ -1,0 +1,5 @@
+---
+const { class: className } = props<{ class?: string }>()
+---
+.box.p-4.text-sm.text-red-500(class={className})
+  slot

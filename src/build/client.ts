@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
 import type { KayConfig, KayExtension } from '../config'
+import type { ClassTable } from '../runtime/class-table'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
 import type { ImportGraph, KayLibrary } from './libraries'
@@ -24,6 +25,7 @@ import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
+import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
 import { fileWords } from './libraries'
 import { packagesOf } from './licenses'
@@ -113,6 +115,8 @@ export interface ClientSources {
   // What makes each island one, by id, as `onClick, line 4`; for a static component that may render as one, what may.
   why: Map<string, IslandWhy>
   classes: Set<string>
+  // Every word of the components, which the class table is read from.
+  words: Set<string>
   // The classes each component writes as the `.class` shorthand, by file.
   shorthand: Map<string, string[]>
   problems: string[]
@@ -150,8 +154,9 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   await clearClientOutput(root)
   await writeClasses(root, sources.classes)
 
-  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options))
-  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
+  const classTable = await classTableOf(root, sources)
+  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable), bundleStyles(root, sources, options))
+  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...classTable && { classTable }, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
   if (options.sourcemap === 'external')
     await keepMaps(root, scripts.maps)
@@ -223,6 +228,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const islands = new Map<string, string>()
   const why = new Map<string, IslandWhy>()
   const classes = new Set<string>()
+  const words = new Set<string>()
   const shorthand = new Map<string, string[]>()
   const diagnostics: FileDiagnostic[] = []
   const { files, own, mounted, editor, libraries, fromLibraries } = await buildFiles(root, options.extensions, graph)
@@ -262,6 +268,9 @@ export async function readClientSources(root: string, options: ClientOptions = {
     for (const name of compiled.classes)
       classes.add(name)
 
+    for (const word of fileWords(file))
+      words.add(word)
+
     shorthand.set(file, [...compiled.classes])
   }
 
@@ -295,7 +304,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routesDir = projectPaths(root, options).routes
 
   // The editor gathers its stylesheet as a page does, an app's own file or not.
-  return { islands, why, classes, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
+  return { islands, why, classes, words, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.
@@ -312,8 +321,15 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
   await writeIfChanged(projectPaths(root).classes, [...classes].sort().join('\n'))
 }
 
+// The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
+export async function classTableOf(root: string, { words }: Pick<ClientSources, 'words'>): Promise<ClassTable | undefined> {
+  const markup = await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })
+
+  return buildClassTable(root, markup.flatMap(file => fileWords(file)).concat([...words]))
+}
+
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions, classTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -341,6 +357,8 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     ...options.search ? ['import { arrive } from \'kay/arrival\''] : [],
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
+    // The merge of an island's classes reads the table the server sets for its own render.
+    ...classTable !== undefined && islands.size > 0 ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.classTable')] = ${JSON.stringify(classTable)}`, ''] : [],
     `const islands = {${registry === '' ? '' : `\n${registry}\n`}}`,
     'const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     '',

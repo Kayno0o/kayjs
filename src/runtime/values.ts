@@ -1,5 +1,6 @@
 // How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
 
+import { resolveClasses } from './class-table'
 import { kayLog } from './log'
 import { isVouched } from './safe-html'
 
@@ -112,6 +113,7 @@ export function flattenClasses(list: readonly unknown[], result: Record<string, 
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
+// An array is several sources merged, so a Tailwind class a later one overrides is left out; see `resolveClasses`.
 export function classText(value: unknown): string {
   if (typeof value === 'number')
     return String(value)
@@ -130,7 +132,7 @@ export function classText(value: unknown): string {
       result += result ? ` ${key}` : key
   }
 
-  return result
+  return Array.isArray(value) ? resolveClasses(result) : result
 }
 
 // The `class` a component gets when its call merges a shorthand, a `class` attribute or a spread's: one string, as a `class?: string` prop takes it, or none when nothing is set.

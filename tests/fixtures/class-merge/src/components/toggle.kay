@@ -1,0 +1,4 @@
+---
+const on = signal(false)
+---
+button.p-2.bg-red-500(class={{ 'p-4': on() }} onClick={() => on.set(true)}) toggle
