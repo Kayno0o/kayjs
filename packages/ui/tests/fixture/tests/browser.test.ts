@@ -254,9 +254,18 @@ inBrowser('LineChart long axis labels', () => {
       expect(labels.filter(label => !label.inside || label.lines !== 1)).toEqual([])
     }
 
-    // An app's own offset wins: a label's box is the offset less 10 px, so 40, and the labels may overflow it.
+    // The top gridline, which sits at the chart's top padding.
+    const top = (id: string) => page.evaluate(((within: string) => Math.min(...[...document.querySelectorAll(`#${within} .ct-grid.ct-vertical`)].map(grid => Number(grid.getAttribute('y1'))))) as never, id as never) as Promise<number>
+
+    // An app's own offset wins: a label's box is the offset less 10 px, so 40, and the labels may overflow it. The top padding grows to the labels' height once the fit has redrawn the chart, which the check waits for.
     await page.waitFor('#long-axis-own .kui-line-chart-plot svg .ct-line')
+    await page.waitUntil((() => Number(document.querySelector('#long-axis-own .ct-grid.ct-vertical')?.getAttribute('y1')) > 8) as never)
     expect(await page.evaluate(() => Number(document.querySelector('#long-axis-own .ct-label.ct-vertical')!.parentElement!.getAttribute('width')))).toBe(40)
+
+    // An own chartPadding wins too, once the labels have said how much room they need.
+    await page.waitFor('#long-axis-padding .kui-line-chart-plot svg .ct-line')
+    await page.waitUntil(((within: string) => Number(document.querySelector(`#${within} .ct-label.ct-vertical`)?.parentElement?.getAttribute('width')) > 30) as never, {}, 'long-axis-padding' as never)
+    expect(await top('long-axis-padding')).toBe(2)
     expect(page.errors).toEqual([])
   }, 120_000)
 })

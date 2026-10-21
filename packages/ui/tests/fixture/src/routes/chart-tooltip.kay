@@ -29,3 +29,5 @@ main
     LineChart(label="Stacked throughput" labels={['a', 'b', 'c']} stacked formatValue={value => `${(value / 1048576).toFixed(1)} MiB/s`} series={[{ name: 'Read', values: [0, 4e8, 3e8] }, { name: 'Write', values: [1e8, 4e8, 3e8] }]} xLabels)
   article#long-axis-own
     LineChart(label="Own offset" labels={['a', 'b', 'c']} formatValue={value => `${value} units per second`} options={{ axisY: { offset: 50 } }} series={[{ name: 'Read', values: [0, 8, 3] }]})
+  article#long-axis-padding
+    LineChart(label="Own padding" labels={['a', 'b', 'c']} formatValue={value => `${value} units per second`} options={{ chartPadding: { top: 2 } }} series={[{ name: 'Read', values: [0, 8, 3] }]})
