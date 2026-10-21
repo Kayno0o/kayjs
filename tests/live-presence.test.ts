@@ -16,8 +16,9 @@ import { fixtureCopy, scratchDir } from './scratch'
 const ROOT = 'tests/fixtures/live-presence'
 // The grace a tab that left is kept in its room for, shortened from 3 s; the tests wait twice that to see a tab kept or taken out.
 const GRACE_MS = 600
-
-presenceGrace.ms = GRACE_MS
+// A browser reconnects slower than a request, so its tests keep a longer grace.
+const BROWSER_GRACE_MS = 1500
+const SERVER_GRACE = presenceGrace.ms
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const ROOM = 'kay:presence:entry:1'
 const ANN = '{"name":"Ann"}'
@@ -62,11 +63,15 @@ describe('presence on the server', () => {
   let rooms: ReturnType<typeof memoryRooms>
 
   beforeAll(async () => {
+    presenceGrace.ms = GRACE_MS
     rooms = memoryRooms()
     site = await testSite({ root: ROOT, store: { rooms } })
   })
 
-  afterAll(async () => site.close())
+  afterAll(async () => {
+    presenceGrace.ms = SERVER_GRACE
+    await site.close()
+  })
 
   it('puts the room and member a page read into its proof, and nothing into a page with none', async () => {
     const { html, keys, proofs } = await visit(site, '/entry/1', 'Ann')
@@ -379,10 +384,14 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
   let site: TestSite
 
   beforeAll(async () => {
+    presenceGrace.ms = BROWSER_GRACE_MS
     site = await testSite({ root: ROOT, browser: { path: chrome } })
   }, 120_000)
 
-  afterAll(async () => site?.close())
+  afterAll(async () => {
+    presenceGrace.ms = SERVER_GRACE
+    await site?.close()
+  })
 
   it('lists the other tab\'s member in each of two tabs, and empties the list of the one left when the other closes', async () => {
     await using ann = await site.open('/entry/1?as=Ann')
@@ -427,7 +436,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await Bun.sleep(GRACE_MS * 2)
+    await Bun.sleep(BROWSER_GRACE_MS * 2)
     expect(await watching.text('p.names')).toBe('Ann')
   }, 30_000)
 
@@ -444,7 +453,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
     })
     await leaving.click('a.same')
     await leaving.waitUntil(() => location.search === '?as=Ann&n=2')
-    await Bun.sleep(GRACE_MS * 2)
+    await Bun.sleep(BROWSER_GRACE_MS * 2)
     expect(await watching.evaluate(() => (Reflect.get(window, 'seen') as string[]).filter(text => text !== 'Ann'))).toEqual([])
     expect(await watching.text('p.names')).toBe('Ann')
     await leaving.click('a.plain')

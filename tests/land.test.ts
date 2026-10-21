@@ -228,7 +228,7 @@ describe('landing', () => {
 
     await running.saying('waiting for another landing to finish')
     // Pushing without the lock would take no longer than this.
-    await Bun.sleep(300)
+    await Bun.sleep(800)
     expect(await tree()).not.toContain('a.txt')
     await holder.stdin.end()
 
