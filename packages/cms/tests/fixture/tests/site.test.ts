@@ -836,6 +836,48 @@ test('the media library lists an upload with its name, size and the entries usin
   }
 })
 
+test('in the browser, the media library renames an upload in place and deletes an unused one after a confirm', async () => {
+  const built = await browser()
+  const upload = async (salt: number, name: string) => {
+    const form = new FormData()
+
+    form.append('file', new File([PIXEL, new Uint8Array([salt])], name, { type: 'image/png' }))
+
+    return ((await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
+  }
+  const [used, stray] = [await upload(11, 'in use.png'), await upload(12, 'stray.png')]
+
+  products.push({ slug: 'crate', data: { name: 'Crate', photo: used } as { name: string } })
+  // An upload under a day old is kept, so time moves on.
+  setSystemTime(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
+
+  try {
+    await using page = await built.open('/admin/media')
+    const names = async () => page.evaluate(() => [...document.querySelectorAll('.kcms-media tbody tr')].map(row => row.textContent ?? ''))
+
+    await page.click('button[aria-label="Rename stray.png"]')
+    await page.fill('input[aria-label="New name of stray.png"]', 'Spare part.png')
+    await page.press('Enter')
+    await page.waitUntil(() => [...document.querySelectorAll('.kcms-media tbody tr')].some(row => row.textContent?.includes('Spare part.png') === true))
+    expect((await names()).some(row => row.includes('stray.png'))).toBe(false)
+    expect((await built.fetch(stray)).status).toBe(200)
+
+    // A used upload cannot be deleted, an unused one asks first.
+    expect(await page.evaluate(() => document.querySelector('button[aria-label="Delete in use.png"]') === null)).toBe(true)
+    await page.click('button[aria-label="Delete Spare part.png"]')
+    await page.waitUntil(() => document.querySelector('dialog[open]') !== null)
+    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')].find(button => button.textContent?.trim() === 'Delete')!.click())
+    await page.waitUntil(() => ![...document.querySelectorAll('.kcms-media tbody tr')].some(row => row.textContent?.includes('Spare part.png') === true))
+    expect((await built.fetch(stray)).status).toBe(404)
+    expect((await built.fetch(used)).status).toBe(200)
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    setSystemTime()
+    products.splice(products.findIndex(product => product.slug === 'crate'), 1)
+  }
+}, 60_000)
+
 test('an image field previews what it holds, takes a drop or a pick, and still a typed path', async () => {
   const page = await site.visit('/admin/collections/products/mug')
 

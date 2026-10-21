@@ -8,6 +8,8 @@ export interface MediaRecord {
   by?: string | undefined
   // Absent for an upload sent before the library, which the file's own date stands in for.
   at?: number | undefined
+  // The keys of the older per-collection uploads this one replaced, which the library and the pickers no longer list.
+  from?: string[] | undefined
 }
 
 // Where every new upload goes, whatever the collection, named by the hash of its bytes so a file sent twice is stored once.
@@ -129,4 +131,42 @@ export async function forgetUploads(keys: string[]): Promise<void> {
 
     return known.length > 0
   })
+}
+
+// One older upload copied into the shared folder: `done` once every entry naming it points at the copy, which hides the old file from the library.
+export interface Adoption {
+  from: string
+  to: string
+  size: number
+  at?: number | undefined
+  done: boolean
+}
+
+// Records the copies of older uploads in the shared folder, carrying the name an older upload was renamed to; a record the copy already has keeps its own name.
+export async function adoptUploads(moves: Adoption[]): Promise<void> {
+  await change((index) => {
+    let changed = false
+
+    for (const move of moves) {
+      const old = index[move.from]
+      const record: MediaRecord = index[move.to] ?? { name: old?.name ?? move.from.split('/').at(-1)!, size: move.size, ...old?.by !== undefined && { by: old.by }, ...(old?.at ?? move.at) !== undefined && { at: old?.at ?? move.at } }
+
+      if (index[move.to] === undefined)
+        changed = true
+
+      if (move.done && !(record.from ?? []).includes(move.from)) {
+        record.from = [...record.from ?? [], move.from]
+        changed = true
+      }
+
+      index[move.to] = record
+    }
+
+    return changed
+  })
+}
+
+// The keys of older uploads whose copy in the shared folder took their place.
+export function movedKeys(index: Record<string, MediaRecord>): Set<string> {
+  return new Set(Object.values(index).flatMap(record => record.from ?? []))
 }

@@ -224,7 +224,7 @@ test('the library lists every upload with the entries using it, its record and w
 
   expect(fresh.uploads.map(found => found.key).toSorted()).toEqual([shared, legacy].toSorted())
   expect(fresh.uploads.find(found => found.key === shared)).toMatchObject({ name: 'team.png', by: 'Ada', size: PIXEL.length, width: 1, height: 1, usedIn: [{ collection: 'posts', slug: 'a' }, { collection: 'posts', slug: 'b' }], deletable: false })
-  expect(fresh.uploads.find(found => found.key === legacy)).toMatchObject({ name: legacy.split('/').at(-1), usedIn: [], deletable: false })
+  expect(fresh.uploads.find(found => found.key === legacy)).toMatchObject({ name: legacy.split('/').at(-1), size: PIXEL.length, usedIn: [], deletable: false })
 
   aged()
 
@@ -245,4 +245,26 @@ test('the shared folder\'s uploads are listed when unused, kept when an entry me
   expect(await unusedKeys()).toEqual([stray])
   expect(await deleteUnusedUploads([kept, stray])).toEqual({ deleted: [stray], kept: [kept] })
   expect(Object.keys(await mediaIndex())).toEqual([kept])
+})
+
+test('the library pages its uploads, newest first, keeps a search to the page it fills and reads the size of an upload with no record', async () => {
+  const legacy = await upload('posts')
+
+  for (let i = 0; i < 49; i++)
+    await storeUpload(new File([PIXEL, new Uint8Array([i + 1])], `photo ${i}.png`, { type: 'image/png' }))
+
+  const first = await libraryUploads()
+  const second = await libraryUploads({ page: 2 })
+  const beyond = await libraryUploads({ page: 99 })
+
+  if ('blocked' in first || 'blocked' in second || 'blocked' in beyond)
+    throw new Error('blocked')
+
+  expect([first.uploads.length, first.pages, first.total, second.uploads.length, second.page, beyond.page]).toEqual([48, 2, 50, 2, 2, 2])
+  expect(new Set([...first.uploads, ...second.uploads].map(found => found.key)).size).toBe(50)
+  expect([...first.uploads, ...second.uploads].find(found => found.key === legacy)?.size).toBe(PIXEL.length)
+
+  const found = await libraryUploads({ q: 'PHOTO 7' })
+
+  expect('uploads' in found && found.uploads.map(each => each.name)).toEqual(['photo 7.png'])
 })

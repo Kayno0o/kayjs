@@ -6,6 +6,7 @@ import { collectionInfo, collections } from './kay/content'
 import { missingKindLines } from './kinds'
 import { bodylessLayout, layoutProblems, whenProblems } from './layout'
 import { log } from './log'
+import { migrateUploads } from './migrate-uploads'
 import { pageLinkLoader } from './page-link'
 import { configure, settings } from './settings'
 
@@ -57,6 +58,17 @@ export function cms(options: CmsOptions = {}): KayExtension {
         }
         catch (error) {
           log.warn('the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none', error)
+        }
+
+        // Uploads an older release kept in a folder per collection move to the shared folder, once and without the app asking.
+        try {
+          const { moved, pending } = await migrateUploads()
+
+          if (moved > 0 || pending > 0)
+            log.info(`${moved} older uploads moved to the shared folder${pending > 0 ? `, ${pending} waiting for an entry that could not be saved` : ''}`)
+        }
+        catch (error) {
+          log.warn('the older uploads could not be moved to the shared folder', error)
         }
       })
 

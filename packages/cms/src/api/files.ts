@@ -3,7 +3,7 @@ import { api, files, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
 import { collections } from '../kay/content'
-import { MEDIA_FOLDER, mediaIndex, renameUpload, storeUpload } from '../media'
+import { MEDIA_FOLDER, mediaIndex, movedKeys, renameUpload, storeUpload } from '../media'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
@@ -27,8 +27,9 @@ export default api({ bodyLimit: uploadBodyLimit })
   .get('/:collection', async ({ params, query }) => {
     const collection = await collectionNamed(params.collection)
     const stored = (await Promise.all(uploadFolders(collection.name).map(async folder => files.list({ folder })))).flat()
-    const wanted = stored.filter(file => query.images !== 'true' || typeOfName(file.key).startsWith('image/'))
     const index = await mediaIndex()
+    const moved = movedKeys(index)
+    const wanted = stored.filter(file => !moved.has(file.key) && (query.images !== 'true' || typeOfName(file.key).startsWith('image/')))
 
     return wanted.toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: index[file.key]?.name ?? file.key.split('/').at(-1) ?? file.key }))
   }, { query: s.Object({ images: s.Optional(s.String()) }) })

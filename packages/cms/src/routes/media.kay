@@ -2,6 +2,8 @@
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { s } from 'kay'
 import { wording } from 'kay/words'
 import MediaLibrary from '../components/media-library.kay'
 import { denials } from '../access'
@@ -10,8 +12,12 @@ import { libraryUploads } from '../orphans'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
 
+export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
+
 const { prefix } = settings()
-const scan = await libraryUploads()
+const url = ctx.url
+const search = ctx.query.q ?? ''
+const scan = await libraryUploads({ page: ctx.query.page, q: search })
 const denied = await denials(ctx)
 ---
 head
@@ -23,4 +29,12 @@ PageSection(title={wording('cms.admin.media', 'Media')} level={1})
   if 'blocked' in scan
     EmptyState(title={wording('cms.media.blocked', 'Uploads cannot be listed')} description={wording('cms.uploads.blockedHint', '{reasons}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.', { reasons: scan.blocked.join('; ') })})
   else
+    .kcms-tools
+      form.kcms-search(method="get" role="search")
+        input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.media.filter', 'Search the uploads')})
+        if search !== ''
+          Button(href={screenPath(prefix, '/media')} label={wording('cms.admin.clearSearch', 'Clear search')} variant="ghost")
+    if search !== ''
+      p.kcms-count(role="status") {wording('cms.admin.resultCount', scan.total === 1 ? '1 result' : '{count} results', { count: scan.total })}
     MediaLibrary(uploads={scan.uploads} prefix={prefix} denied={denied})
+    Pagination(page={scan.page} pages={scan.pages} url={url})

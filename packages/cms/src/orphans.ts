@@ -3,7 +3,7 @@ import { files } from 'kay/server'
 import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
 import { log } from './log'
-import { forgetUploads, MEDIA_FOLDER, mediaIndex } from './media'
+import { forgetUploads, MEDIA_FOLDER, mediaIndex, movedKeys } from './media'
 import { uploadFolder } from './uploads'
 
 export interface UnusedUpload {
@@ -32,16 +32,16 @@ interface Stored {
   modified?: Date | undefined
 }
 
-interface Read {
+export interface Read {
   stored: Stored[]
   // The entries mentioning each upload's id.
   usedBy: Map<string, Map<string, EntryRef>>
 }
 
-const idOf = (key: string) => KEY_ID.exec(key)?.[1]
+export const idOf = (key: string) => KEY_ID.exec(key)?.[1]
 
 // Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
-async function readUploads(): Promise<Read | { blocked: string[] }> {
+export async function readUploads(): Promise<Read | { blocked: string[] }> {
   const blocked: string[] = []
   // Only the names: a loaded collection's loader runs once, in `entries`, and not again to count its entries.
   const listed = await collections({ counts: false })
@@ -128,17 +128,53 @@ export interface LibraryUpload {
 
 const DIMENSIONS = /\.(\d+)x(\d+)(?:-[\da-f]{6})?\.[a-z\d]{1,10}$/
 
-// Every upload, the newest first, with the entries using it and what the index knows of it, or why they cannot be told.
-export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | { blocked: string[] }> {
+// How many uploads a page of the library holds.
+export const LIBRARY_PAGE = 48
+
+// The size of a stored file, which an upload sent before the library has no record of; undefined when the store cannot say.
+async function storedSize(key: string): Promise<number | undefined> {
+  try {
+    const stored = await files.get(key)
+    const size = stored?.size
+
+    if (size !== undefined && Number.isFinite(size) && size > 0)
+      return size
+
+    return stored === undefined ? undefined : (await stored.arrayBuffer()).byteLength
+  }
+  catch (error) {
+    log.warn(`the size of ${key} could not be read`, error)
+
+    return undefined
+  }
+}
+
+export interface Library {
+  uploads: LibraryUpload[]
+  // The page shown, from 1, and how many there are; `total` counts the uploads the search keeps.
+  page: number
+  pages: number
+  total: number
+}
+
+// A page of the uploads, the newest first, with the entries using each and what the index knows of it, or why they cannot be told. `q` keeps the uploads whose name or key holds it; an older upload that a copy in the shared folder replaced is left out.
+export async function libraryUploads(options: { page?: number | undefined, q?: string | undefined } = {}): Promise<Library | { blocked: string[] }> {
   const read = await readUploads()
 
   if ('blocked' in read)
     return read
 
   const index = await mediaIndex()
+  const moved = movedKeys(index)
+  const needle = (options.q ?? '').trim().toLowerCase()
+  const named = (key: string) => index[key]?.name ?? key.split('/').at(-1)!
+  const found = read.stored
+    .filter(file => idOf(file.key) !== undefined && !moved.has(file.key) && (needle === '' || named(file.key).toLowerCase().includes(needle) || file.key.toLowerCase().includes(needle)))
+    .toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0))
+  const pages = Math.max(1, Math.ceil(found.length / LIBRARY_PAGE))
+  const page = Math.min(pages, Math.max(1, Number.isInteger(options.page) ? options.page! : 1))
   const now = Date.now()
-  const found = read.stored.filter(file => idOf(file.key) !== undefined).toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0))
-  const uploads = found.map((file): LibraryUpload => {
+  const uploads = await Promise.all(found.slice((page - 1) * LIBRARY_PAGE, page * LIBRARY_PAGE).map(async (file): Promise<LibraryUpload> => {
     const usedIn = [...read.usedBy.get(idOf(file.key)!)?.values() ?? []]
     const record = index[file.key]
     const [, width, height] = DIMENSIONS.exec(file.key) ?? []
@@ -146,8 +182,8 @@ export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | {
     return {
       key: file.key,
       url: files.url(file.key),
-      name: record?.name ?? file.key.split('/').at(-1)!,
-      size: record?.size,
+      name: named(file.key),
+      size: record?.size ?? await storedSize(file.key),
       width: width === undefined ? undefined : Number(width),
       height: height === undefined ? undefined : Number(height),
       by: record?.by,
@@ -155,9 +191,9 @@ export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | {
       usedIn,
       deletable: usedIn.length === 0 && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
     }
-  })
+  }))
 
-  return { uploads }
+  return { uploads, page, pages, total: found.length }
 }
 
 // Deletes the uploads asked for that are still unused, with their variants; `kept` holds those that a rescan found referenced, or that are no unused upload of the CMS's folders.
