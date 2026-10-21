@@ -53,8 +53,6 @@ export interface DraftEntry extends EntryRef {
 // An entry as the editor opens it: `version` is its file's, which a save names so one made over someone else's is refused.
 export interface StoredEntry extends SourceEntry {
   version?: string | undefined
-  // Which entries name this one in a reference field, as `Collection: title`, set on the entry's screen so deleting it can say what would point nowhere.
-  referencedBy?: string[] | undefined
 }
 
 export interface DraftResult {

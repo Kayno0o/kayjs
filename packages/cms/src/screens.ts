@@ -4,7 +4,6 @@ import type { EntryTranslations, PairedEntry, TranslationRow } from './translati
 import { collections, entries } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows, rowsOf, statusOf } from './listing'
 import { log } from './log'
-import { referrersOf } from './references'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 import { groupEntries, pairKey, translationReport } from './translations'
@@ -30,13 +29,7 @@ export interface ListScreen {
 export async function entryScreen(ref: EntryRef): Promise<EntryScreen | undefined> {
   const screen = await readEntry(ref)
 
-  if (!screen?.entry)
-    return screen && { prefix: settings().prefix, ...screen }
-
-  // Only the screens ask, as the editor's API has no delete to warn for.
-  const referencedBy = (await referrersOf(ref.collection, [screen.entry.slug])).get(screen.entry.slug)
-
-  return { prefix: settings().prefix, ...screen, entry: referencedBy === undefined ? screen.entry : { ...screen.entry, referencedBy } }
+  return screen && { prefix: settings().prefix, ...screen }
 }
 
 // What a new entry's screen reads: the collection alone.
@@ -56,9 +49,8 @@ export async function listScreen({ collection: name, q = '', page = 1, status, s
   const { prefix, pageSize } = settings()
 
   const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir })
-  const referrers = await referrersOf(collection.name, listed.rows.map(row => row.slug))
 
-  return { prefix, collection, ...listed, rows: listed.rows.map(row => ({ ...row, ...referrers.has(row.slug) && { referencedBy: referrers.get(row.slug) } })) }
+  return { prefix, collection, ...listed }
 }
 
 function paired(entry: Pick<SourceEntry, 'locale' | 'slug' | 'data' | 'body'> | undefined): PairedEntry | undefined {

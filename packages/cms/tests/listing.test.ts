@@ -282,7 +282,7 @@ describe('groupCollections', () => {
 
 describe('bulkDeleteMessage', () => {
   it('counts the entries and names those referring to any of them once', () => {
-    expect(bulkDeleteMessage([{}])).toBe('Delete 1 entry? This cannot be undone.')
-    expect(bulkDeleteMessage([{ referencedBy: ['Posts: A'] }, { referencedBy: ['Posts: A', 'Posts: B'] }])).toBe('Delete 2 entries? This cannot be undone. Referenced by Posts: A, Posts: B.')
+    expect(bulkDeleteMessage(1)).toBe('Delete 1 entry? This cannot be undone.')
+    expect(bulkDeleteMessage(2, ['Posts: A', 'Posts: B'])).toBe('Delete 2 entries? This cannot be undone. Referenced by Posts: A, Posts: B.')
   })
 })

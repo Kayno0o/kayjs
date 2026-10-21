@@ -11,9 +11,8 @@ export function referrersNote(referencedBy: string[]): string {
 }
 
 // What a delete of the ticked rows asks: how many, and which other entries name any of them.
-export function bulkDeleteMessage(rows: { referencedBy?: string[] | undefined }[]): string {
-  const asked = wording('cms.bulk.deleteMessage', rows.length === 1 ? 'Delete 1 entry? This cannot be undone.' : 'Delete {count} entries? This cannot be undone.', { count: rows.length })
-  const referrers = [...new Set(rows.flatMap(row => row.referencedBy ?? []))]
+export function bulkDeleteMessage(count: number, referencedBy: string[] = []): string {
+  const asked = wording('cms.bulk.deleteMessage', count === 1 ? 'Delete 1 entry? This cannot be undone.' : 'Delete {count} entries? This cannot be undone.', { count })
 
-  return referrers.length === 0 ? asked : `${asked} ${referrersNote(referrers)}`
+  return referencedBy.length === 0 ? asked : `${asked} ${referrersNote(referencedBy)}`
 }

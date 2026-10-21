@@ -39,7 +39,7 @@ else if form.ends() as at
     else if form.collection.draftField !== undefined
       ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: form.name })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={form.unpublish})
     if !form.collection.single
-      ConfirmDelete(message={deleteMessage(form.name, entry.url, 'entry', entry.referencedBy)} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
+      ConfirmDelete(message={deleteMessage(form.name, entry.url, 'entry', form.referrers())} onOpen={form.askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
   if form.dirty()
     ResetButton(disabled={form.saving()} onReset={form.reset})
   Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})

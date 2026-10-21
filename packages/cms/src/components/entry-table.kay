@@ -7,9 +7,10 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
-import { navigate, refresh } from 'kay'
+import { navigate, refresh, signal } from 'kay'
 import { wording } from 'kay/words'
 import { duplicateSaved } from '../editor/bulk'
+import { readReferrers } from '../editor/referrers'
 import { deleteSaved, moveSaved, publishSaved, unpublishSaved } from '../editor/save'
 import EntryBulk from './entry-bulk.kay'
 import EntryStatus from './entry-status.kay'
@@ -29,6 +30,14 @@ shipWords()
 // The columns and row actions the collection's layout names, all actions by default.
 const shown = listColumns(fieldsOf(collection.schema), collection.layout?.list)
 const actions = rowActions(collection.layout?.list)
+
+// What names the row whose delete confirmation was opened last, read then so it is never older than the click.
+const referrers = signal<Record<string, string[]>>({})
+
+async function askReferrers(row: EntryRow): Promise<void> {
+  referrers.set({})
+  referrers.set(await readReferrers(collection.name, [row.slug]))
+}
 
 // A field's column is keyed apart from the built-in ones, so a field named `title` or `actions` clashes with none.
 const cellKey = (key: string | number) => `cell:${key}`
@@ -123,7 +132,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
         if actions.has('delete')
-          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', row.referencedBy)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpen={() => askReferrers(row)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry matches the search and the filter.')})

@@ -23,8 +23,6 @@ export interface EntryRow {
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
-  // Which entries name this one in a reference field, as `Collection: title`, which a delete from the list names.
-  referencedBy?: string[] | undefined
   // The text of each column the collection's list names, by field key.
   cells?: Record<string, string> | undefined
   // In a localized collection, the site's locales this entry has no translation in, none when it has every one.

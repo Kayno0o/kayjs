@@ -5,7 +5,9 @@ const posts = { name: 'posts', kind: 'folder', localized: false, components: [],
 const friends = { name: 'friends', kind: 'folder', localized: false, components: [], schema: { properties: { name: { type: 'string' }, friend: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'friends' } } } } }
 const broken = { name: 'broken', kind: 'folder', localized: false, components: [], schema: { properties: { who: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'people' } } } } }
 
-const held: Record<string, { slug: string, data: Record<string, unknown> }[]> = {
+const notes = { name: 'notes', kind: 'folder', localized: true, components: [], title: 'Notes', schema: { properties: { title: { type: 'string' }, place: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'places' } } } } }
+
+const held: Record<string, { slug: string, locale?: string, data: Record<string, unknown> }[]> = {
   posts: [
     { slug: 'one', data: { title: 'One', author: 'ada' } },
     { slug: 'two', data: { title: 'Two', editors: ['bob', 'ada'] } },
@@ -13,11 +15,12 @@ const held: Record<string, { slug: string, data: Record<string, unknown> }[]> = 
     { slug: 'four', data: { title: 'Four', author: 'cy' } },
   ],
   people: [{ slug: 'ada', data: { name: 'Ada' } }, { slug: 'bob', data: { name: 'Bob' } }],
+  notes: [{ slug: 'hello', locale: 'fr', data: { title: 'Bonjour', place: 'paris' } }, { slug: 'hello', locale: 'en', data: { title: 'Hello', place: 'paris' } }],
   friends: [{ slug: 'ada', data: { name: 'Ada', friend: 'ada' } }, { slug: 'bob', data: { name: 'Bob', friend: 'ada' } }],
 }
 
 void mock.module('../src/kay/content', () => ({
-  collections: async () => [people, posts, friends, broken],
+  collections: async () => [people, posts, friends, broken, notes],
   entries: async (name: string, filter?: { slug?: string }) => {
     if (name === 'broken')
       throw new Error('database down')
@@ -40,6 +43,10 @@ describe('referrersOf', () => {
   test('reads a reference by the collection it names, not by the slug alone', async () => {
     expect([...(await referrersOf('people', ['ada'])).keys()]).toEqual(['ada'])
     expect((await referrersOf('tags', ['ada'])).get('ada')).toEqual(['Posts: Three'])
+  })
+
+  test('labels a localized referrer with its locale', async () => {
+    expect((await referrersOf('places', ['paris'])).get('paris')).toEqual(['Notes (fr): Bonjour', 'Notes (en): Hello'])
   })
 
   test('leaves out an entry pointing at itself and a collection that fails to read', async () => {

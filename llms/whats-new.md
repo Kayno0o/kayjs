@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-cms asks which entries refer to the one being deleted when the delete confirmation opens, from a small API route, and kayjs-ui's `ConfirmDelete` takes an `onOpen` ([Screens](../packages/cms/llms/screens.md)).
 - kayjs-cms ships `sqliteLoader` and `postgresLoader`, a seeded table of JSON entries editors can save to on a live site, with a loader's new `saveMany` making a reorder all-or-nothing ([loaders](../packages/cms/llms/loaders.md)).
 - kayjs-cms's list sorts, searches (accents ignored) and filters by status across every page from the URL, ticks rows for bulk publish, unpublish and delete, duplicates an entry, and the content list groups, orders and counts drafts; a `reference()` field is a picker and a save refuses a dangling one ([Screens](../packages/cms/llms/screens.md#the-list)).
 - kayjs-cms lists get Add at the top, a jump menu from eight items and an issue count on a folded item, and Reset asks before dropping edits ([fields](../packages/cms/llms/fields.md)).

@@ -37,6 +37,7 @@ const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
 const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
+onCleanup(onSaved.stop)
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
   const answer = source.value()

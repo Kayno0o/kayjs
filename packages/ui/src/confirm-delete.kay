@@ -6,11 +6,13 @@ import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
-const { message, onConfirm, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant, class: className } = props<{
+const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant, class: className } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
   onConfirm: () => void | Promise<void>
+  // Runs when the trigger is pressed, for a message that is read then rather than at render.
+  onOpen?: (() => void) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failure: string
   // Toasted once `onConfirm` went through.
@@ -55,6 +57,7 @@ let armed: HTMLElement | undefined
 function start(event: MouseEvent) {
   opener = event.currentTarget as HTMLElement
   open.set(true)
+  onOpen?.()
 }
 
 function close() {

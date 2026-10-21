@@ -59,11 +59,16 @@ export async function whenLive(url: string, { read = readPage, pause = sleep, in
   return false
 }
 
-// The handler a form gives `saveDraft` as `onSaved`: records the save, and for one that waits for a rebuild watches the entry's public page, if it has one, until it is live. A newer save ends the older watch.
-export function savedHandler(url: () => string | undefined, set: (state: SavedState) => void, finished: () => void, watch: Watch = {}): (saved: { rebuilding: boolean }) => void {
+export type SavedHandler = ((saved: { rebuilding: boolean }) => void) & {
+  // Ends the watch a save started, for the form's cleanup: the page is read no more and the rebuild notice is left alone.
+  stop: () => void
+}
+
+// The handler a form gives `saveDraft` as `onSaved`: records the save, and for one that waits for a rebuild watches the entry's public page, if it has one, until it is live. A newer save, or `stop`, ends the older watch.
+export function savedHandler(url: () => string | undefined, set: (state: SavedState) => void, finished: () => void, watch: Watch = {}): SavedHandler {
   let latest = 0
 
-  return ({ rebuilding }) => {
+  const handler = ({ rebuilding }: { rebuilding: boolean }) => {
     const at = Date.now()
     const page = url()
     const mine = ++latest
@@ -83,4 +88,8 @@ export function savedHandler(url: () => string | undefined, set: (state: SavedSt
       finished()
     })()
   }
+
+  return Object.assign(handler, { stop: () => {
+    latest++
+  } })
 }

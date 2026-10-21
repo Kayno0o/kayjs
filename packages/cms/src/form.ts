@@ -4,13 +4,14 @@ import type { SavedState } from './editor/live'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { SlugReport } from './slug'
 import type { PairedEntry } from './translations'
-import { call, effect, guardLeave, navigate, signal, untrack } from 'kay'
+import { call, effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import slugsApi from './api/slugs'
 import { publishTime, unpublishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
+import { readReferrers } from './editor/referrers'
 import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
@@ -77,6 +78,9 @@ export interface EntryForm extends FormScope {
   publishNow: () => Promise<void>
   unschedule: () => Promise<void>
   clearEnd: () => Promise<void>
+  // The entries naming this one in a reference field, as `Collection: title`, read by `askReferrers` when the delete confirmation opens.
+  referrers: () => string[]
+  askReferrers: () => Promise<void>
   remove: () => Promise<void>
   reset: () => void
 }
@@ -228,6 +232,19 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   const lastSave = signal<SavedState>()
   const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished)
 
+  onCleanup(onSaved.stop)
+
+  const referrers = signal<string[]>([])
+
+  async function askReferrers(): Promise<void> {
+    const slug = stored()?.slug
+
+    referrers.set([])
+
+    if (slug !== undefined)
+      referrers.set((await readReferrers(collection.name, [slug]))[slug] ?? [])
+  }
+
   async function attemptSave(): Promise<boolean> {
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
     if (first && !drafts.changed(ref) && drafts.blocked(ref).length === 0)
@@ -324,6 +341,8 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     publishNow: async () => change(collection.publishField, new Date().toISOString()),
     unschedule: async () => change(collection.publishField, undefined),
     clearEnd: async () => change(collection.unpublishField, undefined),
+    referrers: () => referrers(),
+    askReferrers,
     async remove() {
       if (await deleteSaved(ref, drafts.version(ref)))
         await navigate(collectionPath(prefix, collection.name), { replace: true })

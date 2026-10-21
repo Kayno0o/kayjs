@@ -115,3 +115,20 @@ describe('savedHandler', () => {
     expect(finished).toBe(0)
   })
 })
+
+describe('savedHandler stop', () => {
+  test('ends the watch with the form: nothing is set or finished after it', async () => {
+    const states: SavedState[] = []
+    let finished = 0
+    const page = pageSaying('old', 'new', 'new', 'new')
+    const handler = savedHandler(() => '/talk', state => states.push(state), () => finished++, { ...quick, read: page.read })
+
+    handler({ rebuilding: true })
+    handler.stop()
+    await Bun.sleep(10)
+
+    expect(finished).toBe(0)
+    expect(states).toHaveLength(1)
+    expect(page.reads.length).toBeLessThanOrEqual(1)
+  })
+})

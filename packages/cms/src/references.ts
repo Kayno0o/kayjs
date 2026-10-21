@@ -88,7 +88,7 @@ function collect(collection: CollectionInfo, found: SourceEntry[], target: strin
       if (collection.name === target && entry.slug === slug)
         continue
 
-      const label = `${collectionTitle(collection)}: ${entryTitle(collection, entry)}`
+      const label = `${collectionTitle(collection)}${entry.locale === undefined ? '' : ` (${entry.locale})`}: ${entryTitle(collection, entry)}`
       const listed = result.get(slug) ?? []
 
       if (!listed.includes(label))
