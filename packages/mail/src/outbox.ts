@@ -52,7 +52,7 @@ export interface Outbox extends Transport {
   link: (mail: Mail, match?: string | RegExp) => string
   // The `token` query parameter of that link, as a confirmation, magic link or reset mail carries it.
   token: (mail: Mail, match?: string | RegExp) => string
-  // The newest mail to this address, and `find` when given, once there is one, failing after `timeout`, 5 seconds by default, with the mails the outbox holds. With a `site` from `kay/test`, its queues run until the mail is delivered, for one the app enqueues.
+  // The newest mail to this address, and `find` when given, once there is one, failing after `timeout`, 5 seconds by default, with the mails the outbox holds. With a `site` from `kay/test`, its queues run first and then until the mail is delivered, for one the app enqueues.
   waitFor: (address: string, options?: WaitOptions) => Promise<SentMail>
   // Calls `listener` with each mail sent from now on, until the function it returns is called.
   watch: (listener: (mail: SentMail) => void) => () => void
@@ -206,17 +206,15 @@ export function createOutbox(file?: string): Outbox {
       const lookup = () => mails.findLast(mail => sentTo(mail, wanted) && find(mail))
       const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout', 'kayjs-mail') * 1000
       const fail = () => new Error(`kayjs-mail: no mail to ${address}${options.find ? ' matching `find`' : ''} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
-      let found = lookup()
-
-      if (found)
-        return found
 
       if (site) {
         const deadline = Date.now() + wait
 
+        // The queues run before the first look, so a mail an earlier step enqueued and a worker sent late does not stand in for the one still queued.
         do {
           await site.runJobs()
-          found = lookup()
+
+          const found = lookup()
 
           if (found)
             return found
@@ -226,6 +224,11 @@ export function createOutbox(file?: string): Outbox {
 
         throw fail()
       }
+
+      const found = lookup()
+
+      if (found)
+        return found
 
       const { promise, resolve, reject } = Promise.withResolvers<SentMail>()
       const unwatch = watch((mail) => {

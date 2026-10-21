@@ -241,6 +241,20 @@ describe('the outbox helpers', () => {
     await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('"Second" to ada@example.com')
   })
 
+  it('runs the site\'s queues before taking a mail already there, so the one still queued is the newest', async () => {
+    const site = {
+      runJobs: async () => {
+        await mail.send({ to: 'ada@example.com', subject: 'Queued', text: 'Hi' })
+
+        return 1
+      },
+    }
+
+    await mail.send({ to: 'ada@example.com', subject: 'Sent late', text: 'Hi' })
+
+    expect((await outbox.waitFor('ada@example.com', { site })).subject).toBe('Queued')
+  })
+
   it('waits without a site for a mail its predicate accepts', async () => {
     const waiting = outbox.waitFor('ada@example.com', { find: each => each.subject === 'Wanted' })
 
