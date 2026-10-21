@@ -1,0 +1,6 @@
+--- server
+import { welcome } from '../content.config'
+
+const page = await welcome.get('index') ?? ctx.notFound()
+---
+h1 {page.data.headline}

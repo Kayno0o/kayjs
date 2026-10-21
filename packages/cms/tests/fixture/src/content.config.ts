@@ -45,7 +45,7 @@ export const shop = collection({
 
 // A collection of one entry, written already.
 export const welcome = collection('content/welcome', {
-  schema: s.Object({ headline: s.String() }),
+  schema: s.Object({ headline: s.String({ pattern: '^[A-Za-z ]+$' }) }),
   title: 'Welcome page',
   single: true,
 })

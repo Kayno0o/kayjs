@@ -23,6 +23,8 @@ export interface InlineTarget {
 const sources = new Map<string, InlineSource>()
 // Elements whose own keys and clicks act on a page, left to the form.
 const CONTROLS = 'button, summary, input, select, textarea, label'
+// A marked element the editor gives a tab stop: not a control, nor a link, and with no tabindex of its own.
+const UNREACHED = `[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`
 const LINE_BREAKS = /[\r\n]+/g
 const EDGE_BREAKS = /^[\r\n]+|[\r\n]+$/g
 
@@ -121,13 +123,23 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
   note.setAttribute('role', 'alert')
   note.hidden = true
 
+  const follow = new AbortController()
   const place = () => {
     const box = element.getBoundingClientRect()
 
     note.style.left = `${Math.max(0, box.left)}px`
     note.style.top = `${box.bottom + 4}px`
   }
+  // The note is fixed to the viewport, so it moves with the text on a scroll of any ancestor, a resize, and a line wrapping or unwrapping as the text grows.
+  const placeShown = () => {
+    if (note.hidden === false)
+      place()
+  }
+  const resized = new ResizeObserver(placeShown)
 
+  resized.observe(element)
+  addEventListener('scroll', placeShown, { capture: true, passive: true, signal: follow.signal })
+  addEventListener('resize', placeShown, { passive: true, signal: follow.signal })
   document.body.append(note)
 
   return {
@@ -149,22 +161,48 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
       element.setAttribute('aria-invalid', 'true')
       element.setAttribute('aria-describedby', note.id)
     },
-    remove: () => note.remove(),
+    remove() {
+      follow.abort()
+      resized.disconnect()
+      note.remove()
+    },
   }
 }
 
 // Gives each marked element a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text; the page renders again and may drop it.
 export function reachMarked(): () => void {
   const given = new WeakSet<HTMLElement>()
-  const mark = () => {
-    for (const element of document.querySelectorAll<HTMLElement>(`[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`)) {
+  const give = (root: Element) => {
+    const found = root.matches(UNREACHED) ? [root, ...root.querySelectorAll(UNREACHED)] : root.querySelectorAll(UNREACHED)
+
+    for (const element of found) {
+      if (!(element instanceof HTMLElement))
+        continue
+
       element.tabIndex = 0
       given.add(element)
     }
   }
-  const observer = new MutationObserver(mark)
+  // Only what changed is looked at, and not the text being typed in, whose every keystroke is a mutation.
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (isTypingInline(record.target))
+        continue
 
-  mark()
+      if (record.type === 'attributes') {
+        give(record.target as Element)
+
+        continue
+      }
+
+      for (const node of record.addedNodes) {
+        if (node instanceof Element)
+          give(node)
+      }
+    }
+  })
+
+  give(document.documentElement)
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'data-kay-field'] })
 
   return () => {

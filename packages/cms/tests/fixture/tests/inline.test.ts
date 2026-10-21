@@ -20,13 +20,13 @@ afterAll(async () => {
   await built.close()
 })
 
-async function open() {
-  const page = await built.open(PATH)
+async function open(path = PATH, field = 'title') {
+  const page = await built.open(path)
 
   opened.push(page)
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.querySelector('[data-kcms-path="title"] input') !== null)
+  await page.waitUntil((name: string) => document.querySelector('.kcms-editor-open') !== null && document.querySelector(`[data-kcms-path="${name}"] input`) !== null, undefined, field)
 
   return page
 }
@@ -175,4 +175,75 @@ test('the title takes a tab stop, and Enter on it starts the edit', async () => 
   await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)
   await page.type('!')
   await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLInputElement).value === 'Hello world!', undefined, FORM_TITLE)
+}, 60_000)
+
+// The gap under the text the note keeps, as the stylesheet-free note is placed.
+function noteGap(selector: string) {
+  const note = document.querySelector('.kcms-inline-issue')!.getBoundingClientRect()
+
+  return note.top - document.querySelector(selector)!.getBoundingClientRect().bottom
+}
+
+test('the limit note follows its text on a scroll and on a line wrapping', async () => {
+  const page = await open()
+
+  await page.evaluate(() => {
+    const spacer = document.createElement('div')
+
+    spacer.style.height = '3000px'
+    document.body.append(spacer)
+  })
+  await edit(page)
+  await page.type('x'.repeat(50))
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue:not([hidden])') !== null)
+  expect(await page.evaluate(noteGap, TITLE)).toBe(4)
+
+  await page.evaluate(() => scrollTo(0, 120))
+  await page.waitUntil((selector: string, gap: (selector: string) => number) => scrollY > 0 && gap(selector) === 4, undefined, TITLE, noteGap)
+
+  // The text breaking onto a second line moves the box's bottom with no keystroke.
+  await page.evaluate((selector: string) => {
+    document.querySelector<HTMLElement>(selector)!.style.width = '4ch'
+  }, TITLE)
+  await page.waitUntil((selector: string, gap: (selector: string) => number) => gap(selector) === 4 && document.querySelector(selector)!.getBoundingClientRect().height > 100, undefined, TITLE, noteGap)
+}, 60_000)
+
+test('a pattern limit shows as the text is typed', async () => {
+  const page = await open('/admin/page?path=/welcome', 'headline')
+
+  await page.click(TITLE)
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)
+  await page.evaluate((selector: string) => document.getSelection()!.selectAllChildren(document.querySelector(selector)!), TITLE)
+  await page.type('abc 123')
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue:not([hidden])') !== null)
+
+  expect(await page.evaluate(() => document.querySelector('.kcms-inline-issue')!.textContent)).toContain('not in the expected form')
+}, 60_000)
+
+test('a focus that fails leaves nothing editable behind', async () => {
+  const page = await open()
+
+  await page.evaluate((selector: string) => {
+    const title = document.querySelector<HTMLElement>(selector)!
+
+    title.inert = true
+    title.click()
+  }, TITLE)
+  await page.evaluate(() => new Promise(done => setTimeout(done, 200)))
+
+  expect(await page.evaluate((selector: string) => [document.querySelector(selector)!.hasAttribute('contenteditable'), document.querySelector(selector)!.hasAttribute('data-kay-typing'), document.querySelector('.kcms-inline-issue') === null], TITLE)).toEqual([false, false, true])
+}, 60_000)
+
+test('Escape after the text was emptied puts the text back', async () => {
+  const page = await open()
+  const before = (await page.text(TITLE)) ?? ''
+
+  await edit(page)
+  await page.press('Backspace')
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.textContent === '', undefined, TITLE)
+  await page.press('Escape')
+  await page.waitUntil((selector: string) => !document.querySelector(selector)!.hasAttribute('contenteditable'), undefined, TITLE)
+  await page.waitUntil((selector: string, wanted: string) => (document.querySelector(selector) as HTMLInputElement).value === wanted, undefined, FORM_TITLE, before)
+
+  expect(await page.text(TITLE)).toBe(before)
 }, 60_000)
