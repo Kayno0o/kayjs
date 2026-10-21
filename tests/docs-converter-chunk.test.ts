@@ -1,10 +1,8 @@
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { takeDocsBuild } from './docs-build'
+import { takeDocsBuilt } from './docs-build'
 
-const CLI = resolve('src/cli.ts')
 const CHUNK_NAME = /[\w-]+\.js/g
 // A chunk reaching another, by a static import or a dynamic one.
 const CHUNK_IMPORT = /["']\.\/([\w-]+\.js)["']/g
@@ -41,7 +39,7 @@ function chunksOf(html: string): string[] {
 // The converter of `kay fmt --from-html` is a chunk only the box on the converter page fetches, so the build is read for who can reach it.
 describe('the docs converter chunk', () => {
   beforeAll(async () => {
-    const release = await takeDocsBuild()
+    const release = await takeDocsBuilt()
 
     try {
       await read()
@@ -52,12 +50,6 @@ describe('the docs converter chunk', () => {
   }, 300_000)
 
   async function read() {
-    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
-    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-    if (code !== 0)
-      throw new Error(errors)
-
     for await (const file of new Bun.Glob('*.js').scan(join(CLIENT, 'dist')))
       chunks.set(file, await Bun.file(join(CLIENT, 'dist', file)).text())
 

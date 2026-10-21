@@ -103,20 +103,6 @@ describe('kay build --format json', () => {
     expect(built.exported.dir).toBe(relative(process.cwd(), join(root, 'dist')))
   }, 30_000)
 
-  it('gives the executable it compiled', async () => {
-    const root = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
-      'src/routes/index.kay': 'p Home\n',
-      'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(3000)\n',
-    })
-    const { stdout, stderr, code } = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--format', 'json'])
-    const built = document<{ compiled: { executable: string, ms: number } }>(stdout)
-
-    expect(code, stderr).toBe(0)
-    expect(built.compiled.executable).toBe(relative(process.cwd(), join(root, 'server')))
-    expect(built.compiled.ms).toBeGreaterThan(0)
-  }, 60_000)
-
   it('compiles a project with no server entry into an executable serving its pages on PORT', async () => {
     const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' })
     const built = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'])
@@ -169,7 +155,12 @@ describe('kay build --format json', () => {
     const verified = await kay(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify', '--format', 'json'])
 
     expect(verified.code, verified.stderr).toBe(0)
-    expect(document<{ compiled: { verifiedMs: number } }>(verified.stdout).compiled.verifiedMs).toBeGreaterThan(0)
+
+    const { compiled } = document<{ compiled: { executable: string, ms: number, verifiedMs: number } }>(verified.stdout)
+
+    expect(compiled.executable).toBe(relative(process.cwd(), join(working, 'server')))
+    expect(compiled.ms).toBeGreaterThan(0)
+    expect(compiled.verifiedMs).toBeGreaterThan(0)
 
     const broken = await project({ ...files, 'src/server.ts': `${serving}\nthrow new Error('boom at startup')\n` })
     const failed = await kay(['build', broken, '--no-check', '--compile', join(broken, 'server'), '--verify'])
@@ -212,11 +203,18 @@ describe('kay build --format json', () => {
     expect(await Bun.file(join(working, 'entry-ran')).exists()).toBe(false)
     expect(await Bun.file(join(outputDir(working), 'executable')).exists()).toBe(true)
 
-    // The same executable under --verify starts the entry, which the missing secret stops.
-    const started = await kayWith(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify'], env)
+    // The same executable verified by starting it runs the entry, which the missing secret stops.
+    const secretBefore = process.env.KAY_TEST_SECRET
 
-    expect(started.code).toBe(1)
-    expect(started.stderr).toContain('KAY_TEST_SECRET')
+    delete process.env.KAY_TEST_SECRET
+
+    try {
+      await expect(verifyExecutable(join(working, 'server'), working, undefined)).rejects.toThrow('KAY_TEST_SECRET')
+    }
+    finally {
+      if (secretBefore !== undefined)
+        process.env.KAY_TEST_SECRET = secretBefore
+    }
 
     // A module that only fails inside the executable, as one loading a file the bundle does not carry does.
     const broken = await project({ ...files, 'src/api/gone.ts': 'import { api } from \'kay/server\'\n\nif (import.meta.dir.startsWith(\'/$bunfs\'))\n  throw new Error(\'boom at load\')\n\nexport default api().get(\'/\', () => \'ok\')\n' })

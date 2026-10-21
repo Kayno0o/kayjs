@@ -42,6 +42,20 @@ let client: ClientBuild
 
 type App = Awaited<ReturnType<typeof servePages>>
 
+const mounted = new Map<string, Promise<ClientBuild>>()
+
+// The build of the shared copy under a mount point, made once: the tests under one share its folder and read it as it stands.
+async function builtUnder(base: string): Promise<ClientBuild> {
+  let built = mounted.get(base)
+
+  if (built === undefined) {
+    built = buildClient(root, { plugins: [tailwind], base })
+    mounted.set(base, built)
+  }
+
+  return built
+}
+
 // A copy of the fixture with a page whose own rules pass the limit, built with Tailwind.
 async function copyOfFixture(): Promise<string> {
   const dir = resolve(await fixtureCopy('page-styles'))
@@ -389,7 +403,7 @@ describe('a page\'s head', () => {
   })
 
   it.each([undefined, '/docs'])('goes out under the mount point %s, each rule let through a strict style-src by its hash and compressed whole', async (base) => {
-    const built = base === undefined ? client : await buildClient(root, { plugins: [tailwind], base })
+    const built = base === undefined ? client : await builtUnder(base)
     const security = { csp: { 'style-src': ['\'self\''] } }
     // A proxy strips the mount point before the request reaches the server.
     const path = '/about'
@@ -443,7 +457,7 @@ describe('a page\'s head', () => {
   })
 
   it('puts the mount point on the href of a route copy, which is cut from the stylesheet as the build wrote it', async () => {
-    const built = await buildClient(root, { plugins: [tailwind], base: '/docs' })
+    const built = await builtUnder('/docs')
     const bulk = await head(await serve({ base: '/docs' }, built), '/bulk')
 
     expect(bulk.blocking).toHaveLength(1)
@@ -616,7 +630,7 @@ describe('a class a server builds from data', () => {
 
 describe('a page kept at build time under a mount point', () => {
   it('carries its rules inline and links no stylesheet', async () => {
-    const built = await buildClient(root, { plugins: [tailwind], base: '/docs' })
+    const built = await builtUnder('/docs')
 
     expect(await prerenderPages(resolveProject(root, { routes: 'src/routes', base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
 

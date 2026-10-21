@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
-import { takeDocsBuild } from './docs-build'
+import { takeDocsBuilt } from './docs-build'
 import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const CLI = resolve('src/cli.ts')
@@ -30,13 +30,7 @@ let release: (() => Promise<void>) | undefined
 // The contrast tests in docs.test.ts read the palettes' values, so this one reads the colours the built pages render, served by `kay start` as the docs are, whatever the build made of them.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs as built', () => {
   beforeAll(async () => {
-    release = await takeDocsBuild()
-
-    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
-    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-    if (code !== 0)
-      throw new Error(errors)
+    release = await takeDocsBuilt()
 
     const probe = Bun.serve({ port: 0, fetch: () => new Response() })
     const port = probe.port!
