@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
+### kayjs-auth's guard redirects to `signInPage` without `pages`
+
+An app that sets `signInPage` in `createAuth` and has no `pages` now has `auth.guard()` and `requireUser()` redirect an anonymous GET there with `?redirect=`, where they answered a 401. A GET route that returns JSON under such a guard now gets a 302: give it a guard of its own, or check `auth.user()` and answer the 401 yourself. No lint can recognise it.
+
 ### An entry's page takes its head from the entry
 
 A page with `prerender` or `sitemap` of a collection on a one-param route now writes the entry's `title` and `description` fields over its layout's, and a `Date` field named `publishAt`, `date`, `publishedAt` or `published` makes `og:type` an `article`. A collection whose `title` or `date` means something else (an event date) sets the tags in the page's `head` block, which replaces them ([Head](head.md#site-defaults-and-social-cards)).
