@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '@kaynooo/kayjs-ui/theme.css';
+
+@theme {
+  --color-kui-accent: #123456;
+}

@@ -1,0 +1,5 @@
+--- server
+export const page = { layouts: false }
+---
+.own-chrome
+  slot

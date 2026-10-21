@@ -1,0 +1,8 @@
+---
+import Toaster from '../toaster.kay'
+import TooltipHost from '../tooltip-host.kay'
+import './shell.css'
+---
+slot
+Toaster
+TooltipHost

@@ -4,6 +4,8 @@
 
 kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
 
+`kay add auth` does the rest of this section for a project with `server` and `tailwind`: it installs the packages, writes `src/auth.ts` (over the project's pg-orm `Database`, to which it adds `...authTables`, or over a SQLite file of its own; kayjs-mail's `mail.enqueue` as the mailer when `src/mail.ts` exists), a root `src/routes/_guard.ts` exporting `auth.guard()`, a `SESSION_SECRET` in `.env` (and `SITE_URL` in `.env.example`), and lists `authPages(...)` and kayjs-ui's `ui()` in kay.config.ts. The sign-in, register and account pages stay open to visitors. Delete the guard for a site with public pages.
+
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'

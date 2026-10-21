@@ -21,6 +21,7 @@
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./add": "./src/add.ts",
     "./browser": {
       "types": "./types/browser.d.ts",
       "default": "./src/browser.ts"

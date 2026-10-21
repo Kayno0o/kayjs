@@ -106,6 +106,8 @@ export interface RouteMount {
   prefix: string
   // The extension gives the editor too.
   editor?: true | undefined
+  // A layout the extension wraps every page in, outside the app's own: the mount serves no page and holds no other layout.
+  outer?: string | undefined
 }
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
@@ -229,7 +231,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
     return found
   }
 
-  for (const tree of trees) {
+  for (const tree of trees.filter(tree => tree.outer === undefined)) {
     const own: Route[] = []
 
     for (const file of existsSync(tree.dir) ? await findKayFiles(tree.dir) : []) {
@@ -264,7 +266,7 @@ export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []
   const read: LayoutsRead = new Map()
   const served = new Set<string>()
 
-  for (const tree of trees) {
+  for (const tree of trees.filter(tree => tree.outer === undefined)) {
     const own: Endpoint[] = []
 
     for (const file of existsSync(tree.dir) ? await findProjectFiles(tree.dir, ENDPOINT_FILE) : []) {
@@ -366,7 +368,7 @@ function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsR
   // The innermost layout that leaves its parents out starts the chain.
   const reset = layouts.findLastIndex(layout => setsFalse(layout, 'layouts', read))
 
-  return reset === -1 ? layouts : layouts.slice(reset)
+  return reset === -1 ? [...trees.flatMap(tree => tree.outer ?? []), ...layouts] : layouts.slice(reset)
 }
 
 function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
@@ -617,9 +619,19 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
   return [{ dir: routesDir, prefix: '' }, ...mounts]
 }
 
+// The prefix of an outer layout's mount, which no URL starts with.
+const OUTER_PREFIX = '/\0outer'
+
+function outerMount(layout: string): RouteMount {
+  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout }
+}
+
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
-  return extensions.flatMap(({ routes, editor }) => routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [])
+  return extensions.flatMap(({ routes, editor, layout }) => [
+    ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
+    ...layout === undefined ? [] : [outerMount(throughLinks(root, resolve(root, layout)))],
+  ])
 }
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.
@@ -653,7 +665,7 @@ export function fileAt(trees: RouteMount[], at: string, name: string): string | 
 
 // The first of the trees holding `name` at a directory of the URL tree.
 function treeHolding(trees: RouteMount[], at: string, name: string): RouteMount | undefined {
-  return trees.find(({ dir, prefix }) => (at === prefix || at.startsWith(`${prefix}/`)) && existsSync(join(dir, at.slice(prefix.length), name)))
+  return trees.find(({ dir, prefix, outer }) => outer === undefined && (at === prefix || at.startsWith(`${prefix}/`)) && existsSync(join(dir, at.slice(prefix.length), name)))
 }
 
 // Where a directory of one of the trees sits in the URL tree.

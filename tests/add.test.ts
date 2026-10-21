@@ -46,7 +46,7 @@ it('adds a feature to a project writing what kay new --with would have', async (
   const site = PRESETS.site.features
 
   await addedEqualsNew(['server'], ['starter', 'tailwind', 'accents'], ['server', 'starter', 'tailwind', 'accents'])
-  await addedEqualsNew(PRESETS.server.features, ['auth'], [...PRESETS.server.features, 'auth'])
+  await addedEqualsNew(PRESETS.server.features, ['ws'], [...PRESETS.server.features, 'ws'])
   await addedEqualsNew([...PRESETS.server.features, 'auth', 'postgres'], ['ws'], [...PRESETS.app.features, 'postgres'])
   await addedEqualsNew(site.filter(feature => feature !== 'eslint' && feature !== 'tests'), ['eslint', 'tests'], site)
   await addedEqualsNew(site, ['docker'], site)
@@ -74,7 +74,7 @@ it('names what a feature needs, and writes nothing', async () => {
 
     const before = await snapshot(dir)
 
-    await expect(addFeatures(dir, ['auth'], { install: false })).rejects.toThrow('kay add: auth needs server: run `kay add server,auth` to add them together')
+    await expect(addFeatures(dir, ['ws'], { install: false })).rejects.toThrow('kay add: ws needs server: run `kay add server,ws` to add them together')
     await expect(addFeatures(dir, ['bogus'], { install: false })).rejects.toThrow('kay add: bogus is none of the features')
     expect(await snapshot(dir)).toEqual(before)
   }
@@ -130,15 +130,15 @@ it('keeps the files the author wrote in, and the lines they added to a shared fi
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {
-    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features.filter(feature => feature !== 'eslint') })
     await writeFile(join(dir, '.gitignore'), `${await Bun.file(join(dir, '.gitignore')).text()}notes.txt\n`)
     await writeFile(join(dir, 'AGENTS.md'), 'mine\n')
-    await addFeatures(dir, ['auth'], { install: false })
+    await addFeatures(dir, ['eslint'], { install: false })
 
     expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('notes.txt\n')
-    expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('data')
+    expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('.eslintcache')
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('mine\n')
-    expect(await Bun.file(join(dir, 'package.json')).text()).toContain('"dev": "pg-orm apply && kay dev"')
+    expect(await Bun.file(join(dir, 'package.json')).text()).toContain('"lint":')
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
@@ -223,7 +223,7 @@ it('leaves the project as it was when a library refuses, package.json included',
     const files = ['package.json', 'kay.config.ts', 'src/mail.ts', '.gitignore']
     const before = await Promise.all(files.map(async file => content(dir, file)))
 
-    await expect(addFeatures(dir, ['auth', 'mail'], { install: false })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
+    await expect(addFeatures(dir, ['ws', 'mail'], { install: false })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
     expect(await Promise.all(files.map(async file => content(dir, file)))).toEqual(before)
   }
   finally {
@@ -571,4 +571,118 @@ it('shows a hand edit as an ordered diff', () => {
   expect(handEdit('a\nb\n', 'b\na\n')).not.toBe('')
   expect(handEdit('x\nsame\ny\n', 'x\nz\nsame\ny\n')).toBe('+z')
   expect(handEdit('p\nq\n', 'p\nq\n')).toBe('')
+})
+
+// A project with the workspace copies of kay's libraries linked into its node_modules, as `bun add` would have left them.
+async function linkedProject(dir: string, features: readonly Feature[], libraries: readonly string[]): Promise<void> {
+  await createProject(dir, { kay: '^1.0.0', features })
+  await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+
+  for (const library of libraries)
+    await symlink(join(repo, `packages/${library}`), join(dir, `node_modules/@kaynooo/kayjs-${library}`))
+}
+
+it('adds the ui extension with no line in the layout or the stylesheet', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, PRESETS.server.features, ['ui'])
+
+    const result = await addFeatures(dir, ['ui'], { install: false })
+
+    expect(result.written).toEqual(['kay.config.ts'])
+
+    const config = await Bun.file(join(dir, 'kay.config.ts')).text()
+
+    expect(config).toContain('import { ui } from \'@kaynooo/kayjs-ui/extension\'')
+    expect(config).toContain('extensions: [ui()]')
+    expect((await addFeatures(dir, ['ui'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('refuses ui in a project without Tailwind, naming the command that adds both', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, ['server'], ['ui'])
+    await expect(addFeatures(dir, ['ui'], { install: false })).rejects.toThrow('ui needs tailwind: run `kay add tailwind,ui`')
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('adds kayjs-auth over a SQLite file of its own, with the guard, the secret and the ui extension', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'my-shop')
+
+  try {
+    await linkedProject(dir, PRESETS.server.features, ['auth', 'ui'])
+
+    const result = await addFeatures(dir, ['auth'], { install: false })
+
+    expect(result.written).toEqual(['.env', '.env.example', '.gitignore', 'kay.config.ts', 'src/auth.ts', 'src/routes/_guard.ts'])
+
+    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
+
+    expect(source).toContain('export const db = new Database({ url: \'sqlite://data/auth.db\', tables: authTables })')
+    expect(source).toContain('site: "My Shop"')
+    expect(source).not.toContain('mail.')
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default auth.guard()')
+
+    const config = await Bun.file(join(dir, 'kay.config.ts')).text()
+
+    expect(config).toContain('authPages({ auth: () => import(\'./src/auth\') })')
+    expect(config).toContain('ui()')
+    expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}$/m)
+    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SESSION_SECRET=$/m)
+    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
+    expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)
+    expect(result.notes.join('\n')).toContain('kay add mail')
+
+    // A second run changes nothing, the secret included.
+    const secret = (await Bun.file(join(dir, '.env')).text()).match(SECRET)![0]
+
+    expect((await addFeatures(dir, ['auth'], { install: false })).written).toEqual([])
+    expect((await Bun.file(join(dir, '.env')).text()).match(SECRET)![0]).toBe(secret)
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, PRESETS.server.features, ['auth', 'ui', 'mail'])
+    await mkdir(join(dir, 'src/db'), { recursive: true })
+    await writeFile(join(dir, 'src/db/index.ts'), 'import { Database } from \'@kaynooo/pg-orm\'\nimport { Member } from \'./member\'\n\nexport const tables = [Member]\n\nexport const db = new Database({ url: process.env.DATABASE_URL!, tables })\n')
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+    manifest.dependencies['@kaynooo/pg-orm'] = '^7.0.0'
+    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+
+    const result = await addFeatures(dir, ['mail', 'auth'], { install: false })
+
+    expect(result.written).toContain('src/db/index.ts')
+
+    const tables = await Bun.file(join(dir, 'src/db/index.ts')).text()
+
+    expect(tables).toContain('export const tables = [...authTables, Member]')
+    expect(tables).toContain('import { authTables } from \'@kaynooo/kayjs-auth/pg\'')
+
+    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
+
+    expect(source).toContain('import { db } from \'./db\'')
+    expect(source).toContain('email: { mailer: { send: mail.enqueue } },')
+    expect(source).not.toContain('sqlite://')
+    expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
 })

@@ -7,8 +7,18 @@ description: A set of kay components styled by one theme you restyle from your o
 
 ## Install
 
+In a kay project with Tailwind, `kay add ui` does the install and lists `ui()` in `kay.config.ts`, which brings the theme, a `Toaster` and a `TooltipHost` to every page: nothing else is wired. Otherwise:
+
 ```sh
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
+```
+
+```ts
+// kay.config.ts
+import { defineConfig } from 'kay/server'
+import { ui } from '@kaynooo/kayjs-ui/extension'
+
+export default defineConfig({ extensions: [ui()] })
 ```
 
 The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
@@ -19,7 +29,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Theme
 
-`src/app.css` imports the theme right after Tailwind. Override any token in your own `@theme`.
+`ui()` brings the theme, and its stylesheet comes before yours. To override tokens, write your own `@theme` in `src/app.css`, importing the theme there too if you want the tokens beside the overrides.
 
 ```css
 @import 'tailwindcss';
@@ -63,7 +73,7 @@ slot
 
 ### Toaster and tooltips
 
-Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one.
+`ui()` renders one `Toaster` and one `TooltipHost` after every page's layouts. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one. A layout that renders its own, as below, keeps working: only the first one mounted shows toasts and tooltips.
 
 ```kay
 ---

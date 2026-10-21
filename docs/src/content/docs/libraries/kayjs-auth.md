@@ -23,6 +23,8 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Setup
 
+In a kay project with a server and Tailwind, `kay add auth` installs the packages and writes all of this: `src/auth.ts` over your pg-orm `Database` (with `...authTables` added to its tables) or a SQLite file of its own, using kayjs-mail as the mailer when `src/mail.ts` exists, a root `src/routes/_guard.ts`, a session secret in `.env`, and the extensions below with kayjs-ui's `ui()`. The rest of this section is what it writes.
+
 `src/auth.ts` creates the auth object. `memoryStore()` keeps users in the process, for trying it out.
 
 ```ts

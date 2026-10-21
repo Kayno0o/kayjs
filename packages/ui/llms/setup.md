@@ -5,12 +5,14 @@
 kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
 
 ```sh
-bun add @kaynooo/kayjs-ui @iconify-json/tabler
+kay add ui
 ```
+
+It installs the package and `@iconify-json/tabler` (needing Tailwind in the app) and lists `ui()` from `@kaynooo/kayjs-ui/extension` in `extensions` in kay.config.ts. That one line brings the theme, a `Toaster` and a `TooltipHost` on every page, outside the app's layouts, so no layout or stylesheet names them. Doing it by hand, `bun add @kaynooo/kayjs-ui @iconify-json/tabler` and add `ui()`. The extension's stylesheet comes before the app's, so the app's own `@theme` overrides win.
 
 Two peers are optional, installed only when used: `chartist` for `LineChart`, `hls.js` for an `.m3u8` video in a browser without native HLS.
 
-`src/app.css`, imported by the root `_layout.kay`, imports the theme right after Tailwind. kay collects the classes of the library's templates along with the app's own, so no `@source` line has to point into `node_modules`:
+`ui()` is the whole setup. An app writing the theme itself, as before, still works: `src/app.css`, imported by the root `_layout.kay`, imports it right after Tailwind. kay collects the classes of the library's templates along with the app's own, so no `@source` line has to point into `node_modules`:
 
 ```css
 @import 'tailwindcss';
@@ -47,6 +49,8 @@ A few components take tokens for their box and type, for a skin restyling them w
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.
 
+A layout may still render its own `Toaster` and `TooltipHost`, as an app did before `ui()`: only the first mounted shows toasts and tooltips, so the two copies never double them.
+
 ```kay
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
@@ -58,6 +62,7 @@ Toaster
 TooltipHost
 ```
 
+The extension puts both islands on every page, so each page loads the hydration code, as the layout above does.
 ## Settings
 
 The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:

@@ -1,0 +1,8 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+---
+//- Renders neither a Toaster nor a TooltipHost: the ui() extension mounts them.
+h1 Shell
+button#saved(type="button" onClick={() => toast.success('Saved')}) Save
+IconButton#help(icon="info" label="Help")

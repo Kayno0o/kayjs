@@ -403,6 +403,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
   // Its directories are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined
+  // A `.kay` layout wrapping every page outside the app's own layouts, rendering its `slot` and then what the library mounts on every page, as a toaster: absolute or relative to the project root, and alone in its directory. A page or layout setting `layouts: false` starts afresh without it.
+  layout?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
   api?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.

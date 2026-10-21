@@ -92,6 +92,7 @@ An extension may set these fields. Only `name` is required.
 - `transformPage`: rewrites each prerendered page before it is written.
 - `needsServer`: set it when the extension does nothing without a running server, as a tracker posting to a route of its own. `kay build --static` warns about it.
 - `staticFiles`: files a static export writes into the site, by path, for what the extension's server would otherwise serve, such as a script every page loads.
+- `layout`: one `.kay` layout, alone in its directory, wrapping every page outside the app's layouts. It renders its `slot` and then what the library mounts on every page, such as a toaster; its stylesheet comes before the app's, and a page setting `layouts: false` starts afresh without it.
 - `editor`: a `.kay` island rendered last on every page in edit mode.
 - `devTool`: a browser module adding a tab to the dev tool.
 - `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.

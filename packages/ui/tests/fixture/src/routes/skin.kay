@@ -1,0 +1,6 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import '../skin.css'
+---
+//- The app's own theme import and override, beside the one the ui() extension brings.
+Button#plain(label="Save" tone="accent")
