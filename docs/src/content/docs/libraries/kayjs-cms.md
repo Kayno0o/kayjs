@@ -538,9 +538,9 @@ const saver: FileSaver = {
 
 `base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflict`, which the editor shows with its Keep my edits button.
 
-A saver may also have `move(move)`, which renames an entry's file. `move.from` and `move.to` hold the `repoPath` and `absolute` path of each, `move.text` is the text the file has at `to`, and `move.base` is the version of `from`.
+A saver may also have `move(move)`, which renames an entry's file. `move.from` and `move.to` hold the `repoPath` and `absolute` path of each, `move.text` is the text the file has at `to`, `move.base` is the version of `from`, and `move.message` and `move.author` are as in a save.
 
-It writes `to` and removes `from` in one step. It throws `SaveConflict` when `from` is at another version or gone, or when `to` exists (`new SaveConflict(undefined, true)`). `forgejo()` commits the move as one commit and `workingTree()` does it in place. A saver without `move` cannot rename entries.
+It writes `to`, then removes `from`; `forgejo()` does both in one commit. It throws `SaveConflict` when `from` is at another version or gone, or when `to` exists (`new SaveConflict(undefined, true)`). `workingTree()` does it in place. A saver without `move` cannot rename entries.
 
 ## The entries API
 

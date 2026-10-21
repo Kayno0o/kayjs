@@ -313,6 +313,24 @@ describe('moving a file', () => {
     await Bun.write(join(dir, 'other.md'), 'x')
     expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('other.md'), to: at('deep/new.md') }))).creating).toBe(true)
     expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('gone.md'), to: at('free.md') }))).current).toBeNull()
+  })
+
+  test('the working tree runs a save and a move of one file one after the other', async () => {
+    const dir = await scratchDir('move-race')
+    const saver = workingTree()
+    const old = { repoPath: 'posts/old.md', absolute: join(dir, 'old.md') }
+    const next = { repoPath: 'posts/new.md', absolute: join(dir, 'new.md') }
+
+    await Bun.write(old.absolute, 'before')
+
+    const outcomes = await Promise.allSettled([
+      saver.save({ ...old, text: 'edited', message: 'edit', base: fileVersion('before') }),
+      saver.move!({ ...move, from: old, to: next, base: fileVersion('before') }),
+    ])
+
+    expect(outcomes.map(outcome => outcome.status)).toEqual(['fulfilled', 'rejected'])
+    expect(await Bun.file(old.absolute).text()).toBe('edited')
+    expect(await Bun.file(next.absolute).exists()).toBe(false)
     await rm(dir, { recursive: true, force: true })
   })
 })

@@ -30,8 +30,8 @@ export interface FileMove {
   text: string
   message: string
   author?: Identity | undefined
-  // The version of the file at `from` the move is made from, as in `FileChange`; `to` must not exist yet.
-  base?: string | null | undefined
+  // The version of the file at `from` the move is made from, as `fileVersion` gives it; undefined to move whatever is there. `to` must not exist yet.
+  base?: string | undefined
 }
 
 export interface Commit {
