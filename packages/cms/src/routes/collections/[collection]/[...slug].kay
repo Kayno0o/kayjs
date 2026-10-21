@@ -18,7 +18,7 @@ const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head
-  title {adminTitle(`${entry ? entryTitle(collection, entry) : name} - ${title}`)}
+  title {adminTitle(collection.single ? title : `${entry ? entryTitle(collection, entry) : name} - ${title}`)}
 if entry
   EntryEditor(prefix={prefix} collection={collection} entry={entry} presence={presence})
 else

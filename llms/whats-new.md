@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A collection declared `single: true` is one entry: kayjs-cms's content list links to its form, titled with the collection's `title`, with no list row, slug, New entry or Delete; `seed` fills the form until the first save, and `home.one()` reads the entry typed, with a fallback ([A collection of one entry](content.md), [kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-cms's admin sets `layouts: false` on its layout, which a library layout can do to start its own chain: it draws its own chrome (skip link, nav with Missing pages and Uploads, a link back to the site, `Content admin` in every title, `noindex`, kayjs-ui's theme in light or dark) instead of rendering inside the site's header and footer ([Libraries](component-libraries.md), [kayjs-cms](../packages/cms/llms/screens.md)).
 - A page swap keeps a fetched deferred server island on screen while its next copy is fetched, so a post back to the same page no longer swaps the form for its inert copy and back, which jumped the scroll ([Prerendering](prerendering.md#prerendering)).
 - kayjs-cms ships the French of every `cms.*` text, the screens, the editor and its messages, read on a French page after the app's own catalog with no setup, so a French site no longer words each one itself; another language is a `cms` block in the app's `src/messages/<locale>.ts`, and `tests/words.test.ts` fails for a new key without its French ([Texts and languages](../packages/cms/llms/words.md)).

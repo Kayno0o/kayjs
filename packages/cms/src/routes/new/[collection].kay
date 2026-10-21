@@ -13,7 +13,7 @@ const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? 
 const locale = ctx.query.locale
 ---
 head
-  title {adminTitle(wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) }))}
+  title {adminTitle(collection.single ? collectionTitle(collection) : wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) }))}
 if collection.problem as problem
   EntryHeader(prefix={prefix} collection={collection} title={wording('cms.admin.newEntry', 'New entry')})
   EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})

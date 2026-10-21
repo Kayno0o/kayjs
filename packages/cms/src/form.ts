@@ -8,7 +8,7 @@ import { createDrafts } from './drafts'
 import { deleteSaved, refuseUnsaved, saveDraft } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
-import { collectionPath, entryPath, entryTitle } from './listing'
+import { collectionPath, collectionTitle, entryPath, entryTitle, SINGLE_SLUG } from './listing'
 
 // What the parts of an entry's form read: the drafts, the entry they edit, its collection, and which fields the screen renders.
 export interface FormScope {
@@ -100,12 +100,12 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   const drafts = createDrafts({ show: async () => Promise.resolve({}) })
   // A new entry's draft is kept under no slug until it is saved under the one typed.
   const ref: EntryRef = { collection: collection.name, slug: first?.slug ?? '', locale: first?.locale ?? locale }
-  const slug = signal(first?.slug ?? '')
+  const slug = signal(first?.slug ?? (collection.single ? SINGLE_SLUG : ''))
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
 
-  drafts.open({ ...ref, data: first?.data ?? {}, body: first?.body }, first?.version)
+  drafts.open({ ...ref, data: first?.data ?? collection.seed ?? {}, body: first?.body }, first?.version)
   guardLeave(() => !saving() && drafts.changed(ref))
 
   // The entry as it is now, the one the form opened with once it is gone.
@@ -114,10 +114,17 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   const nameOf = () => {
     const now = stored()
 
+    // A single collection's entry is the collection: its name, never the entry's slug.
+    if (collection.single)
+      return collectionTitle(collection)
+
     return now ? entryTitle(collection, now) : wording('cms.admin.newEntry', 'New entry')
   }
   const subtitleOf = () => {
     const now = stored()
+
+    if (collection.single)
+      return undefined
 
     return now && nameOf() !== now.slug ? slugLine(now) : now?.locale
   }

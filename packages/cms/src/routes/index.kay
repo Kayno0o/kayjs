@@ -6,12 +6,13 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import { collections } from '../kay/content'
-import { adminTitle, collectionPath, collectionTitle, problemId } from '../listing'
+import { adminTitle, collectionTitle, problemId } from '../listing'
 import { screenPath } from '../paths'
+import { openPath } from '../screens'
 import { settings } from '../settings'
 
 const { prefix } = settings()
-const listed = await collections()
+const listed = await Promise.all((await collections()).map(async collection => ({ collection, href: await openPath(collection) })))
 ---
 head
   title {adminTitle(wording('cms.admin.content', 'Content'))}
@@ -19,14 +20,14 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
     Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
-  for collection of listed key={collection.name}
+  for row of listed key={row.collection.name}
     CardRow
       @right
-        if collection.problem as problem
+        if row.collection.problem as problem
           Badge(tone="danger" label={wording('cms.admin.unreadable', 'Cannot be read')})
-          span.kcms-sr-only(id={problemId(collection.name)}) {problem}
-        else
-          span {wording('cms.admin.entryCount', collection.count === 1 ? '1 entry' : '{count} entries', { count: collection.count ?? 0 })}
-      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : problemId(collection.name)}) {collectionTitle(collection)}
+          span.kcms-sr-only(id={problemId(row.collection.name)}) {problem}
+        else if !row.collection.single
+          span {wording('cms.admin.entryCount', row.collection.count === 1 ? '1 entry' : '{count} entries', { count: row.collection.count ?? 0 })}
+      a(href={row.href} data-tooltip={row.collection.problem} aria-describedby={row.collection.problem === undefined ? undefined : problemId(row.collection.name)}) {collectionTitle(row.collection)}
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

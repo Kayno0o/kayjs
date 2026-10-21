@@ -1,6 +1,6 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
+import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows, singlePath } from '../src/listing'
 import { contentVersion } from '../src/version'
 
 const posts: CollectionInfo = {
@@ -148,5 +148,12 @@ describe('pageRows of an ordered collection', () => {
     const listed = await pageRows({ ...shelf, localized: true, count: 3 }, '', 1, localized, none)
 
     expect(listed.rows.map(row => [row.slug, row.locale, row.move?.up, row.move?.down])).toEqual([['a', 'en', false, false], ['b', 'fr', false, true], ['a', 'fr', true, false]])
+  })
+})
+
+describe('singlePath', () => {
+  it('opens the entry written, else the form of the one not written yet', () => {
+    expect(singlePath('/admin', 'home', 'index')).toBe(entryPath('/admin', { collection: 'home', slug: 'index' }))
+    expect(singlePath('/admin', 'home')).toBe(newEntryPath('/admin', 'home'))
   })
 })

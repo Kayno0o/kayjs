@@ -1,7 +1,7 @@
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { EntryRow } from './listing'
 import { entries } from './kay/content'
-import { pageRows } from './listing'
+import { collectionPath, pageRows, singlePath } from './listing'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 
@@ -44,4 +44,14 @@ export async function listScreen({ collection: name, q = '', page = 1 }: { colle
   const { prefix, pageSize } = settings()
 
   return { prefix, collection, ...await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize) }
+}
+
+// Where a collection opens from the content list: its list, or for a single collection its entry's form.
+export async function openPath(collection: Pick<ScreenCollection, 'name' | 'single' | 'problem'>): Promise<string> {
+  const { prefix } = settings()
+
+  if (!collection.single || collection.problem !== undefined)
+    return collectionPath(prefix, collection.name)
+
+  return singlePath(prefix, collection.name, (await entries(collection.name, { limit: 1 }))[0]?.slug)
 }

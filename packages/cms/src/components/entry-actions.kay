@@ -31,7 +31,8 @@ else if form.scheduled() as at
       Button(label={wording('cms.entry.unpublish', 'Unpublish')} disabled={form.saving()} onClick={form.unpublish})
     else if form.collection.draftField !== undefined
       ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: form.name })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={form.unpublish})
-    ConfirmDelete(message={deleteMessage(form.name, entry.url)} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
+    if !form.collection.single
+      ConfirmDelete(message={deleteMessage(form.name, entry.url)} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
   if form.dirty()
     Button(label={wording('cms.entry.reset', 'Reset')} disabled={form.saving()} onClick={form.reset})
   Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})

@@ -8,7 +8,7 @@ import { wording } from 'kay/words'
 // A new entry's slug and, in a localized collection, its locale. Renders nothing for a saved entry.
 const { form } = props<{ form: EntryForm }>()
 ---
-if !form.stored
+if !form.stored && !form.collection.single
   FormField(label={wording('cms.entry.slug', 'Slug')} hint={form.collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
     TextInput(value={form.slug()} onInput={text => form.slug.set(text)} required)
   if form.collection.localized

@@ -402,6 +402,45 @@ describe('the collections a CMS edits', () => {
     })
   })
 
+  it('describes a single collection as such, with its seed', async () => {
+    const home = collection({ name: 'home', load: () => [] }, { schema: t.Object({ title: t.String() }), single: true, seed: { title: 'Welcome' } })
+    const plain = collection({ name: 'plain', load: () => [] }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['home', home], ['plain', plain]], async () => {
+      expect(await collectionInfo('home', { counts: false })).toMatchObject({ single: true, seed: { title: 'Welcome' } })
+      expect(await collectionInfo('plain', { counts: false })).not.toHaveProperty('single')
+      expect(await collectionInfo('plain', { counts: false })).not.toHaveProperty('seed')
+    })
+  })
+
+  it('reads a single collection\'s entry with one(), else the fallback given, else the seed', async () => {
+    const given: { slug: string, data: { title: string } }[] = []
+    const home = collection({ name: 'home', load: () => given }, { schema: t.Object({ title: t.String() }), single: true, seed: { title: 'Welcome' } })
+    const bare = collection({ name: 'bare', load: () => [] }, { schema: t.Object({ title: t.String() }), single: true })
+
+    expect(await home.one()).toEqual({ title: 'Welcome' })
+    // Typed: the data with a fallback, possibly undefined without.
+    const typed: { title: string } = await home.one({ title: 'Fallback' })
+    const maybe: { title: string } | undefined = await home.one()
+
+    expect(typed).toEqual({ title: 'Fallback' })
+    expect(maybe).toEqual({ title: 'Welcome' })
+    expect(await bare.one()).toBeUndefined()
+
+    given.push({ slug: 'index', data: { title: 'Written' } })
+    home.invalidate()
+
+    expect(await home.one({ title: 'Fallback' })).toEqual({ title: 'Written' })
+  })
+
+  it('refuses one() on a collection that is not single, and a single one that is localized or a seed without single', async () => {
+    const schema = t.Object({ title: t.String() })
+
+    await expect(collection({ name: 'many', load: () => [] }, { schema }).one()).rejects.toThrow('declare it with `single: true`')
+    expect(() => collection({ name: 'a', load: () => [] }, { schema, single: true, localized: true })).toThrow('both `single` and `localized`')
+    expect(() => collection({ name: 'b', load: () => [] }, { schema, seed: { title: 'x' } })).toThrow('not `single`')
+  })
+
   it('leaves a loader alone for the names and kinds of its collections when counts is false', async () => {
     let loads = 0
     const tales = collection({ name: 'tales', load: () => {

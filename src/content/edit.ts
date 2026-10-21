@@ -70,6 +70,10 @@ export interface CollectionInfo {
   publishField?: string | undefined
   // The number field `order` names, which the entries are ordered by and a CMS moves one by writing.
   orderField?: string | undefined
+  // The collection holds one entry, which a CMS opens its form on from the content list, with no row, no New entry and no Delete.
+  single?: true | undefined
+  // A single collection's `seed`: the data its form opens filled with while no entry exists.
+  seed?: Record<string, DataValue> | undefined
   // How many entries it holds, every locale's; absent when `problem` says why they fail to read.
   count?: number | undefined
   // Why its entries fail to read, a loader throwing say; `body` is then assumed.
@@ -253,6 +257,8 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...typeof draft === 'string' && { draftField: draft },
     ...publishAt !== undefined && { publishField: publishAt },
     ...order !== undefined && { orderField: order },
+    ...collection.options.single && { single: true as const },
+    ...collection.options.single && collection.options.seed !== undefined && { seed: collection.options.seed as Record<string, DataValue> },
     ...count !== undefined && { count },
     ...problem !== undefined && { problem },
   }

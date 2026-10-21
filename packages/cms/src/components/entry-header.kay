@@ -1,13 +1,19 @@
 ---
 import type { CollectionInfo } from '../kay/contract'
+import { wording } from 'kay/words'
 import { collectionPath, collectionTitle } from '../listing'
+import { screenPath } from '../paths'
 
 // The head of an entry's screen: the way back to its collection, the entry's name as the page's title and its slug beneath, the actions at the end.
 const { prefix, collection, title, subtitle } = props<{ prefix: string, collection: CollectionInfo, title: string, subtitle?: string | undefined }>()
 ---
 header.kcms-entry-header
   .kcms-entry-heading
-    a.kcms-entry-crumb(href={collectionPath(prefix, collection.name)}) {collectionTitle(collection)}
+    // A single collection has no list to go back to, so the way back is the content list.
+    if collection.single
+      a.kcms-entry-crumb(href={screenPath(prefix)}) {wording('cms.admin.content', 'Content')}
+    else
+      a.kcms-entry-crumb(href={collectionPath(prefix, collection.name)}) {collectionTitle(collection)}
     h1.kcms-entry-name {title}
     if subtitle
       p.kcms-entry-subtitle {subtitle}

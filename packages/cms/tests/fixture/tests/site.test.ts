@@ -60,8 +60,33 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Shop', '/admin/collections/shop']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
+})
+
+test('a single collection opens its form from the content list and its list address, with no slug, no New entry and no Delete', async () => {
+  const written = await site.visit('/admin/collections/welcome/index')
+
+  expect(written.find('h1').map(heading => heading.text)).toEqual(['Welcome page'])
+  expect(written.find('.kcms-entry-crumb').map(link => [link.text, link.attributes.href])).toEqual([['Content', '/admin']])
+  expect(written.text('main')).not.toContain('Delete')
+  expect(written.title()).toBe('Welcome page - Content admin')
+  expect(written.find('.kcms-entry-subtitle')).toHaveLength(0)
+
+  const redirected = await site.fetch('/admin/collections/welcome', { redirect: 'manual' })
+
+  expect(redirected.status).toBe(302)
+  expect(redirected.headers.get('location')).toBe('/admin/collections/welcome/index')
+
+  const unwritten = await site.fetch('/admin/collections/footer', { redirect: 'manual' })
+
+  expect(unwritten.headers.get('location')).toBe('/admin/new/footer')
+
+  const form = await site.visit('/admin/new/footer')
+
+  expect(form.find('h1').map(heading => heading.text)).toEqual(['Footer'])
+  expect(form.title()).toBe('Footer - Content admin')
+  expect(form.text('main')).not.toContain('Slug')
 })
 
 test('the screens have their own chrome, none of the site\'s header, footer or head, in each locale and on every screen', async () => {

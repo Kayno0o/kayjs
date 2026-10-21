@@ -129,6 +129,9 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')
   }
 
+  if (create && collection.single && (await entries(collection.name, { limit: 1 })).length > 0)
+    return refused(entry, wording('cms.store.singleExists', '{collection} holds one entry, which is written already', { collection: collection.title ?? collection.name }), 'slug')
+
   if (collection.kind === 'loaded') {
     const versioned = required || version !== undefined
 
@@ -169,6 +172,9 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
 
 export async function deleteEntry(ref: EntryRef, author?: Identity, { version, required = false }: { version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
+
+  if (collection.single)
+    return refused(ref, wording('cms.store.singleDelete', '{collection} holds one entry, which cannot be deleted', { collection: collection.title ?? collection.name }))
 
   if (collection.kind === 'loaded') {
     return inTurn(collection.name, async () => {

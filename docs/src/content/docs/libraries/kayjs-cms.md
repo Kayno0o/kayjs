@@ -90,6 +90,29 @@ export const produits = collection('src/content/produits', { schema, title: 'Pro
 
 The name keeps naming the collection's URL, its markers and its upload folder.
 
+## A collection of one entry
+
+Some content is one entry, such as the texts of a home page. Declare the collection `single`, and the admin shows it as that page, not as a list of one row:
+
+```ts
+export const home = collection('src/content/home', {
+  schema: s.Object({ headline: s.String(), intro: s.String() }),
+  title: 'Home page',
+  single: true,
+  seed: { headline: 'Welcome', intro: '' },
+})
+```
+
+The content list links to the form, which is titled "Home page". It has no slug field, no New entry and no Delete, and the way back leads to the content list. The entry is saved as `index`. The CMS refuses a second entry or a delete, whoever asks.
+
+`seed` is what the form holds until the entry is written. The first save writes it, so the app seeds nothing by hand. Read the entry in a page with `one()`:
+
+```ts
+const { headline } = await home.one()
+```
+
+`one()` gives the entry's data, else the `seed`, else `undefined`. Give it a fallback to get the data typed, `await home.one({ headline: '', intro: '' })`. A single collection cannot be `localized`.
+
 ## Ordering entries
 
 A collection listed in a hand-picked order names a number field with `order`:

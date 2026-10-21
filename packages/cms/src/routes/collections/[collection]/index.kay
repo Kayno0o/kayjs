@@ -7,12 +7,16 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
 import { adminTitle, collectionTitle, newEntryPath } from '../../../listing'
-import { listScreen } from '../../../screens'
+import { listScreen, openPath } from '../../../screens'
 
 export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
 
 const search = ctx.query.q ?? ''
 const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page }) ?? ctx.notFound()
+
+if (collection.single)
+  ctx.redirect(await openPath(collection))
+
 const url = ctx.url
 const title = collectionTitle(collection)
 ---

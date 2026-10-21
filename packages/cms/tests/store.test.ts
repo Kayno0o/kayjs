@@ -16,7 +16,8 @@ const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { t
 
 const shelf: CollectionInfo = { ...posts, name: 'shelf', dir: 'content/shelf', orderField: 'order' }
 const catalog: CollectionInfo = { ...products, name: 'catalog', orderField: 'order' }
-const collectionList = [posts, products, outside, shelf, catalog]
+const home: CollectionInfo = { ...posts, name: 'home', dir: 'content/home', single: true }
+const collectionList = [posts, products, outside, shelf, catalog, home]
 
 const TAKEN = 'names an entry the collection already holds'
 const MISSING = 'names no entry of the collection'
@@ -260,6 +261,32 @@ describe('deleteEntry', () => {
     expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toEqual({ saved: true })
     expect(await deleteEntry({ collection: 'products', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(removed).toEqual(['mug'])
+  })
+})
+
+describe('a single collection', () => {
+  test('refuses a second entry, whatever its slug, and creates the first', async () => {
+    const entry = { collection: 'home', slug: 'other', data: { title: 'Hi' } }
+
+    expect(await saveEntry(entry, { create: true })).toHaveProperty('saved', true)
+
+    stored.home = [{ slug: 'index', data: { title: 'Hi' }, draft: false }]
+
+    expect(await saveEntry(entry, { create: true })).toHaveProperty('issues.0.message', 'home holds one entry, which is written already')
+    expect(saved).toHaveLength(1)
+  })
+
+  test('saves changes to its entry', async () => {
+    stored.home = [{ slug: 'index', data: { title: 'Hi' }, draft: false }]
+
+    expect(await saveEntry({ collection: 'home', slug: 'index', data: { title: 'Hello' } })).toHaveProperty('saved', true)
+  })
+
+  test('refuses a delete, its entry staying', async () => {
+    stored.home = [{ slug: 'index', data: { title: 'Hi' }, draft: false }]
+
+    expect(await deleteEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'home holds one entry, which cannot be deleted')
+    expect(saved).toEqual([])
   })
 })
 

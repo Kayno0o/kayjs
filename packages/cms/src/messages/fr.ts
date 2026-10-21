@@ -178,6 +178,8 @@ export default defineMessages({
       parseFailure: 'Le fichier de {slug} est illisible : {problem}',
       readFailure: 'kay : les entrées de {collection} n\'ont pas pu être lues, le journal du serveur dit pourquoi',
       script: 'Le texte contient {script}, qui s\'exécuterait sur le site : écrivez-le en Markdown, ou ajoutez {collection} à cms({ rawHtml })',
+      singleDelete: '{collection} contient une seule entrée, qui ne peut pas être supprimée',
+      singleExists: '{collection} contient une seule entrée, déjà écrite',
       staleDelete: 'Cet éditeur n\'affiche pas le fichier tel qu\'il est maintenant, il ne le supprimera pas : rechargez la page pour le voir, puis supprimez à nouveau',
       staleSave: 'Cet éditeur est plus ancien que le serveur : copiez vos modifications, rechargez la page, puis refaites-les',
     },

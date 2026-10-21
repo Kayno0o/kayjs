@@ -41,3 +41,18 @@ export const shop = collection({
   schema: s.Object({ name: s.String({ minLength: 1 }), price: s.Optional(s.Number()), stock: s.Optional(s.Integer()), live: s.Optional(s.Boolean()), photo: s.Optional(imageField()), sku: s.String({ minLength: 1 }), position: s.Optional(s.Integer()) }),
   order: 'position',
 })
+
+// A collection of one entry, written already.
+export const welcome = collection('content/welcome', {
+  schema: s.Object({ headline: s.String() }),
+  title: 'Welcome page',
+  single: true,
+})
+
+// A collection of one entry, not written yet: its form opens filled with the seed.
+export const footer = collection({ name: 'footer', load: () => [] }, {
+  schema: s.Object({ legal: s.String() }),
+  title: 'Footer',
+  single: true,
+  seed: { legal: 'All rights reserved' },
+})

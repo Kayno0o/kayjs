@@ -130,6 +130,10 @@ export interface CollectionOptions<Schema extends TSchema> {
   url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Schema> }) => string) | undefined
   // Every open page that read the collection follows it: once `invalidate()` drops its entries, a CMS saving or removing one included, the page shows what `all()` and `get()` give now. Needs the read in a page's server fence or a layout's; a static export of such a page fails.
   live?: boolean | undefined
+  // The collection holds one entry, such as a home page's texts: a CMS opens its form straight from the content list, with no row, no New entry and no Delete, titled with the collection's `title`. Its entry is the collection's only one, `index` when it is first written, and `one()` reads it. Not for a `localized` collection.
+  single?: boolean | undefined
+  // For a `single` collection, the data it holds until its entry is written: a CMS opens the form filled with it, the first save writes it, and `one()` gives it while no entry exists.
+  seed?: Static<Schema> | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
@@ -154,6 +158,8 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   translation: (entry: { slug: string, data: unknown }, locale: string) => Promise<Entry<Data> | undefined>
   // Loads the entries afresh on the next read: for a webhook a CMS calls once an entry changed. A loader's `store` passes it to every process sharing it.
   invalidate: () => void
+  // For a `single` collection, its entry's data, else `fallback`, else the `seed`; undefined with none of them. Throws for a collection not declared `single`.
+  one: <Fallback extends Data | undefined = undefined>(fallback?: Fallback) => Promise<Fallback extends undefined ? Data | undefined : Data>
 }
 
 interface Entries<Data> {
@@ -180,6 +186,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   if (publishAt !== undefined)
     checkPublishField(name, options.schema, publishAt)
+
+  if (options.single && localized)
+    throw new KayError('config-invalid', `kay: the collection ${name} is both \`single\` and \`localized\`; a single entry has no translations, so leave one out`)
+
+  if (options.seed !== undefined && !options.single)
+    throw new KayError('config-invalid', `kay: the collection ${name} has a \`seed\` but is not \`single\`; a seed is the data of its only entry`)
 
   const decodeEach = (raw: RawEntry[]) => {
     const { readingSpeed, imageSizes } = markdownOf(options)
@@ -371,6 +383,15 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const found = shown((await loaded()).paired.get(locale)?.get(translationKey(entry)))
 
       return found && editableEntries(name, [found])[0]
+    },
+    one: async <Fallback extends Data | undefined = undefined>(fallback?: Fallback) => {
+      if (!options.single)
+        throw new KayError('content-api-misuse', `kay: ${name}.one() reads a \`single\` collection; declare it with \`single: true\`, or use all() and get()`)
+
+      const { list } = await loaded()
+      const entry = list.find(candidate => !hidden(candidate))
+
+      return entry ? entry.data : fallback ?? options.seed
     },
     // Holds `reset`, which the listener only holds weakly.
     invalidate: () => {
