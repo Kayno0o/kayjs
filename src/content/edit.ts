@@ -417,8 +417,7 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 
 // Each `unique` field whose value another entry of the collection already holds, in the same locale when it is localized.
 async function uniqueIssues(name: string, collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>): Promise<DraftIssue[]> {
-  const properties = (collection.options.schema as { properties?: Record<string, { 'x-kay-unique'?: boolean }> }).properties ?? {}
-  const fields = Object.keys(properties).filter(field => properties[field]!['x-kay-unique'] === true && data[field] !== undefined && data[field] !== null)
+  const fields = uniqueFields(collection.options.schema).filter(field => data[field] !== undefined && data[field] !== null)
 
   if (fields.length === 0)
     return []
@@ -434,6 +433,13 @@ async function uniqueIssues(name: string, collection: Collection<unknown>, at: {
   }
 
   return issues
+}
+
+// The top-level fields declared `unique`, those of an `Intersect`'s members as well.
+function uniqueFields(schema: TSchema): string[] {
+  const { properties = {}, allOf = [] } = schema as { properties?: Record<string, { 'x-kay-unique'?: boolean }>, allOf?: TSchema[] }
+
+  return [...new Set([...Object.keys(properties).filter(field => properties[field]!['x-kay-unique'] === true), ...allOf.flatMap(uniqueFields)])]
 }
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.

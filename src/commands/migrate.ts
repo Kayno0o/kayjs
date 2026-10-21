@@ -1,13 +1,14 @@
-import type { Command } from './command'
+import type { Command, ProblemFormat } from './command'
 import { statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { migrateAstroProject } from '../migrate/project'
+import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, shellQuote } from './command'
 import { USAGES } from './usages'
 
-// Translates an Astro project's `.astro` files and content config, in place or into `--outdir` (`--out` as before), a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
+// `kay migrate astro` translates an Astro project's `.astro` files and content config, in place or into `--outdir` (`--out` as before), a directory with no package.json getting the kay project around them, and lists what is left to do by hand; `kay migrate content` rewrites the entry files of the folder collections whose `migrations` carried them to the schema's shape.
 export const migrate: Command = {
   usage: USAGES.migrate,
   options: { outdir: { type: 'string' }, out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
@@ -19,8 +20,8 @@ export const migrate: Command = {
     if (format === undefined)
       return 1
 
-    if (from !== 'astro') {
-      printFailure('migrate', `${from === undefined ? 'name what to migrate from' : `${from} is not something kay migrates from`}, as in \`kay migrate astro\``, format)
+    if (from !== 'astro' && from !== 'content') {
+      printFailure('migrate', `${from === undefined ? 'name what to migrate' : `${from} is not something kay migrates`}, as in \`kay migrate astro\` or \`kay migrate content\``, format)
 
       return 1
     }
@@ -30,6 +31,9 @@ export const migrate: Command = {
 
       return 1
     }
+
+    if (from === 'content')
+      return migrateContent(resolve(dir), format, values.quiet === true)
 
     if (typeof values.out === 'string' && typeof values.outdir === 'string' && resolve(values.out) !== resolve(values.outdir)) {
       printFailure('migrate', '--out is the older spelling of --outdir, and the two name different directories; keep --outdir', format)
@@ -84,4 +88,42 @@ export const migrate: Command = {
 
     return 0
   },
+}
+
+// Rewrites the files of the folder collections that declare `migrations`, which `kay build` and the server only migrate as they read.
+async function migrateContent(root: string, format: ProblemFormat, quiet: boolean): Promise<number> {
+  buildingWithoutEnv()
+
+  let migrated: Awaited<ReturnType<typeof import('../content/rewrite').migrateFolders>>
+
+  try {
+    migrated = await (await import('../content/rewrite')).migrateFolders(root)
+  }
+  catch (error) {
+    printFailure('migrate', error, format)
+
+    return 1
+  }
+
+  const { collections, declared } = migrated
+  const rewritten = collections.flatMap(each => each.rewritten)
+  const failed = collections.flatMap(each => each.failed)
+
+  if (format === 'json') {
+    printDocument({ rewritten, failed })
+
+    return failed.length > 0 ? 1 : 0
+  }
+
+  if (!quiet) {
+    for (const file of rewritten)
+      done('rewrote', file)
+  }
+
+  for (const { file, message } of failed)
+    console.error(`${colors.bold.red('failed')} ${file}: ${message}`)
+
+  console.log(declared === 0 ? 'no folder collection declares `migrations`' : `${count(rewritten.length, 'file')} rewritten${failed.length > 0 ? `, ${failed.length} failed` : ''}`)
+
+  return failed.length > 0 ? 1 : 0
 }

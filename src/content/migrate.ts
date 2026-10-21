@@ -4,7 +4,7 @@ import type { RawEntry } from './load'
 import { kayLog } from '../runtime/log'
 import { compiledCheck } from '../server/schema-check'
 import { inTurn } from './turns'
-import { withDefaults } from './validate'
+import { ContentError, withDefaults } from './validate'
 
 // One step carrying a stored entry's data from the shape it had to a newer one; it gets a copy to change or replace.
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>
@@ -41,6 +41,14 @@ export function convertField(name: string, convert: (value: unknown, data: Recor
 // Whether the collection declares any migration.
 export function hasSteps(migrations: readonly Migration[] | undefined): migrations is readonly Migration[] {
   return migrations !== undefined && migrations.length > 0
+}
+
+// The error a folder collection's refused entries raise, pointing at `migrations` where the collection declares none: the files are fixed by hand or rewritten by `kay migrate content`.
+export function withMigrationHint(error: unknown, migrations: readonly Migration[] | undefined): unknown {
+  if (!(error instanceof ContentError) || hasSteps(migrations))
+    return error
+
+  return new ContentError(error.problems, 'fix the files, or declare `migrations` on the collection to carry them over, then run `kay migrate content` to rewrite them')
 }
 
 function isFields(data: unknown): data is Record<string, unknown> {

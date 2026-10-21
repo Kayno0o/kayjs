@@ -19,7 +19,7 @@ export const USAGES = {
   'lint': 'lint [keslint arguments]...',
   'i18n missing': 'i18n missing [locale] [dir] [--format text|json]',
   'i18n accept': 'i18n accept <locale> [dir]',
-  'migrate': 'migrate astro [dir] [--outdir <dir>] [--format text|json] [--quiet]',
+  'migrate': 'migrate astro [dir] [--outdir <dir>] [--format text|json] [--quiet] | migrate content [dir] [--format text|json] [--quiet]',
   'lsp': 'lsp --stdio',
   'mcp': 'mcp [--stdio]',
 } as const

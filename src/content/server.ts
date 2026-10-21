@@ -26,7 +26,7 @@ import { entries, registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
 import { draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
-import { migrateEntries } from './migrate'
+import { migrateEntries, withMigrationHint } from './migrate'
 import { ContentError, decodeEntries } from './validate'
 
 // Enough of an entry's file to hold its first lines.
@@ -102,7 +102,13 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
     const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
 
-    inLocale(locale, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+    try {
+      inLocale(locale, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+    }
+    catch (error) {
+      throw withMigrationHint(error, collection.options.migrations)
+    }
+
     await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
     count += entries.length
   }

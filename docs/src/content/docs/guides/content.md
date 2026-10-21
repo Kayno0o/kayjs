@@ -310,7 +310,7 @@ export const packs = collection(loader, {
 
 The steps run, in order, only on an entry the schema refuses, and stop once it accepts the entry. Write each step so that it leaves data already in the new shape alone. `renameField` does nothing when the new field exists, `setField` fills only a missing field and `convertField` only a present one.
 
-An entry that changed is given to the loader's `save` once, so the next read finds it in the new shape and nothing runs again. An entry of a folder is migrated when it is read and its file stays as it is until a CMS saves it. Defaults fill nested objects and list items as well as the top-level fields.
+An entry that changed is given to the loader's `save` once, so the next read finds it in the new shape and nothing runs again. An entry of a folder is migrated when it is read and its file stays as it is until a CMS saves it, or until you run `kay migrate content`, which rewrites the files a step carried over. Defaults fill nested objects and list items as well as the top-level fields.
 
 To keep two entries from sharing a value, such as a code, wrap the field in `unique()` from `kay/content`: a save that repeats another entry's value is refused with an issue on that field.
 

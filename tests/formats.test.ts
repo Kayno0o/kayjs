@@ -596,6 +596,6 @@ describe('kay migrate --format json', () => {
     const { stdout, code } = await kay(['migrate', 'gatsby', '--format', 'json'])
 
     expect(code).toBe(1)
-    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: 'gatsby is not something kay migrates from, as in `kay migrate astro`' }] })
+    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: 'gatsby is not something kay migrates, as in `kay migrate astro` or `kay migrate content`' }] })
   })
 })

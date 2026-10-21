@@ -339,6 +339,33 @@ describe('migrations', () => {
   })
 })
 
+describe('a folder entry the schema refuses', () => {
+  it('points at `migrations` and `kay migrate content` where the collection declares none', async () => {
+    const root = await scratchDir('migrations-hint-')
+    const schema = t.Object({ title: t.String(), price: t.Integer() })
+    const before = contentPlace()
+
+    try {
+      await Bun.write(join(root, 'packs/old.json'), JSON.stringify({ name: 'Old', price: '7 €' }))
+      setContentPlace(root, root)
+
+      for (const mode of MODES) {
+        setContentMode(mode)
+
+        const without = collection('packs', { schema })
+        const withSteps = collection('packs', { schema, migrations: [() => ({ nothing: true })] })
+
+        expect(((await rejection(without.all())) as ContentError).message).toContain('declare `migrations` on the collection to carry them over, then run `kay migrate content`')
+        expect(((await rejection(withSteps.all())) as ContentError).message).not.toContain('kay migrate content')
+      }
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('a CMS editing a collection with stored entries the schema refuses', () => {
   it('lists the refused entry and opens it migrated, and a save fixes it for the pages', async () => {
     const { loader, rows } = store('editing', [
@@ -406,6 +433,49 @@ describe('a unique field', () => {
     finally {
       registerCollections(before)
     }
+  })
+
+  it.each([
+    ['an Intersect', (code: ReturnType<typeof unique>) => t.Intersect([t.Object({ code }), t.Object({ name: t.String() })])],
+    ['a Composite', (code: ReturnType<typeof unique>) => t.Composite([t.Object({ code }), t.Object({ name: t.String() })])],
+  ])('reads a field of %s', async (_name, build) => {
+    const schema = build(unique(t.String()))
+    const { loader } = store('uniques-merged', [{ slug: 'a', data: { code: 'A', name: 'A' } }])
+    const packs = collection(loader, { schema })
+    const before = registerCollections([['uniquesMerged', packs]])
+
+    try {
+      expect((await entryIssues('uniquesMerged', packs, { slug: 'b', data: { code: 'A', name: 'B' } })).issues).toEqual([{ collection: 'uniquesMerged', slug: 'b', path: 'code', message: 'is already the code of a' }])
+      expect((await entryIssues('uniquesMerged', packs, { slug: 'b', data: { code: 'B', name: 'B' } })).issues).toEqual([])
+    }
+    finally {
+      registerCollections(before)
+    }
+  })
+})
+
+describe('a localized collection pairing entries by translation key', () => {
+  const schema = t.Object({ title: t.String(), translationKey: t.Optional(t.String()) })
+  const raw = (file: string, data: unknown) => ({ slug: file.replace(/\.md$/, ''), file: `c/${file}`, data, lines: { translationKey: 3 } })
+
+  it('lets a refused entry leave its key to a valid sibling, in either order', () => {
+    const refused = raw('fr/old.md', { title: 1, translationKey: 'shared' })
+    const valid = raw('fr/new.md', { title: 'New', translationKey: 'shared' })
+
+    for (const order of [[refused, valid], [valid, refused]]) {
+      const { entries, problems } = validEntries(order, schema, {}, true)
+
+      expect(entries.map(entry => entry.file)).toEqual(['c/fr/new.md'])
+      expect(new Set(problems.map(problem => problem.file))).toEqual(new Set(['c/fr/old.md']))
+      expect(problems.map(problem => problem.message)).toContain('title: Title is not valid')
+    }
+  })
+
+  it('still refuses two valid entries of one locale sharing a key', () => {
+    const { entries, problems } = validEntries([raw('fr/a.md', { title: 'A', translationKey: 'k' }), raw('fr/b.md', { title: 'B', translationKey: 'k' })], schema, {}, true)
+
+    expect(entries).toHaveLength(1)
+    expect(problems).toEqual([expect.objectContaining({ file: 'c/fr/b.md', message: expect.stringContaining('pairs the entry as c/fr/a.md') })])
   })
 
   it('hands a loader\'s save the data with its defaults filled in and a date as its text', async () => {

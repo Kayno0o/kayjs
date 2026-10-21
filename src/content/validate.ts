@@ -19,8 +19,8 @@ export class ContentError extends Error {
   override name = 'ContentError'
   readonly code = 'content-invalid'
 
-  constructor(readonly problems: ContentProblem[]) {
-    super(`kay: ${problems.length === 1 ? 'an entry does' : `${problems.length} entries do`} not match the collection\n${problems.map(problem => `  ${problem.file}:${problem.line} ${problem.message}`).join('\n')}`)
+  constructor(readonly problems: ContentProblem[], hint?: string) {
+    super(`kay: ${problems.length === 1 ? 'an entry does' : `${problems.length} entries do`} not match the collection\n${problems.map(problem => `  ${problem.file}:${problem.line} ${problem.message}`).join('\n')}${hint === undefined ? '' : `\n${hint}`}`)
   }
 }
 
@@ -60,8 +60,7 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
     const data = withDefaults(entry.data, schema)
     const before = problems.length
 
-    if (localized)
-      pairingProblem(entry, paired, problems)
+    const claim = localized ? pairingProblem(entry, paired, problems) : undefined
 
     if (localized && !entry.slug.includes('/'))
       problems.push({ file: entry.file, line: 1, message: 'sits outside a locale folder, where a localized collection keeps each entry: fr/hello.md' })
@@ -70,8 +69,13 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
       problems.push({ file: entry.file, line, message: `uses <${component}>, which the collection's components do not name` })
 
     if (check.Check(data)) {
-      if (problems.length === before)
+      if (problems.length === before) {
         decoded.push({ entry, data: check.Decode(data) })
+
+        // Only an entry that proved valid holds its key, so a refused one does not turn a valid sibling away.
+        if (claim !== undefined)
+          paired.set(claim, entry)
+      }
 
       continue
     }
@@ -87,14 +91,14 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
   return { decoded, problems }
 }
 
-// A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder.
-function pairingProblem(entry: RawEntry, paired: Map<string, RawEntry>, problems: ContentProblem[]): void {
+// A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder. Gives the key the entry would hold, which the caller claims once the entry proved valid, or nothing where it is refused already.
+function pairingProblem(entry: RawEntry, paired: Map<string, RawEntry>, problems: ContentProblem[]): string | undefined {
   const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translationKey?: unknown }).translationKey : undefined
 
   if (given !== undefined && typeof given !== 'string') {
     problems.push({ file: entry.file, line: entry.lines.translationKey ?? 1, message: 'translationKey is not a string' })
 
-    return
+    return undefined
   }
 
   const [locale = '', ...rest] = entry.slug.split('/')
@@ -102,10 +106,13 @@ function pairingProblem(entry: RawEntry, paired: Map<string, RawEntry>, problems
   const id = `${locale}\0${key}`
   const taken = paired.get(id)
 
-  if (taken)
+  if (taken) {
     problems.push({ file: entry.file, line: entry.lines.translationKey ?? 1, message: `translationKey ${key} pairs the entry as ${taken.file} does; rename one` })
-  else
-    paired.set(id, entry)
+
+    return undefined
+  }
+
+  return id
 }
 
 // Where a draft's data fails the schema, each field by its dotted path, `tags.0`, at most once.

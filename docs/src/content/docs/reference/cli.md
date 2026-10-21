@@ -36,6 +36,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay fmt [paths]` | Format `.kay` files, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
+| `kay migrate content [dir]` | Rewrite the entry files that `migrations` carry over |
 | `kay lsp --stdio` | The language server behind the editor extension |
 | `kay mcp` | Serve the project to an agent as MCP tools and resources |
 
@@ -555,6 +556,19 @@ kay migrate astro . --outdir ../kay-site
 | `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. `--out` is the older spelling and still works |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.
+
+```sh
+kay migrate content
+```
+
+`kay migrate content` rewrites the entry files of the folder collections that declare [`migrations`](/guides/content#when-the-schema-changes), for each entry a step carried to the shape the schema accepts. A file keeps its format: a JSON file its indentation, a Markdown file its body as it was written. A YAML file loses its comments, except a `# draft` mark. An entry the schema already accepts is not touched.
+
+The command lists each file it rewrote, and a file it could not read, which makes it exit with 1. Collections a loader fills write their entries back through the loader when they are read, so the command leaves them alone.
+
+| Option | Effect |
+| --- | --- |
+| `[dir]` | The project, the current directory by default |
+| `--format json` | Prints the rewritten and failed files as one JSON document |
 
 ## kay mcp
 

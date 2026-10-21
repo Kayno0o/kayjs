@@ -20,7 +20,7 @@ import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
-import { hasSteps, migrateEntries, migrateLoaded, writeBack } from './migrate'
+import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
@@ -211,7 +211,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const decodeEach = (raw: RawEntry[]) => {
     const { readingSpeed, imageSizes } = markdownOf(options)
 
-    return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes))
+    try {
+      return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes))
+    }
+    catch (error) {
+      throw typeof source === 'string' ? withMigrationHint(error, migrations) : error
+    }
   }
 
   // Sorts the entries and maps them by slug and locale, setting each one's translations.
