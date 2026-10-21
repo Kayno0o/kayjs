@@ -563,6 +563,32 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   expect(await refusal.text()).toContain('which uploads here do not take')
 })
 
+test('an image upload answers its size, a file that is no image none, and the uploads of a collection are listed, images alone when asked', async () => {
+  const send = async (file: File) => {
+    const form = new FormData()
+
+    form.append('file', file)
+
+    return await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string, width?: number, height?: number }
+  }
+  const image = await send(new File([PIXEL], 'size.png', { type: 'image/png' }))
+  const pdf = await send(new File(['%PDF-1.4\n%%EOF'], 'doc.pdf', { type: 'application/pdf' }))
+
+  expect(image).toMatchObject({ width: 1, height: 1 })
+  expect(pdf).not.toHaveProperty('width')
+  expect(pdf).not.toHaveProperty('height')
+
+  const listed = async (query = '') => await (await site.fetch(`/api/cms/files/products${query}`)).json() as { path: string, name: string }[]
+  const everything = (await listed()).map(upload => upload.path)
+  const images = (await listed('?images=true')).map(upload => upload.path)
+
+  expect(everything).toEqual(expect.arrayContaining([image.path, pdf.path]))
+  expect(images).toContain(image.path)
+  expect(images).not.toContain(pdf.path)
+  expect((await listed()).find(upload => upload.path === image.path)?.name).toMatch(/\.1x1\.png$/)
+  expect((await site.fetch('/api/cms/files/nope')).status).toBe(404)
+})
+
 test('the editor is told the types and the size an upload may have', async () => {
   const rules = await (await site.fetch('/api/cms/files/rules')).json() as { accept: string, images: string, maxBytes: number }
 
@@ -856,12 +882,12 @@ test('a file field offers only the types the server takes, and says why a droppe
     data.items.add(new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'logo.svg', { type: 'image/svg+xml' }))
     document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
   })
-  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take') === true)
+  await page.waitUntil(() => document.querySelector('.kcms-file-error')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take') === true)
 
   expect(page.errors).toEqual([])
 }, 60_000)
 
-test('a list of images takes several files at once, one item per file in order, a refused one toasted while the others land', async () => {
+test('a list of images takes several files at once, one item per file in order, a refused one told by the field while the others land', async () => {
   const built = await browser()
 
   await using page = await built.open('/admin/collections/products/mug')
@@ -883,11 +909,11 @@ test('a list of images takes several files at once, one item per file in order, 
   const paths = await page.evaluate(() => [...document.querySelectorAll('[data-kcms-path="gallery"] .kcms-file-preview')].map(image => image.getAttribute('src')))
 
   expect(paths.map(path => (/\.1x1\.(png|gif)&/).exec(path ?? '')?.[1])).toEqual(['png', 'gif', 'png'])
-  expect(await page.evaluate(() => document.querySelector('.kui-toaster')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take'))).toBe(true)
+  expect(await page.evaluate(() => document.querySelector('[data-kcms-path="gallery"] .kcms-file-error')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take'))).toBe(true)
   expect(page.errors).toEqual([])
 }, 60_000)
 
-test('a file over the size limit is refused before it is sent, with its size in the toast', async () => {
+test('a file over the size limit is refused before it is sent, with its size told by the field', async () => {
   const built = await browser()
 
   await using page = await built.open('/admin/collections/products/mug')
@@ -899,8 +925,33 @@ test('a file over the size limit is refused before it is sent, with its size in 
     data.items.add(new File([new Uint8Array(100 * 1024)], 'huge.png', { type: 'image/png' }))
     document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
   })
-  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('huge.png is 100 KB, over the 64 KB an upload may be') === true)
+  await page.waitUntil(() => document.querySelector('.kcms-file-error')?.textContent?.includes('huge.png is 100 KB, over the 64 KB an upload may be') === true)
 
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('an upload stored before can be picked again from the field, and fills it', async () => {
+  const form = new FormData()
+
+  form.append('file', new File([PIXEL], 'again.png', { type: 'image/png' }))
+
+  const built = await browser()
+  const { path } = await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
+
+  await using page = await built.open('/admin/collections/products/mug')
+
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="photo"] .kcms-file-pick') !== null)
+  await page.click('[data-kcms-path="photo"] .kcms-file-pick > summary')
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="photo"] .kcms-file-choice') !== null)
+  await page.evaluate((name) => {
+    const choice = [...document.querySelectorAll<HTMLElement>('[data-kcms-path="photo"] .kcms-file-choice')].find(each => each.getAttribute('aria-label') === `Use ${name}`)
+
+    choice!.click()
+  }, path.split('/').at(-1)!)
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="photo"] a.kcms-file-link') !== null)
+
+  expect(await page.evaluate(() => document.querySelector('[data-kcms-path="photo"] a.kcms-file-link')?.getAttribute('href'))).toBe(path)
+  expect(await page.evaluate(() => document.querySelector('[data-kcms-path="photo"] .kcms-file-pick')?.hasAttribute('open'))).toBe(false)
   expect(page.errors).toEqual([])
 }, 60_000)
 

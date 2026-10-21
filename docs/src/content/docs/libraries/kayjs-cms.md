@@ -174,13 +174,34 @@ A file added while `kay dev` runs is picked up on the next reload. `customField`
 
 ## Files and images
 
-An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The path stays behind a collapsed Path control under the preview, for an editor who would rather type one. It takes a path or an `http:` or `https:` address, and refuses any other scheme such as `javascript:` or `data:`.
+An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The file name is a link that opens it in a new tab, and a Clear button empties the field. An empty field shows a slim drop zone with its button beside it, and under it what the field takes: the types, the size and, for an image, the pixels.
 
-A list of them, such as `s.Array(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported while the others still land.
+An editor who would rather type a path finds a collapsed Path control, shown while the field is empty or holds an address typed by hand. It takes a path or an `http:` or `https:` address, and refuses any other scheme such as `javascript:` or `data:`. A file the CMS stored needs no path, so the control is not shown for it.
+
+While a file uploads, the field shows a progress bar and a Cancel button. A file that fails is explained under the field, not only in a message that goes away. Save refuses while an upload runs, because the field is not set until it ends, and the browser asks before the page is closed.
+
+Under the zone, Choose an uploaded file lists what the collection's folder already holds, so a file is used again without uploading it twice. If the image cannot be shown, the field says so instead of a broken picture.
+
+An image field can ask more of its files, and pair itself with the fields next to it:
+
+```ts
+photo: s.Optional(imageField({ accept: ['image/png', 'image/jpeg'], maxSize: '2mb', minWidth: 800, alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight' })),
+photoAlt: s.Optional(s.String()),
+photoWidth: s.Optional(s.Integer()),
+photoHeight: s.Optional(s.Integer()),
+```
+
+`accept`, `maxSize`, `minWidth` and `minHeight` narrow what `uploads` takes for that field alone; the editor checks them before it sends the file. `fileField` takes `accept` and `maxSize`.
+
+The fields named by `alt`, `width` and `height` leave the form. The editor asks for the alt text under the image, previews the image with it, and fills in the width and height of every image uploaded or picked, so a page can give them to `image()`.
+
+These pairs work for a field of an object, not for the items of a list. An object field is drawn as one block with a rule down its left side.
+
+A list of them, such as `s.Array(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported under the zone while the others still land.
 
 An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
 
-A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over the size limit or of another type is refused with its type or size in the message, an empty one too.
+A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over the size limit or of another type is refused, the field telling its type or size, an empty one too.
 
 The server also reads the file's first bytes. A file named `photo.png` that holds a web page, a JPEG or half a header is refused as not a real `image/png`, whatever name or type the browser sent, and the name counts in any case, so `PHOTO.PNG` is a PNG. PDF and SVG files are checked the same way. A type with no signature, such as a CSV, is taken as named.
 

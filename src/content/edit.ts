@@ -1,4 +1,5 @@
 import type { TSchema } from 'elysia'
+import type { ByteSize } from '../runtime/byte-size'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { Collection, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
@@ -8,6 +9,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { byteSize } from '../runtime/byte-size'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
@@ -31,6 +33,24 @@ export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
 // A value an entry's data holds, which an island takes as a prop.
 export type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
 
+// What `x-kay` says of a field: its kind, the collection a reference names, and what `imageField` and `fileField` ask of an upload and which sibling fields an image fills.
+export interface FieldHint {
+  kind: string
+  collection?: string | undefined
+  // The types an upload may have, exact or as `image/*`, in place of what the CMS takes.
+  accept?: string[] | undefined
+  // The most bytes an upload may weigh.
+  maxSize?: number | undefined
+  // The least pixels an image may have across and down.
+  minWidth?: number | undefined
+  minHeight?: number | undefined
+  // The keys of the fields beside this one that hold the image's alt text, width and height.
+  alt?: string | undefined
+  width?: string | undefined
+  height?: string | undefined
+  [hint: string]: DataValue
+}
+
 // A collection's schema as JSON Schema, the keywords a CMS reads typed and the others kept, a field of a kind kay knows carrying `x-kay`.
 export interface JsonSchema {
   'type'?: string | string[] | undefined
@@ -44,7 +64,7 @@ export interface JsonSchema {
   'enum'?: DataValue[] | undefined
   'default'?: DataValue
   'format'?: string | undefined
-  'x-kay'?: { kind: string, collection?: string | undefined } | undefined
+  'x-kay'?: FieldHint | undefined
   [keyword: string]: DataValue | JsonSchema | JsonSchema[] | Record<string, JsonSchema>
 }
 
@@ -192,14 +212,66 @@ function webOnly(options: StringOptions): NonNullable<StringOptions> {
   return { error: own === undefined ? 'must be a path or an http(s) address' : 'must be a path or an http(s) address, and match its pattern', ...options, pattern: own === undefined ? `^${WEB_ONLY}` : `^(?=${WEB_ONLY})(?=[\\s\\S]*?(?:${own}))` }
 }
 
+// What an upload field asks of the file: the types and size it takes, narrower than the CMS's `uploads`, which the editor checks before sending.
+export interface UploadFieldOptions {
+  accept?: string[] | undefined
+  maxSize?: ByteSize | undefined
+}
+
+// What an image field asks beyond that: the pixels it needs, and the fields beside it that the editor fills, the alt text it asks for and the width and height of the image uploaded, by key, so a page gives `image()` the size.
+export interface ImageFieldOptions extends UploadFieldOptions {
+  minWidth?: number | undefined
+  minHeight?: number | undefined
+  alt?: string | undefined
+  width?: string | undefined
+  height?: string | undefined
+}
+
+type UploadStringOptions<Extra> = NonNullable<StringOptions> & Extra
+
+// The `x-kay` hint of an upload field, and the string options left once its own are taken out.
+function uploadHint<Extra extends UploadFieldOptions>(kind: 'image' | 'file', options: UploadStringOptions<Extra> | undefined, what: string): { hint: FieldHint, rest: StringOptions } {
+  const { accept, maxSize, minWidth, minHeight, alt, width, height, ...rest } = (options ?? {}) as UploadStringOptions<ImageFieldOptions>
+  const hint: FieldHint = { kind }
+
+  if (accept !== undefined)
+    hint.accept = accept
+
+  if (maxSize !== undefined)
+    hint.maxSize = byteSize(maxSize, `\`${what}({ maxSize })\``)
+
+  for (const [name, value] of [['minWidth', minWidth], ['minHeight', minHeight]] as const) {
+    if (value === undefined)
+      continue
+
+    if (!Number.isInteger(value) || value <= 0)
+      throw new KayError('content-api-misuse', `kay: ${what}({ ${name} }) is ${String(value)}; it takes a whole number of pixels above zero`)
+
+    hint[name] = value
+  }
+
+  for (const [name, value] of [['alt', alt], ['width', width], ['height', height]] as const) {
+    if (value !== undefined)
+      hint[name] = value
+  }
+
+  return { hint, rest }
+}
+
 // A string field holding the path the site serves an image at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
-export function imageField(options?: StringOptions): ReturnType<typeof t.String> {
-  return t.String({ ...webOnly(options), 'x-kay': { kind: 'image' } })
+// `alt`, `width` and `height` name fields beside it that the editor fills in, hiding them from the form: the alt text it asks for with the image, and the size of each image uploaded. `accept`, `maxSize`, `minWidth` and `minHeight` narrow what the editor takes.
+export function imageField(options?: UploadStringOptions<ImageFieldOptions>): ReturnType<typeof t.String> {
+  const { hint, rest } = uploadHint('image', options, 'imageField')
+
+  return t.String({ ...webOnly(rest), 'x-kay': hint })
 }
 
 // A string field holding the path the site serves a file at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
-export function fileField(options?: StringOptions): ReturnType<typeof t.String> {
-  return t.String({ ...webOnly(options), 'x-kay': { kind: 'file' } })
+// `accept` and `maxSize` narrow what the editor takes.
+export function fileField(options?: UploadStringOptions<UploadFieldOptions>): ReturnType<typeof t.String> {
+  const { hint, rest } = uploadHint('file', options, 'fileField')
+
+  return t.String({ ...webOnly(rest), 'x-kay': hint })
 }
 
 // A string field holding Markdown, which a CMS edits as it edits a body.

@@ -15,7 +15,8 @@ import copy from '~icons/tabler/copy'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { emptyValue, isCompact, itemAt, itemTitle } from '../fields'
-import { joinPath } from '../paths'
+import { joinPath, siblingPath } from '../paths'
+import { sizeOfPath } from '../upload-text'
 import DatetimeInput from './datetime-input.kay'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
@@ -155,6 +156,41 @@ function itemKey(event: KeyboardEvent, from: number): void {
   followFocus((event.currentTarget as HTMLElement).closest('[data-kcms-row]'), move.to, move.direction)
 }
 
+// The alt text paired with an image field, read from the field beside it.
+function altOf(): { value: string, issue?: string | undefined, required: boolean } | undefined {
+  const alt = field.kind === 'image' ? field.upload.alt : undefined
+
+  if (alt === undefined)
+    return undefined
+
+  const at = siblingPath(path, alt.key)
+
+  return { value: String(drafts.value(entry, at) ?? ''), issue: drafts.issues(entry, at)[0]?.message, required: alt.required }
+}
+
+function setAlt(text: string): void {
+  const alt = field.kind === 'image' ? field.upload.alt : undefined
+
+  if (alt !== undefined)
+    drafts.set(entry, siblingPath(path, alt.key), text === '' ? undefined : text)
+}
+
+// The file set, and the size of an image beside it when the schema keeps one: the upload's answer, else the size kay's storage put in the name of a file picked or typed; a path with none leaves no size behind that would describe the old image.
+function setFile(next: string, uploaded?: { width: number, height: number }): void {
+  const size = uploaded ?? sizeOfPath(next)
+
+  set(next)
+
+  if (field.kind !== 'image')
+    return
+
+  if (field.upload.width !== undefined)
+    drafts.set(entry, siblingPath(path, field.upload.width.key), size?.width)
+
+  if (field.upload.height !== undefined)
+    drafts.set(entry, siblingPath(path, field.upload.height.key), size?.height)
+}
+
 function setJson(next: string): void {
   try {
     set(next.trim() === '' ? undefined : JSON.parse(next))
@@ -206,7 +242,7 @@ function setJson(next: string): void {
               FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} many onChange={path => append(path)})
             Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add onClick={() => append(emptyValue(current.item))})
     when 'group'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
+      FormField.kcms-group(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for child of current.fields key={child.key}
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'textarea'
@@ -214,7 +250,7 @@ function setJson(next: string): void {
         Textarea(rows="4" value={text()} onInput={set})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        MarkdownEditor(value={text()} onInput={set} onImage={file => uploadFile(entry.collection, file)})
+        MarkdownEditor(value={text()} onInput={set} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})
@@ -228,7 +264,7 @@ function setJson(next: string): void {
         Select(value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
-        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
+        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} onAlt={setAlt} onChange={setFile})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind

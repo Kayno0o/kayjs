@@ -18,6 +18,11 @@ export function joinPath(parent: string, key: string | number): string {
   return parent === '' ? String(key) : `${parent}.${key}`
 }
 
+// The path of the field `key` beside the one at `path`, in the same object.
+export function siblingPath(path: string, key: string | number): string {
+  return joinPath(pathSegments(path).slice(0, -1).join('.'), key)
+}
+
 export function valueAt(data: unknown, path: string): unknown {
   let value = data
 

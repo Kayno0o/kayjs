@@ -7,6 +7,7 @@ import entriesApi from '../api/entries'
 import filesApi from '../api/files'
 import redirectsApi from '../api/redirects'
 import { entryKey } from '../markers'
+import { uploading } from './upload'
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
 // `told` is the toast a save this one waited for ended on, which a refusal worded the same does not repeat.
@@ -22,6 +23,13 @@ interface Flight { done: Promise<boolean>, again: boolean, target: string, told?
 // A save asked for while one is on its way waits for it, then saves the edits typed meanwhile once, so the same version is never sent twice.
 // One asked for under another slug or locale waits for it too, then saves the edits typed meanwhile under its own.
 export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOptions = {}): Promise<boolean> {
+  // An upload on its way sets its field when it lands, which a save made now would leave out.
+  if (uploading()) {
+    toast.error(wording('cms.save.uploading', 'An upload is still running: save once it ends'))
+
+    return false
+  }
+
   const inFlight = saving.get(drafts) ?? new Map<string, Flight>()
   const key = entryKey(ref)
   const target = JSON.stringify([options.slug ?? ref.slug, options.locale ?? ref.locale])

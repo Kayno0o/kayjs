@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import type { Field } from '../src/fields'
+import type { Field, UploadHints } from '../src/fields'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
 import process from 'node:process'
@@ -337,4 +337,224 @@ test('the list\'s badge turns to Published when its date passes, with no reload'
   }
 
   expect(statusOf('later')).toBe('Published')
+})
+
+const UPLOADED = '/_kay/files/posts/abc.40x30.png'
+const PHOTO = (hints: UploadHints = {}): Field => ({ key: 'tags', label: 'Photo', hint: undefined, required: false, kind: 'image', upload: hints })
+const sibling = (key: string): Field => ({ key, label: key, hint: undefined, required: false, kind: 'text' })
+
+async function openImage(data: Record<string, unknown>, hints: Parameters<typeof PHOTO>[0] = {}) {
+  const drafts = createDrafts({ show: async () => ({}) })
+
+  drafts.open({ ...ENTRY, data })
+  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: PHOTO(hints) })
+  await settle()
+
+  return { drafts, root: mounted.root }
+}
+
+async function openFile(initial: string, options: { image?: boolean, upload?: UploadHints, alt?: { value: string, issue?: string, required: boolean } } = {}) {
+  mounted = await mountComponent('src/components/file-field.kay', { initial, ...options })
+  await settle()
+
+  return mounted.root
+}
+
+test('the file name of an upload is a link opening it in a new tab, beside a button clearing the field, which brings the path back', async () => {
+  const root = await openFile(UPLOADED)
+  const link = root.querySelector<HTMLAnchorElement>('a.kcms-file-link')!
+
+  expect(link.getAttribute('href')).toBe(UPLOADED)
+  expect(link.getAttribute('target')).toBe('_blank')
+  expect(link.getAttribute('rel')).toBe('noopener')
+  expect(link.textContent).toBe('abc.40x30.png')
+  expect(root.querySelector('.kcms-file-path')).toBeNull()
+  root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
+  await settle()
+  expect(root.querySelector('a.kcms-file-link')).toBeNull()
+  expect(root.querySelector('img.kcms-file-preview')).toBeNull()
+  expect(root.querySelector('.kcms-file-path')).not.toBeNull()
+})
+
+test('a file field links the file too, and the path is offered for an empty field and a typed address, not for an upload the CMS stored', async () => {
+  expect((await openFile('/_kay/files/posts/cv.pdf', { image: false })).querySelector('a.kcms-file-link')?.getAttribute('target')).toBe('_blank')
+  mounted?.unmount()
+  expect((await openFile('')).querySelector('.kcms-file-path')).not.toBeNull()
+  mounted?.unmount()
+
+  const typed = await openFile('https://example.com/a.png')
+
+  expect(typed.querySelector('.kcms-file-path')).not.toBeNull()
+  expect(typed.querySelector('a.kcms-file-link')?.getAttribute('href')).toBe('https://example.com/a.png')
+})
+
+test('an image that cannot be shown says so in place of a broken preview', async () => {
+  const root = await openFile('/nowhere.png')
+
+  root.querySelector('img.kcms-file-preview')!.dispatchEvent(new Event('error'))
+  await settle()
+  expect(root.querySelector<HTMLImageElement>('img.kcms-file-preview')?.hidden).toBe(true)
+  expect(root.querySelector('.kcms-file-broken')?.textContent).toBe('This image cannot be shown')
+  expect(root.querySelector('a.kcms-file-link')).not.toBeNull()
+  // A load that follows brings the preview back.
+  root.querySelector('img.kcms-file-preview')!.dispatchEvent(new Event('load'))
+  await settle()
+  expect(root.querySelector<HTMLImageElement>('img.kcms-file-preview')?.hidden).toBe(false)
+  expect(root.querySelector('.kcms-file-broken')).toBeNull()
+})
+
+test('an image previews with its alt text, which is edited in place, shown only for a set image and a field with an alt', async () => {
+  const withAlt = await openFile(UPLOADED, { alt: { value: 'A cat', required: true } })
+
+  expect(withAlt.querySelector('img.kcms-file-preview')?.getAttribute('alt')).toBe('A cat')
+  expect(withAlt.querySelector<HTMLInputElement>('input[aria-label="Alt text *"]')?.value).toBe('A cat')
+  mounted?.unmount()
+
+  const refused = await openFile(UPLOADED, { alt: { value: '', issue: 'Required', required: true } })
+
+  expect(refused.querySelector('input[aria-label="Alt text *"]')?.getAttribute('aria-invalid')).toBe('true')
+  expect(refused.querySelector('.kcms-file-error')?.textContent).toBe('Required')
+  mounted?.unmount()
+  expect((await openFile(UPLOADED)).querySelector('input[aria-label="Alt text"]')).toBeNull()
+  mounted?.unmount()
+  expect((await openFile('', { alt: { value: '', required: false } })).querySelector('input[aria-label="Alt text"]')).toBeNull()
+})
+
+test('the field says what it takes: the types, the most it weighs and the pixels an image needs', async () => {
+  const root = await openFile('', { upload: { accept: ['image/png', 'image/svg+xml'], maxSize: 2 * 1024 * 1024, minWidth: 800, minHeight: 600 } })
+
+  expect(root.querySelector('.kcms-file-rules')?.textContent).toBe('Accepts PNG, SVG. Up to 2 MB. At least 800 by 600 pixels.')
+  expect(root.querySelector('input[type=file]')?.getAttribute('accept')).toBe('image/png,image/svg+xml')
+})
+
+test('the alt text of a paired field is written to the field beside the image, and a path sets or drops the size beside it', async () => {
+  const hints = { alt: sibling('alt'), width: sibling('width'), height: sibling('height') }
+  const { drafts, root } = await openImage({ tags: UPLOADED, alt: 'A cat', width: 1, height: 1 }, hints)
+  const alt = root.querySelector<HTMLInputElement>('input[aria-label="Alt text"]')!
+
+  expect(alt.value).toBe('A cat')
+  alt.value = 'A black cat'
+  alt.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(drafts.value(ENTRY, 'alt')).toBe('A black cat')
+  alt.value = ''
+  alt.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(drafts.value(ENTRY, 'alt')).toBeUndefined()
+  // Clearing the field leaves no size that would describe the old image.
+  root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
+  await settle()
+  expect([drafts.value(ENTRY, 'tags'), drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual(['', undefined, undefined])
+})
+
+test('a typed path in the storage\'s naming gives the size beside it, any other path none', async () => {
+  const { drafts, root } = await openImage({ tags: '', width: 9, height: 9 }, { width: sibling('width'), height: sibling('height') })
+  const typed = root.querySelector<HTMLInputElement>('.kcms-file-path input')!
+  const type = async (text: string) => {
+    typed.value = text
+    typed.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+  }
+
+  await type('/_kay/files/posts/zzz.640x480.webp')
+  expect([drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual([640, 480])
+  await type('https://example.com/a.png')
+  expect([drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual([undefined, undefined])
+})
+
+// An XMLHttpRequest that goes nowhere until the test says so.
+class SlowRequest {
+  static instances: SlowRequest[] = []
+  static HEADERS_RECEIVED = 2
+  upload: { onload?: () => void, onprogress?: (event: { lengthComputable: boolean, loaded: number, total: number }) => void } = {}
+  readyState = 0
+  status = 200
+  response: Blob = new Blob([JSON.stringify({ path: UPLOADED, width: 40, height: 30 })], { type: 'application/json' })
+  responseType = ''
+  onload?: () => void
+  onabort?: () => void
+  onerror?: () => void
+  ontimeout?: () => void
+  onreadystatechange?: () => void
+  constructor() {
+    SlowRequest.instances.push(this)
+  }
+
+  open = () => undefined
+  setRequestHeader = () => undefined
+  send = () => undefined
+  getAllResponseHeaders() {
+    return 'content-type: application/json'
+  }
+
+  abort() {
+    this.onabort?.()
+  }
+}
+
+async function drop(root: HTMLElement, file: File) {
+  root.querySelector('.kcms-file-drop')!.dispatchEvent(Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer: { files: [file] } }))
+  await settle()
+}
+
+test('an upload shows a progress bar and a button cancelling it, and the field is left as it was', async () => {
+  const request = globalThis.XMLHttpRequest
+
+  Object.assign(globalThis, { XMLHttpRequest: SlowRequest })
+  SlowRequest.instances = []
+
+  try {
+    const { drafts, root } = await openImage({ tags: '' }, { alt: sibling('alt') })
+
+    await drop(root, new File([new Uint8Array(10)], 'a.png', { type: 'image/png' }))
+    SlowRequest.instances[0]!.upload.onprogress?.({ lengthComputable: true, loaded: 25, total: 100 })
+    await settle()
+    expect(root.querySelector<HTMLProgressElement>('progress.kcms-file-progress')?.value).toBe(0.25)
+    root.querySelector<HTMLButtonElement>('.kcms-file-drop button[aria-label="Cancel the upload"]')!.click()
+    await settle()
+    expect(root.querySelector('progress')).toBeNull()
+    expect(root.querySelector('.kcms-file-error')).toBeNull()
+    expect(drafts.value(ENTRY, 'tags')).toBe('')
+  }
+  finally {
+    Object.assign(globalThis, { XMLHttpRequest: request })
+  }
+})
+
+test('a failed upload is told by the field, and a landed one sets the path and the size of its image', async () => {
+  const request = globalThis.XMLHttpRequest
+
+  Object.assign(globalThis, { XMLHttpRequest: SlowRequest })
+  SlowRequest.instances = []
+
+  try {
+    const { drafts, root } = await openImage({ tags: '' }, { width: sibling('width'), height: sibling('height') })
+
+    await drop(root, new File([new Uint8Array(10)], 'a.png', { type: 'image/png' }))
+
+    const failing = SlowRequest.instances[0]!
+
+    failing.status = 415
+    failing.response = new Blob(['a.png is not a real image/png'])
+    failing.onload?.()
+    await settle()
+    expect(root.querySelector('.kcms-file-error')?.textContent).toContain('a.png is not a real image/png')
+    expect(drafts.value(ENTRY, 'tags')).toBe('')
+
+    await drop(root, new File([new Uint8Array(10)], 'b.png', { type: 'image/png' }))
+    SlowRequest.instances[1]!.onload?.()
+    await settle()
+    expect(root.querySelector('.kcms-file-error')).toBeNull()
+    expect([drafts.value(ENTRY, 'tags'), drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual([UPLOADED, 40, 30])
+  }
+  finally {
+    Object.assign(globalThis, { XMLHttpRequest: request })
+  }
+})
+
+test('a typed script address is neither linked nor previewed as one', async () => {
+  const root = await openFile('javascript:alert(1)')
+
+  expect(root.querySelector('a.kcms-file-link')?.getAttribute('href') ?? '').not.toMatch(/^javascript:/i)
+  expect(root.querySelector('img.kcms-file-preview')?.getAttribute('src') ?? '').not.toMatch(/^javascript:/i)
 })

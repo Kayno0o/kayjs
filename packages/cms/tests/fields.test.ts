@@ -224,3 +224,43 @@ describe('itemTitle and isCompact', () => {
     expect([people, tags, flags].map(list => isCompact(list!))).toEqual([false, true, true])
   })
 })
+
+describe('image fields', () => {
+  const image = (hint: object) => ({ 'type': 'string', 'x-kay': { kind: 'image', ...hint } })
+
+  it('carry what they ask of an upload', () => {
+    const [photo, doc] = fieldsOf({ properties: { photo: image({ accept: ['image/png'], maxSize: 2048, minWidth: 800 }), doc: { 'type': 'string', 'x-kay': { kind: 'file', accept: ['application/pdf'] } } } })
+
+    expect(photo).toMatchObject({ kind: 'image', upload: { accept: ['image/png'], maxSize: 2048, minWidth: 800 } })
+    expect(doc).toMatchObject({ kind: 'file', upload: { accept: ['application/pdf'] } })
+  })
+
+  it('take the fields they name for alt, width and height, which the form no longer shows beside them', () => {
+    const fields = fieldsOf({
+      required: ['photoAlt'],
+      properties: { title: { type: 'string' }, photo: image({ alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight' }), photoAlt: { type: 'string' }, photoWidth: { type: 'integer' }, photoHeight: { type: 'integer' }, caption: { type: 'string' } },
+    })
+
+    expect(fields.map(field => field.key)).toEqual(['title', 'photo', 'caption'])
+    expect(fields[1]).toMatchObject({ kind: 'image', upload: { alt: { key: 'photoAlt', required: true }, width: { key: 'photoWidth', kind: 'integer' }, height: { key: 'photoHeight' } } })
+  })
+
+  it('ignore a name that is no field beside them, and pair inside a group', () => {
+    const [lone] = fieldsOf({ properties: { photo: image({ alt: 'missing' }) } })
+
+    expect(lone).toMatchObject({ kind: 'image', upload: {} })
+    expect((lone as Field & { kind: 'image' }).upload.alt).toBeUndefined()
+
+    const [group] = fieldsOf({ properties: { hero: { type: 'object', properties: { src: image({ alt: 'alt' }), alt: { type: 'string' } } } } })
+
+    expect(group).toMatchObject({ kind: 'group', fields: [{ key: 'src', upload: { alt: { key: 'alt' } } }] })
+    expect((group as Field & { kind: 'group' }).fields).toHaveLength(1)
+  })
+
+  it('pair with nothing in a list, whose items have no siblings', () => {
+    const [list] = fieldsOf({ properties: { gallery: { type: 'array', items: image({ alt: 'alt', minWidth: 10 }) } } })
+
+    expect(list).toMatchObject({ kind: 'list', item: { kind: 'image', upload: { minWidth: 10 } } })
+    expect((list as Field & { kind: 'list' }).item).not.toHaveProperty('upload.alt')
+  })
+})

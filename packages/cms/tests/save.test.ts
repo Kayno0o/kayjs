@@ -12,6 +12,7 @@ const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')
 const { createDrafts } = await import('../src/drafts')
 const { deleteSaved, deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
+const { uploadFile, uploading } = await import('../src/editor/upload')
 
 // What kay's build gives an API module's default export in the browser: where it is served.
 Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/api/cms/entries' })
@@ -186,5 +187,78 @@ describe('deleting unused uploads', () => {
 
     expect(await deleteUnusedUploadsInChunks(Array.from({ length: 250 }, (_, index) => `k${index}`))).toBe(false)
     expect(sent.map(keys => keys.length)).toEqual([100, 100])
+  })
+})
+
+describe('an upload on its way', () => {
+  const PNG = () => new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' })
+
+  // The files API taking an upload only once `land` is called, or failing when its request is aborted.
+  function slowFiles(rules = { accept: 'image/png', images: 'image/png', maxBytes: 1000 }) {
+    const control = { land: () => undefined as void, posts: 0 }
+
+    spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).endsWith('/rules'))
+        return Response.json(rules)
+
+      if (init?.method === 'POST' && String(input).includes('/files/')) {
+        control.posts++
+        await new Promise<void>((resolve, reject) => {
+          control.land = resolve
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+        })
+
+        return Response.json({ path: '/_kay/files/posts/a.1x1.png', width: 1, height: 1 })
+      }
+
+      return Response.json({ saved: true, version: 'v2' })
+    }) as typeof fetch)
+
+    return control
+  }
+
+  it('makes a save refuse and say why, then lets it through once the upload landed', async () => {
+    const files = slowFiles()
+    const drafts = opened()
+    const upload = uploadFile('posts', PNG())
+
+    await Bun.sleep(20)
+    expect(uploading()).toBe(true)
+    drafts.set(post, 'title', 'Edited')
+    expect(await saveDraft(drafts, post)).toBe(false)
+    expect(toasts().map(toast => toast.message)).toEqual(['An upload is still running: save once it ends'])
+    expect(drafts.changed(post)).toBe(true)
+
+    files.land()
+    expect(await upload).toEqual({ path: '/_kay/files/posts/a.1x1.png', width: 1, height: 1 })
+    expect(uploading()).toBe(false)
+    expect(await saveDraft(drafts, post)).toBe(true)
+  })
+
+  it('stops counting once it is cancelled, rejecting with the signal\'s reason', async () => {
+    slowFiles()
+
+    const cancel = new AbortController()
+    const upload = uploadFile('posts', PNG(), { signal: cancel.signal })
+
+    await Bun.sleep(20)
+    expect(uploading()).toBe(true)
+    cancel.abort()
+    await expect(upload).rejects.toMatchObject({ name: 'AbortError' })
+    expect(uploading()).toBe(false)
+  })
+
+  it('stops counting once the server refused it', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation((async (input: string | URL | Request) => String(input).endsWith('/rules') ? Response.json({ accept: 'image/png', images: 'image/png', maxBytes: 1000 }) : new Response('nope', { status: 415 })) as typeof fetch)
+    await expect(uploadFile('posts', PNG())).rejects.toThrow('nope')
+    expect(uploading()).toBe(false)
+  })
+
+  it('refuses a file over the field\'s own size before sending it, the smaller of that and the server\'s', async () => {
+    const files = slowFiles({ accept: 'image/png', images: 'image/png', maxBytes: 1000 })
+
+    await expect(uploadFile('posts', PNG(), { limits: { maxSize: 2 } })).rejects.toThrow('a.png is 3 bytes, over the 2 bytes an upload may be')
+    expect(files.posts).toBe(0)
+    expect(uploading()).toBe(false)
   })
 })

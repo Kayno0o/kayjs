@@ -251,6 +251,20 @@ describe('the collections a CMS edits', () => {
     expect(own.Check('javascript:alert(1).png')).toBe(false)
   })
 
+  it('image and file fields report what they ask of an upload in x-kay, and leave those options out of the string schema', () => {
+    const image = JSON.parse(JSON.stringify(imageField({ accept: ['image/png'], maxSize: '2mb', minWidth: 800, minHeight: 600, alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight', maxLength: 300 }))) as Record<string, unknown>
+
+    expect(image['x-kay']).toEqual({ kind: 'image', accept: ['image/png'], maxSize: 2 * 1024 * 1024, minWidth: 800, minHeight: 600, alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight' })
+    expect(image).toMatchObject({ type: 'string', maxLength: 300 })
+    expect(image).not.toHaveProperty('accept')
+    expect(image).not.toHaveProperty('alt')
+    expect((JSON.parse(JSON.stringify(fileField({ accept: ['application/pdf'], maxSize: 1024 }))) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'file', accept: ['application/pdf'], maxSize: 1024 })
+    expect((JSON.parse(JSON.stringify(imageField())) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'image' })
+    expect(() => imageField({ maxSize: '0mb' })).toThrow('imageField({ maxSize })')
+    expect(() => imageField({ minWidth: 0 })).toThrow('minWidth')
+    expect(() => imageField({ minHeight: 1.5 })).toThrow('minHeight')
+  })
+
   it('reports a custom field kind in the schema beside the schema it wraps, so saves validate by it alone', () => {
     const color = customField('color', t.String({ pattern: '^#[0-9a-f]{6}$' }))
 

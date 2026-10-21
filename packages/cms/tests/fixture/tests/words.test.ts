@@ -81,7 +81,7 @@ test('the editor reads the locale in the browser: a list item, a button and the 
       data.items.add(new File([new Uint8Array(100 * 1024)], 'huge.png', { type: 'image/png' }))
       document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
     })
-    await products.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.replaceAll(/\s/g, ' ').includes('huge.png pèse 100 ko, au-delà des 64 ko permis par envoi') === true)
+    await products.waitUntil(() => document.querySelector('.kcms-file-error')?.textContent?.replaceAll(/\s/g, ' ').includes('huge.png pèse 100 ko, au-delà des 64 ko permis par envoi') === true)
     expect(await products.evaluate(() => [...document.querySelectorAll('.kcms-file .kui-btn')].map(button => button.textContent))).toContain('Téléverser')
     expect(products.errors).toEqual([])
     expect(page.errors).toEqual([])

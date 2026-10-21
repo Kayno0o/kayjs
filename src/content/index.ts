@@ -23,7 +23,7 @@ import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, writeBack } from './migrate'
 import { ContentError, decodeEntries, validEntries } from './validate'
 
-export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
+export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
 export { collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'

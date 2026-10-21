@@ -1,4 +1,4 @@
-import type { JsonSchema } from './kay/contract'
+import type { FieldHint, JsonSchema } from './kay/contract'
 import { wording } from 'kay/words'
 
 interface FieldBase {
@@ -17,8 +17,20 @@ export interface Choice {
   raw: unknown
 }
 
+// What an image or file field asks of an upload, narrower than the CMS's `uploads`, and the fields beside it that the editor fills in and the form leaves out: the alt text of an image and the width and height of the one uploaded.
+export interface UploadHints {
+  accept?: string[] | undefined
+  maxSize?: number | undefined
+  minWidth?: number | undefined
+  minHeight?: number | undefined
+  alt?: Field | undefined
+  width?: Field | undefined
+  height?: Field | undefined
+}
+
 export type Field
-  = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'image' | 'file' | 'json' }
+  = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json' }
+    | FieldBase & { kind: 'image' | 'file', upload: UploadHints }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
     | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined }
@@ -27,8 +39,8 @@ export type Field
     | FieldBase & { kind: 'custom', name: string }
 
 // The kinds a schema's `x-kay` hint may name that need nothing beyond the hint; any other name is the app's own.
-type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom'>
-const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json'] satisfies Hinted[])
+type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom' | 'image' | 'file'>
+const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'json'] satisfies Hinted[])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
@@ -44,7 +56,36 @@ export function humanize(key: string): string {
 export function fieldsOf(schema: JsonSchema): Field[] {
   const required = new Set(schema.required)
 
-  return Object.entries(schema.properties ?? {}).map(([key, property]) => fieldOf(key, property, required.has(key)))
+  return pairUploads(Object.entries(schema.properties ?? {}).map(([key, property]) => fieldOf(key, property, required.has(key))))
+}
+
+// The fields an image names as its `alt`, `width` and `height` move into it, so the form shows them with the image and not beside it.
+function pairUploads(fields: Field[]): Field[] {
+  const claimed = new Set<string | number>()
+
+  const paired = fields.map((field) => {
+    if (field.kind !== 'image')
+      return field
+
+    const upload = { ...field.upload }
+
+    for (const name of ['alt', 'width', 'height'] as const) {
+      const key = field.upload[name]?.key
+      const sibling = fields.find(other => other !== field && other.key === key)
+
+      if (sibling === undefined) {
+        delete upload[name]
+      }
+      else {
+        upload[name] = sibling
+        claimed.add(sibling.key)
+      }
+    }
+
+    return { ...field, upload }
+  })
+
+  return paired.filter(field => !claimed.has(field.key))
 }
 
 export function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field {
@@ -61,6 +102,9 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
 
   if (hint?.kind === 'reference')
     return { ...base, kind: 'reference', collection: hint.collection ?? '' }
+
+  if (hint?.kind === 'image' || hint?.kind === 'file')
+    return { ...base, kind: hint.kind, upload: uploadHints(hint) }
 
   if (hint !== undefined)
     return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Hinted } : { ...base, kind: 'custom', name: hint.kind }
@@ -89,7 +133,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       return { ...base, kind: 'boolean' }
     case 'array':
       // A tuple, items listed one schema per place, is edited as JSON.
-      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems) }
+      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems) }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     case undefined:
@@ -124,6 +168,33 @@ export function itemTitle(list: Field & { kind: 'list' }, value: unknown, index:
   }
 
   return label
+}
+
+// A list item has no siblings to fill in, so an image in a list keeps the limits it asks and none of the fields it names.
+function unpaired(field: Field): Field {
+  if (field.kind !== 'image' && field.kind !== 'file')
+    return field
+
+  const { accept, maxSize, minWidth, minHeight } = field.upload
+
+  return { ...field, upload: { accept, maxSize, minWidth, minHeight } }
+}
+
+// The hints of an upload field, `alt`, `width` and `height` still the keys of the fields beside it, which `fieldsOf` swaps for the fields.
+function uploadHints(hint: FieldHint): UploadHints {
+  const upload: UploadHints = {}
+
+  for (const name of ['accept', 'maxSize', 'minWidth', 'minHeight'] as const) {
+    if (hint[name] !== undefined)
+      Object.assign(upload, { [name]: hint[name] })
+  }
+
+  for (const name of ['alt', 'width', 'height'] as const) {
+    if (hint[name] !== undefined)
+      upload[name] = { key: hint[name], label: '', required: false, kind: 'text' }
+  }
+
+  return upload
 }
 
 // A list's field for its item at `index`, numbered by its place unless its schema titles it.
