@@ -125,7 +125,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const ids = persist === undefined ? undefined : islandPrefix(persist)
     const slots = withFieldMarks(undefined, () => ids === undefined ? staticSlots(own) : withIds(`${ids}s-`, () => withSlotIslands(`${ids}i`, () => staticSlots(own))))
     const given = slots.length === 0 ? own : withSlots(own, slots)
-    const serialized = serializeProps(`${id} ${why}`, own, slots)
+    const serialized = withFieldMarks(undefined, () => serializeProps(`${id} ${why}`, own, slots))
 
     // The browser revives an action only for an island whose chunk installs the reviver, which the compiler does for one typing a prop as an action.
     if (!takesActions && serialized.includes(ACTION_NODE))

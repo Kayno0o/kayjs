@@ -18,6 +18,7 @@ import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
 import { child, loop } from '../src/runtime/html'
+import { island } from '../src/runtime/island.server'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
@@ -1369,6 +1370,24 @@ describe('preview mode', () => {
         props.name = 'Franck'
       }).not.toThrow()
       expect(entry.data.name).toBe('Franck')
+    }, true)
+  })
+
+  it('queues no text for an entry spread into an island, nor for its slots, so a later equal text stays unmarked', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { name: 'Delphine', role: 'Pilot' }, Content: () => renderedHtml('') })
+      const Card = island('card.kay', (_props: { name: string, role: string, children?: unknown }) => null)
+      // What a page's `Card(...entry.data)` with a slot hands the island: the fields as getters, and a child as one.
+      const props = merge(entry.data, { get children() {
+        return renderedHtml(`<em>${child(entry.data.role)}</em>`)
+      } })
+
+      const html = withFieldMarks(marks, () => `${child(Card(props as { name: string, role: string }))}<p>${child('Delphine')}</p><p>${child('Pilot')}</p>`)
+
+      expect([...marks.unrendered.keys()]).toEqual([])
+      expect(placeFieldMarks(html, marks)).toContain('</slot><p>Delphine</p><p>Pilot</p>')
+      expect(placeFieldMarks(html, marks)).not.toContain('data-kay-field')
     }, true)
   })
 

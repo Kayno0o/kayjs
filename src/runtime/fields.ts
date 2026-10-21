@@ -59,7 +59,8 @@ const BLANK = /^\s*$/
 const exportNames = new Map<string, string>()
 
 // The marks of the page rendering now, set only while a page renders in edit mode, outside its islands: a module's, so the render they are set around stays synchronous.
-export const fieldMarks: { marking: FieldMarks | undefined } = { marking: undefined }
+// `unmarked` is set while an island's props and slots are read, where a read is no field's: nothing renders it as one.
+export const fieldMarks: { marking: FieldMarks | undefined, unmarked: boolean } = { marking: undefined, unmarked: false }
 
 export function nameCollection(name: string, exportName: string): void {
   exportNames.set(name, exportName)
@@ -95,14 +96,17 @@ export function editableEntries<E extends Editable>(collection: string, entries:
 // Renders with the request's marks, or with none inside an island, whose markup hydration claims node by node.
 export function withFieldMarks<T>(marks: FieldMarks | undefined, render: () => T): T {
   const outer = fieldMarks.marking
+  const outerUnmarked = fieldMarks.unmarked
 
   fieldMarks.marking = marks
+  fieldMarks.unmarked = marks === undefined
 
   try {
     return render()
   }
   finally {
     fieldMarks.marking = outer
+    fieldMarks.unmarked = outerUnmarked
   }
 }
 
@@ -289,6 +293,13 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         return ref()
 
       const read = Reflect.get(target, key, receiver) as unknown
+
+      if (fieldMarks.unmarked) {
+        if (!tracked(target, key))
+          return read
+
+        return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
+      }
 
       if (!tracked(target, key)) {
         // Any other read comes between a number and its render, the number then no longer told apart from one computed.
