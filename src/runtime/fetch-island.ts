@@ -13,6 +13,8 @@ export interface FetchedIsland extends HTMLElement {
 export async function fetchServerIsland(element: FetchedIsland): Promise<void> {
   const url = new URL(location.href)
   const held = element._$b
+  // Taken before any exit, so a fetch that fails or meets a skew leaves no node referenced.
+  const focused = focusIn(element)
 
   url.searchParams.set(ISLAND_PARAM, element.dataset.kayServer ?? '')
   url.hash = ''
@@ -27,7 +29,6 @@ export async function fetchServerIsland(element: FetchedIsland): Promise<void> {
       throw new Error(`kay: the server island ${element.dataset.kayServer} of ${location.pathname} answered ${response.status}`)
 
     const text = await response.text()
-    const focused = focusIn(element)
 
     element._$b ??= element.innerHTML
     element.innerHTML = text

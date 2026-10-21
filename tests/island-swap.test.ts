@@ -246,9 +246,19 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         it('keeps the focus on the field of the island once its fetch lands', async () => {
           await open()
 
+          // The fetch is held back, so the swap is seen before the fetch lands.
+          const release = Promise.withResolvers<void>()
+          const pending = /kay_island=0/
+
+          await page.route(pending, async (request) => {
+            await release.promise
+            await request.continue()
+          })
           await page.click('input#note')
           await page.press('Enter')
           await page.waitUntil(() => document.querySelector('slot[data-kay-server][inert]') !== null)
+          release.resolve()
+          await page.unroute(pending)
           await page.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1, {}, FORM)
           await settled(page)
 
