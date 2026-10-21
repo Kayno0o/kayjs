@@ -1302,6 +1302,18 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await go('a.keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
       expect(await go('a.group-link')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
 
+      // The nearest data-keep-scroll decides, "false" meaning a plain scroll to the top.
+      expect(await go('a.false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.nested-false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.false-group-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.deep-false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.hash-false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.true-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+      expect(await go('a.empty-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+      expect(await go('a.nested-keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+      expect(await go('a.false-group-keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+      expect(await go('a.hash-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+
       // Back to the page left restores where it was, whatever kept the scroll going there.
       await fresh.back()
       await fresh.waitFor('h1', { text: 'Scrolled' })

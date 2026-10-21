@@ -10,4 +10,18 @@ a.keep-link(href="/second" data-keep-scroll) Keep link
 div(data-keep-scroll data-no-transition)
   a.group-link(href="/second") Group link
 a.plain-link(href="/second") Plain link
+a.false-link(href="/second" data-keep-scroll="false") False link
+a.true-link(href="/second" data-keep-scroll="true") True link
+a.empty-link(href="/second" data-keep-scroll="") Empty link
+a.hash-link(href="/second#top" data-keep-scroll) Hash link
+a.hash-false-link(href="/second#top" data-keep-scroll="false") Hash false link
+nav(data-keep-scroll)
+  a.nested-false-link(href="/second" data-keep-scroll="false") Nested false link
+  a.nested-keep-link(href="/second") Nested keep link
+div(data-keep-scroll="false")
+  a.false-group-keep-link(href="/second" data-keep-scroll) Keep inside false
+  a.false-group-link(href="/second") False group link
+div(data-keep-scroll)
+  div(data-keep-scroll="false")
+    a.deep-false-link(href="/second") Deep false link
 div(style="height: 200px")

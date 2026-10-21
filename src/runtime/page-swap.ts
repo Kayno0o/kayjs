@@ -190,8 +190,12 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   if (swap.focused instanceof HTMLInputElement || swap.focused instanceof HTMLTextAreaElement)
     swap = { ...swap, held: swap.focused.value }
 
-  if (swap.link)
-    swap = { ...swap, scroll: swap.link.closest('[data-keep-scroll]') ? 'keep' : undefined, transition: !swap.link.closest('[data-no-transition]') }
+  if (swap.link) {
+    // The nearest `data-keep-scroll` decides, `"false"` meaning a plain scroll to the top.
+    const keeper = swap.link.closest('[data-keep-scroll]')
+
+    swap = { ...swap, scroll: keeper && keeper.getAttribute('data-keep-scroll') !== 'false' ? 'keep' : undefined, transition: !swap.link.closest('[data-no-transition]') }
+  }
 
   const token = ++navigation.current
   const controller = new AbortController()
