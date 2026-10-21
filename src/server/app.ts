@@ -269,7 +269,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // A redirect to a page goes out as a visit to it is answered, with the trailing slash its page has; a route something else registered, such as an extension's or an API module's, is not one.
   const pagePaths = new Set(table.paths.keys())
-  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...app.routes.filter(route => (route.method === 'GET' || route.method === 'ALL') && !pagePaths.has(route.path) && !served.suffixed().has(route.path)).map(route => route.path)])
+  // Held weakly: the setup's render options keep the spelling, and through it the app would outlive its last request.
+  const appRef = new WeakRef(app)
+  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...(appRef.deref()?.routes ?? []).filter(route => (route.method === 'GET' || route.method === 'ALL') && !pagePaths.has(route.path) && !served.suffixed().has(route.path)).map(route => route.path)])
 
   renderOptions.redirectSpelling = spell
 
