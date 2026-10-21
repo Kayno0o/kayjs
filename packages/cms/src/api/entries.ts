@@ -1,3 +1,4 @@
+import type { StoredEntry } from '../kay/contract'
 import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
@@ -21,8 +22,12 @@ export default api()
     if (screen.collection.problem !== undefined)
       return status(500, screen.collection.problem)
 
-    if (!screen.entry && params.slug === SINGLE_SLUG && screen.collection.single && screen.collection.seed !== undefined)
-      return { collection: screen.collection, entry: { slug: SINGLE_SLUG, data: screen.collection.seed, draft: false }, seeded: true as const }
+    // A single collection's seed is the entry the first save writes.
+    if (!screen.entry && params.slug === SINGLE_SLUG && screen.collection.single && screen.collection.seed !== undefined) {
+      const entry: StoredEntry = { slug: SINGLE_SLUG, data: screen.collection.seed, draft: false }
+
+      return { collection: screen.collection, entry, seeded: true as const }
+    }
 
     return screen.entry ? { collection: screen.collection, entry: screen.entry } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })
