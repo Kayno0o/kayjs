@@ -67,6 +67,7 @@ describe('the release\'s link check', () => {
 
     expect(before(pages.get('llms/whats-new-archive.md')!)).toBe('before 9.9.9')
     expect(before(line(pages.get(INDEX)!, 'llms/whats-new-archive.md'))).toBe(before(pages.get('llms/whats-new-archive.md')!))
-    expect(line(pages.get(INDEX)!, 'llms/upgrading-archive.md')).toBe(line(texts.get(INDEX)!, 'llms/upgrading-archive.md'))
+    // The real upgrading page may be over its limit too, so its line follows its archive, moved or not.
+    expect(before(line(pages.get(INDEX)!, 'llms/upgrading-archive.md'))).toBe(before(pages.get('llms/upgrading-archive.md') ?? texts.get('llms/upgrading-archive.md')!))
   })
 })
