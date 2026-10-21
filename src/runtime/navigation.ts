@@ -247,10 +247,3 @@ export function takeFormCheck(form: HTMLFormElement): void {
   form.noValidate = true
   checkedForms.add(form)
 }
-
-// The focused element and the text it holds, for a swap that keeps the focus.
-export function heldField(): Pick<Swap, 'focused' | 'held'> {
-  const focused = document.activeElement
-
-  return { focused, held: focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement ? focused.value : undefined }
-}

@@ -187,6 +187,9 @@ let fetching: { controller: AbortController, key: string } | undefined
 export async function go(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
 
+  if (swap.focused instanceof HTMLInputElement || swap.focused instanceof HTMLTextAreaElement)
+    swap = { ...swap, held: swap.focused.value }
+
   if (swap.link)
     swap = { ...swap, scroll: swap.link.closest('[data-keep-scroll]') ? 'keep' : undefined, transition: !swap.link.closest('[data-no-transition]') }
 

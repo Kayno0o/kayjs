@@ -1,7 +1,7 @@
 import type { CheckedHref } from './checks'
 import { withBase } from './base'
 import { follow } from './navigate'
-import { heldField, leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
+import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
 
 export interface NavigateOptions {
   // Replaces the current history entry instead of adding one.
@@ -53,7 +53,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     return
   }
 
-  await follow(url, typeof to === 'string' ? { ...options, intent: 'visit' } : { ...options, intent: 'query', ...heldField() })
+  await follow(url, typeof to === 'string' ? { ...options, intent: 'visit' } : { ...options, intent: 'query', focused: document.activeElement })
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
@@ -68,5 +68,5 @@ export async function refresh(): Promise<void> {
   }
 
   prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', ...heldField() })
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement })
 }
