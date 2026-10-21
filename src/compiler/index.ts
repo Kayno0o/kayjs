@@ -4,7 +4,7 @@ import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
-import type { ScriptAnalysis, ServerAnalysis } from './script'
+import type { ScriptAnalysis, ServerAnalysis, SignalPropType } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
@@ -82,6 +82,28 @@ export interface CompileResult {
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   diagnostics: Diagnostic[]
+  // The props typed `Signal<T>` or `Memo<T>`, with what rewriting them to values would touch: what `deprecated-signal-prop` reads.
+  signalProps: SignalPropFact[]
+}
+
+export interface SignalPropFact extends SignalPropType {
+  // The name the component reads it by, when it destructures it.
+  local?: string | undefined
+  // The `()` of each call reading it.
+  calls: Span[]
+  // Why it cannot be rewritten to a value, if it cannot.
+  blocked?: string | undefined
+}
+
+function signalPropFacts(script: ScriptAnalysis, found: NameFindings, expanded: boolean): SignalPropFact[] {
+  return (script.props?.signalTypes ?? []).map((type) => {
+    const use = found.signalProps.get(type.key)
+
+    if (expanded)
+      return { ...type, calls: [], blocked: 'the file has a markdown block, whose offsets differ from the source' }
+
+    return { ...type, local: use?.local, calls: use?.calls ?? [], blocked: use ? use.blocked : 'it is not destructured off the props, so its reads are not found' }
+  })
 }
 
 const WORD = /[a-z0-9]+/gi
@@ -223,7 +245,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, diagnostics: reported, signalProps: [] }
   }
 
   return {
@@ -236,6 +258,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     why,
     classes,
     diagnostics: reported,
+    signalProps: signalPropFacts(script, found.findings, expansion !== undefined),
   }
 }
 

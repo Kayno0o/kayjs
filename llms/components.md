@@ -45,33 +45,9 @@ const double = memo(() => count() * 2)
 button(onClick={() => count++}) Clicked {count()} times, {double()} doubled
 ```
 
-### Let a child write the parent's state
-
-The parent hands the signal itself, by name, and the child types the prop `Signal<T>`, which it reads by calling and writes by assigning, `src/toggle.kay`:
-
-```kay
----
-import type { Signal } from 'kay'
-
-const { open } = props<{ open: Signal<boolean> }>()
----
-button(onClick={() => open = !open()}) {open() ? 'Hide' : 'Show'}
-```
-
-```kay
----
-import Toggle from './toggle.kay'
-
-const open = signal(false)
----
-Toggle(open={open})
-if open()
-  p Details
-```
-
 ### Bind a prop to the parent's signal
 
-A prop typed `Bindable<T>` from `kay` is read and assigned as a plain name, with no call. The parent binds it to a signal with `bind:`, and an assignment in the child writes that signal; with a plain value, `Toggle(open={false})`, the assignment stays in the child until the parent's value changes:
+A child that writes the parent's state types the prop `Bindable<T>` from `kay`, and reads and assigns it as a plain name, with no call. The parent binds it to a signal with `bind:`, and an assignment in the child writes that signal; with a plain value, `Toggle(open={false})`, the assignment stays in the child until the parent's value changes:
 
 ```kay
 ---
@@ -225,23 +201,23 @@ ul
 - A prop holding an action is typed `Action<never, unknown>`, or `NoInputAction<unknown>` for one without input; see [Pass an action to a component](actions-from-islands.md#pass-an-action-to-a-component).
 - A prop holding a component is typed `Component<Props>` from `kay` and drawn by its capitalised name, one holding an icon with `svg({...icon})`; see [Draw an icon or a component chosen by a value](templates.md#draw-an-icon-or-a-component-chosen-by-a-value).
 - A page has no props: its data comes from its `--- server` fence.
-- A prop is a plain name in the template, `{title}`, not `{title()}`, unless its type is a signal.
+- A prop is a plain name in the template, `{title}`, not `{title()}`.
 
 ### Signals
 
 - `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`.
 - A signal or a memo is read by calling it, `count()`, in the template as in the script.
 - In the template, one named bare where its value goes, `{count}` or `if count > 1`, is an error, `uncalled-signal`, which `kay check --fix` calls.
-- Named bare where it is handed on, as a component's prop, `Toggle(open={open})`, or a function's argument, it passes the signal itself; an argument or prop typed `unknown` or `any`, `String(count)`, is `uncalled-signal`: call it there, or write `count as Signal<number>` to hand it on on purpose.
+- Named bare as a function's argument it passes the signal itself; an argument typed `unknown` or `any`, `String(count)`, is `uncalled-signal`: call it there, or write `count as Signal<number>` to hand it on on purpose.
 - `bind:value={query}` and `.set`, `count.set(c => c * 2)`, take the signal itself too.
 - A signal is written by assigning it, in the template and the script alike: `count = 0` compiles to `count.set(0)`.
 - `count += step` and `count++` compile to an updater, `count.set((c) => c + step)`, so an effect writing it does not track it.
 - `.set` stays for an updater of your own, `count.set(c => c * 2)`.
-- Assigning works on any signal a `const` or an import holds, wherever it was made: the script's own, a module's, a re-export, one a function returns or a destructuring gives, and a prop the props type, inline or a script `interface` or `type`, writes as `Signal<T>` from `kay`.
+- Assigning works on any signal a `const` or an import holds, wherever it was made: the script's own, a module's, a re-export, one a function returns or a destructuring gives, and a prop typed `Bindable<T>`.
 - `kay check` reports assigning a memo, or a `const` or an import holding no signal, at its name; a `const` plainly holding none, `const n = 1` or `const seen = new Set()`, is a compile error.
-- Assigning writes a signal wherever it sits: one a `const`, an import, a `let` or `var` set to `signal(...)` or a prop typed `Signal<T>` holds, and also one in an object's property or an array element, `box.count = 1`, `list[2]++`, or in a `let` set from a function's result. The compiler cannot tell those from a plain write, so the runtime does: a signal there is written, anything else assigned, and `kay check` types the write by what the target holds, `box.count = 'x'` being a type error for a `Signal<number>`. A function assigned there, a signal included, replaces what was held. A target kay sees holds no signal, a literal or `new Map()`, is assigned as written, and so is a field of `this`, a write beside an `await` or another write, and a `let` update whose value is read: use `.set` there.
+- Assigning writes a signal wherever it sits: one a `const`, an import, a `let` or `var` set to `signal(...)` holds, and also one in an object's property or an array element, `box.count = 1`, `list[2]++`, or in a `let` set from a function's result. The compiler cannot tell those from a plain write, so the runtime does: a signal there is written, anything else assigned, and `kay check` types the write by what the target holds, `box.count = 'x'` being a type error for a `Signal<number>`. A function assigned there, a signal included, replaces what was held. A target kay sees holds no signal, a literal or `new Map()`, is assigned as written, and so is a field of `this`, a write beside an `await` or another write, and a `let` update whose value is read: use `.set` there.
 - `bind:name={signal}` on a component needs a signal and a prop typed `Bindable<T>`; a child hands it on with `bind:name={name}`, through any number of levels. `bind:` on a component makes the parent an island. `kay check` reports a prop not typed `Bindable`, and a memo or a value that is no signal.
-- A prop typed `Signal<T>` or `Memo<T>` from `kay` takes the signal a parent hands by name, `Toggle(open={open})`; one typed `T` takes its value, `Toggle(open={open()})`, kept current.
+- A prop is always a value: a parent hands a signal's or a memo's value, `Toggle(open={open()})`, kept current through a getter, or binds a `Bindable<T>` prop with `bind:`. A prop typed `Signal<T>` or `Memo<T>` is deprecated (`deprecated-signal-prop`): `kay check --fix --since 1.70` rewrites it, its reads and every tag passing it.
 - `persisted`, `queryParam` and `linked` signals read and write as `signal` ones do; a `selection`, a `resource` or a `socket` is called or read through its members.
 - `kay check` narrows a signal or memo a template expression calls within that expression: `{error() && error().message}`, with `error` a `signal<Error>()`, checks.
 - A write in between, as by a function the expression calls, is not seen by that narrowing.

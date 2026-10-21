@@ -588,6 +588,15 @@ export const LINTS = {
     wrong: 'const open = await auth.sessions()',
     right: 'const open = await auth.listSessions()',
   },
+  'deprecated-signal-prop': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'A required prop typed `Signal<T>` or `Memo<T>`: from 1.70 a prop is always a value. A child writing its parent\'s state types it `Bindable<T>`, reads it as `open` and assigns it, and the parent passes `bind:open={open}`; a prop typed `Memo<T>` becomes a plain `T`, passed as `value={memo()}` and kept current. The fix rewrites the type, the reads in the component and every tag passing the prop in the project together, and is not offered, with the reason reported, when a tag spreads its props or passes an expression that is no name or property path, or the component uses the prop other than by calling it. An optional prop is not reported. Found in the project\'s own `.kay` files.',
+    wrong: '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton(onClick={() => open = !open()}) Toggle\n\n// parent\nToggle(open={open})',
+    right: '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) Toggle\n\n// parent\nToggle(bind:open={open})',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

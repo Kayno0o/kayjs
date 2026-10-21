@@ -45,6 +45,9 @@ A collection is `list*` (`listSessions`, `listPasskeys`, `listTokens`, `listMemb
 ### A project with a test database runs `kay test`
 
 `kay/test/preload` refuses a run without `--isolate` when the project has a `pg-orm.config.ts` and a `DATABASE_URL`, as every file would share one database: set the `test` script to `kay test` (no lint can recognise it, `kay check` not reading `package.json` scripts). `kay/test/dom` no longer needs listing in `bunfig.toml`: `mountComponent` loads it, and a test reading `document` before then imports it.
+### Props typed `Signal<T>` and `Memo<T>` are deprecated
+
+A prop is now always a value. A child that writes its parent's state types the prop `Bindable<T>`, reads it as `open` and assigns it, `open = !open`, and the parent passes `bind:open={open}` where it passed `open={open}`; a prop typed `Memo<T>` becomes a plain `T`, passed `value={memo()}` and kept current. `kay upgrade` rewrites the type, the `open()` reads of the component and every tag passing the prop in the project (the `deprecated-signal-prop` lint, kept three minors). It leaves a prop, and says why, when a tag spreads its props or passes an expression that is no name or property path, or when the component uses the prop other than by calling it, `open.set(true)` for one: change those by hand ([Components](components.md#bind-a-prop-to-the-parents-signal)).
 
 ## 1.69.0
 

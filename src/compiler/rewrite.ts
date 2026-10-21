@@ -110,6 +110,17 @@ export interface NameFindings {
   constantSignals: ConstantSignal[]
   // The names read as values that nothing in the module declares, which the component function must not take.
   globalReads: Set<string>
+  // How the component uses each prop typed `Signal<T>` or `Memo<T>`, by the prop's key.
+  signalProps: Map<string, SignalPropUse>
+}
+
+export interface SignalPropUse {
+  // The name the component reads it by.
+  local: string
+  // The `()` of each call reading it, which a plain value no longer needs.
+  calls: Span[]
+  // Why the reads cannot be rewritten for a value, when something besides a call and a hand-over to a component uses it.
+  blocked?: string | undefined
 }
 
 export interface FoundRewrites {
@@ -134,7 +145,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
     ast = parse(input.code, { sourceType: 'module', attachComment: false, plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
-    return { plan: { rewrites: new Map(), translates: false, values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
+    return { plan: { rewrites: new Map(), translates: false, values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set(), signalProps: new Map() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
   }
 
   return new RewriteFinder(input).run(ast)
@@ -179,6 +190,7 @@ class RewriteFinder {
   private readonly serverReads = new Set<string>()
   private readonly constantSignals = new Map<number, ConstantSignal>()
   private readonly globalReads = new Set<string>()
+  private readonly signalProps = new Map<string, SignalPropUse>()
   // The names whose writes are handled: written as signals, or reported as read-only.
   private readonly known = new Set<Binding>()
   // Writes to a constant or an import, handled once every name kay knows is found.
@@ -225,7 +237,7 @@ class RewriteFinder {
 
     return {
       plan: { rewrites: this.rewrites, translates: this.translates, values: this.values, writes: this.writes },
-      findings: { unread: this.unread, serverReads: this.serverReads, constantSignals: [...this.constantSignals.values()], globalReads: this.globalReads },
+      findings: { unread: this.unread, serverReads: this.serverReads, constantSignals: [...this.constantSignals.values()], globalReads: this.globalReads, signalProps: this.signalProps },
       diagnostics: this.diagnostics,
     }
   }
@@ -673,6 +685,9 @@ class RewriteFinder {
     if (signal) {
       for (const violation of binding?.constantViolations ?? [])
         this.signalWrite(violation, name, signal, access)
+
+      if (binding)
+        this.signalProps.set(prop.binding.key, this.signalPropUse(binding, name, prop.binding.fallback !== undefined))
     }
 
     // A `Bindable` prop is assigned on the props object, whose setter writes what a parent bound or keeps the value in the component; a default is read, never assigned.
@@ -685,6 +700,32 @@ class RewriteFinder {
 
     if (binding && valueReferences(binding).length === 0)
       this.unread.add(prop.binding.local.start)
+  }
+
+  // The calls reading a prop typed `Signal<T>` or `Memo<T>`, which a value prop no longer needs, and whether anything else uses it.
+  private signalPropUse(binding: Binding, name: string, defaulted: boolean): SignalPropUse {
+    const { map } = this.input
+    const calls = new Map<number, Span>()
+    const use: SignalPropUse = { local: name, calls: [], blocked: defaulted ? 'it has a default' : undefined }
+
+    for (const reference of valueReferences(binding)) {
+      const { node, parent } = reference
+      const start = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
+      const last = parent.type === 'CallExpression' && map.isExact(parent.end! - 1) ? map.toSource(parent.end! - 1) : undefined
+      const end = last === undefined ? undefined : last + 1
+
+      if (start === undefined || tagPosition(reference) !== undefined)
+        continue
+
+      if (parent.type === 'CallExpression' && parent.callee === node && parent.arguments.length === 0 && end !== undefined)
+        calls.set(start, { start: start + name.length, end })
+      else if (parent.type !== 'UpdateExpression' && !handedToComponent(reference) && !(isPropCheck(parent) && handedToComponent(reference.parentPath!)))
+        use.blocked ??= 'it is used other than by calling it or handing it to a component'
+    }
+
+    use.calls = [...calls.values()]
+
+    return use
   }
 
   // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
@@ -1078,6 +1119,11 @@ function handedToComponent(reference: NodePath): boolean {
   const tag = element.name
 
   return tag.type === 'JSXMemberExpression' || (tag.type === 'JSXIdentifier' && CAPITAL.test(tag.name) && !COMPILER_NAME.test(tag.name))
+}
+
+// The type check wraps a component's prop in `KayProp(Tag)(value)`.
+function isPropCheck(node: t.Node): boolean {
+  return node.type === 'CallExpression' && node.callee.type === 'CallExpression' && node.callee.callee.type === 'Identifier' && node.callee.callee.name === 'KayProp'
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

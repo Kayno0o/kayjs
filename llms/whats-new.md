@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Every size limit is `maxSize`: `bodyLimit` in the config, an action, `api()` and a route's `detail` is renamed, the old name kept three minors ([Protecting actions](action-protection.md#body-limit)).
 - One test helper per library, called at the top of a file with the test site and clearing itself before each test: `mailTest(site)`, `aiTest()`, `cmsTest(site)` (sign in as an editor, `save`, `entry`) and `auth.test(site)` ([Testing](testing.md)).
 - `kay test` runs `bun test` isolated, with kay's preload and failures at `.kay` lines, so a project needs no `bunfig.toml` or `--isolate`; `mountComponent` loads happy-dom itself ([Testing](testing.md)).
+- A prop typed `Signal<T>` or `Memo<T>` is deprecated for `Bindable<T>` with `bind:` and a plain value prop: `kay check --fix --since 1.70` rewrites the type, its reads and every tag passing it ([Components](components.md#bind-a-prop-to-the-parents-signal)).
 
 ## 1.69.0
 

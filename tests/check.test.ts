@@ -383,7 +383,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 63, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 63, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -769,7 +769,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/shared.ts': 'import { signal } from \'kay\'\n\nexport const shared = signal(1)\n', 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['Toggle.kay', 7, 'uncalled-signal'], ...[11, 12, 13, 14, 16, 17, 20, 20].map(line => ['index.kay', line, 'uncalled-signal'])])
+      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [basename(d.file), d.line, d.code])).toEqual([['Toggle.kay', 7, 'uncalled-signal'], ...[11, 12, 13, 14, 16, 17, 20, 20].map(line => ['index.kay', line, 'uncalled-signal'])])
     }
     finally {
       await rm(root, { recursive: true, force: true })
