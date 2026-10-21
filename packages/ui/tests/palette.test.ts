@@ -1,6 +1,6 @@
 import type { PaletteEntry } from '../src/palette'
 import { describe, expect, test } from 'bun:test'
-import { paletteHits, paletteMatches, paletteScore, paletteSections, RECENT_GROUP, withRecent } from '../src/palette'
+import { paletteHits, paletteMatches, paletteScore, paletteSections, RECENT_GROUP, splitMatches, withRecent } from '../src/palette'
 
 const link = (label: string, group: string, keywords?: string): PaletteEntry => ({ label, group, keywords, href: `/${group}/${label}`.toLowerCase().replaceAll(' ', '-') })
 
@@ -74,5 +74,19 @@ describe('withRecent', () => {
   test('moves the href to the front without repeating it, and keeps the limit', () => {
     expect(withRecent(['/a', '/b', '/c'], '/b')).toEqual(['/b', '/a', '/c'])
     expect(withRecent(['/a', '/b'], '/c', 2)).toEqual(['/c', '/a'])
+  })
+})
+
+describe('splitMatches', () => {
+  test('keeps the entries holding the query apart from those matching by characters in order, each in its order', () => {
+    const entries = [link('LineChart', 'UI components'), link('Mailed links', 'Pages'), link('Links', 'Pages')]
+
+    expect(splitMatches(paletteMatches(entries, 'link'), 'link').strong.map(entry => entry.label)).toEqual(['Links', 'Mailed links'])
+    expect(splitMatches(paletteMatches(entries, 'link'), 'link').loose).toEqual([])
+
+    const { strong, loose } = splitMatches(paletteMatches(entries, 'lc'), ' LC ')
+
+    expect(strong).toEqual([])
+    expect(loose.map(entry => entry.label)).toEqual(['LineChart'])
   })
 })

@@ -89,6 +89,18 @@ export function paletteMatches(entries: PaletteEntry[], query: string, groups: s
     .map(match => match.entry)
 }
 
+// The matches of `paletteMatches` split in two, in order: those holding the query in their label, group or keywords, and those matching by their characters in order alone, which the palette lists after the site's hits.
+export function splitMatches(matches: PaletteEntry[], query: string): { strong: PaletteEntry[], loose: PaletteEntry[] } {
+  const needle = query.trim().toLowerCase()
+  const strong: PaletteEntry[] = []
+  const loose: PaletteEntry[] = []
+
+  for (const entry of matches)
+    (paletteScore(entry, needle) < 600 ? loose : strong).push(entry)
+
+  return { strong, loose }
+}
+
 // The unfiltered list: the links named in `recent` that still exist, in that order under the `recentGroup` heading, then every entry under its group, groups in `groups` order and the rest after them as they come.
 export function paletteSections(entries: PaletteEntry[], recent: string[] = [], groups: string[] = [], recentGroup = RECENT_GROUP): PaletteSection[] {
   const byHref = new Map(entries.filter(isPaletteLink).map(entry => [entry.href, entry]))

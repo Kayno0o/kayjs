@@ -4,7 +4,7 @@ import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
 import { effect, memo, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
-import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
+import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 
 const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, siteSearchMore, class: className } = props<{
@@ -70,10 +70,15 @@ const sections = memo(() => {
     return paletteSections(entries, followedRecently(), groups, recentLabel).map(section => ({ group: section.group as string | null, rows: numbered(section.entries) }))
 
   const matches = paletteMatches(entries, query(), groups)
-  const found = numbered(matches)
+  const split = splitMatches(matches, query())
+  const found = numbered(split.strong)
   const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet, labelParts: hit.labelParts, more: hit.more }))
+  const loose = numbered(split.loose)
 
-  return hits.length > 0 ? [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }] : [{ group: null, rows: found }]
+  if (hits.length === 0)
+    return [{ group: null, rows: [...found, ...loose] }]
+
+  return [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }, ...loose.length > 0 ? [{ group: null, rows: loose }] : []]
 })
 
 const rows = memo(() => sections().flatMap(section => section.rows))
@@ -183,7 +188,7 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
       Icon(icon="search")
       input.kui-command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
     .kui-command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
-      for section, sectionIndex of sections() key={section.group ?? ''}
+      for section, sectionIndex of sections() key={sectionIndex}
         div(role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
           if section.group !== null
             .kui-heading-section.kui-command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}

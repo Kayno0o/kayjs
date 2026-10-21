@@ -16,7 +16,9 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 ## Searching the pages
 
-With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too. A query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in. The words found stand out in the accent colour, in that line and in the heading. When the section holds them again past that line, the row says how many more times, through `siteSearchMore`.
+With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too. A query lists the sections it finds after the entries holding the query, under `siteSearchLabel` (`In the pages`), each with the line it was found in. The words found stand out in the accent colour, in that line and in the heading. When the section holds them again past that line, the row says how many more times, through `siteSearchMore`.
+
+An entry matching only by its characters in order is listed after those sections.
 
 `siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default. A section an entry already links to is left out. A page opened from a section marks the words you typed.
 
