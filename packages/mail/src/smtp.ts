@@ -124,7 +124,7 @@ export function checkOptions(settings: SmtpOverrides, what: string): number | un
 // Sends over SMTP, connecting on the first mail rather than when made, so a module making one at import never opens a socket.
 export function smtp(settings: SmtpSettings): Transport {
   if ((settings.user === undefined) !== (settings.pass === undefined))
-    throw configError('SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+    throw configError('the login needs a user and a password: give both, or neither for a server that needs no login')
 
   if (settings.dkim !== undefined)
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')
@@ -197,7 +197,7 @@ function explained(error: unknown, settings: SmtpSettings, outcome = 'nothing wa
   if ((error as { code?: unknown }).code !== 'ETLS')
     return error
 
-  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so ${outcome}; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true (smtp({ insecure: true })), which is ignored while SMTP_PASS is set, as a password never goes in clear`, { cause: error })
+  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so ${outcome}; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true (smtp({ insecure: true })), which is ignored while a password is set, as a password never goes in clear`, { cause: error })
 }
 
 async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): Promise<void> {

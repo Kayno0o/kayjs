@@ -176,8 +176,8 @@ export default defineConfig({
 - A layout or the page setting a tag of the same identity replaces one of those.
 - An inline script or style among them is let through by the content security policy, its hash added.
 - `site` is an origin, nothing after the host.
-- Left out of kay.config.ts, `site` is read from `SITE_URL`, else `ORIGIN`, a value that is a plain http(s) origin (the name SvelteKit's adapter-node reads; `SITE_URL` wins when both are set), a server and `kay build` alike, so one build serves each host it is deployed to: production, a preview, the e2e server.
-- `kay build` does not report `missing-site` for such a server build; the server warns once at boot when `seo` is set and neither `SITE_URL` nor `ORIGIN` is set.
+- Left out of kay.config.ts, `site` is read from `SITE_URL`, a server and `kay build` alike, so one build serves each host it is deployed to: production, a preview, the e2e server. A literal `site` in kay.config.ts wins over `SITE_URL`; the deprecated `ORIGIN`, a plain http(s) origin, is read when `SITE_URL` is unset, with a warning, until 1.73. Server code reads it as `siteUrl()` and `siteOrigin()` from `kay/seo`, which kayjs-auth and kayjs-mail build their links on, so the origin is set once.
+- `kay build` does not report `missing-site` for such a server build; the server warns once at boot when `seo` is set and `SITE_URL` is not set either.
 - Prerendered pages name the site `kay build` ran for; a server running for another renders each again on its first request, with a warning at boot, so set `site` when building where it is known.
 - With no site at build, a page reading it through `siteUrl()` or `siteOrigin()` prerenders all the same, and the server renders it again before serving it; `kay build --static` refuses it.
 - Each page answering 200 gets `link(rel="canonical")` at `site` plus its path, query left out; an error page gets none.

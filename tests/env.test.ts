@@ -234,8 +234,8 @@ describe('kay env', () => {
     const rows = (name: string) => listed.variables.filter(variable => variable.name === name)
 
     expect(rows('OWN')).toEqual([expect.objectContaining({ source: 'src/defineEnv-mail/mail.ts' })])
-    expect(rows('SMTP_HOST')).toEqual([expect.objectContaining({ source: 'src/defineEnv-mail/mail.ts', required: false })])
-    expect(rows('SMTP_PORT')).toHaveLength(1)
+    expect(rows('MAIL_URL')).toEqual([expect.objectContaining({ source: 'src/defineEnv-mail/mail.ts', required: false })])
+    expect(rows('MAIL_INSECURE')).toHaveLength(1)
   })
 })
 
@@ -430,16 +430,50 @@ describe('kay env against compose and .env.example', () => {
     expect(findings!.map(({ severity, file, line, message }) => `${severity} ${file}:${line} ${message.slice(0, message.indexOf(' '))}`)).toEqual(['warning src/lib.ts:1 process.env.FOO', 'warning src/lib.ts:2 process.env.BAR', 'warning src/lib.ts:3 process.env.BAZ'])
   })
 
-  it('is unchanged with no flag and no env key in the config, and takes the files from the config', async () => {
+  it('compares the project\'s production compose files and .env.example with no flag and no env key in the config, and takes the files from the config', async () => {
     const root = await project(files)
 
-    expect((await run(root, [])).findings).toBeUndefined()
+    expect((await run(root, [])).findings).toEqual([])
+    expect((await run(await project({ ...files, 'app.env': '' }), [])).findings).toHaveLength(1)
+    expect((await run(await project({ 'kay.config.ts': files['kay.config.ts'], 'src/env.ts': env }), [])).findings).toBeUndefined()
 
     const configured = await project({ ...files, 'kay.config.ts': 'export default { favicon: false, env: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'app.env': '' })
     const { code, findings } = await run(configured, [])
 
     expect(code).toBe(1)
     expect(findings).toHaveLength(1)
+  })
+
+  it('leaves a development or test compose file out of the default comparison', async () => {
+    const root = await project({ 'kay.config.ts': files['kay.config.ts'], 'src/env.ts': env, 'compose.dev.yaml': 'services:\n  db:\n    image: postgres\n', 'compose.test.yaml': 'services: {}\n' })
+
+    expect((await run(root, [])).findings).toBeUndefined()
+  })
+
+  it('writes the variables an .env.example lacks with --write, keeping what it holds, and writes none a second time', async () => {
+    const root = await project({ ...files, '.env.example': '# mine\nSESSION_SECRET=keep\n' })
+    const first = await kay(['env', '--write'], root)
+
+    expect(first.stderr).toContain('.env.example: added DATABASE_URL, DISCORD_ID, MODE, PORT, HOST, SITE_URL, KAY_SECRET')
+
+    const text = await Bun.file(join(root, '.env.example')).text()
+
+    expect(text.startsWith('# mine\nSESSION_SECRET=keep\n\n')).toBe(true)
+    expect(text).toContain('DATABASE_URL=\n')
+    expect(text).toContain('# required in production\nDISCORD_ID=\n')
+    expect(text).toContain('# MODE=fast\n')
+    expect(text).toContain('# KAY_SECRET=\n')
+    expect(text).not.toContain('ORIGIN')
+
+    expect((await kay(['env', '--write'], root)).stderr).toContain('.env.example already lists every variable')
+    expect(await Bun.file(join(root, '.env.example')).text()).toBe(text)
+  })
+
+  it('creates the .env.example --write names when it does not exist', async () => {
+    const root = await project({ 'kay.config.ts': files['kay.config.ts'], 'src/env.ts': env })
+
+    await kay(['env', '--write', '--example', 'created.env'], root)
+    expect(await Bun.file(join(root, 'created.env')).text()).toContain('DISCORD_ID=')
   })
 
   it('reads env_file entries with required: false and a list KEY=value, an empty value counting as unset', async () => {

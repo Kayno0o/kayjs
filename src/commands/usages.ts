@@ -11,7 +11,7 @@ export const USAGES = {
   'upgrade': 'upgrade [dir] [--dry-run]',
   'routes': 'routes [dir] [--format text|json]',
   'not-found': 'not-found [dir] [--redirect <path> [--to <target>] [--runtime]] [--file <database>] [--format text|json]',
-  'env': 'env [dir] [--compose <file>]... [--example <file>] [--format text|json]',
+  'env': 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]',
   'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',
   'types': 'types [dir] [--quiet]',

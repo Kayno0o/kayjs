@@ -53,7 +53,7 @@ describe('smtp', () => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
     const before = server.received.length
 
-    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true`)
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true`)
     expect(server.received).toHaveLength(before)
   })
 
@@ -63,7 +63,7 @@ describe('smtp', () => {
     const boot = async (insecure: string) => logged(async () => {
       const closed = server.connections.closed
 
-      Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: insecure, SMTP_FROM: 'site@env.test' })
+      Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: insecure, MAIL_FROM: 'site@env.test' })
 
       const app = new Elysia().use(mailer({ queue: { name: 'boot-check', store: memoryJobs() } }))
 
@@ -82,7 +82,7 @@ describe('smtp', () => {
 
       expect(refused).toContain(`warn kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS`)
       expect(refused).toContain('so no mail would be sent')
-      expect(refused).toContain('SMTP_INSECURE=true')
+      expect(refused).toContain('MAIL_INSECURE=true')
       expect(await boot('true')).toEqual([])
     }
     finally {
@@ -94,7 +94,7 @@ describe('smtp', () => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, user: 'site', pass: 'secret' }) })
     const before = server.received.length
 
-    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('which is ignored while SMTP_PASS is set')
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('which is ignored while a password is set')
     expect(server.received).toHaveLength(before)
   })
 
@@ -156,7 +156,7 @@ describe('smtp', () => {
   it('reads its settings from the environment in production, the greeting named after the sender\'s domain', async () => {
     const saved = { ...process.env }
 
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test' })
+    Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true', MAIL_FROM: 'site@env.test' })
 
     try {
       await mailer({ fromName: 'Site, Env' }).send({ to: 'bob@example.com', subject: 'From env', text: 'Hello' })
@@ -174,7 +174,7 @@ describe('smtp', () => {
   it('signs with the DKIM key the environment gives, its line breaks written \\n, for the sender\'s domain', async () => {
     const saved = { ...process.env }
 
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail', SMTP_DKIM_PRIVATE_KEY: privateKey.replaceAll('\n', '\\n') })
+    Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true', MAIL_FROM: 'site@env.test', MAIL_DKIM_SELECTOR: 'mail', MAIL_DKIM_PRIVATE_KEY: privateKey.replaceAll('\n', '\\n') })
 
     try {
       await mailer({ queue: { name: 'dkim-env' } }).send({ to: 'bob@example.com', subject: 'Signed from env', text: 'Hello' })
@@ -189,12 +189,12 @@ describe('smtp', () => {
   it('stops the boot on a DKIM selector without a key, or a key that is none', () => {
     const saved = { ...process.env }
 
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail' })
+    Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: 'smtp://127.0.0.1', MAIL_FROM: 'site@env.test', MAIL_DKIM_SELECTOR: 'mail' })
 
     try {
-      expect(() => mailer({ queue: { name: 'dkim-half' } })).toThrow('SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together')
-      process.env.SMTP_DKIM_PRIVATE_KEY = 'not a key'
-      expect(() => mailer({ queue: { name: 'dkim-broken' } })).toThrow('SMTP_DKIM_PRIVATE_KEY is no private key')
+      expect(() => mailer({ queue: { name: 'dkim-half' } })).toThrow('MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together')
+      process.env.MAIL_DKIM_PRIVATE_KEY = 'not a key'
+      expect(() => mailer({ queue: { name: 'dkim-broken' } })).toThrow('MAIL_DKIM_PRIVATE_KEY is no private key')
     }
     finally {
       process.env = saved
@@ -203,13 +203,13 @@ describe('smtp', () => {
 })
 
 describe('mailer({ smtp })', () => {
-  const production = { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test' }
+  const production = { NODE_ENV: 'production', MAIL_INSECURE: 'true', MAIL_FROM: 'site@env.test' }
 
   // Runs `run` with the environment a production server has, restoring it after.
   async function inProduction(port: number, run: () => Promise<unknown>, extra: Record<string, string> = {}): Promise<void> {
     const saved = { ...process.env }
 
-    Object.assign(process.env, production, { SMTP_PORT: String(port) }, extra)
+    Object.assign(process.env, production, { MAIL_URL: `smtp://127.0.0.1:${port}` }, extra)
 
     try {
       await run()
@@ -239,7 +239,7 @@ describe('mailer({ smtp })', () => {
   })
 
   it('keeps a sender whose domain is no valid greeting sending, with no greeting of its own', async () => {
-    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-odd' } }).send({ to: 'bob@example.com', subject: 'Odd', text: 'Hi' }), { SMTP_FROM: 'site@bücher.test' })
+    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-odd' } }).send({ to: 'bob@example.com', subject: 'Odd', text: 'Hi' }), { MAIL_FROM: 'site@bücher.test' })
 
     expect(server.received.at(-1)?.from).toContain('site@')
   })

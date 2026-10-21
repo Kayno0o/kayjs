@@ -57,6 +57,18 @@ A prop is now always a value. A child that writes its parent's state types the p
 ### `forgejo({ url })` is `forgejo({ baseUrl })`
 
 kayjs-cms's `forgejo` names the forge's address `baseUrl`, as the other service options of kay do. `url` still works for three minors (the `deprecated-option-name` lint), and `kay upgrade` renames it. A `url` in an object held in a variable is not found: rename it where it is passed.
+### Environment variables were renamed
+
+No lint can recognise an environment variable, so kay warns at boot for each old name still set and reads it until 1.73. Rename in the compose files, `.env` files and hosts.
+
+- `ORIGIN` to `SITE_URL` (the site's public origin, which kayjs-auth and kayjs-mail now build on).
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS` to one `MAIL_URL`, `smtp://user:pass@host:port` (a password with special characters percent-encoded); `SMTP_FROM` to `MAIL_FROM`, `SMTP_INSECURE` to `MAIL_INSECURE`, `SMTP_DKIM_*` to `MAIL_DKIM_*`. `SMTP_RATE_LIMIT` keeps its name for now.
+- `MAIL_FROM` may go: the sender defaults to `noreply@` the site's host. A server with no `MAIL_FROM`, `from` or site domain stops as it starts.
+- `SESSION_SECRET`, `AUTH_SECRET` and `PREVIEW_SECRET` to `KAY_SECRET`: `session()`, kayjs-auth and `preview` default to it, each under a key of its own. Keep a secret that still seals data in `KAY_SECRET`'s comma list. In production `session()` with no secret now throws at startup, naming `KAY_SECRET`.
+
+### kayjs-auth's `url` defaults to the site
+
+Drop `url` from `createAuth` when it repeats `site` or `SITE_URL`. OAuth sign-in and mailed links with no `url` and no site stop the server as it starts.
 
 ## 1.69.0
 

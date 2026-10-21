@@ -45,21 +45,21 @@ The path is the file exporting the mailer as `mail`, relative to the project roo
 
 ## Production settings
 
-In production the mailer reads its settings from the environment. `SMTP_HOST` is required, and so is `SMTP_FROM` unless `from` is set. A missing required one stops the boot. `kay env` lists them with no wiring.
+In production the mailer reads its settings from the environment. `MAIL_URL` is required. The sender is `MAIL_FROM`, else `from`, else `noreply@` the host of your site (`SITE_URL`, without a leading `www.`). A missing `MAIL_URL`, or a server starting with no sender, stops the boot. `kay env` lists them with no wiring.
 
 | Variable | Use |
 | --- | --- |
-| `SMTP_HOST` | The server to send through. Required. |
-| `SMTP_PORT` | Optional, 465 by default. |
-| `SMTP_USER`, `SMTP_PASS` | Optional, both or neither, for a server needing no login. |
+| `MAIL_URL` | The server to send through, such as `smtp://user:pass@mail.example.com:465`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
 | `SMTP_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
-| `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
-| `SMTP_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
-| `SMTP_FROM` | The sender, unless `from` is set. |
-| `SMTP_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
+| `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
+| `MAIL_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
+| `MAIL_FROM` | Optional. The sender, `noreply@` the site's host when left out. A site with no domain, such as `localhost`, gives none. |
+| `MAIL_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
 | `MAIL_TO` | Optional. Where a mail naming no recipient goes, such as a contact form's. |
 
-On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `SMTP_INSECURE=true` for a local Mailpit. A set `SMTP_PASS` overrides it, so a password never goes in clear.
+On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
+
+The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_INSECURE`, `SMTP_DKIM_*` and `SMTP_FROM`, still work until 1.73, with a warning naming the new one. `SMTP_RATE_LIMIT` keeps its name for now.
 
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
@@ -250,7 +250,7 @@ export const mail = mailer({
 })
 ```
 
-In production a mailer with a custom `transport` still needs a sender, `from` or `SMTP_FROM`, or the boot stops naming both. Development and tests keep sending from `kay@localhost`.
+In production a mailer with a custom `transport` still needs a sender, `from`, `MAIL_FROM` or the site's host, or the server stops as it starts, naming them. Development and tests keep sending from `kay@localhost`.
 
 `smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. It takes the options of `mailer({ smtp })` as well as `insecure` and `dkim: { domain, selector, privateKey }`, which signs each mail for a relay that does not. The private key is PEM, and the public key is published at `<selector>._domainkey.<domain>`. `outbox` is a transport too, for a staging server that must never send.
 
@@ -311,7 +311,7 @@ A mail's page and a sample's page each have a form that sends that one mail for 
 
 To get every mail that way, turn on Send for real in the Mail tab and type an address. From then on each mail your app sends is delivered to that address alone, never to the person it was written for, with its `cc` and `bcc` dropped. The mail still lands in the outbox, marked as delivered or with the SMTP error.
 
-The switch is kept in `.kay` for your checkout, so it stays on when `kay dev` restarts the server. It works under `kay dev` only, never in production or in tests. Without `SMTP_HOST` and a sender, the tab names what is missing and the switch stays off.
+The switch is kept in `.kay` for your checkout, so it stays on when `kay dev` restarts the server. It works under `kay dev` only, never in production or in tests. Without `MAIL_URL` and a sender, the tab names what is missing and the switch stays off.
 
 While the switch is on, a relay that is slow or cannot be reached holds up `send()` for up to the SMTP `timeout`, 10 seconds by default, at each step of the connection. The mail is handed to the relay before `send()` returns.
 

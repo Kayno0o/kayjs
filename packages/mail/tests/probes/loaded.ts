@@ -15,9 +15,8 @@ if (mode === 'dev') {
 
 if (server) {
   process.env.NODE_ENV = 'production'
-  process.env.SMTP_HOST = '127.0.0.1'
-  process.env.SMTP_PORT = String(server.port)
-  process.env.SMTP_INSECURE = 'true'
+  process.env.MAIL_URL = `smtp://127.0.0.1:${server.port}`
+  process.env.MAIL_INSECURE = 'true'
 }
 
 const mail = mailer({ from: 'dev@example.com' })

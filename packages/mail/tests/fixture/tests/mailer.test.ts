@@ -2,6 +2,8 @@ import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
 import { darkPalette, defaults, mailer, MailNotConfiguredError, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { setSite } from 'kay/library'
 import { mail } from '../src/mail'
 import ContactForm from '../src/mails/contact-form.kay'
 import Contact from '../src/mails/contact.kay'
@@ -397,33 +399,72 @@ describe('configuration', () => {
     process.env = { ...saved }
   })
 
-  it('stops a production boot naming each SMTP variable missing', () => {
+  it('stops a production boot with no MAIL_URL, and a server starting with no sender, naming where one is set', () => {
     process.env.NODE_ENV = 'production'
-    delete process.env.SMTP_HOST
-    delete process.env.SMTP_FROM
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_FROM
 
-    expect(() => mailer()).toThrow(/SMTP_HOST[\s\S]*SMTP_FROM|SMTP_FROM[\s\S]*SMTP_HOST/)
-    expect(() => mailer({ from: 'site@example.com' })).toThrow('SMTP_HOST')
+    expect(() => mailer()).toThrow('MAIL_URL')
+    expect(() => mailer({ from: 'site@example.com' })).toThrow('MAIL_URL')
+
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    expect(() => new Elysia().use(mailer({ queue: { name: 'no-sender' } })).listen(0)).toThrow(/MAIL_FROM[\s\S]*SITE_URL/)
   })
 
-  it('stops a production boot on a custom transport with no sender, naming from and SMTP_FROM, while development and tests keep the fallback', async () => {
+  it('sends from noreply@ the site\'s host, without www., when no sender is set', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    delete process.env.MAIL_FROM
+    setSite('https://www.example.org/')
+
+    try {
+      const app = mailer({ queue: { name: 'site-sender' } })
+
+      expect(app.configured).toBe(true)
+      expect((await app.render({ to: 'a@example.com', subject: 'S', text: 'T' })).from).toBe('noreply@example.org')
+      expect((await mailer({ queue: { name: 'site-sender-name' }, fromName: 'Site' }).render({ to: 'a@example.com', subject: 'S', text: 'T' })).from).toEqual({ name: 'Site', address: 'noreply@example.org' })
+      expect((await mailer({ queue: { name: 'site-sender-env' } }).render({ to: 'a@example.com', subject: 'S', text: 'T' })).from).toBe('noreply@example.org')
+
+      process.env.MAIL_FROM = 'hello@example.org'
+      expect((await mailer({ queue: { name: 'site-sender-set' } }).render({ to: 'a@example.com', subject: 'S', text: 'T' })).from).toBe('hello@example.org')
+    }
+    finally {
+      setSite(undefined)
+    }
+  })
+
+  it('offers no default sender for a site with no domain, such as localhost', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    delete process.env.MAIL_FROM
+    setSite('http://localhost:3000/')
+
+    try {
+      expect(mailer({ queue: { name: 'localhost-sender' } }).configured).toBe(false)
+    }
+    finally {
+      setSite(undefined)
+    }
+  })
+
+  it('stops a production boot on a custom transport with no sender, naming from and MAIL_FROM, while development and tests keep the fallback', async () => {
     const custom: Transport = { send: async () => ({ accepted: [], rejected: [] }) }
 
     process.env.NODE_ENV = 'production'
-    delete process.env.SMTP_FROM
+    delete process.env.MAIL_FROM
 
-    expect(() => mailer({ transport: custom, queue: { name: 'senderless-a' } })).toThrow(/`from`[\s\S]*SMTP_FROM/)
+    expect(() => new Elysia().use(mailer({ transport: custom, queue: { name: 'senderless-a' } })).listen(0)).toThrow(/MAIL_FROM[\s\S]*`from`/)
     expect(() => mailer({ transport: custom, from: 'site@example.com', queue: { name: 'senderless-b' } })).not.toThrow()
 
-    process.env.SMTP_FROM = 'site@example.com'
+    process.env.MAIL_FROM = 'site@example.com'
     expect(() => mailer({ transport: custom, queue: { name: 'senderless-c' } })).not.toThrow()
 
-    delete process.env.SMTP_FROM
+    delete process.env.MAIL_FROM
 
     const optional = mailer({ transport: custom, optional: true, queue: { name: 'senderless-d' } })
 
     expect(optional.configured).toBe(false)
-    await expect(optional.send({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('SMTP_FROM must be set to send mail')
+    await expect(optional.send({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('MAIL_FROM must be set to send mail')
 
     for (const env of ['development', 'test']) {
       process.env.NODE_ENV = env
@@ -436,8 +477,8 @@ describe('configuration', () => {
 
   it('lets an optional mailer boot without its settings, each send then throwing MailNotConfiguredError before anything is queued', async () => {
     process.env.NODE_ENV = 'production'
-    delete process.env.SMTP_HOST
-    delete process.env.SMTP_FROM
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_FROM
 
     const optional = mailer({ optional: true, queue: { name: 'optional-mail' } })
 
@@ -454,12 +495,12 @@ describe('configuration', () => {
     }
 
     expect(refusal).toBeInstanceOf(MailNotConfiguredError)
-    expect((refusal as MailNotConfiguredError).missing).toEqual(['SMTP_HOST', 'SMTP_FROM'])
-    await expect(optional.enqueue({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('SMTP_HOST and SMTP_FROM must be set to send mail')
+    expect((refusal as MailNotConfiguredError).missing).toEqual(['MAIL_URL', 'MAIL_FROM'])
+    await expect(optional.enqueue({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('MAIL_URL and MAIL_FROM must be set to send mail')
     expect(await optional.drain()).toBe(0)
 
-    process.env.SMTP_HOST = 'smtp.example.com'
-    process.env.SMTP_FROM = 'site@example.com'
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    process.env.MAIL_FROM = 'site@example.com'
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
   })
 
@@ -480,17 +521,17 @@ describe('configuration', () => {
 
   it('counts MAIL_TO among what an optional mailer misses for a send naming no recipient, and stops a production boot on a malformed one', async () => {
     process.env.NODE_ENV = 'production'
-    delete process.env.SMTP_HOST
-    delete process.env.SMTP_FROM
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_FROM
     delete process.env.MAIL_TO
 
     const optional = mailer({ optional: true, queue: { name: 'optional-to' } })
 
-    await expect(optional.send({ subject: 'Contact', text: 'Hi' })).rejects.toThrow('SMTP_HOST, SMTP_FROM and MAIL_TO must be set to send mail')
-    await expect(optional.send({ to: 'ada@example.com', subject: 'Contact', text: 'Hi' })).rejects.toThrow('SMTP_HOST and SMTP_FROM must be set to send mail')
+    await expect(optional.send({ subject: 'Contact', text: 'Hi' })).rejects.toThrow('MAIL_URL, MAIL_FROM and MAIL_TO must be set to send mail')
+    await expect(optional.send({ to: 'ada@example.com', subject: 'Contact', text: 'Hi' })).rejects.toThrow('MAIL_URL and MAIL_FROM must be set to send mail')
 
-    process.env.SMTP_HOST = 'smtp.example.com'
-    process.env.SMTP_FROM = 'site@example.com'
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    process.env.MAIL_FROM = 'site@example.com'
     process.env.MAIL_TO = 'team'
     expect(() => mailer({ queue: { name: 'malformed-to' } })).toThrow('MAIL_TO')
 
@@ -498,15 +539,15 @@ describe('configuration', () => {
     expect(() => mailer({ queue: { name: 'valid-to' } })).not.toThrow()
   })
 
-  it('stops a production boot on a SMTP_FROM that is no address', () => {
+  it('stops a production boot on a MAIL_FROM that is no address', () => {
     process.env.NODE_ENV = 'production'
-    process.env.SMTP_HOST = 'smtp.example.com'
-    process.env.SMTP_FROM = 'Site'
+    process.env.MAIL_URL = 'smtp://smtp.example.com'
+    process.env.MAIL_FROM = 'Site'
 
-    expect(() => mailer({ queue: { name: 'malformed-from' } })).toThrow('SMTP_FROM')
+    expect(() => mailer({ queue: { name: 'malformed-from' } })).toThrow('MAIL_FROM')
 
     for (const valid of ['site@example.com', 'Site <site@example.com>']) {
-      process.env.SMTP_FROM = valid
+      process.env.MAIL_FROM = valid
       expect(() => mailer({ queue: { name: 'valid-from' } })).not.toThrow()
     }
   })
@@ -526,18 +567,52 @@ describe('configuration', () => {
     }
   })
 
-  it('stops the boot of a server given a user without a password, or the other way round', () => {
+  it('stops the boot of a server whose MAIL_URL gives a user without a password, or a URL that is no server', () => {
     process.env.NODE_ENV = 'production'
-    process.env.SMTP_HOST = 'smtp.example.com'
-    process.env.SMTP_FROM = 'site@example.com'
-    process.env.SMTP_USER = 'site@example.com'
-    delete process.env.SMTP_PASS
+    process.env.MAIL_FROM = 'site@example.com'
 
-    expect(() => mailer()).toThrow('SMTP_USER and SMTP_PASS go together')
-    expect(() => mailer({ optional: true })).toThrow('SMTP_USER and SMTP_PASS go together')
+    for (const url of ['smtp://site@smtp.example.com', 'smtp://:secret@smtp.example.com']) {
+      process.env.MAIL_URL = url
+      expect(() => mailer()).toThrow('the login in MAIL_URL needs a user and a password')
+      expect(() => mailer({ optional: true })).toThrow('the login in MAIL_URL needs a user and a password')
+    }
 
-    delete process.env.SMTP_USER
-    process.env.SMTP_PASS = 'secret'
-    expect(() => mailer()).toThrow('SMTP_USER and SMTP_PASS go together')
+    for (const url of ['smtp.example.com', 'https://smtp.example.com', 'smtp://']) {
+      process.env.MAIL_URL = url
+      expect(() => mailer()).toThrow('MAIL_URL is no SMTP server')
+    }
+
+    process.env.MAIL_URL = 'smtp://site%40example.com:p%3Ass@smtp.example.com:587'
+    expect(() => mailer()).not.toThrow()
+  })
+
+  it('still reads the names of before 1.70, warning once which to rename', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_FROM
+    Object.assign(process.env, { SMTP_HOST: 'smtp.example.com', SMTP_PORT: '587', SMTP_USER: 'site@example.com', SMTP_PASS: 'p:ss', SMTP_FROM: 'old@example.com', SMTP_INSECURE: 'false' })
+
+    const lines = await logged(async () => {
+      expect(mailer({ queue: { name: 'legacy-names' } }).configured).toBe(true)
+      expect(mailer({ queue: { name: 'legacy-names-again' } }).configured).toBe(true)
+    })
+
+    const env: Record<string, string | undefined> = process.env
+
+    expect(env.MAIL_URL).toBe('smtp://site%40example.com:p%3Ass@smtp.example.com:587')
+    expect(env.MAIL_FROM).toBe('old@example.com')
+    expect(env.MAIL_INSECURE).toBe('false')
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringMatching(/rename .*SMTP_FROM to MAIL_FROM.*MAIL_URL/)]])
+  })
+
+  it('prefers a new name over the old one set beside it', () => {
+    process.env.NODE_ENV = 'production'
+    Object.assign(process.env, { SMTP_HOST: 'old.example.com', MAIL_URL: 'smtp://new.example.com:25', SMTP_FROM: 'old@example.com', MAIL_FROM: 'new@example.com' })
+    mailer({ queue: { name: 'legacy-both' } })
+
+    const env: Record<string, string | undefined> = process.env
+
+    expect(env.MAIL_URL).toBe('smtp://new.example.com:25')
+    expect(env.MAIL_FROM).toBe('new@example.com')
   })
 })

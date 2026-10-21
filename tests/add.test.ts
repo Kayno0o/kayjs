@@ -163,7 +163,7 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
     const result = await addFeatures(dir, ['mail'], { install: false })
 
     expect(result.written).toEqual(['kay.config.ts', 'src/mail.ts'])
-    expect(result.notes).toEqual([expect.stringContaining('SMTP_HOST')])
+    expect(result.notes).toEqual([expect.stringContaining('MAIL_URL')])
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail({ module: \'./src/mail\' })],')
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('import { mail } from \'@kaynooo/kayjs-mail\'\n')
     expect(await Bun.file(join(dir, 'src/mail.ts')).text()).toContain('export const mail = mailer()')

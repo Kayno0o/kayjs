@@ -33,7 +33,7 @@ Every option is optional. The tables give each option's default. The full refere
 
 | Option | Effect |
 | --- | --- |
-| `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL`, else `ORIGIN`, when left out. See [Head and SEO](/essentials/head-and-seo) |
+| `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL` when left out; a `site` written here wins over it. See [Head and SEO](/essentials/head-and-seo) |
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `imageAlt`, `locale` (`og:locale`), `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
 | `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |

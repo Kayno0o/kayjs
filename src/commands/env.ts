@@ -1,7 +1,7 @@
 import type { EnvVariable } from '../server/env'
 import type { EnvSchemaRecord } from '../server/env-state'
 import type { Command } from './command'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
@@ -9,7 +9,7 @@ import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, listingEnv } from '../server/env-state'
 import { registerLoader } from '../server/loader'
 import { formatOption, printDocument, printedProblems, printFailure, printProblems, projectRoot, withStdoutOnStderr } from './command'
-import { compareEnv } from './env-compare'
+import { compareEnv, defaultEnvFiles, withDeclaredVariables } from './env-compare'
 import { importApi } from './import-module'
 import { USAGES } from './usages'
 
@@ -33,7 +33,7 @@ const KAY_VARIABLES: EnvVariable[] = [
 // Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
   usage: USAGES.env,
-  options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' } },
+  options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {
     const format = formatOption('env', values.format)
@@ -51,7 +51,18 @@ export const env: Command = {
     try {
       const { variables, unread, findings } = await withStdoutOnStderr(async () => {
         const listed = await listEnv(root)
-        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : (await loadConfig(root)).env
+        const config = await loadConfig(root)
+        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : config.env ?? await defaultEnvFiles(root)
+
+        if (values.write === true) {
+          const path = resolve(root, files?.example ?? '.env.example')
+          const { text, added } = withDeclaredVariables(await Bun.file(path).exists() ? await readFile(path, 'utf8') : '', listed.variables)
+
+          if (added.length > 0)
+            await writeFile(path, text)
+
+          console.error(added.length === 0 ? `${relative(root, path)} already lists every variable` : `${relative(root, path)}: added ${added.join(', ')}`)
+        }
 
         return { ...listed, findings: files === undefined ? undefined : await compareEnv(root, listed.variables, files, listed.unread) }
       })

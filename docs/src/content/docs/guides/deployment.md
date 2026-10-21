@@ -118,7 +118,7 @@ The password goes into the URL as it is, so keep it to letters and digits. An ex
 
 ## Secrets
 
-A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or kayjs-mail's `SMTP_PASS`, is a secret. Set it as an environment variable of the container, or in a `.env` next to the executable. Never put it in the image or the repository.
+A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or the password in kayjs-mail's `MAIL_URL`, is a secret. Set it as an environment variable of the container, or in a `.env` next to the executable. Never put it in the image or the repository.
 
 `kay env` lists the variables each library reads, and which of them production requires. Name your compose file and `.env.example` in `kay.config.ts` as `env: { compose: 'compose.prod.yaml', example: '.env.example' }`, and `kay check` compares them with what the project declares ([kay env](/reference/cli#kay-env)).
 

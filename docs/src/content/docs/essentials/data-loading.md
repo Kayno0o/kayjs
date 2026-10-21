@@ -167,7 +167,7 @@ A field with no default keeps its type `string`: in development it is an empty s
 ```ts
 export const env = defineEnv(s.Object({
   DISCORD_CLIENT_ID: s.String({ requiredInProduction: true }),
-  SMTP_HOST: s.Optional(s.String({ requiredInProduction: true })),
+  STRIPE_KEY: s.Optional(s.String({ requiredInProduction: true })),
 }))
 ```
 
@@ -183,7 +183,7 @@ export const env = defineEnv(s.Object({
 
 `kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It does not read the server's environment or run the server entry.
 
-It finds the `defineEnv` schemas in the modules under `src`, `publicEnv`, the variables of each library in `extensions` (kayjs-mail's SMTP ones and kayjs-ai's provider keys, with nothing wired in the app), and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`.
+It finds the `defineEnv` schemas in the modules under `src`, `publicEnv`, the variables of each library in `extensions` (kayjs-mail's `MAIL_*` ones and kayjs-ai's provider keys, with nothing wired in the app), and kay's own `PORT`, `HOST`, `SITE_URL`, `KAY_SECRET` and the deprecated `ORIGIN`.
 
 ```sh
 kay env
@@ -192,7 +192,7 @@ kay env
 ```
 DATABASE_URL    src/env.ts  string   always
 DOWNLOAD_KEY    src/env.ts  string (secret)  production
-SMTP_HOST       the extension @kaynooo/kayjs-mail  string  production
+MAIL_URL        the extension @kaynooo/kayjs-mail  string  production
 PORT            kay         integer  optional    3000
 ```
 

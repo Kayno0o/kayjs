@@ -40,11 +40,8 @@ services:
       KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/noticeboard
       SITE_URL: ${SITE_URL:?set SITE_URL, the public origin mailed links start with}
-      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-465}
-      # Drop both for a mail server that needs no login.
-      SMTP_USER: ${SMTP_USER:?set SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS}
+      # smtp://user:pass@host:port, the login and the port optional; mails come from noreply@ the site's host.
+      MAIL_URL: ${MAIL_URL:?set MAIL_URL}
     volumes:
       - data:/app/data
     depends_on:

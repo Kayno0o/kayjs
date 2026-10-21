@@ -38,13 +38,13 @@ afterAll(() => {
 
 beforeEach(() => {
   outbox.clear()
-  Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
+  Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
 })
 
 afterEach(async () => {
   await rm(SWITCH, { force: true })
 
-  for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_INSECURE', 'SMTP_USER'])
+  for (const name of ['MAIL_URL', 'MAIL_INSECURE'])
     delete process.env[name]
 
   process.env.NODE_ENV = 'development'
@@ -122,7 +122,7 @@ describe('the "Send for real" switch', () => {
   })
 
   it('keeps the mail in the outbox with the SMTP error when the server cannot be reached, and sends no error to the caller', async () => {
-    process.env.SMTP_PORT = String(closed.port)
+    process.env.MAIL_URL = `smtp://127.0.0.1:${closed.port}`
 
     const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
 
@@ -156,17 +156,17 @@ describe('the "Send for real" switch', () => {
   })
 
   it('names the SMTP variables missing and delivers nothing without them, whatever the file says', async () => {
-    delete process.env.SMTP_HOST
+    delete process.env.MAIL_URL
 
     const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
     const state = await (await request(app, '/_kay/mail/delivery')).json() as { on: boolean, missing: string[] }
 
-    expect(state).toMatchObject({ on: false, missing: ['SMTP_HOST'] })
+    expect(state).toMatchObject({ on: false, missing: ['MAIL_URL'] })
 
     const refused = await toggle(app, 'me@example.com')
 
     expect(refused.status).toBe(409)
-    expect(await refused.text()).toContain('SMTP_HOST')
+    expect(await refused.text()).toContain('MAIL_URL')
     expect(existsSync(SWITCH)).toBe(false)
 
     await Bun.write(SWITCH, JSON.stringify({ to: 'me@example.com' }))
@@ -176,11 +176,11 @@ describe('the "Send for real" switch', () => {
     await app.send(mail('Nowhere to go'))
     expect(outbox.last()!.relayed).toBeUndefined()
     expect(server.received.length).toBe(received)
-    expect(await (await request(app, '/_kay/mail/delivery')).json()).toMatchObject({ on: false, missing: ['SMTP_HOST'] })
+    expect(await (await request(app, '/_kay/mail/delivery')).json()).toMatchObject({ on: false, missing: ['MAIL_URL'] })
   })
 
   it('logs once that settings it cannot read stop the delivery, the mail still reaching the outbox', async () => {
-    process.env.SMTP_USER = 'user'
+    process.env.MAIL_URL = `smtp://user@127.0.0.1:${server.port}`
 
     const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
 
@@ -191,10 +191,8 @@ describe('the "Send for real" switch', () => {
       await app.send(mail('Second'))
     })
 
-    delete process.env.SMTP_USER
-
     expect(outbox.mails.map(each => [each.subject, each.relayed])).toEqual([['First', undefined], ['Second', undefined]])
-    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringContaining('the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to me@example.com: kay: SMTP_USER and SMTP_PASS go together')]])
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringContaining('the "Send for real" switch is on, but the SMTP settings could not be read, so no mail is delivered to me@example.com: kay: the login in MAIL_URL needs a user and a password')]])
   })
 
   it('refuses a post from another site, an address that is not one, and several addresses', async () => {

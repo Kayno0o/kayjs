@@ -15,7 +15,7 @@ const LISTENING = /localhost:(\d+)/
 const SOME_PASSED = / [1-9]\d* pass/
 // A Postgres whose user may create databases, as the app template's tests take: CI sets it.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
-const SECRETS = { KAY_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', SITE_URL: 'http://localhost:3000' }
+const SECRETS = { KAY_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', SITE_URL: 'https://board.example.com' }
 
 // Every app the repository ships: the documentation site and each example.
 async function shippedApps(): Promise<string[]> {
@@ -73,7 +73,7 @@ describe('the noticeboard example', () => {
         throw new Error(`kay build --compile failed:\n${report}${errors}`)
 
       // Nothing reaches the database or a mail server until a page asks: the page a magic link opens needs neither, where the sign-in page reads the client's attempts for its proof of work.
-      const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+      const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', MAIL_URL: 'smtp://localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
         const origin = `http://localhost:${await listeningPort(server, 'the executable', LISTENING)}`

@@ -434,9 +434,17 @@ kay env
 
 `kay env` lists the environment variables the project declares, without running the server entry. Each has its source, its type, whether it is required (`always`, `production` or `optional`) and its default.
 
-It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL`, `ORIGIN` and `KAY_SECRET`. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
+It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL`, `KAY_SECRET` and the deprecated `ORIGIN`. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
 
 The modules under `src` are imported, so their top-level code runs.
+
+### Write the example file
+
+```sh
+kay env --write
+```
+
+This appends to `.env.example` every declared variable it does not mention, with its description, the libraries' and kay's included. A required variable is written as `NAME=`, an optional one commented out beside its default. What the file holds is kept, and it is created when missing. `--example <file>` writes another file.
 
 ### Compare with the compose and example files
 
@@ -456,13 +464,13 @@ A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warnin
 
 A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Two things change. An empty value now takes the default, as `defineEnv` treats it as unset. And the files you read from now import the schema, which reads and checks the environment as it loads. `kay upgrade` does not do this.
 
-`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely.
+`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely. With neither, kay compares the production compose files at the project root (`compose*.yaml` and `docker-compose*.yaml`, leaving out a name with `dev`, `development`, `test`, `local` or `override` in it) and `.env.example`, those that exist.
 
 A module under `src` that does not load is reported, and nothing is then called undeclared. A variable set to an empty string counts as not set.
 
 Raw reads are found in one-line forms only: `process.env.X`, `process.env['X']`, `Bun.env.X` and `const { X } = process.env`. The command exits with 1 on an error, and `--format json` adds the problems as `findings`.
 
-To run it with `kay check`, name the files in `kay.config.ts`.
+`kay check` runs the same comparison. To choose the files, name them in `kay.config.ts`.
 
 ```ts
 export default {

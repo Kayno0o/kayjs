@@ -306,9 +306,8 @@ describe('sending a development mail for real', () => {
     server.stop()
   })
   afterEach(() => {
-    delete process.env.SMTP_HOST
-    delete process.env.SMTP_PORT
-    delete process.env.SMTP_INSECURE
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_INSECURE
   })
 
   async function post(app: { handle: (request: Request) => Promise<Response> }, path: string, to: string, site = 'same-origin'): Promise<Response> {
@@ -322,12 +321,12 @@ describe('sending a development mail for real', () => {
 
     const page = await (await get(mail, `/_kay/mail/${outbox.last()!.id}`)).text()
 
-    expect(page).toContain('Set SMTP_HOST to send this mail over SMTP')
+    expect(page).toContain('Set MAIL_URL to send this mail over SMTP')
     expect(page).not.toContain('<form')
   })
 
   it('sends an outbox mail to the typed address alone, over the environment\'s SMTP', async () => {
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
+    Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
 
     await mail.send({ to: 'ada@example.com', cc: 'cc@example.com', bcc: 'bcc@example.com', subject: 'For real', text: 'Hello' })
@@ -347,7 +346,7 @@ describe('sending a development mail for real', () => {
   })
 
   it('sends a sample, rendered with its preview props', async () => {
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
+    Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
     const sent = await post(mail, '/_kay/mail/samples/send?mail=welcome.kay', 'me@example.com')
 
@@ -360,7 +359,7 @@ describe('sending a development mail for real', () => {
     const closed = startSmtp()
 
     closed.stop()
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
+    Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
     const received = server.received.length
 
@@ -377,7 +376,7 @@ describe('sending a development mail for real', () => {
     expect(await several.text()).toContain('Not sent: type one address to send it to')
     expect(server.received.length).toBe(received)
 
-    process.env.SMTP_PORT = String(closed.port)
+    process.env.MAIL_URL = `smtp://127.0.0.1:${closed.port}`
     const unreachable = mailer({ from: 'dev@example.com' })
 
     await unreachable.send({ to: 'ada@example.com', subject: 'Unreachable', text: 'Hello' })

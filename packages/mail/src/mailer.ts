@@ -10,6 +10,7 @@ import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'ka
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
+import { adoptLegacyEnv, defaultSender, parseMailUrl } from './env'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
@@ -46,9 +47,9 @@ function mountPreview(plugin: Elysia, render: (message: Message) => Promise<Mail
 }
 
 export interface MailerOptions {
-  // The address mails are sent from unless one says otherwise, `SMTP_FROM` when left out.
+  // The address mails are sent from unless one says otherwise, `MAIL_FROM` when left out, else `noreply@` the site's host.
   from?: Address | undefined
-  // The name shown beside a bare `SMTP_FROM`, so the environment holds the address alone.
+  // The name shown beside a bare `MAIL_FROM`, so the environment holds the address alone.
   fromName?: string | undefined
   // Where a mail naming no recipient goes, such as a contact form's, `MAIL_TO` when left out.
   to?: Address | Address[] | undefined
@@ -64,7 +65,7 @@ export interface MailerOptions {
   logRecipients?: boolean | undefined
   // Names each mail's subject in the log, which says `A mail` otherwise: a subject can hold a visitor's name or an organization's.
   logSubjects?: boolean | undefined
-  // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
+  // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
 
@@ -119,7 +120,7 @@ const LINE_BREAK = /[\r\n]/
 // A style element, inside the conditional comment of one only Outlook reads included.
 const STYLE_ELEMENT = /(?:<!--\[if [^\]]+\]>)?<style\b[^>]*>[\s\S]*?<\/style>(?:<!\[endif\]-->)?/gi
 const DARK_RULES = /prefers-color-scheme:\s*dark/
-// `Name <address>` or a bare address, as `SMTP_FROM` holds one.
+// `Name <address>` or a bare address, as `MAIL_FROM` holds one.
 const SENDER = '^(?:[^<>]*<[^\\s<>@]+@[^\\s<>@]+>|[^\\s<>@]+@[^\\s<>@]+)$'
 // One address or more, apart by commas, as `MAIL_TO` holds them: a name in it holds no comma.
 const RECIPIENT = '(?:[^<>,]*<[^\\s<>@,]+@[^\\s<>@,]+>|[^\\s<>@,]+@[^\\s<>@,]+)'
@@ -211,22 +212,18 @@ function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
 
-// The SMTP variables. `listed` is the extension's list for `kay env`, which shows the host and the sender as required in production, where the mailer sends over SMTP; the sender is not when the mailer sets `from`, which the list cannot know.
-function smtpEnv({ optional = false, hasFrom = false, listed = false }: { optional?: boolean, hasFrom?: boolean, listed?: boolean } = {}) {
+// The mailer's variables. `listed` is the extension's list for `kay env`, which shows the server as required in production, where the mailer sends over SMTP.
+function smtpEnv({ optional = false, listed = false }: { optional?: boolean, listed?: boolean } = {}) {
   const hostOptional = listed || optional
-  const fromOptional = hostOptional || hasFrom
 
   return s.Object({
-    SMTP_HOST: hostOptional ? s.Optional(s.String(listed ? { requiredInProduction: true } : {})) : s.String(),
-    SMTP_PORT: s.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
-    SMTP_INSECURE: s.Optional(s.Boolean()),
-    SMTP_USER: s.Optional(s.String()),
-    SMTP_PASS: s.Optional(s.String()),
+    MAIL_URL: hostOptional ? s.Optional(s.String(listed ? { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional', requiredInProduction: true } : {})) : s.String(),
+    MAIL_INSECURE: s.Optional(s.Boolean()),
     SMTP_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
-    SMTP_DKIM_SELECTOR: s.Optional(s.String()),
-    SMTP_DKIM_PRIVATE_KEY: s.Optional(s.String()),
-    SMTP_DKIM_DOMAIN: s.Optional(s.String()),
-    SMTP_FROM: fromOptional ? s.Optional(s.String(listed ? { pattern: SENDER, description: 'required unless the mailer sets `from`', requiredInProduction: true } : { pattern: SENDER })) : s.String({ pattern: SENDER }),
+    MAIL_DKIM_SELECTOR: s.Optional(s.String()),
+    MAIL_DKIM_PRIVATE_KEY: s.Optional(s.String()),
+    MAIL_DKIM_DOMAIN: s.Optional(s.String()),
+    MAIL_FROM: s.Optional(s.String({ pattern: SENDER, ...listed ? { description: 'defaults to noreply@ the site\'s host' } : {} })),
     MAIL_TO: s.Optional(s.String({ pattern: RECIPIENTS })),
   })
 }
@@ -236,31 +233,31 @@ function defined<T extends object>(options: T): Partial<T> {
   return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) as Partial<T>
 }
 
-// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+// SMTP from `MAIL_URL`, `MAIL_INSECURE`, `SMTP_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
-  const env = defineEnv(smtpEnv({ optional, hasFrom: from !== undefined }))
+  adoptLegacyEnv()
 
-  // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
-  if ((env.SMTP_USER === undefined) !== (env.SMTP_PASS === undefined))
-    throw configError('SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+  const env = defineEnv(smtpEnv({ optional }))
+  // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
+  const server = env.MAIL_URL === undefined || env.MAIL_URL === '' ? undefined : parseMailUrl(env.MAIL_URL)
 
-  if ((env.SMTP_DKIM_SELECTOR === undefined) !== (env.SMTP_DKIM_PRIVATE_KEY === undefined))
-    throw configError('SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
+  if ((env.MAIL_DKIM_SELECTOR === undefined) !== (env.MAIL_DKIM_PRIVATE_KEY === undefined))
+    throw configError('MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
 
   // A `.env` file often holds the key on one line, its line breaks written `\\n`.
-  const dkimKey = env.SMTP_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
+  const dkimKey = env.MAIL_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
 
   if (dkimKey !== undefined)
-    checkKey(dkimKey, 'SMTP_DKIM_PRIVATE_KEY')
+    checkKey(dkimKey, 'MAIL_DKIM_PRIVATE_KEY')
 
   const rateLimit = rateFromText(env.SMTP_RATE_LIMIT)
 
   let transport: Transport | undefined
-  const sender = () => from ?? named(env.SMTP_FROM, fromName)
-  const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
+  const sender = () => from ?? named(env.MAIL_FROM ?? defaultSender() ?? 'kay@localhost', fromName)
+  const missing = () => [...server === undefined ? ['MAIL_URL'] : [], ...from === undefined && env.MAIL_FROM === undefined && defaultSender() === undefined ? ['MAIL_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= smtp({ host: server!.host, port: server!.port, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {
@@ -274,7 +271,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
       return env.MAIL_TO
     },
     get server() {
-      return `${env.SMTP_HOST}:${env.SMTP_PORT}`
+      return `${server?.host}:${server?.port}`
     },
     missing,
   }
@@ -328,6 +325,8 @@ export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtens
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
+  adoptLegacyEnv()
+
   if (options.smtp !== undefined) {
     if (options.transport !== undefined)
       throw configError('mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
@@ -341,18 +340,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true, options.smtp) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
   // A custom transport sends in production too, where `kay@localhost` as the sender fails SPF and lands in spam without an error.
-  const senderless = options.transport !== undefined && delivering() === 'smtp' && options.from === undefined && (process.env.SMTP_FROM ?? '') === ''
+  // Read when asked, as the site may be set after the mailer is made.
+  const noSender = (): boolean => options.from === undefined && (process.env.MAIL_FROM ?? '') === '' && defaultSender() === undefined
+  const senderless = (): boolean => options.transport !== undefined && delivering() === 'smtp' && noSender()
 
-  if (senderless && options.optional !== true) {
-    try {
-      defineEnv(s.Object({ SMTP_FROM: s.String({ pattern: SENDER }) }))
-    }
-    catch (error) {
-      throw configError(`a mailer with a custom transport needs a sender in production: set \`from\` in mailer() or SMTP_FROM\n${error instanceof Error ? error.message : String(error)}`, { cause: error })
-    }
-  }
-
-  const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM === undefined || process.env.SMTP_FROM === '' ? 'kay@localhost' : process.env.SMTP_FROM, options.fromName)
+  const sender = (): Address => configured?.from ?? options.from ?? named(process.env.MAIL_FROM === undefined || process.env.MAIL_FROM === '' ? defaultSender() ?? 'kay@localhost' : process.env.MAIL_FROM, options.fromName)
 
   // The message's own, else the mailer's; undefined when it names none and the mailer has none to give.
   const recipients = (message: Envelope): Address[] | undefined => {
@@ -369,7 +361,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
   const ready = (message: Envelope): void => {
-    const missing = [...configured?.missing() ?? [], ...senderless ? ['SMTP_FROM'] : [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
+    const missing = [...configured?.missing() ?? [], ...senderless() ? ['MAIL_FROM'] : [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
 
     if (missing.length > 0)
       throw new MailNotConfiguredError(missing)
@@ -487,9 +479,20 @@ export function mailer(options: MailerOptions = {}): Mailer {
   })
   const plugin = new Elysia().use(jobs)
 
+  // Checked as the server starts, once the site is set: a sender in production is the mailer's `from`, `MAIL_FROM`, or `noreply@` the site's host, since `kay@localhost` fails SPF and lands in spam without an error.
+  if (delivering() === 'smtp' && options.optional !== true) {
+    plugin.onStart(() => {
+      if (noSender())
+        throw new Error('kayjs-mail: mails need a sender in production: set MAIL_FROM, or the site (SITE_URL or `site` in kay.config.ts) for noreply@ its host, or `from` in mailer()')
+    })
+  }
+
   // Checked as the server starts, so a relay refused for lacking STARTTLS shows in the boot log with the setting that allows it, not only at the first mail. Only that is said: an unreachable relay may be up by the time a mail goes.
-  if (configured !== undefined && configured.missing().length === 0) {
+  if (configured !== undefined) {
     plugin.onStart(async () => {
+      if (configured.missing().length > 0)
+        return
+
       try {
         await configured.transport.verify?.()
       }
@@ -544,5 +547,5 @@ export function mailer(options: MailerOptions = {}): Mailer {
   })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
-  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless }) as Mailer
+  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer
 }

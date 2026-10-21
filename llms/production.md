@@ -81,7 +81,7 @@ kay build --compile server --verify
 
 ### Set a library's secrets
 
-- A provider key, kayjs-ai's `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or kayjs-mail's `SMTP_PASS`, is a production secret: an environment variable of the container or a `.env` beside the executable, never in the image or the repository.
+- A provider key, kayjs-ai's `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or the password in kayjs-mail's `MAIL_URL`, is a production secret: an environment variable of the container or a `.env` beside the executable, never in the image or the repository.
 - `kay env` lists what each library in `extensions` reads and which of it production requires, such as `AI_MODEL`; `env: { compose, example }` in kay.config.ts has `kay check` compare it with the compose file and `.env.example` ([Server](server.md)).
 
 ### Run a job on a schedule

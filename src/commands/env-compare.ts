@@ -236,3 +236,38 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
 
   return problems
 }
+
+// A compose file a development, test or local setup keeps, which holds the services around the app and not the app's own environment.
+const NON_PRODUCTION_COMPOSE = /[.-](?:dev|development|test|local|override)[.-]/
+const COMPOSE_FILE = /^(?:docker-)?compose[\w.-]*\.ya?ml$/
+
+// The files compared when kay.config.ts names none: the project's production compose files and its `.env.example`, those that exist. Undefined when there is neither.
+export async function defaultEnvFiles(root: string): Promise<EnvFiles | undefined> {
+  const compose = [...new Bun.Glob('*').scanSync({ cwd: root })].filter(file => COMPOSE_FILE.test(file) && !NON_PRODUCTION_COMPOSE.test(file)).sort()
+  const example = await Bun.file(join(root, '.env.example')).exists() ? '.env.example' : undefined
+
+  return compose.length === 0 && example === undefined ? undefined : { compose: compose.length === 0 ? undefined : compose, example }
+}
+
+const TRAILING_BREAKS = /\n*$/
+
+// Never written to the example: a deprecated name only keeps old deploys working.
+const NOT_EXAMPLED = new Set(['ORIGIN'])
+
+// `text` with every declared variable it does not mention appended, a required one as `NAME=`, an optional one commented out beside its default. What the file already holds is kept as it is.
+export function withDeclaredVariables(text: string, variables: Listed[]): { text: string, added: string[] } {
+  const mentioned = new Set([...text.matchAll(/^\s*(?:#\s*)?(?:export\s+)?([a-z_]\w*)\s*=/gim)].map(match => match[1]!))
+  const added = variables.filter(({ name }) => !mentioned.has(name) && !NOT_EXAMPLED.has(name))
+  const blocks = added.map((variable) => {
+    const needed = variable.required === 'production' ? 'required in production' : 'required'
+    const note = [variable.description, variable.required === false ? undefined : needed].filter(part => part !== undefined)
+    const value = variable.default === undefined || variable.secret === true ? '' : String(variable.default)
+
+    return `${note.length === 0 ? '' : `# ${note.join('; ')}\n`}${variable.required === false ? '# ' : ''}${variable.name}=${value}\n`
+  })
+
+  if (blocks.length === 0)
+    return { text, added: [] }
+
+  return { text: `${text === '' || text.endsWith('\n\n') ? text : `${text.replace(TRAILING_BREAKS, '\n')}\n`}${blocks.join('\n')}`, added: added.map(({ name }) => name) }
+}
