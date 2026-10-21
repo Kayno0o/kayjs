@@ -128,6 +128,7 @@ export function pagePaths(prefix: string) {
     signIn: `${prefix}/sign-in`,
     twoFactor: `${prefix}/two-factor`,
     sessions: `${prefix}/account/sessions`,
+    security: `${prefix}/account/security`,
     links: {
       'verify-email': `${prefix}/verify-email`,
       'reset-password': `${prefix}/reset-password`,
@@ -157,8 +158,13 @@ export const AUTH_OF = Symbol('kayjs-auth.auth')
 // Set on the extensions kayjs-auth gives, answering the app's `auth` for the commands.
 export const LOAD_AUTH = Symbol('kayjs-auth.load')
 
+// Set on the `createAuth` result, answering what `createUser` would refuse a login for.
+export const CHECK_USER = Symbol('kayjs-auth.checkUser')
+
 // What `kay auth create-user` needs of the app's `auth`.
 export interface UserMaker {
+  // What `createUser` would refuse the login for, asked before the password is.
+  [CHECK_USER]: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<Partial<Record<'email' | 'username' | 'password', string>>>
   createUser: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<CreateUserResult>
 }
 

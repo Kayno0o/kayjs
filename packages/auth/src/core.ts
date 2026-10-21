@@ -103,6 +103,8 @@ export interface Core {
   rules: ResolvedRules
   // The app's page listing the user's sessions, linked from new sign-in mails.
   sessionsPage?: string | undefined
+  // The app's page setting up two-factor, where `forwardAuth` sends a user without it.
+  securityPage?: string | undefined
   // Where an address is, such as a city, shown beside each session.
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // The scopes a bearer token may be given.

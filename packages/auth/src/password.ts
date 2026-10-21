@@ -156,8 +156,8 @@ export async function register(state: RequestState, input: RegisterInput, captch
   return { ok: true, user, signedIn: true }
 }
 
-// A user made by the app, checked as registering is but signing no one in and mailing no one, open with `signUp: false` too.
-export async function createUser(core: Core, input: CreateUserInput): Promise<CreateUserResult> {
+// What `createUser` would refuse `input` for, without making anyone, so the terminal command can say so before it asks a password; empty when it would go through.
+export async function userProblems(core: Core, input: CreateUserInput): Promise<RegisterErrors> {
   const email = input.email === undefined ? null : normalizeEmail(input.email)
   const username = input.username === undefined ? null : normalizeUsername(input.username)
 
@@ -181,8 +181,18 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   if (username !== null && !errors.username && await core.store.users.findByUsername(username))
     errors.username = 'taken'
 
-  if (errors.email !== undefined || errors.password !== undefined || errors.username !== undefined)
-    return { ok: false, errors: withoutUndefined(errors) }
+  return withoutUndefined(errors)
+}
+
+// A user made by the app, checked as registering is but signing no one in and mailing no one, open with `signUp: false` too.
+export async function createUser(core: Core, input: CreateUserInput): Promise<CreateUserResult> {
+  const errors = await userProblems(core, input)
+
+  if (Object.keys(errors).length > 0)
+    return { ok: false, errors }
+
+  const email = input.email === undefined ? null : normalizeEmail(input.email)
+  const username = input.username === undefined ? null : normalizeUsername(input.username)
 
   let record = newUserRecord({
     email,

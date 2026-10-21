@@ -15,6 +15,7 @@ export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/saniti
 export { configuredSite } from '../runtime/site'
 export { parseEvents } from '../runtime/sse'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'
+export { overHttps } from './actions'
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'
 export type { LocalizedEntry } from './entry-drafts'

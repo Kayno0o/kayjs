@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { BareUser, Core } from './core'
-import { rootUsable, siteRoot } from './authorize/metadata'
+import { siteRoot } from './authorize/metadata'
 import { homeOf } from './core'
 
 // A domain, or several: the sites behind the proxy are on them or on their subdomains.
@@ -27,7 +27,7 @@ const MAX_URL_LENGTH = 2048
 // Printable ASCII, which a header carries as it is.
 const PLAIN_HEADER = /^[\u0020-\u007E]*$/
 
-// The domains `forwardAuth` names, each a hostname of two labels at least with no scheme, port or path, so one misspelt as `com` or `https://example.com/` stops the app at startup rather than opening a whole suffix or nothing.
+// The domains `forwardAuth` names, each a hostname of two labels at least with no scheme, port or path, so one misspelt as `com` or `https://example.com/` stops the app at startup rather than opening a whole suffix or nothing. A public suffix of two labels (`co.uk`, `github.io`) passes: kay carries no suffix list, so naming the app's own domain is the app's to get right.
 export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefined): ForwardAuthCore | undefined {
   if (option === undefined)
     return undefined
@@ -99,20 +99,18 @@ export function serveForwardAuth(plugin: Elysia, core: Core, forward: ForwardAut
         if (wanted.length > 0 && !wanted.some(role => granted(role, person)))
           return new Response(null, { status: 403, headers })
 
-        if (!forward.requireTwoFactor || person.twoFactor) {
+        // A passkey stands for the password and the second factor both, so a user who holds one passes.
+        if (!forward.requireTwoFactor || person.twoFactor || (await core.store.passkeys.listByUser(person.id)).length > 0) {
           const name = person.username ?? person.email ?? person.id
 
           return new Response(null, { status: 204, headers: { ...headers, 'remote-user': headerValue(name), 'remote-name': headerValue(name), 'remote-email': headerValue(person.email ?? ''), 'remote-groups': headerValue(person.roles.join(',')) } })
         }
       }
 
-      if (!rootUsable(core))
-        throw new Error('kayjs-auth: forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts or `url` in createAuth')
-
       const root = siteRoot(core, request)
       const original = returnTarget(requestedUrl(request.headers), forward.domains)
-      // A signed-in user the second factor is missing for sets it up on the account page, which the prebuilt pages have; without them there is nowhere to send them.
-      const setup = person !== null && core.pages ? `${core.pages.prefix}/account/security` : undefined
+      // A signed-in user the second factor is missing for sets it up on the app's security page, which the prebuilt pages have; without them there is nowhere to send them.
+      const setup = person !== null ? core.securityPage : undefined
 
       if (person !== null && setup === undefined)
         return new Response(null, { status: 403, headers })

@@ -2,7 +2,7 @@
 import type { KayCommand } from 'kay/library'
 import type { UserMaker } from './pages'
 import process from 'node:process'
-import { LOAD_AUTH } from './pages'
+import { CHECK_USER, LOAD_AUTH } from './pages'
 
 const END_OF_INPUT = '\u0004'
 const INTERRUPT = '\u0003'
@@ -32,37 +32,51 @@ export function typedSecret(value: string, chunk: string): { value: string, end?
   return { value: typed }
 }
 
-// One line typed without an echo, the label written on stderr so a piped stdout stays clean. Cancelled with Ctrl+C: undefined.
-async function readFromTerminal(label: string): Promise<string | undefined> {
+// One line typed without an echo, the label written on stderr so a piped stdout stays clean. Cancelled with Ctrl+C, or when the input ends or closes: undefined. The terminal is restored on SIGTERM too, which raw mode would otherwise leave typing without an echo.
+export async function readFromTerminal(label: string): Promise<string | undefined> {
   const { stdin } = process
+  const restore = () => {
+    stdin.setRawMode(false)
+    stdin.pause()
+    process.stderr.write('\n')
+  }
+  const onTerminate = () => {
+    restore()
+    process.exit(143)
+  }
 
   process.stderr.write(label)
   stdin.setRawMode(true)
   stdin.setEncoding('utf8')
   stdin.resume()
+  process.once('SIGTERM', onTerminate)
+
+  let finish: (typed: string | undefined) => void = () => undefined
+  let value = ''
+  const onData = (chunk: string) => {
+    const typed = typedSecret(value, chunk)
+
+    value = typed.value
+
+    if (typed.end !== undefined)
+      finish(typed.end === 'done' ? value : undefined)
+  }
+  const onEnd = () => finish(undefined)
 
   try {
-    return await new Promise((resolve) => {
-      let value = ''
-      const onData = (chunk: string) => {
-        const typed = typedSecret(value, chunk)
-
-        value = typed.value
-
-        if (typed.end === undefined)
-          return
-
-        stdin.off('data', onData)
-        resolve(typed.end === 'done' ? value : undefined)
-      }
-
+    return await new Promise<string | undefined>((resolve) => {
+      finish = resolve
       stdin.on('data', onData)
+      stdin.once('end', onEnd)
+      stdin.once('close', onEnd)
     })
   }
   finally {
-    stdin.setRawMode(false)
-    stdin.pause()
-    process.stderr.write('\n')
+    stdin.off('data', onData)
+    stdin.off('end', onEnd)
+    stdin.off('close', onEnd)
+    process.off('SIGTERM', onTerminate)
+    restore()
   }
 }
 
@@ -121,23 +135,32 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
         return 1
       }
 
-      const password = values['no-password'] === true ? undefined : await ask()
-
-      if (password === undefined && values['no-password'] !== true)
-        return 1
-
-      if (password === '') {
-        console.error('kay auth create-user: no password given; pass --no-password for a user who signs in another way')
-
-        return 1
-      }
-
       const email = isEmail ? login : values.email as string | undefined
       const username = isEmail ? values.username as string | undefined : login
       const roles = values.role as string[] | undefined
 
       try {
+        // The app's auth loads, and the login is checked, before a password is asked twice for a user that cannot be made.
         const auth = await loader()
+        const problems = await auth[CHECK_USER]({ ...email !== undefined && { email }, ...username !== undefined && { username }, ...roles && { roles } })
+
+        if (Object.keys(problems).length > 0) {
+          console.error(`kay auth create-user: refused: ${Object.entries(problems).map(([field, code]) => `${field} ${code}`).join(', ')}`)
+
+          return 1
+        }
+
+        const password = values['no-password'] === true ? undefined : await ask()
+
+        if (password === undefined && values['no-password'] !== true)
+          return 1
+
+        if (password === '') {
+          console.error('kay auth create-user: no password given; pass --no-password for a user who signs in another way')
+
+          return 1
+        }
+
         // An address the operator types is vouched for: the user cannot receive a verification mail before they can sign in.
         const result = await auth.createUser({ ...email !== undefined && { email, emailVerified: true }, ...username !== undefined && { username }, ...password !== undefined && { password }, ...roles && { roles } })
 

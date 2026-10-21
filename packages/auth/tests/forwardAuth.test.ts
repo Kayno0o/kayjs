@@ -152,6 +152,35 @@ describe('a proxy asking whether to let a request through', () => {
     expect(locationOf(await ask(browser())).pathname).toBe('/auth/sign-in')
   })
 
+  test('requireTwoFactor lets a user who holds a passkey through, and sends the others to the security page of the pages\' prefix', async () => {
+    const app = testApp({ url: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
+    const made = await app.auth.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
+
+    if (!made.ok)
+      throw new Error('no user')
+
+    const browser = app.browser()
+
+    await browser.post(`/sign-in/${made.user.id}`, {})
+    expect(locationOf(await browser.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).pathname).toBe('/account-area/account/security')
+
+    await app.store.passkeys.create({ id: 'key', userId: made.user.id, name: 'Laptop', publicKey: 'k', counter: 0, transports: [], multiDevice: false, backedUp: false, userVerified: true, createdAt: new Date(), lastUsedAt: null })
+    expect((await browser.fetch('/auth/forward')).status).toBe(204)
+  })
+
+  test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {
+    const app = testApp({ url: PORTAL, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
+    const made = await app.auth.createUser({ username: 'plain', password: PASSWORD, emailVerified: true })
+
+    if (!made.ok)
+      throw new Error('no user')
+
+    const browser = app.browser()
+
+    await browser.post(`/sign-in/${made.user.id}`, {})
+    expect((await browser.fetch('/auth/forward')).status).toBe(403)
+  })
+
   test('a hostile original URL is dropped from the sign-in return, the visitor still being sent to sign in', async () => {
     const { browser, ask } = setup()
 
@@ -216,6 +245,20 @@ describe('the domains', () => {
       expect(() => forwardOf(bad)).toThrow('forwardAuth')
 
     expect(() => forwardOf([])).toThrow('at least one domain')
+  })
+
+  test('stop the app at startup in production when no site or url says where to send the sign-in', () => {
+    const previous = process.env.NODE_ENV ?? 'test'
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(() => testApp({ forwardAuth: 'example.test' })).toThrow('forwardAuth sends visitors')
+      expect(() => testApp({ url: PORTAL, forwardAuth: 'example.test' })).not.toThrow()
+    }
+    finally {
+      process.env.NODE_ENV = previous
+    }
   })
 
   test('are not served without the option', async () => {

@@ -132,6 +132,101 @@ describe('typing a secret', () => {
   })
 })
 
+async function hangs(ms: number): Promise<'hung'> {
+  await Bun.sleep(ms)
+
+  return 'hung'
+}
+
+// The helper script on a pseudo-terminal: what it printed, and the terminal to type into.
+function onTerminal() {
+  let output = ''
+  const child = Bun.spawn([process.execPath, `${import.meta.dir}/helpers/readTerminal.ts`], { terminal: { data: (_terminal, data) => {
+    output += new TextDecoder().decode(data)
+  } } })
+  const seen = async (text: string) => {
+    while (!output.includes(text))
+      await Bun.sleep(20)
+  }
+
+  return { child, seen, output: () => output }
+}
+
+describe('reading a secret on a terminal', () => {
+  test('turns raw mode on without an echo, and off when the line ends', async () => {
+    const { child, seen, output } = onTerminal()
+
+    try {
+      await seen('Password: ')
+      expect(output()).toContain('start raw=false')
+      child.terminal!.write('hunter2\r')
+      await seen('typed=7')
+      expect(output()).toContain('typed=7 raw=false')
+      expect(output().replace('typed=7', '')).not.toContain('hunter2')
+      expect(await child.exited).toBe(0)
+    }
+    finally {
+      child.kill()
+      child.terminal?.close()
+    }
+  })
+
+  test('ends with nothing when the terminal goes away instead of hanging', async () => {
+    const { child, seen } = onTerminal()
+
+    try {
+      await seen('Password: ')
+      child.terminal!.close()
+      expect(await Promise.race([child.exited, hangs(5000)])).not.toBe('hung')
+    }
+    finally {
+      child.kill()
+    }
+  })
+
+  test('puts the terminal back when it is terminated while asking', async () => {
+    const { child, seen, output } = onTerminal()
+
+    try {
+      await seen('Password: ')
+      child.kill('SIGTERM')
+      expect(await child.exited).toBe(143)
+      expect(output()).toContain('exit raw=false')
+    }
+    finally {
+      child.terminal?.close()
+    }
+  })
+})
+
+describe('the order of the command', () => {
+  test('a taken name or a broken config shows before the password is asked', async () => {
+    await run(['taken@example.com'])
+
+    let asked = 0
+    const ask = async () => {
+      asked++
+
+      return PASSWORD
+    }
+    const command = createUserCommand(ask)
+    const attempt = async (args: string[], config: KayConfig) => {
+      const { values, positionals } = parseArgs({ args, options: command.options, allowPositionals: true })
+
+      return command.run({ values: values as Parsed['values'], positionals }, () => 1, { root: FIXTURE, config })
+    }
+
+    expect(await attempt(['taken@example.com'], CONFIG)).toBe(1)
+    expect(await attempt(['other', '--role', 'nobody'], CONFIG)).toBe(1)
+    expect(await attempt(['fresh@example.com'], { extensions: [authPages({ auth: async () => {
+      throw new Error('config broken')
+    } })] })).toBe(1)
+    expect(asked).toBe(0)
+    expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('email taken')
+    expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('config broken')
+  })
+})
+
 describe('the kay command line', () => {
   test('lists the command and runs it on a piped password in the project of the current directory', async () => {
     const cli = `${import.meta.dir}/../../../src/cli.ts`

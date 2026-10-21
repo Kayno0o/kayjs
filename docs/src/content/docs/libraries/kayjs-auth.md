@@ -232,6 +232,8 @@ kay auth create-user ada@example.com --role admin
 
 It asks for the password twice without showing it, or reads one line from a pipe. A name without `@` is a username, `--email` adds an address, and `--no-password` makes a user who signs in another way. An address typed this way counts as verified. It runs in the project of the current directory with its `.env`, so run it with the production environment to make a user in the production database.
 
+It needs `kay.config.ts` and the source, so it cannot run from a built or compiled app on its own: run it from a checkout. A taken name or a broken config shows before the password is asked.
+
 ### Breached passwords
 
 `breachedPasswords: true` refuses a new password that Have I Been Pwned lists, as `errors.password: 'breached'`. It runs on `register`, `resetPassword` and `changePassword`.
@@ -243,6 +245,8 @@ A function `(password) => boolean` checks against a list of your own instead.
 ## Telling a script the user is signed in
 
 Each sign-in of a person sets a `kay_user` cookie that a script of your site can read, and a sign-out clears it. A guest does not set it. The server never reads it and it grants nothing: it only tells a script that asking the server may be worth it. kayjs-cms uses it to show an editor the Edit this page button right after signing in.
+
+It is `Secure` when the session cookie is. It lasts as long as a session can, so a remembered editor still sees the link after restarting the browser. A sign-in that asked not to be remembered gets a cookie the browser drops on closing.
 
 ## Account changes
 
@@ -558,6 +562,10 @@ createAuth({
 
 The cookie needs the domain so the guarded sites receive it. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
 
+Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user holding a passkey has two-factor, and one without it is sent to the account security page.
+
+The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or `url` in `createAuth` the app stops at startup in production.
+
 The route is `/auth/forward`. For a person signed in with a session it answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` (the roles, comma-separated). A guest, a bearer token and a sign-in waiting for its second factor are not signed in. Otherwise it answers 401 with the sign-in page in `Location`, which brings the visitor back to the page they asked for. `/auth/forward?role=admin` also refuses a user without that role with a 403.
 
 ```nginx
@@ -589,7 +597,11 @@ location / {
 location @signin { return 302 $signin; }
 ```
 
-The proxy must overwrite the `Remote-*` headers, as above, so a visitor cannot send their own. For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?redirect=1` and `authResponseHeaders`. For Caddy, use `forward_auth auth:3000 { uri /auth/forward?redirect=1; copy_headers Remote-User Remote-Name Remote-Email Remote-Groups }`. The `?redirect=1` makes the app answer 302 instead of 401, because these two hand its answer to the browser as it is.
+The proxy must overwrite the `Remote-*` headers, as above, so a visitor cannot send their own.
+
+An app served under a `base` puts it in the `proxy_pass` path (`/app/auth/forward`). The session cookie is on the shared domain, so the guarded sites receive it too: strip it where they do not need it, with `proxy_set_header Cookie "";` in nginx.
+
+For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?redirect=1` and `authResponseHeaders`. For Caddy, use `forward_auth auth:3000 { uri /auth/forward?redirect=1; copy_headers Remote-User Remote-Name Remote-Email Remote-Groups }`. The `?redirect=1` makes the app answer 302 instead of 401, because these two hand its answer to the browser as it is.
 
 ## Letting an AI agent sign in
 

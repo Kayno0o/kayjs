@@ -29,7 +29,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { durationSeconds, nameUser, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -59,9 +59,9 @@ import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from '.
 import { safeRedirect } from './oauth/redirect'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
-import { AUTH_OF, DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
+import { AUTH_OF, CHECK_USER, DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
-import { createUser, register, signInWithPassword } from './password'
+import { createUser, register, signInWithPassword, userProblems } from './password'
 import { pruneWhenDue } from './prune'
 import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
@@ -73,6 +73,7 @@ import { userDataRules } from './userData'
 export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
 const STATE = Symbol('kayjs-auth.state')
+const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
 
 // The readable cookie telling a script of the site that a person is signed in, so a library's script (kayjs-cms's Edit this page link) asks the server only for a browser that may get an answer.
 export const SIGNED_IN_HINT = 'kay_user'
@@ -254,21 +255,18 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     }
   }
 
-  // Marks this browser as signed in, or not, with a readable cookie any script of the site may look for before asking the server: a hint only, never trusted, new at each sign-in so a script can tell one from the next.
-  private markBrowser(signedIn: boolean): void {
+  // Marks this browser as signed in, or not, with a readable cookie any script of the site may look for before asking the server: a hint only, never trusted, new at each sign-in so a script can tell one from the next. `maxAge` is the session's, undefined for a cookie the browser drops on closing.
+  private markBrowser(signedIn: boolean, maxAge?: number): void {
     const header = this.request.headers.get('cookie') ?? ''
 
     if (!signedIn && !header.includes(`${SIGNED_IN_HINT}=`))
       return
 
-    const url = new URL(this.request.url)
-    const secure = url.protocol === 'https:' || this.request.headers.get('x-forwarded-proto') === 'https'
-
-    this.cookies.push(new Bun.Cookie(SIGNED_IN_HINT, signedIn ? crypto.randomUUID() : '', { path: '/', sameSite: 'lax', secure, ...!signedIn && { maxAge: 0 } }).serialize())
+    this.cookies.push(new Bun.Cookie(SIGNED_IN_HINT, signedIn ? crypto.randomUUID() : '', { path: '/', sameSite: 'lax', secure: overHttps(this.request), ...!signedIn && { maxAge: 0 }, ...signedIn && maxAge !== undefined && { maxAge } }).serialize())
   }
 
   // The cookies the response must carry, handed over once.
-  takeCookies(): string[] {
+  [TAKE_COOKIES](): string[] {
     return this.cookies.splice(0)
   }
 
@@ -1043,7 +1041,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
-    this.markBrowser(!record.guest)
+    // Browser-only (`remember: false`) leaves it a session cookie like the session's; else it lasts as long as the session can, since the session's own cookie is renewed with use.
+    this.markBrowser(!record.guest, remember === false ? undefined : this.session.settings.absoluteMaxAge)
     await noteSignIn(this[STATE], record)
     await report(this[STATE], record, 'signed-in', method)
   }
@@ -1144,7 +1143,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
     // The cookies a sign-in or a sign-out adds, on the response the route built or on Elysia's own, as the session plugin's cookie is.
     .onAfterHandle({ as: 'global' }, (context) => {
-      const cookies = (context as unknown as { auth?: Auth }).auth?.takeCookies() ?? []
+      const cookies = (context as unknown as { auth?: Auth }).auth?.[TAKE_COOKIES]() ?? []
 
       if (cookies.length === 0)
         return
@@ -1236,8 +1235,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
   }
 
-  if (core.forward)
+  if (core.forward) {
+    if (!rootUsable(core))
+      throw new Error('kayjs-auth: forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts or `url` in createAuth')
+
     serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
+  }
 
   const evaluate = async (user: BareUser, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
     if (typeof grant === 'string')
@@ -1261,6 +1264,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   return withPluginOwner({
     [PAGES_OF]: core.pages && pagesHandle(core, options),
+    // What `kay auth create-user` asks before the password: what `createUser` would refuse the login for.
+    [CHECK_USER]: async (input: CreateUserInput) => userProblems(core, input),
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
@@ -1437,6 +1442,7 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
       core.signInPage = options.signInPage ?? paths.signIn
       core.twoFactorPage = options.twoFactorPage ?? paths.twoFactor
       core.sessionsPage = options.sessionsPage ?? paths.sessions
+      core.securityPage = paths.security
 
       if (core.email)
         core.email.links = emailLinks(options.email?.links, paths.links)
@@ -1477,6 +1483,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
     rules: resolveRules(options.rules),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
+    securityPage: paths?.security,
     locate: options.locate,
     scopes: new Set(options.scopes),
     passkeys: url === undefined
