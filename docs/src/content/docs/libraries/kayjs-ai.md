@@ -334,6 +334,8 @@ Every plain text field of an entry is translated. Wrap one that holds a brand, a
 brand: untranslated(t.String())
 ```
 
+The text fields inside a `blocks()` list are translated too, each by the type of its item, and `untranslated` keeps one as it is.
+
 If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too. Such an entry is shown at once, so read it before you deploy. `kay check` warns about it until the line is gone.
 
 A long body is translated in parts, cut between paragraphs and never inside a code block, and the entry is saved only when every part passed.

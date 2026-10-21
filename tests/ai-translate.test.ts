@@ -253,6 +253,28 @@ describe('kay i18n translate: entries', () => {
       expect(asked[0]!.messages[0]!.content).not.toContain(kept)
   })
 
+  it('translates the texts inside blocks by each item\'s type, nested and nullable lists included, and skips what is untranslated', async () => {
+    const config = 'import { t } from \'elysia\'\nimport { blocks, collection, markdownField, untranslated } from \'kay/content\'\n\nconst cell = blocks({ cell: t.Object({ text: t.String(), code: t.String({ format: \'uri\' }) }) })\nconst sections = blocks({ hero: t.Object({ heading: t.String(), brand: untranslated(t.String()) }), text: t.Object({ heading: t.String(), copy: markdownField() }), grid: t.Object({ cells: cell }) })\n\nexport const pages = collection(\'content/pages\', { schema: t.Object({ title: t.String(), sections, extra: t.Union([sections, t.Null()]), skipped: untranslated(sections) }), localized: true })\n'
+    const page = '---\ntitle: Home\nsections:\n  - type: hero\n    heading: Welcome\n    brand: Acme\n  - type: text\n    heading: About\n    copy: Some **text**\n  - type: grid\n    cells:\n      - type: cell\n        text: Inner\n        code: https://a.example/x\nextra:\n  - type: hero\n    heading: Maybe\n    brand: Keep\nskipped:\n  - type: hero\n    heading: Hidden\n    brand: Hidden brand\n---\nBody\n'
+    const root = await project({ ...noMessages, 'src/content.config.ts': config, 'src/content/pages/en/home.md': page })
+    const dry = await run(root, ['fr'], [], { 'dry-run': true })
+
+    expect(dry.out).toContain('pages: home (title, sections.0.heading, sections.1.heading, sections.1.copy, sections.2.cells.0.text, extra.0.heading, body)')
+
+    const { asked } = await run(root, ['fr'], [{}])
+    const written = await read(root, 'src/content/pages/fr/home.md')
+
+    for (const text of ['Welcome', 'About', 'Inner', 'Maybe'])
+      expect(written).toContain(`FR ${text}`)
+
+    expect(written).toContain('type: hero')
+    expect(written).toContain('brand: Acme')
+    expect(written).toContain('heading: Hidden')
+    expect(written).toContain('https://a.example/x')
+    expect(asked[0]!.messages[0]!.content).not.toContain('Hidden')
+    expect(asked[0]!.messages[0]!.content).not.toContain('Acme')
+  })
+
   it('writes an entry of a collection with a draft field with that field true, other fields kept', async () => {
     const root = await project({ ...entries, ...noMessages })
     const { code } = await run(root, ['fr'], [{}, {}])

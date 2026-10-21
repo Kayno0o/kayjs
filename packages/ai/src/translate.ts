@@ -14,8 +14,8 @@ const BATCH_CHARS = 8000
 // A body past this many characters is translated in parts, so no reply nears the token cap.
 const BODY_CHARS = 6000
 const BODY_PREFIX = 'body.'
-// The kinds of field a model translates: no kind is plain text; every other, built in (image, file, reference) or the app's own, holds data a component edits.
-const TRANSLATED_KINDS = new Set(['text', 'textarea', 'markdown'])
+// The kinds of field a model translates: no kind is plain text; every other, built in (image, file, reference) or the app's own, holds data a component edits; `block` marks a blocks() item, an object read by its fields.
+const TRANSLATED_KINDS = new Set(['text', 'textarea', 'markdown', 'block'])
 
 interface MessageUnit extends Unit {
   key: string
@@ -323,7 +323,7 @@ async function planEntry(root: string, config: Run['config'], collection: string
 
   collectPaths(entry.schema, entry.data, [], paths)
 
-  const units: Unit[] = paths.map((path, index) => ({ id: String(index + 1), text: valueAt(entry.data, path) as string, kind: schemaAt(entry.schema, path)?.['x-kay']?.kind === 'markdown' ? 'markdown' : 'text' }))
+  const units: Unit[] = paths.map((path, index) => ({ id: String(index + 1), text: valueAt(entry.data, path) as string, kind: schemaAt(entry.schema, path, entry.data)?.['x-kay']?.kind === 'markdown' ? 'markdown' : 'text' }))
 
   const body: string[] = []
 
@@ -349,14 +349,29 @@ function narrowed(schema: JsonSchema | undefined): JsonSchema | undefined {
   return branches.length === 1 ? narrowed(branches[0]) : undefined
 }
 
-function schemaAt(schema: JsonSchema, path: Path): JsonSchema | undefined {
+function schemaAt(schema: JsonSchema, path: Path, data: unknown): JsonSchema | undefined {
   let node: JsonSchema | undefined = narrowed(schema)
+  let value = data
 
   for (const step of path) {
-    node = typeof step === 'number' ? narrowed(Array.isArray(node?.items) ? undefined : node?.items) : narrowed(node?.properties?.[step])
+    value = (value as Record<string | number, unknown> | undefined)?.[step]
+    node = typeof step === 'number' ? itemOf(node, value) : narrowed(node?.properties?.[step])
   }
 
   return node
+}
+
+// The schema of a list's item; for a `blocks()` list, the block the item's `type` names.
+function itemOf(list: JsonSchema | undefined, item: unknown): JsonSchema | undefined {
+  const items = Array.isArray(list?.items) ? undefined : list?.items
+
+  if (list?.['x-kay']?.kind !== 'blocks')
+    return narrowed(items)
+
+  const type = typeof item === 'object' && item !== null ? (item as { type?: unknown }).type : undefined
+
+  // A lone block type is not wrapped in a union.
+  return (items?.anyOf ?? (items ? [items] : [])).find(variant => variant.properties?.type?.const === type)
 }
 
 // The paths of the strings worth translating: free text, not an identifier, a date, a choice, a pattern, a file or a field of a kind the app adds.
@@ -366,7 +381,16 @@ function collectPaths(schema: JsonSchema | undefined, data: unknown, path: Path,
   if (node === undefined || schema?.['x-kay-translate'] === false || node['x-kay-translate'] === false)
     return
 
-  // A field of a kind the app adds is data its component edits, whatever shape it wraps.
+  // A field of a kind the app adds is data its component edits, whatever shape it wraps; a blocks list is walked by each item's type.
+  if (node['x-kay']?.kind === 'blocks') {
+    if (Array.isArray(data)) {
+      for (const [index, item] of data.entries())
+        collectPaths(itemOf(node, item), item, [...path, index], found)
+    }
+
+    return
+  }
+
   if (!TRANSLATED_KINDS.has(node['x-kay']?.kind ?? 'text'))
     return
 
