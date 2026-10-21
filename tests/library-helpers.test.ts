@@ -25,7 +25,10 @@ describe('kay/library', () => {
     expect(openWith([KEY], sealed, 'flash')).toBeUndefined()
     expect(openWith([KEY], sealed)).toBeUndefined()
     expect(openWith([OTHER_KEY], sealed, 'session')).toBeUndefined()
-    expect(openWith([KEY], `${sealed.slice(0, -2)}AA`, 'session')).toBeUndefined()
+    const tampered = Buffer.from(sealed, 'base64url')
+
+    tampered[tampered.length - 1]! ^= 1
+    expect(openWith([KEY], tampered.toString('base64url'), 'session')).toBeUndefined()
     expect(openWith([KEY], 'short', 'session')).toBeUndefined()
     expect(openWith([KEY], sealWith(KEY, 'no context'))).toEqual({ text: 'no context', key: 0 })
   })
