@@ -257,6 +257,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export); not with `--compile` |
 | `--outdir <dir>` | Where `--static` writes, `dist` by default; only with `--static` |
 | `--no-check` | Skips the check |
+| (outputs) | A build first removes the executable the last `--compile` wrote and the folder the last `--static` wrote, as Tailwind scans every file of the project and a leftover output would be read as a source |
 | `--no-cache` | Empties `.kay/cache` first, so everything is compiled, encoded and fetched again; the chunks kept for open tabs stay |
 | `--analyze` | Lists the modules weighing most in the entry and each island, see [Performance](/guides/performance#find-the-heavy-modules) |
 | `--deny-warnings` | Fails the build on a warning of the check or of a lint too, such as `over-budget` |

@@ -218,9 +218,19 @@ async function localeRedirect(app: App, source: string, base: string): Promise<s
   return slashOnly(target, sitePath(settled)) ? settled : location
 }
 
+function overProject(root: string, out: string): boolean {
+  return out === root || root.startsWith(out + sep) || out.startsWith(join(root, 'src') + sep) || out === join(root, 'src')
+}
+
+// The last export, which a build removes first so its pages, still in the folder, are no source of the stylesheets: only a folder an export wrote.
+export async function removeLastExport(root: string, out: string): Promise<void> {
+  if (!overProject(root, out) && existsSync(join(out, MARKER)))
+    await rm(out, { recursive: true, force: true })
+}
+
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.
 async function clear(root: string, out: string): Promise<void> {
-  if (out === root || root.startsWith(out + sep) || out.startsWith(join(root, 'src') + sep) || out === join(root, 'src'))
+  if (overProject(root, out))
     throw new KayError('export-output-dir', `kay: a static export into ${relative(process.cwd(), out) || '.'} would write over the project; give it a directory of its own, such as dist`)
 
   if (existsSync(out) && (await readdir(out)).length > 0 && !existsSync(join(out, MARKER)))

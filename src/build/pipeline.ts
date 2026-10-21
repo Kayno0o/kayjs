@@ -8,7 +8,7 @@ import type { KeptStop } from '../server/prerender'
 import type { Route } from '../server/routes'
 import type { RouteFootprint } from './footprint'
 import type { BuildSummary, RouteSize, SizeReport, StageTime, StoredReport } from './report'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -51,7 +51,7 @@ import { readStoredReport, storedReport, writeStoredReport } from './report'
 import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
-import { exportStatic, refuseStaticConfig } from './static'
+import { exportStatic, refuseStaticConfig, removeLastExport } from './static'
 import { pruneCompileCache } from './transform'
 import { loadExecutable, verifyExecutable } from './verify'
 import { warnServerClasses } from './warn-classes'
@@ -130,6 +130,13 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   if (options.fresh)
     await rm(project.paths.cache, { recursive: true, force: true })
+
+  // The last executable and export are no sources: Tailwind scans every file of the project it does not know to skip, the executable and a custom folder among them.
+  if (options.compile && statSync(resolve(root, options.compile.outfile), { throwIfNoEntry: false })?.isFile() === true)
+    await rm(resolve(root, options.compile.outfile))
+
+  if (options.exportTo !== undefined)
+    await removeLastExport(root, resolve(root, options.exportTo))
 
   // A callback throwing while the last build waits aside puts it back, as a failing stage does.
   const reportAside = async (stage: BuildStage) => {

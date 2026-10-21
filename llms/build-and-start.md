@@ -57,6 +57,7 @@ kay build --static --outdir dist
   - It carries the maps of its code and of the browser build too, compressed (about 1.5 MB for a small app), so a stack in its logs and an island's report to `onError` point at your `.kay` lines as under `kay start`.
   - It reads nothing of the project from disk but a `.env` and `bunfig.toml` where it runs, as `bun` would, so a file a page reads at runtime by path, rather than importing it, is not in it; the root, routes and public directory it was built with win over the options given to `pages()`.
   - `--compile` and `--entry` are relative to the current directory.
+  - A build removes the executable the last `--compile` wrote, and the folder the last `--static` wrote (only one holding its `.kay-static` marker), before it starts: Tailwind scans every file of the project, so a leftover output would give its stylesheets the classes it names, at the cost of reading it.
   - The public directory cannot be named `client`.
   - The executable carries `kay.config.ts` without its `plugins`, nor the imports and top-level declarations only they used, side effects included, so a build plugin such as Tailwind's, whose native addon loads from node_modules, never runs there;
   - Plugins set other than as a property of the object the file exports by default, or beside a spread, stay in, with a warning.
