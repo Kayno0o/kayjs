@@ -133,6 +133,7 @@ const ARROW_PARENS = /(?:^|\/)arrow-parens$/
 const SLOT_HEAD_OPEN = /@[\w-]+\($/
 const COMPILED_PROPS = /\b__props\./g
 const HORIZONTAL_SPACE = /^[ \t]*/
+const LINE_END = /^(?:\r?\n|$)/
 const PLAIN_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A slot's one plain parameter, `@about(text)`: kay writes it bare in the shadow, so a rule about the parentheses around it would report, and fix, text the .kay file holds as the slot's own syntax.
