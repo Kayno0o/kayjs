@@ -9,10 +9,14 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-async function open() {
+async function open(answer: (value: number) => unknown = () => undefined) {
   const told: number[] = []
 
-  mounted = await mountComponent('src/components/radio-group.kay', { onChange: (value: number) => told.push(value) })
+  mounted = await mountComponent('src/components/radio-group.kay', { onChange: (value: number) => {
+    told.push(value)
+
+    return answer(value)
+  } })
 
   const root = mounted.root
   const radios = () => [...root.querySelectorAll<HTMLInputElement>('input[name="plan"]')]
@@ -51,4 +55,13 @@ test('a FormField around it shows the message and marks each radio invalid', asy
 
   expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Pick a plan')
   expect(radios().map(radio => radio.getAttribute('aria-invalid'))).toEqual(['true', 'true', 'true'])
+})
+
+test('puts the previous option back when onChange resolves to false', async () => {
+  const { radios, told, checked } = await open(async () => Promise.resolve(false))
+
+  click(radios()[2]!)
+  await settle()
+
+  expect([told, checked()]).toEqual([[3], '1'])
 })
