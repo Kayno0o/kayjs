@@ -20,44 +20,48 @@
 
 To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form. The topic files below cover what it leaves out: open one when a task needs more. Each opens with its common tasks, one sentence and one example apiece, which answer most tasks; the exact rules follow under Reference, one per bullet, to search for an edge case.
 
-- [Build a site](llms/site.md): one walkthrough of a small site: config, layout and nav, a Markdown collection, the 404 page, islands and shared state, a form checked on both sides
+- [Build a site](llms/site.md): a small site: config, layout and nav, a Markdown collection, the 404 page, islands, a form checked on both sides
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`
-- [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, using one, and the extensions a library adds: pages, dev tool tabs, commands
-- [Template lines](llms/templates.md): the indented template syntax: elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots, snippets
+- [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, and the pages, dev tool tabs and commands a library adds
+- [Template lines](llms/templates.md): elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots, snippets
 - [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards
-- [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): sitemap and robots.txt, favicon and web manifest, offline service worker, site search, self-hosted fonts
+- [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): sitemap, robots.txt, favicon, web manifest, offline, search, fonts
 - [Styles and assets](llms/styles-and-assets.md): component styles and Tailwind, `public/`, imported files, wasm and workers
-- [Images and icons](llms/images.md): imported images, responsive images and their variants, share cards, resizing stored or remote images, Iconify icons
-- [Islands](llms/islands.md): what runs in the browser: islands, props, hydration, shared and persisted state, transitions, error fallbacks, context, unique ids
-- [Browser-only code](llms/browser-only.md): components that render in the browser only, browser globals on the server, server globals in the browser
-- [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages, forms posting in place, going to a page from code, `.kay` components on a page kay does not serve
+- [Images and icons](llms/images.md): imported and responsive images, share cards, resizing stored or remote images, Iconify icons
+- [Islands](llms/islands.md): props, hydration, shared and persisted state, transitions, error fallbacks, context
+- [Browser-only code](llms/browser-only.md): browser-only components, browser globals on the server, server globals in the browser
+- [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages, forms posting in place
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`
 - [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `llms.txt.ts` exporting `GET`, `redirects`, `rewrite`, `base`
-- [Prerendering and static export](llms/prerendering.md): prerendered pages and their params, revalidation, server islands, static export
-- [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, entries as pages, pagination, feeds
-- [Loaded collections and preview mode](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, a CMS editing collections
+- [Prerendering and static export](llms/prerendering.md): prerendered pages, revalidation, server islands, static export
+- [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, entries as pages, feeds
+- [Loaded collections and preview mode](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, a CMS
 - [Edit mode and the CMS editor](llms/content-edit.md): edit mode's markers on a page, the editor island, `showDraft`
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
-- [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
+- [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming with `await` blocks, `renderToString` for mails and feeds
 - [Actions](llms/actions.md): form posts that work without JavaScript, typed by a schema: validation errors, files, redirects
 - [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming answers, optimistic changes, actions as props
 - [Schemas](llms/schemas.md): one schema for the server, its type read by islands
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, guards on actions, rate limits, body limit
-- [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes images, signs private links, upload progress
-- [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
+- [Stored files](llms/files.md): uploads on disk or in S3, links from pages, resizing, private links, upload progress
+- [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions and stores, `_guard.ts` route guards
+- [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, and the MCP endpoint
-- [Calling API routes from islands, event streams, live values and websockets](llms/api-from-islands.md): reading routes typed from islands, server-sent events, `live()` values and presence, websockets
+- [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events, streaming actions
+- [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
 - [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): every lint at its default level, how to change a level, allow one, or apply its fix
 - [Errors](llms/errors.md): the codes of the errors that are no lint, and where each fix is documented
-- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, `kay new` and `kay add`, migrating from Astro
+- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, migrating from Astro
+- [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one to a project
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `render`, `screenshot`, `routes`, `env`, `doctor`, `upgrade`, `explain`, `fmt` (`--from-html`), `lsp`, `mcp`, `kay/compiler`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `explain`, `fmt`, `kay/compiler`
+- [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `kay screenshot`, `kay mcp`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
 - [Queues](llms/queues.md): jobs surviving a restart
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression

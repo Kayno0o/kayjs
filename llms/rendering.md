@@ -118,7 +118,7 @@ const posts = await cached('posts', '5m', listPosts)
 - A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content-cms.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now.
 - `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh, and marks stale every prerendered page that read a dropped key: call it from the action that changed what they hold.
-- `{ live: true }` as the fourth argument has every open page that read the key in its server fence follow it: an `invalidate` of the key, or of one it was built from, shows the page afresh in each tab (see [Following cached values](api-from-islands.md#following-cached-values)).
+- `{ live: true }` as the fourth argument has every open page that read the key in its server fence follow it: an `invalidate` of the key, or of one it was built from, shows the page afresh in each tab (see [Following cached values](live-values.md#following-cached-values)).
 - A value also depends on the keys and collections its own `load` read: dropping `news` drops a `cached('latest', ...)` built from `news.all()`, and the pages hitting it. Not tracked: module-level data, and a store's value another process loaded.
 - A load already running for a dropped key never lands in the cache.
 - The value is the same object for every caller, so it is never mutated.

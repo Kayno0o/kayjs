@@ -125,5 +125,5 @@ export default api()
 - A process listens from its first `join` on, never handed what was published before.
 - A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat. A process with no connection joined neither beats nor polls, so an idle one costs the file nothing.
 - `close()` on the store stops its timers and lets go of the file.
-- `sqliteData(path).rooms` is such a store, and `store: { rooms }` in kay.config.ts is where an island's `presence()` keeps who has a page open ([Presence](api-from-islands.md#presence)); `rooms()` does not read it, name it as `rooms({ store })` to share it.
+- `sqliteData(path).rooms` is such a store, and `store: { rooms }` in kay.config.ts is where an island's `presence()` keeps who has a page open ([Presence](live-values.md#presence)); `rooms()` does not read it, name it as `rooms({ store })` to share it.
 - Rooms do not reach other machines.

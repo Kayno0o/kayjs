@@ -263,4 +263,4 @@ export default defineConfig({
 
 Nothing else of the environment reaches the browser. The server refuses to boot when `publicEnv` names a variable that looks secret, such as `DATABASE_URL`, `API_KEY` or one with `SECRET`, `PASSWORD`, `PRIVATE` or `TOKEN` in its name. Every visitor reads those, so keep them in `defineEnv`.
 
-<ReadMore href="/llms/server#environment">Required-in-production fields, empty variables, `kay env` and how a prerendered page sees public variables are in the full server reference.</ReadMore>
+<ReadMore href="/llms/environment#environment">Required-in-production fields, empty variables, `kay env` and how a prerendered page sees public variables are in the full server reference.</ReadMore>

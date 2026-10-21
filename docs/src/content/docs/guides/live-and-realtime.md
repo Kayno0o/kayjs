@@ -71,7 +71,7 @@ A client holds at most 20 live connections, a few tabs, and opens at most 120 a 
 
 While a tab is hidden it holds no connection for live values, and it opens one again, with every value as it is then, when the tab is shown. A tab following who else is here, below, keeps its connection.
 
-<ReadMore href="/llms/api-from-islands#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/live-values#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 
 ### Data from the cache
 
@@ -103,7 +103,7 @@ A collection follows when you add `live: true` to it. See [Showing edits in open
 
 A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. If that quiet request fails, the old value stays, so a route that now fails for good, such as a 404 after its row was deleted, keeps showing what it showed. You add nothing to the route or the island, and a route that reads no such value opens no connection.
 
-<ReadMore href="/llms/api-from-islands#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/live-values#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
 
 ### Who else is here
 
@@ -129,7 +129,7 @@ A tab leaves when it closes, goes to a page without the room, or loses its conne
 
 Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. A page with presence is rendered for each request, so a static export of it fails. The room and the member together take at most 256 characters as JSON. Call `presence` once per room on a page, and expect a room of many tabs to send each the whole list on every join and leave.
 
-<ReadMore href="/llms/api-from-islands#presence">The proof, the timing of a leave and the limits are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/live-values#presence">The proof, the timing of a leave and the limits are in the full API routes reference.</ReadMore>
 
 ## Reading a route in an island
 

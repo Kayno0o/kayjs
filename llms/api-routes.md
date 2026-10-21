@@ -136,7 +136,7 @@ export default api()
 - A route answers a plain object or array as JSON, and a string, a number, a `Date`, a `Response`, a `Blob`, bytes or a stream as Elysia does.
 - A class instance without its own `toString`, or a `Map`, such as an ORM row returned as is, answers 500 and is logged with the route and its class, as a throw is, where Elysia would send `[object Object]`.
 - A class instance without its own `toString`, or a `Map`, passed to `status()` answers 500 the same way.
-- On an `api()` chain, a `.ws()` route's refused `body` message is dropped, not answered (see [API from islands](api-from-islands.md#chat-over-a-websocket)).
+- On an `api()` chain, a `.ws()` route's refused `body` message is dropped, not answered (see [API from islands](live-values.md#chat-over-a-websocket)).
 - `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see [Locals](server.md#locals)): `({ user })`, `ws.data.user`.
 - A plain `new Elysia()` is mounted the same way.
 - A handler, and the `onError` of its module or route, runs in the request's locale as the guards do, so `t()`, `wording()` and `locale()` read it: the locale of the page the call came from by its `Referer`, else the browser's `Accept-Language`, the site's one language without `i18n`. An `eventStream` source is read in it too; a stream of your own `Response` and a websocket's `open` and `message` are not.

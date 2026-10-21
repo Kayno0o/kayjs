@@ -41,7 +41,7 @@
 | `favicon-invalid` | build | A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope. | [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest) |
 | `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title. | [Draw a share card for a page](images.md#draw-a-share-card-for-a-page) |
 | `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](images.md#responsive-images) |
-| `env-invalid` | build | The environment does not match its schema. | [Environment](server.md#environment) |
+| `env-invalid` | build | The environment does not match its schema. | [Environment](environment.md#environment) |
 | `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold. | [Project setup](project.md#project-setup) |
 | `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](prerendering.md#static-export) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](sitemap-search-fonts.md#site-search) |
