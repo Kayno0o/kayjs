@@ -151,7 +151,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
   let done = 0
   const writeVariants = async (name: string) => decoding(async () => {
     const source = join(assets, name)
-    const { width, animated } = await imageHeader(Bun.file(source))
+    const { width, format: kind, animated } = await imageHeader(Bun.file(source))
 
     // Imported, an animated GIF is linked as it is, with no variants.
     if (animated)
@@ -188,7 +188,18 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       return
 
     // Decoded once for all its variants, each width and format resizing these pixels rather than decoding the source again.
-    const decoded = await new Bun.Image(await decodable(Bun.file(source))).png({ compressionLevel: 0 }).bytes()
+    let decoded: Uint8Array
+
+    try {
+      decoded = await new Bun.Image(await decodable(Bun.file(source))).png({ compressionLevel: 0 }).bytes()
+    }
+    catch (error) {
+      // A GIF Bun.Image cannot decode but a browser draws is left with no variants, and the route answers it as it is.
+      if (kind === 'gif')
+        return
+
+      throw error
+    }
 
     await Promise.all(missing.map(async ({ variant, format, target, cached }) => {
       await writeVariant(decoded, variant, cached ?? target, variantLevel(variant, format, quality, avif ?? DEFAULT_AVIF_QUALITY), format)
@@ -349,8 +360,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return guarded(response)
     }
 
-    // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
-    if (own.animated && requested !== 'card') {
+    const asIs = () => {
       const original = Bun.file(path, { type: 'image/gif' })
 
       if (source.immutable)
@@ -358,6 +368,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
       return answer(revalidated(request, `W/"${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}"`, () => original, ownHeaders(set, revalidatedAs)))
     }
+
+    // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
+    if (own.animated && requested !== 'card')
+      return asIs()
 
     // A visitor saving data gets the next width down of the same image.
     const variant = saving && typeof requested === 'object' ? { ...requested, width: narrowerWidth(requested.width) } : requested
@@ -417,7 +431,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         if (typeof (error as { syscall?: unknown }).syscall === 'string')
           throw error
 
-        return fail('Not an image kay can resize', 415)
+        // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
+        return own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
       }
 
       file = cached

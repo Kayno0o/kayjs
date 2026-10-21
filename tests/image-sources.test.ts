@@ -20,11 +20,15 @@ const media = join(dir, 'media')
 
 const still = gif(400, 10, [3])
 const animated = gif(400, 10, [3, 90])
+// The 1x1 GIF the cms fixture uploads: Chromium draws it, Bun.Image reads its header but cannot decode its pixels.
+const undecodable = Uint8Array.from(atob('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='), char => char.charCodeAt(0))
+// A 1x1 GIF Bun.Image decodes.
+const tiny = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), char => char.charCodeAt(0))
 const avif = await avifCodec.encodeAvif(new Bun.Image(Bun.file(HERO)), 50)
 
 await mkdir(uploads)
 await mkdir(media)
-await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(uploads, 'animated.gif'), animated), Bun.write(join(uploads, 'hero.avif'), avif), Bun.write(join(uploads, 'burst.avif'), avif), Bun.write(join(media, '7'), Bun.file(HERO)), Bun.write(join(media, '8'), animated), Bun.write(join(media, '9'), avif)])
+await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(uploads, 'animated.gif'), animated), Bun.write(join(uploads, 'undecodable.gif'), undecodable), Bun.write(join(uploads, 'tiny.gif'), tiny), Bun.write(join(uploads, 'broken.png'), new Uint8Array((await Bun.file(HERO).bytes()).subarray(0, 64))), Bun.write(join(uploads, 'hero.avif'), avif), Bun.write(join(uploads, 'burst.avif'), avif), Bun.write(join(media, '7'), Bun.file(HERO)), Bun.write(join(media, '8'), animated), Bun.write(join(media, '9'), avif)])
 
 const app = await pages({
   routes: 'tests/fixtures/images/src/routes',
@@ -111,6 +115,29 @@ describe('gif and avif sources', () => {
     }
   })
 
+  it('resizes a 1x1 still GIF, and answers a GIF kay cannot decode as it is, where any other image kay cannot decode is a 415', async () => {
+    const resized = await get('/uploads/tiny.gif', 'w=1')
+
+    expect(resized.status).toBe(200)
+    expect(resized.headers.get('content-type')).toBe('image/webp')
+
+    for (const query of ['w=1', 'card']) {
+      const response = await get('/uploads/undecodable.gif', query)
+
+      expect(response.status).toBe(query === 'card' ? 415 : 200)
+
+      if (query !== 'card') {
+        expect(response.headers.get('content-type')).toBe('image/gif')
+        expect(await response.bytes()).toEqual(undecodable)
+      }
+    }
+
+    const etag = (await get('/uploads/undecodable.gif', 'w=1')).headers.get('etag')!
+
+    expect((await get('/uploads/undecodable.gif', 'w=1', { 'if-none-match': etag })).status).toBe(304)
+    expect((await get('/uploads/broken.png', 'w=320')).status).toBe(415)
+  })
+
   it('passes an animated GIF through untouched at every width, revalidated, and still draws its card', async () => {
     const response = await get('/uploads/animated.gif')
     const etag = response.headers.get('etag')!
@@ -131,14 +158,14 @@ describe('gif and avif sources', () => {
     const client = join(dir, 'client')
 
     await mkdir(join(client, 'assets'), { recursive: true })
-    await Promise.all([Bun.write(join(client, 'assets', 'still-a1.gif'), still), Bun.write(join(client, 'assets', 'animated-b2.gif'), animated), Bun.write(join(client, 'assets', 'hero-c3.avif'), avif)])
+    await Promise.all([Bun.write(join(client, 'assets', 'still-a1.gif'), still), Bun.write(join(client, 'assets', 'animated-b2.gif'), animated), Bun.write(join(client, 'assets', 'hero-c3.avif'), avif), Bun.write(join(client, 'assets', 'undecodable-d4.gif'), undecodable)])
     await writeImageVariants(client)
 
     const names = await readdir(join(client, 'images'))
 
     expect(names).toContain('still-a1-320.webp')
     expect(names).toContain('hero-c3-960.webp')
-    expect(names.some(name => name.startsWith('animated'))).toBe(false)
+    expect(names.some(name => name.startsWith('animated') || name.startsWith('undecodable'))).toBe(false)
   })
 })
 
