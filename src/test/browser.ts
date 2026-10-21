@@ -219,7 +219,7 @@ try {
 }
 catch {}
 
-// The browser pages are opened in, or undefined when there is none: for `describe.skipIf(!browserPath())`.
+// The browser pages are opened in, or undefined when there is none: for `describe.skipIf(browserPath() === undefined)`.
 export function browserPath(path?: string): string | undefined {
   const given = path ?? process.env.BUN_CHROME_PATH
 
@@ -488,11 +488,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         if (over === null)
           continue
 
-        // The composed tree, as a hit inside a shadow root of the element is the element's own.
-        for (let node: Node | null = over; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
-          if (node === element)
-            return [x, y, at === 0]
-        }
+        if (element.contains(over))
+          return [x, y, at === 0]
 
         if (covered === 'out of view') {
           const { tagName, id, classList } = over
@@ -502,7 +499,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
     }
 
-    return `covered by ${covered}`
+    return covered === 'out of view' ? covered : `covered by ${covered}`
   }, [selector, options.javaScript !== false, ALIGNMENTS, POINTS]))
 
   // Waits once for a loading page, before a click or hover scrolls, as the browser restoring a reload's scroll position until then would move the page away from the place a press is aimed at. A page that never finishes is acted on after the bound.

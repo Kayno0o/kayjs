@@ -351,7 +351,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }
   })
 
-  it('counts what a page with JavaScript off draws in a declarative shadow root of the element as the element', async () => {
+  it('clicks an element of a page with JavaScript off that draws a declarative shadow root, and names what covers it', async () => {
     const plain = await site.open('/', { javaScript: false, timeout: 500 })
 
     try {

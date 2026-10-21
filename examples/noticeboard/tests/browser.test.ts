@@ -10,7 +10,7 @@ afterAll(async () => {
 })
 
 // CI installs Chromium; elsewhere the suite runs where one is found.
-describe.skipIf(!browserPath())('in a browser', () => {
+describe.skipIf(browserPath() === undefined)('in a browser', () => {
   it('pins a notice from the dialog, and shows another member\'s at once with a toast, the live island kept', async () => {
     // The browser signs in as Ada; the test site, which keeps cookies of its own, stays Grace.
     await joinAs(site, 'Ada')

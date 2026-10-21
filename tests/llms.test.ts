@@ -21,6 +21,7 @@ const NAMED = /`(\w+)(?:<[^`>]*>)?(?:\([^`]*\))?`/g
 const MENTION = /((?:`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`(?:, | and | or ))*`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`),? (?:(?:imported |comes? )?from|in) `(kay(?:\/[\w/-]+)?)`/g
 // The entry points an app imports from, without what compiled files import (llms/project.md).
 const PUBLIC_ENTRIES = ['kay', 'kay/bun', 'kay/cache', 'kay/compiler', 'kay/content', 'kay/dev-tool', 'kay/edit', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/markdown', 'kay/mount', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
+const NEGATED_SKIP = /!\s*browserPath\(\)/
 const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
@@ -136,9 +137,10 @@ describe('llms.txt and its docs', () => {
 
 describe('the browser test skip', () => {
   // `browserPath()` is a string or undefined, which the lint preset refuses as a condition.
-  it('is written in the docs as the lint preset accepts it', async () => {
-    const docs = await Promise.all([spec, ...[...new Bun.Glob('**/*.md').scanSync(join(root, 'docs/src/content/docs'))].map(async file => Bun.file(join(root, 'docs/src/content/docs', file)).text())])
+  it('is written where the docs, the examples and the source say it as the lint preset accepts it', async () => {
+    const files = ['llms', 'docs/src/content/docs', 'examples', 'src/test'].flatMap(folder => [...new Bun.Glob('**/*.{md,ts}').scanSync({ cwd: join(root, folder) })].filter(file => !file.includes('node_modules')).map(file => join(root, folder, file)))
+    const negated = (await Promise.all(files.map(async file => NEGATED_SKIP.test(await Bun.file(file).text()) ? file : ''))).filter(file => file !== '')
 
-    expect(docs.filter(text => text.includes('!browserPath()'))).toEqual([])
+    expect(negated).toEqual([])
   })
 })
