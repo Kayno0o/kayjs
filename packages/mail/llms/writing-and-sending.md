@@ -4,7 +4,7 @@
 
 ### Setup
 
-`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mail({ module: './src/mail' })` in `kay.config.ts`; the files below add `from` and `lang`.
+`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mail({ module: './src/mail' })` in `kay.config.ts`; the files below add `from` and `locale`.
 
 kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
 
@@ -12,7 +12,7 @@ kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/
 // src/mail.ts
 import { mailer } from '@kaynooo/kayjs-mail'
 
-export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
+export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'fr' })
 ```
 
 ```ts
@@ -27,7 +27,7 @@ export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
 - An Elysia app not served by `pages()` uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mail({ module })` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.
-- Options: `from`, the default sender, `MAIL_FROM` when left out, else `noreply@` the site's host without its `www.`; `fromName`, the name shown beside a bare `MAIL_FROM` or that default; `to`, the recipient of a mail naming none, `MAIL_TO` when left out, read from the environment in development too; `lang`, the language mails are written in, which a message's own `lang` replaces: the locale their component renders `t()` in and the `<html lang>`, the site's default locale (or the request's) when neither is set; `transport`, where mails go in place of the default; `smtp: { name, timeout, maxConnections, rateLimit }`, merged over the SMTP built from the environment (`name` is the sender's domain by default, `timeout` a duration such as `'30s'`, 10 seconds by default, `maxConnections` 5), the options left out keeping the defaults, a broken one stopping the boot, and refused next to a `transport`, whose `smtp()` takes them; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment; `logRecipients: true` logs each mail's recipients in full rather than their count and domains, and `logSubjects: true` logs each mail's subject, which the log leaves out.
+- Options: `from`, the default sender, `MAIL_FROM` when left out, else `noreply@` the site's host without its `www.`; `fromName`, the name shown beside a bare `MAIL_FROM` or that default; `to`, the recipient of a mail naming none, `MAIL_TO` when left out, read from the environment in development too; `locale` (`lang` until 1.73), the locale mails are written in, which a message's own `locale` replaces: their component renders `t()` in it and the `<html lang>` follows, the site's default locale (or the request's) when neither is set; `transport`, where mails go in place of the default; `smtp: { name, timeout, maxConnections, rateLimit }`, merged over the SMTP built from the environment (`name` is the sender's domain by default, `timeout` a duration such as `'30s'`, 10 seconds by default, `maxConnections` 5), the options left out keeping the defaults, a broken one stopping the boot, and refused next to a `transport`, whose `smtp()` takes them; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment; `logRecipients: true` logs each mail's recipients in full rather than their count and domains, and `logSubjects: true` logs each mail's subject, which the log leaves out.
 
 ### Environment
 
@@ -137,8 +137,8 @@ export const signUp = action(s.Object({ name: s.String({ maxLength: 100 }), emai
 ---
 ```
 
-- A message takes `to` (the mailer's `to` or `MAIL_TO` when left out), `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `lang`, `headers`, `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes) and `unsubscribe`, and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone. Each address, a string or `{ name, address }`, holds one mailbox: one holding several (`a@x.com,b@y.com`, a `;` or a group) or a line break is refused before rendering, so an address a visitor typed cannot relay the mail to others; several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out; an empty `to` is refused.
-- A message's `lang` is its `<html lang>` and the locale its component renders in, so `t()` and the formatters from `kay/i18n` read the recipient's language: one of the site's locales, `renderToString` refusing another. Without one on the message or the mailer, the component renders in the site's default locale, or the request's while one runs, and the `<html lang>` says that locale.
+- A message takes `to` (the mailer's `to` or `MAIL_TO` when left out), `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `locale`, `headers`, `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes) and `unsubscribe`, and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone. Each address, a string or `{ name, address }`, holds one mailbox: one holding several (`a@x.com,b@y.com`, a `;` or a group) or a line break is refused before rendering, so an address a visitor typed cannot relay the mail to others; several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out; an empty `to` is refused.
+- A message's `locale` (`lang` until 1.73) is the locale its component renders in, its `<html lang>` following, so `t()` and the formatters from `kay/i18n` read the recipient's language: one of the site's locales, `renderToString` refusing another. Without one on the message or the mailer, the component renders in the site's default locale, or the request's while one runs, and the `<html lang>` says that locale.
 - `unsubscribe` offers one-click unsubscribe (RFC 8058), which Gmail and Yahoo require of bulk senders: an https URL that unsubscribes the recipient when it receives a POST, or `{ url, address }` to offer an address to write to as well. It is written as the `List-Unsubscribe` and `List-Unsubscribe-Post` headers; a URL that is not https is refused.
 - An address is `'Name <address>'`, a bare address, or `{ name, address }`, which needs no quoting of a name holding a comma.
 - Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, table rows one to a line and a row header written `Label: value`, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.

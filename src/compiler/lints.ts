@@ -610,7 +610,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.70',
     site: true,
-    summary: 'An option of a library function under its old name: kayjs-cms\'s `forgejo({ url })`, which is `baseUrl` since 1.70, as the address of a service API is named across kay\'s libraries. The old name still works for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
+    summary: 'An option of a library function under its old name: kayjs-cms\'s `forgejo({ url })`, which is `baseUrl` since 1.70, as the address of a service API is named across kay\'s libraries, and kayjs-mail\'s `mailer({ lang })`, which is `locale` since 1.70, as a language an app writes or formats for is a locale. The old name still works for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
     wrong: 'forgejo({ url: \'https://git.example.com\', repo: \'me/site\', token })',
     right: 'forgejo({ baseUrl: \'https://git.example.com\', repo: \'me/site\', token })',
   },

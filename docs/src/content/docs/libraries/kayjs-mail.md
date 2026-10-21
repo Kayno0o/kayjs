@@ -26,7 +26,7 @@ In a kay project, `kay add mail` does the install, writes `src/mail.ts` with a b
 ```ts
 import { mailer } from '@kaynooo/kayjs-mail'
 
-export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'en' })
+export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'en' })
 ```
 
 List it in `kay.config.ts`. The server then runs the queue and, under `kay dev`, serves the outbox at `/_kay/mail`.
@@ -161,7 +161,7 @@ export const signUp = action(newUser, async ({ name, email }) => {
 
 `send` sends before it answers and throws on failure. Use it where you need to know the mail went out.
 
-A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang` and `unsubscribe` for one-click unsubscribe. Give `html` and `text` in place of `view` to skip the component. Left without `to`, a message goes to `MAIL_TO`.
+A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `locale` and `unsubscribe` for one-click unsubscribe. Give `html` and `text` in place of `view` to skip the component. Left without `to`, a message goes to `MAIL_TO`.
 
 Each address holds one mailbox. A visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out. An empty `to` is refused.
 
@@ -208,13 +208,13 @@ await mail.enqueue({
 
 ### The recipient's language
 
-A message's `lang`, else the mailer's, is the `<html lang>` of the mail and the locale its component renders in. `t()` and the formatters from `kay/i18n` then read the recipient's language, not the site's.
+A message's `locale`, else the mailer's, is the locale its component renders in, and the `<html lang>` of the mail follows. `t()` and the formatters from `kay/i18n` then read the recipient's language, not the site's.
 
 ```ts
-await mail.enqueue({ to: user.email, subject: 'Bienvenue', view: Welcome, props: { name }, lang: user.locale })
+await mail.enqueue({ to: user.email, subject: 'Bienvenue', view: Welcome, props: { name }, locale: user.locale })
 ```
 
-`lang` must be one of the site's locales. Without one on the message or the mailer, the component renders in the site's default locale, or the request's, and the `<html lang>` says that locale.
+`locale` must be one of the site's locales. Without one on the message or the mailer, the component renders in the site's default locale, or the request's, and the `<html lang>` says that locale.
 
 ### Plain text
 

@@ -57,7 +57,9 @@ export interface MailerOptions {
   transport?: Transport | undefined
   // The SMTP built from the environment, with these over what it sets: the name it greets the server with (the sender's domain by default), `timeout`, `maxConnections` and `rateLimit`. Options left out keep the environment's and smtp()'s defaults; it takes none with a `transport`, which is not built from the environment.
   smtp?: SmtpOverrides | undefined
-  // The language mails are written in unless one names its own: the locale their component renders `t()` in, and the `<html lang>` of the document. The site's default locale (the request's, while one runs) when left out.
+  // The locale mails are written in unless one names its own: their component renders `t()` in it, and the `<html lang>` of the document follows. The site's default locale (the request's, while one runs) when left out.
+  locale?: string | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `locale`. */
   lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are. A mail given up is kept 7 days (`keepFailed`) without its body, links, headers and attachments (`redact`); both can be set here.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
@@ -386,8 +388,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
-    // The locale the component renders `t()` in and the document's `lang`: the message's, else the mailer's, else the site's default or the request's.
-    const chosen = message.lang ?? options.lang
+    // The locale the component renders `t()` in, which the document's `lang` follows: the message's, else the mailer's, else the site's default or the request's.
+    const chosen = message.locale ?? message.lang ?? options.locale ?? options.lang
     const rendered = message.view ? await renderLocale(chosen) : chosen ?? 'en'
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
     const html = markup === undefined ? undefined : asDocument(markup, message.subject, rendered)

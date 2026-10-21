@@ -23,7 +23,7 @@ kay and Elysia are peers. It is released with kay, at kay's own version, and pee
 // src/mail.ts
 import { mailer } from '@kaynooo/kayjs-mail'
 
-export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
+export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'fr' })
 ```
 
 ```ts

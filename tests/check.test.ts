@@ -3451,6 +3451,20 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports mailer({ lang }) and --fix renames it to locale', async () => {
+    const mail = 'import { mailer } from \'@kaynooo/kayjs-mail\'\n\nexport const a = mailer({ from: \'a@example.com\', lang: \'fr\' })\nexport const b = mailer({ from: \'a@example.com\', locale: \'fr\' })\n'
+    const root = await scratchProject({ 'kay.config.ts': 'export default {}\n', 'src/mail.ts': mail })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-option-name/g)).toHaveLength(1)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe(mail.replace('lang: \'fr\'', 'locale: \'fr\''))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('--fix removes the reason of a sole identity-key kay-allow comment with it, and keeps the reason of one naming other lints', async () => {
     const root = await scratchProject({
       'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\n---\n// kay-allow-file identity-key - the whole file\nul\n  // kay-allow identity-key - rows are static\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key - rows are static\n  for row of posts()\n    li {row.slug}\nbutton(onClick={() => posts.set([])}) Clear\n',

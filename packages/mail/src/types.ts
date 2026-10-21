@@ -20,7 +20,9 @@ export interface Envelope {
   // The mailer's own address unless given; another domain than the server's fails SPF and DKIM, so a visitor's address goes in `replyTo`.
   from?: Address | undefined
   subject: string
-  // The mail's language, the mailer's `lang` unless given: its `<html lang>`, and the locale its component renders `t()` in, which must be one of the site's.
+  // The locale the mail is written in, the mailer's `locale` unless given: its component renders `t()` in it, which must be one of the site's, and its `<html lang>` follows.
+  locale?: string | undefined
+  /** @deprecated Since 1.70, dropped in 1.73: this is `locale`. */
   lang?: string | undefined
   headers?: Record<string, string> | undefined
   attachments?: Attachment[] | undefined

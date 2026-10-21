@@ -20,6 +20,7 @@ interface Rename {
 }
 
 const RENAMES: Rename[] = [
+  { package: '@kaynooo/kayjs-mail', function: 'mailer', at: 0, from: 'lang', to: 'locale', because: 'a language an app writes or formats for is a locale across kay' },
   { package: '@kaynooo/kayjs-cms', function: 'forgejo', at: 0, from: 'url', to: 'baseUrl', because: 'the address of a service API is named in kay\'s libraries' },
 ]
 

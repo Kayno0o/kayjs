@@ -81,6 +81,10 @@ Drop `url` from `createAuth` when it repeats `site` or `SITE_URL`. OAuth sign-in
 
 Every option, store argument and test helper of kay and its libraries takes a `Duration` (`'250ms'`, `'30s'`, `'5m'`, `'7d'`), so a bare number is a type error. `kay check --fix` (or `kay upgrade`) rewrites a literal as `'<n>s'`, or `'<n>ms'` where the option took milliseconds (`kay/test`'s `timeout`, a toast's `duration`). A `SessionStore.set` (its `maxAge`), a `RateStore.hit`, a kayjs-auth `attempts`/`prune` store and a kayjs-ai provider now receive a `Duration` string where they got a number: `durationMs` from `kay` turns it into milliseconds. The runtime reads the old numbers until 1.73.
 
+### kayjs-mail's `lang` is `locale`
+
+`mailer({ lang })` and a message's `lang` are `locale`, as kayjs-auth's mail and `i18n` name a language an app serves or formats for; `lang` stays the language of a document, as kay's own `lang`. The old name still works for three minors, and `kay upgrade` renames it in a `mailer({ ... })` call. A message's `lang`, and an object held in a variable, are not found: rename them where they are passed.
+
 ## 1.69.0
 
 ### `guards` and `layouts` held in a variable, and a spread in an endpoint or `api()`, are errors

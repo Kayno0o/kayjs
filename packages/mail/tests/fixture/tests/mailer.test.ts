@@ -74,25 +74,34 @@ describe('rendering', () => {
   })
 
   it('renders a mail in the language it is given, its component reading that locale\'s messages', async () => {
-    const french = await mail.render({ to: 'ada@example.com', subject: 'Salut', view: Hello, lang: 'fr' })
+    const french = await mail.render({ to: 'ada@example.com', subject: 'Salut', view: Hello, locale: 'fr' })
     const english = await mailer({ from: 'hello@fixture.test', queue: { name: 'english-mail' } }).render({ to: 'ada@example.com', subject: 'Hi', view: Hello })
 
     expect(french.html).toContain('<html lang="fr"')
     expect(french.text).toBe('Bonjour')
     expect(english.html).toContain('<html lang="en"')
     expect(english.text).toBe('Hello')
-    await expect(mail.render({ to: 'ada@example.com', subject: 'Hallo', view: Hello, lang: 'de' })).rejects.toThrow('none of the site\'s locales')
+    await expect(mail.render({ to: 'ada@example.com', subject: 'Hallo', view: Hello, locale: 'de' })).rejects.toThrow('none of the site\'s locales')
   })
 
-  it('renders in the mailer\'s lang when the message names none, the html lang being the locale rendered', async () => {
+  it('renders in the mailer\'s locale when the message names none, the html lang being the locale rendered', async () => {
     const inherited = await mail.render({ to: 'ada@example.com', subject: 'Salut', view: Hello })
-    const overridden = await mail.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en' })
+    const overridden = await mail.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, locale: 'en' })
 
     expect(inherited.text).toBe('Bonjour')
     expect(inherited.html).toContain('<html lang="fr"')
     expect(overridden.text).toBe('Hello')
     expect(overridden.html).toContain('<html lang="en"')
     expect((await mailer({ from: 'hello@fixture.test', queue: { name: 'default-lang' } }).render({ to: 'ada@example.com', subject: 'Hi', view: Hello })).html).toContain('<html lang="en"')
+  })
+
+  it('still reads lang, the old name of locale, on a message and on the mailer, the new name winning', async () => {
+    const legacy = { lang: 'fr' }
+    const old = mailer({ from: 'hello@fixture.test', ...legacy, queue: { name: 'old-lang' } })
+
+    expect((await old.render({ to: 'ada@example.com', subject: 'Salut', view: Hello })).text).toBe('Bonjour')
+    expect((await old.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en' })).text).toBe('Hello')
+    expect((await old.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en', locale: 'fr' })).text).toBe('Bonjour')
   })
 
   it('offers one-click unsubscribe through the headers RFC 8058 names, refusing a URL that is not https', async () => {
