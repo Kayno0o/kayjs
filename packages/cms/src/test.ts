@@ -39,7 +39,9 @@ export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, rol
 }
 
 // Posts the sign-in form with this password, as a visitor does, so a wrong one is answered 401 on the screen and the right one signs the site in; the answer is the page the form leads to.
-export async function cmsSignInWith(site: Pick<TestSite, 'submit'>, password: string): Promise<Visit> {
+export async function cmsSignInWith(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>, password: string): Promise<Visit> {
+  await passwordsOf(site)
+
   // Imported once the site has loaded, which is what gives the action its address.
   const { signIn } = await import(SIGN_IN) as { signIn: Action<{ password: string, redirect?: string | undefined }, unknown> }
 
