@@ -34,14 +34,13 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
-it('reads each file\'s last commit in one go, and the modification time of a file git does not know yet', async () => {
+it('reads each file\'s last commit in one go, and gives a file git does not know no date', async () => {
   const edits = await readEdits(['content/a.md', 'content/b é.md', 'content/loose.md', 'content/missing.md'])
 
   expect(edits.get('content/a.md')).toMatchObject({ author: 'Ada' })
   expect((await readEdits(['content/q"t.md'])).get('content/q"t.md')).toMatchObject({ author: 'Linus' })
   expect(edits.get('content/b é.md')).toMatchObject({ author: 'Grace' })
-  expect(edits.get('content/loose.md')?.author).toBeUndefined()
-  expect(edits.get('content/loose.md')?.at).toBeGreaterThan(0)
+  expect(edits.has('content/loose.md')).toBe(false)
   expect(edits.has('content/missing.md')).toBe(false)
   expect(await readEdits([])).toEqual(new Map())
 })

@@ -32,7 +32,7 @@ export interface EntryRow {
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
   move?: { up: boolean, down: boolean } | undefined
-  // For a folder entry, when its file was last edited in milliseconds and by whom, from the repository's history, else the file's modification time.
+  // For a folder entry, when its file was last edited in milliseconds and by whom, from the repository's history, none for a file with no commit.
   modifiedAt?: number | undefined
   author?: string | undefined
 }

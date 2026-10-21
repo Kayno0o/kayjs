@@ -165,3 +165,16 @@ export function sinceText(at: number): string {
 
   return `${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
 }
+
+// The day an entry was last edited, in the editor's zone and the page's language once the browser says them; the UTC day as `2026-10-21` where neither is known, as the server renders it.
+export function editedDay(time: number, zone?: string, lang?: string): string {
+  if (zone === undefined)
+    return new Date(time).toISOString().slice(0, 10)
+
+  try {
+    return new Intl.DateTimeFormat(lang === '' ? undefined : lang, { dateStyle: 'medium', timeZone: zone }).format(time)
+  }
+  catch {
+    return new Date(time).toISOString().slice(0, 10)
+  }
+}

@@ -309,7 +309,7 @@ test('a new entry offers Cancel back to its list and Create and add another, a s
   expect([...saved.querySelectorAll('a')].some(link => link.textContent?.trim() === 'Cancel')).toBe(false)
 })
 
-test('Create and add another creates the entry, then leaves for an empty form', async () => {
+test('Create and add another creates the entry, then visits the new entry page', async () => {
   const fetched = creating()
   const root = await open(undefined, POSTS, true)
 

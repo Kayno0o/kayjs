@@ -1,13 +1,12 @@
-import { stat } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { repositoryRoot } from 'kay/content'
 
-// How many commits the history of a list is read from; an entry last edited before them shows its file's modification time.
+// How many commits the history of a list is read from; an entry last edited before them shows no date.
 const LOG_LIMIT = 5000
-// A git that takes longer is killed, and the files show their modification time.
+// A git that takes longer is killed, and the files show no date.
 const GIT_LIMIT_MS = 5000
 
-// The last edit of an entry's file: when, in milliseconds, and who by when git knows.
+// The last edit of an entry's file: when, in milliseconds, and who by. Only git knows, so a file with no commit has none: its modification time would only say when it was checked out.
 export interface Edit {
   at: number
   author?: string | undefined
@@ -48,19 +47,10 @@ async function logged(paths: string[]): Promise<Map<string, Edit>> {
     }
   }
 
-  const root = repositoryRoot()
-
-  await Promise.all(paths.filter(path => !edits.has(path)).map(async (path) => {
-    try {
-      edits.set(path, { at: (await stat(join(root, path))).mtimeMs })
-    }
-    catch {}
-  }))
-
   return edits
 }
 
-// A file's last commit gives its time and author, else its modification time gives the time alone; a project outside git has the second only.
+// A file's last commit gives its time and author; a file git has no commit for, or a project outside git, gives none.
 export const readEdits: EditReader = async (paths) => {
   return paths.length === 0 ? new Map() : logged(paths)
 }

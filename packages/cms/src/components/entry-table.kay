@@ -13,6 +13,7 @@ import { wording } from 'kay/words'
 import { duplicateSaved } from '../editor/bulk'
 import { readReferrers } from '../editor/referrers'
 import { deleteSaved, moveSaved, publishSaved, unpublishSaved } from '../editor/save'
+import EntryEdited from './entry-edited.kay'
 import EntryBulk from './entry-bulk.kay'
 import Refused from './refused.kay'
 import EntryStatus from './entry-status.kay'
@@ -122,7 +123,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
       span {row.cells?.[column.key.slice(5)] ?? ''}
     else if column.key === 'modified'
       if row.modifiedAt as at
-        time(datetime={new Date(at).toISOString()}) {new Date(at).toISOString().slice(0, 10)}
+        EntryEdited(at={at})
     else if column.key === 'author'
       span {row.author ?? ''}
     else if column.key === 'locale'

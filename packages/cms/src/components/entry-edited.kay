@@ -1,0 +1,18 @@
+---
+import { editedDay, useEditorZone } from '../datetime'
+
+// The day an entry was last edited, which the browser writes in the editor's zone and the page's language once it has loaded.
+const { at } = props<{ at: number }>()
+
+const zone = useEditorZone()
+const lang = signal<string>()
+
+onMount(() => lang.set(document.documentElement.lang))
+
+const text = () => {
+  const where = zone()
+
+  return editedDay(at, where, lang())
+}
+---
+time(datetime={new Date(at).toISOString()}) {text()}
