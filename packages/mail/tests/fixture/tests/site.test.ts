@@ -52,5 +52,6 @@ test('runJobs runs a mail an action enqueued after its response, every time', as
     expect(page.status).toBe(200)
     expect(await site.runJobs()).toBe(1)
     expect(outbox.to('ada@example.com').map(mail => mail.subject)).toEqual([`Welcome, Ada${at}`])
+    expect((await outbox.waitFor('ada@example.com', { site })).subject).toBe(`Welcome, Ada${at}`)
   }
 })
