@@ -10,7 +10,7 @@ export interface FormLayout {
 }
 
 // What a row of a collection's list can offer beside its title.
-export type RowAction = 'move' | 'publish' | 'unpublish' | 'editOnPage' | 'delete'
+export type RowAction = 'move' | 'publish' | 'unpublish' | 'duplicate' | 'editOnPage' | 'delete'
 
 // The columns of a collection's list, field keys shown after the title, and the row actions kept, all by default.
 export interface ListLayout {
@@ -19,6 +19,10 @@ export interface ListLayout {
 }
 
 export interface CollectionLayout {
+  // The heading the content list puts the collection under; collections with none come first.
+  group?: string | undefined
+  // Where the collection stands in the content list, among its group: the lowest first, then the site's order.
+  order?: number | undefined
   form?: FormLayout | undefined
   list?: ListLayout | undefined
 }

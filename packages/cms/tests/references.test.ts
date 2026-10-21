@@ -12,6 +12,7 @@ const held: Record<string, { slug: string, data: Record<string, unknown> }[]> = 
     { slug: 'three', data: { title: 'Three', credit: { by: 'bob' }, tag: 'ada' } },
     { slug: 'four', data: { title: 'Four', author: 'cy' } },
   ],
+  people: [{ slug: 'ada', data: { name: 'Ada' } }, { slug: 'bob', data: { name: 'Bob' } }],
   friends: [{ slug: 'ada', data: { name: 'Ada', friend: 'ada' } }, { slug: 'bob', data: { name: 'Bob', friend: 'ada' } }],
 }
 
@@ -25,7 +26,7 @@ void mock.module('../src/kay/content', () => ({
   },
 }))
 
-const { referrersOf } = await import('../src/references')
+const { referrersOf, missingReferences } = await import('../src/references')
 
 describe('referrersOf', () => {
   test('names the entries pointing at a slug through a field, a list or a group, in any collection', async () => {
@@ -50,5 +51,35 @@ describe('referrersOf', () => {
 
   test('reads nothing for no slug', async () => {
     expect((await referrersOf('people', [])).size).toBe(0)
+  })
+})
+
+describe('missingReferences', () => {
+  const draft = (data: Record<string, unknown>, slug = 'new') => ({ collection: 'posts', slug, data })
+  const nothingStored = async () => undefined
+  const post = posts as never
+
+  test('names a reference to an entry the target lacks, through a field, a list or a group, with its path', async () => {
+    const issues = await missingReferences(post, draft({ author: 'ghost', editors: ['bob', 'ghost'], credit: { by: 'nobody' } }), nothingStored)
+
+    expect(issues.map(issue => [issue.path, issue.message])).toEqual([['author', 'No entry ghost in people'], ['editors.1', 'No entry ghost in people'], ['credit.by', 'No entry nobody in people']])
+  })
+
+  test('lets a reference to an entry that exists, an empty one and a collection that fails to read through', async () => {
+    expect(await missingReferences(post, draft({ author: 'ada', editors: [] }), nothingStored)).toEqual([])
+    const fragile = { ...broken, name: 'fragile', schema: { properties: { who: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'broken' } } } } }
+
+    expect(await missingReferences(fragile as never, { collection: 'fragile', slug: 'f', data: { who: 'ghost' } }, nothingStored)).toEqual([])
+    expect(await missingReferences(post, draft({ author: '' }), nothingStored)).toEqual([])
+  })
+
+  test('lets a reference the stored entry held already, so publishing never stops on an old one', async () => {
+    expect(await missingReferences(post, draft({ author: 'ghost' }, 'one'), async () => ({ author: 'ghost' }))).toEqual([])
+    expect((await missingReferences(post, draft({ author: 'other' }, 'one'), async () => ({ author: 'ghost' }))).map(issue => issue.path)).toEqual(['author'])
+  })
+
+  test('lets an entry of a collection refer to itself', async () => {
+    expect(await missingReferences(friends as never, { collection: 'friends', slug: 'cy', data: { friend: 'cy' } }, nothingStored)).toEqual([])
+    expect(await missingReferences(friends as never, { collection: 'friends', slug: 'cy', data: { friend: 'dan' } }, nothingStored)).toHaveLength(1)
   })
 })

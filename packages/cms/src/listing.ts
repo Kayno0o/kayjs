@@ -1,5 +1,6 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
 import { wording } from 'kay/words'
+import { referrersNote } from './bulk-message'
 import { publishTime, unpublishTime } from './datetime'
 import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
@@ -7,9 +8,6 @@ import { sortOrdered } from './order'
 import { screenPath } from './paths'
 import { groupEntries, missingLocales } from './translations'
 import { contentVersion } from './version'
-
-// The most referencing entries a delete confirmation names; the rest is told as a trailing ellipsis.
-const REFERRERS_SHOWN = 5
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 
@@ -62,21 +60,117 @@ export function entryTitle(collection: ScreenCollection, entry: SourceEntry): st
 }
 
 const WHITESPACE = /\s+/
+const MARKS = /\p{M}/gu
 
-// The rows whose title or slug holds every word of the search, whatever their case.
-export function searchRows(rows: EntryRow[], search: string): EntryRow[] {
-  const words = search.toLowerCase().split(WHITESPACE).filter(Boolean)
+// A text as a search compares it: without accents nor case.
+export function fold(text: string): string {
+  return text.normalize('NFD').replace(MARKS, '').toLowerCase()
+}
+
+// Every string an entry holds, however deep.
+function stringsOf(value: unknown, into: string[]): void {
+  if (typeof value === 'string') {
+    into.push(value)
+  }
+  else if (Array.isArray(value)) {
+    for (const item of value) {
+      stringsOf(item, into)
+    }
+  }
+  else if (typeof value === 'object' && value !== null) {
+    for (const item of Object.values(value)) {
+      stringsOf(item, into)
+    }
+  }
+}
+
+// The rows whose entry holds every word of the search, accents and case aside: in its title, slug, cells, text fields or body. `rows` and `entries` line up.
+export function searchRows(rows: EntryRow[], search: string, entries: SourceEntry[] = []): EntryRow[] {
+  const words = fold(search).split(WHITESPACE).filter(Boolean)
 
   if (words.length === 0)
     return rows
 
-  return rows.filter((row) => {
-    // Both folded once, not once per word.
-    const title = row.title.toLowerCase()
-    const slug = row.slug.toLowerCase()
+  return rows.filter((row, i) => {
+    const texts = [row.title, row.slug, ...Object.values(row.cells ?? {})]
+    const entry = entries[i]
 
-    return words.every(word => title.includes(word) || slug.includes(word))
+    if (entry !== undefined) {
+      stringsOf(entry.data, texts)
+      texts.push(entry.body ?? '')
+    }
+
+    // Folded once, not once per word.
+    const text = fold(texts.join('\n'))
+
+    return words.every(word => text.includes(word))
   })
+}
+
+// Where an entry stands in the list's status filter.
+export type EntryStatus = 'draft' | 'scheduled' | 'published'
+
+export const ENTRY_STATUSES: readonly EntryStatus[] = ['draft', 'scheduled', 'published']
+
+export function statusOf(row: Pick<EntryRow, 'draft' | 'scheduledAt'>): EntryStatus {
+  if (row.draft)
+    return 'draft'
+
+  return row.scheduledAt === undefined ? 'published' : 'scheduled'
+}
+
+// How a list is narrowed and ordered, all of it in the page's URL.
+export interface ListView {
+  search?: string | undefined
+  status?: EntryStatus | undefined
+  // A column's key as the table names it: `title`, `locale`, `draft` for the status, or `cell:<field>`.
+  sort?: string | undefined
+  direction?: 'asc' | 'desc' | undefined
+}
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+const STATUS_RANK: Record<EntryStatus, number> = { draft: 0, scheduled: 1, published: 2 }
+const NUMBERS = new Set(['number', 'integer'])
+const CELL = 'cell:'
+
+// The rows ordered by a column, an empty cell last whichever way; as they were for a key no column has.
+function sortRows(collection: ScreenCollection, rows: EntryRow[], key: string, direction: 'asc' | 'desc'): EntryRow[] {
+  const fields = listColumns(fieldsOf(collection.schema), collection.layout?.list)
+  const factor = direction === 'asc' ? 1 : -1
+  const field = key.startsWith(CELL) ? fields.find(each => each.key === key.slice(CELL.length)) : undefined
+
+  const value = (row: EntryRow): string | number | undefined => {
+    if (key === 'title')
+      return row.title
+
+    if (key === 'locale')
+      return row.locale
+
+    if (key === 'draft')
+      return STATUS_RANK[statusOf(row)]
+
+    const text = field === undefined ? undefined : row.cells?.[field.key]
+
+    if (text === undefined || text === '')
+      return undefined
+
+    return field !== undefined && NUMBERS.has(field.kind) ? Number(text) : text
+  }
+
+  if (key !== 'title' && key !== 'locale' && key !== 'draft' && field === undefined)
+    return rows
+
+  const keyed = rows.map(row => ({ row, key: value(row) }))
+
+  return keyed.sort((a, b) => {
+    if (a.key === undefined && b.key === undefined)
+      return 0
+
+    if (a.key === undefined || b.key === undefined)
+      return a.key === undefined ? 1 : -1
+
+    return factor * (typeof a.key === 'number' && typeof b.key === 'number' ? a.key - b.key : collator.compare(String(a.key), String(b.key)))
+  }).map(each => each.row)
 }
 
 export function pageOf<T>(rows: T[], page: number, size = PAGE_SIZE): { rows: T[], page: number, pages: number } {
@@ -93,11 +187,19 @@ function pageAt(total: number, page: number, size: number): { page: number, page
   return { page: current, pages, offset: (current - 1) * size }
 }
 
-// A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
+export interface RowsPage {
+  rows: EntryRow[]
+  page: number
+  pages: number
+  // How many entries the search and the status filter keep, across the pages.
+  total: number
+}
+
+// A page of the collection's rows: a search, a status filter or a sort reads every entry to match or order them, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone; a loaded entry's is taken from the entries `read` gave.
-export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort, direction = 'asc' }: Omit<ListView, 'search'> = {}): Promise<RowsPage> {
   if (collection.problem !== undefined)
-    return pageOf([], 1, size)
+    return { ...pageOf([], 1, size), total: 0 }
 
   const seen = new Map<string, SourceEntry>()
   const key = (slug: string, locale: string | undefined) => JSON.stringify([slug, locale])
@@ -134,7 +236,7 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     }) }
   }
 
-  const versioned = async <T extends { rows: EntryRow[] }>(found: T): Promise<T> => {
+  const versioned = async (found: Omit<RowsPage, 'total'>, total: number): Promise<RowsPage> => {
     const listed = await marked(found)
 
     if (collection.kind === 'loaded') {
@@ -144,35 +246,54 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
         return entry === undefined ? row : { ...row, version: contentVersion(entry, collection.schema) }
       })
 
-      return { ...listed, rows }
+      return { ...listed, rows, total }
     }
 
     if (collection.kind !== 'folder')
-      return listed
+      return { ...listed, total }
 
     const rows = await Promise.all(listed.rows.map(async row => ({ ...row, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) })))
 
-    return { ...listed, rows }
+    return { ...listed, rows, total }
   }
 
-  if (collection.orderField !== undefined)
-    return versioned(pageOf(orderedRows(collection, collection.orderField, await list({}), search), page, size))
+  const narrowed = search.trim() !== '' || status !== undefined || sort !== undefined
 
-  if (search.trim() !== '')
-    return versioned(pageOf(searchRows(rowsOf(collection, await list({})), search), page, size))
+  if (collection.orderField !== undefined) {
+    const rows = orderedRows(collection, collection.orderField, await list({}), { search, status, sort, direction })
 
-  const at = pageAt(collection.count ?? 0, page, size)
+    return versioned(pageOf(rows, page, size), rows.length)
+  }
 
-  return versioned({ rows: rowsOf(collection, await list({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
+  if (narrowed) {
+    const found = await list({})
+    const all = rowsOf(collection, found)
+    const kept = narrow(collection, all, found, { search, status, sort, direction })
+
+    return versioned(pageOf(kept, page, size), kept.length)
+  }
+
+  const total = collection.count ?? 0
+  const at = pageAt(total, page, size)
+
+  return versioned({ rows: rowsOf(collection, await list({ offset: at.offset, limit: size })), page: at.page, pages: at.pages }, total)
 }
 
-// The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search narrows the rows.
-function orderedRows(collection: ScreenCollection, field: string, found: SourceEntry[], search: string): EntryRow[] {
+// The rows the search and the status keep, in the sort asked for.
+function narrow(collection: ScreenCollection, rows: EntryRow[], entries: SourceEntry[], { search = '', status, sort, direction = 'asc' }: ListView): EntryRow[] {
+  const found = searchRows(rows, search, entries)
+  const kept = status === undefined ? found : found.filter(row => statusOf(row) === status)
+
+  return sort === undefined ? kept : sortRows(collection, kept, sort, direction)
+}
+
+// The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search, a status or a sort narrows or reorders the rows.
+function orderedRows(collection: ScreenCollection, field: string, found: SourceEntry[], view: ListView): EntryRow[] {
   const sorted = sortOrdered(found, field)
   const rows = rowsOf(collection, sorted)
 
-  if (search.trim() !== '')
-    return searchRows(rows, search)
+  if ((view.search ?? '').trim() !== '' || view.status !== undefined || view.sort !== undefined)
+    return narrow(collection, rows, sorted, view)
 
   const groups = Map.groupBy(sorted.filter(entry => entry.data !== undefined), entry => entry.locale)
 
@@ -188,6 +309,26 @@ function orderedRows(collection: ScreenCollection, field: string, found: SourceE
 // What the screens title a collection with: its `title`, else its name humanized.
 export function collectionTitle(collection: Pick<ScreenCollection, 'name' | 'title'>): string {
   return collection.title ?? humanize(collection.name)
+}
+
+export interface CollectionGroup<T> {
+  // Undefined for the collections naming none, which come first.
+  name: string | undefined
+  collections: T[]
+}
+
+// The collections as the content list shows them: by `order`, then the site's, under the `group` each names, groups in the order they first appear.
+export function groupCollections<T>(listed: T[], layoutOf: (item: T) => Pick<NonNullable<ScreenCollection['layout']>, 'group' | 'order'> | undefined): CollectionGroup<T>[] {
+  const ordered = listed.map((item, i) => ({ item, i, order: layoutOf(item)?.order ?? Number.POSITIVE_INFINITY })).sort((a, b) => a.order - b.order || a.i - b.i)
+  const groups = new Map<string | undefined, T[]>()
+
+  for (const { item } of ordered) {
+    const name = layoutOf(item)?.group
+
+    groups.set(name, [...groups.get(name) ?? [], item])
+  }
+
+  return [...groups].map(([name, collections]) => ({ name, collections })).sort((a, b) => Number(a.name !== undefined) - Number(b.name !== undefined))
 }
 
 // The slug a single collection's entry is first written under.
@@ -230,12 +371,28 @@ export function deleteMessage(title: string, url?: string | undefined, where: 'e
   const asked = where === 'table' ? wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title }) : wording('cms.entry.deleteMessage', 'Delete {title}? This cannot be undone.', { title })
   const page = url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
 
-  if (referencedBy.length === 0)
-    return page
+  return referencedBy.length === 0 ? page : `${page} ${referrersNote(referencedBy)}`
+}
 
-  const entries = referencedBy.slice(0, REFERRERS_SHOWN).join(', ') + (referencedBy.length > REFERRERS_SHOWN ? ', …' : '')
+// The list's URL with some params changed, a `undefined` one left out, and back on its first page: a view of the list is a link.
+export function viewHref(url: URL | string, changes: Record<string, string | undefined>): string {
+  const target = new URL(url, 'http://localhost')
 
-  return `${page} ${wording('cms.entry.deleteReferenced', 'Referenced by {entries}.', { entries })}`
+  for (const [name, value] of Object.entries(changes)) {
+    if (value === undefined || value === '')
+      target.searchParams.delete(name)
+    else
+      target.searchParams.set(name, value)
+  }
+
+  target.searchParams.delete('page')
+
+  return `${target.pathname}${target.search}`
+}
+
+// The status a `?status=` names, none for any other text.
+export function statusParam(value: string | undefined): EntryStatus | undefined {
+  return ENTRY_STATUSES.find(status => status === value)
 }
 
 // A screen's `<title>`: what it shows, then the admin's name, so a tab or a history entry says it is the CMS and not the site.

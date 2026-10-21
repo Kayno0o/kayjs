@@ -3,7 +3,7 @@ import type { CollectionInfo, CollectionLayout, FormLayout, ListLayout, RowActio
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from './fields'
 
-export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'editOnPage', 'delete']
+export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
 
 // What a field named `#body` stands for, and `body` too unless the schema has a data field of that name.
@@ -96,9 +96,15 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, Collecti
 
   for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
     const where = `cms({ collections: { ${JSON.stringify(name)} } })`
-    const { form, list } = plain(where, value, ['form', 'list'])
+    const { form, list, group, order } = plain(where, value, ['form', 'list', 'group', 'order'])
 
-    layouts.set(name, { form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
+    if (group !== undefined && (typeof group !== 'string' || group.trim() === ''))
+      throw new Error(`kayjs-cms: \`${where}.group\` takes a heading, got ${JSON.stringify(group)}`)
+
+    if (order !== undefined && (typeof order !== 'number' || !Number.isFinite(order)))
+      throw new Error(`kayjs-cms: \`${where}.order\` takes a number, got ${JSON.stringify(order)}`)
+
+    layouts.set(name, { group, order, form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
   }
 
   return layouts

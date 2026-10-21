@@ -1,6 +1,7 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
+import { bulkDeleteMessage } from '../src/bulk-message'
+import { collectionTitle, entryPath, fold, groupCollections, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows, statusOf, statusParam, viewHref } from '../src/listing'
 import { contentVersion } from '../src/version'
 
 const posts: CollectionInfo = {
@@ -88,7 +89,7 @@ describe('pageRows', () => {
     const { asked, read } = reader()
 
     expect((await pageRows({ ...posts, count: 120 }, 'post 11', 1, read, none)).rows.map(row => row.slug)).toEqual(['post-11', 'post-110', 'post-111', 'post-112', 'post-113', 'post-114', 'post-115', 'post-116', 'post-117', 'post-118', 'post-119'])
-    expect(await pageRows({ ...posts, problem: 'gone' }, '', 1, read, none)).toEqual({ rows: [], page: 1, pages: 1 })
+    expect(await pageRows({ ...posts, problem: 'gone' }, '', 1, read, none)).toEqual({ rows: [], page: 1, pages: 1, total: 0 })
     expect(asked).toEqual([{}])
   })
 })
@@ -148,5 +149,124 @@ describe('pageRows of an ordered collection', () => {
     const listed = await pageRows({ ...shelf, localized: true, count: 3 }, '', 1, localized, none)
 
     expect(listed.rows.map(row => [row.slug, row.locale, row.move?.up, row.move?.down])).toEqual([['a', 'en', false, false], ['b', 'fr', false, true], ['a', 'fr', true, false]])
+  })
+})
+
+describe('search', () => {
+  const shop: CollectionInfo = { ...posts, draftField: 'draft', publishField: 'publishAt', schema: { properties: { title: { type: 'string' }, summary: { type: 'string' }, draft: { type: 'boolean' } } } }
+  const stock: SourceEntry[] = [
+    { slug: 'creme', data: { title: 'Crème brûlée', summary: 'A dessert' }, body: 'Vanilla and sugar', draft: false },
+    { slug: 'tarte', data: { title: 'Tarte', summary: 'Aux pommes' }, draft: true },
+  ]
+  const none = async () => undefined
+  const read = async () => stock
+
+  it('ignores accents and case, in the title, the other text fields and the body', async () => {
+    const find = async (q: string) => (await pageRows({ ...shop, count: 2 }, q, 1, read, none)).rows.map(row => row.slug)
+
+    expect(fold('Crème BRÛLÉE')).toBe('creme brulee')
+    expect(await find('CREME brulee')).toEqual(['creme'])
+    expect(await find('dessert')).toEqual(['creme'])
+    expect(await find('vanilla')).toEqual(['creme'])
+    expect(await find('pomme')).toEqual(['tarte'])
+    expect(await find('vanilla pomme')).toEqual([])
+  })
+
+  it('searches rows alone by title and slug', () => {
+    expect(searchRows(rowsOf(posts, stock), 'ÉCR')).toEqual([])
+    expect(searchRows(rowsOf(posts, stock), 'tart').map(row => row.slug)).toEqual(['tarte'])
+  })
+
+  it('counts every entry the search keeps across the pages', async () => {
+    const many: SourceEntry[] = Array.from({ length: 120 }, (_, i) => ({ slug: `p-${i}`, data: { title: `Post ${i}` }, draft: false }))
+    const listed = await pageRows({ ...posts, count: 120 }, 'post 1', 2, async () => many, none, 10)
+
+    expect([listed.total, listed.pages, listed.rows.length]).toEqual([39, 4, 10])
+  })
+})
+
+describe('status', () => {
+  const shop: CollectionInfo = { ...posts, draftField: 'draft', publishField: 'publishAt' }
+  const now = Date.now()
+  const future = new Date(now + 86_400_000).toISOString()
+  const stock: SourceEntry[] = [
+    { slug: 'a', data: { title: 'A', publishAt: future }, draft: false },
+    { slug: 'b', data: { title: 'B' }, draft: true },
+    { slug: 'c', data: { title: 'C' }, draft: false },
+  ]
+  const none = async () => undefined
+  const read = async () => stock
+
+  it('tells draft, scheduled and published apart, and filters on it', async () => {
+    expect(rowsOf(shop, stock).map(statusOf)).toEqual(['scheduled', 'draft', 'published'])
+    expect((await pageRows({ ...shop, count: 3 }, '', 1, read, none, 50, { status: 'draft' })).rows.map(row => row.slug)).toEqual(['b'])
+    expect((await pageRows({ ...shop, count: 3 }, '', 1, read, none, 50, { status: 'scheduled' })).rows.map(row => row.slug)).toEqual(['a'])
+    expect((await pageRows({ ...shop, count: 3 }, 'c', 1, read, none, 50, { status: 'published' })).total).toBe(1)
+  })
+
+  it('reads a status param, none for anything else', () => {
+    expect(statusParam('draft')).toBe('draft')
+    expect(statusParam('Draft')).toBeUndefined()
+    expect(statusParam(undefined)).toBeUndefined()
+  })
+})
+
+describe('sort', () => {
+  const priced: CollectionInfo = { ...posts, draftField: 'draft', layout: undefined, schema: { properties: { title: { type: 'string' }, price: { type: 'number' }, draft: { type: 'boolean' } } } } as CollectionInfo
+  const shop = { ...priced, layout: { list: { columns: ['price'] } }, count: 4 }
+  const stock: SourceEntry[] = [
+    { slug: 'a', data: { title: 'éclair', price: 10 }, draft: false },
+    { slug: 'b', data: { title: 'Brioche', price: 9 }, draft: true },
+    { slug: 'c', data: { title: 'Cake' }, draft: false },
+    { slug: 'd', data: { title: 'Ananas', price: 100 }, draft: false },
+  ]
+  const none = async () => undefined
+  const read = async () => stock
+  const order = async (sort: string, direction: 'asc' | 'desc') => (await pageRows(shop, '', 1, read, none, 50, { sort, direction })).rows.map(row => row.slug)
+
+  it('orders every entry, not the page, by title regardless of accents and case', async () => {
+    expect(await order('title', 'asc')).toEqual(['d', 'b', 'c', 'a'])
+    expect(await order('title', 'desc')).toEqual(['a', 'c', 'b', 'd'])
+  })
+
+  it('orders a number column by value and leaves an empty cell last either way', async () => {
+    expect(await order('cell:price', 'asc')).toEqual(['b', 'a', 'd', 'c'])
+    expect(await order('cell:price', 'desc')).toEqual(['d', 'a', 'b', 'c'])
+  })
+
+  it('orders by status, and sorts across pages', async () => {
+    expect((await order('draft', 'asc'))[0]).toBe('b')
+
+    const second = await pageRows(shop, '', 2, read, none, 2, { sort: 'title', direction: 'asc' })
+
+    expect(second.rows.map(row => row.slug)).toEqual(['c', 'a'])
+  })
+
+  it('keeps the order of a key no column has', async () => {
+    expect(await order('nope', 'asc')).toEqual(['a', 'b', 'c', 'd'])
+    expect(await order('cell:summary', 'asc')).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
+describe('viewHref', () => {
+  it('sets or drops the params it is given, and goes back to the first page', () => {
+    expect(viewHref(new URL('http://x/admin/collections/posts?q=a&page=3&status=draft'), { status: undefined })).toBe('/admin/collections/posts?q=a')
+    expect(viewHref('http://x/admin/collections/posts?page=2', { status: 'draft', q: 'é' })).toBe('/admin/collections/posts?status=draft&q=%C3%A9')
+  })
+})
+
+describe('groupCollections', () => {
+  const layouts: Record<string, { group?: string, order?: number }> = { a: { group: 'Blog' }, b: {}, c: { group: 'Shop', order: 1 }, d: { group: 'Blog', order: 0 } }
+  const groups = groupCollections(['a', 'b', 'c', 'd'], name => layouts[name])
+
+  it('puts the ungrouped first, then each group in the order it first appears, its collections by order then by the site\'s', () => {
+    expect(groups.map(group => [group.name, group.collections])).toEqual([[undefined, ['b']], ['Blog', ['d', 'a']], ['Shop', ['c']]])
+  })
+})
+
+describe('bulkDeleteMessage', () => {
+  it('counts the entries and names those referring to any of them once', () => {
+    expect(bulkDeleteMessage([{}])).toBe('Delete 1 entry? This cannot be undone.')
+    expect(bulkDeleteMessage([{ referencedBy: ['Posts: A'] }, { referencedBy: ['Posts: A', 'Posts: B'] }])).toBe('Delete 2 entries? This cannot be undone. Referenced by Posts: A, Posts: B.')
   })
 })

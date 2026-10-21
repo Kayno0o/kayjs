@@ -60,7 +60,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Ledger', '/admin/collections/ledger'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
+  expect(page.find('.kui-card-row-body a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Ledger', '/admin/collections/ledger'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -99,7 +99,7 @@ test('a single collection that cannot be read keeps its list address, which says
   footerDown.down = true
 
   try {
-    expect((await site.visit('/admin')).find('.kui-card-row a').map(link => link.attributes.href)).toContain('/admin/collections/footer')
+    expect((await site.visit('/admin')).find('.kui-card-row-body a').map(link => link.attributes.href)).toContain('/admin/collections/footer')
 
     const response = await site.fetch('/admin/collections/footer', { redirect: 'manual' })
 
@@ -211,8 +211,8 @@ test('a new entry asks for its slug, and no locale in a plain collection', async
 test('a collection\'s list shows the columns and the row actions its layout names', async () => {
   const page = await site.visit('/admin/collections/shop')
 
-  expect(page.find('.kcms-entries th').map(head => head.text.trim())).toEqual(['Title', 'Price', 'Live', 'Actions'])
-  expect(page.find('.kcms-entries td').map(cell => cell.text.trim())).toEqual(['TitleLamp', 'Price30', 'LiveYes', 'Actions', 'TitleVase', 'Price12.5', 'LiveNo', 'Actions'])
+  expect(page.find('.kcms-entries th').map(head => head.text.trim()).filter(head => head !== 'Select all')).toEqual(['Title', 'Price', 'Live', 'Actions'])
+  expect(page.find('.kcms-entries td').map(cell => cell.text.trim()).filter(text => text !== '')).toEqual(['TitleLamp', 'Price30', 'LiveYes', 'Actions', 'TitleVase', 'Price12.5', 'LiveNo', 'Actions'])
   expect(page.find('.kcms-entries a').map(link => link.text)).toEqual(['Lamp', 'Vase'])
   expect(page.find('.kcms-row-actions button').map(button => button.attributes['aria-label'] ?? button.text)).toEqual(['Delete Lamp', 'Delete Vase'])
   expect((await site.visit('/admin/collections/shop?q=vase')).find('.kcms-entries a').map(link => link.text)).toEqual(['Vase'])
@@ -453,6 +453,36 @@ test('a nested slug is published and deleted through its file', async () => {
   expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['packages/cms/tests/fixture/src/content/posts/notes/garden.md', undefined])
 })
 
+test('a duplicate is a draft copy under a free slug, and a collection\'s entries are listed for a reference to pick', async () => {
+  saved.length = 0
+
+  expect((await send('POST', 'posts/notes%2Fgarden/duplicate')).answer).toMatchObject({ saved: true, slug: 'notes/garden-copy' })
+  expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['packages/cms/tests/fixture/src/content/posts/notes/garden-copy.md', 'content(posts): duplicate notes/garden-copy']])
+  expect(saved[0]?.text).toContain('title: Spring garden')
+  expect(saved[0]?.text).toContain('draft: true')
+  expect((await send('POST', 'posts/nope/duplicate')).answer).toHaveProperty('issues.0.key', 'slug')
+  expect((await send('POST', 'welcome/index/duplicate')).answer).toHaveProperty('issues.0.message', expect.stringContaining('cannot be duplicated'))
+  expect((await send('GET', 'posts')).answer).toEqual([{ slug: 'hello', title: 'Hello world' }, { slug: 'notes/garden', title: 'Spring garden' }])
+  expect((await site.fetch('/api/cms/entries/nothing')).status).toBe(404)
+})
+
+test('a list sorts, filters and searches across its entries from the URL, and counts what it keeps', async () => {
+  const titles = async (query: string) => (await site.visit(`/admin/collections/posts${query}`)).find('.kcms-entries td a').filter(link => link.attributes.href?.startsWith('/admin/collections/posts/')).map(link => link.text)
+
+  expect(await titles('?sort=title&dir=desc')).toEqual(['Spring garden', 'Hello world'])
+  expect(await titles('?sort=title&dir=asc')).toEqual(['Hello world', 'Spring garden'])
+  expect(await titles('?q=SPRÍNG')).toEqual(['Spring garden'])
+  expect(await titles('?status=draft')).toEqual(['Spring garden'])
+  expect(await titles('?status=nonsense&sort=nope&dir=sideways')).toEqual(['Hello world', 'Spring garden'])
+
+  const filtered = await site.visit('/admin/collections/posts?status=published')
+
+  expect(filtered.find('.kcms-count').map(count => count.text)).toEqual(['1 result'])
+  expect(filtered.find('.kcms-statuses a').map(link => [link.text, 'aria-current' in link.attributes])).toEqual([['All', false], ['Drafts', false], ['Published', true]])
+  expect((await site.visit('/admin/collections/posts')).find('.kcms-count')).toEqual([])
+  expect((await site.visit('/admin/collections/posts?q=zzz')).find('.kui-empty-state-title').map(title => title.text)).toEqual(['No match'])
+})
+
 test('a loaded entry is created and removed through its loader, a slug starting with / opening at its escaped path', async () => {
   expect((await send('POST', 'products/lamp', { data: { name: 'Lamp' }, create: true })).answer).toHaveProperty('saved', true)
   expect(products.map(product => product.slug)).toEqual(['mug', 'lamp'])
@@ -515,7 +545,7 @@ test('a collection whose loader throws says so on its screens, its error kept to
   try {
     const index = await site.visit('/admin')
 
-    expect(index.find('.kui-badge').map(badge => badge.text)).toEqual(['Cannot be read'])
+    expect(index.find('.kui-badge').map(badge => badge.text).filter(text => text === 'Cannot be read')).toEqual(['Cannot be read'])
     expect(index.find('main a[data-tooltip]').map(link => link.attributes['data-tooltip'])).toEqual([expect.stringContaining('failed to read')])
     expect(index.html).not.toContain('db.internal')
     expect(index.find('h1').map(heading => heading.text)).toEqual(['Content'])

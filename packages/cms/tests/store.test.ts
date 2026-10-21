@@ -100,7 +100,7 @@ const content: typeof Content = {
 void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
-const { deleteEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
+const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -576,5 +576,45 @@ describe('moveEntry', () => {
   test('refuses a collection with no order field, and an entry it does not hold', async () => {
     expect(await moveEntry({ collection: 'posts', slug: 'hello' }, 'up')).toHaveProperty('issues.0.message', 'posts names no order field to move entries by')
     expect(await moveEntry({ collection: 'shelf', slug: 'gone' }, 'up')).toHaveProperty('issues.0.message', 'gone does not exist')
+  })
+})
+
+describe('copySlug', () => {
+  test('is the slug with -copy, then -copy-2 and on, the first that is free', () => {
+    expect(copySlug('a', new Set(['a']))).toBe('a-copy')
+    expect(copySlug('a', new Set(['a', 'a-copy']))).toBe('a-copy-2')
+    expect(copySlug('notes/a', new Set(['notes/a-copy', 'notes/a-copy-2']))).toBe('notes/a-copy-3')
+  })
+})
+
+describe('references on save', () => {
+  const notes: CollectionInfo = { ...posts, name: 'notes', dir: 'content/notes', schema: { type: 'object', properties: { title: { type: 'string' }, post: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'posts' } } } } }
+
+  test('refuses a reference to an entry the target lacks, and saves one that exists', async () => {
+    collectionList.push(notes)
+
+    try {
+      expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'ghost' } })).toEqual({ issues: [{ collection: 'notes', slug: 'n', locale: undefined, path: 'post', message: 'No entry ghost in posts' }] })
+      expect(saved).toEqual([])
+      expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'hello' } })).toHaveProperty('saved', true)
+    }
+    finally {
+      collectionList.pop()
+    }
+  })
+})
+
+describe('duplicateEntry', () => {
+  test('saves a draft copy of the entry under a free slug and names it', async () => {
+    stored.posts = [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: false }, body: 'Hi', draft: false }, { slug: 'hello-copy', path: 'content/posts/hello-copy.md', data: { title: 'Hello', draft: true }, draft: true }]
+
+    expect(await duplicateEntry({ collection: 'posts', slug: 'hello' })).toMatchObject({ saved: true, slug: 'hello-copy-2' })
+    expect(saved.map(change => [change.repoPath, change.message, change.text])).toEqual([['content/posts/hello-copy-2.md', 'content(posts): duplicate hello-copy-2', '{"title":"Hello","draft":true}\nHi']])
+  })
+
+  test('refuses an entry that does not exist and a single collection', async () => {
+    expect(await duplicateEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
+    expect(await duplicateEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'Home holds one entry, which cannot be duplicated')
+    expect(saved).toEqual([])
   })
 })

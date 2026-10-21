@@ -69,8 +69,30 @@ body {
   outline: none;
 }
 
-.kcms-search {
+.kcms-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
   margin-bottom: 1rem;
+}
+
+.kcms-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kcms-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.kcms-count {
+  margin: 0 0 0.75rem;
+  color: var(--color-kui-subtext);
 }
 
 .kcms-search input {
@@ -195,6 +217,12 @@ body {
 /* A section's title and its buttons wrap on a narrow screen instead of reaching past it. */
 .kcms-admin .kui-page-section-head {
   flex-wrap: wrap;
+}
+
+.kcms-group-title {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .kcms-locales {

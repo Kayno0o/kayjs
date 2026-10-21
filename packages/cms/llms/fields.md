@@ -10,6 +10,7 @@ How the editor enters a field comes from the schema's own keywords first, then f
 - An `integer` takes no decimal key and cuts a pasted decimal to its whole part; the mouse wheel over any number box leaves it instead of changing the figure.
 - Emptying an optional text unsets the field instead of storing `''`; a required one keeps `''` for the schema to refuse.
 - A boolean toggle shows its `description` and its issue.
+- A `reference('authors')` field is a menu of that collection's entries by title (typed as a slug if they cannot be read). A save is refused for a reference to an entry that does not exist, unless the entry already held it, so publishing never stops on an old one; deleting an entry names the entries that refer to it.
 
 ## `fieldInput`
 

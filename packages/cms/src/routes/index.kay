@@ -5,16 +5,15 @@ import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
-import { collections } from '../kay/content'
-import { adminTitle, collectionTitle, problemId } from '../listing'
+import { adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
 import { screenPath } from '../paths'
-import { openPath } from '../screens'
+import { indexRows } from '../screens'
 import { settings } from '../settings'
 
 const { prefix } = settings()
 const all = await collections()
 const localized = all.some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
-const listed = await Promise.all(all.map(async collection => ({ collection, href: await openPath(collection) })))
+const groups = groupCollections(await indexRows(), row => row.layout)
 ---
 head
   title {adminTitle(wording('cms.admin.content', 'Content'))}
@@ -24,14 +23,26 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
       Button(href={screenPath(prefix, '/translations')} label={wording('cms.locales.title', 'Translations')})
     Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
-  for row of listed key={row.collection.name}
-    CardRow
-      @right
-        if row.collection.problem as problem
-          Badge(tone="danger" label={wording('cms.admin.unreadable', 'Cannot be read')})
-          span.kcms-sr-only(id={problemId(row.collection.name)}) {problem}
-        else if !row.collection.single
-          span {wording('cms.admin.entryCount', row.collection.count === 1 ? '1 entry' : '{count} entries', { count: row.collection.count ?? 0 })}
-      a(href={row.href} data-tooltip={row.collection.problem} aria-describedby={row.collection.problem === undefined ? undefined : problemId(row.collection.name)}) {collectionTitle(row.collection)}
+  for group of groups key={group.name ?? ''}
+    if group.name
+      h2.kcms-group-title {group.name}
+    for row of group.collections key={row.collection.name}
+      CardRow
+        @right
+          if row.collection.problem as problem
+            Badge(tone="danger" label={wording('cms.admin.unreadable', 'Cannot be read')})
+            span.kcms-sr-only(id={problemId(row.collection.name)}) {problem}
+          else
+            if row.drafts
+              Badge(tone="warning" label={wording('cms.admin.draftCount', row.drafts === 1 ? '1 draft' : '{count} drafts', { count: row.drafts })})
+            if row.scheduled
+              Badge(tone="info" label={wording('cms.admin.scheduledCount', row.scheduled === 1 ? '1 scheduled' : '{count} scheduled', { count: row.scheduled })})
+            if !row.collection.single
+              span {wording('cms.admin.entryCount', row.collection.count === 1 ? '1 entry' : '{count} entries', { count: row.collection.count ?? 0 })}
+            if row.newHref as href
+              Button(href={href} label={wording('cms.admin.newEntry', 'New entry')} aria-label={wording('cms.admin.newEntryIn', 'New entry in {collection}', { collection: collectionTitle(row.collection) })} icon="plus" size="sm")
+        a(href={row.href} data-tooltip={row.collection.problem} aria-describedby={row.collection.problem === undefined ? undefined : problemId(row.collection.name)}) {collectionTitle(row.collection)}
+        if row.collection.description
+          p.kcms-entry-subtitle {row.collection.description}
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

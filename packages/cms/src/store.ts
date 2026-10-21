@@ -3,9 +3,10 @@ import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCol
 import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
-import { collectionTitle, SINGLE_SLUG } from './listing'
+import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
+import { missingReferences } from './references'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
@@ -141,6 +142,11 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')
   }
 
+  const dangling = await missingReferences(collection, entry, async () => (await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]?.data)
+
+  if (dangling.length > 0)
+    return { issues: dangling }
+
   if (collection.kind === 'loaded') {
     const versioned = required || version !== undefined
 
@@ -259,6 +265,65 @@ export async function unpublishEntry(ref: EntryRef, author?: Identity): Promise<
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: true }, body: existing.body }, { version: existing.version, verb: 'unpublish', author, bodyKept: true })
+}
+
+// The most entries a reference picker lists; a collection past it keeps the typed slug, which a save still checks.
+export const REFERENCE_CHOICES = 1000
+
+export interface ReferenceChoice {
+  slug: string
+  title: string
+}
+
+// The entries of a collection a reference can name, by title, one per slug whatever its locales; the entries that do not parse are left out.
+export async function referenceChoices(name: string): Promise<ReferenceChoice[]> {
+  const collection = await collectionNamed(name)
+  const found = (await entries(name, {})).filter(entry => entry.data !== undefined)
+  const seen = new Set<string>()
+  const choices: ReferenceChoice[] = []
+
+  for (const row of rowsOf(collection, found)) {
+    if (seen.has(row.slug))
+      continue
+
+    seen.add(row.slug)
+    choices.push({ slug: row.slug, title: row.title })
+  }
+
+  return choices.slice(0, REFERENCE_CHOICES)
+}
+
+// The slug a copy of `slug` is written under: `<slug>-copy`, then `-copy-2`, `-copy-3`, the first that is free.
+export function copySlug(slug: string, taken: ReadonlySet<string>): string {
+  let copy = `${slug}-copy`
+
+  for (let n = 2; taken.has(copy); n++)
+    copy = `${slug}-copy-${n}`
+
+  return copy
+}
+
+// Saves a copy of an entry as a draft, when the collection has a draft field, under a free slug; the outcome names the slug.
+export async function duplicateEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome & { slug?: string }> {
+  const collection = await collectionNamed(ref.collection)
+
+  if (collection.single)
+    return refused(ref, wording('cms.store.singleDuplicate', '{collection} holds one entry, which cannot be duplicated', { collection: collectionTitle(collection) }))
+
+  const existing = await entryOf(ref, collection)
+
+  if (!existing)
+    return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+  if (!existing.data)
+    return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
+
+  const taken = new Set((await entries(collection.name, { locale: ref.locale })).map(entry => entry.slug))
+  const slug = copySlug(ref.slug, taken)
+  const data = collection.draftField === undefined ? existing.data : { ...existing.data, [collection.draftField]: true }
+  const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data, body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true })
+
+  return 'issues' in outcome ? outcome : { ...outcome, slug }
 }
 
 // Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.

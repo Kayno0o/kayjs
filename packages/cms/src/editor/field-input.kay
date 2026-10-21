@@ -18,6 +18,7 @@ import { wording } from 'kay/words'
 import { today } from '../datetime'
 import { checkField, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
+import { referenceChoices } from './references'
 import { sizeOfPath } from '../upload-text'
 import Adorned from './adorned.kay'
 import ReadyInput from './ready-input.kay'
@@ -50,6 +51,8 @@ const jsonFocused = signal(false)
 // The list's items folded away by place, and the last item removed, which Undo puts back.
 const folded = signal<readonly boolean[]>([])
 const removed = signal<{ at: number, title: string, value: unknown }>()
+// The entries a reference field can pick, undefined while they load and null once they cannot be read, the field then taking the slug typed.
+const choices = signal<{ value: string, label: string }[] | null>()
 let rows: HTMLElement | undefined
 let box: HTMLElement | undefined
 
@@ -79,6 +82,31 @@ function grow(element: HTMLTextAreaElement, rows: number | undefined): void {
 
 // The text typed stands while it is being edited or does not parse; once the draft is dropped or the box is left, the box shows the draft.
 const jsonShown = () => jsonFocused() || drafts.blocked(entry, path).length > 0 ? jsonText() ?? formatted() : formatted()
+
+// A reference picks among the target collection's entries.
+effect(() => {
+  const target = field.kind === 'reference' ? field.collection : ''
+
+  if (target === '')
+    return
+
+  void (async () => {
+    try {
+      choices.set(await referenceChoices(target))
+    }
+    catch {
+      choices.set(null)
+    }
+  })()
+})
+
+// The entries to pick, the one the field holds now among them even when the collection lacks it, so a reference left dangling shows rather than vanishes.
+const picks = () => {
+  const held = text()
+  const list = choices() ?? []
+
+  return held === '' || list.some(choice => choice.value === held) ? list : [{ value: held, label: held }, ...list]
+}
 
 // A box that goes (a list item removed) no longer blocks the save.
 effect(() => {
@@ -458,6 +486,12 @@ function leaveJson(): void {
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} sizeIssues={sizeIssues()} onAlt={setAlt} onChange={setFile})
+    when 'reference'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
+        if choices() === null || current.collection === ''
+          TextInput(placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()})
+        else
+          Select(required={starred()} value={text()} options={picks()} loading={choices() === undefined} emptyOption={!current.required || value() === undefined} onChange={next => set(next === '' ? cleared : next)})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind

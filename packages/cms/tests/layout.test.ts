@@ -132,14 +132,21 @@ describe('listColumns and cellText', () => {
 })
 
 describe('rowActions', () => {
-  test('are all five unless the layout names some', () => {
-    expect([...rowActions()]).toEqual(['move', 'publish', 'unpublish', 'editOnPage', 'delete'])
+  test('are all six unless the layout names some', () => {
+    expect([...rowActions()]).toEqual(['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete'])
     expect([...rowActions({ actions: ['delete'] })]).toEqual(['delete'])
     expect([...rowActions({ actions: [] })]).toEqual([])
   })
 })
 
 describe('checkLayouts', () => {
+  test('reads the group and the order of the content list, and refuses what means nothing', () => {
+    expect(checkLayouts({ posts: { group: 'Blog', order: 2 } }).get('posts')).toMatchObject({ group: 'Blog', order: 2 })
+    expect(() => checkLayouts({ posts: { group: '  ' } })).toThrow('group')
+    expect(() => checkLayouts({ posts: { order: '1' } })).toThrow('order')
+    expect(() => checkLayouts({ posts: { order: Number.NaN } })).toThrow('order')
+  })
+
   test('reads a layout as given, none as none', () => {
     expect(checkLayouts(undefined).size).toBe(0)
     expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })

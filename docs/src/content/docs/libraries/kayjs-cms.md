@@ -165,6 +165,8 @@ A new item starts from the `default` of the item's schema, and a select with no 
 
 Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields, a multi-line text excepted. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
 
+A `reference('authors')` field is a menu of that collection's entries. A save is refused for a reference to an entry that does not exist, and deleting an entry names the entries that point at it.
+
 A list also has Add at the top, and a menu to jump to an item once it holds eight or more. A folded item shows how many issues it hides, such as `2 issues`. Reset asks before it drops your unsaved changes.
 
 ## How a field is entered
@@ -432,7 +434,9 @@ const saver: FileSaver = {
 
 ## The entries API
 
-The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
+The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
+
+`POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
@@ -493,7 +497,11 @@ cms({ collections: { shop: {
 
 In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
 
-In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
+In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
+
+To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts and a New entry button.
+
+The list keeps its state in the URL, so you can send a link to a view. You can search without caring for accents, filter by status, sort any column across every page, tick entries to publish, unpublish or delete them together, and duplicate an entry into a draft.
 
 The editor on the page follows the form's layout too. A name twice, or an action that does not exist, throws when `kay.config.ts` loads. A field the schema lacks logs a warning at boot.
 

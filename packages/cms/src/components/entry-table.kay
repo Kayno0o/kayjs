@@ -1,5 +1,5 @@
 ---
-import type { Column } from '@kaynooo/kayjs-ui'
+import type { Column, SortState } from '@kaynooo/kayjs-ui'
 import type { ScreenCollection } from '../kay/contract'
 import type { EntryRow } from '../listing'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
@@ -7,18 +7,21 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
-import { refresh } from 'kay'
+import { navigate, refresh } from 'kay'
 import { wording } from 'kay/words'
+import { duplicateSaved } from '../editor/bulk'
 import { deleteSaved, moveSaved, publishSaved, unpublishSaved } from '../editor/save'
+import EntryBulk from './entry-bulk.kay'
 import EntryStatus from './entry-status.kay'
 import EntryWatch from './entry-watch.kay'
 import { shipWords } from '../editor/words'
 import { fieldsOf } from '../fields'
 import { listColumns, rowActions } from '../layout'
-import { deleteMessage, entryPath, onPagePath, problemId } from '../listing'
+import { deleteMessage, entryPath, newEntryPath, onPagePath, problemId, statusOf } from '../listing'
 import { WATCHED_ROWS } from '../room'
 
-const { prefix, collection, rows, searched } = props<{ prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean }>()
+// `sort` is the column the rows come sorted by, the server having sorted them across the pages: a click on a header goes to the same list sorted by that column.
+const { prefix, collection, rows, searched, sort } = props<{ prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean, sort?: SortState | undefined }>()
 
 // Looks up what a save says once the page has loaded, so the page sends it.
 shipWords()
@@ -37,7 +40,7 @@ const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
   ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
-  ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
+  ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), sortValue: (row: EntryRow) => ['draft', 'scheduled', 'published'].indexOf(statusOf(row)), cell: true } satisfies Column<EntryRow>]),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
 
@@ -61,12 +64,29 @@ async function move(row: EntryRow, direction: 'up' | 'down'): Promise<void> {
     await refresh()
 }
 
+async function copy(row: EntryRow): Promise<void> {
+  const slug = await duplicateSaved(ref(row))
+
+  if (slug !== undefined)
+    await navigate(entryPath(prefix, { ...ref(row), slug }))
+}
+
+// Goes to the same list sorted the way the header asks, from its first page.
+async function sortBy(next: SortState): Promise<void> {
+  await navigate({ query: { sort: next.key, dir: next.direction, page: null } })
+}
+
+// The bulk actions the layout keeps; the table lets rows be ticked only when it has one.
+const bulkable = ['publish', 'unpublish', 'delete'].some(action => actions.has(action as never) && (action === 'delete' || collection.draftField !== undefined))
+
 async function remove(row: EntryRow): Promise<void> {
   if (await deleteSaved(ref(row), row.version))
     await refresh()
 }
 ---
-Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
+Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSort={sortBy} selectable={bulkable})
+  @bulk(keys, clear)
+    EntryBulk(collection={collection} rows={rows.filter(row => keys.includes(keyOf(row)))} actions={actions} clear={clear})
   @cell(row, column)
     if column.key === 'title'
       // Why an entry is broken shows on the link too, so a keyboard reaches it and a screen reader reads it with the title.
@@ -97,6 +117,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
           Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
         if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
           ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
+        if actions.has('duplicate') && !collection.single && row.problem === undefined
+          Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateLabel', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('editOnPage')
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
@@ -104,6 +126,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
           ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', row.referencedBy)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
-      EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry\'s title or slug holds every word searched.')})
+      EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry holds every word searched.')})
     else
       EmptyState(title={wording('cms.table.empty', 'No entries yet')})
+        @actions
+          Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" tone="accent")

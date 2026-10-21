@@ -1,8 +1,9 @@
-import type { EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
-import type { EntryRow } from './listing'
+import type { CollectionInfo, CollectionLayout, EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
+import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
 import { collections, entries } from './kay/content'
-import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
+import { collectionPath, entryPath, newEntryPath, pageRows, rowsOf, statusOf } from './listing'
+import { log } from './log'
 import { referrersOf } from './references'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
@@ -21,6 +22,8 @@ export interface ListScreen {
   rows: EntryRow[]
   page: number
   pages: number
+  // How many entries the search and the status keep, across the pages.
+  total: number
 }
 
 // What an entry's screen reads, for an app's page at that screen's path: undefined for a collection the site lacks. Reads only: the extension's guard covers a page at a screen's path, a page outside the prefix needs its own.
@@ -43,8 +46,8 @@ export async function collectionScreen(name: string): Promise<{ prefix: string, 
   return collection && { prefix: settings().prefix, collection }
 }
 
-// What a collection's list reads, `q` being the search and `page` from 1: undefined for a collection the site lacks.
-export async function listScreen({ collection: name, q = '', page = 1 }: { collection: string, q?: string | undefined, page?: number | undefined }): Promise<ListScreen | undefined> {
+// What a collection's list reads, `q` being the search, `status` the status kept, `sort` a column's key with its `dir`ection, and `page` from 1: undefined for a collection the site lacks.
+export async function listScreen({ collection: name, q = '', page = 1, status, sort, dir }: { collection: string, q?: string | undefined, page?: number | undefined, status?: ListView['status'], sort?: string | undefined, dir?: ListView['direction'] }): Promise<ListScreen | undefined> {
   const collection = await findCollection(name)
 
   if (!collection)
@@ -52,7 +55,7 @@ export async function listScreen({ collection: name, q = '', page = 1 }: { colle
 
   const { prefix, pageSize } = settings()
 
-  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize)
+  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir })
   const referrers = await referrersOf(collection.name, listed.rows.map(row => row.slug))
 
   return { prefix, collection, ...listed, rows: listed.rows.map(row => ({ ...row, ...referrers.has(row.slug) && { referencedBy: referrers.get(row.slug) } })) }
@@ -130,4 +133,47 @@ export async function translationsScreen(): Promise<TranslationsScreen> {
   }
 
   return { prefix: settings().prefix, collections: found }
+
+export interface IndexRow {
+  collection: CollectionInfo
+  layout: CollectionLayout | undefined
+  // Where the collection opens, see `openPath`.
+  href: string
+  // Where a new entry is written; undefined for a collection that cannot be read or holds its one entry already.
+  newHref: string | undefined
+  // The entries in draft and those scheduled ahead, for a collection with a draft or publish field; undefined for any other.
+  drafts: number | undefined
+  scheduled: number | undefined
+}
+
+// What the content list reads: each collection with where it opens, where a new entry goes and how many entries wait in draft or for their date. A count that fails to read is left out, as the list must open whatever one collection does.
+export async function indexRows(): Promise<IndexRow[]> {
+  const { prefix, layouts } = settings()
+
+  return Promise.all((await collections()).map(async (collection) => {
+    const href = await openPath(collection)
+    const layout = layouts.get(collection.name)
+    const counted = collection.problem === undefined && !collection.single && (collection.draftField !== undefined || collection.publishField !== undefined)
+    const rows = counted ? await readRows(collection) : undefined
+
+    return {
+      collection,
+      layout,
+      href,
+      newHref: collection.problem === undefined && !collection.single ? newEntryPath(prefix, collection.name) : undefined,
+      drafts: rows?.filter(row => statusOf(row) === 'draft').length,
+      scheduled: collection.publishField === undefined ? undefined : rows?.filter(row => statusOf(row) === 'scheduled').length,
+    }
+  }))
+}
+
+async function readRows(collection: CollectionInfo): Promise<ReturnType<typeof rowsOf> | undefined> {
+  try {
+    return rowsOf({ ...collection }, await entries(collection.name, {}))
+  }
+  catch (error) {
+    log.error(`${collection.name}'s entries failed to read for the content list`, error)
+
+    return undefined
+  }
 }

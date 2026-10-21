@@ -18,10 +18,17 @@ cms({ collections: { shop: {
 - A name reaches into a group with a dotted path, `address.street`, in `fields` (alone or in a row) and in `hide`: the field leaves its group and takes the place named, the group keeping the others (and vanishing once none is left). A path the schema lacks is warned of at boot like a missing name.
 - A hidden field that a save refuses (a required one, say) still shows its issue above the form, so the editor is never told nothing. See [Fixing a refused save](#fixing-a-refused-save) for what the form does with the others.
 - `list.columns` are field keys shown after the title, each headed by the field's label and sortable. A text, number, boolean (Yes or No), select (its label), date, image or file (its file name) or reference field can be a column; a list, group, JSON or custom field cannot.
-- `list.actions` keeps some of a row's actions, `'move'`, `'publish'`, `'unpublish'`, `'editOnPage'`, `'delete'`; all by default. `actions: []` removes the Actions column.
+- `list.actions` keeps some of a row's actions, `'move'`, `'publish'`, `'unpublish'`, `'duplicate'`, `'editOnPage'`, `'delete'`; all by default. `actions: []` removes the Actions column.
+- `group: 'Blog'` puts the collection under that heading in the content list (those with none come first) and `order: 1` places it, the lowest first, then the site's order. The list names each collection's `description`, its drafts and scheduled entries, and has a New entry button.
 - A shape that means nothing, a name twice, a name both shown and hidden or an unknown action throws as `kay.config.ts` loads. A name the schema lacks logs a warning at boot, and the screens skip it.
 
-## Replace a screen
+## The list
+
+State is in the URL, so a view of the list is a link: `?q=` searches (accents and case ignored, in the title, the text fields, the cells and the body), `?status=draft|scheduled|published` filters a collection that has a draft or publish field, `?sort=<column>&dir=asc|desc` sorts and `?page=` pages. Sort, search and filter run on every entry of the collection, not on the page shown, and the count of results shows under the search once one is on. A header click sorts by that column (`title`, `locale`, `draft` for the status, `cell:<field>` for a field's column). A sorted ordered collection shows no move buttons.
+
+- Ticking rows offers Publish, Unpublish and Delete on them (as many as `list.actions` keeps), one request each; the delete confirmation names the entries that refer to any of them. Duplicate saves a draft copy under `<slug>-copy`, `-copy-2`... and opens it; a collection with no draft field copies as it is.
+- An empty collection offers New entry.
+
 
 A page of the app at a screen's path replaces it: `src/routes/admin/collections/shop/[...slug].kay` (under prefix `/` the screens mount in a `(admin)` group, a folder adding nothing to a URL, so the page is `src/routes/(admin)/collections/shop/[...slug].kay` and `src/routes/(admin)/_layout.kay` is the layout; a page outside the group keeps the app's layouts and guards) serves the shop's entries in place of `<prefix>/collections/[collection]/[...slug]`, and the other screens stay. A `src/routes/admin/_layout.kay` replaces the cms's own layout for every screen. That one holds the chrome (skip link, the `cms({ logo })` image and name, nav with Content, Missing pages and Unused uploads, a link back to the site), kayjs-ui's `Toaster` and `TooltipHost` and the stylesheet `@kaynooo/kayjs-cms/admin.css`, which imports Tailwind and kayjs-ui's theme, so a layout of your own renders the chrome and the toaster, imports the stylesheet and sets `export const page = { layouts: false, noindex: true }` to stay clear of the site's layouts as the default does. The extension's guard still runs before a replacing page, as guards resolve per URL directory across both trees, unless the app has a `_guard.ts` of its own at that level.
 
@@ -43,7 +50,7 @@ ShopEntry(prefix={screen.prefix} collection={screen.collection} entry={entry})
 
 - `entryScreen({ collection, slug, locale })` gives `{ prefix, collection, entry }`. `entry` is `undefined` when the collection cannot be read (its `problem` says why) or holds no such entry. A page reading `?locale=` names it in `export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }`.
 - `collectionScreen(name)` gives `{ prefix, collection }`, for a new entry's screen, which has no entry to read.
-- `listScreen({ collection, q, page })` gives `{ prefix, collection, rows, page, pages }`, the rows of a page of the list as the default list draws them, `cells` for the layout's columns included.
+- `listScreen({ collection, q, page, status, sort, dir })` gives `{ prefix, collection, rows, page, pages, total }`, the rows of a page of the list as the default list draws them, `cells` for the layout's columns included.
 - The collection carries its layout as `collection.layout`, so the parts below need no other prop.
 
 ## Build a screen from the parts

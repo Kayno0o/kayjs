@@ -6,19 +6,25 @@ import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
-import { adminTitle, collectionTitle, newEntryPath } from '../../../listing'
+import { adminTitle, collectionTitle, newEntryPath, statusParam, viewHref } from '../../../listing'
 import { listScreen, openPath } from '../../../screens'
 
-export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
+export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()), status: s.Optional(s.String()), sort: s.Optional(s.String()), dir: s.Optional(s.String()) }) }
 
 const search = ctx.query.q ?? ''
-const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page }) ?? ctx.notFound()
+const status = statusParam(ctx.query.status)
+const direction: 'asc' | 'desc' = ctx.query.dir === 'desc' ? 'desc' : 'asc'
+const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page, status, sort: ctx.query.sort, dir: direction }) ?? ctx.notFound()
 
 if (collection.single && collection.problem === undefined)
   ctx.redirect(await openPath(collection))
 
 const url = ctx.url
+const sort = ctx.query.sort
 const title = collectionTitle(collection)
+const narrowed = search !== '' || status !== undefined
+// The status filter is for a collection that has drafts or dates.
+const statuses = [{ value: undefined, label: wording('cms.admin.statusAll', 'All') }, { value: 'draft', label: wording('cms.admin.statusDraft', 'Drafts') }, ...collection.publishField === undefined ? [] : [{ value: 'scheduled', label: wording('cms.admin.statusScheduled', 'Scheduled') }], { value: 'published', label: wording('cms.admin.statusPublished', 'Published') }]
 ---
 head
   title {adminTitle(title)}
@@ -31,7 +37,21 @@ PageSection(title={title} level={1})
   if collection.problem as problem
     EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
   else
-    form.kcms-search(method="get" role="search")
-      input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.admin.searchLabel', 'Search entries')})
-    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ''})
+    .kcms-tools
+      form.kcms-search(method="get" role="search")
+        input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.admin.searchLabel', 'Search entries')})
+        if status
+          input(type="hidden" name="status" value={status})
+        if sort
+          input(type="hidden" name="sort" value={sort})
+          input(type="hidden" name="dir" value={direction})
+        if search !== ''
+          Button(href={viewHref(url, { q: undefined })} label={wording('cms.admin.clearSearch', 'Clear search')} variant="ghost")
+      if collection.draftField !== undefined || collection.publishField !== undefined
+        nav.kcms-statuses(aria-label={wording('cms.admin.statusLabel', 'Filter by status')})
+          for option of statuses key={option.label}
+            Button(href={viewHref(url, { status: option.value })} label={option.label} variant={status === option.value ? 'solid' : 'ghost'} aria-current={status === option.value ? 'true' : undefined})
+    if narrowed
+      p.kcms-count(role="status") {wording('cms.admin.resultCount', listed.total === 1 ? '1 result' : '{count} results', { count: listed.total })}
+    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={narrowed} sort={sort ? { key: sort, direction } : undefined})
     Pagination(page={listed.page} pages={listed.pages} url={url})
