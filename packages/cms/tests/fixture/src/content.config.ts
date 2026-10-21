@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, imageField } from 'kay/content'
-import { outage, shop as shelf, products as stock } from './products'
+import { footerDown, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
@@ -50,7 +50,12 @@ export const welcome = collection('content/welcome', {
 })
 
 // A collection of one entry, not written yet: its form opens filled with the seed.
-export const footer = collection({ name: 'footer', load: () => [] }, {
+export const footer = collection({ name: 'footer', load: () => {
+  if (footerDown.down)
+    throw new Error('the database is down')
+
+  return []
+} }, {
   schema: s.Object({ legal: s.String() }),
   title: 'Footer',
   single: true,

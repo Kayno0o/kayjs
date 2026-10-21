@@ -2,6 +2,9 @@
 // Set to make the loader throw, as a database down would.
 export const outage: { message?: string | undefined } = {}
 
+// Set to make the footer's loader throw.
+export const footerDown = { down: false }
+
 export const products: { slug: string, data: { name: string, color?: string, mood?: string } }[] = [{ slug: 'mug', data: { name: 'Mug', color: '#ff0000', mood: 'calm' } }]
 
 // The shop collection's store, which the tests read back: `sku` is required and hidden by the layout.

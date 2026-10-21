@@ -7,7 +7,7 @@ import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
 import { entryScreen, listScreen } from '../../../src/screens'
-import { outage, products, shop } from '../src/products'
+import { footerDown, outage, products, shop } from '../src/products'
 import { saved } from '../src/saved'
 
 const ROOT = join(import.meta.dir, '..')
@@ -87,6 +87,28 @@ test('a single collection opens its form from the content list and its list addr
   expect(form.find('h1').map(heading => heading.text)).toEqual(['Footer'])
   expect(form.title()).toBe('Footer - Content admin')
   expect(form.text('main')).not.toContain('Slug')
+})
+
+test('a single collection whose entry is written has no seed form: its new address leads to the entry', async () => {
+  const response = await site.fetch('/admin/new/welcome', { redirect: 'manual' })
+
+  expect(response.headers.get('location')).toBe('/admin/collections/welcome/index')
+})
+
+test('a single collection that cannot be read keeps its list address, which says why, instead of redirecting to itself', async () => {
+  footerDown.down = true
+
+  try {
+    expect((await site.visit('/admin')).find('.kui-card-row a').map(link => link.attributes.href)).toContain('/admin/collections/footer')
+
+    const response = await site.fetch('/admin/collections/footer', { redirect: 'manual' })
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('This collection cannot be read')
+  }
+  finally {
+    footerDown.down = false
+  }
 })
 
 test('the screens have their own chrome, none of the site\'s header, footer or head, in each locale and on every screen', async () => {

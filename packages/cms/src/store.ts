@@ -3,6 +3,7 @@ import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCol
 import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
+import { collectionTitle, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { settings } from './settings'
@@ -117,6 +118,17 @@ function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): {
   return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', ...at, message }] }
 }
 
+// What a new entry of a single collection is refused for: the collection holds its entry already, or the slug is not the one the first is written under.
+async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Promise<{ issues: Issue[] } | undefined> {
+  if (!collection.single)
+    return undefined
+
+  if ((await entries(collection.name, { limit: 1 })).length > 0)
+    return refused(entry, wording('cms.store.singleExists', '{collection} holds one entry, which is written already', { collection: collectionTitle(collection) }))
+
+  return entry.slug === SINGLE_SLUG ? undefined : refused(entry, wording('cms.store.singleSlug', '{collection} holds one entry, written as {slug}', { collection: collectionTitle(collection), slug: SINGLE_SLUG }))
+}
+
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
 export async function saveEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } & VersionRule = {}): Promise<SaveOutcome> {
@@ -129,13 +141,15 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')
   }
 
-  if (create && collection.single && (await entries(collection.name, { limit: 1 })).length > 0)
-    return refused(entry, wording('cms.store.singleExists', '{collection} holds one entry, which is written already', { collection: collection.title ?? collection.name }), 'slug')
-
   if (collection.kind === 'loaded') {
     const versioned = required || version !== undefined
 
     return inTurn(collection.name, async () => {
+      const single = create ? await singleRefusal(entry, collection) : undefined
+
+      if (single)
+        return single
+
       const stale = versioned && !create ? await staleLoaded(entry, collection.schema, version, required) : undefined
 
       if (stale)
@@ -149,6 +163,11 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       return versioned ? { saved: true, version: await loadedVersion(entry, collection.schema) } : { saved: true }
     })
   }
+
+  const single = create ? await singleRefusal(entry, collection) : undefined
+
+  if (single)
+    return single
 
   if (required && !create && version === undefined && await versionOf(entry) !== undefined)
     return unversioned(entry)
@@ -174,7 +193,7 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
   const collection = await collectionNamed(ref.collection)
 
   if (collection.single)
-    return refused(ref, wording('cms.store.singleDelete', '{collection} holds one entry, which cannot be deleted', { collection: collection.title ?? collection.name }))
+    return refused(ref, wording('cms.store.singleDelete', '{collection} holds one entry, which cannot be deleted', { collection: collectionTitle(collection) }))
 
   if (collection.kind === 'loaded') {
     return inTurn(collection.name, async () => {

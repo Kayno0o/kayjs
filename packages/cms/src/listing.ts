@@ -174,11 +174,6 @@ export function problemId(collection: string, key?: string): string {
   return `kcms-problem-${[collection, key].filter(part => part !== undefined).map(part => part.replace(UNSAFE_ID, char => `_${char.codePointAt(0)!.toString(16)}_`)).join('-')}`
 }
 
-// Where a single collection opens, in place of a list: its entry's form, else the form of the entry not written yet. `slug` is the entry's, when there is one.
-export function singlePath(prefix: string, collection: string, slug?: string): string {
-  return slug === undefined ? newEntryPath(prefix, collection) : entryPath(prefix, { collection, slug })
-}
-
 export function newEntryPath(prefix: string, collection: string): string {
   return screenPath(prefix, `/new/${encodeURIComponent(collection)}`)
 }

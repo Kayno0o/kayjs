@@ -5,12 +5,16 @@ import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
 import EntryHeader from '../../components/entry-header.kay'
 import { adminTitle, collectionTitle } from '../../listing'
-import { collectionScreen } from '../../screens'
+import { collectionScreen, openPath, writtenSlug } from '../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
 const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? ctx.notFound()
 const locale = ctx.query.locale
+
+// The entry of a single collection is written already, so its form is the one to open, not the seed's.
+if (collection.single && collection.problem === undefined && await writtenSlug(collection.name) !== undefined)
+  ctx.redirect(await openPath(collection))
 ---
 head
   title {adminTitle(collection.single ? collectionTitle(collection) : wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) }))}

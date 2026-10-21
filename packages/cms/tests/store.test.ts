@@ -266,14 +266,22 @@ describe('deleteEntry', () => {
 
 describe('a single collection', () => {
   test('refuses a second entry, whatever its slug, and creates the first', async () => {
-    const entry = { collection: 'home', slug: 'other', data: { title: 'Hi' } }
+    const entry = { collection: 'home', slug: 'index', data: { title: 'Hi' } }
 
     expect(await saveEntry(entry, { create: true })).toHaveProperty('saved', true)
 
     stored.home = [{ slug: 'index', data: { title: 'Hi' }, draft: false }]
 
-    expect(await saveEntry(entry, { create: true })).toHaveProperty('issues.0.message', 'home holds one entry, which is written already')
+    expect(await saveEntry(entry, { create: true })).toHaveProperty('issues.0.message', 'Home holds one entry, which is written already')
     expect(saved).toHaveLength(1)
+  })
+
+  test('refuses a first entry under another slug, with a message that names no field', async () => {
+    const outcome = await saveEntry({ collection: 'home', slug: 'other', data: { title: 'Hi' } }, { create: true })
+
+    expect(outcome).toHaveProperty('issues.0.message', 'Home holds one entry, written as index')
+    expect(outcome).not.toHaveProperty('issues.0.key')
+    expect(saved).toEqual([])
   })
 
   test('saves changes to its entry', async () => {
@@ -285,7 +293,7 @@ describe('a single collection', () => {
   test('refuses a delete, its entry staying', async () => {
     stored.home = [{ slug: 'index', data: { title: 'Hi' }, draft: false }]
 
-    expect(await deleteEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'home holds one entry, which cannot be deleted')
+    expect(await deleteEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'Home holds one entry, which cannot be deleted')
     expect(saved).toEqual([])
   })
 })

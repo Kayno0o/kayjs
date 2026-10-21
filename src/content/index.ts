@@ -391,7 +391,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const { list } = await loaded()
       const entry = list.find(candidate => !hidden(candidate))
 
-      return entry ? entry.data : fallback ?? options.seed
+      return entry ? editableEntries(name, [entry])[0]!.data : fallback ?? options.seed
     },
     // Holds `reset`, which the listener only holds weakly.
     invalidate: () => {

@@ -14,7 +14,7 @@ export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optio
 const search = ctx.query.q ?? ''
 const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page }) ?? ctx.notFound()
 
-if (collection.single)
+if (collection.single && collection.problem === undefined)
   ctx.redirect(await openPath(collection))
 
 const url = ctx.url

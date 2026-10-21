@@ -433,6 +433,17 @@ describe('the collections a CMS edits', () => {
     expect(await home.one({ title: 'Fallback' })).toEqual({ title: 'Written' })
   })
 
+  it('marks the fields one() reads in edit mode, as get() does', async () => {
+    const home = collection({ name: 'home', load: () => [{ slug: 'index', data: { title: 'Written' } }] }, { schema: t.Object({ title: t.String() }), single: true })
+
+    await inPreview(async () => {
+      const data = await home.one({ title: 'Fallback' })
+      const marks = editMarks()!
+
+      expect(placeFieldMarks(withFieldMarks(marks, () => `<h1>${child(data.title)}</h1>`), marks)).toBe('<h1 data-kay-field="home:index:title">Written</h1>')
+    }, true)
+  })
+
   it('refuses one() on a collection that is not single, and a single one that is localized or a seed without single', async () => {
     const schema = t.Object({ title: t.String() })
 

@@ -111,7 +111,7 @@ The content list links to the form, which is titled "Home page". It has no slug 
 const { headline } = await home.one()
 ```
 
-`one()` gives the entry's data, else the `seed`, else `undefined`. Give it a fallback to get the data typed, `await home.one({ headline: '', intro: '' })`. A single collection cannot be `localized`.
+`one()` gives the entry's data, else the `seed`, else `undefined`. Give it a fallback to get the data typed, `await home.one({ headline: '', intro: '' })`. A single collection cannot be `localized`. If it already holds several entries, such as a list you turned into one, the admin and `one()` show the first and the others are out of its reach, so keep one.
 
 ## Ordering entries
 

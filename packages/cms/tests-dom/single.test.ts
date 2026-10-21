@@ -20,8 +20,8 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-async function open(entry?: StoredEntry, collection = home) {
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection, entry })
+async function open(entry?: StoredEntry, collection = home, prefix = '/admin') {
+  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix, collection, entry })
 
   return mounted.root
 }
@@ -55,4 +55,10 @@ test('a collection that is not single keeps its slug field, its Delete and its l
   expect(root.querySelector('h1')?.textContent).toBe('Hello')
   expect(root.querySelector('.kcms-entry-crumb')?.getAttribute('href')).toBe('/admin/collections/home')
   expect(buttons(root)).toContain('Delete')
+})
+
+test('the way back from a single collection under the root prefix is the content list at /', async () => {
+  const root = await open(written, home, '/')
+
+  expect(root.querySelector('.kcms-entry-crumb')?.getAttribute('href')).toBe('/')
 })
