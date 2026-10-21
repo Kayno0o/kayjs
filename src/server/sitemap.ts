@@ -140,7 +140,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
       }
 
       if (matchesEtag(request.headers.get('if-none-match'), kept.etag))
-        return new Response(null, { status: 304, headers: { 'etag': kept.etag, 'cache-control': REVALIDATE } })
+        return new Response(null, { status: 304, headers: { 'etag': kept.etag, 'cache-control': REVALIDATE, 'vary': 'accept-encoding' } })
 
       return await kept.reply(request)
     }

@@ -135,7 +135,7 @@ async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Pro
 }
 
 // The longest the editor waits for `cms({ onSave })`, which runs before the save answers.
-export const SAVE_HOOK_LIMIT_MS = 10_000
+const SAVE_HOOK_LIMIT_MS = 10_000
 let hookLimit = SAVE_HOOK_LIMIT_MS
 
 // For tests, which cannot wait ten seconds; not for apps. No argument restores the limit.
@@ -478,8 +478,8 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
     })
 
     if ('saved' in moved) {
-      for (const entry of written)
-        await saved({ collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: 'move', ...author !== undefined && { author } })
+      // Together, so a hook that hangs holds the editor for one limit and not one per entry.
+      await Promise.all(written.map(async entry => saved({ collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: 'move', ...author !== undefined && { author } })))
     }
 
     return moved

@@ -3,7 +3,7 @@ import { SQL } from 'bun'
 import { afterAll, afterEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, contentKey } from 'kay/content'
-import { invalidate, onKeysInvalidated, trackStore, untrackStore } from '../../../src/runtime/cache'
+import { onKeysInvalidated, refreshLocally, trackStore, untrackStore } from '../../../src/runtime/cache'
 import { postgresLoader } from '../src/loaders/postgres'
 import { watcher } from '../src/loaders/shared'
 
@@ -17,12 +17,12 @@ function fresh(): string {
   return `watched-${++count}`
 }
 
-// Counts the drops of a collection this process saw.
+// Counts the times a collection's own entries were dropped in this process.
 function drops(name: string): { count: () => number } {
   let seen = 0
 
-  stops.push(onKeysInvalidated((matches) => {
-    if (matches(contentKey(name)))
+  stops.push(onKeysInvalidated((_, dropped) => {
+    if (dropped(contentKey(name)))
       seen++
 
     return []
@@ -83,8 +83,16 @@ describe('a loader\'s watcher', () => {
     const name = fresh()
     let first = 0
     let second = 0
-    const old = watcher(name, 'scope', `${EVERY}ms`, '1s', () => String(++first))
-    const replacement = watcher(name, 'scope', `${EVERY}ms`, '1s', () => String(++second))
+    const old = watcher(name, 'scope', `${EVERY}ms`, '1s', () => {
+      first++
+
+      return 'x'
+    })
+    const replacement = watcher(name, 'scope', `${EVERY}ms`, '1s', () => {
+      second++
+
+      return 'x'
+    })
 
     await old.start()
     await replacement.start()
@@ -94,7 +102,6 @@ describe('a loader\'s watcher', () => {
     await Bun.sleep(EVERY * 5)
     expect(first).toBe(before)
     expect(second).toBeGreaterThan(2)
-    invalidate(contentKey(name))
   })
 
   test('starts again after a start that failed, and a second start does nothing', async () => {
@@ -116,8 +123,26 @@ describe('a loader\'s watcher', () => {
     failing = false
     await watching.start()
     await watching.start()
-    await Bun.sleep(EVERY * 3)
-    expect(calls).toBeGreaterThan(2)
+
+    const before = calls
+
+    await Bun.sleep(EVERY * 5)
+    // One timer looks about five times in that time, two would look ten.
+    expect(calls - before).toBeGreaterThan(1)
+    expect(calls - before).toBeLessThanOrEqual(7)
+  })
+
+  test('keeps looking after the entries were refreshed without being dropped, as a publishAt date passing does', async () => {
+    const name = fresh()
+    const seen = drops(name)
+    let signature = 'a'
+    const watching = watcher(name, 'scope', `${EVERY}ms`, '1s', () => signature)
+
+    await watching.start()
+    signature = 'b'
+    refreshLocally(contentKey(name))
+    await Bun.sleep(EVERY * 5)
+    expect(seen.count()).toBe(1)
   })
 
   test('does not report a change a look read before a save settled', async () => {

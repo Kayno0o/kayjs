@@ -168,9 +168,9 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
       timer.unref()
 
       const mine = timer
-      // A drop of the collection made elsewhere, a save here or one another process broadcast, already shows in the database: the next look must not report it again.
-      const stopHearing = onKeysInvalidated((matches) => {
-        if (!dropping && matches(contentKey(name)))
+      // A drop of the collection's own entries made elsewhere, a save here or one another process broadcast, already shows in the database: the next look must not report it again.
+      const stopHearing = onKeysInvalidated((_, dropped) => {
+        if (!dropping && dropped(contentKey(name)))
           void settle()
 
         return []
