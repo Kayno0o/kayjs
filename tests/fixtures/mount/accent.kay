@@ -1,0 +1,4 @@
+---
+import { accent } from './accent'
+---
+p.accent {accent()}

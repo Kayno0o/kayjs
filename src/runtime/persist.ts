@@ -37,14 +37,14 @@ export const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.
-export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration): Persisted<T> {
+export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration, values?: readonly unknown[]): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ .`)
 
   const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'
-    ? { request: scope => decoded(scope.cookie(key)), stored: () => decoded(cookie(key)), save: value => saveCookie(key, value, seconds) }
-    : { stored: () => decoded(readLocal(key)), save: value => saveLocal(key, value), afterHydration: true }
+    ? { request: scope => decoded(scope.cookie(key), values), stored: () => decoded(cookie(key), values), save: value => saveCookie(key, value, seconds) }
+    : { stored: () => decoded(readLocal(key), values), save: value => saveLocal(key, value), afterHydration: true }
 
   return keep(store, read, write)
 }
@@ -134,12 +134,15 @@ function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T
   }
 }
 
-function decoded<T>(text: string | null | undefined): Stored<T> {
+// `values`, when the signal names them, leaves out a value among none of them, as one that does not decode.
+function decoded<T>(text: string | null | undefined, values?: readonly unknown[]): Stored<T> {
   if (text == null)
     return { found: false }
 
   try {
-    return { found: true, value: decodeValue(text) as T }
+    const value = decodeValue(text)
+
+    return values && !values.includes(value) ? { found: false } : { found: true, value: value as T }
   }
   catch {
     // Written by another version of the app, or by hand: the default stands.

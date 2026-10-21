@@ -78,6 +78,14 @@ describe('persistedCookie', () => {
     expect((await site.visit('/theme')).find('main')[0]?.attributes['data-theme']).toBe('system')
   })
 
+  it('reads a value the signal does not offer as its default', async () => {
+    const purple = await site.as(persistedCookie('scheme', 'purple')).visit('/theme')
+
+    expect(purple.find('p.scheme')[0]?.text).toBe('system')
+    expect((await site.as(persistedCookie('scheme', 7)).visit('/theme')).find('p.scheme')[0]?.text).toBe('system')
+    expect((await site.as(persistedCookie('scheme', 'dark')).visit('/theme')).find('p.scheme')[0]?.text).toBe('dark')
+  })
+
   it('stacks with other cookies by name', async () => {
     const both = site.as('a=1').as(persistedCookie('scheme', 'dark'))
 

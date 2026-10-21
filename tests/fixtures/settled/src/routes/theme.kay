@@ -1,7 +1,7 @@
 --- script
 import { persisted } from 'kay'
 
-const scheme = persisted<'system' | 'light' | 'dark'>('scheme', 'system')
+const scheme = persisted('scheme', 'system', { values: ['system', 'light', 'dark'] })
 ---
 main(data-theme={scheme()})
   p.scheme {scheme()}

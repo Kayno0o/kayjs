@@ -197,6 +197,26 @@ describe('mount', () => {
     }
   })
 
+  it('reads a kept value the signal does not offer as its default', async () => {
+    try {
+      writePersisted('accent', 'purple')
+
+      const stale = await mountComponent('tests/fixtures/mount/accent.kay')
+
+      expect(stale.root.querySelector('.accent')!.textContent).toBe('blue')
+      stale.unmount()
+      writePersisted('accent', 'green')
+
+      const kept = await mountComponent('tests/fixtures/mount/accent.kay')
+
+      expect(kept.root.querySelector('.accent')!.textContent).toBe('green')
+      kept.unmount()
+    }
+    finally {
+      localStorage.clear()
+    }
+  })
+
   it('shares only kay\'s own safe-html module with the test process, not any module of that name', async () => {
     const { root, unmount } = await mountComponent('tests/fixtures/mount/own-safe-html.kay')
 
