@@ -13,7 +13,8 @@ const saved: Record<string, unknown> = { title: 'Hello', draft: false, publishAt
 
 void mock.module('kay/server', () => ({ ...server, editRequested: () => false, editedEntry: () => false }))
 void mock.module('../src/store', () => ({
-  collectionNamed: async (name: string) => ({ name, draftField: 'draft', publishField: 'publishAt', unpublishField: undefined }),
+  collectionNamed: async (name: string) => ({ name, draftField: name === 'events' ? undefined : 'draft', publishField: 'publishAt', unpublishField: undefined }),
+  heldDate: () => '9999-12-31T00:00:00.000Z',
   entryScreen: async ({ slug }: { slug: string }) => ({ entry: slug === 'hello' || slug === 'café' ? { data: saved } : undefined }),
 }))
 
@@ -202,6 +203,73 @@ describe('roles', () => {
     // Whom may publish saves freely.
     expect(await save('/entries/posts/hello', { ...saved, draft: true }, { roles: ['publisher'] })).toBe(200)
     expect(await save('/entries/posts/new', { title: 'New', draft: false }, { roles: ['admin'] })).toBe(200)
+  })
+})
+
+describe('a custom guard', () => {
+  function custom(): void {
+    configure({ guard: () => undefined, roles, member: ({ locals }) => (locals as { me?: { mail: string, groups: string[] } }).me && { name: (locals as { me: { mail: string } }).me.mail, roles: (locals as { me: { groups: string[] } }).me.groups } })
+  }
+
+  const as = (groups: string[], path = '/entries/posts/hello', method = 'DELETE') => Object.assign(ask({ method, path }), { locals: { me: { mail: 'a@b.c', groups } } }) as GuardContext
+
+  test('holds the roles `cms({ member })` reports, and no role without it', async () => {
+    custom()
+    expect(await statusOf(as(['admin']))).toBe(200)
+    expect(await statusOf(as(['publisher']))).toBe(403)
+    expect(await statusOf(as(['stranger']))).toBe(403)
+    expect(await statusOf(ask({ method: 'DELETE', path: '/entries/posts/hello' }))).toBe(403)
+
+    configure({ guard: () => undefined, roles })
+    expect(await statusOf(as(['admin']))).toBe(403)
+  })
+
+  test('names the person for the header, and lists what its roles may not do', async () => {
+    custom()
+
+    const { memberOf, denials } = await import('../src/access')
+    const ctx = as(['publisher'])
+
+    expect(await memberOf(ctx)).toEqual({ name: 'a@b.c', held: ['publisher'] })
+    expect(Object.keys(await denials(ctx)).toSorted()).toEqual(['delete', 'redirects', 'upload'])
+    expect(await denials(as(['admin']))).toEqual({})
+
+    configure({ guard: () => undefined })
+    expect(await denials(as(['stranger']))).toEqual({})
+  })
+})
+
+describe('what the screens may offer', () => {
+  test('the api answers the denials of the person the guard read', async () => {
+    auth()
+
+    const { denialsOf } = await import('../src/access')
+    const ctx = ask({ method: 'GET', path: '/editor/can', user: { roles: ['uploader'] } })
+
+    expect(await statusOf(ctx)).toBe(200)
+    expect(Object.keys(await denialsOf(ctx.request)).toSorted()).toEqual(['delete', 'publish', 'redirects'])
+  })
+})
+
+describe('a new entry in a collection with a publish date and no draft flag', () => {
+  test('is held back for a role that may not publish, and left alone for one that may', async () => {
+    auth()
+
+    const { withHold } = await import('../src/publishing')
+    const body = { title: 'New' }
+    const save = async (user: { roles: string[] }) => {
+      const ctx = ask({ path: '/entries/events/new', body: { data: body, create: true }, user })
+
+      return { status: await statusOf(ctx), data: await withHold(ctx.request, 'events', body) }
+    }
+
+    expect(await save({ roles: ['editor'] })).toEqual({ status: 200, data: { title: 'New', publishAt: '9999-12-31T00:00:00.000Z' } })
+    expect(await save({ roles: ['publisher'] })).toEqual({ status: 200, data: body })
+  })
+
+  test('still refuses a date the editor picks, which is a publish', async () => {
+    auth()
+    expect(await statusOf(ask({ path: '/entries/events/new', body: { data: { title: 'New', publishAt: '2020-01-01' } }, user: { roles: ['editor'] } }))).toBe(403)
   })
 })
 

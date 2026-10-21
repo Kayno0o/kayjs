@@ -4,6 +4,7 @@ import type { SaveEvent } from './settings'
 import { wording } from 'kay/words'
 import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
+import { fieldsOf } from './fields'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
@@ -365,6 +366,13 @@ export function copySlug(slug: string, taken: ReadonlySet<string>): string {
 // The date a copy of a scheduled-only entry waits for until an editor picks one: it has no draft field to hide behind, and a copy dated in the past or undated would show on the site at once.
 const HELD_UNTIL = '9999-12-31T00:00:00.000Z'
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+// The publish date that holds a new entry back in a collection with no draft flag, in the format its publish field takes.
+export function heldDate(collection: Pick<CollectionInfo, 'schema' | 'publishField'>): string {
+  const field = fieldsOf(collection.schema).find(each => each.key === collection.publishField)
+
+  return field?.kind === 'date' ? HELD_UNTIL.slice(0, 10) : HELD_UNTIL
+}
 
 // The data a copy starts with: a draft when the collection has a draft field, else held back by its publish date; last in the order, not alongside the original.
 function copyData(collection: CollectionInfo, data: Record<string, unknown>, siblings: SourceEntry[]): Record<string, unknown> {

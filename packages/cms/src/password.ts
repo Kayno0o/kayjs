@@ -35,7 +35,10 @@ function same(a: Buffer, b: Buffer): boolean {
 export class Passwords {
   private readonly digests = new Map<string, Buffer>()
   private readonly keys = new Map<string, Buffer>()
+  // The signatures of cookies signed out, each kept until the cookie would have expired anyway; in this process only, so another process or a restart still takes a copied cookie.
+  private readonly revoked = new Map<string, number>()
   private readonly seconds: number
+  private lastIssued = 0
 
   constructor(passwords: Record<string, string>, maxAge: string | number, secret = '') {
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`', 'kayjs-cms')
@@ -74,7 +77,10 @@ export class Passwords {
 
   // The sign-in cookie for a role this password opened.
   issue(role: string, secure: boolean): Bun.Cookie {
-    const payload = `${role}.${Date.now() + this.seconds * 1000}`
+    // Each sign-in gets a date of its own, so signing one out never ends another made in the same millisecond.
+    this.lastIssued = Math.max(Date.now(), this.lastIssued + 1)
+
+    const payload = `${role}.${this.lastIssued + this.seconds * 1000}`
 
     return new Bun.Cookie(SESSION_COOKIE, `${payload}.${this.sign(role, payload)}`, { path: '/', maxAge: this.seconds, httpOnly: true, sameSite: 'lax', secure })
   }
@@ -92,7 +98,26 @@ export class Passwords {
     if (!this.keys.has(role) || !same(Buffer.from(signature), Buffer.from(this.sign(role, payload))))
       return undefined
 
+    if (this.revoked.has(signature))
+      return undefined
+
     return Number(expires) > Date.now() ? role : undefined
+  }
+
+  // Ends the sign-in a cookie holds, so a copy of it stops working too; a value that is not a live sign-in of this server changes nothing.
+  revoke(value: string | null | undefined): void {
+    if (this.read(value) === undefined)
+      return
+
+    const [, expires = '', signature = ''] = value?.split('.') ?? []
+    const now = Date.now()
+
+    for (const [kept, until] of this.revoked) {
+      if (until <= now)
+        this.revoked.delete(kept)
+    }
+
+    this.revoked.set(signature, Number(expires))
   }
 
   private sign(role: string, payload: string): string {

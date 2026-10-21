@@ -5,6 +5,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
+import { denials } from '../../../access'
 import EntryTable from '../../../components/entry-table.kay'
 import { adminTitle, collectionTitle, newEntryPath, statusParam, viewHref } from '../../../listing'
 import { listScreen, openPath } from '../../../screens'
@@ -19,6 +20,7 @@ const { prefix, collection, ...listed } = await listScreen({ collection: ctx.par
 if (collection.single && collection.problem === undefined)
   ctx.redirect(await openPath(collection))
 
+const denied = await denials(ctx)
 const url = ctx.url
 const sort = ctx.query.sort
 const title = collectionTitle(collection)
@@ -53,5 +55,5 @@ PageSection(title={title} level={1})
             Button(href={viewHref(url, { status: option.value })} label={option.label} variant={status === option.value ? 'solid' : 'ghost'} aria-current={status === option.value ? 'true' : undefined})
     if narrowed
       p.kcms-count(role="status") {wording('cms.admin.resultCount', listed.total === 1 ? '1 result' : '{count} results', { count: listed.total })}
-    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={narrowed} sort={sort ? { key: sort, direction } : undefined})
+    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={narrowed} sort={sort ? { key: sort, direction } : undefined} denied={denied})
     Pagination(page={listed.page} pages={listed.pages} url={url})

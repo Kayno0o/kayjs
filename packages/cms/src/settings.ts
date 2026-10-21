@@ -27,6 +27,12 @@ export interface SaveEvent {
   commit?: Commit | undefined
 }
 
+// Who the guard let in, as `cms({ member })` reports them.
+export interface MemberInfo {
+  name?: string | undefined
+  roles: readonly string[]
+}
+
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
@@ -48,6 +54,8 @@ export interface CmsOptions {
   pageLink?: false | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
   roles?: Record<string, readonly Action[]> | undefined
+  // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, and `roles` are matched against `roles`; without it such a guard holds no role.
+  member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
@@ -65,6 +73,7 @@ export interface CmsSettings {
   pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
+  member: CmsOptions['member']
   onSave: CmsOptions['onSave']
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
   pageLink: boolean
@@ -91,7 +100,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, collections, pageLink, roles }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -102,7 +111,7 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections) }
 
   return current
 }

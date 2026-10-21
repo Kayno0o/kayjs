@@ -1,6 +1,7 @@
 import { overHttps } from 'kay/library'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
+import { denialsOf } from '../access'
 import { hintCookie, pageLinkModule } from '../page-link'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
@@ -15,6 +16,12 @@ export default api()
       set.headers['set-cookie'] = [set.headers['set-cookie'] ?? []].flat().concat(hintCookie(overHttps(request)).serialize())
 
     return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page') }
+  })
+  // What the signed-in person's role may not do, with the reason, so the controls for it are disabled; empty when the app lists no roles. The server refuses it all the same.
+  .get('/can', async ({ request, set }) => {
+    set.headers['cache-control'] = 'no-store'
+
+    return { denied: await denialsOf(request) }
   })
   // What an editor's browser runs on each page, the same bytes for everyone and no secret in them; the guard leaves it open so a stale hint is found and cleared.
   .get('/module.js', ({ set }) => {

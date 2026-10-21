@@ -5,6 +5,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import UnusedUploads from '../components/unused-uploads.kay'
+import { denials } from '../access'
 import { adminTitle } from '../listing'
 import { unusedUploads } from '../orphans'
 import { screenPath } from '../paths'
@@ -12,6 +13,7 @@ import { settings } from '../settings'
 
 const { prefix } = settings()
 const scan = await unusedUploads()
+const denied = await denials(ctx)
 ---
 head
   title {adminTitle(wording('cms.admin.uploads', 'Unused uploads'))}
@@ -22,4 +24,4 @@ PageSection(title={wording('cms.admin.uploads', 'Unused uploads')} level={1})
     EmptyState(title={wording('cms.uploads.blocked', 'Uploads cannot be checked')} description={wording('cms.uploads.blockedHint', '{reasons}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.', { reasons: scan.blocked.join('; ') })})
   else
     Notice(tone="warning" label={wording('cms.uploads.notice', 'These uploads are mentioned in no entry of any collection, locale or draft the server can read, and are over a day old. Recent uploads are held back, since a save the site has not rebuilt from, another server\'s save or an unsaved form may use them. A URL written by hand in a page and an older revision a revert brings back are not seen either, so check each before you delete it: deleting is permanent, variants included.')})
-    UnusedUploads(uploads={scan.unused})
+    UnusedUploads(uploads={scan.unused} denied={denied})

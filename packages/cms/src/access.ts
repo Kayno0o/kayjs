@@ -6,6 +6,7 @@ import { READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
 import { activePasswords, SESSION_COOKIE, signedInBy } from './password'
 import { screenPath } from './paths'
+import { ACTIONS } from './roles'
 import { settings } from './settings'
 
 // The part of kayjs-auth's `ctx.locals.auth` the cms reads: found by its shape, so the cms works without it installed.
@@ -79,18 +80,56 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
   if (password)
     return { name: password.name, held: [...password.roles] }
 
+  const { member, roles } = settings()
+
+  if (member) {
+    const given = await member(ctx)
+
+    return given && { name: given.name ?? '', held: [...roles?.keys() ?? []].filter(role => given.roles.includes(role)) }
+  }
+
   const auth = authOf(ctx)
   const user = await (auth?.bareUser ?? auth?.user)?.call(auth)
 
   if (!auth || !user)
     return undefined
 
-  const roles = settings().roles
   const owned = Array.isArray(user.roles) ? user.roles.filter(role => typeof role === 'string') : []
   const held = [...roles?.keys() ?? []].filter(role => auth.isGranted ? auth.isGranted(role, user) : owned.includes(role))
   const name = [user.username, user.email, user.id].find(value => (typeof value === 'string' && value !== '') || typeof value === 'number')
 
   return { name: String(name ?? ''), held }
+}
+
+// The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.
+export type Denials = Partial<Record<Action, string>>
+
+function deniedTo(member: Member | undefined): Denials {
+  const { roles } = settings()
+  const found: Denials = {}
+
+  if (roles === undefined)
+    return found
+
+  for (const action of ACTIONS) {
+    if (!member?.held.some(role => roles.get(role)?.has(action)))
+      found[action] = refusal(action)
+  }
+
+  return found
+}
+
+export async function denials(ctx: GuardContext): Promise<Denials> {
+  return deniedTo(settings().roles === undefined ? undefined : await memberOf(ctx))
+}
+
+// The same for a request the api guard has read the person of (it does for every request when the app lists roles), as an API route has no guard context.
+export async function denialsOf(request: Request): Promise<Denials> {
+  return deniedTo(await members.get(request))
+}
+
+function refusal(action: Action): string {
+  return wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[action]() })
 }
 
 // Whether the signed-in person may do an action: everyone the guard admits may when the app lists no roles, and nobody may when it lists some and none of the person's roles allows it.
@@ -106,7 +145,7 @@ export async function may(ctx: GuardContext, action: Action): Promise<boolean> {
 }
 
 export function forbidden(ctx: GuardContext, action: Action): never {
-  return ctx.deny(403, wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[action]() }))
+  return ctx.deny(403, refusal(action))
 }
 
 // Where an anonymous visitor goes to sign in and return to `back`: the cms's own screen for a password guard, else kayjs-auth's sign-in page, else nowhere.
@@ -138,6 +177,7 @@ export function sendToSignIn(ctx: GuardContext, error: unknown): void {
 
 // Ends the sign-in: a password guard's cookie, else kayjs-auth's session.
 export async function signOutOf(ctx: GuardContext): Promise<void> {
+  activePasswords()?.revoke(ctx.cookies.get(SESSION_COOKIE))
   ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
   await authOf(ctx)?.signOut?.()
 }

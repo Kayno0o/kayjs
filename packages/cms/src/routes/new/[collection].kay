@@ -4,12 +4,14 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
 import EntryHeader from '../../components/entry-header.kay'
+import { denials } from '../../access'
 import { adminTitle, collectionTitle } from '../../listing'
 import { collectionScreen, openPath, translationStart, writtenSlug } from '../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()), from: s.Optional(s.String()), fromLocale: s.Optional(s.String()) }) }
 
 const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? ctx.notFound()
+const denied = await denials(ctx)
 const locale = ctx.query.locale
 const start = ctx.query.from === undefined || ctx.query.fromLocale === undefined ? {} : await translationStart(collection, ctx.query.from, ctx.query.fromLocale)
 
@@ -23,4 +25,4 @@ if collection.problem as problem
   EntryHeader(prefix={prefix} collection={collection} title={wording('cms.admin.newEntry', 'New entry')})
   EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
 else
-  EntryEditor(prefix={prefix} collection={collection} locale={locale} copy={start.copy} source={start.source})
+  EntryEditor(prefix={prefix} collection={collection} locale={locale} copy={start.copy} source={start.source} denied={denied})

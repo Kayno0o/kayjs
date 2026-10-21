@@ -60,7 +60,7 @@ A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` 
 
 Pass `{ secret }` with a secret of your own to tie the sign-in to your site, and set kay's `proxy` option behind a proxy, as the ten tries are counted per client address.
 
-Signing out deletes the cookie, but a copy of it stays valid until it expires or the password changes. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
+Signing out deletes the cookie and ends it on the server, so a copy of it stops working too. That is kept in memory: another server process, or a restart, still accepts a copy until it expires or the password changes. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
 
 The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
 
@@ -73,7 +73,21 @@ cms({
 })
 ```
 
-The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries and unused uploads), `upload` and `redirects` (the missing pages screen and its API). A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks.
+The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries and unused uploads), `upload` and `redirects` (the missing pages screen and its API). 
+
+A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks. The screens show its button disabled, with that sentence as a tooltip.
+
+A role without `publish` can still add an entry to a collection that has a publish date and no draft flag. The server holds it back with a far publish date until a publisher sets one.
+
+A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in:
+
+```ts
+cms({
+  guard: myGuard,
+  roles: { publisher: ['publish'] },
+  member: ({ locals }) => ({ name: locals.user.email, roles: locals.user.roles }),
+})
+```
 
 If the sign-in ends while an editor is typing, the save says the session ended instead of "Could not save", keeps the edits, and offers a link to sign in again in a new tab. Come back to the first tab and save again.
 

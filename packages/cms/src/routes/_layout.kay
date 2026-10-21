@@ -4,7 +4,7 @@ import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import { memberOf } from '../access'
+import { denials, memberOf } from '../access'
 import { screenPath } from '../paths'
 import { signOut } from './_actions.kay'
 import { settings } from '../settings'
@@ -19,6 +19,7 @@ const { prefix, logo } = settings()
 // kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
 // Who is signed in, when the guard let the request in: the sign-in screen, which no guard covers, shows no one.
 const member = await memberOf(ctx)
+const denied = await denials(ctx)
 const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 // The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
 ---
@@ -33,7 +34,11 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
       | {wording('cms.admin.brand', 'Content admin')}
     nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}
-      a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
+      if denied.redirects as reason
+        // A disabled link, with the reason a keyboard reaches too.
+        span.kcms-admin-refused(data-tooltip={reason} tabindex="0" aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
+      else
+        a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
       a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
     a.kcms-admin-site(href={localize('/')}) {wording('cms.admin.viewSite', 'View the site')}
     if member

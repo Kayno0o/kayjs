@@ -2,6 +2,7 @@ import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
+import { withHold } from '../publishing'
 import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, saveEntry, UnknownCollection, unpublishEntry } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
@@ -21,7 +22,7 @@ export default api()
 
     return screen.entry ? { collection: screen.collection, entry: screen.entry } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })
-  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
+  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: await withHold(request, params.collection, body.data), body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),

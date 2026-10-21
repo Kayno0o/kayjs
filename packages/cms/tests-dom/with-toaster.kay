@@ -1,4 +1,5 @@
 ---
+import type { Denials } from '../src/access'
 import type { AddedRedirect, MissingRow } from '../src/missing'
 import type { ScreenCollection } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
@@ -12,8 +13,8 @@ import MissingPaths from '../src/components/missing-paths.kay'
 const { rows, redirects, bar, table } = props<{
   rows?: MissingRow[]
   redirects?: AddedRedirect[]
-  bar?: { collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }
-  table?: { collection: ScreenCollection, rows: EntryRow[] }
+  bar?: { collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void, denied?: Denials }
+  table?: { collection: ScreenCollection, rows: EntryRow[], denied?: Denials }
 }>()
 ---
 Toaster
@@ -22,6 +23,6 @@ if rows
 if redirects
   AddedRedirects(redirects={redirects})
 if bar
-  EntryBulk(collection={bar.collection} rows={bar.rows} actions={bar.actions} clear={bar.clear})
+  EntryBulk(collection={bar.collection} rows={bar.rows} actions={bar.actions} clear={bar.clear} denied={bar.denied})
 if table
-  EntryTable(prefix="/admin" collection={table.collection} rows={table.rows} searched={false})
+  EntryTable(prefix="/admin" collection={table.collection} rows={table.rows} searched={false} denied={table.denied})

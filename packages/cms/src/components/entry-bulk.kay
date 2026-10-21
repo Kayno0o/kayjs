@@ -1,4 +1,5 @@
 ---
+import type { Denials } from '../access'
 import type { ScreenCollection } from '../kay/contract'
 import type { EntryRow } from '../listing'
 import Button from '@kaynooo/kayjs-ui/button.kay'
@@ -6,13 +7,15 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import { toast } from '@kaynooo/kayjs-ui'
 import { refresh, signal } from 'kay'
 import { wording } from 'kay/words'
+import Refused from './refused.kay'
 import { bulk } from '../editor/bulk'
 import { readReferrers } from '../editor/referrers'
 import { bulkDeleteMessage } from '../bulk-message'
 import type { BulkAction } from '../editor/bulk'
 
 // The actions on the rows ticked in the list, each saved one after another and told in one toast.
-const { collection, rows, actions, clear } = props<{ collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }>()
+// `denied`, from `denials`, disables the buttons for what the signed-in person's role may not do.
+const { collection, rows, actions, clear, denied = {} } = props<{ denied?: Denials, collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }>()
 
 // Only the rows an action fits: a draft is published and a published entry unpublished, as the row buttons offer, and a broken entry is neither.
 const fitting = (action: BulkAction) => rows.filter(row => action === 'delete' || (row.problem === undefined && row.draft === (action === 'publish')))
@@ -58,8 +61,15 @@ async function run(action: BulkAction): Promise<void> {
 }
 ---
 if actions.has('publish') && drafts() && fitting('publish').length > 0
-  Button(label={wording('cms.entry.publish', 'Publish')} onClick={() => run('publish')})
-if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
+  if denied.publish !== undefined
+    Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})
+  else
+    Button(label={wording('cms.entry.publish', 'Publish')} onClick={() => run('publish')})
+if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0 && denied.publish !== undefined
+  Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
+else if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
   ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
-if actions.has('delete')
+if actions.has('delete') && denied.delete !== undefined
+  Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
+else if actions.has('delete')
   ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpen={askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})

@@ -4,7 +4,7 @@ import { guard } from 'kay'
 import { READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
-import { forbidden, may, routePath } from '../access'
+import { forbidden, may, memberOf, routePath } from '../access'
 import { authors } from '../authors'
 import { leavesPublication } from '../publishing'
 import { settings } from '../settings'
@@ -90,6 +90,9 @@ export default guard(async (ctx) => {
   await admits(ctx)
 
   if (settings().roles !== undefined) {
+    // Read now so a route can tell what the person may do.
+    await memberOf(ctx)
+
     const path = routePath(ctx.url)
     const needed = actionOf(method, path)
 

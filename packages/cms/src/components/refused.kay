@@ -1,0 +1,13 @@
+---
+import type { IconSlot } from '@kaynooo/kayjs-ui'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+
+// A control the signed-in person's role may not use: disabled, with `reason` as its tooltip. A disabled button gets no hover or focus, so the tooltip sits on a wrapper a keyboard reaches. With `icon` it is an icon button, which names itself by `label` and the reason.
+const { label, reason, icon, tone, variant, size } = props<{ label: string, reason: string | undefined, icon?: IconSlot | undefined, tone?: 'neutral' | 'accent' | 'danger' | undefined, variant?: 'solid' | 'ghost' | 'inline' | undefined, size?: 'xs' | 'sm' | 'md' | 'lg' | undefined }>()
+---
+span.kcms-refused(data-tooltip={reason} tabindex="0")
+  if icon
+    IconButton(icon={icon} label={`${label}: ${reason}`} variant={variant} size={size} disabled)
+  else
+    Button(label={label} tone={tone} variant={variant} size={size} disabled)

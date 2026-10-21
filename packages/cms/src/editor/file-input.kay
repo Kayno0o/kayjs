@@ -7,7 +7,7 @@ import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { guardLeave } from 'kay'
 import { sizeText, wording } from 'kay/words'
 import { atLeast, typeName } from '../upload-text'
-import { listUploads, uploadFile, uploadRules } from './upload'
+import { listUploads, uploadDenied, uploadFile, uploadRules } from './upload'
 
 type Size = { width: number, height: number } | undefined
 
@@ -31,6 +31,9 @@ const accept = signal<string>()
 // The most an upload may weigh here: the field's own limit, else the server's.
 const maxBytes = signal<number>()
 
+// Why the signed-in person's role may not upload, when it may not; the zone is then disabled with this as its tooltip.
+const denied = signal<string>()
+
 // The uploads already stored, listed when the picker is first opened; undefined until then.
 const stored = signal<{ path: string, name: string }[]>()
 
@@ -47,6 +50,12 @@ async function offer(): Promise<void> {
 }
 
 void offer()
+
+async function askRole(): Promise<void> {
+  denied = await uploadDenied()
+}
+
+void askRole()
 
 // An address the CMS stored: its path says nothing an editor needs to read or type.
 const stays = () => value.startsWith('/_kay/files/')
@@ -177,9 +186,10 @@ function pick(path: string, event: Event): void {
   if image && !many
     for issue of sizeIssues key={issue.id}
       p.kcms-file-error(id={issue.id} role="alert") {issue.message}
-  FileDrop.kcms-file-drop(compact accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined} onFiles={send} onReject={reject})
+  // A disabled zone is a div, so the tooltip is reachable by hover and keyboard where a disabled button's would not be.
+  FileDrop.kcms-file-drop(compact accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
     @content(zone)
-      Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
+      Button(label={label()} busy={sent() !== undefined} disabled={denied() !== undefined} onClick={zone.open})
       if sent() !== undefined
         progress.kcms-file-progress(value={sent()} max="1" aria-label={label()})
         IconButton(icon="close" label={wording('cms.file.cancel', 'Cancel the upload')} variant="ghost" size="sm" onClick={stop})

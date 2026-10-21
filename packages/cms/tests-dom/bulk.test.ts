@@ -164,3 +164,26 @@ test('a duplicate that went through is told', async () => {
   expect(text()).toContain('Duplicated')
   expect(calls.map(call => [call.method, call.url.pathname.split('/').slice(-3).join('/')])).toContainEqual(['POST', 'posts/a/duplicate'])
 })
+
+test('the bar disables the actions the role may not do, with the reason', async () => {
+  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { bar: { collection: POSTS, rows: [row('a')], actions: new Set(['publish', 'delete']), clear: () => undefined, denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
+  await settle()
+
+  for (const label of ['Publish', 'Delete']) {
+    const control = button(mounted.root, label)!
+
+    expect(control.disabled, label).toBe(true)
+    expect(control.closest('[data-tooltip]')?.getAttribute('data-tooltip'), label).toContain('Your role may not')
+  }
+})
+
+test('a row of the list disables its publish and delete for a role that may not, with the reason', async () => {
+  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { table: { collection: POSTS, rows: [row('a')], denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
+  await settle()
+
+  const actions = mounted.root.querySelector('.kcms-row-actions')!
+  const refused = [...actions.querySelectorAll('.kcms-refused')]
+
+  expect(refused.map(each => each.getAttribute('data-tooltip'))).toEqual(['Your role may not publish', 'Your role may not delete'])
+  expect(refused.every(each => each.querySelector('button')!.disabled)).toBe(true)
+})

@@ -278,3 +278,12 @@ body {
   margin: 0 0 0.75rem;
   white-space: pre-wrap;
 }
+
+.kcms-refused {
+  display: inline-flex;
+}
+
+.kcms-admin-refused {
+  color: var(--color-kui-muted);
+  cursor: not-allowed;
+}

@@ -91,6 +91,22 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(() => passwordGuard('x', { maxAge: 'soon' })).toThrow()
   })
 
+  test('signing out ends the sign-in for a copy of the cookie too, and only that one', () => {
+    const cookie = passwords.issue('editor', false).value
+    const copy = cookie.slice()
+    const other = passwords.issue('admin', false).value
+
+    expect(passwords.read(copy)).toBe('editor')
+    passwords.revoke(cookie)
+    expect(passwords.read(copy)).toBeUndefined()
+    expect(passwords.read(other)).toBe('admin')
+
+    // A forged or foreign value revokes nothing.
+    passwords.revoke('editor.9999999999999.forged')
+    passwords.revoke(undefined)
+    expect(passwords.read(passwords.issue('editor', false).value)).toBe('editor')
+  })
+
   test('a lone password signs in as the editor role', async () => {
     const lone = new Passwords({ editor: 'only' }, '1h')
 
@@ -120,5 +136,24 @@ describe('the secret and the lazily loaded guard', () => {
 
     configure({ guard: () => undefined })
     expect(activePasswords()).toBeUndefined()
+  })
+})
+
+describe('signing out', () => {
+  test('ends a copy of the cookie, which the guard then refuses with a 401', async () => {
+    const { configure } = await import('../src/settings')
+    const { signOutOf } = await import('../src/access')
+    const { activePasswords } = await import('../src/password')
+    const guard = passwordGuard({ editor: 'pw-editor' })
+
+    configure({ guard })
+
+    const cookie = activePasswords()!.issue('editor', false).value
+
+    expect(await statusOf(context(cookie), guard)).toBe(200)
+    await signOutOf(context(cookie))
+    expect(await statusOf(context(cookie), guard)).toBe(401)
+    // Another sign-in of the same role is a cookie of its own.
+    expect(await statusOf(context(activePasswords()!.issue('editor', false).value), guard)).toBe(200)
   })
 })

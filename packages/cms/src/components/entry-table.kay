@@ -1,5 +1,6 @@
 ---
 import type { Column, SortState } from '@kaynooo/kayjs-ui'
+import type { Denials } from '../access'
 import type { ScreenCollection } from '../kay/contract'
 import type { EntryRow } from '../listing'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
@@ -13,6 +14,7 @@ import { duplicateSaved } from '../editor/bulk'
 import { readReferrers } from '../editor/referrers'
 import { deleteSaved, moveSaved, publishSaved, unpublishSaved } from '../editor/save'
 import EntryBulk from './entry-bulk.kay'
+import Refused from './refused.kay'
 import EntryStatus from './entry-status.kay'
 import EntryWatch from './entry-watch.kay'
 import { shipWords } from '../editor/words'
@@ -22,7 +24,8 @@ import { deleteMessage, entryPath, newEntryPath, onPagePath, problemId, statusOf
 import { WATCHED_ROWS } from '../room'
 
 // `sort` is the column the rows come sorted by, the server having sorted them across the pages: a click on a header goes to the same list sorted by that column.
-const { prefix, collection, rows, searched, sort } = props<{ prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean, sort?: SortState | undefined }>()
+// `denied`, from `denials`, disables the buttons for what the signed-in person's role may not do.
+const { prefix, collection, rows, searched, sort, denied = {} } = props<{ denied?: Denials, prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean, sort?: SortState | undefined }>()
 
 // Looks up what a save says once the page has loaded, so the page sends it.
 shipWords()
@@ -104,7 +107,7 @@ async function remove(row: EntryRow): Promise<void> {
 ---
 Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSort={sortBy} selectable={bulkable})
   @bulk(keys, clear)
-    EntryBulk(collection={collection} rows={rows.filter(row => keys.includes(keyOf(row)))} actions={actions} clear={clear})
+    EntryBulk(collection={collection} rows={rows.filter(row => keys.includes(keyOf(row)))} actions={actions} clear={clear} denied={denied})
   @cell(row, column)
     if column.key === 'title'
       // Why an entry is broken shows on the link too, so a keyboard reaches it and a screen reader reads it with the title.
@@ -115,7 +118,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
       if watched(row)
         EntryWatch(collection={collection.name} entry={ref(row)})
     else if column.key.startsWith('cell:')
-      span {row.cells?.[column.key.slice(5)] ?? ''}
+      span {row.cells?.[column.key.slice(5)]}
     else if column.key === 'locale'
       span {row.locale}
       if row.missing as lacks
@@ -132,15 +135,22 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
             Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpLabel', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
             Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownLabel', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if actions.has('publish') && row.draft && collection.draftField !== undefined
-          Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
-        if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
+          if denied.publish !== undefined
+            Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})
+          else
+            Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
+        if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && denied.publish !== undefined
+          Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
+        else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
           ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
           Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateLabel', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('editOnPage')
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
-        if actions.has('delete')
+        if actions.has('delete') && denied.delete !== undefined
+          Refused(icon="delete" label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} reason={denied.delete} size="sm" variant="ghost")
+        else if actions.has('delete')
           ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpen={() => askReferrers(row)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched

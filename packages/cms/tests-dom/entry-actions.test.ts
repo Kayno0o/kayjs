@@ -239,3 +239,27 @@ test('Ctrl+S in a field saves and leaves the caret in it once the save ends', as
   expect(root.querySelector('fieldset')!.disabled).toBe(false)
   expect(document.activeElement).toBe(title(root))
 })
+
+test('a role that may not publish or delete sees those buttons disabled, with the reason as their tooltip', async () => {
+  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: POSTS, entry: stored({ draft: true }), denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } })
+  await settle()
+
+  const { root } = mounted
+
+  for (const label of ['Publish', 'Delete']) {
+    const control = button(root, label)!
+
+    expect(control.disabled, label).toBe(true)
+    expect(control.closest('[data-tooltip]')?.getAttribute('data-tooltip'), label).toBe(label === 'Publish' ? 'Your role may not publish' : 'Your role may not delete')
+  }
+
+  // Saving stays, since editing is every role's.
+  expect(button(root, 'Save')).toBeDefined()
+})
+
+test('a role holding every action sees the enabled buttons', async () => {
+  const root = await open(stored({ draft: true }))
+
+  expect(button(root, 'Publish')!.disabled).toBe(false)
+  expect(root.querySelector('.kcms-refused')).toBeNull()
+})

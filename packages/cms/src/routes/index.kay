@@ -5,6 +5,8 @@ import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
+import Refused from '../components/refused.kay'
+import { denials } from '../access'
 import { collections } from '../kay/content'
 import { adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
 import { screenPath } from '../paths'
@@ -14,6 +16,7 @@ import { settings } from '../settings'
 const { prefix } = settings()
 const all = await collections()
 const localized = all.some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
+const denied = await denials(ctx)
 const groups = groupCollections(await indexRows(), row => row.layout)
 ---
 head
@@ -22,7 +25,10 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
     if localized
       Button(href={screenPath(prefix, '/translations')} label={wording('cms.locales.title', 'Translations')})
-    Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
+    if denied.redirects as reason
+      Refused(label={wording('cms.missing.title', 'Missing pages')} reason={reason})
+    else
+      Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for group of groups key={group.name ?? ''}
     if group.name

@@ -1,5 +1,6 @@
 ---
 import type { Column } from '@kaynooo/kayjs-ui'
+import type { Denials } from '../access'
 import type { UnusedUpload } from '../orphans'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
@@ -8,8 +9,10 @@ import { refresh } from 'kay'
 import { wording } from 'kay/words'
 import { deleteUnusedUploadsInChunks } from '../editor/save'
 import { shipWords } from '../editor/words'
+import Refused from './refused.kay'
 
-const { uploads } = props<{ uploads: UnusedUpload[] }>()
+// `denied`, from `denials`, disables the deletions when the signed-in person's role may not delete.
+const { uploads, denied = {} } = props<{ uploads: UnusedUpload[], denied?: Denials }>()
 
 // Looks up what a deletion says once the page has loaded, so the page sends it.
 shipWords()
@@ -31,12 +34,17 @@ async function remove(keys: string[]): Promise<boolean> {
 ---
 Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)
   @bulk(keys, clear)
-    ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
+    if denied.delete !== undefined
+      Refused(label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} reason={denied.delete} size="sm" variant="ghost")
+    else
+      ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
   @cell(row, column)
     if column.key === 'key'
       a(href={row.url} target="_blank" rel="noopener") {row.key}
     else if column.key === 'variants'
       span(data-tooltip={row.variants.join(', ')} tabindex="0") {row.variants.length === 0 ? wording('cms.uploads.noVariant', 'None') : wording('cms.uploads.variantCount', row.variants.length === 1 ? '1 variant' : '{count} variants', { count: row.variants.length })}
+    else if denied.delete !== undefined
+      Refused(icon="delete" label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.key })} reason={denied.delete} size="sm" variant="ghost")
     else
       ConfirmDelete(message={row.variants.length === 0 ? wording('cms.uploads.deleteOne', 'Delete {key}? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { key: row.key }) : wording('cms.uploads.deleteOneWithVariants', row.variants.length === 1 ? 'Delete {key} and its 1 variant? Check that no page, unsaved form or older revision uses it: this cannot be undone.' : 'Delete {key} and its {count} variants? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { key: row.key, count: row.variants.length })} label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.key })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove([row.key]) }})
   @empty

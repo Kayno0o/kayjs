@@ -1,5 +1,6 @@
 import { ActionError, ApiError, call } from 'kay'
 import { wording } from 'kay/words'
+import editorApi from '../api/editor'
 import filesApi from '../api/files'
 import { emptyFile, tooLarge, tooLargeForServer, tooSmall } from '../upload-text'
 import { isSignedOut, setSessionEnded } from './session'
@@ -39,6 +40,24 @@ export function uploading(): boolean {
 
 function track(change: 1 | -1): void {
   running += change
+}
+
+let denial: Promise<string | undefined> | undefined
+
+// Why the signed-in person's role may not upload, asked once; undefined when it may, or when it could not be asked, the server then refusing in its own words.
+export async function uploadDenied(): Promise<string | undefined> {
+  denial ??= (async () => {
+    try {
+      return (await call(editorApi, '/can')).denied.upload
+    }
+    catch {
+      denial = undefined
+
+      return undefined
+    }
+  })()
+
+  return denial
 }
 
 let rules: Promise<UploadRules | undefined> | undefined
