@@ -1,5 +1,6 @@
 import type { Collection } from '../content'
 import type { Project } from '../project'
+import type { LocaleSettings } from '../runtime/i18n'
 import type { Cards } from './card'
 import type { ClientBuild } from './client'
 import type { I18n } from './i18n'
@@ -17,7 +18,7 @@ import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
 import { setupStore } from './app-store'
 import { basePath } from './base'
-import { setupCards } from './card'
+import { checkCardConfig, drawLogo, setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
 import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
@@ -35,6 +36,19 @@ import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
+
+// What the config's refusals that need the scanned project read, handed to the check a server passes before any client build starts.
+export interface Scanned {
+  routes: Route[]
+  files: PublicFile[]
+  endpoints: Endpoint[]
+  collections: Collection<unknown>[]
+  // The locales' settings as the config declares them, before the pages told them of their routes.
+  declared: LocaleSettings | undefined
+  site: string | undefined
+  base: string
+  ownManifest: boolean
+}
 
 export interface PageSetup {
   source: ProjectSource
@@ -66,11 +80,11 @@ export interface PageSetup {
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
 // It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode and the locales, with the preview secret, the tracer and the file store when serving, as a build traces nothing, previews nothing and an export links its files itself.
-export async function setupPages(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false, redirectSpelling?: RenderOptions['redirectSpelling']): Promise<PageSetup> {
+export async function setupPages(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false, redirectSpelling?: RenderOptions['redirectSpelling'], refuse?: (scanned: Scanned) => void): Promise<PageSetup> {
   let loading: Promise<ClientBuild> | undefined
 
   try {
-    return await setupWith(project, async () => loading ??= Promise.resolve(loadClient()), prerendering, redirectSpelling)
+    return await setupWith(project, async () => loading ??= Promise.resolve(loadClient()), prerendering, redirectSpelling, refuse)
   }
   catch (error) {
     // A build still running would go on writing the output while the caller deals with the failure.
@@ -80,16 +94,27 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   }
 }
 
-async function setupWith(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling']): Promise<PageSetup> {
+async function setupWith(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling'], refuse: ((scanned: Scanned) => void) | undefined): Promise<PageSetup> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
   const source = projectSource()
+  // Drawn while the project is scanned, unless a build or an executable holds the drawing; a logo kay cannot draw refuses the config before the build starts.
+  const logoFile = config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo)
+  const logoDrawn = logoFile !== undefined && !source.embedded && !mode.prebuilt ? drawLogo(logoFile) : undefined
+
+  void Promise.allSettled([logoDrawn])
 
   await source.prepare(root, config.settings)
+  // Scanned beside the routes, which the refusals before the build need.
+  const scanning = Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const routes = await source.routes(paths.routes, mounts)
+
+  void Promise.allSettled([scanning])
 
   refuseClashes(paths.routes, routes)
   const [matchers, i18n] = await Promise.all([loadMatchers(paths.routes, routes), config.i18n && loadI18n(root, config.i18n, config.extensions)])
+
+  const declared = i18n?.settings
 
   if (i18n)
     i18n.settings = routedSettings(i18n.settings, routes)
@@ -124,7 +149,22 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   setMarkdownDefaults(config.markdown)
 
-  // Started once the config's early refusals (images, markdown, i18n locales, matchers, base, preview) are behind; a refusal raised later, by the app or the head, still comes after it.
+  // The content config is imported beside the scans, as its refusals (a missing file, a feed without the site) come before the build too.
+  const loadingCollections = projectCollections(root, config.content)
+
+  void Promise.allSettled([loadingCollections])
+
+  const [files, endpoints] = await scanning
+  const ownManifest = appServesManifest(files, endpoints, routes)
+
+  checkCardConfig(config.images?.card, config.fonts)
+  await logoDrawn
+
+  const collections = await loadingCollections
+
+  refuse?.({ routes, files, endpoints, collections, declared, site, base, ownManifest })
+
+  // Started once every refusal that needs no build is behind, those of the config (images, markdown, i18n, matchers, base, preview, the cards) and of the scanned project, the server's own among them; only what needs the built client or the routes' guards (the font faces of a Fontsource family, API modules, extension routes) still follows it.
   // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
   const loadingClient = loadClient()
 
@@ -136,8 +176,6 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   void Promise.allSettled([extensions, api])
 
-  const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
-  const ownManifest = appServesManifest(files, endpoints, routes)
   const client = await loadingClient
 
   if (!mode.dev)
@@ -147,10 +185,10 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, ownManifest)
 
-    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
+    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
 
-  const [{ head, scripts, styles, cards, fontCss }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
+  const { head, scripts, styles, cards, fontCss } = await headAndCards()
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
   if (i18n)

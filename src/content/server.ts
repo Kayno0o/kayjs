@@ -208,6 +208,14 @@ function componentUses(collection: string, components: object, file: string, seg
     : [{ collection, component: segment.component, props: segment.props, children: segment.children.length > 0, file, line: segment.line }, ...componentUses(collection, components, file, segment.children)])
 }
 
+// Refuses a collection with a feed when the site has no URL, which its links need.
+export function refuseFeedsWithoutSite(collections: Collection<unknown>[], origin: string | undefined): void {
+  const feeding = collections.find(collection => collection.options.feed)
+
+  if (feeding && origin === undefined)
+    throw feedNeedsSite(feeding)
+}
+
 function feedNeedsSite(collection: Collection<unknown>): Error {
   return new KayError('feed-needs-site', `kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
 }

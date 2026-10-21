@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { CardConfig } from '../config'
+import type { CardConfig, KayConfig } from '../config'
 import type { Localized } from '../runtime/localized'
 import type { CardLook } from './card-draw'
 import type { Face } from './face'
@@ -38,6 +38,8 @@ export interface CardSetup {
   config?: CardConfig | undefined
   // `images.card.logo`, absolute.
   logo?: string | undefined
+  // The logo `drawLogo` drew before the build started, which the setup takes in place of drawing it again.
+  logoDrawn?: Promise<Uint8Array> | undefined
   // `seo.name`, written under the title, in the page's locale when it holds one text per locale.
   name?: Localized | undefined
   // The locale a page outside any locale reads the name in.
@@ -94,6 +96,26 @@ const REMOTE = /^https?:\/\//i
 let current: Cards | undefined
 const svgDrawings = new Map<string, Promise<Uint8Array>>()
 const requested = new Map<string, { title: string, image?: string | undefined, name?: string | undefined }>()
+
+// What `images.card` refuses that needs no build: a colour that is none, a face the explicit `fonts` lack (a Fontsource family's faces are known once built).
+export function checkCardConfig(config: CardConfig | undefined, fonts: KayConfig['fonts']): void {
+  if (config === undefined)
+    return
+
+  cardColor('background', config.background ?? '#111111')
+  cardColor('color', config.color ?? '#ffffff')
+
+  const listed = fonts ?? []
+  const explicit = listed.filter(font => 'src' in font)
+
+  if (config.font !== undefined && explicit.length === listed.length) {
+    const faces = explicit.map(font => ({ family: font.family, weight: String(font.weight ?? 400), style: font.style ?? 'normal', url: `${ASSET_PREFIX}face` }))
+    const font = cardFont('', faces, config.font)
+
+    if (font instanceof Error)
+      throw font
+  }
+}
 
 // Settles the face, look and key cards are drawn and signed with, for every card this process links, served or prerendered; a face `images.card.font` names that `fonts` lacks stops the boot.
 export async function setupCards(setup: CardSetup): Promise<Cards> {
@@ -243,7 +265,7 @@ async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
   if (setup.prebuilt && !setup.collect && await Bun.file(built).exists())
     return Bun.file(built).bytes()
 
-  const logo = await drawLogo(setup.logo)
+  const logo = await (setup.logoDrawn ?? drawLogo(setup.logo))
 
   if (setup.collect)
     await Bun.write(built, logo)
@@ -265,7 +287,7 @@ export async function cardLogoProblems(file: string): Promise<{ file: string, me
   return warnings.map(message => ({ file, message: `kay: ${message}`, severity: 'warning' as const }))
 }
 
-async function drawLogo(file: string, warn?: (message: string) => void): Promise<Uint8Array> {
+export async function drawLogo(file: string, warn?: (message: string) => void): Promise<Uint8Array> {
   if (!await Bun.file(file).exists())
     throw new KayError('share-card-invalid', `kay: images.card.logo names ${file}, which does not exist`)
 

@@ -11,7 +11,7 @@ import type { Unmatched } from './page-routes'
 import type { Publishing } from './publishing'
 import type { ServedPage } from './render'
 import type { Claim } from './served-paths'
-import type { PageSetup } from './setup'
+import type { PageSetup, Scanned } from './setup'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -19,7 +19,7 @@ import { MAPS_DIR } from '../build/assets'
 import { pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
-import { serveFeeds } from '../content/server'
+import { refuseFeedsWithoutSite, serveFeeds } from '../content/server'
 import { cacheDir, offlineOf } from '../project'
 import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { localizedText } from '../runtime/localized'
@@ -33,7 +33,8 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { remoteLimits } from './config-limits'
+import { checkRequestIdHeader, healthTimeoutMs, remoteLimits } from './config-limits'
+import { corsRule } from './cors'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
@@ -41,8 +42,9 @@ import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
+import { PUBLIC_ENV_PATH } from './env-state'
 import { serveErrorReports } from './errors'
-import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
+import { FAVICON_DIR, faviconSource, manifestJson, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
@@ -59,7 +61,7 @@ import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { plumbing } from './plumbing'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
-import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
+import { checkProxy, requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { redirectSpelling } from './redirect-spelling'
@@ -67,7 +69,7 @@ import { claimRedirects, readRedirects, redirectStatus, serveRedirects } from '.
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
-import { routeMatch, routeTable } from './route-table'
+import { refuseClashes, routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
@@ -101,13 +103,48 @@ export interface PagesOptions extends KayConfig {
 }
 
 // The routes with their guards loaded.
-async function servedRoutes({ routes, i18n }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
-  const served = await Promise.all(routes.map(async route => loadGuards(route, required)))
+async function servedRoutes({ routes }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
+  return Promise.all(routes.map(async route => loadGuards(route, required)))
+}
 
-  if (i18n)
-    refuseLocaleClashes(i18n.settings, served)
+// What the server's options refuse by themselves, before the project is read.
+function refuseOptions(options: PagesOptions): void {
+  if (options.health !== false)
+    healthTimeoutMs(options.health)
 
-  return served
+  checkRequestIdHeader(options.requestIdHeader)
+  checkProxy(options.proxy)
+
+  if (options.cors)
+    corsRule(options.cors)
+}
+
+// What the server refuses once the routes, public files, endpoints and collections are read, which is all of it that needs no build, so a refused config starts none.
+// Claims run in the order the server makes them, on a table of their own; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
+function refuseScanned({ root, config, paths }: Project<PagesOptions>, { routes, files, endpoints, collections, declared, site, base, ownManifest }: Scanned): void {
+  if (declared)
+    refuseLocaleClashes(declared, routes)
+
+  const served = new ServedPaths()
+
+  refuseClashes(paths.routes, routes, served, declared)
+
+  if (config.publicEnv)
+    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay' })
+
+  claimPublic(served, files)
+  claimEndpoints(served, endpoints, root)
+  claimRedirects(served, readRedirects(config.redirects ?? {}))
+
+  const mcpAt = mcpPath(config.mcp)
+
+  if (mcpAt !== undefined)
+    served.claim({ path: mcpAt, owner: '`mcp`', kind: 'kay', method: 'ALL' })
+
+  refuseFeedsWithoutSite(collections, site)
+
+  if (!ownManifest && faviconSource(root, config.favicon, config.manifest) !== undefined)
+    manifestJson(undefined, undefined, config.manifest, base)
 }
 
 // The routes under `/_kay/files/` carry the security headers themselves, as the build's files and the image route do.
@@ -258,7 +295,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const { root, config: options, paths, mode } = project
   // The one spelling every redirect goes through, handed to the setup's render options and the actions alike; it reads the routes, so it is set once they are known.
   let spell = (location: string) => location
-  const setup = await setupPages(project, loadClient, false, location => spell(location))
+
+  refuseOptions(options)
+
+  const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned))
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints, appManifest, extensions, api: apiImport } = setup
   const routes = await servedRoutes(setup, options.requireGuards)
   const served = new ServedPaths()

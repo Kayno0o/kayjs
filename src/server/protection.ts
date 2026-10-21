@@ -595,8 +595,8 @@ export function requestServer(request: Request): Server<unknown> | undefined {
   return servers.get(request)
 }
 
-// Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
-export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean | undefined): void {
+// Refuses a `proxy` setting that names no proxy, so the boot can before any build starts.
+export function checkProxy(setting: ProxyConfig | number | boolean | undefined): ProxyConfig | undefined {
   const proxy = proxyOf(setting)
 
   if (proxy) {
@@ -613,6 +613,13 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
 
     rangesOf(proxy)
   }
+
+  return proxy
+}
+
+// Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
+export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean | undefined): void {
+  const proxy = checkProxy(setting)
 
   app.onRequest(({ request, server }) => {
     proxies.set(request, proxy ?? null)
