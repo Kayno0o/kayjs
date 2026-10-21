@@ -294,8 +294,10 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
   // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.
   for (const file of [...files.slice(own.length), ...fromLibraries.scripts]) {
-    for (const name of fileWords(file))
+    for (const name of fileWords(file)) {
       classes.add(name)
+      words.add(name)
+    }
   }
 
   if (diagnostics.length > 0)

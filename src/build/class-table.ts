@@ -9,6 +9,8 @@ interface Parsed {
 }
 
 const SKIPPED_BLOCK = /^@(?:property|keyframes)\b/
+// What `space-*` and `divide-*` write: the element's children, whose properties are kept apart from the element's own.
+const CHILDREN_BLOCK = /^:where\(/
 const SIDES = ['top', 'right', 'bottom', 'left', 'inline', 'block', 'inline-start', 'inline-end', 'block-start', 'block-end']
 const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'start-start', 'start-end', 'end-start', 'end-end']
 
@@ -17,6 +19,11 @@ const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'start-
 const LONGHANDS: Record<string, string[]> = (() => {
   const result: Record<string, string[]> = {
     'gap': ['row-gap', 'column-gap'],
+    'place-items': ['align-items', 'justify-items'],
+    'place-content': ['align-content', 'justify-content'],
+    'place-self': ['align-self', 'justify-self'],
+    'grid-column': ['grid-column-start', 'grid-column-end'],
+    'grid-row': ['grid-row-start', 'grid-row-end'],
     'overflow': ['overflow-x', 'overflow-y'],
     'overscroll-behavior': ['overscroll-behavior-x', 'overscroll-behavior-y'],
     'border-radius': CORNERS.map(corner => `border-${corner}-radius`),
@@ -57,6 +64,7 @@ function covering(property: string, seen = new Set<string>()): Set<string> {
 export function declaredProperties(css: string): string[] {
   const names = new Set<string>()
   const skipped: boolean[] = []
+  const children: boolean[] = []
   let current = ''
   let depth = 0
   let quote = ''
@@ -66,7 +74,7 @@ export function declaredProperties(css: string): string[] {
     const colon = text.indexOf(':')
 
     if (colon > 0 && !skipped.includes(true) && !text.startsWith('@'))
-      names.add(text.slice(0, colon).trim())
+      names.add(`${children.includes(true) ? '>' : ''}${text.slice(0, colon).trim()}`)
 
     current = ''
   }
@@ -98,11 +106,13 @@ export function declaredProperties(css: string): string[] {
     }
     else if (char === '{') {
       skipped.push(SKIPPED_BLOCK.test(current.trim()))
+      children.push(CHILDREN_BLOCK.test(current.trim()))
       current = ''
     }
     else if (char === '}') {
       declaration()
       skipped.pop()
+      children.pop()
     }
     else if (char === ';') {
       declaration()

@@ -102,7 +102,7 @@ Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwi
 
 `Button(class="px-2")` over the `px-4` a component sets renders `px-2` alone, with no `twMerge` or `cn`. Wherever kay merges classes, the shorthand, `class`, a spread's `class` and a component's `class` prop, a later class drops an earlier one that sets the same CSS properties under the same variants and importance.
 
-`p-6` after `px-4` drops it, but `px-4` after `p-6` keeps both, and `hover:p-2` never meets `p-4`. The properties come from your own Tailwind, so `@utility`, theme tokens and plugins count. A class Tailwind does not know, and one built at runtime from parts, is never dropped.
+`p-6` after `px-4` drops it, but `px-4` after `p-6` keeps both, and `hover:p-2` never meets `p-4`. The properties come from your own Tailwind, so `@utility`, theme tokens and plugins count. A class Tailwind does not know, and one built at runtime from parts, is never dropped. Only a merge made while rendering resolves: literal classes written together in one template join as written.
 
 The build writes the table of classes that can meet another into the manifest and the islands' entry, about 200 to 1,000 bytes gzipped. An app without Tailwind keeps the plain join.
 

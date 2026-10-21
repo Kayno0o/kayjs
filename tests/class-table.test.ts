@@ -22,7 +22,7 @@ async function project(css: string): Promise<string> {
   return dir
 }
 
-const WORDS = ['p-4', 'p-6', 'px-4', 'py-2', 'hover:p-2', 'hover:p-4', '!p-2', '-mt-2', 'mt-2', 'mt-4', 'p-[3px]', 'p-[5px]', 'flex', 'hidden', 'block', 'text-sm', 'text-lg', 'text-red-500', 'text-blue-500', 'bg-red-500', 'bg-[image:var(--hero)]', 'size-4', 'w-4', 'h-4', 'shadow-md', 'shadow-lg', 'ring-2', 'border', 'border-2', 'border-t-2', 'border-red-500', 'rounded', 'rounded-t-lg', 'md:p-4', 'md:p-6', 'card', 'btn-primary', 'group', 'tab-4', 'tab-8', 'uppercase', 'font-bold', 'font-medium', '*:p-2', 'bg-brand', 'bg-red-500/50', 'gap-2', 'gap-x-4', 'inset-0', 'top-0', 'bg-(--brand)']
+const WORDS = ['p-4', 'p-6', 'px-4', 'py-2', 'hover:p-2', 'hover:p-4', '!p-2', '-mt-2', 'mt-2', 'mt-4', 'p-[3px]', 'p-[5px]', 'flex', 'hidden', 'block', 'text-sm', 'text-lg', 'text-red-500', 'text-blue-500', 'bg-red-500', 'bg-[image:var(--hero)]', 'size-4', 'w-4', 'h-4', 'shadow-md', 'shadow-lg', 'ring-2', 'border', 'border-2', 'border-t-2', 'border-red-500', 'rounded', 'rounded-t-lg', 'md:p-4', 'md:p-6', 'card', 'btn-primary', 'group', 'tab-4', 'tab-8', 'uppercase', 'font-bold', 'font-medium', '*:p-2', 'bg-brand', 'bg-red-500/50', 'gap-2', 'gap-x-4', 'inset-0', 'top-0', 'bg-(--brand)', 'place-items-center', 'items-start', 'place-content-center', 'content-start', 'col-span-2', 'col-start-1', 'ms-2', 'space-x-4', 'space-y-4', 'divide-x']
 
 describe('declaredProperties', () => {
   it('reads the properties of a rule, nested variants included, and skips @property blocks', () => {
@@ -60,6 +60,12 @@ describe('the class table', () => {
     expect(table!.classes.card).toBeUndefined()
     expect(table!.classes.group).toBeUndefined()
     expect(table!.classes.uppercase).toBeUndefined()
+  })
+
+  it('is built for an app importing only Tailwind\'s theme and utilities', async () => {
+    const parts = await buildClassTable(await project('@import "tailwindcss/theme.css" layer(theme);\n@import "tailwindcss/utilities.css" layer(utilities);\n'), WORDS)
+
+    expect(parts?.classes['p-4']).toBeDefined()
   })
 
   it('has none without Tailwind', async () => {
@@ -105,6 +111,18 @@ describe('the class table', () => {
     expect(merge('shadow-md', 'ring-2')).toBe('shadow-md ring-2')
     expect(merge('font-bold uppercase', 'font-medium')).toBe('uppercase font-medium')
     expect(merge('rounded', 'rounded-t-lg')).toBe('rounded rounded-t-lg')
+  })
+
+  it('lets a place-* shorthand and a grid span override what they cover', () => {
+    expect(merge('items-start', 'place-items-center')).toBe('place-items-center')
+    expect(merge('content-start', 'place-content-center')).toBe('place-content-center')
+    expect(merge('col-start-1', 'col-span-2')).toBe('col-span-2')
+    expect(merge('col-span-2', 'col-start-1')).toBe('col-span-2 col-start-1')
+  })
+
+  it('keeps a class whose utility spaces the element\'s children', () => {
+    expect(merge('ms-2', 'space-x-4')).toBe('ms-2 space-x-4')
+    expect(merge('space-x-4', 'space-y-4')).toBe('space-x-4 space-y-4')
   })
 
   it('lets shadows override each other', () => {
