@@ -3,7 +3,7 @@ import type { CmsOptions } from './settings'
 import { serverRoot, underKayDev } from 'kay/library'
 import { api } from 'kay/server'
 import { collectionInfo, collections } from './kay/content'
-import { missingKindLines } from './kinds'
+import { hintProblems, missingKindLines } from './kinds'
 import { bodylessLayout, layoutProblems, whenProblems } from './layout'
 import { log } from './log'
 import { migrateUploads } from './migrate-uploads'
@@ -53,7 +53,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
         try {
           const listed = await collections({ counts: false })
 
-          for (const line of [...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)])
+          for (const line of [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)])
             log.warn(line)
         }
         catch (error) {

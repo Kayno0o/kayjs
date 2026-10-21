@@ -157,6 +157,17 @@ export function pairedFields(fields: Field[]): Map<string, { image: string, role
   return paired
 }
 
+// The hint a schema's `x-kay` gives: an object with a string `kind`, or a string naming the kind as apps wrote it before `fieldInput`. Anything else gives none.
+export function hintOf(raw: unknown): FieldHint | undefined {
+  if (typeof raw === 'string')
+    return raw === '' ? undefined : { kind: raw }
+
+  if (typeof raw === 'object' && raw !== null && typeof (raw as { kind?: unknown }).kind === 'string')
+    return raw as FieldHint
+
+  return undefined
+}
+
 export function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field {
   const { schema: inner, nullable } = withoutNull(schema)
   const limits = limitsOf(inner)
@@ -174,7 +185,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
 
   Object.assign(base, entering.base)
 
-  const hint = inner['x-kay']
+  const hint = hintOf(inner['x-kay'])
 
   if (hint?.kind === 'reference')
     return { ...base, kind: 'reference', collection: hint.collection ?? '' }

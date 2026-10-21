@@ -1,8 +1,8 @@
 import type { Field } from './fields'
-import type { CollectionInfo } from './kay/contract'
+import type { CollectionInfo, JsonSchema } from './kay/contract'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { fieldsOf, itemFields } from './fields'
+import { fieldsOf, hintOf, itemFields } from './fields'
 
 const KAY_FILE = /\.kay$/
 
@@ -42,4 +42,30 @@ export function missingKindLines(root: string, listed: Pick<CollectionInfo, 'nam
   const available = new Set(existsSync(folder) ? readdirSync(folder).filter(file => KAY_FILE.test(file)).map(file => file.replace(KAY_FILE, '')) : [])
 
   return [...missingKinds(listed, available)].map(([kind, names]) => `no editor for the ${kind} kind that ${names.join(', ')} uses: add src/cms/fields/${kind}.kay, until then it is edited as JSON`)
+}
+
+// A line for each `x-kay` that is neither a kind name nor an object with a `kind`, which the field ignores: the collection, the field's path and what to write instead.
+export function hintProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]): string[] {
+  const lines: string[] = []
+
+  function walk(collection: string, at: string, schema: JsonSchema): void {
+    const raw: unknown = schema['x-kay']
+
+    if (raw !== undefined && hintOf(raw) === undefined && at !== '')
+      lines.push(`${collection}: ${at} has an \`x-kay\` that is neither a kind name nor \`{ kind }\`: set it with \`fieldInput\`, or remove it`)
+
+    for (const [key, property] of Object.entries(schema.properties ?? {}))
+      walk(collection, at === '' ? key : `${at}.${key}`, property)
+
+    if (schema.items !== undefined && !Array.isArray(schema.items))
+      walk(collection, `${at}[]`, schema.items)
+
+    for (const variant of schema.anyOf ?? [])
+      walk(collection, at, variant)
+  }
+
+  for (const { name, schema } of listed)
+    walk(name, '', schema)
+
+  return lines
 }

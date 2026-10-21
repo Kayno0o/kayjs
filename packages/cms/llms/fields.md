@@ -29,6 +29,7 @@ s.Object({
 ```
 
 It wraps any schema, an optional or nullable one too, keeps its kind and keywords and reports the options as `x-kay-input`. A nullable field listed as required stores `null` when cleared, not a missing key.
+A hand-written `x-kay` string (`{ 'x-kay': 'text' }`, as apps wrote before `fieldInput`) is read as the kind it names, a built-in one or the app's own; one that is neither a string nor an object with a `kind` is ignored and the boot logs it with the collection and field path.
 
 - `placeholder`: shown in the empty control.
 - `prefix`, `suffix`: a word before or after a text or number box, a currency or a unit; `600 €` is a number with `suffix: '€'`, stored as `600`.
