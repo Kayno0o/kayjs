@@ -13,9 +13,11 @@ With Tailwind, classes merged from the shorthand, `class`, a spread and a compon
 `authPages({ auth: () => import('./src/auth') })` is `auth({ module: './src/auth' })`, `authExtension(() => import('./src/auth'))` is `auth({ module: './src/auth', pages: false })` and `mailExtension('./src/mail')` is `mail({ module: './src/mail' })`; `authPages({ server })` is `auth({ server })` and `mailExtension(fn)` is `mail({ server: fn })`. The old names work for three minors, and `kay upgrade` rewrites them (the `deprecated-library-registration` lint) where the module is a literal path. `auth({ module })` reads the `auth` export alone, no longer the default one, so a `src/auth.ts` exporting `createAuth` as `default` gains `export const auth`. `kay.config.ts` still imports none of the module, which loads as the server starts.
 
 `cms({ guard: { load } })` is unchanged: a guard is the app's own call, so it stays a function the config bundles. The lint leaves a call alone whose module has no `export const auth`.
+
 ### Rate limits are `rateLimit` and `key`
 
 kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `ask(messages, { visitor })` are `key`, and kayjs-auth's `createAuth({ limits })` is `rateLimit`, as kay's actions and API routes already name theirs. The old names still work for three minors (the `deprecated-rate-limit` lint), and `kay upgrade` renames them. kayjs-mail's `smtp({ rateLimit: 5 })` and `mailer({ smtp: { rateLimit: 5 } })` are `{ max: 5, window: '1s' }`, and `SMTP_RATE_LIMIT` reads `5/1s` (a bare `5` still means 5 a second). A `limit`, `limits` or number held in a variable is not found: change the option where it is passed.
+
 ### Runtime error classes end in `Error` and carry a `code`
 
 kay's `HydrationMismatch` of `kay/dom`, `ActionRedirect` from `kay`, `CspViolation` from `kay/server` and `RedirectRefused` of `kay/library` are `HydrationMismatchError`, `ActionRedirectError`, `CspViolationError` and `RedirectRefusedError` (their `name` changes with them), kayjs-cms's `SaveConflict` is `SaveConflictError` and kayjs-mail's `MailNotConfigured` is `MailNotConfiguredError`; the old names stay as aliases three minors, and `kay upgrade` renames the imports and their uses (the `deprecated-renamed-export` lint). Every error class a library exports has a `code` (`'save-conflict'`, `'mail-not-configured'`, `'oauth-exchange'`, `'forge-refused'`), and `AiError` has `code` beside `kind`, the same value.
@@ -23,6 +25,7 @@ kay's `HydrationMismatch` of `kay/dom`, `ActionRedirect` from `kay`, `CspViolati
 ### Boot config errors of the libraries are `KayError`s
 
 A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a bad argument to `ask()`, throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
+
 ### Size limits are `maxSize`
 
 `bodyLimit` in `kay.config.ts`, an action's options and its `messages`, `api({ ... })` and a route's `detail` is `maxSize`, as kayjs-cms's `uploads: { maxSize }` is. The old name works three minors, and `kay upgrade` renames it (the `deprecated-body-limit` lint). The `kay.action.bodyLimit` catalog key keeps its name.
@@ -34,6 +37,7 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 ### kayjs-auth names its methods by the kind of thing
 
 A collection is `list*` (`listSessions`, `listPasskeys`, `listTokens`, `listMembers`, `listOrganizations`, `listInvitations`, `listMyInvitations`, `listOAuthClients`, `listIdentities`, `listAuditLog`, `listAdminAuditLog`), one item `get*` (`getOrganization`, `getInvitation`), a credential `revoke*` (`revokePasskey`, `revokeSession`) and a record `delete*` (`deleteMember`). `revokeSession(id)` answers `{ ok }` where `endSession(id)` answered a boolean. The old names work three minors, and `kay upgrade` renames the calls on `auth` (the `deprecated-auth-method` lint), `await auth.endSession(id)` becoming `(await auth.revokeSession(id)).ok`; any other use of `endSession`, and `revokeToken`, `revokeOAuthClient`, `renamePasskey`, `declineInvitation` and `setLocale`, which still answer a boolean, are left as they are.
+
 ### A project with a test database runs `kay test`
 
 `kay/test/preload` refuses a run without `--isolate` when the project has a `pg-orm.config.ts` and a `DATABASE_URL`, as every file would share one database: set the `test` script to `kay test` (no lint can recognise it, `kay check` not reading `package.json` scripts). `kay/test/dom` no longer needs listing in `bunfig.toml`: `mountComponent` loads it, and a test reading `document` before then imports it.
@@ -147,6 +151,7 @@ The keyline now also sizes ChipGroup's chips, IconPicker's grid, the ScatterChar
 - A `User` has `data` (what the `user` schema keeps, `{}` without one) and `providers` (the id of each linked provider), and `Auth` has a fourth generic, the data's type, so a `User` literal in a test or a mock needs both fields and an exact `toEqual` on a returned user gains `data: {}` and `providers: {}`. Guards, gates, predicates, admin lists, `signInAsGuest`, `register` and `createUser` work with `BareUser`, a `User` without `providers`. An app's own `(user: User) =>` annotations on predicates, `authorize`, the profile's `load` and `save` and `memberOf` must become `BareUser`, which `strictFunctionTypes` enforces.
 - With pg-orm, generate a migration for the new `auth_user.data` column (jsonb, not null, default `{}`, so rows stored before it read back `{}`). A custom store keeps and returns `data` on `UserRecord` as JSON; it is optional, and a store that drops it reads as `{}`. `kay check` cannot recognise this, so there is no lint.
 - `createAuth({ secret })` is optional: left out, kayjs-auth derives its key from the session's secret. An app that keeps `secret` changes nothing; one that drops it must read the secret section of the kayjs-auth setup first, as what is sealed under the old secret no longer opens.
+
 ### kayjs-ui's keyline token is `--kui-border-width`
 
 - Rename `--kui-border-card` to `--kui-border-width` in the skin, whose value is a length such as `2px`: the old name keeps working until 1.61. The keyline now also sizes cards, card heads, card rows, widgets, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav and chart tooltips, which drew 1px whatever it held, so a skin that set it above `1px` sees them thicken. No lint can recognise it: kay check does not read an app's CSS.
@@ -154,6 +159,7 @@ The keyline now also sizes ChipGroup's chips, IconPicker's grid, the ScatterChar
 ### kayjs-ui derives its palette from eight seeds
 
 - `surface0`, `surface1`, `mantle`, `fill-hover`, `fill-danger`, `subtext0`, `overlay1`, the hairlines and `accent-hi` are mixed from `canvas`, `text`, `accent` and `error` unless the skin sets them, so a skin that set a seed and left its derived colours at the old defaults now sees them follow the seed: set the derived colour too to keep it. `on-accent` is now the canvas (it was `#fff` in light and `#1a0d0b` in dark), `row-hover` derives from `text`, and `chart-3` and `chart-4` follow `info` and `warning`, so a skin that set those seeds sees them move; set them to keep the old ones. A skin that sets every colour is unchanged. No lint can recognise it.
+
 ### a websocket route's body drops a refused message
 
 On an `api()` chain, a message failing a `.ws()` route's `body` is dropped: the sender gets no validation frame and the module's `onError` is not called, and a key the schema does not name is stripped instead of kept or refused. Remove any island code reading the validation frame. `kay check` cannot recognise the old form, so no lint is possible.

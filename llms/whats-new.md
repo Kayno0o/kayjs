@@ -9,11 +9,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).
 - `kay add ui` and `kay add auth` add kayjs-ui and kayjs-auth: `ui()` mounts the theme, one Toaster and one TooltipHost on every page, and an extension may name a `layout` wrapping every page ([Scaffold with kay new and kay add](project-new-and-add.md), [Extensions](component-libraries.md#extensions), [Setup](../packages/ui/llms/setup.md)).
 - kayjs-auth and kayjs-mail register like every library, with `auth({ module: './src/auth' })` and `mail({ module: './src/mail' })`, and `kay check` types the module's locals ([Component libraries](component-libraries.md), [Setup](../packages/auth/llms/setup.md), [Writing and sending](../packages/mail/llms/writing-and-sending.md)).
-
-## 1.69.0
-
-- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
-- Rate limits are named `rateLimit` and `key` across the libraries: kayjs-ai's `ai({ rateLimit, key })` and `ask({ key })`, kayjs-auth's `createAuth({ rateLimit })` ([Limits](../packages/ai/llms/limits.md)); `kay upgrade` renames the old names.
 - Rate limits are named `rateLimit` and `key` across the libraries: kayjs-ai's `ai({ rateLimit, key })` and `ask({ key })`, kayjs-auth's `createAuth({ rateLimit })`, kayjs-mail's `smtp({ rateLimit: { max, window } })` ([Limits](../packages/ai/llms/limits.md)); `kay upgrade` renames the old names.
 - kayjs-ui: a SaveForm over signal state takes `dirty` and `onSave` instead of `action`, and `status` for the bar ([Forms](../packages/ui/llms/forms.md)).
 - An extension's `check` hands `kay check` and the editor the problems with how the app configured it, with no server started; kayjs-cms reports its collection and layout warnings through it ([Component libraries](component-libraries.md)).
@@ -24,6 +19,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Every size limit is `maxSize`: `bodyLimit` in the config, an action, `api()` and a route's `detail` is renamed, the old name kept three minors ([Protecting actions](action-protection.md#body-limit)).
 - One test helper per library, called at the top of a file with the test site and clearing itself before each test: `mailTest(site)`, `aiTest()`, `cmsTest(site)` (sign in as an editor, `save`, `entry`) and `auth.test(site)` ([Testing](testing.md)).
 - `kay test` runs `bun test` isolated, with kay's preload and failures at `.kay` lines, so a project needs no `bunfig.toml` or `--isolate`; `mountComponent` loads happy-dom itself ([Testing](testing.md)).
+
+## 1.69.0
+
+- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
 - `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
 - `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).
