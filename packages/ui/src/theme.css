@@ -962,7 +962,7 @@
       @apply flex fill-kui-overlay1 text-kui-2xs leading-none text-kui-overlay1;
     }
     & :where(.ct-label.ct-vertical.ct-start) {
-      @apply items-end justify-end text-right;
+      @apply items-end justify-end whitespace-nowrap text-right;
     }
     /* Zero width so a tick's label ignores its step, which is a couple of pixels wide on a long series, and centres on the tick by overflowing evenly. */
     & :where(.ct-label.ct-horizontal.ct-end) {

@@ -216,6 +216,51 @@ inBrowser('LineChart stacked far above one series', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart long axis labels', () => {
+  test('keeps every y label whole, on one line and inside the svg, and leaves an own offset alone', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+
+    // Each y label's text box against the svg's box, and how many lines it takes.
+    const read = async (id: string) => {
+      await page.waitFor(`#${id} .kui-line-chart-plot svg .ct-line`)
+      // Chartist draws again once the labels have said how much room they need.
+      await page.waitUntil(((within: string) => {
+        const label = document.querySelector(`#${within} .ct-label.ct-vertical`)
+
+        return label !== null && Number.parseFloat(label.parentElement?.getAttribute('width') ?? '0') > 30
+      }) as never, {}, id as never)
+
+      return await page.evaluate(((within: string) => {
+        const svg = document.querySelector(`#${within} .kui-line-chart-plot svg`)!.getBoundingClientRect()
+        const range = document.createRange()
+
+        return [...document.querySelectorAll(`#${within} .ct-label.ct-vertical`)].map((label) => {
+          range.selectNodeContents(label)
+
+          const text = range.getBoundingClientRect()
+
+          return { text: label.textContent ?? '', inside: text.left >= svg.left && text.right <= svg.right && text.top >= svg.top && text.bottom <= svg.bottom, lines: Math.round(text.height / Number.parseFloat(getComputedStyle(label).lineHeight)) }
+        })
+      }) as never, id as never) as { text: string, inside: boolean, lines: number }[]
+    }
+
+    for (const id of ['long-axis', 'long-axis-stacked']) {
+      const labels = await read(id)
+
+      expect(labels.length).toBeGreaterThan(2)
+      expect(labels.some(label => label.text.length > 9)).toBe(true)
+      expect(labels.filter(label => !label.inside || label.lines !== 1)).toEqual([])
+    }
+
+    // An app's own offset wins: the axis keeps its 50 px and the labels may overflow it.
+    await page.waitFor('#long-axis-own .kui-line-chart-plot svg .ct-line')
+    expect(await page.evaluate(() => Number(document.querySelector('#long-axis-own .ct-label.ct-vertical')!.parentElement!.getAttribute('width')))).toBe(40)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart in another timezone', () => {
   test('words a timed label in the server\'s zone with its name, then in the viewer\'s own zone once hydrated, with no error', async () => {
     const before = process.env.TZ

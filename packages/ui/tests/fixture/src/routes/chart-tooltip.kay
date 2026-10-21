@@ -23,3 +23,9 @@ main
     LineChart(label="Stacked" labels={['a', 'b', 'c']} stacked series={[{ name: 'A', values: [1, 2, 3] }, { name: 'B', values: [null, 1, 1] }, { name: 'C', values: [2, 2, null] }]} xLabels)
   article#cores
     LineChart(label="Cores" labels={['a', 'b', 'c']} stacked formatValue={value => `${value}%`} series={cores} xLabels)
+  article#long-axis
+    LineChart(label="Throughput" labels={['a', 'b', 'c']} formatValue={value => `${(value / 1048576).toFixed(1)} MiB/s`} series={[{ name: 'Read', values: [0, 8e8, 3e8] }]})
+  article#long-axis-stacked
+    LineChart(label="Stacked throughput" labels={['a', 'b', 'c']} stacked formatValue={value => `${(value / 1048576).toFixed(1)} MiB/s`} series={[{ name: 'Read', values: [0, 4e8, 3e8] }, { name: 'Write', values: [1e8, 4e8, 3e8] }]} xLabels)
+  article#long-axis-own
+    LineChart(label="Own offset" labels={['a', 'b', 'c']} formatValue={value => `${value} units per second`} options={{ axisY: { offset: 50 } }} series={[{ name: 'Read', values: [0, 8, 3] }]})

@@ -48,6 +48,9 @@ const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[inde
 // A stacked chart draws every line solid: its filled bands tell the series apart, and the dash cycle would repeat every six.
 const dashes = memo(() => series.map((_, index) => stacked ? '' : SERIES_DASHES[index % SERIES_DASHES.length]!))
 
+// The room the y labels measured for themselves: the widest one, which chartist would wrap at its default 30 px, and their height, which the top tick's label rises above the plot by.
+const fit = signal({ width: 0, height: 0 })
+
 const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
 
@@ -57,9 +60,9 @@ const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
     showPoint: false,
     ...stacked ? { low: heights().flat().reduce<number>((lowest, height) => Math.min(lowest, height ?? 0), 0) } : {},
     ...options,
-    chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
+    chartPadding: { top: Math.max(8, fit().height), right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
     axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
-    axisY: { showLabel: true, showGrid: true, labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
+    axisY: { showLabel: true, showGrid: true, offset: Math.max(40, fit().width + 10), labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
   }
 }
 
@@ -138,6 +141,28 @@ const announced = () => {
   return `${heading(index)}: ${readings}${picked}`
 }
 
+// Reads the y labels as drawn, which stay on one line, and gives them the room they took: a redraw settles at once, as a label's own size does not depend on the room it is given.
+const fitLabels = () => {
+  const range = document.createRange()
+  let width = 0
+  let height = 0
+
+  for (const label of canvas?.querySelectorAll('.ct-label.ct-vertical') ?? []) {
+    range.selectNodeContents(label)
+
+    const box = range.getBoundingClientRect()
+
+    width = Math.max(width, box.width)
+    height = Math.max(height, box.height)
+  }
+
+  const next = { width: Math.ceil(width), height: Math.ceil(height) }
+  const now = fit()
+
+  if (next.width !== now.width || next.height !== now.height)
+    fit.set(next)
+}
+
 // Drawn in the browser alone: chartist measures the box it draws into. It is read once the chart is on the page, so the page's own code loads and runs first.
 onMount(() => {
   tipObserver = new ResizeObserver((entries) => {
@@ -175,6 +200,7 @@ onMount(() => {
     chart = new LineChart(canvas!, { series: [] }, {})
     chart.on('created', (event) => {
       plot.set({ rect: event.chartRect, axisY: event.axisY })
+      fitLabels()
     })
     // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
     // A stacked area is the band between its line and the one below: its own area and the one below it, filled with the even-odd rule, leave only the band.
