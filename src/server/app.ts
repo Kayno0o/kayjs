@@ -63,7 +63,7 @@ import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './pr
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { redirectSpelling } from './redirect-spelling'
-import { claimRedirects, readRedirects, serveRedirects } from './redirects'
+import { claimRedirects, readRedirects, redirectStatus, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
@@ -421,8 +421,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   knowRedirects(Object.keys(options.redirects ?? {}))
   knowRuntimeRules({
     redirects: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, typeof target === 'string' ? target : target.to])),
+    statuses: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, redirectStatus(from, target)])),
     hosts: options.runtimeRedirects?.hosts,
     served: () => [...served.paths(), ...client.pages.keys(), ...table.paths.keys()],
+    pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
   })
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)

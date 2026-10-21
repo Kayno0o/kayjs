@@ -6,6 +6,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { underKayDev } from 'kay/library'
 import { wording } from 'kay/words'
 import AddedRedirects from '../components/added-redirects.kay'
+import ConfigRedirects from '../components/config-redirects.kay'
 import MissingPaths from '../components/missing-paths.kay'
 import { adminTitle } from '../listing'
 import { readMissing } from '../missing'
@@ -28,7 +29,13 @@ PageSection(title={wording('cms.missing.title', 'Missing pages')} level={1})
     Notice(tone="info" label={wording('cms.missing.notice', 'The pages visitors asked for and found nothing at, most visited first, as the production server counted them. Paths a redirect answers are left out. Add a suggested redirect here and it answers at once, or copy it into the redirects of kay.config.ts, or run kay not-found --redirect with the path.')})
     if screen.total > screen.rows.length
       Notice(tone="warning" label={wording('cms.missing.truncated', 'Showing the {shown} most visited of {total} paths.', { shown: screen.rows.length, total: screen.total })})
-    MissingPaths(rows={screen.rows} hint={hint})
+    datalist#kcms-site-paths
+      for path of screen.paths key={path}
+        option(value={path})
+    MissingPaths(rows={screen.rows} hint={hint} listId="kcms-site-paths")
     if screen.added.length > 0
       PageSection(title={wording('cms.redirects.title', 'Redirects added here')} level={2})
-        AddedRedirects(redirects={screen.added})
+        AddedRedirects(redirects={screen.added} listId="kcms-site-paths")
+    if screen.configured.length > 0
+      PageSection(title={wording('cms.redirects.configTitle', 'Redirects in kay.config.ts')} level={2})
+        ConfigRedirects(redirects={screen.configured})

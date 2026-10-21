@@ -8,7 +8,7 @@ import { openSqlite } from '../src/runtime/sqlite.server'
 import { pages } from '../src/server'
 import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
 import { dropStore, missingPaths, pageRequested, sharedStore } from '../src/server/not-found'
-import { knowRuntimeRules, missingRedirector } from '../src/server/runtime-redirect-api'
+import { configuredRedirects, knowRuntimeRules, missingRedirector, sitePaths } from '../src/server/runtime-redirect-api'
 import { answerFor, RedirectRefused, redirectSet } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
 
@@ -161,6 +161,60 @@ describe('answering a missing path', () => {
     expect(set.remove('/old')).toBe(true)
     expect(set.remove('/old')).toBe(false)
     expect(answerFor(set, '/old', '', [])).toBeUndefined()
+  })
+})
+
+describe('a path that is gone', () => {
+  it('answers 410 for an exact path and a pattern, with no target', () => {
+    const set = setOf()
+
+    expect(set.add('/retired', '', 410, rules)).toMatchObject({ from: '/retired', to: '', status: 410 })
+    set.add('/retired-docs/*', 'ignored', 410, rules)
+
+    expect(answerFor(set, '/retired/', '?x=1', [])).toEqual({ location: '', status: 410 })
+    expect(answerFor(set, '/retired-docs/a/b', '', [])).toEqual({ location: '', status: 410 })
+    expect(set.find('/retired-docs/*')?.to).toBe('')
+  })
+
+  it('is edited in place: the same path takes a new target and status', () => {
+    const set = setOf()
+
+    set.add('/old', '/a', 307, rules)
+    set.add('/old', '/b', 308, rules)
+    expect(set.list().map(({ from, to, status }) => [from, to, status])).toEqual([['/old', '/b', 308]])
+    set.add('/old', '', 410, rules)
+    expect(set.list().map(({ to, status }) => [to, status])).toEqual([['', 410]])
+  })
+
+  it('still refuses a path that is not one, and a path of the config', () => {
+    const set = setOf()
+
+    expect(() => set.add('//evil.example', '', 410, rules)).toThrow()
+    expect(() => set.add('/_kay/x', '', 410, rules)).toThrow()
+    expect(() => set.add('/cfg', '', 410, { ...rules, configured: { '/cfg': '/z' } })).toThrow(/kay\.config/)
+  })
+
+  it('answers 410 from a served app, under a base, without a location', async () => {
+    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, base: '/app' }))
+
+    addRuntimeRedirect('/rt-retired', '', { status: 410 })
+
+    const response = await served.handle(new Request('http://localhost/rt-retired'))
+
+    expect([response.status, response.headers.get('location')]).toEqual([410, null])
+    expect(missingPaths().map(({ path }) => path)).not.toContain('/rt-retired')
+    removeRuntimeRedirect('/rt-retired')
+  })
+})
+
+describe('what the app tells the screens', () => {
+  it('lists the config\'s redirects with their status and the paths the site serves', () => {
+    knowRuntimeRules({ redirects: { '/a': '/b', '/c': '/d' }, statuses: { '/c': 301 }, served: () => ['/b', '/d', '/e', '/f.xml'], pages: () => ['/e', '/b', '/b'] })
+
+    expect(configuredRedirects()).toEqual([{ from: '/a', to: '/b', status: 308 }, { from: '/c', to: '/d', status: 301 }])
+    expect(sitePaths()).toEqual(['/b', '/e'])
+    knowRuntimeRules({ redirects: {} })
+    expect(sitePaths()).toEqual([])
   })
 })
 

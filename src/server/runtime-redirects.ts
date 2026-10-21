@@ -21,12 +21,16 @@ const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 // Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
 export class RedirectRefused extends Error {}
 
+// What a runtime row answers: a redirect's status, or 410 for a path that is gone for good, which has no target.
+export type RuntimeStatus = RedirectStatus | 410
+
 // A redirect an editor added while the site runs, in the same file as the paths visitors found nothing at.
 export interface RuntimeRedirect {
   // As in `redirects` of kay.config.ts: `:name` for a segment, a final `*` for the rest.
   from: string
+  // Empty for a 410.
   to: string
-  status: RedirectStatus
+  status: RuntimeStatus
   addedAt: number
 }
 
@@ -47,14 +51,14 @@ export interface RedirectSet {
   patterns: () => RuntimeRedirect[]
   // Every redirect held in memory, read again only when the file changed, for the lookup a missing path makes.
   snapshot: () => { exact: ReadonlyMap<string, RuntimeRedirect>, patterns: readonly RuntimeRedirect[] }
-  add: (from: string, to: string, status: RedirectStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
+  add: (from: string, to: string, status: RuntimeStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
   remove: (from: string) => boolean
 }
 
 interface Row { path: string, target: string, status: number, added_at: number }
 
 function entry(row: Row): RuntimeRedirect {
-  return { from: row.path, to: row.target, status: row.status as RedirectStatus, addedAt: row.added_at }
+  return { from: row.path, to: row.target, status: row.status as RuntimeStatus, addedAt: row.added_at }
 }
 
 // The path as it is compared: no query, hash nor trailing slash.
@@ -122,8 +126,8 @@ export function safeLocation(location: string, hosts: readonly string[]): boolea
 
 // Throws, saying why, unless `from` and `to` make a redirect that cannot loop and cannot leave the site but where the app allows.
 function check(set: RedirectSet, from: string, to: string, status: number, rules: RuntimeRules): void {
-  if (status !== 301 && status !== 302 && status !== 307 && status !== 308)
-    throw new RedirectRefused(`status ${String(status)} is none of 301, 302, 307 and 308`)
+  if (status !== 301 && status !== 302 && status !== 307 && status !== 308 && status !== 410)
+    throw new RedirectRefused(`status ${String(status)} is none of 301, 302, 307, 308 and 410`)
 
   if (!from.startsWith('/') || from.startsWith('//') || from.length > MAX_LENGTH || UNSAFE.test(from))
     throw new RedirectRefused(`${from} is no path to redirect: it starts with one / and holds no control character, space nor backslash`)
@@ -131,11 +135,12 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
   if (from.startsWith('/_kay/'))
     throw new RedirectRefused('the paths under /_kay/ are kay\'s')
 
-  checkTarget(to, rules.hosts)
-
-  // Names the param or `*` a target uses without the path having it.
+  // Names the param or `*` a target uses without the path having it; a path that is gone has no target.
   try {
-    readRedirects({ [from]: to })
+    if (status !== 410)
+      checkTarget(to, rules.hosts)
+
+    readRedirects({ [from]: status === 410 ? '/' : to })
   }
   catch (error) {
     throw new RedirectRefused(error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error))
@@ -143,6 +148,9 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
 
   if (rules.configured[plainPath(from)] !== undefined)
     throw new RedirectRefused(`${from} is a redirect of kay.config.ts already`)
+
+  if (status === 410)
+    return
 
   const origin = plainPath(from)
   let at = to
@@ -213,7 +221,7 @@ export function redirectSet(db: Database): RedirectSet {
     add(rawFrom, rawTo, status = 307, rules) {
       // Checked and written in one write transaction, so two editors adding at once cannot make a loop between them.
       const write = db.transaction(() => {
-        const to = encoded(rawTo)
+        const to = status === 410 ? '' : encoded(rawTo)
         const from = encoded(rawFrom)
 
         check(set, from, to, status, rules)
@@ -288,12 +296,16 @@ function matcherOf(from: string): Matcher {
 }
 
 // Where an asked path goes, as `location`, when a redirect of the set answers it: an exact row first, then the first `:param` or `*` row it matches. Undefined when none does or the answer would leave where the rules allow, or send the visitor back to the path they asked.
-export function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): { location: string, status: RedirectStatus } | undefined {
+// A path that is gone answers with an empty location and 410.
+export function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): { location: string, status: RuntimeStatus } | undefined {
   const path = plainPath(asked)
   const { exact: byPath, patterns } = set.snapshot()
   const exact = byPath.get(path)
   let location: string | undefined
   let found = exact
+
+  if (exact?.status === 410)
+    return { location: '', status: 410 }
 
   if (exact) {
     location = redirectLocation(exact.to, search)
@@ -305,6 +317,9 @@ export function answerFor(set: RedirectSet, asked: string, search: string, hosts
 
       if (!match)
         continue
+
+      if (row.status === 410)
+        return { location: '', status: 410 }
 
       try {
         const params = new Map(matcher.names.map((name, index) => [name, decodeURIComponent(match[index + 1]!)]))

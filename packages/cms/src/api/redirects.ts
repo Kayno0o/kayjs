@@ -1,22 +1,32 @@
 import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
-import { addRedirect, removeRedirect } from '../missing'
+import { addRedirect, clearPaths, dismissPaths, MAX_BULK, removeRedirects } from '../missing'
 import { settings } from '../settings'
 
-// Only whom the app's guard admits may add or remove a redirect, since an edit cookie is tied to no user and a redirect answers every visitor.
+function needsGuard(): string {
+  return wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })')
+}
+
+const STATUS = s.Optional(s.Union([s.Literal(307), s.Literal(308), s.Literal(410)]))
+const PATHS = s.Array(s.String({ maxLength: 512 }), { maxItems: MAX_BULK })
+
+// Only whom the app's guard admits may change a redirect or the list of missing pages, since an edit cookie is tied to no user and a redirect answers every visitor.
 export default api()
   .post('/', ({ body, status }) => {
     if (!settings().guard)
-      return status(403, wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })'))
+      return status(403, needsGuard())
 
-    const refusal = addRedirect(body.from, body.to, body.permanent)
+    const refusal = addRedirect(body.from, body.to, body.status)
 
     return refusal === undefined ? { added: true } : status(400, refusal)
-  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }), permanent: s.Optional(s.Boolean()) }) })
+  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }), status: STATUS }) })
   .post('/remove', ({ body, status }) => {
-    if (!settings().guard)
-      return status(403, wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })'))
-
-    return { removed: removeRedirect(body.from) }
-  }, { body: s.Object({ from: s.String({ maxLength: 512 }) }) })
+    return !settings().guard ? status(403, needsGuard()) : { removed: removeRedirects(body.froms) }
+  }, { body: s.Object({ froms: PATHS }) })
+  .post('/dismiss', ({ body, status }) => {
+    return !settings().guard ? status(403, needsGuard()) : { dismissed: dismissPaths(body.paths) }
+  }, { body: s.Object({ paths: PATHS }) })
+  .post('/clear', ({ status }) => {
+    return !settings().guard ? status(403, needsGuard()) : { cleared: clearPaths() }
+  })

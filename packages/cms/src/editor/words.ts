@@ -78,6 +78,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.list.expand',
   'cms.list.removed',
   'cms.list.undo',
+  'cms.missing.dismissFailure',
+  'cms.missing.dismissed',
   'cms.redirects.addFailure',
   'cms.redirects.added',
   'cms.redirects.removeFailure',

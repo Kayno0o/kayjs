@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { RedirectStatus } from './redirects'
-import type { RuntimeRedirect, RuntimeRules } from './runtime-redirects'
+import type { RuntimeRedirect, RuntimeRules, RuntimeStatus } from './runtime-redirects'
 import { existsSync } from 'node:fs'
 import { joinBase } from '../runtime/base'
 import { kayLog } from '../runtime/log'
@@ -17,11 +17,25 @@ const TRAILING_SLASHES = /\/+$/
 
 let rules: RuntimeRules = { hosts: [], configured: {} }
 let hosts: readonly string[] = []
+let pagesOf: (() => string[]) | undefined
+let statuses: Record<string, RedirectStatus> = {}
 
 // What the running app lets an editor add, from its config: the redirects of kay.config.ts, which win and count in a chain; the hosts a target may name besides the site's own; the paths the site serves.
-export function knowRuntimeRules(options: { redirects: Record<string, string>, hosts?: readonly string[] | undefined, served?: (() => string[]) | undefined }): void {
+export function knowRuntimeRules(options: { redirects: Record<string, string>, statuses?: Record<string, RedirectStatus> | undefined, hosts?: readonly string[] | undefined, served?: (() => string[]) | undefined, pages?: (() => string[]) | undefined }): void {
   hosts = (options.hosts ?? []).map(host => host.toLowerCase())
   rules = { hosts, configured: options.redirects, served: options.served }
+  statuses = options.statuses ?? {}
+  pagesOf = options.pages
+}
+
+// The redirects of kay.config.ts, which an editor reads and cannot change.
+export function configuredRedirects(): { from: string, to: string, status: RedirectStatus }[] {
+  return Object.entries(rules.configured).map(([from, to]) => ({ from, to, status: statuses[from] ?? 308 }))
+}
+
+// The pages the running site serves, for a screen to offer as a redirect's target: none before the server knows them.
+export function sitePaths(): string[] {
+  return pagesOf ? [...new Set(pagesOf())].sort() : []
 }
 
 // Runs `use` on the store of the running server, else on the file opened for the call.
@@ -52,7 +66,7 @@ export function runtimeRedirects(file?: string): RuntimeRedirect[] {
 
 // Adds a redirect from a path nothing serves, to a path of this site (or a host `runtimeRedirects.hosts` allows), and forgets the path in the list of missing ones.
 // Throws, saying why, for a path or target it refuses: a loop, a target nothing serves, another site.
-export function addRuntimeRedirect(from: string, to: string, options: { status?: RedirectStatus | undefined, file?: string | undefined } = {}): RuntimeRedirect {
+export function addRuntimeRedirect(from: string, to: string, options: { status?: RuntimeStatus | undefined, file?: string | undefined } = {}): RuntimeRedirect {
   return inStore(options.file, true, (store) => {
     const added = store.redirects.add(from, to, options.status, rules)
 
@@ -120,6 +134,9 @@ export function missingRedirector(options: { file?: string | undefined, trailing
 
     if (!found)
       return undefined
+
+    if (found.status === 410)
+      return new Response('Gone', { status: 410, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 
     // A location Bun refuses as a header answers the 404 it would have, and leaves the store open.
     try {

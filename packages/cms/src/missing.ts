@@ -1,18 +1,26 @@
 import type { MissingPath, RuntimeRedirect } from 'kay/library'
-import { addRuntimeRedirect, RedirectRefused, removeRuntimeRedirect, runtimeRedirects, unansweredPaths } from 'kay/library'
+import { addRuntimeRedirect, clearMissing, configuredRedirects, dismissMissing, RedirectRefused, removeRuntimeRedirect, runtimeRedirects, sitePaths, unansweredPaths } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
 // The most paths the screen lists: the file keeps 1000, and the island sends every row it shows.
 export const SHOWN = 200
 const REFERRERS_SHOWN = 3
+// The most paths offered for a target, which the page sends once.
+const PATHS_OFFERED = 1000
+
+// The most rows a bulk action sends.
+export const MAX_BULK = 1000
+const MINUTE_END = 16
 
 export interface MissingRow {
   path: string
   hits: number
-  // The day of the last visit, `2026-10-17`.
+  // The last visit in UTC, to the minute: `2026-10-17 12:00`.
   lastSeen: string
-  // The hosts visitors came from, most first, cut short with `...`.
+  // The pages of the site that linked to the path, most first.
+  pages: string[]
+  // The hosts of other sites visitors came from, most first, cut short with `...`.
   from: string
   // Where the path likely meant to go, with why that is thought.
   target: string | undefined
@@ -24,11 +32,26 @@ export interface MissingRow {
 // A redirect added from the screen, as it is listed with its Remove button.
 export interface AddedRedirect {
   from: string
+  // Empty for a 410.
+  to: string
+  status: number
+  // When it was added, in UTC.
+  at: string
+}
+
+// A redirect of kay.config.ts, which the screen lists and does not change.
+export interface ConfiguredRedirect {
+  from: string
   to: string
   status: number
 }
 
-export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[] } | { failure: string }
+export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[], configured: ConfiguredRedirect[], paths: string[] } | { failure: string }
+
+// A time as the screen words it, in UTC so a server and an editor in two zones read the same.
+function minute(time: number): string {
+  return new Date(time).toISOString().slice(0, MINUTE_END).replace('T', ' ')
+}
 
 function quoted(text: string): string {
   return `'${text.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`
@@ -45,13 +68,20 @@ function reasonText(reason: MissingPath['reason']): string | undefined {
   return reason === undefined ? undefined : words[reason]()
 }
 
+function hostsOf(referrers: MissingPath['referrers']): string {
+  const hosts = [...new Set(referrers.filter(({ page }) => page === undefined).map(({ host }) => host))]
+
+  return hosts.slice(0, REFERRERS_SHOWN).join(', ') + (hosts.length > REFERRERS_SHOWN ? ', ...' : '')
+}
+
 // The paths worded for the screen, most hit first as the store gives them.
 export function missingRows(paths: MissingPath[]): { rows: MissingRow[], total: number } {
   const rows = paths.slice(0, SHOWN).map(({ path, hits, lastAt, referrers, target, reason }) => ({
     path,
     hits,
-    lastSeen: new Date(lastAt).toISOString().slice(0, 10),
-    from: referrers.slice(0, REFERRERS_SHOWN).map(({ host }) => host).join(', ') + (referrers.length > REFERRERS_SHOWN ? ', ...' : ''),
+    lastSeen: minute(lastAt),
+    pages: referrers.flatMap(({ page }) => page === undefined ? [] : [page]).slice(0, REFERRERS_SHOWN),
+    from: hostsOf(referrers),
     target,
     reason: target === undefined ? undefined : reasonText(reason),
     line: target === undefined ? undefined : `${quoted(path)}: ${quoted(target)},`,
@@ -63,7 +93,12 @@ export function missingRows(paths: MissingPath[]): { rows: MissingRow[], total: 
 // What the production server recorded, minus the paths a redirect answers; a store that cannot be read says so and logs why.
 export function readMissing(): MissingScreen {
   try {
-    return { ...missingRows(unansweredPaths()), added: runtimeRedirects().map(({ from, to, status }: RuntimeRedirect) => ({ from, to, status })) }
+    return {
+      ...missingRows(unansweredPaths()),
+      added: runtimeRedirects().map(({ from, to, status, addedAt }: RuntimeRedirect) => ({ from, to, status, at: minute(addedAt) })),
+      configured: configuredRedirects(),
+      paths: sitePaths().slice(0, PATHS_OFFERED),
+    }
   }
   catch (error) {
     log.warn('the paths visitors found nothing at cannot be read', error)
@@ -73,10 +108,11 @@ export function readMissing(): MissingScreen {
 }
 
 // Adds the redirect to the set the server reads while it runs, which forgets the path as missing; the reason it was refused, worded, or undefined once added.
-// A 307, which browsers do not keep, so the editor can still undo it; `permanent` makes it a 308.
-export function addRedirect(from: string, to: string, permanent = false): string | undefined {
+// A 307, which browsers do not keep, so the editor can still undo it; 308 is permanent, and 410 says the path is gone for good, with no target.
+// A path that has a redirect already takes the new target and status: that is how one is edited.
+export function addRedirect(from: string, to: string, status: 307 | 308 | 410 = 307): string | undefined {
   try {
-    addRuntimeRedirect(from, to, permanent ? { status: 308 } : {})
+    addRuntimeRedirect(from, to, { status })
 
     return undefined
   }
@@ -90,6 +126,17 @@ export function addRedirect(from: string, to: string, permanent = false): string
   }
 }
 
-export function removeRedirect(from: string): boolean {
-  return removeRuntimeRedirect(from)
+// Removes the redirects, so their paths answer 404 again; how many there were.
+export function removeRedirects(froms: string[]): number {
+  return froms.filter(from => removeRuntimeRedirect(from)).length
+}
+
+// Forgets the paths in the list, which come back if a visitor asks for them again; how many were listed.
+export function dismissPaths(paths: string[]): number {
+  return paths.filter(path => dismissMissing(path)).length
+}
+
+// Forgets every listed path; how many there were.
+export function clearPaths(): number {
+  return clearMissing()
 }

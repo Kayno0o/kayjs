@@ -1,0 +1,18 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { ConfiguredRedirect } from '../missing'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import { wording } from 'kay/words'
+
+// The redirects of kay.config.ts, which answer before any added here and are changed in that file: listed so an editor sees every redirect the site has.
+const { redirects } = props<{ redirects: ConfiguredRedirect[] }>()
+
+const columns: Column<ConfiguredRedirect>[] = [
+  { key: 'from', header: wording('cms.redirects.from', 'Path'), cell: true },
+  { key: 'to', header: wording('cms.redirects.to', 'Redirects to'), cell: true },
+  { key: 'status', header: wording('cms.redirects.status', 'Status') },
+]
+---
+Table.kcms-missing.kcms-config-redirects(columns={columns} rows={redirects} rowKey={row => row.from})
+  @cell(row, column)
+    code.kcms-missing-path {column.key === 'from' ? row.from : row.to}

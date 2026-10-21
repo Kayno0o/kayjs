@@ -6,7 +6,8 @@ import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
-import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
+import { clearMissing, dismissMissing } from '../src/server/library'
+import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, referrerOf, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
 import { readRuntimeRedirects } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
@@ -71,6 +72,18 @@ describe('referrerHost', () => {
     expect(referrerHost('not a url')).toBeUndefined()
     expect(referrerHost(`https://${'a'.repeat(300)}.example/`)).toBeUndefined()
     expect(referrerHost(`https://x.example/${'a'.repeat(3000)}`)).toBeUndefined()
+  })
+})
+
+describe('referrerOf', () => {
+  it('keeps the page a visitor came from on the site itself, without its query nor hash, and the host alone of any other site', () => {
+    expect(referrerOf('https://Site.Example/blog/post?x=1#top', 'site.example')).toBe('site.example/blog/post')
+    expect(referrerOf('https://site.example/', 'site.example')).toBe('site.example')
+    expect(referrerOf('https://search.example/results?q=secret', 'site.example')).toBe('search.example')
+    expect(referrerOf('https://search.example/results', undefined)).toBe('search.example')
+    expect(referrerOf('https://site.example/a b', 'site.example')).toBe('site.example/a%20b')
+    expect(referrerOf(`https://site.example/${'a'.repeat(600)}`, 'site.example')).toBe('site.example')
+    expect(referrerOf(null, 'site.example')).toBeUndefined()
   })
 })
 
@@ -290,6 +303,46 @@ describe('unansweredPaths', () => {
   })
 })
 
+describe('dismissing missing paths', () => {
+  const never = () => undefined
+
+  it('lists a referrer page apart from its host, and forgets one path or all of them', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+
+    store.hit('/a', 'site.example/blog/post', never)
+    store.hit('/a', 'search.example', never)
+    store.hit('/b', undefined, never)
+
+    expect(store.list().find(({ path }) => path === '/a')!.referrers).toEqual([{ host: 'search.example', hits: 1 }, { host: 'site.example', page: '/blog/post', hits: 1 }])
+
+    store.forget('/a')
+    expect(store.list().map(({ path }) => path)).toEqual(['/b'])
+
+    store.hit('/c', 'x.example', never)
+    store.clear()
+    expect(store.list()).toEqual([])
+    store.hit('/c', undefined, never)
+    expect(store.list()[0]!.referrers).toEqual([])
+    store.close()
+  })
+
+  it('dismisses and clears through the library, in the open store or a file', async () => {
+    const file = join(await scratchDir('not-found-'), 'missing.sqlite')
+    const store = missingStore(file)
+
+    store.hit('/x', undefined, never)
+    store.hit('/y', undefined, never)
+    store.close()
+
+    expect(dismissMissing('/x', file)).toBe(true)
+    expect(dismissMissing('/x', file)).toBe(false)
+    expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/y'])
+    expect(clearMissing(file)).toBe(1)
+    expect(unansweredPaths(file)).toEqual([])
+    expect(dismissMissing('/x', join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(false)
+  })
+})
+
 describe('countMissing', () => {
   const served = countMissing(new Elysia(), { known: () => ['/fine', '/news/gone2'] })
     .get('/gone', ({ request }) => {
@@ -322,6 +375,16 @@ describe('countMissing', () => {
     expect(listed.map(({ path, hits }) => [path, hits]).sort()).toEqual([['/gone', 2], ['/nothing-registered', 1]])
     expect(listed.find(({ path }) => path === '/gone')!.referrers).toEqual([{ host: 'search.example', hits: 1 }])
     expect(JSON.stringify(listed)).not.toContain('private')
+  })
+
+  it('keeps the page of a visit that came from a link on the site itself', async () => {
+    await visit('/gone', { headers: { referer: 'http://localhost/news/item?q=private' } })
+
+    await counted('/gone')
+    await Bun.sleep(20)
+
+    expect((await counted('/gone')).referrers).toContainEqual({ host: 'localhost', page: '/news/item', hits: 1 })
+    expect(JSON.stringify(missingPaths())).not.toContain('private')
   })
 })
 

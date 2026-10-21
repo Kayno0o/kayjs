@@ -9,11 +9,22 @@ describe('missingRows', () => {
   test('words a path with its hits, its last day, its referrers and the redirect line to paste', () => {
     const [shown] = missingRows([row('/old/post', 12, { target: '/blog/post', reason: 'slug', referrers: [{ host: 'search.example', hits: 9 }, { host: 'a.example', hits: 2 }, { host: 'b.example', hits: 1 }, { host: 'c.example', hits: 1 }] })]).rows
 
-    expect(shown).toEqual({ path: '/old/post', hits: 12, lastSeen: '2026-10-17', from: 'search.example, a.example, b.example, ...', target: '/blog/post', reason: 'Same slug elsewhere', line: '\'/old/post\': \'/blog/post\',' })
+    expect(shown).toEqual({ path: '/old/post', hits: 12, lastSeen: '2026-10-17 12:00', pages: [], from: 'search.example, a.example, b.example, ...', target: '/blog/post', reason: 'Same slug elsewhere', line: '\'/old/post\': \'/blog/post\',' })
+  })
+
+  test('names the pages of the site that link to a missing path apart from the hosts of other sites, three at most', () => {
+    const [shown] = missingRows([row('/old', 5, { referrers: [{ host: 'site.example', page: '/blog/a', hits: 3 }, { host: 'search.example', hits: 2 }, { host: 'site.example', page: '/blog/b', hits: 1 }, { host: 'site.example', page: '/c', hits: 1 }, { host: 'site.example', page: '/d', hits: 1 }] })]).rows
+
+    expect(shown?.pages).toEqual(['/blog/a', '/blog/b', '/c'])
+    expect(shown?.from).toBe('search.example')
+  })
+
+  test('words the time of the last visit in UTC, to the minute', () => {
+    expect(missingRows([row('/late', 1, { lastAt: Date.UTC(2026, 0, 5, 23, 59, 59) })]).rows[0]?.lastSeen).toBe('2026-01-05 23:59')
   })
 
   test('keeps a path with no suggestion without a line, and a visit from nowhere without referrers', () => {
-    expect(missingRows([row('/gone', 3)]).rows).toEqual([{ path: '/gone', hits: 3, lastSeen: '2026-10-17', from: '', target: undefined, reason: undefined, line: undefined }])
+    expect(missingRows([row('/gone', 3)]).rows).toEqual([{ path: '/gone', hits: 3, lastSeen: '2026-10-17 12:00', pages: [], from: '', target: undefined, reason: undefined, line: undefined }])
   })
 
   test('escapes quotes and backslashes in the line, so pasted into kay.config.ts it is the string it names', () => {

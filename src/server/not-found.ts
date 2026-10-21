@@ -9,6 +9,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { pathOf } from './log'
 import { onReload } from './reload'
+import { requestUrl } from './request-url'
 import { slashedPath, withoutSlash } from './routes'
 import { redirectSet } from './runtime-redirects'
 
@@ -51,8 +52,8 @@ export interface MissingPath {
   // Where the path likely meant to go, and why that is thought.
   target?: string | undefined
   reason?: Reason | undefined
-  // The hosts visitors came from, most first.
-  referrers: { host: string, hits: number }[]
+  // The hosts visitors came from, most first, with the page of the site itself a link was on, which is the only page kept.
+  referrers: { host: string, page?: string | undefined, hits: number }[]
 }
 
 export type Reason = 'spelling' | 'locale' | 'slug' | 'similar'
@@ -65,7 +66,10 @@ export interface Suggestion {
 export interface MissingStore {
   hit: (path: string, referrer: string | undefined, suggest: (path: string) => Suggestion | undefined) => void
   list: () => MissingPath[]
-  forget: (path: string) => void
+  // Whether the path was listed.
+  forget: (path: string) => boolean
+  // Forgets every path, and says how many there were.
+  clear: () => number
   // The redirects an editor added, which share the file.
   redirects: RedirectSet
   close: () => void
@@ -135,6 +139,20 @@ export function referrerHost(header: string | null): string | undefined {
   catch {
     return undefined
   }
+}
+
+const MAX_REFERRER_PAGE = 512
+
+// What is kept of a referrer: its host, and for a link on the site itself (`own` being the host the request came to) its page too, without query nor hash. The pages of other sites are never kept, as they can hold a name or an address.
+export function referrerOf(header: string | null, own: string | undefined): string | undefined {
+  const host = referrerHost(header)
+
+  if (host === undefined || own === undefined || host !== own.toLowerCase())
+    return host
+
+  const { pathname } = new URL(header!)
+
+  return pathname.length > 1 && pathname.length <= MAX_REFERRER_PAGE ? `${host}${pathname}` : host
 }
 
 // Where a missing path likely meant to go among the paths the site serves: the same page spelled another way, in another locale, under another parent with the same slug, or a near typo of a slug.
@@ -309,6 +327,7 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
   const hosts = db.query<{ path: string, host: string, hits: number }, []>('SELECT path, host, hits FROM kay_missing_referrers ORDER BY hits DESC, host')
   const removed = db.query('DELETE FROM kay_missing WHERE path = ?')
   const removedHosts = db.query('DELETE FROM kay_missing_referrers WHERE path = ?')
+  const removedAll = db.query('DELETE FROM kay_missing')
 
   const aged = db.query('DELETE FROM kay_missing WHERE last_at < ?')
   const orphans = db.query('DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
@@ -448,15 +467,27 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
 
       const byPath = new Map<string, MissingPath['referrers']>()
 
-      for (const { path, host, hits } of hosts.all())
-        byPath.set(path, [...byPath.get(path) ?? [], { host, hits }])
+      for (const { path, host: key, hits } of hosts.all()) {
+        const slash = key.indexOf('/')
+
+        byPath.set(path, [...byPath.get(path) ?? [], slash === -1 ? { host: key, hits } : { host: key.slice(0, slash), page: key.slice(slash), hits }])
+      }
 
       return rows.all().map(row => ({ path: row.path, hits: row.hits, firstAt: row.first_at, lastAt: row.last_at, target: row.target ?? undefined, reason: (row.reason ?? undefined) as Reason | undefined, referrers: byPath.get(row.path) ?? [] }))
     },
     forget(path) {
       flush()
-      removed.run(path)
       removedHosts.run(path)
+
+      return removed.run(path).changes > 0
+    },
+    clear() {
+      flush()
+      const { changes } = removedAll.run()
+
+      orphans.run()
+
+      return changes
     },
     redirects,
     close: settle,
@@ -510,7 +541,7 @@ export function missingPaths(): MissingPath[] {
   return current?.list() ?? []
 }
 
-// Counts the pages a visitor asked for with a GET that answered 404, in production: the path without its query, the host of the referrer, never an address or a header.
+// Counts the pages a visitor asked for with a GET that answered 404, in production: the path without its query, the host of the referrer and, for a link on the site itself, its page, never an address, a query or a header.
 // The file is opened by the first one, so a site nobody mistypes a URL of writes nothing.
 export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, trailingSlash?: TrailingSlash | undefined, file?: string | undefined }): App {
   let suggest: ReturnType<typeof suggester> | undefined
@@ -531,7 +562,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
       return
 
     try {
-      sharedStore(file, true)!.hit(path, referrerHost(request.headers.get('referer')), (missing) => {
+      sharedStore(file, true)!.hit(path, referrerOf(request.headers.get('referer'), requestUrl(request).host), (missing) => {
         suggest ??= suggester(options.known(), options.settings)
 
         const found = suggest(missing)
@@ -590,6 +621,37 @@ export function unansweredPaths(file?: string): MissingPath[] {
 
   try {
     return store.list().filter(row => !answered(row.path))
+  }
+  finally {
+    store.close()
+  }
+}
+
+// Forgets one path in the list of missing ones, in this process's store while it has one open, else in the file (or `file`); false when it was not listed. It is listed again if a visitor asks for it again.
+export function dismissMissing(path: string, file?: string): boolean {
+  return inMissing(file, store => store.forget(path)) ?? false
+}
+
+// Forgets every missing path, and says how many there were.
+export function clearMissing(file?: string): number {
+  return inMissing(file, store => store.clear()) ?? 0
+}
+
+function inMissing<T>(file: string | undefined, use: (store: MissingStore) => T): T | undefined {
+  if (file === undefined && current)
+    return use(current)
+
+  file ??= NOT_FOUND_FILE
+
+  if (!existsSync(file))
+    return undefined
+
+  flushStores()
+
+  const store = missingStore(file)
+
+  try {
+    return use(store)
   }
   finally {
     store.close()
