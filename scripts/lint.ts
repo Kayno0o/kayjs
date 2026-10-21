@@ -6,8 +6,9 @@ const HEAP_MB = 1536
 const keslint = join(import.meta.dir, '../node_modules/.bin/keslint')
 const rest = ['.', '--ignore-pattern', 'packages/**', ...typeAwareSlices.flat().flatMap(glob => ['--ignore-pattern', glob])]
 // Each process caches in a file of its own: ESLint drops from a cache the files its run did not lint.
-const passes = [...typeAwareSlices, null]
 const flags = process.argv.slice(2)
+// Files named on the command line are one pass, not one in each group.
+const passes = flags.some(flag => !flag.startsWith('-')) ? [[]] : [...typeAwareSlices, null]
 let status = 0
 
 for (const [index, slice] of passes.entries()) {
