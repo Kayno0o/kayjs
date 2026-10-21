@@ -1,7 +1,9 @@
 # Texts and languages
 
-Every text kayjs-cms shows is looked up in the app's catalogs (`src/messages/<locale>.ts`) under a `cms.<area>.<name>` key before its English, through `wording` from `kay/words`, in the screens and in the editor alike. A site without the keys renders the English below, unchanged.
+Every text kayjs-cms shows is looked up in the app's catalogs (`src/messages/<locale>.ts`) under a `cms.<area>.<name>` key before its English, through `wording` from `kay/words`, in the screens and in the editor alike. kayjs-cms ships the French of every key, read on a page whose locale is `fr` (`fr-CA` and the like included) after the app's own catalog, with no setup: a site on `lang: 'fr'` reads French screens and a French editor, markdown editor help and placeholder included (kayjs-ui ships those `ui.*` keys in French). Any other locale, and a key the app words itself, reads the app's catalog, then the English below.
 
+- The French lives in `src/messages/fr.ts` of the package, declared by `"kay": { "messages": "./src/messages" }` in its package.json; an app overrides any key in its own `src/messages/fr.ts`, which lays over it key by key.
+- Another language: a site words the `cms` block in its own `src/messages/<locale>.ts`, whatever the keys it gives, the rest reading the English. A language for every site is a `src/messages/<locale>.ts` added to the package with every key: `tests/words.test.ts` holds each file there to the keys, with the placeholders of the English, so a new `cms.*` key without its text fails it.
 - Word a text once for the whole site, in the locale's file: `cms: { editor: { title: 'Modifier cette page', stop: 'Arrêter de modifier' }, admin: { content: 'Contenu' } }`. The screens read it server-side, the editor and the forms read it in the browser, where the page sends the keys of the locale it is in.
 - A message may hold the placeholders its English shows, `{title}`, `{n}` or `{count}`, and a count may be written as plural forms: `admin: { entryCount: { one: '{count} entrée', other: '{count} entrées' } }`.
 - A value is text: the catalog's HTML is escaped, never rendered.

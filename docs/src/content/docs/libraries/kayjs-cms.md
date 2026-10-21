@@ -187,6 +187,8 @@ export default defineMessages({
 })
 ```
 
+kayjs-cms ships the French of all of them. A site whose locale is `fr` shows French screens and a French editor with nothing declared, and the `fr.ts` above only changes the words you want worded differently. For another language, write the same `cms` block in that locale's file: each key you leave out reads the English.
+
 A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's refusals are worded in the locale of the page that called.
 
 <ReadMore href="/llms/kayjs-cms">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>

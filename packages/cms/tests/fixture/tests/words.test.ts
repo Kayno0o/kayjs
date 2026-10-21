@@ -12,7 +12,7 @@ function sent(html: string): string[] {
   return payload === undefined ? [] : Object.keys((JSON.parse(payload) as { messages: object }).messages)
 }
 
-test('the screens read `cms.*` messages in the page\'s locale, plural ones included, and the English where a key is missing', async () => {
+test('the screens read `cms.*` messages in the page\'s locale, plural ones included, and the French the package ships where the app words none', async () => {
   const french = await site.visit('/fr/admin')
   const english = await site.visit('/admin')
 
@@ -21,17 +21,17 @@ test('the screens read `cms.*` messages in the page\'s locale, plural ones inclu
   expect(french.text('main')).toContain('2 entrées')
   expect(english.find('.kcms-admin-home')[0]?.text).toBe('Content')
   expect(english.text('main')).toContain('2 entries')
-  // `cms.admin.noCollections` has no French, `cms.admin.uploads` has.
+  // `cms.admin.uploads` is the app\'s own, `cms.admin.noCollections` the package\'s.
   expect((await site.visit('/fr/admin/uploads')).title()).toBe('Fichiers inutilisés')
   expect((await site.visit('/fr/admin/collections/posts')).text('main')).toContain('Brouillon')
 })
 
-test('a message with parameters and a plural reads the locale\'s form, a column header following the catalog and the others the English', async () => {
+test('a message with parameters and a plural reads the locale\'s form, a key the app\'s catalog lacks reading the French the package ships', async () => {
   const page = await site.visit('/fr/admin/collections/posts')
 
   expect(page.find('.kui-table th').map(header => header.text)).toEqual(expect.arrayContaining(['Titre', 'Actions']))
-  expect(page.find('.kcms-entries button').map(button => button.text)).toContain('Publish')
-  expect((await site.visit('/fr/admin/collections/posts?q=zzz')).text('main')).toContain('No match')
+  expect(page.find('.kcms-entries button').map(button => button.text)).toContain('Publier')
+  expect((await site.visit('/fr/admin/collections/posts?q=zzz')).text('main')).toContain('Aucun résultat')
 })
 
 test('the editor server-renders its texts in the locale, a value holding HTML staying text', async () => {

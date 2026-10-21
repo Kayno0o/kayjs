@@ -33,6 +33,52 @@ describe('the cms.* keys', () => {
   })
 })
 
+type Message = string | Record<string, string>
+
+async function catalogOf(locale: string): Promise<Map<string, Message>> {
+  const { default: catalog } = await import(`../src/messages/${locale}`) as { default: { cms: Record<string, Record<string, Message>> } }
+
+  return new Map(Object.entries(catalog.cms).flatMap(([area, leaves]) => Object.entries(leaves).map(([leaf, message]) => [`cms.${area}.${leaf}`, message] as const)))
+}
+
+const placeholders = (text: string): string[] => Array.from(text.matchAll(/\{(\w+)\}/g), match => match[1]!)
+
+// Every `src/messages/<locale>.ts` the package ships is held to the keys, so a new `cms.*` key without its text in one fails here.
+const LOCALES = [...new Bun.Glob('*.ts').scanSync({ cwd: join(SRC, 'messages') })].map(file => file.replace(/\.ts$/, '')).sort()
+
+describe.each(LOCALES)('the %s catalog the cms ships', (locale) => {
+  test('words every cms.* key, and no other', async () => {
+    expect([...(await catalogOf(locale)).keys()].sort()).toEqual(await everyKey())
+  })
+
+  test('holds the placeholders of the English, in each of its plural forms or none', async () => {
+    const listed = await Bun.file(join(import.meta.dir, '../llms/words.md')).text()
+    const english = new Map<string, string>()
+
+    for (const [, area, rest] of listed.matchAll(/^- `cms\.(\w+)\.\*`: (.*)$/gm)) {
+      for (const [, leaf, text] of rest!.matchAll(/`(\w+)` \(`([^`]*)`/g))
+        english.set(`cms.${area}.${leaf}`, text!)
+    }
+
+    for (const [key, message] of await catalogOf(locale)) {
+      const wanted = english.get(key)
+
+      if (wanted === undefined)
+        continue
+
+      const forms = typeof message === 'string' ? [message] : Object.values(message)
+
+      expect({ key, placeholders: [...new Set(forms.flatMap(placeholders))].sort() }).toEqual({ key, placeholders: [...new Set(placeholders(wanted))].sort() })
+    }
+  })
+
+  test('is declared by the package, so an app reads it with no setup', async () => {
+    const { kay } = await Bun.file(join(import.meta.dir, '../package.json')).json() as { kay?: { messages?: string } }
+
+    expect(kay?.messages).toBe('./src/messages')
+  })
+})
+
 describe('the upload refusals, with no catalog', () => {
   test('read as they always did', () => {
     expect(tooLarge('big.png', 100 * 1024, 64 * 1024)).toBe('big.png is 100 KB, over the 64 KB an upload may be')

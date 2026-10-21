@@ -38,6 +38,9 @@
     "./form": "./src/form.ts",
     "./presence": "./src/presence.ts"
   },
+  "kay": {
+    "messages": "./src/messages"
+  },
   "files": [
     "LICENSE",
     "README.md",
