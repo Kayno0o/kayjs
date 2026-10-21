@@ -99,6 +99,22 @@ export function headings(labels: string[], times: number[] | null, format?: Labe
   })
 }
 
+// Each series laid on top of the ones before it: a point's height is the sum of its own value and the ones below, a `null` counting as 0.
+export function stackValues(series: (number | null)[][]): number[][] {
+  const totals: number[] = []
+
+  return series.map(values => values.map((value, index) => {
+    totals[index] = (totals[index] ?? 0) + (value ?? 0)
+
+    return totals[index]
+  }))
+}
+
+// What every series adds up to at one point, a `null` counting as 0.
+export function totalAt(series: (number | null)[][], index: number): number {
+  return series.reduce((sum, values) => sum + (values[index] ?? 0), 0)
+}
+
 export function chartData(labels: string[], series: (number | null)[][], times: number[] | null): LineChartData {
   return { labels, series: times ? series.map(values => values.map((value, index) => ({ x: times[index]!, y: value }))) : series }
 }

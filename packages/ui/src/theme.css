@@ -1014,6 +1014,11 @@
     @apply flex items-center gap-1.5 text-kui-subtext0;
   }
 
+  /* The total sits under the series with no swatch, its name lined up with theirs. */
+  .kui-line-chart-tooltip-total {
+    @apply mt-0.5 border-t border-solid border-kui-overlay0 pt-1 pl-3.5 text-kui-text;
+  }
+
   .kui-line-chart-tooltip-name {
     @apply truncate;
   }

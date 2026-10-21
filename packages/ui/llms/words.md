@@ -26,7 +26,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.formDialog.*`: `cancelLabel` (`Cancel`), `savingLabel` (`Saving…`)
 - `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `errorLabel` (`The icons could not be loaded.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)
 - `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
-- `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`)
+- `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`), `total` (`Total`)
 - `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)
 - `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `previewLabel` (`Preview`), `toolbarFailure` (`The toolbar could not be loaded`), `toolbarLabel` (`Formatting`), `uploadFailure` (`Could not upload the image`)
 - `ui.mediaGallery.*`: `closeLabel` (`Close`), `emptyLabel` (`No media.`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)

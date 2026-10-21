@@ -140,6 +140,45 @@ inBrowser('LineChart tooltip', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart stacked', () => {
+  test('draws each line on the ones below, reads each series\' own value with a total row, and starts the axis at 0', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+    await page.waitFor('#stacked .kui-line-chart-plot svg .ct-line')
+
+    const drawn = await page.evaluate(() => {
+      const lines = [...document.querySelectorAll('#stacked .ct-line')].map(line => (line.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g)!.map(Number))
+      const labels = [...document.querySelectorAll('#stacked .ct-label.ct-vertical')].map(label => Number(label.textContent))
+
+      return { first: lines.map(line => line[1]!), last: lines.map(line => line.at(-1)!), labels, areas: document.querySelectorAll('#stacked .ct-area[fill-rule="evenodd"]').length }
+    }) as { first: number[], last: number[], labels: number[], areas: number }
+
+    // A null counts as 0: B starts on A's line, and C rises above both.
+    expect(drawn.first[1]).toBe(drawn.first[0]!)
+    expect(drawn.first[2]!).toBeLessThan(drawn.first[1]!)
+    // C's gap ends on B's line.
+    expect(drawn.last[2]).toBe(drawn.last[1]!)
+    expect(Math.min(...drawn.labels)).toBe(0)
+    expect(Math.max(...drawn.labels)).toBeGreaterThanOrEqual(5)
+    expect(drawn.areas).toBeGreaterThan(0)
+
+    const read = async (x: number) => {
+      await page.evaluate(((at: number) => {
+        const overlay = document.querySelector('#stacked .kui-line-chart-overlay')!
+
+        overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: at, clientY: overlay.getBoundingClientRect().top + 40 }))
+      }) as never, x as never)
+      await page.waitFor('#stacked .kui-line-chart-tooltip')
+
+      return await page.evaluate(() => [...document.querySelectorAll('#stacked .kui-line-chart-tooltip-row')].map(row => row.textContent)) as string[]
+    }
+
+    expect(await read(1)).toEqual(['A1', 'B-', 'C2', 'Total3'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart in another timezone', () => {
   test('words a timed label in the server\'s zone with its name, then in the viewer\'s own zone once hydrated, with no error', async () => {
     const before = process.env.TZ

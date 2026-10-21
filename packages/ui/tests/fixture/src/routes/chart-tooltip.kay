@@ -18,3 +18,5 @@ main
     LineChart(label="Plain" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Load', values: [1, 2, 3] }]})
   article#formatted
     LineChart(label="Formatted" labels={['a', 'b', 'c']} formatLabel={(label, { place }) => `${place === 'tick' ? 'Tick' : 'Point'} ${label}`} series={[{ name: 'Load', values: [1, 2, 3] }]} xLabels)
+  article#stacked
+    LineChart(label="Stacked" labels={['a', 'b', 'c']} stacked series={[{ name: 'A', values: [1, 2, 3] }, { name: 'B', values: [null, 1, 1] }, { name: 'C', values: [2, 2, null] }]} xLabels)

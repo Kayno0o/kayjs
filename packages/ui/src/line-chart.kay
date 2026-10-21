@@ -4,7 +4,7 @@ import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
 import type { LabelContext } from './chart-axis'
-import { chartData, headings, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
+import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
 import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
@@ -13,7 +13,7 @@ const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -22,6 +22,10 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   // Draws the x-axis labels: up to five, spaced by time when every label is a date.
   xLabels?: boolean | undefined
+  // Draws each series on top of the ones before it, the band between two lines filled, so the top line reads the total: the tooltip, the announcements and the table still read each series' own value, and add a total.
+  stacked?: boolean | undefined
+  // Names the total a stacked chart adds to its tooltip, its announcements and its table.
+  totalLabel?: string | undefined
   // Names each series under the chart; shown by default once there is more than one.
   legend?: boolean | undefined
   // Merged over the defaults, for what the props do not cover.
@@ -38,6 +42,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
 const id = uid()
 const times = memo(() => labelTimes(labels))
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
+// The heights the series are drawn at: their own values, or each laid on the ones before it when stacked.
+const heights = memo(() => stacked ? stackValues(series.map(item => item.values)) : series.map(item => item.values))
 const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
 const dashes = memo(() => series.map((_, index) => SERIES_DASHES[index % SERIES_DASHES.length]!))
 
@@ -48,6 +54,7 @@ const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
     fullWidth: true,
     showArea: true,
     showPoint: false,
+    ...stacked ? { low: 0 } : {},
     ...options,
     chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
     axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
@@ -95,9 +102,10 @@ const cursor = () => {
 const dot = (index: number) => {
   const drawn = plot()
   const at = hovered()
-  const value = at ? series[index]!.values[at.index] : undefined
+  const own = at ? series[index]!.values[at.index] : undefined
+  const height = at ? heights()[index]![at.index] : undefined
 
-  return drawn && typeof value === 'number' ? `left: ${cursor()}px; top: ${drawn.rect.y1 - drawn.axisY.projectValue(value)}px; background-color: ${colors()[index]}` : undefined
+  return drawn && typeof own === 'number' && typeof height === 'number' ? `left: ${cursor()}px; top: ${drawn.rect.y1 - drawn.axisY.projectValue(height)}px; background-color: ${colors()[index]}` : undefined
 }
 
 const valueText = (item: ChartSeries, index: number) => {
@@ -112,6 +120,8 @@ const reading = (index: number) => {
   return at ? valueText(series[index]!, at.index) : '-'
 }
 
+const totalText = (index: number) => formatValue(totalAt(series.map(item => item.values), index))
+
 const heading = (index: number) => headingTexts()[index] ?? ''
 
 // The point the keyboard stands at, the latest one before it moved.
@@ -121,7 +131,7 @@ const current = () => hovered()?.index ?? Math.max(0, labels.length - 1)
 const announced = () => {
   const index = current()
   const span = dragged()
-  const readings = series.map(item => `${item.name} ${valueText(item, index)}`).join(', ')
+  const readings = [...series.map(item => `${item.name} ${valueText(item, index)}`), ...stacked ? [`${totalLabel} ${totalText(index)}`] : []].join(', ')
   const picked = span && span.from !== span.to ? `; ${heading(Math.min(span.from, span.to))} - ${heading(Math.max(span.from, span.to))}` : ''
 
   return `${heading(index)}: ${readings}${picked}`
@@ -166,11 +176,22 @@ onMount(() => {
       plot.set({ rect: event.chartRect, axisY: event.axisY })
     })
     // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
+    // A stacked area is the band between its line and the one below: its own area and the one below it, filled with the even-odd rule, leave only the band.
+    const areas: string[] = []
+
     chart.on('draw', (event) => {
       const paint = PAINT[event.type]
 
       if (!paint || !('seriesIndex' in event))
         return
+
+      if (event.type === 'area' && stacked) {
+        const own = event.element.attr('d') as string
+        const below = areas[event.seriesIndex - 1]
+
+        areas[event.seriesIndex] = own
+        event.element.attr({ 'd': below ? `${own} ${below}` : own, 'fill-rule': 'evenodd' })
+      }
 
       const dash = event.type === 'line' ? dashes()[event.seriesIndex] : ''
 
@@ -183,7 +204,7 @@ onMount(() => {
     const ready = drawing()
 
     if (ready)
-      ready.chart.update(chartData(labels, series.map(item => item.values), times()), settings(ready.fixedScale), true)
+      ready.chart.update(chartData(labels, heights(), times()), settings(ready.fixedScale), true)
   })
 
   // New points, such as a span the app zoomed in on, leave nothing picked on the old ones, whose indices may not exist any more.
@@ -341,6 +362,10 @@ function pointerLeave(event: PointerEvent) {
           span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})
           span.kui-line-chart-tooltip-name {item.name}
           span.kui-line-chart-tooltip-value {reading(index)}
+      if stacked
+        .kui-line-chart-tooltip-row.kui-line-chart-tooltip-total
+          span.kui-line-chart-tooltip-name {totalLabel}
+          span.kui-line-chart-tooltip-value {totalText(hovered()!.index)}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
   .kui-line-chart-data
     table
@@ -350,12 +375,16 @@ function pointerLeave(event: PointerEvent) {
           td
           for item of series key={item.name}
             th(scope="col") {item.name}
+          if stacked
+            th(scope="col") {totalLabel}
       tbody
         for name, index of labels key={index}
           tr
             th(scope="row") {name}
             for item of series key={item.name}
               td {valueText(item, index)}
+            if stacked
+              td {totalText(index)}
   if onRange
     span.kui-line-chart-hint(id={`${id}-hint`}) {rangeHint}
   if legend ?? series.length > 1

@@ -1,7 +1,7 @@
 import type { LabelContext } from '../src/chart-axis'
 import { describe, expect, test } from 'bun:test'
 import { FixedScaleAxis } from 'chartist'
-import { chartData, headings, indexAt, labelTimes, positionOf, tickIndices, xAxisOptions } from '../src/chart-axis'
+import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tickIndices, totalAt, xAxisOptions } from '../src/chart-axis'
 
 const DAYS = ['2026-01-01', '2026-01-02', '2026-01-11']
 
@@ -108,5 +108,14 @@ describe('chart axis', () => {
 
     expect(plain.labelInterpolationFnc?.('a', 0)).toBe('tick-a')
     expect(plain.labelInterpolationFnc?.('c', 2)).toBeNull()
+  })
+
+  test('stacks each series on the ones before it, a null counting as 0, and totals a point the same way', () => {
+    const series = [[1, 2, 3], [null, 1, 1], [2, 2, null]]
+
+    expect(stackValues(series)).toEqual([[1, 2, 3], [1, 3, 4], [3, 5, 4]])
+    expect([0, 1, 2].map(index => totalAt(series, index))).toEqual([3, 5, 4])
+    expect(series[1]).toEqual([null, 1, 1])
+    expect(stackValues([])).toEqual([])
   })
 })

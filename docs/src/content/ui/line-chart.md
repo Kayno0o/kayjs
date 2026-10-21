@@ -22,6 +22,12 @@ A span under a day labels the x-axis with times. The tooltip keeps its width and
 
 <Demo name="line-chart/formatted" />
 
+## Stacking series
+
+`stacked` draws each series on top of the ones before it and fills the band between two lines, so the top line reads the total. It suits parts of a whole, such as one line per CPU core, each its share of the machine. The y-axis starts at 0 and reaches the highest total (`options.low` overrides the start).
+
+The tooltip, the keyboard announcements and the table for screen readers still read each series' own value through `formatValue`, never the running sum, and add a total. A `null` reads `-` and counts as 0 in the total. `totalLabel` renames the total, which is `Total` by default and read from the `ui.lineChart.total` word.
+
 ## Picking a span
 
 `onRange(from, to)` lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span and hands over the indices of its first and last points, such as to zoom in on them; Escape drops a span under way, and `rangeHint` is what screen readers are told about the keys. A `null` value in a series leaves a gap in the line.

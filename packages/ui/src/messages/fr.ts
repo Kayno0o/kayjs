@@ -57,7 +57,7 @@ export default defineMessages({
       cropLabel: 'Zone de recadrage : les flèches la déplacent, Maj et les flèches la redimensionnent',
       cropText: '{w} sur {h} pixels en {x}, {y}',
     },
-    lineChart: { rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne' },
+    lineChart: { rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne', total: 'Total' },
     loadMore: { failureLabel: 'Impossible d\'en charger davantage.', loadingLabel: 'Chargement…', retryLabel: 'Réessayer' },
     markdownEditor: {
       bold: 'Gras',
