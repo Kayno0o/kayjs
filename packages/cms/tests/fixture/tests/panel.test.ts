@@ -1,10 +1,18 @@
 import { join } from 'node:path'
-import { afterAll, expect, test } from 'bun:test'
+import { afterAll, afterEach, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 
 const ROOT = join(import.meta.dir, '..')
 const built = await testSite({ root: ROOT, browser: true })
 const PATH = '/admin/page?path=/blog/hello'
+
+// Each page holds the live connection the editor's presence keeps open, and a browser allows a host a few, so a page is closed with its test.
+const opened: { close: () => void }[] = []
+
+afterEach(() => {
+  for (const page of opened.splice(0))
+    page.close()
+})
 
 afterAll(async () => {
   await built.close()
@@ -19,6 +27,8 @@ interface Sized {
 // Opens the page in a window of the given size, with a fixed site header and a page long enough to scroll, as a site has.
 async function open(width: number, height: number) {
   const page = await built.open(PATH)
+
+  opened.push(page)
 
   await page.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
   await page.evaluate(() => localStorage.clear())

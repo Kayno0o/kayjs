@@ -24,6 +24,26 @@ function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async (
 
 const settled = async () => Bun.sleep(20)
 
+describe('opening an entry again', () => {
+  it('shows the current copy and version of an entry with no edits', () => {
+    const { drafts } = setup()
+
+    drafts.open({ ...post, data: { title: 'Saved elsewhere', tags: ['a'] } }, 'v2')
+
+    expect([drafts.value(post, 'title'), drafts.version(post), drafts.changed(post)]).toEqual(['Saved elsewhere', 'v2', false])
+  })
+
+  it('keeps the edits and the version they were made from, so the next save meets the conflict', () => {
+    const { drafts } = setup()
+
+    drafts.open(post, 'v1')
+    drafts.set(post, 'title', 'Mine')
+    drafts.open({ ...post, data: { title: 'Saved elsewhere', tags: ['a'] } }, 'v2')
+
+    expect([drafts.value(post, 'title'), drafts.version(post), drafts.changed(post)]).toEqual(['Mine', 'v1', true])
+  })
+})
+
 describe('createDrafts', () => {
   it('reads the delay as a duration, and refuses a bare number', async () => {
     const { drafts, calls } = setup(undefined, '5ms')

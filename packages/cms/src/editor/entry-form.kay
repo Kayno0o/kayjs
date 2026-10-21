@@ -10,7 +10,9 @@ import { BODY } from '../markers'
 import { drafts } from './drafts'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
+import EntryPresence from '../components/entry-presence.kay'
 import EntrySaveState from '../components/entry-save-state.kay'
+import { entryRoom } from '../room'
 import { saveDraft } from './save'
 import { saveShortcut } from './shortcut'
 
@@ -20,6 +22,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },
   query: entry.locale === undefined ? {} : { locale: entry.locale },
 })
+// The page editor asks no author, so its editors are counted, and named ones are told of them.
+const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
 const lastSave = signal<{ at: number, rebuilding: boolean }>()
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
@@ -77,6 +81,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()})
       Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving() || !drafts.changed(entry)} onClick={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !drafts.changed(entry)} onClick={save})
+  EntryPresence(room={room.room} member={room.member})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
   else if source.value() as answer

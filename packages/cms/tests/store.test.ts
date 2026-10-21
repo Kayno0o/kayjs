@@ -308,8 +308,28 @@ describe('a loaded entry\'s version', () => {
     stored.products = [{ slug: 'mug', data: { name: 'Mug', size: 1 }, draft: false }]
 
     expect(await opened()).toBe(second)
-    expect(second).not.toBe(first)
     expect(first).toBe(contentVersion({ data: { name: 'Mug' } }))
+  })
+
+  test('leaves out what the schema does not declare, so a loader adding computed or changing fields causes no conflict', async () => {
+    let reads = 0
+    const read = async () => {
+      stored.products = [{ slug: 'mug', data: { name: 'Mug', readAt: ++reads, url: '/mug/' }, draft: false }]
+
+      return opened()
+    }
+    const version = await read()
+
+    expect(await read()).toBe(version)
+    expect(await saveEntry(named('Mug 2'), { version, required: true })).toHaveProperty('saved', true)
+
+    stored.products = [{ slug: 'mug', data: { name: 'Other', readAt: 1 }, draft: false }]
+    expect(await saveEntry(named('Mug 3'), { version, required: true })).toHaveProperty('conflict')
+  })
+
+  test('hashes every field when the schema declares none', () => {
+    expect(contentVersion({ data: { a: 1 } }, { type: 'object' })).not.toBe(contentVersion({ data: { a: 2 } }, { type: 'object' }))
+    expect(contentVersion({ data: { a: 1, b: 1 } }, products.schema)).toBe(contentVersion({ data: { a: 2, b: 2 } }, products.schema))
   })
 
   test('hashes the values JSON cannot hold, telling different ones apart', () => {

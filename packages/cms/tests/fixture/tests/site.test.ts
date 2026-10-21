@@ -960,3 +960,23 @@ test('two tabs on one entry\'s screen name each other, and the one left is told 
   expect(await ann.evaluate(text)).toBe('')
   expect(ann.errors).toEqual([])
 }, 60_000)
+
+test('the on-page editor and the list join an entry\'s room: editors name each other, and a list only shows that the entry is being edited', async () => {
+  const built = await browser()
+  const screenSays = () => document.querySelector('.kcms-entry-presence')?.textContent?.trim()
+  const pageSays = () => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim()
+
+  await using screen = await built.open('/admin/collections/posts/hello?as=Ann')
+  await using onPage = await built.open('/admin/page?path=/blog/hello')
+
+  await onPage.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim() === 'Also open: Ann', SETTLED)
+  await screen.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '1 other editor', SETTLED)
+
+  await using list = await built.open('/admin/collections/posts?as=Bob')
+
+  await list.waitUntil(() => [...document.querySelectorAll('.kcms-entry-watch')].some(mark => mark.textContent?.trim() === 'Being edited by Ann'), SETTLED)
+  // The list is no editor: neither the screen nor the page editor counts it.
+  await Bun.sleep(300)
+  expect(await screen.evaluate(screenSays)).toBe('1 other editor')
+  expect(await onPage.evaluate(pageSays)).toBe('Also open: Ann')
+}, 60_000)

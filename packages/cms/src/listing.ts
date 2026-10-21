@@ -104,7 +104,7 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
       const rows = listed.rows.map((row) => {
         const entry = seen.get(key(row.slug, row.locale))
 
-        return entry === undefined ? row : { ...row, version: contentVersion(entry) }
+        return entry === undefined ? row : { ...row, version: contentVersion(entry, collection.schema) }
       })
 
       return { ...listed, rows }

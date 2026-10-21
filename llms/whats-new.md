@@ -52,6 +52,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A server build sends each page after the first as its difference from the build's 404 page to a browser holding it (Compression Dictionary Transport, `Content-Encoding: dcz`): no setup, off in development and in a static export, and a browser without the feature gets what it did before; on kay's docs a 41 KB page goes in 4.4 KB instead of 9.2 KB with brotli ([Production](proxy-and-security.md#compression)).
 - `kay check` no longer asks an app's locale for the `ui.*` or `mail.*` keys of kayjs-ui or kayjs-mail when the library ships no catalog for it, `de` for one: the locale reads the default locale's texts ([Locales](locales.md)).
 - kayjs-cms keeps the on-page editor's unsaved edits in the browser and brings them back after a reload, a crash or in a second tab (a draft older than the saved entry is left out with a note), asks before a reload, a link or Stop editing drops them, and a save conflict names the fields both sides changed and offers Take their version beside Keep my edits ([kayjs-cms](../packages/cms/llms.txt))
+- kayjs-cms lists who edits an entry on the entry list (`Being edited`) and above the on-page editor's form, a returning entry shows its current copy and version unless it holds edits, and a loaded entry's version leaves out the fields its schema does not declare, so a loader adding or changing computed fields no longer causes false conflicts ([kayjs-cms](../packages/cms/llms/screens.md))
 
 ## 1.60.1
 

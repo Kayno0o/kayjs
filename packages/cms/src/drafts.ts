@@ -158,8 +158,16 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     open(entry: DraftEntry, version?: string | undefined): void {
       const key = entryKey(entry)
 
-      if (saved.has(key))
+      if (saved.has(key)) {
+        // An entry opened again with no edits shows the copy and version it has now; edits keep the version they were made from, so their save meets any conflict.
+        if (current().get(key) === saved.get(key) && (versions.get(key) !== version || JSON.stringify(saved.get(key)) !== JSON.stringify(entry))) {
+          saved.set(key, entry)
+          versions.set(key, version)
+          current.set(new Map(current()).set(key, entry))
+        }
+
         return
+      }
 
       const start = recover(key, entry, version)
 

@@ -136,10 +136,16 @@ body {
   color: var(--color-kui-subtext0);
 }
 
+.kcms-entry-watch {
+  margin-inline-start: 0.5rem;
+  color: var(--color-kui-warning);
+  font-size: 0.875em;
+}
+
 .kcms-entry-presence p {
   margin: 0.5rem 0 0;
   font-size: 0.8rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-kui-warning);
 }
 
 .kcms-entry-header .kcms-entry-actions {

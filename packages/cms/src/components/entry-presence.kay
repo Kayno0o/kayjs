@@ -1,17 +1,18 @@
 ---
+import type { Member } from '../room'
 import { memo, presence } from 'kay'
 import { wording } from 'kay/words'
+import { editorsOf } from '../room'
 
-// Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`.
-const { room, member } = props<{ room: string, member: { name: string } }>()
+// Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` for the on-page editor, which asks no author.
+const { room, member } = props<{ room: string, member: Member }>()
 const here = presence(room, member)
-const names = memo(() => here.others().map(other => other.name).filter(name => name !== ''))
+const editors = memo(() => editorsOf(here.others(), here.count(), member))
 const text = memo(() => {
-  if (names().length > 0)
-    return wording('cms.entry.alsoOpen', 'Also open: {names}', { names: names().join(', ') })
+  if (editors().names.length > 0)
+    return wording('cms.entry.alsoOpen', 'Also open: {names}', { names: editors().names.join(', ') })
 
-  // An editor with a name is not told of their own other tabs, while one with none can only be counted.
-  return member.name === '' && here.count() > 0 ? wording('cms.entry.otherEditors', here.count() === 1 ? '1 other editor' : '{count} other editors', { count: here.count() }) : ''
+  return editors().unnamed > 0 ? wording('cms.entry.otherEditors', editors().unnamed === 1 ? '1 other editor' : '{count} other editors', { count: editors().unnamed }) : ''
 })
 ---
 .kcms-entry-presence(role="status")

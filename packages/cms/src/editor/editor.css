@@ -71,6 +71,11 @@ html.kcms-dock-side .kcms-editor-open {
   color: var(--color-kui-error);
 }
 
+.kcms-entry-presence p {
+  margin: 0 1rem 0.5rem;
+  color: var(--color-kui-warning);
+}
+
 .kcms-editor-confirm {
   display: grid;
   justify-items: start;

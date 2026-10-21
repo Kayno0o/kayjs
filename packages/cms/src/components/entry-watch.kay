@@ -1,0 +1,19 @@
+---
+import type { Member } from '../room'
+import { memo, presence } from 'kay'
+import { wording } from 'kay/words'
+import { editorsOf } from '../room'
+
+// Tells a list that an entry is being edited, by name when the editors have one. The list joins the entry's room as a tab that only watches, which no editor is told of.
+const { room, member } = props<{ room: string, member: Member }>()
+const here = presence(room, member)
+const editors = memo(() => editorsOf(here.others(), here.count(), member))
+const text = memo(() => {
+  if (editors().names.length > 0)
+    return wording('cms.table.editing', 'Being edited by {names}', { names: editors().names.join(', ') })
+
+  return editors().unnamed > 0 ? wording('cms.table.editingUnnamed', 'Being edited') : ''
+})
+---
+if text() !== ''
+  span.kcms-entry-watch(role="status") {text()}

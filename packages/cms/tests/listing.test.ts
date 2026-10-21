@@ -105,7 +105,7 @@ describe('pageRows versions', () => {
     }
 
     expect((await pageRows({ ...posts, count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual(['v-a', 'v-b'])
-    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([contentVersion(stock[0]!), contentVersion(stock[1]!)])
+    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([contentVersion(stock[0]!, posts.schema), contentVersion(stock[1]!, posts.schema)])
     expect(asked).toEqual(['a', 'b'])
   })
 })

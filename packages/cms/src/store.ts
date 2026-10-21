@@ -50,7 +50,7 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
   if (!bare)
     return undefined
 
-  const [collection, entry] = await Promise.allSettled([findCollection(ref.collection), entryOf(ref, bare.kind)])
+  const [collection, entry] = await Promise.allSettled([findCollection(ref.collection), entryOf(ref, bare)])
 
   if (collection.status === 'rejected')
     throw collection.reason
@@ -76,15 +76,18 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
 }
 
 // `kind` is the collection's when the caller has it, else it is read.
-export async function entryOf(ref: EntryRef, kind?: CollectionInfo['kind']): Promise<StoredEntry | undefined> {
+export async function entryOf(ref: EntryRef, bare?: CollectionInfo): Promise<StoredEntry | undefined> {
   const entry = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 
   if (!entry)
     return entry
 
   // A loaded entry has no file: its version is a hash of what its loader gave. A folder entry outside the repository has no path either, and no version.
-  if (entry.path === undefined)
-    return (kind ?? (await bareCollection(ref.collection))?.kind) === 'loaded' ? { ...entry, version: contentVersion(entry) } : entry
+  if (entry.path === undefined) {
+    const collection = bare ?? await bareCollection(ref.collection)
+
+    return collection?.kind === 'loaded' ? { ...entry, version: contentVersion(entry, collection.schema) } : entry
+  }
 
   const version = await versionOf(ref)
 
@@ -130,7 +133,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
     const versioned = required || version !== undefined
 
     return inTurn(collection.name, async () => {
-      const stale = versioned && !create ? await staleLoaded(entry, version, required) : undefined
+      const stale = versioned && !create ? await staleLoaded(entry, collection.schema, version, required) : undefined
 
       if (stale)
         return stale
@@ -140,7 +143,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       if (issues !== undefined && issues.length > 0)
         return { issues }
 
-      return versioned ? { saved: true, version: await loadedVersion(entry) } : { saved: true }
+      return versioned ? { saved: true, version: await loadedVersion(entry, collection.schema) } : { saved: true }
     })
   }
 
@@ -169,7 +172,7 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
 
   if (collection.kind === 'loaded') {
     return inTurn(collection.name, async () => {
-      const stale = required || version !== undefined ? await staleLoaded(ref, version, required, true) : undefined
+      const stale = required || version !== undefined ? await staleLoaded(ref, collection.schema, version, required, true) : undefined
 
       if (stale)
         return stale
@@ -204,7 +207,7 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
   if (collection.draftField === undefined)
     return refused(ref, wording('cms.store.noDraftField', '{collection} names no draft field to publish by', { collection: collection.name }))
 
-  const existing = await entryOf(ref)
+  const existing = await entryOf(ref, collection)
 
   if (!existing)
     return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
@@ -292,16 +295,16 @@ async function inTurn<T>(collection: string, run: () => Promise<T>): Promise<T> 
 }
 
 // What a loaded entry is at now, as its loader gives it: undefined once it holds none.
-async function currentLoaded(ref: EntryRef): Promise<string | undefined> {
+async function currentLoaded(ref: EntryRef, schema: unknown): Promise<string | undefined> {
   const found = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 
-  return found === undefined ? undefined : contentVersion(found)
+  return found === undefined ? undefined : contentVersion(found, schema)
 }
 
 // The version a save leaves a loaded entry at, for the editor's next save to name; none when the loader cannot be read again, which the save does not fail for.
-async function loadedVersion(ref: EntryRef): Promise<string | undefined> {
+async function loadedVersion(ref: EntryRef, schema: unknown): Promise<string | undefined> {
   try {
-    return await currentLoaded(ref)
+    return await currentLoaded(ref, schema)
   }
   catch (error) {
     log.error(`${ref.collection}/${ref.slug} failed to read after its save`, error)
@@ -311,8 +314,8 @@ async function loadedVersion(ref: EntryRef): Promise<string | undefined> {
 }
 
 // Refuses a save or a delete of a loaded entry made over a change of it since the editor opened it, by another editor or by the app: the loader keeps no version, so the editor names the hash of the entry it showed.
-async function staleLoaded(ref: EntryRef, version: string | undefined, required: boolean, deleting = false): Promise<{ issues: Issue[], conflict?: { version: string | null } | undefined } | undefined> {
-  const current = await currentLoaded(ref)
+async function staleLoaded(ref: EntryRef, schema: unknown, version: string | undefined, required: boolean, deleting = false): Promise<{ issues: Issue[], conflict?: { version: string | null } | undefined } | undefined> {
+  const current = await currentLoaded(ref, schema)
 
   if (version === undefined)
     return required && current !== undefined ? unversioned(ref, deleting) : undefined
