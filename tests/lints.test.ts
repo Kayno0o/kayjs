@@ -810,6 +810,25 @@ describe('deprecated-markup-prop', () => {
     expect(rewritten(component(imports, '', 'props<{ row: (this: Window, a: number) => JSX.Element }>()'))).toEqual([])
   })
 
+  it('reads the members of the props type only, not a type literal nested in a property or a type argument', () => {
+    const imports = 'import type { JSX } from \'kay\''
+
+    expect(markup(component(imports, '', 'props<{ child: Component<{ a: JSX.Element }>, on: (options: { view: JSX.Element }) => void }>()'))).toEqual([])
+    expect(markup(component(imports, '', 'props<Wrapper<{ a: JSX.Element }>>()'))).toEqual([])
+    expect(markup(component(imports, '', 'props<({ a: JSX.Element } & { b: string }) | { c: JSX.Element }>()'))).toHaveLength(2)
+  })
+
+  it('drops JSX from the import when only the template text names it', () => {
+    const source = '---\nimport type { JSX } from \'kay\'\n\nconst { actions } = props<{ actions?: JSX.Element }>()\n---\np the JSX word\nslot actions\n'
+
+    expect(rewritten(source)).toEqual(['---\nimport type { Snippet } from \'kay\'\n\nconst { actions } = props<{ actions?: Snippet }>()\n---\np the JSX word\nslot actions\n'])
+  })
+
+  it('rewrites through an aliased import', () => {
+    expect(rewritten(component('import type { JSX as J } from \'kay\'', '', 'props<{ actions?: J.Element }>()'))).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ actions?: Snippet }>()')])
+    expect(rewritten(component('import type { JSX as J } from \'kay\'', '', 'props<J.IntrinsicElements[\'div\'] & { actions?: J.Element }>()'))).toEqual([component('import type { JSX as J, Snippet } from \'kay\'', '', 'props<J.IntrinsicElements[\'div\'] & { actions?: Snippet }>()')])
+  })
+
   it('has no fix while another Snippet is declared in the file', () => {
     const source = component('import type { JSX } from \'kay\'', 'type Snippet = string\n\n', 'props<{ actions?: JSX.Element }>()')
 

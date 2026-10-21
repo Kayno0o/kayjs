@@ -229,7 +229,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? script.fence : undefined
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...script.fence ? markupProps(script.fence, source) : [], ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...script.fence ? markupProps(script.fence) : [], ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
   }
 
   if (file.client && routeFile)

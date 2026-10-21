@@ -13,18 +13,22 @@ const tsconfig = JSON.stringify({
   include: ['src', '.kay/types'],
 })
 
-async function problems(files: Record<string, string>): Promise<[string, number, string | undefined][]> {
+async function diagnostics(files: Record<string, string>) {
   const root = await scratchDir('snippet-')
 
   try {
     await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
     // The implicit any of a block whose parameters match nothing follows the error naming the mismatch.
-    return (await turn(async () => check(root))).filter(d => d.code !== 'TS7006').map(d => [d.file.slice(root.length + 1), d.line, d.code])
+    return (await turn(async () => check(root))).filter(d => d.code !== 'TS7006').map(d => ({ ...d, file: d.file.slice(root.length + 1) }))
   }
   finally {
     await rm(root, { recursive: true, force: true })
   }
+}
+
+async function problems(files: Record<string, string>): Promise<[string, number, string | undefined][]> {
+  return (await diagnostics(files)).map(d => [d.file, d.line, d.code])
 }
 
 const LIST = '---\nimport type { Snippet } from \'kay\'\n\nconst { items, row, empty } = props<{ items: string[], row: Snippet<[item: string, index: number]>, empty?: Snippet }>()\n---\nfor item, i of items\n  slot row(item, i)\nslot empty\n  p none\n'
@@ -92,6 +96,15 @@ describe('Snippet', () => {
     })).toEqual([['src/card.kay', 5, 'TS2349'], ['src/card.kay', 6, 'TS2339']])
   })
 
+  it('puts the error of a slot at its name', async () => {
+    const found = await diagnostics({
+      'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard(title="x" n={1})\n',
+      'src/card.kay': '---\nconst { title, n } = props<{ title: string, n: number }>()\n---\nslot title\nslot n(1)\nslot nope\n',
+    })
+
+    expect(found.map(d => [d.line, d.column])).toEqual([[5, 6], [6, 6]])
+  })
+
   it('sends an island a Snippet with no parameters as its static slot, and refuses one with parameters from a layout or a server page', async () => {
     const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { icon, row } = props<{ icon?: Snippet, row?: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)})\n  slot icon\n  slot row(\'x\')\n'
 
@@ -103,5 +116,20 @@ describe('Snippet', () => {
       'src/routes/index.kay': '--- server\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
       'src/toggle.kay': island,
     })).toEqual([['src/routes/index.kay', 5, 'TS2345']])
+  })
+
+  it('refuses a block with parameters from a layout, and allows it from a static component the island promotes', async () => {
+    const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { row } = props<{ row: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)})\n  slot row(\'x\')\n'
+
+    expect(await problems({
+      'src/routes/_layout.kay': '---\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\nslot\n',
+      'src/routes/index.kay': 'p x\n',
+      'src/toggle.kay': island,
+    })).toEqual([['src/routes/_layout.kay', 5, 'TS2345']])
+    expect(await problems({
+      'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\n---\nWrap\n',
+      'src/wrap.kay': '---\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
+      'src/toggle.kay': island,
+    })).toEqual([])
   })
 })

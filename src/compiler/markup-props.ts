@@ -13,7 +13,7 @@ interface Rewrite {
 const SNIPPET = 'Snippet'
 
 // A markup prop in the props type of the fence, or in an interface or alias of it the props type names, with one fix rewriting them all and the import: each diagnostic carries the same fix, applied once.
-export function markupProps(fence: ParsedFence, source: string): Diagnostic[] {
+export function markupProps(fence: ParsedFence): Diagnostic[] {
   if (!fence.code.includes('JSX'))
     return []
 
@@ -61,26 +61,16 @@ export function markupProps(fence: ParsedFence, source: string): Diagnostic[] {
   const found: Rewrite[] = []
 
   for (const root of roots) {
-    eachNode(root, (node) => {
-      if (node.type !== 'TSPropertySignature' || !node.typeAnnotation)
-        return
-
-      const rewrites = rewritesOf(node.typeAnnotation.typeAnnotation, jsx, fence.code)
-
-      if (rewrites.length === 0)
-        return
-
-      found.push(...rewrites)
-
-      // What a rewrite keeps of its parameters' types is read again by the next run.
-      return false
-    })
+    for (const member of membersOf(root)) {
+      if (member.type === 'TSPropertySignature' && member.typeAnnotation)
+        found.push(...rewritesOf(member.typeAnnotation.typeAnnotation, jsx, fence.code))
+    }
   }
 
   if (found.length === 0)
     return []
 
-  const fix = fixOf(fence, source, found, namespace, jsx)
+  const fix = fixOf(fence, found, namespace, jsx)
 
   return found.map(({ node }) => ({
     ...fence.shift(node),
@@ -91,6 +81,20 @@ export function markupProps(fence: ParsedFence, source: string): Diagnostic[] {
     fixes: fix ? [fix] : [],
     checkOnly: true,
   }))
+}
+
+// The members of a props type itself, through intersections, unions and parentheses: a type literal nested in a property or a type argument describes another component's props or a callback's parameter.
+function membersOf(type: t.Node): t.Node[] {
+  if (type.type === 'TSTypeLiteral')
+    return type.members
+
+  if (type.type === 'TSInterfaceBody')
+    return type.body
+
+  if (type.type === 'TSIntersectionType' || type.type === 'TSUnionType')
+    return type.types.flatMap(membersOf)
+
+  return type.type === 'TSParenthesizedType' ? membersOf(type.typeAnnotation) : []
 }
 
 function importedName(specifier: t.ImportSpecifier): string {
@@ -156,7 +160,7 @@ function argumentsOf(type: t.TSFunctionType, code: string): string | undefined {
   return `${SNIPPET}<[${elements.join(', ')}]>`
 }
 
-function fixOf(fence: ParsedFence, source: string, found: Rewrite[], namespace: { statement: t.ImportDeclaration, specifier: t.ImportSpecifier }, jsx: string): Fix | undefined {
+function fixOf(fence: ParsedFence, found: Rewrite[], namespace: { statement: t.ImportDeclaration, specifier: t.ImportSpecifier }, jsx: string): Fix | undefined {
   if (found.some(({ text }) => text === undefined))
     return undefined
 
@@ -168,7 +172,8 @@ function fixOf(fence: ParsedFence, source: string, found: Rewrite[], namespace: 
     return undefined
 
   const edits = found.map(({ node, text }) => ({ ...fence.shift(node), text: text! }))
-  const masked = [...edits, fence.shift(statement)].reduce((text, { start, end }) => text.slice(0, start) + ' '.repeat(end - start) + text.slice(end), source)
+  // Only the script can use the import: a `JSX` word in the template is text.
+  const masked = [...edits, fence.shift(statement)].reduce((text, { start, end }) => text.slice(0, start - fence.offset) + ' '.repeat(end - start) + text.slice(end - fence.offset), fence.code)
   const name = new RegExp(`\\b${jsx.replace('$', '\\$')}\\b`)
   // A parameter type copied into the new text may name it too.
   const stillUsed = name.test(masked) || edits.some(edit => name.test(edit.text))
