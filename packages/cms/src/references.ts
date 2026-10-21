@@ -1,7 +1,7 @@
 import type { Field } from './fields'
 import type { CollectionInfo, DraftEntry, Issue, SourceEntry } from './kay/contract'
 import { wording } from 'kay/words'
-import { fieldsOf } from './fields'
+import { fieldsOf, itemAt, itemFields } from './fields'
 import { collections, entries } from './kay/content'
 import { collectionTitle, entryTitle } from './listing'
 import { log } from './log'
@@ -16,7 +16,7 @@ function names(field: Field, value: unknown, target: string, slugs: Set<string>,
   else if (field.kind === 'list') {
     if (Array.isArray(value)) {
       for (const item of value)
-        names(field.item, item, target, slugs, found)
+        names(itemAt(field, 0, item), item, target, slugs, found)
     }
   }
   else if (field.kind === 'group' && typeof value === 'object' && value !== null) {
@@ -31,7 +31,7 @@ function refersTo(fields: Field[], target: string): boolean {
       return field.collection === target
 
     if (field.kind === 'list')
-      return refersTo([field.item], target)
+      return refersTo(itemFields(field), target)
 
     return field.kind === 'group' && refersTo(field.fields, target)
   })
@@ -112,7 +112,7 @@ function named(field: Field, value: unknown, path: string, found: Named[]): void
   else if (field.kind === 'list') {
     if (Array.isArray(value)) {
       for (const [i, item] of value.entries()) {
-        named(field.item, item, joinPath(path, i), found)
+        named(itemAt(field, i, item), item, joinPath(path, i), found)
       }
     }
   }

@@ -3,6 +3,11 @@ import { wording } from 'kay/words'
 // The `cms.*` keys the editor reads only once the page has loaded: an entry's form is fetched by the browser, so the server never renders it, and an island's source names only the keys written in its own file.
 // `tests/words.test.ts` fails for a key the editor's files use that this list lacks.
 export const AFTER_LOAD: readonly string[] = [
+  'cms.blocks.add',
+  'cms.blocks.addFirst',
+  'cms.blocks.addFirstLabel',
+  'cms.blocks.addType',
+  'cms.blocks.unknown',
   'cms.bulk.delete',
   'cms.bulk.deleteMessage',
   'cms.bulk.deleted',

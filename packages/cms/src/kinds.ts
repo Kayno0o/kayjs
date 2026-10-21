@@ -2,7 +2,7 @@ import type { Field } from './fields'
 import type { CollectionInfo } from './kay/contract'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { fieldsOf } from './fields'
+import { fieldsOf, itemFields } from './fields'
 
 const KAY_FILE = /\.kay$/
 
@@ -12,7 +12,7 @@ function customKinds(fields: Field[]): string[] {
       return [field.name]
 
     if (field.kind === 'list')
-      return customKinds([field.item])
+      return customKinds(itemFields(field))
 
     return field.kind === 'group' ? customKinds(field.fields) : []
   })

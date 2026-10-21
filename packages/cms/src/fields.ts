@@ -34,6 +34,13 @@ interface FieldBase {
   nullable?: true
 }
 
+// A type of a `blocks()` list: the name its items store as `type`, the label the editor adds it by, and the fields of an item of it, `type` left out.
+export interface Block {
+  type: string
+  label: string
+  fields: Field[]
+}
+
 // `value` is what the select posts, `raw` what the entry holds, a number for a numeric enum.
 export interface Choice {
   value: string
@@ -60,7 +67,8 @@ export type Field
     | FieldBase & { kind: 'image' | 'file', upload?: UploadHints | undefined }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
-    | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined, titleField?: string }
+    // A `blocks()` list holds `blocks` too: `item` is then an empty group, each item showing the fields of the block its `type` names.
+    | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined, titleField?: string, blocks?: Block[] }
     // A list of strings entered one per line.
     | FieldBase & { kind: 'lines' }
     | FieldBase & { kind: 'group', fields: Field[] }
@@ -174,6 +182,9 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
   if (hint?.kind === 'image' || hint?.kind === 'file')
     return { ...base, kind: hint.kind, upload: uploadHints(hint) }
 
+  if (hint?.kind === 'blocks')
+    return blocksOf(base, inner)
+
   if (hint?.kind === 'hex-color')
     return { ...base, kind: 'color' }
 
@@ -226,6 +237,23 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     default:
       return { ...base, kind: 'json' }
   }
+}
+
+// The list a `blocks()` schema makes: one block per type its items may be, read from the `type` literal of each variant of the union.
+function blocksOf(base: FieldBase, schema: JsonSchema): Field {
+  const items = schema.items === undefined || Array.isArray(schema.items) ? undefined : schema.items
+  const variants = items?.anyOf ?? (items === undefined ? [] : [items])
+  const blocks: Block[] = []
+
+  for (const variant of variants) {
+    const { type, ...properties } = variant.properties ?? {}
+    const name = type?.const
+
+    if (typeof name === 'string')
+      blocks.push({ type: name, label: variant.title ?? humanize(name), fields: fieldsOf({ ...variant, properties, required: variant.required?.filter(key => key !== 'type') }) })
+  }
+
+  return { ...base, kind: 'list', item: { key: 0, label: '', required: true, kind: 'group', fields: [] }, numbered: false, minItems: bound(schema.minItems), maxItems: bound(schema.maxItems), blocks }
 }
 
 const LIMIT_KEYS = ['minLength', 'maxLength', 'minimum', 'maximum'] as const
@@ -396,26 +424,31 @@ export function isCompact(list: Field & { kind: 'list' }): boolean {
   return COMPACT.has(list.item.kind)
 }
 
-// What heads a list's item: a group's first filled text field, else the item's own label ("Item 3", or its schema's title).
+// What heads a list's item: a group's first filled text field, else the item's own label ("Item 3", or its schema's title); a block is headed by its type, then that text.
 export function itemTitle(list: Field & { kind: 'list' }, value: unknown, index: number): string {
-  const label = itemAt(list, index).label
+  const item = itemAt(list, index, value)
 
-  if (list.item.kind !== 'group' || typeof value !== 'object' || value === null)
-    return label
+  if (item.kind !== 'group' || typeof value !== 'object' || value === null)
+    return item.label
 
   const named = list.titleField === undefined ? undefined : (value as Record<string, unknown>)[list.titleField]
+  const text = typeof named === 'string' && named.trim() !== '' ? named.trim() : firstText(item.fields, value as Record<string, unknown>)
 
-  if (typeof named === 'string' && named.trim() !== '')
-    return named.trim()
+  if (text === undefined)
+    return item.label
 
-  for (const child of list.item.fields) {
-    const text = child.kind === 'text' ? (value as Record<string, unknown>)[String(child.key)] : undefined
+  return list.blocks === undefined ? text : `${item.label}: ${text}`
+}
+
+function firstText(fields: Field[], value: Record<string, unknown>): string | undefined {
+  for (const child of fields) {
+    const text = child.kind === 'text' ? value[String(child.key)] : undefined
 
     if (typeof text === 'string' && text.trim() !== '')
       return text.trim()
   }
 
-  return label
+  return undefined
 }
 
 // A list item has no siblings to fill in, so an image in a list keeps the limits it asks and none of the fields it names.
@@ -445,9 +478,31 @@ function uploadHints(hint: FieldHint): UploadHints {
   return upload
 }
 
-// A list's field for its item at `index`, numbered by its place unless its schema titles it.
-export function itemAt(list: Field & { kind: 'list' }, index: number): Field {
-  return { ...list.item, key: index, ...list.numbered && { label: wording('cms.field.item', 'Item {n}', { n: index + 1 }) } }
+// A list's field for its item at `index`, numbered by its place unless its schema titles it; a block's is a group of its type's fields, an item naming no declared type one with none.
+export function itemAt(list: Field & { kind: 'list' }, index: number, value?: unknown): Field {
+  if (list.blocks === undefined)
+    return { ...list.item, key: index, ...list.numbered && { label: wording('cms.field.item', 'Item {n}', { n: index + 1 }) } }
+
+  const block = blockOf(list, value)
+
+  return { ...list.item, key: index, label: block?.label ?? wording('cms.blocks.unknown', 'Unknown block'), fields: block?.fields ?? [] } as Field
+}
+
+// The fields an item of the list may be made of: its one item's, or every block's.
+export function itemFields(list: Field & { kind: 'list' }): Field[] {
+  return list.blocks?.flatMap(block => block.fields) ?? [list.item]
+}
+
+// The block a list's item is of, by its `type`.
+export function blockOf(list: Field & { kind: 'list' }, value: unknown): Block | undefined {
+  const type = typeof value === 'object' && value !== null ? (value as { type?: unknown }).type : undefined
+
+  return list.blocks?.find(block => block.type === type)
+}
+
+// What a new block starts as: its type and the starting value of each of its fields.
+export function emptyBlock(block: Block): Record<string, unknown> {
+  return { type: block.type, ...Object.fromEntries(block.fields.map(field => [field.key, emptyValue(field)])) }
 }
 
 function typeOf(schema: JsonSchema): string | undefined {

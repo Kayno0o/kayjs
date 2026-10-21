@@ -860,3 +860,50 @@ test('a new list item under a minLength is not flagged before it is touched', as
   await settle()
   expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(1)
 })
+
+const text = (key: string, label: string): Field => ({ key, label, hint: undefined, required: false, kind: 'text' })
+const SECTIONS: Field = {
+  key: 'tags',
+  label: 'Sections',
+  hint: undefined,
+  required: false,
+  kind: 'list',
+  numbered: false,
+  item: { key: 0, label: '', hint: undefined, required: true, kind: 'group', fields: [] },
+  blocks: [{ type: 'hero', label: 'Hero banner', fields: [text('heading', 'Heading')] }, { type: 'text', label: 'Text', fields: [text('body', 'Body'), text('note', 'Note')] }],
+}
+
+test('a blocks list adds an item by its type, each item showing the fields of its own type', async () => {
+  const { drafted, root, click, rows } = await openField(SECTIONS, [{ type: 'text', body: 'Hi' }])
+
+  expect([...root.querySelectorAll('[data-kcms-add]')].map(button => button.getAttribute('aria-label') ?? button.textContent?.trim())).toEqual(['Add Hero banner', 'Add Text'])
+  await click('[data-kcms-add]', 0)
+  expect(drafted()).toEqual([{ type: 'text', body: 'Hi' }, { type: 'hero', heading: '' }])
+  expect(rows().map(row => [...row.querySelectorAll('label')].map(label => label.textContent?.trim()))).toEqual([['Body', 'Note'], ['Heading']])
+  expect([...root.querySelectorAll('.kcms-item-title')].map(title => title.textContent)).toEqual(['Text: Hi', 'Hero banner'])
+})
+
+test('a block moves across types, duplicates and is removed with an Undo, and an unknown type shows no field', async () => {
+  const { drafted, root, click, rows } = await openField(SECTIONS, [{ type: 'text', body: 'Hi' }, { type: 'hero', heading: 'Welcome' }, { type: 'video', url: 'x' }])
+
+  expect([...root.querySelectorAll('.kcms-item-title')].map(title => title.textContent)).toEqual(['Text: Hi', 'Hero banner: Welcome', 'Unknown block'])
+  expect(rows()[2]!.querySelectorAll('input, textarea').length).toBe(0)
+  await click('[data-kcms-move="down"]', 0)
+  expect(drafted()).toEqual([{ type: 'hero', heading: 'Welcome' }, { type: 'text', body: 'Hi' }, { type: 'video', url: 'x' }])
+  await click('button[aria-label^="Duplicate"]', 0)
+  expect(drafted()).toEqual([{ type: 'hero', heading: 'Welcome' }, { type: 'hero', heading: 'Welcome' }, { type: 'text', body: 'Hi' }, { type: 'video', url: 'x' }])
+  await click('button[aria-label^="Remove"]', 1)
+  await click('.kcms-item-removed button')
+  expect(drafted()).toHaveLength(4)
+})
+
+test('a blocks list adds a block at the top from a menu of its types', async () => {
+  const { drafted, root } = await openField(SECTIONS, [{ type: 'text', body: 'Hi' }])
+  const menu = root.querySelector<HTMLSelectElement>('.kcms-list-tools select')!
+
+  expect([...menu.options].map(option => option.textContent?.trim())).toEqual(['Add at the top…', 'Hero banner', 'Text'])
+  menu.value = 'hero'
+  menu.dispatchEvent(new Event('change', { bubbles: true }))
+  await settle()
+  expect(drafted()).toEqual([{ type: 'hero', heading: '' }, { type: 'text', body: 'Hi' }])
+})

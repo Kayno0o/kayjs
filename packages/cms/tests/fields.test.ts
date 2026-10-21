@@ -2,7 +2,8 @@ import type { Field } from '../src/fields'
 import type { JsonSchema } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { checkField, emptyValue, fieldsOf, htmlPattern, humanize, isCompact, itemAt, itemTitle, pairedFields } from '../src/fields'
+import { blocks } from 'kay/content'
+import { blockOf, checkField, emptyBlock, emptyValue, fieldsOf, htmlPattern, humanize, isCompact, itemAt, itemFields, itemTitle, pairedFields } from '../src/fields'
 
 describe('how a field is entered', () => {
   const one = (property: Record<string, unknown>, required = false) => fieldsOf({ type: 'object', required: required ? ['field'] : [], properties: { field: property as JsonSchema } })[0]!
@@ -414,5 +415,61 @@ describe('htmlPattern', () => {
 
     expect(htmlPattern('^\\.[a-z]\\\\$')).toBe('^\\.[a-z]\\\\$')
     expect(htmlPattern('^\\d+\\w$')).toBe('^\\d+\\w$')
+  })
+})
+
+describe('a blocks list', () => {
+  const sections = blocks({
+    hero: s.Object({ heading: s.String({ minLength: 1 }), image: s.Optional(s.String()) }, { title: 'Hero banner' }),
+    text: s.Object({ body: s.String(), links: s.Array(s.Object({ label: s.String() })) }),
+    quote: s.Object({ author: s.Optional(s.String()) }),
+  }, { minItems: 1, maxItems: 5 })
+  const list = () => fieldsOf(JSON.parse(JSON.stringify(s.Object({ sections }))) as JsonSchema)[0] as Field & { kind: 'list' }
+
+  it('is a list of one block per declared type, each with its own fields and no type field', () => {
+    expect(list()).toMatchObject({ kind: 'list', key: 'sections', minItems: 1, maxItems: 5, numbered: false })
+    expect(list().blocks?.map(block => [block.type, block.label, block.fields.map(field => `${String(field.key)}:${field.kind}`)])).toEqual([
+      ['hero', 'Hero banner', ['heading:text', 'image:text']],
+      ['text', 'Text', ['body:text', 'links:list']],
+      ['quote', 'Quote', ['author:text']],
+    ])
+    expect(list().blocks?.[0]?.fields[0]?.required).toBe(true)
+    expect(list().blocks?.[0]?.fields[1]?.required).toBe(false)
+  })
+
+  it('shows each item as a group of its type\'s fields, headed by its type then its first text', () => {
+    const l = list()
+
+    expect(isCompact(l)).toBe(false)
+    expect(itemAt(l, 1, { type: 'text', body: 'x' })).toMatchObject({ kind: 'group', key: 1, label: 'Text', fields: [{ key: 'body' }, { key: 'links' }] })
+    expect(itemTitle(l, { type: 'hero', heading: ' Welcome ' }, 0)).toBe('Hero banner: Welcome')
+    expect(itemTitle(l, { type: 'hero', heading: '' }, 0)).toBe('Hero banner')
+    expect(itemTitle(l, { type: 'quote' }, 2)).toBe('Quote')
+  })
+
+  it('shows an item of no declared type as an unknown block with no field', () => {
+    expect(itemAt(list(), 0, { type: 'video' })).toMatchObject({ kind: 'group', label: 'Unknown block', fields: [] })
+    expect(blockOf(list(), { type: 'video' })).toBeUndefined()
+    expect(blockOf(list(), 'text')).toBeUndefined()
+  })
+
+  it('starts a new block with its type and the start of each field', () => {
+    const [hero, text] = list().blocks!
+
+    expect(emptyBlock(hero!)).toEqual({ type: 'hero', heading: '', image: '' })
+    expect(emptyBlock(text!)).toEqual({ type: 'text', body: '', links: [] })
+    expect(emptyValue(list())).toEqual([])
+    expect(itemFields(list()).map(field => field.key)).toEqual(['heading', 'image', 'body', 'links', 'author'])
+  })
+
+  it('reads a lone block type, an optional list and a list inside a block as blocks too', () => {
+    const lone = fieldsOf(JSON.parse(JSON.stringify(s.Object({ rows: blocks({ cell: s.Object({ text: s.String() }) }) }))) as JsonSchema)[0] as Field & { kind: 'list' }
+    const nested = fieldsOf(JSON.parse(JSON.stringify(s.Object({ columns: blocks({ column: s.Object({ cells: blocks({ cell: s.Object({ text: s.String() }) }) }) }) }))) as JsonSchema)[0] as Field & { kind: 'list' }
+    const optional = fieldsOf(JSON.parse(JSON.stringify(s.Object({ sections: s.Optional(sections) }))) as JsonSchema)[0]!
+
+    expect(lone.blocks?.map(block => block.type)).toEqual(['cell'])
+    expect(nested.blocks?.[0]?.fields[0]).toMatchObject({ kind: 'list', blocks: [{ type: 'cell' }] })
+    expect(optional).toMatchObject({ kind: 'list', required: false })
+    expect(optional.kind === 'list' && optional.blocks?.length).toBe(3)
   })
 })

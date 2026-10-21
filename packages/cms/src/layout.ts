@@ -284,10 +284,15 @@ export function whenProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]):
       if (field.when !== undefined && !keys.has(field.when))
         lines.push(`${at} waits for ${field.when} (fieldInput \`when\`), which is no field beside it, so it stays hidden`)
 
-      if (field.kind === 'group')
+      if (field.kind === 'group') {
         walk(`${at}.`, field.fields)
-      else if (field.kind === 'list' && field.item.kind === 'group')
+      }
+      else if (field.kind === 'list' && field.blocks !== undefined) {
+        for (const block of field.blocks) walk(`${at}.`, block.fields)
+      }
+      else if (field.kind === 'list' && field.item.kind === 'group') {
         walk(`${at}.`, field.item.fields)
+      }
     }
   }
 

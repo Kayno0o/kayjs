@@ -36,6 +36,13 @@ export default defineMessages({
       statusPublished: 'Publiées',
       statusScheduled: 'Programmées',
     },
+    blocks: {
+      add: 'Ajouter un bloc',
+      addFirst: 'Ajouter en tête…',
+      addFirstLabel: 'Ajouter un bloc en tête de {list}',
+      addType: 'Ajouter {block}',
+      unknown: 'Bloc inconnu',
+    },
     bulk: {
       delete: 'Supprimer',
       deleted: { one: '{count} entrée supprimée', other: '{count} entrées supprimées' },

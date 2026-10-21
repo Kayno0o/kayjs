@@ -1,3 +1,4 @@
+import type { JsonSchema } from '../src/kay/contract'
 import { expect, test } from 'bun:test'
 import { missingKindLines, missingKinds } from '../src/kinds'
 
@@ -20,4 +21,11 @@ test('reads the components off the project\'s src/cms/fields folder', () => {
 
 test('reports nothing for a root without src, as an executable has', () => {
   expect(missingKindLines(`${import.meta.dir}/fixture/src/cms`, [posts])).toEqual([])
+})
+
+test('finds a custom kind inside a block of a blocks list', () => {
+  const item = (type: string, field: JsonSchema) => ({ type: 'object', properties: { type: { type: 'string', const: type }, field }, required: ['type'] })
+  const page = { name: 'pages', schema: { type: 'object', properties: { sections: { 'type': 'array', 'x-kay': { kind: 'blocks' }, 'items': { anyOf: [item('hero', { type: 'string' }), item('text', custom('mood'))] } } } } }
+
+  expect([...missingKinds([page], new Set())]).toEqual([['mood', ['pages']]])
 })

@@ -69,7 +69,8 @@
   white-space: nowrap;
 }
 
-.kcms-list-tools {
+.kcms-list-tools,
+.kcms-block-add {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
