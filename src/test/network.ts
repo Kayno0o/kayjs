@@ -475,7 +475,11 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
       await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*', requestStage: 'Response' }] })
     }
     catch (error) {
-      await send('Network.setCacheDisabled', { cacheDisabled: false })
+      // The refusal to intercept is what the caller hears, not a failure to undo the cache change.
+      try {
+        await send('Network.setCacheDisabled', { cacheDisabled: false })
+      }
+      catch {}
 
       throw error
     }

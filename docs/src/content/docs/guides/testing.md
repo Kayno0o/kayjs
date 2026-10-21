@@ -263,7 +263,7 @@ The page clicks and types as a user does.
 
 | Call | Does |
 | --- | --- |
-| `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']` |
+| `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']`. Covered at the middle of the view, by a fixed bar for instance, it is scrolled to the other alignments and aimed at the first point of its box nothing covers; covered everywhere, it fails naming what covers it |
 | `hover(selector)` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays |
 | `fill(selector, text)` | Replaces a field's text, as typing does |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
@@ -369,7 +369,7 @@ Each rule has an `id` such as `color-contrast`, an `impact`, `help`, a `helpUrl`
 
 A page that does not settle in time fails `open()`, naming the files it could not load, such as an island's chunk answering 404. A page whose renderer crashes fails its next call at once, not at the test's timeout.
 
-The browser is `Bun.WebView` on Chrome. Kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. Use `describe.skipIf(!browserPath())` to skip a suite when there is none.
+The browser is `Bun.WebView` on Chrome. Kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. Use `describe.skipIf(browserPath() === undefined)` to skip a suite when there is none.
 
 Chrome's profile lives in the temp directory while the browser runs. Kay closes it a second after the last page closes, and again after the run, when `kay/test/preload` kills every process Chrome started.
 

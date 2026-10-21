@@ -2,6 +2,7 @@ import type { TestPage } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
+import { createNetwork } from '../src/test/network'
 
 const path = browserPath()
 
@@ -40,6 +41,9 @@ const server = Bun.serve({
 
       return new Response('window.cached = "server"', { headers: { 'cache-control': 'max-age=3600', 'content-type': 'text/javascript' } })
     }
+
+    if (url.pathname === '/stalled')
+      return new Response('<!doctype html><title>t</title><h1>Stalled</h1><a class="link" href="#linked">link</a><img src="/hang.png" alt="">', { headers: { 'content-type': 'text/html' } })
 
     if (url.pathname === '/old')
       return new Response(null, { status: 302, headers: { location: '/api/hello' } })
@@ -437,6 +441,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(removing.errors).toEqual([])
     removing.close()
   })
+
+  it('ends after its bound on a page that never finishes loading, inside the timeout', async () => {
+    const stalled = await browse(`${origin}/`, { timeout: 5000 })
+
+    // A request that never answers keeps the next document loading.
+    await stalled.route('/hang.png', async () => new Promise<void>(() => undefined))
+
+    try {
+      await stalled.evaluate(() => {
+        setTimeout(() => location.assign('/stalled'), 0)
+      })
+      await stalled.waitFor('h1', { text: 'Stalled' })
+      expect(await stalled.evaluate(() => document.readyState)).not.toBe('complete')
+
+      for (const act of [async () => stalled.hover('a.link'), async () => stalled.click('a.link')]) {
+        const started = Date.now()
+
+        await act()
+
+        expect(Date.now() - started).toBeGreaterThanOrEqual(900)
+        expect(Date.now() - started).toBeLessThan(3000)
+      }
+
+      expect(await stalled.evaluate(() => location.hash)).toBe('#linked')
+    }
+    finally {
+      await stalled.unroute()
+      stalled.close()
+    }
+  })
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page under a mount point', () => {
@@ -457,5 +491,31 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page und
       docs.close()
       await mounted.stop(true)
     }
+  })
+})
+
+describe('the interception of a kay/test page', () => {
+  it('rejects a route with the error of Fetch.enable, even when putting the cache back fails too', async () => {
+    const sent: string[] = []
+    const network = createNetwork({
+      view: { addEventListener: () => undefined },
+      cdp: async (method, params) => {
+        sent.push(method)
+
+        if (method === 'Fetch.enable')
+          throw new Error('Fetch.enable refused')
+
+        if (params?.cacheDisabled === false)
+          throw new Error('cache restore refused')
+
+        return undefined as never
+      },
+      origin: () => 'http://localhost',
+      errors: [],
+      timeout: 1000,
+    })
+
+    await expect(network.route('/api', async request => request.continue())).rejects.toThrow('Fetch.enable refused')
+    expect(sent).toEqual(['Network.setCacheDisabled', 'Fetch.enable', 'Network.setCacheDisabled'])
   })
 })

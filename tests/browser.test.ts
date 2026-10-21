@@ -314,6 +314,62 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }
   })
 
+  it('clicks an element covered at the centre of the view or of its own box, and names what covers one it cannot reach', async () => {
+    for (const javaScript of [true, false]) {
+      const own = await site.open('/', { javaScript, timeout: 1500 })
+
+      try {
+        await own.evaluate(() => {
+          document.body.insertAdjacentHTML('afterbegin', `
+            <style>a.hit { display: block } #band, #bar { position: fixed; left: 0; right: 0; background: #fff } #band { top: 30vh; height: 40vh } #bar { bottom: 0; height: 40px }</style>
+            <div style="height: 2000px"></div>
+            <a class="hit" id="banded" href="#banded" style="height: 30px">banded</a>
+            <div style="height: 2000px"></div>
+            <a class="hit" id="ended" href="#ended" style="height: 80px">ended</a>
+            <div id="band"></div><div id="bar"></div>`)
+        })
+
+        // Covered by the band where the centre alignment puts it, free at another alignment.
+        await own.click('#banded')
+        expect(await own.evaluate(() => location.hash)).toBe('#banded')
+
+        // Under the bar at the very end of the page, where no alignment moves it: free above the bar.
+        await own.evaluate(() => {
+          document.getElementById('band')!.remove()
+        })
+        await own.click('#ended')
+        expect(await own.evaluate(() => location.hash)).toBe('#ended')
+
+        await own.evaluate(() => {
+          document.body.insertAdjacentHTML('afterbegin', '<div id="cover" style="position:fixed;inset:0;background:#fff"></div>')
+        })
+        await expect(own.click('#ended')).rejects.toThrow('kay: #ended is covered by div#cover, waiting for it to be actionable')
+      }
+      finally {
+        own.close()
+      }
+    }
+  })
+
+  it('counts what a page with JavaScript off draws in a declarative shadow root of the element as the element', async () => {
+    const plain = await site.open('/', { javaScript: false, timeout: 500 })
+
+    try {
+      await plain.evaluate(() => {
+        document.body.setHTMLUnsafe('<span id="host" style="display:block"><template shadowrootmode="open"><a href="#inside" style="display:block">inside</a></template></span><span id="over" style="display:block;position:fixed;inset:0;background:#fff"></span>')
+      })
+      await expect(plain.click('#host')).rejects.toThrow('kay: #host is covered by span#over')
+      await plain.evaluate(() => {
+        document.getElementById('over')!.remove()
+      })
+      await plain.click('#host')
+      expect(await plain.evaluate(() => location.hash)).toBe('#inside')
+    }
+    finally {
+      plain.close()
+    }
+  })
+
   it('collects the warnings of the page beside its errors', async () => {
     const warned = await site.open('/')
 

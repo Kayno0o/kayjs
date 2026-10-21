@@ -389,8 +389,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       bar.find(button => (/islands?$/).test(button.textContent))!.click()
     })
     await islands(/extra\.kay.*#1true/)
-    // The open panel covers the button, which a click at its place would reach instead.
-    await page.evaluate(() => document.querySelector<HTMLButtonElement>('button.extra')!.click())
+    await page.click('button.extra')
     await islands(/extra\.kay.*#1false/)
     expect(await islandsText()).toMatch(/counter\.kay.*#10number#2""string/)
     expect(await islandsText()).toMatch(/counter\.kay(?:props \d+ B)?hydrated in \d+(?:\.\d)? ms#1/)

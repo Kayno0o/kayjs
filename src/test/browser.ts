@@ -172,6 +172,10 @@ const ACTIONABLE = /to be actionable$/
 const NAVIGATED = /navigated or closed/
 // How long a click or a hover waits for a loading page to finish before it scrolls: a page that never finishes, as with a stalled image, is acted on after it.
 const LOAD_WAIT_MS = 1000
+// How a click scrolls the element into the view in turn, for one covered where another alignment puts it, such as under a fixed bar.
+const ALIGNMENTS = ['center', 'end', 'start', 'nearest']
+// The points of an element's box a click may aim at, as the fractions of its width and height: the middle first.
+const POINTS = [[0.5, 0.5], [0.5, 0.25], [0.5, 0.75], [0.25, 0.5], [0.75, 0.5]]
 // What the message of a wait that ran out of time starts with.
 const UNSETTLED = 'kay: timed out after'
 // Loaded, for a page with JavaScript off, which hydrates no island.
@@ -450,29 +454,56 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
-  // The middle of the element, two frames on when scripts run, once a scroll or a transition settled. With `actionable`, what keeps a click from reaching it (nothing drawn, another element over its middle) comes back as a reason instead.
-  const center = async (selector: string, actionable = false) => inView<[number, number] | string>(script(async (target: string, frames: boolean, check: boolean) => {
+  // The middle of the element, two frames on when scripts run, once a scroll or a transition settled.
+  const center = async (selector: string) => inView<[number, number]>(script(async (target: string, frames: boolean) => {
     if (frames)
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
+    const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
+
+    return [left + width / 2, top + height / 2]
+  }, [selector, options.javaScript !== false]))
+
+  // Where a click reaches the element: scrolled to each alignment in turn, the point of its box that nothing covers first at the middle and then nearer each side, and whether it is the middle. What keeps a click from reaching it (nothing drawn, another element over every point) comes back as a reason instead.
+  const reach = async (selector: string) => inView<[number, number, boolean] | string>(script(async (target: string, frames: boolean, alignments: string[], points: number[][]) => {
     const element = document.querySelector(target)!
+    let covered = 'out of view'
 
-    if (check && element.getClientRects().length === 0)
-      return 'not visible'
+    for (const block of alignments) {
+      element.scrollIntoView({ block: block as ScrollLogicalPosition, inline: 'center', behavior: 'instant' })
 
-    const { left, top, width, height } = element.getBoundingClientRect()
-    const x = left + width / 2
-    const y = top + height / 2
+      if (frames)
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
-    if (check) {
-      const over = document.elementFromPoint(x, y)
+      if (element.getClientRects().length === 0)
+        return 'not visible'
 
-      if (over === null || !element.contains(over))
-        return 'covered by another element'
+      const { left, top, width, height } = element.getBoundingClientRect()
+
+      for (const [at, [across, down]] of points.entries()) {
+        const x = left + width * across!
+        const y = top + height * down!
+        const over = document.elementFromPoint(x, y)
+
+        if (over === null)
+          continue
+
+        // The composed tree, as a hit inside a shadow root of the element is the element's own.
+        for (let node: Node | null = over; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
+          if (node === element)
+            return [x, y, at === 0]
+        }
+
+        if (covered === 'out of view') {
+          const { tagName, id, classList } = over
+
+          covered = `${tagName.toLowerCase()}${id === '' ? '' : `#${id}`}${classList.length === 0 ? '' : `.${classList[0]}`}`
+        }
+      }
     }
 
-    return [x, y]
-  }, [selector, options.javaScript !== false, actionable]))
+    return `covered by ${covered}`
+  }, [selector, options.javaScript !== false, ALIGNMENTS, POINTS]))
 
   // Waits once for a loading page, before a click or hover scrolls, as the browser restoring a reload's scroll position until then would move the page away from the place a press is aimed at. A page that never finishes is acted on after the bound.
   const untilLoaded = async () => {
@@ -505,7 +536,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await untilLoaded()
       await poll(script(scrolledTo, [selector, true]), selector, wait.timeout)
 
-      const [x, y] = await center(selector) as [number, number]
+      const [x, y] = await center(selector)
 
       await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
     }),
@@ -552,21 +583,19 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         const tried = Date.now()
 
         try {
-          // Bun's click waits for the element with a script of its own, which a page with JavaScript off does not run.
-          if (options.javaScript === false) {
-            const at = await center(selector, true)
+          const at = await reach(selector)
 
-            if (typeof at === 'string') {
-              await Bun.sleep(POLL_MS)
+          if (typeof at === 'string') {
+            await Bun.sleep(POLL_MS)
 
-              throw new Error(`kay: ${selector} is ${at}, waiting for it to be actionable`)
-            }
+            throw new Error(`kay: ${selector} is ${at}, waiting for it to be actionable`)
+          }
 
+          // Bun's click waits for the element with a script of its own, which a page with JavaScript off does not run, and aims at its middle.
+          if (options.javaScript === false || !at[2])
             await live(async () => view.click(at[0], at[1], modifiers === undefined ? {} : { modifiers }))
-          }
-          else {
+          else
             await live(async () => view.click(selector, { timeout: Math.min(Math.max(until - Date.now(), 1), CLICK_WAIT_MS), ...modifiers === undefined ? {} : { modifiers } }))
-          }
 
           return
         }

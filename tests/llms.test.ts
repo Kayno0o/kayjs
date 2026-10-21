@@ -133,3 +133,12 @@ describe('llms.txt and its docs', () => {
     expect(Object.keys(await import('kay/i18n')).filter(name => name === 'runInLocale' || name === 'localeState')).toEqual([])
   })
 })
+
+describe('the browser test skip', () => {
+  // `browserPath()` is a string or undefined, which the lint preset refuses as a condition.
+  it('is written in the docs as the lint preset accepts it', async () => {
+    const docs = await Promise.all([spec, ...[...new Bun.Glob('**/*.md').scanSync(join(root, 'docs/src/content/docs'))].map(async file => Bun.file(join(root, 'docs/src/content/docs', file)).text())])
+
+    expect(docs.filter(text => text.includes('!browserPath()'))).toEqual([])
+  })
+})
