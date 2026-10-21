@@ -798,7 +798,7 @@ describe('variant names the form and tone the meaning', () => {
   })
 })
 
-test('a toast on screen as a page swap brings the next page hydrates that page\'s toaster without a mismatch', async () => {
+test('a page swap with a toast on screen hydrates the next toaster without a mismatch', async () => {
   const built = await testSite({ root: ROOT, browser: true })
 
   try {
