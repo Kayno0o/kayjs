@@ -73,10 +73,11 @@ const GAP = 12
 const tipPlace = () => {
   const at = hovered()!
   const { width, height, wide, high } = tipSize()
+  const hidden = width === 0 ? '; visibility: hidden' : ''
   const above = at.clientY - height - GAP
   const top = above >= EDGE ? above : at.clientY + GAP
 
-  return `translate: ${Math.max(EDGE, Math.min(at.clientX - width / 2, wide - width - EDGE))}px ${Math.max(EDGE, Math.min(top, high - height - EDGE))}px`
+  return `translate: ${Math.max(EDGE, Math.min(at.clientX - width / 2, wide - width - EDGE))}px ${Math.max(EDGE, Math.min(top, high - height - EDGE))}px${hidden}`
 }
 
 const watchTip = (element: HTMLElement) => {
