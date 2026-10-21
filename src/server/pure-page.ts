@@ -106,6 +106,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   isPaginated: 'free',
   collections: 'request',
   collectionInfo: 'request',
+  collectionLoader: 'request',
   entries: 'request',
   entrySource: 'request',
   entryFile: 'request',
