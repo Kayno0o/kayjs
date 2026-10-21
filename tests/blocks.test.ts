@@ -54,6 +54,20 @@ describe('blocks', () => {
     expect(dataIssues(nested, { columns: [], maybe: null }).map(issue => issue.path)).toEqual([])
   })
 
+  it('fills the defaults of a nullable blocks list', () => {
+    const maybe = t.Object({ maybe: t.Union([blocks({ a: t.Object({ n: t.Number({ default: 1 }) }) }), t.Null()]) })
+
+    expect(withDefaults({ maybe: [{ type: 'a' }] }, maybe)).toEqual({ maybe: [{ type: 'a', n: 1 }] })
+    expect(dataIssues(maybe, { maybe: [{ type: 'a' }] })).toEqual([])
+    expect(withDefaults({ maybe: null }, maybe)).toEqual({ maybe: null })
+  })
+
+  it('words a refused field with the label of its own block when two share a field name', () => {
+    const shared = t.Object({ sections: blocks({ hero: t.Object({ heading: t.String({ title: 'Heading H' }) }), text: t.Object({ heading: t.String({ title: 'Text title' }) }) }) })
+
+    expect(dataIssues(shared, { sections: [{ type: 'text', heading: 5 }, { type: 'hero', heading: 5 }] }).map(issue => issue.message)).toEqual(['Text title is not valid', 'Heading H is not valid'])
+  })
+
   it('leaves a hand-written discriminated union reported as the one value it is', () => {
     const union = t.Object({ shape: t.Union([t.Object({ type: t.Literal('a'), x: t.String() }), t.Object({ type: t.Literal('b') })]) })
 

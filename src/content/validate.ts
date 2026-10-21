@@ -82,7 +82,7 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
     }
 
     // Each refused field once by its JSON pointer, so `a.b` and `a` > `b` stay apart, on the line its top-level key starts at.
-    for (const [pointer, message] of refusals(check, data, path => path, issue => refusalSentence(schema, issue))) {
+    for (const [pointer, message] of refusals(check, data, path => path, issue => refusalSentence(schema, issue, data))) {
       const path = dottedPath(pointer)
 
       problems.push({ file: entry.file, line: entry.lines[fieldOf(pointer)] ?? 1, message: path === '' ? message : `${path}: ${message}` })
@@ -124,21 +124,21 @@ export function dataIssues(schema: TSchema, data: unknown): { path: string, mess
   if (check.Check(filled))
     return []
 
-  return [...refusals(check, filled, dottedPath, issue => refusalSentence(schema, issue))].map(([path, message]) => ({ path, message }))
+  return [...refusals(check, filled, dottedPath, issue => refusalSentence(schema, issue, filled))].map(([path, message]) => ({ path, message }))
 }
 
 const INDEX = /^\d+$/
 
 interface SchemaNode {
   title?: unknown
-  properties?: Record<string, SchemaNode>
+  properties?: Record<string, SchemaNode & { const?: unknown }>
   items?: SchemaNode
   anyOf?: SchemaNode[]
 }
 
 // The node of a field one step down: a property by its name, else an array's item for an index, looking through the branches of a union such as a nullable field; `item` says it was a list's.
-function stepInto(node: SchemaNode | undefined, segment: string): { node: SchemaNode | undefined, item: boolean } {
-  for (const candidate of [node, ...node?.anyOf ?? []]) {
+function stepInto(node: SchemaNode | undefined, segment: string, value: unknown): { node: SchemaNode | undefined, item: boolean } {
+  for (const candidate of [node, ...variantsOf(node, value)]) {
     const property = candidate?.properties?.[segment]
 
     if (property)
@@ -151,19 +151,31 @@ function stepInto(node: SchemaNode | undefined, segment: string): { node: Schema
   return { node: undefined, item: false }
 }
 
+// The branches of a union to look through; a `blocks()` item's, only the block its `type` names, so a field two blocks share is read from its own.
+function variantsOf(node: SchemaNode | undefined, value: unknown): SchemaNode[] {
+  const variants = node?.anyOf ?? []
+  const type = typeof value === 'object' && value !== null ? (value as { type?: unknown }).type : undefined
+  const named = type === undefined ? [] : variants.filter(variant => variant.properties?.type?.const === type)
+
+  return named.length > 0 ? named : variants
+}
+
 // A field's `title`, the inner type's of a nullable one first, as the CMS editor labels it.
 function titleOf(node: SchemaNode | undefined): string | undefined {
   return [...node?.anyOf ?? [], node].map(candidate => candidate?.title).find((title): title is string => typeof title === 'string')
 }
 
 // How an entry names a field: its schema `title`, else its key worded (`publishedAt` gives `Published at`), an item of a list as `Tags, item 2`.
-function labelOf(schema: TSchema, pointer: string): string {
+function labelOf(schema: TSchema, pointer: string, data: unknown): string {
   const segments = pointer.split('/').slice(1).map(unescaped)
   let node: SchemaNode | undefined = schema
+  let value = data
   let label = ''
 
   for (const segment of segments) {
-    const step = stepInto(node, segment)
+    const step = stepInto(node, segment, value)
+
+    value = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[segment] : undefined
 
     node = step.node
     label = step.item ? kayWord('kay.entry.item', { field: label, n: Number(segment) + 1 }) : titleOf(node) ?? humanize(segment)
@@ -183,8 +195,8 @@ function humanize(key: string): string {
 }
 
 // The sentence for a refused field: the field's own `error` when it has one, else its label and the keyword it fails, in the request's locale.
-function refusalSentence(schema: TSchema, issue: { path: string, schema?: unknown, value?: unknown }): string {
-  return errorText((issue.schema as { error?: unknown } | undefined)?.error) ?? entryRefusal(labelOf(schema, issue.path), issue)
+function refusalSentence(schema: TSchema, issue: { path: string, schema?: unknown, value?: unknown }, data: unknown): string {
+  return errorText((issue.schema as { error?: unknown } | undefined)?.error) ?? entryRefusal(labelOf(schema, issue.path, data), issue)
 }
 
 // The data with each missing field's default filled in, nested objects and list items too; a default is a whole value, filled as it is.
@@ -195,8 +207,11 @@ export function withDefaults(data: unknown, schema: TSchema): unknown {
 const PLAIN = new Set<object | null>([Object.prototype, null])
 
 function filled(data: unknown, schema: FieldSchema): unknown {
-  if (Array.isArray(data))
-    return schema.items === undefined ? data : data.map(item => filled(item, schema.items!))
+  if (Array.isArray(data)) {
+    const items = schema.items ?? schema.anyOf?.find(variant => variant.items !== undefined)?.items
+
+    return items === undefined ? data : data.map(item => filled(item, items))
+  }
 
   if (typeof data !== 'object' || data === null || !PLAIN.has(Object.getPrototypeOf(data) as object | null))
     return data
