@@ -6,11 +6,11 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
+import EntryEdited from '../components/entry-edited.kay'
 import Refused from '../components/refused.kay'
 import { denials } from '../access'
 import { collections } from '../kay/content'
 import { adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
-import { editedDay } from '../datetime'
 import { screenPath } from '../paths'
 import { indexRows } from '../screens'
 import { settings } from '../settings'
@@ -57,6 +57,7 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
         if row.collection.description
           p.kcms-entry-subtitle {row.collection.description}
         if row.edited as edit
-          p.kcms-entry-subtitle {edit.author ? wording('cms.admin.lastEditedBy', 'Last edited {date} by {author}', { date: editedDay(edit.at), author: edit.author }) : wording('cms.admin.lastEdited', 'Last edited {date}', { date: editedDay(edit.at) })}
+          p.kcms-entry-subtitle
+            EntryEdited(at={edit.at} author={edit.author} sentence)
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

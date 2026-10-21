@@ -1297,3 +1297,31 @@ test('the dev tool\'s CMS tab state answers under kay dev alone, in the language
       process.env.KAY_DEV_CODE = before
   }
 })
+
+test('Create and add another saves the entry and opens an empty form for the next one', async () => {
+  ledgerRows.length = 0
+
+  const built = await browser()
+
+  // Not strict: the toaster logs a hydration mismatch after any save's swap, kaynooo/kayjs#1548.
+  await using page = await built.open('/admin/new/ledger', { strict: false })
+  const name = '[data-kcms-path="name"] input'
+
+  await page.waitUntil(() => document.querySelector('form.kcms-entry-editor input') !== null)
+  await page.click('form.kcms-entry-editor input')
+  await page.type('first')
+  await page.click(name)
+  await page.type('First one')
+  await page.click('[data-kcms-path="note"] input')
+  await page.type('A note')
+  await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Create and add another')?.click())
+
+  for (let wait = 0; wait < 100 && ledgerRows.length === 0; wait++)
+    await Bun.sleep(50)
+
+  expect(ledgerRows.map(row => row.data.name)).toEqual(['First one'])
+  await page.waitUntil(() => [...document.querySelectorAll<HTMLInputElement>('form.kcms-entry-editor input')].every(input => input.value === ''))
+  expect(await page.evaluate(() => location.pathname)).toBe('/admin/new/ledger')
+  expect(page.errors.filter(error => !error.includes('toaster.kay did not match'))).toEqual([])
+  ledgerRows.length = 0
+}, 60_000)
