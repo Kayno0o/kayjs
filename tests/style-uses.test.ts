@@ -238,6 +238,32 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolvedIn({ 'page.kay': '---\nimport { position } from \'./data\'\n---\np(class={position(i)}) a\n', 'data.ts': 'export function position(i: number) {\n  return i ? \'mt-1\' : \'p-1\'\n}\n' })).toEqual([])
   })
 
+  it('reads undefined, null and false as no class in a ternary, a logical and a return', async () => {
+    const attribute = (value: string) => `---\np(.shorthand class={${value}}) a\n`
+
+    expect(await unresolved(attribute('cond ? undefined : \'mt-1\''), '', 'page.kay')).toEqual([])
+    expect(await unresolved(attribute('cond ? \'mt-1\' : null'), '', 'page.kay')).toEqual([])
+    expect(await unresolved(attribute('cond && \'mt-1\''), '', 'page.kay')).toEqual([])
+    expect(await unresolved(attribute('cond ? false : \'mt-1\''), '', 'page.kay')).toEqual([])
+    expect(await unresolved('el.className = on ? undefined : \'mt-1\'\n')).toEqual([])
+    expect(await unresolved(attribute('cond ? undefined : tone'), '', 'page.kay')).toEqual(['2 class attribute '])
+  })
+
+  it('reads a function returning literals or undefined, annotated or not', async () => {
+    const page = (fn: string) => `${fn}\n---\np(class={tone(u)}) a\n`
+
+    expect(await unresolved(page('function tone(u: number): string | undefined {\n  if (u < 1)\n    return \'mt-1\'\n\n  if (u < 2)\n    return \'p-1\'\n\n  return undefined\n}'), '', 'page.kay')).toEqual([])
+    expect(await unresolved(page('function tone(u: number) {\n  if (u < 1)\n    return \'mt-1\'\n\n  return undefined\n}'), '', 'page.kay')).toEqual([])
+    expect(await unresolved(page('function tone(u: number) {\n  if (u < 1)\n    return \'mt-1\'\n}'), '', 'page.kay')).toEqual([])
+    expect(await unresolved(page('const tone = (u: number): string | undefined => u ? \'mt-1\' : undefined'), '', 'page.kay')).toEqual([])
+  })
+
+  it('reads undefined in a class inside a Table cell block', async () => {
+    const cell = '---\nimport { Table } from \'kayjs-ui\'\n---\nTable(rows={rows} columns={columns})\n  @cell(row, column)\n    span(class={row.enabled ? undefined : \'mt-1\'}) x\n'
+
+    expect(await unresolved(cell, '', 'page.kay')).toEqual([])
+  })
+
   it('still warns of a function returning a parameter, a call or a value of the runtime', async () => {
     const island = (body: string) => `function position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
 

@@ -377,6 +377,10 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
   if (node.type === 'NumericLiteral' || node.type === 'NullLiteral' || node.type === 'BooleanLiteral' || node.type === 'ObjectExpression')
     return CLOSED
 
+  // `undefined` is no class, like `null` and `false`.
+  if (node.type === 'Identifier' && node.name === 'undefined' && !scope.props.has('undefined') && scope.initializers('undefined') === undefined)
+    return CLOSED
+
   if (node.type === 'TemplateLiteral')
     return merged([...node.quasis.map(quasi => ({ parts: [quasi.value.cooked ?? ''], open: false })), ...node.expressions.map(inner => verdictOf(inner as Expression, scope, depth))])
 
