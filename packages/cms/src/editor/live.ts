@@ -1,3 +1,4 @@
+import { withBase } from 'kay'
 import { REBUILD_WINDOW } from './rebuild'
 
 // Where an entry stands after its last save: `live` once the public page serves what was saved, which a forge-backed site does only after a rebuild.
@@ -8,20 +9,21 @@ export const LIVE_INTERVAL = 4000
 
 const NONCE = /\snonce="[^"]*"/g
 
-// What a page answers, as comparable text: its status and body, without the nonce a response may carry per request.
-export async function readPage(url: string): Promise<string> {
+// What a page answers, as comparable text: its status and body, undefined when it could not be read, without the nonce a response may carry per request.
+export async function readPage(url: string): Promise<string | undefined> {
   try {
-    const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+    const response = await fetch(withBase(url), { cache: 'no-store', credentials: 'same-origin' })
 
-    return `${response.status}\n${(await response.text()).replaceAll(NONCE, '')}`
+    // A site that is down or restarting is no sign of a rebuild done.
+    return response.status >= 500 ? undefined : `${response.status}\n${(await response.text()).replaceAll(NONCE, '')}`
   }
   catch {
-    return 'unreachable'
+    return undefined
   }
 }
 
 interface Watch {
-  read?: (url: string) => Promise<string>
+  read?: (url: string) => Promise<string | undefined>
   pause?: (ms: number) => Promise<void>
   interval?: number
   window?: number
@@ -33,7 +35,7 @@ const sleep = async (ms: number) => new Promise<void>(resolve => setTimeout(reso
 
 // Reads the public page until it differs from how it stood right after the save and then holds still for two reads, so a rebuild that is under way, or a page that changes on each request, does not count. False when the window passes first or the watch is cancelled: a page that does not show the saved fields never turns live.
 export async function whenLive(url: string, { read = readPage, pause = sleep, interval = LIVE_INTERVAL, window = REBUILD_WINDOW, cancelled = () => false }: Watch = {}): Promise<boolean> {
-  const before = await read(url)
+  const before = await read(url) ?? ''
   let candidate: string | undefined
 
   for (let waited = 0; waited < window; waited += interval) {
@@ -44,7 +46,9 @@ export async function whenLive(url: string, { read = readPage, pause = sleep, in
 
     const now = await read(url)
 
-    if (now === before)
+    if (now === undefined)
+      candidate = undefined
+    else if (now === before)
       candidate = undefined
     else if (now === candidate)
       return true

@@ -23,6 +23,33 @@ describe('whenLive', () => {
     expect(page.reads).toEqual(['/talk', '/talk', '/talk', '/talk'])
   })
 
+  test('is not live while the site is down or erroring, however many reads say so', async () => {
+    const page = pageSaying('200\nold', undefined as unknown as string, undefined as unknown as string, undefined as unknown as string)
+
+    expect(await whenLive('/talk', { ...quick, window: 4000, read: page.read })).toBe(false)
+  })
+
+  test('reads the page under the site base', async () => {
+    const urls: string[] = []
+    const fetched = globalThis.fetch
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      urls.push(String(input))
+
+      return new Response('ok')
+    }) as typeof fetch
+
+    try {
+      const { readPage } = await import('../src/editor/live')
+
+      expect(await readPage('/talk')).toBe('200\nok')
+      expect(urls).toEqual(['/talk'])
+    }
+    finally {
+      globalThis.fetch = fetched
+    }
+  })
+
   test('is not live for a page that changes on every read', async () => {
     let n = 0
 

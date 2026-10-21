@@ -25,7 +25,13 @@ export interface ListScreen {
 export async function entryScreen(ref: EntryRef): Promise<EntryScreen | undefined> {
   const screen = await readEntry(ref)
 
-  return screen && { prefix: settings().prefix, ...screen }
+  if (!screen?.entry)
+    return screen && { prefix: settings().prefix, ...screen }
+
+  // Only the screens ask, as the editor's API has no delete to warn for.
+  const referencedBy = (await referrersOf(ref.collection, [screen.entry.slug])).get(screen.entry.slug)
+
+  return { prefix: settings().prefix, ...screen, entry: referencedBy === undefined ? screen.entry : { ...screen.entry, referencedBy } }
 }
 
 // What a new entry's screen reads: the collection alone.

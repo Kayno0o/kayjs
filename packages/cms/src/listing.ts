@@ -8,7 +8,7 @@ import { screenPath } from './paths'
 import { contentVersion } from './version'
 
 // The most referencing entries a delete confirmation names; the rest is told as a trailing ellipsis.
-export const REFERRERS_SHOWN = 5
+const REFERRERS_SHOWN = 5
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 

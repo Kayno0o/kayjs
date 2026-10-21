@@ -91,8 +91,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
             Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownLabel', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if actions.has('publish') && row.draft && collection.draftField !== undefined
           Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
-        if actions.has('unpublish') && !row.draft && collection.draftField !== undefined
-          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.table.unpublishLabel', 'Unpublish {title}', { title: row.title })} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
+        if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
+          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('editOnPage')
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})

@@ -436,6 +436,11 @@ test('a save refused comes back as issues and nothing is written, a body showing
   expect((await send('POST', 'posts/hello', { data: { title: 'Hello' }, body: '```html\n<script>shown, not run</script>\n```\n', version: await versionOf('posts/hello') })).answer).toHaveProperty('saved', true)
 })
 
+test('unpublish is refused for a collection with no draft field and for a missing entry', async () => {
+  expect((await send('POST', 'products/mug/unpublish')).answer).toHaveProperty('issues.0.message', expect.stringContaining('names no draft field'))
+  expect((await send('POST', 'posts/nope/unpublish')).answer).toHaveProperty('issues.0.key', 'slug')
+})
+
 test('a nested slug is published and deleted through its file', async () => {
   saved.length = 0
 

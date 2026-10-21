@@ -43,7 +43,17 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
   if (wanted.size === 0)
     return result
 
-  const referring = (await collections({ counts: false })).filter(collection => refersTo(fieldsOf(collection.schema), target))
+  let referring: CollectionInfo[]
+
+  try {
+    referring = (await collections({ counts: false })).filter(collection => refersTo(fieldsOf(collection.schema), target))
+  }
+  catch (error) {
+    log.error(`the collections failed to read for the references to ${target}`, error)
+
+    return result
+  }
+
   const read = await Promise.allSettled(referring.map(async collection => ({ collection, found: await entries(collection.name, {}) })))
 
   for (const [i, outcome] of read.entries()) {

@@ -272,6 +272,11 @@ describe('the site the command sets', () => {
     expect(await siteIn('https://site.example.test', '/docs/')).toMatchObject({ code: 0, seen: 'https://site.example.test/docs' })
   })
 
+  test('is refused as the server refuses it, when the base is no path', async () => {
+    expect((await siteIn('https://site.example.test', 'docs')).code).toBe(1)
+    expect((await siteIn('https://site.example.test', '/a b')).code).toBe(1)
+  })
+
   test('is refused as the server refuses it, when the site carries a path', async () => {
     const result = await siteIn('https://site.example.test/docs')
 

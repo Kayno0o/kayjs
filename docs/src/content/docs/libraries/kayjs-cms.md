@@ -369,7 +369,7 @@ const saver: FileSaver = {
 
 ## The entries API
 
-The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry as the editor opens it, with its `version`. Add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
+The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 

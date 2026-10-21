@@ -6,7 +6,6 @@ import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry
 import { collectionTitle, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
-import { referrersOf } from './references'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
@@ -74,13 +73,7 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
     return { collection: collection.value, entry: undefined }
   }
 
-  if (collection.value.problem !== undefined || !entry.value)
-    return { collection: collection.value, entry: undefined }
-
-  const referrers = await referrersOf(ref.collection, [entry.value.slug])
-  const referencedBy = referrers.get(entry.value.slug)
-
-  return { collection: collection.value, entry: referencedBy === undefined ? entry.value : { ...entry.value, referencedBy } }
+  return { collection: collection.value, entry: collection.value.problem === undefined ? entry.value : undefined }
 }
 
 // `kind` is the collection's when the caller has it, else it is read.

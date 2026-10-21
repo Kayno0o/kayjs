@@ -73,8 +73,8 @@ export default defineMessages({
       conflict: 'Si vous gardez vos modifications, la prochaine sauvegarde écrasera cet autre enregistrement.',
       create: 'Créer',
       deleteMessage: 'Supprimer {title} ? C\'est définitif.',
-      deleteReferenced: 'Référencée par {entries}.',
       deletePage: 'Sa page {url} ne répondra plus, et les liens qui y mènent seront cassés.',
+      deleteReferenced: 'Référencée par {entries}.',
       draft: 'Brouillon',
       editOnPage: 'Modifier sur la page',
       ended: 'Terminé',
@@ -300,7 +300,6 @@ export default defineMessages({
       scheduled: 'Programmé pour {at}',
       status: 'Statut',
       title: 'Titre',
-      unpublishLabel: 'Dépublier {title}',
       yes: 'Oui',
     },
     upload: {
