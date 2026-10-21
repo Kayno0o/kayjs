@@ -10,4 +10,4 @@ const { hint, issue, label, onChange, required, value } = props<{ hint: string |
 const zone = useEditorZone()
 ---
 FormField(label={label} hint={[hint, wording('cms.field.zone', 'Time in {zone}', { zone: zone() ?? 'UTC' })].filter(Boolean).join(' ')} issue={issue} required={required})
-  TextInput(type="datetime-local" value={inputValue(value, zone())} onInput={next => onChange(storedValue(next ?? '', zone()))})
+  TextInput(type="datetime-local" required={required} value={inputValue(value, zone())} onInput={next => onChange(storedValue(next ?? '', zone()))})

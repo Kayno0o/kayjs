@@ -240,6 +240,56 @@ export function checkField(field: Field, value: unknown): string | undefined {
   return undefined
 }
 
+// The pattern for the control's `pattern` attribute, which HTML anchors itself and compiles with the `v` flag, while the schema's is unanchored: only a pattern already anchored at both ends in one alternative, which both read the same, becomes the attribute. Any other is left to the form's own check.
+export function htmlPattern(pattern: string | undefined): string | undefined {
+  if (pattern === undefined || !pattern.startsWith('^') || !pattern.endsWith('$') || endsEscaped(pattern) || hasTopLevelAlternative(pattern))
+    return undefined
+
+  try {
+    void new RegExp(pattern, 'v')
+
+    return pattern
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Whether the final `$` is escaped, an odd run of backslashes before it.
+function endsEscaped(pattern: string): boolean {
+  let slashes = 0
+
+  for (let at = pattern.length - 2; at >= 0 && pattern[at] === '\\'; at--)
+    slashes++
+
+  return slashes % 2 === 1
+}
+
+// Whether a `|` stands outside every group and class.
+function hasTopLevelAlternative(pattern: string): boolean {
+  let depth = 0
+  let inClass = false
+
+  for (let at = 0; at < pattern.length; at++) {
+    const char = pattern[at]
+
+    if (char === '\\')
+      at++
+    else if (inClass)
+      inClass = char !== ']'
+    else if (char === '[')
+      inClass = true
+    else if (char === '(')
+      depth++
+    else if (char === ')')
+      depth--
+    else if (char === '|' && depth === 0)
+      return true
+  }
+
+  return false
+}
+
 // A pattern a plain RegExp cannot compile is left to the server.
 function matches(pattern: string, value: string): boolean {
   try {

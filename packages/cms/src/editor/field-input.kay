@@ -15,7 +15,7 @@ import copy from '~icons/tabler/copy'
 import { uid } from 'kay'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
-import { checkField, emptyValue, isCompact, itemAt, itemTitle } from '../fields'
+import { checkField, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
 import { sizeOfPath } from '../upload-text'
 import Adorned from './adorned.kay'
@@ -326,7 +326,7 @@ function leaveJson(): void {
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} data-kcms-grow={current.rows === undefined ? undefined : ''} style={current.rows === undefined ? undefined : `--kcms-rows: ${current.rows}`} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        MarkdownEditor(value={text()} onInput={typed} onImage={async file => (await uploadFile(entry.collection, file)).path})
+        MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
@@ -338,7 +338,7 @@ function leaveJson(): void {
       DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={set})
     when 'select'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Select(value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
+        Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} onAlt={setAlt} onChange={setFile})
@@ -355,4 +355,4 @@ function leaveJson(): void {
     else
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
-          TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={current.limits?.pattern})
+          TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={htmlPattern(current.limits?.pattern)})

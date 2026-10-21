@@ -2,7 +2,7 @@ import type { Field } from '../src/fields'
 import type { JsonSchema } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { checkField, emptyValue, fieldsOf, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
+import { checkField, emptyValue, fieldsOf, htmlPattern, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
 
 describe('how a field is entered', () => {
   const one = (property: Record<string, unknown>, required = false) => fieldsOf({ type: 'object', required: required ? ['field'] : [], properties: { field: property as JsonSchema } })[0]!
@@ -358,5 +358,25 @@ describe('checkField', () => {
 
   it('leaves a pattern a RegExp cannot compile to the server', () => {
     expect(checkField({ ...mail, limits: { pattern: '(' } }, 'anything')).toBeUndefined()
+  })
+})
+
+describe('htmlPattern', () => {
+  it('keeps a pattern the HTML attribute reads as the schema does: anchored at both ends, one alternative, valid with the v flag', () => {
+    expect(htmlPattern('^[a-z]+$')).toBe('^[a-z]+$')
+    expect(htmlPattern('^(a|b)$')).toBe('^(a|b)$')
+    expect(htmlPattern('^[ab]$')).toBe('^[ab]$')
+  })
+
+  it('drops one the attribute would anchor differently, or not compile', () => {
+    expect(htmlPattern('[a-z]+')).toBeUndefined()
+    expect(htmlPattern('^[a-z]+')).toBeUndefined()
+    expect(htmlPattern('[a-z]+$')).toBeUndefined()
+    expect(htmlPattern('^a|b$')).toBeUndefined()
+    expect(htmlPattern('^a\\$')).toBeUndefined()
+    expect(htmlPattern('^[a-z-]$')).toBeUndefined()
+    expect(htmlPattern('^[a|b]$')).toBeUndefined()
+    expect(htmlPattern('^(a$')).toBeUndefined()
+    expect(htmlPattern(undefined)).toBeUndefined()
   })
 })
