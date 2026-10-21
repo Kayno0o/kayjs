@@ -79,10 +79,10 @@ export default defineMessages({
       pathLabel: 'Adresse',
       rejected: '{name} est {type}, que les envois n\'acceptent pas ici : {accept}',
       replace: 'Remplacer',
-      someType: 'd\'un type',
+      someType: 'de type inconnu',
       upload: 'Envoyer',
       uploadMany: 'Envoyer des fichiers',
-      uploading: 'Envoi {percent} %',
+      uploading: 'Envoi {percent}\u00A0%',
     },
     guard: {
       needsGuard: 'Enregistrer demande cms({ guard })',
@@ -193,7 +193,7 @@ export default defineMessages({
     },
     upload: {
       empty: '{name} est vide',
-      notReal: '{name} n\'est pas un vrai {type}',
+      notReal: '{name} n\'est pas un fichier {type} valide',
       refused: '{name} est {type}, que les envois n\'acceptent pas ici : {accepted}',
       theFile: 'Le fichier',
       tooLarge: '{name} pèse {size}, plus que les {limit} permis',

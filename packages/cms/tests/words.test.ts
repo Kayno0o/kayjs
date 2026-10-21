@@ -60,7 +60,12 @@ describe.each(LOCALES)('the %s catalog the cms ships', (locale) => {
         english.set(`cms.${area}.${leaf}`, text!)
     }
 
-    for (const [key, message] of await catalogOf(locale)) {
+    const catalog = await catalogOf(locale)
+
+    // A text the topic describes in prose, with no literal English to compare.
+    expect([...catalog.keys()].filter(key => !english.has(key))).toEqual(['cms.uploads.notice'])
+
+    for (const [key, message] of catalog) {
       const wanted = english.get(key)
 
       if (wanted === undefined)
