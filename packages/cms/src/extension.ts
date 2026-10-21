@@ -2,9 +2,9 @@ import type { KayExtension } from 'kay/server'
 import type { CmsOptions } from './settings'
 import { serverRoot, underKayDev } from 'kay/library'
 import { api } from 'kay/server'
-import { collections } from './kay/content'
+import { collectionInfo, collections } from './kay/content'
 import { missingKindLines } from './kinds'
-import { layoutProblems, whenProblems } from './layout'
+import { bodylessLayout, layoutProblems, whenProblems } from './layout'
 import { log } from './log'
 import { pageLinkLoader } from './page-link'
 import { configure, settings } from './settings'
@@ -39,6 +39,13 @@ export function cms(options: CmsOptions = {}): KayExtension {
 
       // Once the server listens, the content config is registered.
       plugin.onStart(async () => {
+        const worded = [...settings().layouts].filter(([, layout]) => layout.form?.body !== undefined).map(([name]) => name)
+        // A body worded on a collection with none is a mistake to fix, so it stops the boot rather than logging; only those collections are read for their body, as a loader runs for it.
+        const problem = bodylessLayout((await Promise.all(worded.map(async name => collectionInfo(name)))).filter(found => found !== undefined), settings().layouts)
+
+        if (problem !== undefined)
+          throw new Error(problem)
+
         try {
           const listed = await collections({ counts: false })
 

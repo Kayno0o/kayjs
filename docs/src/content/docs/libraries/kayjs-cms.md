@@ -566,9 +566,13 @@ cms({ collections: { shop: {
 
 In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
 
-The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Over every Markdown box, the body and the `markdown` fields, sits a toolbar of bold, italic, heading, lists, link and image buttons. `toolbar: false` removes it and `toolbar: ['bold', 'italic', 'link']` keeps those buttons, in that order.
+The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Setting `body` on a collection that has no Markdown body stops the server at boot and names the collection.
 
-Each Markdown box also has a Preview button. It shows the text rendered by your site's own Markdown parser, beside the box, or in place of it where there is no room. Nothing in your app is needed for it. The preview shows the text's structure, not your page's styles: a component shows as its content and code is not highlighted. It shows a short reason when the text cannot be read, such as a component left open.
+Over every Markdown box, the body and the `markdown` fields, sits a toolbar of bold, italic, heading, lists, link and image buttons. `toolbar: false` removes it and `toolbar: ['bold', 'italic', 'link']` keeps those buttons, in that order.
+
+Each Markdown box also has a Preview button. It shows the text rendered by your site's own Markdown parser, beside the box, or in place of it where there is no room. Nothing in your app is needed for it.
+
+A component shows as its content, code is highlighted by your site's highlighter, and an image written as a path in the entry's folder, such as `./cat.png`, shows from there. `previewClass: 'prose'` in `form` gives the preview the classes your pages style rendered Markdown with. It shows a short reason when the text cannot be read, such as a component left open.
 
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 

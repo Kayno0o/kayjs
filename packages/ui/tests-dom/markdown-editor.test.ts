@@ -200,6 +200,43 @@ describe('MarkdownEditor toolbar', () => {
     expect(buttons(some.root).map(button => button.getAttribute('aria-label'))).toEqual(['Link', 'Bold'])
   })
 
+  test('is one tab stop, and the arrows, Home and End move it between the buttons', async () => {
+    const state = await editor('x', undefined, { toolbar: ['bold', 'italic', 'link'], preview: async (markdown: string) => markdown })
+    const all = buttons(state.root)
+    const stops = () => all.filter(button => button.tabIndex === 0).map(button => button.getAttribute('aria-label'))
+
+    expect(stops()).toEqual(['Bold'])
+
+    all[0]!.focus()
+    press(all[0]!, 'ArrowRight')
+    await settle()
+
+    expect(document.activeElement).toBe(all[1]!)
+    expect(stops()).toEqual(['Italic'])
+
+    press(all[1]!, 'End')
+    await settle()
+
+    expect(document.activeElement).toBe(all[3]!)
+    expect(stops()).toEqual(['Preview'])
+
+    press(all[3]!, 'ArrowRight')
+    await settle()
+
+    expect(document.activeElement).toBe(all[0]!)
+
+    press(all[0]!, 'ArrowLeft')
+    await settle()
+
+    expect(document.activeElement).toBe(all[3]!)
+
+    press(all[3]!, 'Home')
+    await settle()
+
+    expect(stops()).toEqual(['Bold'])
+    expect(press(all[0]!, 'ArrowRight', { ctrlKey: true }).defaultPrevented).toBe(false)
+  })
+
   test('writes an image to fill in where nothing uploads', async () => {
     const state = await editor('')
 
@@ -224,6 +261,15 @@ describe('MarkdownEditor preview', () => {
     const state = await editor('x')
 
     expect(buttons(state.root).some(button => button.getAttribute('aria-label') === 'Preview')).toBe(false)
+  })
+
+  test('gives the preview the classes the page styles its Markdown with', async () => {
+    const state = await editor('one', undefined, { preview: async (markdown: string) => `<p>${markdown}</p>`, previewClass: 'prose lg:prose-lg' })
+
+    named(state.root, 'Preview').click()
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one</p>')
+
+    expect(state.root.querySelector('.kui-markdown-preview-body')?.className).toContain('prose lg:prose-lg')
   })
 
   test('shows the server HTML once asked, follows the text, and hides on a second press', async () => {

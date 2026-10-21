@@ -1,0 +1,85 @@
+---
+import type { ToolbarAction } from '../markdown-edit'
+import { signal } from 'kay'
+import { wording } from 'kay/words'
+import bold from '~icons/tabler/bold'
+import eye from '~icons/tabler/eye'
+import heading from '~icons/tabler/heading'
+import italic from '~icons/tabler/italic'
+import link from '~icons/tabler/link'
+import list from '~icons/tabler/list'
+import listNumbers from '~icons/tabler/list-numbers'
+import photo from '~icons/tabler/photo'
+import { stepIndex } from '../cycle'
+import IconButton from '../icon-button.kay'
+
+// The keys that move between the buttons, as the toolbar pattern has them: the arrows wrap, Home and End go to either end.
+const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
+  ArrowRight: (index, count) => stepIndex(index, 1, count),
+  ArrowLeft: (index, count) => stepIndex(index, -1, count),
+  Home: () => 0,
+  End: (_, count) => count - 1,
+}
+
+const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }
+
+const ICONS = { bold, italic, heading, bulletList: list, numberedList: listNumbers, link, image: photo }
+
+// The buttons over a MarkdownEditor's field, loaded by the editor once it knows it shows any, so an editor with none ships neither these icons nor this code.
+const { actions, hasPreview, previewing, onAction, onPreview } = props<{
+  actions: readonly ToolbarAction[]
+  hasPreview: boolean
+  previewing: boolean
+  onAction: (action: ToolbarAction) => void
+  onPreview: () => void
+}>()
+
+const labels: Record<ToolbarAction, string> = {
+  bold: wording('ui.markdownEditor.bold', 'Bold'),
+  italic: wording('ui.markdownEditor.italic', 'Italic'),
+  heading: wording('ui.markdownEditor.heading', 'Heading'),
+  bulletList: wording('ui.markdownEditor.bulletList', 'Bulleted list'),
+  numberedList: wording('ui.markdownEditor.numberedList', 'Numbered list'),
+  link: wording('ui.markdownEditor.link', 'Link'),
+  image: wording('ui.markdownEditor.image', 'Image'),
+}
+
+// The one button in the page's tab order; the arrows move it, so the whole bar costs one Tab.
+const stop = signal(0)
+
+const tabStop = (index: number) => Math.min(stop(), actions.length + (hasPreview ? 0 : -1)) === index ? 0 : -1
+
+function keyDown(event: KeyboardEvent) {
+  const bar = (event.currentTarget as HTMLElement).closest('[role="toolbar"]')
+  const key = bar && getComputedStyle(bar).direction === 'rtl' ? FLIPPED[event.key] ?? event.key : event.key
+  const move = MOVES[key]
+
+  // A chord is the browser's, such as Alt with an arrow going back a page.
+  if (!move || !bar || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+    return
+
+  const buttons = [...bar.querySelectorAll('button')]
+  const at = buttons.findIndex(button => button === document.activeElement)
+
+  if (at === -1)
+    return
+
+  event.preventDefault()
+
+  const next = move(at, buttons.length)
+
+  stop.set(next)
+  buttons[next]?.focus()
+}
+
+// A click does not focus a button in every browser, so the button clicked becomes the stop here.
+function preview() {
+  stop.set(actions.length)
+  onPreview()
+}
+---
+.kui-markdown-tools(onKeyDown={keyDown})
+  for action, index of actions key={action}
+    IconButton(icon={ICONS[action]} label={labels[action]} variant="ghost" size="sm" tabindex={tabStop(index)} onFocus={() => stop.set(index)} onClick={() => onAction(action)})
+if hasPreview
+  IconButton.kui-markdown-toggle(icon={eye} label={wording('ui.markdownEditor.preview', 'Preview')} variant="ghost" size="sm" aria-pressed={previewing ? 'true' : 'false'} tabindex={tabStop(actions.length)} onFocus={() => stop.set(actions.length)} onKeyDown={keyDown} onClick={preview})

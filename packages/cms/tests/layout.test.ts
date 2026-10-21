@@ -3,7 +3,7 @@ import type { CollectionInfo, ScreenCollection, ToolbarAction } from '../src/kay
 import { describe, expect, test } from 'bun:test'
 import { TOOLBAR_ACTIONS } from '../../ui/src/markdown-edit'
 import { fieldsOf } from '../src/fields'
-import { cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, TOOLBAR_BUTTONS, whenProblems } from '../src/layout'
+import { bodylessLayout, cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, TOOLBAR_BUTTONS, whenProblems } from '../src/layout'
 import { rowsOf } from '../src/listing'
 import { configure, settings } from '../src/settings'
 
@@ -155,6 +155,9 @@ describe('the form\'s Markdown settings', () => {
     expect(() => checkLayouts({ posts: { form: { toolbar: 'bold' } } })).toThrow('takes true, false or a list of buttons')
     expect(() => checkLayouts({ posts: { form: { toolbar: [''] } } })).toThrow('the buttons are')
     expect(checkLayouts({ posts: { form: { toolbar: true } } }).get('posts')?.form?.toolbar).toBe(true)
+    expect(checkLayouts({ posts: { form: { previewClass: 'prose' } } }).get('posts')?.form?.previewClass).toBe('prose')
+    expect(() => checkLayouts({ posts: { form: { previewClass: ' ' } } })).toThrow('previewClass')
+    expect(() => checkLayouts({ posts: { form: { previewClass: ['prose'] } } })).toThrow('posts')
     expect(() => checkLayouts({ posts: { form: { body: { label: ' ' } } } })).toThrow('label')
     expect(() => checkLayouts({ posts: { form: { body: { title: 'x' } } } })).toThrow('title')
   })
@@ -286,5 +289,18 @@ describe('rowsOf with columns', () => {
 
     expect(row?.cells).toEqual({ price: '3', live: 'Yes', title: 'T' })
     expect(rowsOf({ ...products, layout: undefined }, [{ slug: 'a', data: { name: 'A' }, draft: false }])[0]?.cells).toBeUndefined()
+  })
+})
+
+describe('bodylessLayout', () => {
+  const posts: CollectionInfo = { name: 'posts', kind: 'folder', localized: false, components: [], schema, body: { kind: 'markdown' } }
+  const tags: CollectionInfo = { name: 'tags', kind: 'folder', localized: false, components: [], schema }
+
+  test('names a collection whose body is worded though it has none, and lets a collection with one through', () => {
+    const layouts = checkLayouts({ posts: { form: { body: { label: 'Article' } } }, tags: { form: { body: { hint: 'Never shown' } } } })
+
+    expect(bodylessLayout([posts], layouts)).toBeUndefined()
+    expect(bodylessLayout([posts, tags], layouts)).toContain('`tags.form.body`')
+    expect(bodylessLayout([tags], checkLayouts({ tags: { form: { toolbar: false } } }))).toBeUndefined()
   })
 })

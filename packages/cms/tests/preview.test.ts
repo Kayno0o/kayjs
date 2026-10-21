@@ -30,6 +30,16 @@ test('posts the text and gives back the HTML', async () => {
   expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({ markdown: 'Hi' })
 })
 
+test('tells the route which entry the text is written for, once it has a slug', async () => {
+  const { requests } = answering(() => Response.json({ html: '' }))
+
+  await previewMarkdown('Hi', { collection: 'posts', slug: 'hello', locale: 'fr' })
+  await previewMarkdown('Hi', { collection: 'posts', slug: '' })
+
+  expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({ markdown: 'Hi', collection: 'posts', slug: 'hello', locale: 'fr' })
+  expect(JSON.parse(String(requests[1]?.init?.body))).toEqual({ markdown: 'Hi' })
+})
+
 test('shows why a text kay cannot read is refused, escaped, and fails for any other error', async () => {
   answering(() => new Response('<Card> is never closed', { status: 422 }))
 

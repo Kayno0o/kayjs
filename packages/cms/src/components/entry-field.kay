@@ -4,7 +4,7 @@ import FieldInput from '../editor/field-input.kay'
 import type { Field } from '../fields'
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from '../fields'
-import { markdownToolbar } from '../editor/markdown-options'
+import { markdownOptions } from '../editor/markdown-options'
 import { resolve } from '../layout'
 import { gapOf, translatable } from '../translations'
 
@@ -12,7 +12,7 @@ import { gapOf, translatable } from '../translations'
 // `field` is the form layout's own copy of it, a group without the fields the layout placed elsewhere.
 const { form, name, field: given } = props<{ form: FormScope, name: string, field?: Field | undefined }>()
 
-markdownToolbar.provide(form.collection.layout?.form?.toolbar)
+markdownOptions.provide({ toolbar: form.collection.layout?.form?.toolbar, previewClass: form.collection.layout?.form?.previewClass })
 
 const field = memo(() => {
   if (given)

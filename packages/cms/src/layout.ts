@@ -85,7 +85,10 @@ function checkToolbar(where: string, value: unknown): boolean | ToolbarAction[] 
 }
 
 function checkForm(where: string, value: unknown): FormLayout {
-  const { fields, hide, body, toolbar } = plain(where, value, ['fields', 'hide', 'body', 'toolbar'])
+  const { fields, hide, body, toolbar, previewClass } = plain(where, value, ['fields', 'hide', 'body', 'toolbar', 'previewClass'])
+
+  if (previewClass !== undefined && (typeof previewClass !== 'string' || previewClass.trim() === ''))
+    throw new Error(`kayjs-cms: \`${where}.previewClass\` takes the classes of the site's Markdown, such as "prose", got ${JSON.stringify(previewClass)}`)
 
   if (fields !== undefined && !Array.isArray(fields))
     throw new Error(`kayjs-cms: \`${where}.fields\` takes a list of field names, or of lists of them for a row, got ${JSON.stringify(fields)}`)
@@ -102,7 +105,7 @@ function checkForm(where: string, value: unknown): FormLayout {
       throw new Error(`kayjs-cms: \`${where}\` both shows and hides ${JSON.stringify(name)}`)
   }
 
-  return { fields: rows, hide: hidden, body: body === undefined ? undefined : checkBody(`${where}.body`, body), toolbar: toolbar === undefined ? undefined : checkToolbar(`${where}.toolbar`, toolbar) }
+  return { fields: rows, hide: hidden, body: body === undefined ? undefined : checkBody(`${where}.body`, body), toolbar: toolbar === undefined ? undefined : checkToolbar(`${where}.toolbar`, toolbar), previewClass }
 }
 
 function checkList(where: string, value: unknown): ListLayout {
@@ -292,6 +295,16 @@ export function whenProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]):
     walk(`${name}: `, fieldsOf(schema))
 
   return lines
+}
+
+// Why the boot stops when a layout words a body (`form.body`) for a collection that holds none, which would show nowhere.
+export function bodylessLayout(listed: Pick<CollectionInfo, 'name' | 'body'>[], layouts: ReadonlyMap<string, GivenLayout>): string | undefined {
+  for (const { name, body } of listed) {
+    if (body === undefined && layouts.get(name)?.form?.body !== undefined)
+      return `kayjs-cms: \`cms({ collections })\` sets \`${name}.form.body\`, but ${name} has no Markdown body to word: remove it, or give its entries a Markdown body`
+  }
+
+  return undefined
 }
 
 // What the layouts name that the collections lack, once they are loaded: a line each, for the boot's log.

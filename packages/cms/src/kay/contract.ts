@@ -15,6 +15,8 @@ export interface FormLayout {
   body?: { label?: string | undefined, hint?: string | undefined } | undefined
   // The formatting buttons over every Markdown box of the collection, the body included: `false` for none, else the buttons to keep, in order; all by default.
   toolbar?: boolean | ToolbarAction[] | undefined
+  // The classes the preview of every Markdown box of the collection puts on its HTML, so it takes the styles the site's pages give rendered Markdown, such as `prose`.
+  previewClass?: string | undefined
 }
 
 // What a row of a collection's list can offer beside its title.

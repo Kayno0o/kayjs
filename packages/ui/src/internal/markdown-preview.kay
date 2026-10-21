@@ -1,0 +1,46 @@
+---
+import { effect, onCleanup, signal, trustHtml, untrack } from 'kay'
+import { wording } from 'kay/words'
+
+const PREVIEW_DELAY = 250
+
+// The pane beside a MarkdownEditor's field, loaded the first time the preview is shown. It renders the text a pause after the last keystroke.
+const { text, render, class: className } = props<{
+  text: string
+  render: (markdown: string) => Promise<string>
+  class?: string | undefined
+}>()
+
+const rendered = signal<string | undefined>(undefined)
+const failed = signal(false)
+// Counts the renders asked for, so a slow answer to an older text never lands over a newer one.
+let asked = 0
+
+effect(() => {
+  const markdown = text
+  const turn = ++asked
+  const timer = setTimeout(async () => {
+    try {
+      const html = await render(markdown)
+
+      if (turn === asked) {
+        rendered.set(html)
+        failed.set(false)
+      }
+    }
+    catch (error) {
+      console.error('kayjs-ui: a MarkdownEditor\'s preview failed', error)
+
+      if (turn === asked)
+        failed.set(true)
+    }
+  }, untrack(rendered) === undefined ? 0 : PREVIEW_DELAY)
+
+  onCleanup(() => clearTimeout(timer))
+})
+---
+.kui-markdown-preview(role="region" aria-label={wording('ui.markdownEditor.previewLabel', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
+  if failed()
+    p.kui-markdown-preview-failed {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
+  else
+    .kui-markdown-preview-body(class={className} innerHTML={trustHtml(rendered() ?? '')})

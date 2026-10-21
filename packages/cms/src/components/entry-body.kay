@@ -26,4 +26,4 @@ effect(() => {
 if form.collection.body
   .kcms-field(data-kcms-body id={fieldId(form.entry, 'b')})
     FormField(label={layout?.body?.label ?? wording('cms.entry.body', 'Body')} hint={layout?.body?.hint} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
-      MarkdownEditor(toolbar={layout?.toolbar} preview={previewMarkdown} value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadRefused() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})
+      MarkdownEditor(toolbar={layout?.toolbar} previewClass={layout?.previewClass} preview={source => previewMarkdown(source, form.entry)} value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadRefused() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})

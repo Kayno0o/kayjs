@@ -4,12 +4,12 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // What the test reads back: the text after each change.
-const { value, onInput, onImage, toolbar, preview, labelled = false } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, toolbar?: boolean | readonly ('bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image')[], preview?: (markdown: string) => Promise<string>, labelled?: boolean }>()
+const { value, onInput, onImage, toolbar, preview, previewClass, labelled = false } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, toolbar?: boolean | readonly ('bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image')[], preview?: (markdown: string) => Promise<string>, previewClass?: string, labelled?: boolean }>()
 ---
 if labelled
   FormField(label="Body")
-    MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview})
+    MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewClass={previewClass})
 else
-  MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview})
+  MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewClass={previewClass})
 input#title(aria-label="Title")
 Toaster

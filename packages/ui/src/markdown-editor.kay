@@ -1,39 +1,27 @@
 ---
 import type { JSX } from 'kay'
-import type { IconProps } from 'kay/icons'
 import type { TextEdit, ToolbarAction } from './markdown-edit'
 import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
-import { effect, onCleanup, onMount, signal, trustHtml, uid, untrack } from 'kay'
+import { effect, onMount, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
-import bold from '~icons/tabler/bold'
-import eye from '~icons/tabler/eye'
-import heading from '~icons/tabler/heading'
-import italic from '~icons/tabler/italic'
-import link from '~icons/tabler/link'
-import list from '~icons/tabler/list'
-import listNumbers from '~icons/tabler/list-numbers'
-import photo from '~icons/tabler/photo'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
-import IconButton from './icon-button.kay'
 import { enterEdit, headingEdit, imageEdit, indentEdit, linkEdit, listEdit, TOOLBAR_ACTIONS, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
 
 const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
-const PREVIEW_DELAY = 250
 
-
-const ACTIONS: Record<ToolbarAction, { icon: IconProps, edit: (text: string, start: number, end: number) => TextEdit }> = {
-  bold: { icon: bold, edit: (text: string, start: number, end: number) => wrapEdit(text, start, end, '**') },
-  italic: { icon: italic, edit: (text: string, start: number, end: number) => wrapEdit(text, start, end, '*') },
-  heading: { icon: heading, edit: headingEdit },
-  bulletList: { icon: list, edit: (text: string, start: number, end: number) => listEdit(text, start, end, false) },
-  numberedList: { icon: listNumbers, edit: (text: string, start: number, end: number) => listEdit(text, start, end, true) },
-  link: { icon: link, edit: linkEdit },
-  image: { icon: photo, edit: imageEdit },
+const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) => TextEdit> = {
+  bold: (text, start, end) => wrapEdit(text, start, end, '**'),
+  italic: (text, start, end) => wrapEdit(text, start, end, '*'),
+  heading: headingEdit,
+  bulletList: (text, start, end) => listEdit(text, start, end, false),
+  numberedList: (text, start, end) => listEdit(text, start, end, true),
+  link: linkEdit,
+  image: imageEdit,
 }
 
-const { value = '', onInput, onImage, toolbar = true, preview, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', onInput, onImage, toolbar = true, preview, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -47,21 +35,12 @@ const { value = '', onInput, onImage, toolbar = true, preview, uploadFailure = w
   toolbar?: boolean | readonly ToolbarAction[] | undefined
   // Renders the text as the page shows it, as HTML, on the server: given, a Preview button shows it beside the field, or in place of it on a narrow one. The HTML is trusted, so it must come from the app's own renderer.
   preview?: ((markdown: string) => Promise<string>) | undefined
+  // Classes for the HTML of the preview, so it takes the styles the page gives rendered Markdown, such as a prose class.
+  previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
   keysHint?: string | undefined
   class?: string | undefined
 }>()
-
-// Per instance, as the page's locale is only known when it renders.
-const labels: Record<ToolbarAction, string> = {
-  bold: wording('ui.markdownEditor.bold', 'Bold'),
-  italic: wording('ui.markdownEditor.italic', 'Italic'),
-  heading: wording('ui.markdownEditor.heading', 'Heading'),
-  bulletList: wording('ui.markdownEditor.bulletList', 'Bulleted list'),
-  numberedList: wording('ui.markdownEditor.numberedList', 'Numbered list'),
-  link: wording('ui.markdownEditor.link', 'Link'),
-  image: wording('ui.markdownEditor.image', 'Image'),
-}
 
 const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
@@ -102,40 +81,33 @@ function actions(): readonly ToolbarAction[] {
 }
 const text = signal(untrack(() => value))
 const previewing = signal(false)
-const rendered = signal<string | undefined>(undefined)
-const failed = signal(false)
-// Counts the renders asked for, so a slow answer to an older text never lands over a newer one.
-let asked = 0
 
 effect(() => {
   text.set(value)
 })
 
+// The toolbar and the preview pane are separate chunks, fetched once the editor shows buttons or the preview is first asked for: an editor with neither never loads their icons and code.
+// Each is held in a list of at most one component, as a template draws a component from a list.
+const toolbarView = signal<(typeof import('./internal/markdown-toolbar.kay'))['default'][]>([])
+const previewView = signal<(typeof import('./internal/markdown-preview.kay'))['default'][]>([])
+
+async function loadView<View>(load: () => Promise<{ default: View }>, keep: (view: View) => void): Promise<void> {
+  try {
+    keep((await load()).default)
+  }
+  catch (error) {
+    console.error('kayjs-ui: a MarkdownEditor part could not be loaded', error)
+  }
+}
+
+onMount(() => {
+  if (actions().length > 0 || preview)
+    void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView.set([view]))
+})
+
 effect(() => {
-  if (!previewing() || !preview)
-    return
-
-  const markdown = text()
-  const render = preview
-  const turn = ++asked
-  const timer = setTimeout(async () => {
-    try {
-      const html = await render(markdown)
-
-      if (turn === asked) {
-        rendered.set(html)
-        failed.set(false)
-      }
-    }
-    catch (error) {
-      console.error('kayjs-ui: a MarkdownEditor\'s preview failed', error)
-
-      if (turn === asked)
-        failed.set(true)
-    }
-  }, untrack(rendered) === undefined ? 0 : PREVIEW_DELAY)
-
-  onCleanup(() => clearTimeout(timer))
+  if (previewing() && untrack(previewView).length === 0)
+    void loadView(async () => import('./internal/markdown-preview.kay'), view => previewView.set([view]))
 })
 
 // The attribute fills the field on the server and as it hydrates; afterwards the text lands on it only when it differs, since writing it moves the caret to the end. A reset is reported as if typed.
@@ -170,10 +142,6 @@ function applyEdit(el: HTMLTextAreaElement, edit: TextEdit, takeFocus = true): v
 }
 
 function togglePreview(): void {
-  // What was shown last time is not what the text says now.
-  if (previewing())
-    rendered.set(undefined)
-
   previewing.set(on => !on)
 }
 
@@ -198,7 +166,7 @@ function runAction(action: ToolbarAction): void {
     return
 
   area.focus()
-  applyEdit(area, ACTIONS[action].edit(area.value, area.selectionStart, area.selectionEnd))
+  applyEdit(area, EDITS[action](area.value, area.selectionStart, area.selectionEnd))
 }
 
 function edit(next: TextEdit | null, event: Event): void {
@@ -354,14 +322,8 @@ function drop(event: DragEvent) {
     textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview
       .kui-markdown-bar(role="toolbar" aria-label={wording('ui.markdownEditor.toolbarLabel', 'Formatting')})
-        .kui-markdown-tools
-          for action of actions() key={action}
-            IconButton(icon={ACTIONS[action].icon} label={labels[action]} variant="ghost" size="sm" onClick={() => action === 'image' ? pickImage() : runAction(action)})
-        if preview
-          IconButton.kui-markdown-toggle(icon={eye} label={wording('ui.markdownEditor.preview', 'Preview')} variant="ghost" size="sm" aria-pressed={previewing() ? 'true' : 'false'} onClick={togglePreview})
-    if previewing()
-      .kui-markdown-preview(role="region" aria-label={wording('ui.markdownEditor.previewLabel', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
-        if failed()
-          p.kui-markdown-preview-failed {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
-        else
-          .kui-markdown-preview-body(innerHTML={trustHtml(rendered() ?? '')})
+        for View of toolbarView() key={View}
+          View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
+    if previewing() && preview
+      for View of previewView() key={View}
+        View(text={text()} render={preview} class={previewClass})

@@ -1068,8 +1068,9 @@
     grid-area: text;
   }
 
+  /* The height of its buttons, which load after the editor, so the field does not jump. */
   .kui-markdown-bar {
-    @apply flex flex-wrap items-center gap-1;
+    @apply flex min-h-6 flex-wrap items-center gap-1;
 
     grid-area: bar;
   }
