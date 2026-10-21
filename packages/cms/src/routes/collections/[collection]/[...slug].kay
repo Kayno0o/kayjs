@@ -4,7 +4,7 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
 import EntryHeader from '../../../components/entry-header.kay'
-import { collectionTitle, entryTitle } from '../../../listing'
+import { adminTitle, collectionTitle, entryTitle } from '../../../listing'
 import { entryPresence } from '../../../presence'
 import { entryScreen } from '../../../screens'
 
@@ -18,7 +18,7 @@ const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head
-  title {entry ? entryTitle(collection, entry) : name} - {title}
+  title {adminTitle(`${entry ? entryTitle(collection, entry) : name} - ${title}`)}
 if entry
   EntryEditor(prefix={prefix} collection={collection} entry={entry} presence={presence})
 else

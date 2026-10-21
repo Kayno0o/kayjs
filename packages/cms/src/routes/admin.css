@@ -1,8 +1,21 @@
+@import 'tailwindcss';
+@import '@kaynooo/kayjs-ui/theme.css';
+
+/* The admin starts its own page, so its colours and light or dark scheme come from the theme it imports. */
+body {
+  background: var(--color-kui-canvas);
+  color: var(--color-kui-text);
+}
+
 .kcms-admin {
   padding: 1rem;
 }
 
 .kcms-admin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
   padding-block: 0.5rem 1rem;
 }
 
@@ -10,6 +23,43 @@
   font-weight: 600;
   color: var(--color-kui-text);
   text-decoration: none;
+}
+
+.kcms-admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-right: auto;
+}
+
+.kcms-admin-nav a,
+.kcms-admin-site {
+  color: var(--color-kui-text);
+}
+
+.kcms-admin-nav a[aria-current] {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Out of sight until the keyboard reaches it, then the first thing on the page. */
+.kcms-skip {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  padding: 0.5rem 1rem;
+  background: var(--color-kui-canvas);
+  color: var(--color-kui-text);
+  transform: translateY(-100%);
+}
+
+.kcms-skip:focus {
+  transform: none;
+  z-index: 10;
+}
+
+.kcms-admin-main:focus {
+  outline: none;
 }
 
 .kcms-search {

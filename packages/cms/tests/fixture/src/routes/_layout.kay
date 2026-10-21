@@ -1,4 +1,8 @@
 ---
 import '../app.css'
 ---
+head
+  meta(name="site-head" content="site")
+header.site-header Site header
 slot
+footer.site-footer Site footer

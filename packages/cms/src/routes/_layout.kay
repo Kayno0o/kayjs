@@ -1,18 +1,28 @@
 --- server
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
 import './admin.css'
 
+// The screens are the CMS's own: none of the app's layouts above wraps them, so the editor sees no header, nav or footer of the site, and none of its pages is indexed.
+export const page = { layouts: false, noindex: true }
+
 const { prefix } = settings()
-// Toaster and TooltipHost give way to the app's own when its root layout renders them.
+// The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
 ---
 .kcms-admin
+  a.kcms-skip(href="#kcms-main") {wording('cms.admin.skip', 'Skip to the content')}
   header.kcms-admin-head
-    a.kcms-admin-home(href={screenPath(prefix)}) {wording('cms.admin.content', 'Content')}
-  main.kcms-admin-main
+    a.kcms-admin-home(href={screenPath(prefix)}) {wording('cms.admin.brand', 'Content admin')}
+    nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
+      a(href={screenPath(prefix)}) {wording('cms.admin.content', 'Content')}
+      a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
+      a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
+    a.kcms-admin-site(href={localize('/')}) {wording('cms.admin.viewSite', 'View the site')}
+  main.kcms-admin-main#kcms-main(tabindex="-1")
     slot
 Toaster
 TooltipHost

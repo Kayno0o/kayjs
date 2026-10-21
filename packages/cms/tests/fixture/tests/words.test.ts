@@ -16,13 +16,14 @@ test('the screens read `cms.*` messages in the page\'s locale, plural ones inclu
   const french = await site.visit('/fr/admin')
   const english = await site.visit('/admin')
 
-  expect(french.find('.kcms-admin-home')[0]?.text).toBe('Contenu')
-  expect(french.title()).toBe('Contenu')
+  expect(french.find('.kcms-admin-home')[0]?.text).toBe('Administration')
+  expect(french.find('.kcms-admin-nav a')[0]?.text).toBe('Contenu')
+  expect(french.title()).toBe('Contenu - Administration')
   expect(french.text('main')).toContain('2 entrées')
-  expect(english.find('.kcms-admin-home')[0]?.text).toBe('Content')
+  expect(english.find('.kcms-admin-home')[0]?.text).toBe('Content admin')
   expect(english.text('main')).toContain('2 entries')
   // `cms.admin.uploads` is the app\'s own, `cms.admin.noCollections` the package\'s.
-  expect((await site.visit('/fr/admin/uploads')).title()).toBe('Fichiers inutilisés')
+  expect((await site.visit('/fr/admin/uploads')).title()).toBe('Fichiers inutilisés - Administration')
   expect((await site.visit('/fr/admin/collections/posts')).text('main')).toContain('Brouillon')
 })
 

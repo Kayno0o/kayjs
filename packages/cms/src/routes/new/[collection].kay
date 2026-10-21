@@ -4,7 +4,7 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
 import EntryHeader from '../../components/entry-header.kay'
-import { collectionTitle } from '../../listing'
+import { adminTitle, collectionTitle } from '../../listing'
 import { collectionScreen } from '../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
@@ -13,7 +13,7 @@ const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? 
 const locale = ctx.query.locale
 ---
 head
-  title {wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) })}
+  title {adminTitle(wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) }))}
 if collection.problem as problem
   EntryHeader(prefix={prefix} collection={collection} title={wording('cms.admin.newEntry', 'New entry')})
   EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})

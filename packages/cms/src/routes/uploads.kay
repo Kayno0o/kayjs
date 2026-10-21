@@ -5,6 +5,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import UnusedUploads from '../components/unused-uploads.kay'
+import { adminTitle } from '../listing'
 import { unusedUploads } from '../orphans'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
@@ -13,7 +14,7 @@ const { prefix } = settings()
 const scan = await unusedUploads()
 ---
 head
-  title {wording('cms.admin.uploads', 'Unused uploads')}
+  title {adminTitle(wording('cms.admin.uploads', 'Unused uploads'))}
 PageSection(title={wording('cms.admin.uploads', 'Unused uploads')} level={1})
   @actions
     Button(href={screenPath(prefix)} label={wording('cms.admin.content', 'Content')})

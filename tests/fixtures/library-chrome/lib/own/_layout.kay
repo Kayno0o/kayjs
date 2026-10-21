@@ -1,0 +1,8 @@
+--- server
+// The library's screens start their own chain: none of the app's layouts above wraps them.
+export const page = { layouts: false }
+---
+head
+  meta(name="lib-head" content="screens")
+.lib-chrome
+  slot

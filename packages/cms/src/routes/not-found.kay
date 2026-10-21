@@ -7,6 +7,7 @@ import { underKayDev } from 'kay/library'
 import { wording } from 'kay/words'
 import AddedRedirects from '../components/added-redirects.kay'
 import MissingPaths from '../components/missing-paths.kay'
+import { adminTitle } from '../listing'
 import { readMissing } from '../missing'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
@@ -17,7 +18,7 @@ const records = 'production server records the pages visitors asked for and foun
 const hint = underKayDev() ? wording('cms.missing.devHint', `kay dev counts nothing: the ${records}`) : wording('cms.missing.emptyHint', `The ${records}`)
 ---
 head
-  title {wording('cms.missing.title', 'Missing pages')}
+  title {adminTitle(wording('cms.missing.title', 'Missing pages'))}
 PageSection(title={wording('cms.missing.title', 'Missing pages')} level={1})
   @actions
     Button(href={screenPath(prefix)} label={wording('cms.admin.content', 'Content')})

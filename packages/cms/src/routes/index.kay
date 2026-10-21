@@ -6,7 +6,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import { collections } from '../kay/content'
-import { collectionPath, collectionTitle, problemId } from '../listing'
+import { adminTitle, collectionPath, collectionTitle, problemId } from '../listing'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
 
@@ -14,7 +14,7 @@ const { prefix } = settings()
 const listed = await collections()
 ---
 head
-  title {wording('cms.admin.content', 'Content')}
+  title {adminTitle(wording('cms.admin.content', 'Content'))}
 PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
     Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})

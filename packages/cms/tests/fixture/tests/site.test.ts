@@ -64,6 +64,44 @@ test('the screens list each collection with its entry count', async () => {
   expect(page.text('main')).toContain('2 entries')
 })
 
+test('the screens have their own chrome, none of the site\'s header, footer or head, in each locale and on every screen', async () => {
+  for (const path of ['/admin', '/fr/admin', '/admin/not-found', '/admin/uploads', '/admin/collections/posts', '/admin/collections/posts/hello', '/admin/new/posts']) {
+    const page = await site.visit(path)
+
+    expect(page.status, path).toBe(200)
+    expect(page.find('.site-header, .site-footer'), path).toEqual([])
+    expect(page.meta('site-head'), path).toBeUndefined()
+    expect(page.find('header.kcms-admin-head'), path).toHaveLength(1)
+    expect(page.meta('robots'), path).toBe('noindex')
+  }
+
+  const home = await site.visit('/blog/hello')
+
+  expect(home.find('.site-header')).toHaveLength(1)
+  expect(home.find('.site-footer')).toHaveLength(1)
+  expect(home.meta('site-head')).toBe('site')
+  expect(home.meta('robots')).not.toBe('noindex')
+})
+
+test('the admin\'s nav keeps every screen in view, marks the current one, and leads back to the site', async () => {
+  const page = await site.visit('/admin/uploads')
+  const links = page.find('nav.kcms-admin-nav a')
+
+  expect(page.find('nav.kcms-admin-nav')[0]?.attributes['aria-label']).toBe('Content admin')
+  expect(links.map(link => [link.text, link.attributes.href])).toEqual([['Content', '/admin'], ['Missing pages', '/admin/not-found'], ['Unused uploads', '/admin/uploads']])
+  expect(links.filter(link => 'aria-current' in link.attributes).map(link => link.text)).toEqual(['Unused uploads'])
+  expect(page.find('a.kcms-admin-site')[0]?.attributes.href).toBe('/')
+  expect((await site.visit('/fr/admin')).find('a.kcms-admin-site')[0]?.attributes.href).toBe('/fr')
+  expect(page.find('a.kcms-skip')[0]?.attributes.href).toBe('#kcms-main')
+  expect(page.find('main#kcms-main')).toHaveLength(1)
+})
+
+test('a screen\'s title says it is the admin', async () => {
+  expect((await site.visit('/admin')).title()).toBe('Content - Content admin')
+  expect((await site.visit('/admin/uploads')).title()).toBe('Unused uploads - Content admin')
+  expect((await site.visit('/admin/collections/posts')).title()).toBe('Posts - Content admin')
+})
+
 test('the screens and the editor render their own toaster, for an app rendering none', async () => {
   expect((await site.visit('/admin/collections/posts')).find('.kui-toaster')).toHaveLength(1)
   expect((await editor.visit('/admin/page?path=/blog/hello')).find('.kui-toaster')).toHaveLength(1)
@@ -113,7 +151,7 @@ test('a collection lists its entries, with a draft to publish, and searches them
 test('an entry opens in a form of its collection\'s fields, nested slugs included', async () => {
   const page = await site.visit('/admin/collections/posts/notes/garden')
 
-  expect(page.title()).toBe('Spring garden - Posts')
+  expect(page.title()).toBe('Spring garden - Posts - Content admin')
   expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft', 'tags'])
   expect(page.find('[data-kcms-body]')).toHaveLength(1)
 })
@@ -194,7 +232,7 @@ test('the missing-pages screen lists what visitors found nothing at, most visite
 
   const rows = page.find('.kcms-missing tbody tr').map(row => row.text.replaceAll(/\s+/g, ' ').trim())
 
-  expect(page.title()).toBe('Missing pages')
+  expect(page.title()).toBe('Missing pages - Content admin')
   expect(page.find('.kcms-missing-path').map(path => path.text)).toEqual(expect.arrayContaining(['/Empty', '/empty', '/never-was', '/%3Cscript%3Ealert(1)%3C/script%3E']))
   expect(rows.find(row => row.includes('/Empty'))).toContain('search.example')
   expect(rows.find(row => row.includes('/Empty'))).toContain('Spelled differently')
@@ -206,7 +244,7 @@ test('the missing-pages screen lists what visitors found nothing at, most visite
 })
 
 test('the content index links to the missing-pages screen under the prefix', async () => {
-  expect((await site.visit('/admin')).find('a').filter(link => link.text === 'Missing pages').map(link => link.attributes.href)).toEqual(['/admin/not-found'])
+  expect((await site.visit('/admin')).find('main a').filter(link => link.text === 'Missing pages').map(link => link.attributes.href)).toEqual(['/admin/not-found'])
   expect((await site.fetch('/fr/admin/not-found')).status).toBe(200)
 })
 
@@ -365,7 +403,7 @@ test('a loaded entry is created and removed through its loader, a slug starting 
 
   try {
     expect((await site.visit('/admin/collections/products')).find('.kcms-entries a').map(link => link.attributes.href)).toContain('/admin/collections/products/%2Fabout')
-    expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('About - Our products')
+    expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('About - Our products - Content admin')
   }
   finally {
     await send('DELETE', `products/%2Fabout?version=${await versionOf('products/%2Fabout')}`)

@@ -4,6 +4,7 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   cms: {
     admin: {
+      brand: 'Administration',
       content: 'Contenu',
       uploads: 'Fichiers inutilisés',
       newEntry: 'Nouvelle entrée',

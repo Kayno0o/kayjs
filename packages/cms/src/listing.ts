@@ -186,3 +186,8 @@ export function deleteMessage(title: string, url?: string | undefined, where: 'e
 
   return url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
 }
+
+// A screen's `<title>`: what it shows, then the admin's name, so a tab or a history entry says it is the CMS and not the site.
+export function adminTitle(title: string): string {
+  return `${title} - ${wording('cms.admin.brand', 'Content admin')}`
+}

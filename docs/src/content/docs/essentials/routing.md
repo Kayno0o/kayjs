@@ -299,7 +299,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ extensions: [authPages()] })
 ```
 
-Its pages serve under their prefix, such as `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`. It replaces that page alone.
+Its pages serve under their prefix, such as `/auth/login`, inside your layouts and guards, unless the library's own layout sets `layouts: false`, as kayjs-cms's admin does to draw its own header instead of your site's. To change one, put your own file at the same path, `src/routes/auth/login.kay`. It replaces that page alone.
 
 <ReadMore href="/guides/component-libraries">Writing your own library or extension.</ReadMore>
 

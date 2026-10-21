@@ -6,7 +6,7 @@ import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
-import { collectionTitle, newEntryPath } from '../../../listing'
+import { adminTitle, collectionTitle, newEntryPath } from '../../../listing'
 import { listScreen } from '../../../screens'
 
 export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
@@ -17,7 +17,7 @@ const url = ctx.url
 const title = collectionTitle(collection)
 ---
 head
-  title {title}
+  title {adminTitle(title)}
 PageSection(title={title} level={1})
   @actions
     if collection.problem === undefined
