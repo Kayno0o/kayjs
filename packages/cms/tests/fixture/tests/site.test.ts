@@ -441,6 +441,9 @@ test('a nested slug is published and deleted through its file', async () => {
 
   expect((await send('POST', 'posts/notes%2Fgarden/publish')).answer).toHaveProperty('saved', true)
   expect(saved[0]?.text).toContain('draft: false')
+  expect((await send('POST', 'posts/notes%2Fgarden/unpublish')).answer).toHaveProperty('saved', true)
+  expect(saved[1]?.text).toContain('draft: true')
+  saved.splice(1, 1)
   expect((await send('DELETE', `posts/notes%2Fgarden?version=${await versionOf('posts/notes%2Fgarden')}`)).answer).toHaveProperty('saved', true)
   expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['packages/cms/tests/fixture/src/content/posts/notes/garden.md', undefined])
 })

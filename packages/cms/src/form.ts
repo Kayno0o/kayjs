@@ -1,5 +1,6 @@
 import type { Signal } from 'kay'
 import type { Drafts } from './drafts'
+import type { SavedState } from './editor/live'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { SlugReport } from './slug'
 import { call, effect, guardLeave, navigate, signal, untrack } from 'kay'
@@ -7,6 +8,8 @@ import { wording } from 'kay/words'
 import slugsApi from './api/slugs'
 import { publishTime, unpublishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
+import { savedHandler } from './editor/live'
+import { rebuildFinished } from './editor/rebuild'
 import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
@@ -55,7 +58,7 @@ export interface EntryForm extends FormScope {
   // Whether Save has something to do: edits to save, or a new entry to create, and no save on its way.
   canSave: () => boolean
   // The last save that went through, when it was (`Date.now()`) and whether the site shows it only once it has rebuilt; undefined before the first.
-  savedAt: () => { at: number, rebuilding: boolean } | undefined
+  savedAt: () => SavedState | undefined
   stored: StoredEntry | undefined
   isDraft: () => boolean
   // When a published entry whose `publishAt` date is ahead goes live, in the editor's time zone (UTC until the browser says it), as the form holds it now; gone once the date passes, with no reload.
@@ -215,8 +218,8 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   // A text that does not parse keeps Save enabled, so pressing it says what to fix.
   const canSave = () => !saving() && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
-  const lastSave = signal<{ at: number, rebuilding: boolean }>()
-  const onSaved = ({ rebuilding }: { rebuilding: boolean }) => lastSave.set({ at: Date.now(), rebuilding })
+  const lastSave = signal<SavedState>()
+  const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished)
 
   async function attemptSave(): Promise<boolean> {
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.

@@ -1,6 +1,7 @@
 ---
 import type { Unclickable } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
+import type { SavedState } from './live'
 import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { resource } from 'kay'
@@ -9,7 +10,8 @@ import entriesApi from '../api/entries'
 import { collectionTitle } from '../listing'
 import { BODY } from '../markers'
 import { drafts } from './drafts'
-import { rebuildStarted } from './rebuild'
+import { savedHandler } from './live'
+import { rebuildFinished, rebuildStarted } from './rebuild'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
@@ -33,7 +35,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
 // The page editor asks no author, so its editors are counted, and named ones are told of them.
 const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
-const lastSave = signal<{ at: number, rebuilding: boolean }>()
+const lastSave = signal<SavedState>()
+const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
   const answer = source.value()
@@ -76,10 +79,10 @@ async function save(): Promise<void> {
   let saved = false
 
   try {
-    saved = await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => {
-      lastSave.set({ at: Date.now(), rebuilding })
+    saved = await saveDraft(drafts, entry, { onSaved: (outcome) => {
+      onSaved(outcome)
 
-      if (rebuilding)
+      if (outcome.rebuilding)
         rebuildStarted()
     } })
   }
@@ -100,7 +103,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       h3.kcms-entry-title {collectionTitle({ name: entry.collection, title: source.value()?.collection.title })}
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
     .kcms-entry-actions
-      EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()})
+      EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
       ResetButton(disabled={saving() || !unsaved()} onReset={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !unsaved()} onClick={save})
   EntryPresence(room={room.room} member={room.member})

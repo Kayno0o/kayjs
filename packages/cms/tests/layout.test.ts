@@ -84,8 +84,8 @@ describe('listColumns and cellText', () => {
 })
 
 describe('rowActions', () => {
-  test('are all four unless the layout names some', () => {
-    expect([...rowActions()]).toEqual(['move', 'publish', 'editOnPage', 'delete'])
+  test('are all five unless the layout names some', () => {
+    expect([...rowActions()]).toEqual(['move', 'publish', 'unpublish', 'editOnPage', 'delete'])
     expect([...rowActions({ actions: ['delete'] })]).toEqual(['delete'])
     expect([...rowActions({ actions: [] })]).toEqual([])
   })

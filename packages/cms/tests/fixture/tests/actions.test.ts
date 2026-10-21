@@ -285,4 +285,9 @@ describe('the delete confirmation', () => {
     expect(deleteMessage('My talk')).toBe('Delete My talk? This cannot be undone.')
     expect(deleteMessage('My talk', '/talks/my-talk')).toBe('Delete My talk? This cannot be undone. Its page /talks/my-talk stops answering, and links to it break.')
   })
+
+  test('lists the entries pointing at it, the first few only', () => {
+    expect(deleteMessage('Ada', undefined, 'entry', ['Posts: One', 'Posts: Two'])).toBe('Delete Ada? This cannot be undone. Referenced by Posts: One, Posts: Two.')
+    expect(deleteMessage('Ada', undefined, 'table', ['a', 'b', 'c', 'd', 'e', 'f'])).toBe('Delete Ada? This cannot be undone. Referenced by a, b, c, d, e, ….')
+  })
 })

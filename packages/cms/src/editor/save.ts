@@ -207,6 +207,17 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
   return settled(outcome, wording('cms.save.published', 'Published'), wording('cms.save.notPublished', 'Not published'))
 }
 
+// Turns a published entry back into a draft and says how it went; true once unpublished.
+export async function unpublishSaved(ref: EntryRef): Promise<boolean> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/unpublish', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: localeOf(ref),
+  }), wording('cms.entry.unpublishFailure', 'Could not unpublish'))
+
+  return settled(outcome, wording('cms.save.unpublished', 'Unpublished'), wording('cms.save.notUnpublished', 'Not unpublished'))
+}
+
 // Tells the editor a publish, an unpublish or a schedule change waits for the edits typed so far to be saved, which they would otherwise carry along.
 export function refuseUnsaved(): void {
   toast.error(wording('cms.save.saveFirst', 'You have unsaved changes. Save or cancel them first, so this does not save them too.'))

@@ -2,7 +2,7 @@ import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
-import { deleteEntry, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } from '../store'
+import { deleteEntry, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection, unpublishEntry } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
 const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional(s.String()) })
@@ -30,5 +30,6 @@ export default api()
     }),
   })
   .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
+  .post('/:collection/:slug/unpublish', async ({ params, query, request }) => unpublishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/move', async ({ params, query, request }) => moveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, query.direction, authors.get(request)), { query: s.Object({ locale: s.Optional(s.String()), direction: s.Union([s.Literal('up'), s.Literal('down')]) }) })
   .delete('/:collection/:slug', async ({ params, query, request }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request), { version: query.version, required: true }), { query: versioned })

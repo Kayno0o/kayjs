@@ -10,7 +10,7 @@ export interface FormLayout {
 }
 
 // What a row of a collection's list can offer beside its title.
-export type RowAction = 'move' | 'publish' | 'editOnPage' | 'delete'
+export type RowAction = 'move' | 'publish' | 'unpublish' | 'editOnPage' | 'delete'
 
 // The columns of a collection's list, field keys shown after the title, and the row actions kept, all by default.
 export interface ListLayout {
@@ -49,6 +49,8 @@ export interface DraftEntry extends EntryRef {
 // An entry as the editor opens it: `version` is its file's, which a save names so one made over someone else's is refused.
 export interface StoredEntry extends SourceEntry {
   version?: string | undefined
+  // Which entries name this one in a reference field, as `Collection: title`, set on the entry's screen so deleting it can say what would point nowhere.
+  referencedBy?: string[] | undefined
 }
 
 export interface DraftResult {

@@ -6,6 +6,7 @@ import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry
 import { collectionTitle, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
+import { referrersOf } from './references'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
@@ -73,7 +74,13 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
     return { collection: collection.value, entry: undefined }
   }
 
-  return { collection: collection.value, entry: collection.value.problem === undefined ? entry.value : undefined }
+  if (collection.value.problem !== undefined || !entry.value)
+    return { collection: collection.value, entry: undefined }
+
+  const referrers = await referrersOf(ref.collection, [entry.value.slug])
+  const referencedBy = referrers.get(entry.value.slug)
+
+  return { collection: collection.value, entry: referencedBy === undefined ? entry.value : { ...entry.value, referencedBy } }
 }
 
 // `kind` is the collection's when the caller has it, else it is read.
@@ -241,6 +248,24 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true })
+}
+
+// Turns a published entry back into a draft, the way Publish turns a draft public.
+export async function unpublishEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome> {
+  const collection = await collectionNamed(ref.collection)
+
+  if (collection.draftField === undefined)
+    return refused(ref, wording('cms.store.noDraftField', '{collection} names no draft field to publish by', { collection: collection.name }))
+
+  const existing = await entryOf(ref, collection)
+
+  if (!existing)
+    return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+  if (!existing.data)
+    return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
+
+  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: true }, body: existing.body }, { version: existing.version, verb: 'unpublish', author, bodyKept: true })
 }
 
 // Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change; saving stops at the first that is refused.

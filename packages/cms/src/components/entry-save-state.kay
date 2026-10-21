@@ -1,8 +1,9 @@
 ---
+import type { SavedState } from '../editor/live'
 import { wording } from 'kay/words'
 
 // Where an entry stands, kept on screen and read out as it changes: saving, edits not saved yet, or the time of the last save, with a link to the public page when the site shows the save only once it has rebuilt.
-const { changed, saving, saved, url } = props<{ changed: boolean, saving: boolean, saved: { at: number, rebuilding: boolean } | undefined, url?: string | undefined }>()
+const { changed, saving, saved, url } = props<{ changed: boolean, saving: boolean, saved: SavedState | undefined, url?: string | undefined }>()
 
 const time = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 ---
@@ -14,6 +15,10 @@ p.kcms-save-state(role="status" aria-live="polite")
   else if saved as last
     if last.rebuilding
       {wording('cms.entry.savedRebuild', 'Saved at {time}. Not live yet: the site shows it once it has rebuilt.', { time: time(last.at) })}
+      if url
+        a(href={url} target="_blank" rel="noopener") {wording('cms.entry.viewLive', 'View the page')}
+    else if last.live
+      {wording('cms.entry.savedLive', 'Saved at {time}. Live now.', { time: time(last.at) })}
       if url
         a(href={url} target="_blank" rel="noopener") {wording('cms.entry.viewLive', 'View the page')}
     else

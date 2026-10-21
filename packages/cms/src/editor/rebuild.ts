@@ -46,3 +46,13 @@ export function rebuildStarted(): void {
   markRebuilding(browserStorage())
   watchRebuild()
 }
+
+// The site serves the last save: the notice goes, here and in the other tabs once they read the storage again.
+export function rebuildFinished(): void {
+  try {
+    browserStorage()?.removeItem(KEY)
+  }
+  catch {}
+
+  watchRebuild()
+}

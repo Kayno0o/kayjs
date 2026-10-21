@@ -369,13 +369,15 @@ const saver: FileSaver = {
 
 ## The entries API
 
-The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry as the editor opens it, with its `version`. Add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
+The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry as the editor opens it, with its `version`. Add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
 Save is disabled until something changed, and Ctrl or Cmd+S saves from anywhere on the screen or in the editor on the page. While a save is on its way the fields are locked. Next to the buttons, a line says where the entry stands: `Saving…`, `Unsaved changes`, or `Saved at 14:32`. When the site shows a save only after it has rebuilt, the line says `Not live yet` and links to the page.
 
-Publish, Unpublish, Publish now and Clear schedule each change one field and save it. With unsaved edits they refuse and ask you to save or cancel them first, so they never save half-typed text. If the save is refused, the form goes back to how it was. Delete names the entry, and for one that has a page it warns that the page stops answering.
+Publish, Unpublish, Publish now and Clear schedule each change one field and save it. With unsaved edits they refuse and ask you to save or cancel them first, so they never save half-typed text. If the save is refused, the form goes back to how it was. Delete names the entry, warns that the page of one that has a page stops answering, and lists the entries that name it in a reference field.
+
+After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`.
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
 
@@ -428,7 +430,7 @@ cms({ collections: { shop: {
 
 In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form.
 
-In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
+In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
 The editor on the page follows the form's layout too. A name twice, or an action that does not exist, throws when `kay.config.ts` loads. A field the schema lacks logs a warning at boot.
 

@@ -3,7 +3,7 @@ import type { CollectionInfo, CollectionLayout, FormLayout, ListLayout, RowActio
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from './fields'
 
-export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'editOnPage', 'delete']
+export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
 
 // What a field named `#body` stands for, and `body` too unless the schema has a data field of that name.

@@ -7,6 +7,9 @@ import { sortOrdered } from './order'
 import { screenPath } from './paths'
 import { contentVersion } from './version'
 
+// The most referencing entries a delete confirmation names; the rest is told as a trailing ellipsis.
+export const REFERRERS_SHOWN = 5
+
 const UNSAFE_ID = /[^a-z0-9]/giu
 
 export interface EntryRow {
@@ -19,6 +22,8 @@ export interface EntryRow {
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
+  // Which entries name this one in a reference field, as `Collection: title`, which a delete from the list names.
+  referencedBy?: string[] | undefined
   // The text of each column the collection's list names, by field key.
   cells?: Record<string, string> | undefined
   // The version of an entry as the list read it, a folder entry's file or a loaded entry's content, which a delete from the list names, so it never removes an entry saved since.
@@ -184,10 +189,16 @@ export function onPagePath(prefix: string, url: string): string {
 }
 
 // What a delete confirmation asks: the entry by its title, and, for one with a page, that the page goes and links to it break. The list and the entry screen word the question under their own keys.
-export function deleteMessage(title: string, url?: string | undefined, where: 'entry' | 'table' = 'entry'): string {
+export function deleteMessage(title: string, url?: string | undefined, where: 'entry' | 'table' = 'entry', referencedBy: string[] = []): string {
   const asked = where === 'table' ? wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title }) : wording('cms.entry.deleteMessage', 'Delete {title}? This cannot be undone.', { title })
+  const page = url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
 
-  return url === undefined ? asked : `${asked} ${wording('cms.entry.deletePage', 'Its page {url} stops answering, and links to it break.', { url })}`
+  if (referencedBy.length === 0)
+    return page
+
+  const entries = referencedBy.slice(0, REFERRERS_SHOWN).join(', ') + (referencedBy.length > REFERRERS_SHOWN ? ', …' : '')
+
+  return `${page} ${wording('cms.entry.deleteReferenced', 'Referenced by {entries}.', { entries })}`
 }
 
 // A screen's `<title>`: what it shows, then the admin's name, so a tab or a history entry says it is the CMS and not the site.

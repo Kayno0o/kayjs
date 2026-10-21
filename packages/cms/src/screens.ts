@@ -2,6 +2,7 @@ import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { EntryRow } from './listing'
 import { entries } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
+import { referrersOf } from './references'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 
@@ -43,7 +44,10 @@ export async function listScreen({ collection: name, q = '', page = 1 }: { colle
 
   const { prefix, pageSize } = settings()
 
-  return { prefix, collection, ...await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize) }
+  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize)
+  const referrers = await referrersOf(collection.name, listed.rows.map(row => row.slug))
+
+  return { prefix, collection, ...listed, rows: listed.rows.map(row => ({ ...row, ...referrers.has(row.slug) && { referencedBy: referrers.get(row.slug) } })) }
 }
 
 // The slug of a single collection's entry, or undefined while none is written.
