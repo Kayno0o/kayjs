@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
+import { drainOutput } from './listening'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -50,6 +51,7 @@ async function start(script: string, store: string, behind: number): Promise<Rep
   const { value } = await reader.read()
 
   reader.releaseLock()
+  drainOutput(child)
 
   if (value === undefined)
     throw new Error('a replica ended before it listened')

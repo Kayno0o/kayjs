@@ -1,4 +1,3 @@
-import type { Subprocess } from 'bun'
 import type { Feature } from '../src/new'
 import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,6 +15,7 @@ import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
 import { TAILWIND_CLASS_REGEX } from '../src/templates'
+import { listeningPort } from './listening'
 import { lintInProcess } from './scaffold-lint'
 
 const repo = join(import.meta.dir, '..')
@@ -607,7 +607,7 @@ describe('kay new', () => {
       const server = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev'], { cwd: dir, env: { ...process.env, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
-        const home = await (await fetch(`http://localhost:${await listeningPort(server)}/`)).text()
+        const home = await (await fetch(`http://localhost:${await listeningPort(server, 'the executable', LISTENING)}/`)).text()
 
         expect(home).toContain('<title>Home | my-site</title>')
         expect(home).toContain('new EventSource("/_kay/dev/events")')
@@ -925,25 +925,6 @@ async function shown(screen: () => string, text: string): Promise<void> {
   }
 }
 
-// The first line a server prints with the port it listens on.
-async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
-  const reader = child.stdout.getReader()
-  let output = ''
-
-  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
-    const { value, done } = await reader.read()
-
-    if (done)
-      throw new Error(`the executable exited without listening: ${await new Response(child.stderr).text()}`)
-
-    output += new TextDecoder().decode(value)
-  }
-
-  reader.releaseLock()
-
-  return LISTENING.exec(output)![1]!
-}
-
 describe('kay build --compile', () => {
   it('bundles the server, its pages and the client build into one executable that serves them from anywhere', async () => {
     const { dir } = await scaffoldServerPreset()
@@ -1020,7 +1001,7 @@ describe('kay build --compile', () => {
     const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0', TMPDIR: tmpdir() }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
     try {
-      const port = await listeningPort(server)
+      const port = await listeningPort(server, 'the executable', LISTENING)
       const origin = `http://localhost:${port}`
       const get = async (path: string) => {
         const response = await fetch(`${origin}${path}`)

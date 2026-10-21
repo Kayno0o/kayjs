@@ -5,11 +5,11 @@ import process from 'node:process'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { browse, browserPath } from '../src/test'
+import { listeningPort } from './listening'
 import { fixtureCopy } from './scratch'
 import { ready } from './skew-page'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
-const LISTENING = /listening (\d+)/
 const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
 const path = browserPath()
 
@@ -21,18 +21,10 @@ interface Running {
 // A compiled executable of the app, listening on a port of its own.
 async function start(executable: string, root: string): Promise<Running> {
   const child = Bun.spawn([executable], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0' } })
-  const reader = child.stdout.getReader()
-  let output = ''
-
-  while (!LISTENING.test(output)) {
-    const { value, done } = await reader.read()
-
-    expect(done).toBe(false)
-    output += new TextDecoder().decode(value)
-  }
+  const port = await listeningPort(child, 'the executable')
 
   return {
-    origin: `http://localhost:${LISTENING.exec(output)![1]}`,
+    origin: `http://localhost:${port}`,
     stop: async () => {
       child.kill()
       await child.exited

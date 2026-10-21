@@ -21,6 +21,7 @@ import { NOT_FOUND_FILE } from '../src/server/not-found'
 import { addRuntimeRedirect } from '../src/server/runtime-redirect-api'
 import { alive } from './alive'
 import { kayCheck } from './check-helper'
+import { drainOutput } from './listening'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
@@ -256,6 +257,9 @@ function watchChecks(root: string, ...flags: string[]): { report: () => Promise<
   const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json', ...flags], { stdout: 'pipe', stderr: 'pipe' })
   const reader = child.stdout.getReader()
   let output = ''
+
+  // Its stderr is never read, and a full pipe would stop the watcher.
+  drainOutput({ stdout: undefined, stderr: child.stderr })
 
   return {
     report: async () => {

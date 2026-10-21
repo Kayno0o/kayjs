@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { modeOf, resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
+import { listeningPort } from './listening'
 import { fixtureCopy } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -18,7 +19,6 @@ const FEW = 3
 const HEAVY = new Set([32, 33])
 const CAP = 32
 const COPY = /\/_kay\/[^"'\s]+\.r-[a-z0-9]+\.css/g
-const LISTENING = /listening (\d+)/
 const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
 
 // Many arbitrary values, each its own rule, so a page's own rules pass what its head may inline.
@@ -119,17 +119,7 @@ describe('the copies of a stylesheet a build writes', () => {
     const child = Bun.spawn([executable], { cwd: few, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0' } })
 
     try {
-      const reader = child.stdout.getReader()
-      let output = ''
-
-      while (!LISTENING.test(output)) {
-        const { value, done } = await reader.read()
-
-        expect(done).toBe(false)
-        output += new TextDecoder().decode(value)
-      }
-
-      const origin = `http://localhost:${LISTENING.exec(output)![1]}`
+      const origin = `http://localhost:${await listeningPort(child, 'the executable')}`
       const links = new Set<string>()
 
       for (let index = 0; index < FEW; index++) {

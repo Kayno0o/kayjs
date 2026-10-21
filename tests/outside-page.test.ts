@@ -5,6 +5,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from 'kay/bun'
 import { settle } from '../src/test'
+import { drainOutput } from './listening'
 import { scratchDir } from './scratch'
 
 const COUNTER = `---
@@ -163,6 +164,10 @@ describe('a page kay does not serve', () => {
     try {
       const reader = server.stdout.getReader()
       const { value } = await reader.read()
+
+      reader.releaseLock()
+      drainOutput(server)
+
       const url = new TextDecoder().decode(value).trim()
       const page = await (await serverFetch(url)).text()
       const script = await serverFetch(new URL(page.match(SCRIPT_SRC)![1]!, url))

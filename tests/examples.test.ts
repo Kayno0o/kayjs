@@ -1,4 +1,3 @@
-import type { Subprocess } from 'bun'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +6,7 @@ import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
 import { loadConfig } from '../src/config'
 import { takeDocsBuild } from './docs-build'
+import { listeningPort } from './listening'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const ROOT = join(import.meta.dir, '..')
@@ -76,7 +76,7 @@ describe('the noticeboard example', () => {
       const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
-        const origin = `http://localhost:${await listeningPort(server)}`
+        const origin = `http://localhost:${await listeningPort(server, 'the executable', LISTENING)}`
         const magic = await (await fetch(`${origin}/auth/magic-link?token=mailed`)).text()
         const stylesheet = [...magic.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('')
 
@@ -95,22 +95,3 @@ describe('the noticeboard example', () => {
     }
   }, 120_000)
 })
-
-// The port the server prints once it listens.
-async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
-  const reader = child.stdout.getReader()
-  let output = ''
-
-  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
-    const { value, done } = await reader.read()
-
-    if (done)
-      throw new Error(`the executable exited without listening: ${await new Response(child.stderr).text()}`)
-
-    output += new TextDecoder().decode(value)
-  }
-
-  reader.releaseLock()
-
-  return LISTENING.exec(output)![1]!
-}

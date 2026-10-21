@@ -2,6 +2,7 @@ import type { TestPage } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
+import { listeningPort } from './listening'
 
 const LISTENING = /port (\d+)/
 const path = browserPath()
@@ -9,24 +10,6 @@ const path = browserPath()
 let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
 let page: TestPage
 let origin: string
-
-async function listeningPort(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
-  const reader = child.stdout.getReader()
-  let output = ''
-
-  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
-    const { value, done } = await reader.read()
-
-    if (done)
-      throw new Error(`the arrival fixture exited without listening: ${await new Response(child.stderr).text()}`)
-
-    output += new TextDecoder().decode(value)
-  }
-
-  reader.releaseLock()
-
-  return LISTENING.exec(output)![1]!
-}
 
 // The words the page has highlighted, and how far it is scrolled.
 async function marks(): Promise<string[]> {
@@ -37,7 +20,7 @@ async function marks(): Promise<string[]> {
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page opened from a search hit in Chromium', () => {
   beforeAll(async () => {
     server = Bun.spawn(['bun', 'tests/fixtures/arrival/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
-    origin = `http://localhost:${await listeningPort(server)}`
+    origin = `http://localhost:${await listeningPort(server, 'the arrival fixture', LISTENING)}`
     page = await browse(origin, { path })
   }, 60_000)
 

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { pages } from '../src/server'
 import { browse, browserPath } from '../src/test'
+import { listeningPort } from './listening'
 
 const CLI = resolve('src/cli.ts')
 const MAGIC = Buffer.from([0x5E, 0x2A, 0x4D, 0x18, 0x20, 0, 0, 0])
@@ -459,19 +460,7 @@ describe('a compiled executable', () => {
     const child = Bun.spawn([executable], { cwd: empty, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0' } })
 
     try {
-      const reader = child.stdout.getReader()
-      let output = ''
-
-      while (!LISTENING.test(output)) {
-        const { value, done } = await reader.read()
-
-        if (done)
-          throw new Error(`the executable exited: ${output}${await new Response(child.stderr).text()}`)
-
-        output += new TextDecoder().decode(value)
-      }
-
-      const site: Site = { root, origin: `http://localhost:${LISTENING.exec(output)![1]}`, server: child, base: '' }
+      const site: Site = { root, origin: `http://localhost:${await listeningPort(child, 'the executable', LISTENING)}`, server: child, base: '' }
       const { dictionary } = await manifestOf(site)
       const file = await get(site, `/_kay/${dictionary!.file}`, { 'accept-encoding': 'identity' })
 
