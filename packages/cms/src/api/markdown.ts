@@ -21,9 +21,9 @@ export default api()
       const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
-      const safe = aside.restore(String(sanitizeHtml(place ? imagesFromFolder(aside.html, place) : aside.html, KEPT)))
+      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place) : aside.html, KEPT))
 
-      return { html: safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" ') }
+      return { html: aside.restore(safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" ')) }
     }
     catch (error) {
       if (error instanceof MarkdownError)

@@ -16,6 +16,8 @@ const LEAVING = /\/api\/cms\/preview\/exit$/
 const ENTRY = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
 const UPLOAD_RULES = /\/api\/cms\/files\/rules$/
 const ICON_PAGE = /\/api\/cms\/icons$/
+// The preview's images, read from the folder of the entry being edited.
+const PREVIEW_IMAGE = /\/api\/cms\/markdown\/image$/
 // The module an editor's browser loads on each page, which holds nothing private.
 const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
@@ -44,7 +46,7 @@ function actionOf(method: string, path: string): Action | undefined {
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext): boolean {
-  if (UPLOAD_RULES.test(ctx.url.pathname) || ICON_PAGE.test(ctx.url.pathname))
+  if (UPLOAD_RULES.test(ctx.url.pathname) || ICON_PAGE.test(ctx.url.pathname) || (PREVIEW_IMAGE.test(ctx.url.pathname) && underKayDev()))
     return true
 
   const [, collection, slug] = ENTRY.exec(ctx.url.pathname) ?? []

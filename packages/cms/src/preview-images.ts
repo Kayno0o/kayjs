@@ -29,7 +29,7 @@ export function imagesFromFolder(html: string, place: EntryPlace): string {
     let path: string
 
     try {
-      path = decodeURIComponent(src.replace(QUERY_OR_FRAGMENT, ''))
+      path = decodeURIComponent(src.replace(QUERY_OR_FRAGMENT, '').replaceAll('&amp;', '&'))
     }
     catch {
       return whole
@@ -53,9 +53,9 @@ export async function folderImage(place: EntryPlace, path: string): Promise<{ fi
     return undefined
 
   const root = resolve(repositoryRoot(), dir)
-  const found = await entryFile(place.collection, place.slug, place.locale === undefined ? {} : { locale: place.locale })
 
   try {
+    const found = await entryFile(place.collection, place.slug, place.locale === undefined ? {} : { locale: place.locale })
     const [inside, folder] = await Promise.all([realpath(root), realpath(resolve('file' in found && found.file.repoPath.startsWith(`${dir}/`) ? dirname(resolve(root, found.file.repoPath.slice(dir.length + 1))) : root, path))])
 
     return folder.startsWith(inside + sep) ? { file: folder, type } : undefined

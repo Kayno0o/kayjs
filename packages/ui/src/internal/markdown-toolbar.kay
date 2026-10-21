@@ -58,7 +58,8 @@ function keyDown(event: KeyboardEvent) {
   if (!move || !bar || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
     return
 
-  const buttons = [...bar.querySelectorAll('button')]
+  // A button hidden by the narrow layout cannot take focus, so it is no stop.
+  const buttons = [...bar.querySelectorAll('button')].filter(button => button.checkVisibility())
   const at = buttons.findIndex(button => button === document.activeElement)
 
   if (at === -1)

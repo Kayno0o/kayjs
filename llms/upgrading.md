@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.64.0
+
+### kayjs-cms stops at boot for `form.body` on a collection with no Markdown body
+
+Remove `body` from that collection's `form` in `cms({ collections })`: it worded a body the collection does not have, and the server now logs the collection's name and exits.
+
 ## 1.63.0
 
 ### kayjs-auth's guard answers a fetch with a 401, and redirects to `signInPage` without `pages`

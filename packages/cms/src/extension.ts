@@ -43,8 +43,11 @@ export function cms(options: CmsOptions = {}): KayExtension {
         // A body worded on a collection with none is a mistake to fix, so it stops the boot rather than logging; only those collections are read for their body, as a loader runs for it.
         const problem = bodylessLayout((await Promise.all(worded.map(async name => collectionInfo(name)))).filter(found => found !== undefined), settings().layouts)
 
-        if (problem !== undefined)
-          throw new Error(problem)
+        // A throw here would be an unhandled rejection of a hook nobody awaits, leaving the server up, so the process ends itself.
+        if (problem !== undefined) {
+          log.error(problem)
+          process.exit(1)
+        }
 
         try {
           const listed = await collections({ counts: false })
