@@ -1195,6 +1195,8 @@
   /* A long list drawing the rows in view: the box scrolls, 70vh tall unless the app sets a height. */
   .kui-virtual-list {
     @apply max-h-[70vh] overflow-y-auto;
+    /* The list keeps what is in view in place itself, so the browser must not do it too. */
+    overflow-anchor: none;
 
     &:focus-visible {
       outline: 2px solid var(--color-kui-accent);
@@ -1952,6 +1954,7 @@
   .kui-table-wrap:where([data-virtual]) {
     @apply overflow-y-auto;
     max-height: var(--kui-table-height, 70vh);
+    overflow-anchor: none;
 
     &:focus-visible {
       outline: 2px solid var(--color-kui-accent);
