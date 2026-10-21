@@ -13,7 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.62.0
 
-- `a(href="/docs" section)` is marked `aria-current="true"` on the pages below `/docs`, and `page` on it, so a header lights a section with no path passed down; the attribute is never written out and `section-not-a-link` flags it on anything but a link ([Navigation](navigation.md)).
+- `a(href="/docs" section)`, or `section={expr}`, is marked `aria-current="true"` on the pages below `/docs`, and `page` on it, so a header lights a section with no path passed down; the attribute is never written out and `section-not-a-link` flags it on anything but a link ([Navigation](navigation.md)).
 - `analytics()`'s notice and information line read in French on a page whose `lang` is `fr`, English elsewhere, and the app's `consent` / `info` strings still win ([Analytics](analytics.md)).
 - kayjs-auth sets a readable `kay_user` cookie at sign-in, and kayjs-cms's script reads it, so an editor sees Edit this page on the first page after signing in ([hint](../packages/cms/llms/page-links.md)).
 - kayjs-auth's `forwardAuth: 'example.com'` serves `/auth/forward` for nginx `auth_request`, Traefik and Caddy: 204 with `Remote-*` headers or a sign-in that returns to the guarded site ([forward auth](../packages/auth/llms/oauth-server-and-tokens.md)).

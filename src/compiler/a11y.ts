@@ -1,6 +1,6 @@
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
-import { childBlocks, nodeExpressions, visitNodes } from './ast'
+import { childBlocks, nodeExpressions, sectionOf, visitNodes } from './ast'
 
 // Controls a person fills in, which a screen reader announces by their label.
 const LABELLED = new Set(['input', 'select', 'textarea'])
@@ -451,10 +451,10 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     if (alt !== undefined && alt !== '' && (REDUNDANT_ALT.test(alt) || FILENAME_ALT.test(alt)))
       lint(attribute(element, 'alt')!.name, 'redundant-alt', FILENAME_ALT.test(alt) ? 'This alt text is a filename' : 'This alt text says it is an image', { note: 'a screen reader already announces an image as one, and a filename says nothing of what it shows', help: 'say what the image shows, as you would to someone who cannot see it' })
 
-    const section = attribute(element, 'section')
+    const section = sectionOf(element, source)
 
-    if (section?.kind === 'boolean' && (element.name !== 'a' || !(has(element, 'href') || element.attributes.some(candidate => candidate.kind === 'spread'))))
-      lint(section.name, 'section-not-a-link', 'A `section` only marks a link', { note: 'kay marks a link carrying it as current on the pages below it, and writes the attribute out of the page', help: 'put it on an `a` with an `href`, or remove it' })
+    if (section !== undefined && (element.name !== 'a' || !(has(element, 'href') || element.attributes.some(candidate => candidate.kind === 'spread'))))
+      lint(section.name, 'section-not-a-link', 'A `section` only marks a link', { note: 'kay marks a link carrying it as current on the pages below it, and never writes the attribute out', help: 'put it on an `a` with an `href`, or remove it' })
 
     const autocomplete = staticValue(element, 'autocomplete')
 

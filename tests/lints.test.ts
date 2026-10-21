@@ -532,8 +532,8 @@ describe('a11y lints', () => {
     expect(a11y('input(type="radio" name="plan" value="a" aria-label="A")\ninput(type="radio" name="plan" value="b" aria-label="B")\ninput(type="radio" name="solo" aria-label="Solo")\nfieldset\n  legend Size\n  input(type="radio" name="size" value="s" aria-label="S")\n  input(type="radio" name="size" value="m" aria-label="M")\ndiv(role="radiogroup" aria-label="Tone")\n  input(type="radio" name="tone" value="a" aria-label="A")\n  input(type="radio" name="tone" value="b" aria-label="B")\n')).toEqual(['ungrouped-radios input'])
   })
 
-  it('reports a bare section on anything but a link with an href', () => {
-    expect(a11y('a(href="/docs" section) Docs\na(section) Docs\nspan(section) Docs\na(href="/docs" section="x") Docs\n')).toEqual(['section-not-a-link section', 'section-not-a-link section'])
+  it('reports a bare section, or one given an expression, on anything but a link with an href, and leaves a component its own prop', () => {
+    expect(a11y('a(href="/docs" section) Docs\na(href="/docs" section={on}) Docs\na(section) Docs\nspan(section) Docs\nspan(section={on}) Docs\na(href="/docs" section="x") Docs\nCard(section) Docs\nCard(section={on}) Docs\n')).toEqual(['section-not-a-link section', 'section-not-a-link section', 'section-not-a-link section'])
   })
 
   it('reports alt text naming the image as one, or a filename, as whole words only', () => {

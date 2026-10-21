@@ -218,7 +218,7 @@ export const LINTS = {
   'section-not-a-link': {
     level: 'warn',
     group: 'a11y',
-    summary: 'A bare `section` on an element that is not an `a` with an `href`: it marks a link as current on the pages below it, and does nothing anywhere else.',
+    summary: 'A `section`, bare or `section={expr}`, on an element that is not an `a` with an `href`: it marks a link as current on the pages below it, and does nothing anywhere else.',
     wrong: 'span(section) Docs',
     right: 'a(href="/docs" section) Docs',
   },

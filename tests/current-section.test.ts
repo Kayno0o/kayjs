@@ -19,8 +19,8 @@ describe('a link marked section', () => {
 
     expect(await marks(site, '/')).toEqual(['home:page'])
     expect(await (await site.handle(new Request('http://localhost/docs/guide'))).text()).not.toContain('section')
-    expect(await marks(site, '/docs')).toEqual(['docs:page', 'up:page'])
-    expect(await marks(site, '/docs/guide')).toEqual(['docs:true', 'guide:page'])
+    expect(await marks(site, '/docs')).toEqual(['docs:page', 'up:page', 'on:page', 'off:page'])
+    expect(await marks(site, '/docs/guide')).toEqual(['docs:true', 'guide:page', 'on:true'])
     expect(await marks(site, '/docs-old')).toEqual(['old:page'])
   })
 
@@ -29,8 +29,8 @@ describe('a link marked section', () => {
       const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, base: '/repo', trailingSlash }))
       const slash = trailingSlash === 'always' ? '/' : ''
 
-      expect(await marks(site, `/docs/guide${slash}`)).toEqual(['docs:true', 'guide:page'])
-      expect(await marks(site, `/docs${slash}`)).toEqual(['docs:page', 'up:page'])
+      expect(await marks(site, `/docs/guide${slash}`)).toEqual(['docs:true', 'guide:page', 'on:true'])
+      expect(await marks(site, `/docs${slash}`)).toEqual(['docs:page', 'up:page', 'on:page', 'off:page'])
       expect(await marks(site, '/')).toEqual(['home:page'])
       expect(await (await site.handle(new Request('http://localhost/docs/guide'))).text()).not.toContain('section')
     }
@@ -41,11 +41,11 @@ describe('a link marked section', () => {
       const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault } }))
       const french = prefixDefault ? '/fr' : ''
 
-      expect(await marks(site, `${french}/docs/guide`)).toEqual(['docs:true', 'guide:page'])
-      expect(await marks(site, `${french}/docs`)).toEqual(['docs:page', 'up:page'])
-      expect(await marks(site, '/en/docs/guide')).toEqual(['docs:true', 'guide:page'])
+      expect(await marks(site, `${french}/docs/guide`)).toEqual(['docs:true', 'guide:page', 'on:true'])
+      expect(await marks(site, `${french}/docs`)).toEqual(['docs:page', 'up:page', 'on:page', 'off:page'])
+      expect(await marks(site, '/en/docs/guide')).toEqual(['docs:true', 'guide:page', 'on:true'])
       expect(await marks(site, '/en/docs-old')).toEqual(['old:page'])
-      expect(await marks(site, '/en/docs')).toEqual(['docs:page', 'up:page'])
+      expect(await marks(site, '/en/docs')).toEqual(['docs:page', 'up:page', 'on:page', 'off:page'])
       expect(await marks(site, '/en')).toEqual(['home:page'])
     }
   })
@@ -53,8 +53,8 @@ describe('a link marked section', () => {
   it('holds under a base and a locale prefix together', async () => {
     const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true }, base: '/repo', trailingSlash: 'always' }))
 
-    expect(await marks(site, '/en/docs/guide/')).toEqual(['docs:true', 'guide:page'])
+    expect(await marks(site, '/en/docs/guide/')).toEqual(['docs:true', 'guide:page', 'on:true'])
     expect(await marks(site, '/en/')).toEqual(['home:page'])
-    expect(await marks(site, '/fr/docs/')).toEqual(['docs:page', 'up:page'])
+    expect(await marks(site, '/fr/docs/')).toEqual(['docs:page', 'up:page', 'on:page', 'off:page'])
   })
 })

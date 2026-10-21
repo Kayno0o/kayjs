@@ -204,6 +204,16 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
+// `a(href="/docs" section)` or `section={active}`: kay's own attribute marking a link current on the pages below it, read by the server markup and never written out.
+export function sectionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'boolean' | 'expression' }> | undefined {
+  if (element.component)
+    return undefined
+
+  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'section')
+
+  return attribute?.kind === 'boolean' || attribute?.kind === 'expression' ? attribute : undefined
+}
+
 // `Card(server)` renders per request inside a prerendered page, `Card(server="defer")` once the browser fetches it on approach.
 export const SERVER_ISLAND_ATTRIBUTE = 'server'
 export const SERVER_ISLAND_MODES = new Set(['defer'])

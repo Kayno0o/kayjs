@@ -6,6 +6,8 @@ nav
   a.old(href="/docs-old" section) Old
   a.self(href="/docs" section aria-current={undefined}) Own
   a.up(href="/docs") Up
+  a.on(href="/docs" section={true}) On
+  a.off(href="/docs" section={false}) Off
   a.ext(href="https://example.com/docs" section) Away
 main
   slot

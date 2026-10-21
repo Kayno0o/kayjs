@@ -1,7 +1,7 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
+import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
@@ -694,14 +694,31 @@ export class HtmlTemplate extends TemplateWriter {
 
     const href = element.attributes.find(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'href')
 
-    const local = this.localLink(element)
-    // A bare `section` also marks the link on the pages below it.
-    const below = element.attributes.some(attribute => attribute.kind === 'boolean' && this.source(attribute.name) === 'section') ? ', true' : ''
+    if (!(href?.kind === 'expression' || (href?.kind === 'static' && fromRoot(decodeEntities(href.text)))))
+      return
 
-    if (href?.kind === 'static' && fromRoot(decodeEntities(href.text)))
-      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''}${below})`))
-    else if (href?.kind === 'expression')
-      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}(`).addSource(href.expression).add(local ? `))${below})` : `)${below})`))
+    const local = this.localLink(element)
+    // `section` also marks the link on the pages below it.
+    const section = sectionOf(element, this.src)
+
+    markup.dynamic(() => {
+      this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}`)
+
+      if (href.kind === 'static')
+        this.b.add(JSON.stringify(decodeEntities(href.text)))
+      else
+        this.b.add('(').addSource(href.expression).add(')')
+
+      if (local)
+        this.b.add(')')
+
+      if (section?.kind === 'boolean')
+        this.b.add(', true')
+      else if (section?.kind === 'expression')
+        this.b.add(', !!(').addSource(section.expression).add(')')
+
+      this.b.add(')')
+    })
   }
 
   // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.

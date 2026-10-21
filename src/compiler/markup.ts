@@ -2,7 +2,7 @@ import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, 
 import type { CodeBuilder } from './mapping'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, sectionOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
@@ -18,7 +18,6 @@ const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
 // The attribute of an `img` that leaves out the color it shows until it loads.
 const NO_PLACEHOLDER = 'no-placeholder'
-const SECTION = 'section'
 // A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
 const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
@@ -159,7 +158,7 @@ export abstract class TemplateWriter {
         continue
 
       // Read by `currentLink` on the server, and never written.
-      if (name === 'a' && attribute.kind === 'boolean' && attributeName === SECTION)
+      if (name === 'a' && attribute === sectionOf(element, this.src))
         continue
 
       if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {

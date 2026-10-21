@@ -1110,14 +1110,22 @@ describe('shorthand classes with a decimal', () => {
 describe('section link', () => {
   it('never writes section, in the server or the browser markup, and marks only the server one', () => {
     for (const output of ['html', 'dom'] as const) {
-      for (const link of ['a(href="/docs" section) Docs', 'a(href={path} section) Docs', 'a(href="/docs" hreflang="en" section) Docs']) {
-        const result = compileKay(`---\nconst path = '/docs'\n---\n${link}\n`, 'test.kay', { output })
+      for (const link of ['a(href="/docs" section) Docs', 'a(href={path} section) Docs', 'a(href="/docs" hreflang="en" section) Docs', 'a(href="/docs" section={active}) Docs']) {
+        const result = compileKay(`---\nconst path = '/docs'\nconst active = true\n---\n${link}\n`, 'test.kay', { output })
 
         expect(result.diagnostics).toEqual([])
         expect(result.tsx).not.toContain('section')
         expect(result.tsx.includes('currentPage')).toBe(output === 'html')
       }
     }
+  })
+
+  it('hands the server the expression of a section, true for a bare one', () => {
+    const tsx = (link: string) => compileKay(`---\nconst active = true\n---\n${link}\n`, 'test.kay', { output: 'html' }).tsx
+
+    expect(tsx('a(href="/docs" section) Docs')).toContain('KayLocalHref("/docs"), true)')
+    expect(tsx('a(href="/docs" section={active}) Docs')).toContain('KayLocalHref("/docs"), !!(active))')
+    expect(tsx('a(href="/docs") Docs')).not.toContain('true)')
   })
 })
 
