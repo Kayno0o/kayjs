@@ -41,7 +41,7 @@ function refuseWeak(secrets: string[], where: string): void {
     throw new KayError('config-invalid', `kay: ${where} holds a secret ${weak.length} characters long: the app's secret signs form stamps, links to private files and the flash cookie, and seals sessions, so each is at least ${MIN_SECRET_LENGTH} random characters, commas separating a rotation list; generate one with ${GENERATE_SECRET}`)
 }
 
-// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both, and a list rotating: the first signs, every one opens. A short one is refused.
+// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both, and a list rotating: the first signs, and only sessions and kayjs-auth open the others. A short one is refused.
 export function setupStampSecret(configured: string | string[] | undefined): void {
   const fromConfig = listed(configured)
   const secrets = fromConfig ?? listed(process.env.KAY_SECRET)
@@ -75,7 +75,7 @@ export function appSecrets(): string[] | undefined {
 
 // What an app without any secret is told: where one goes.
 export function noAppSecret(use: string): KayError {
-  return new KayError('config-invalid', `kay: ${use} has no secret: set KAY_SECRET (or \`secret\` in kay.config.ts) to at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)
+  return new KayError('config-invalid', `kay: ${use} has no secret: set KAY_SECRET to at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)
 }
 
 // A production server says so the first time it signs with the process's own key, which no restart and no other replica shares.

@@ -235,8 +235,6 @@ function defined<T extends object>(options: T): Partial<T> {
 
 // SMTP from `MAIL_URL`, `MAIL_INSECURE`, `SMTP_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
-  adoptLegacyEnv()
-
   const env = defineEnv(smtpEnv({ optional }))
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
   const server = env.MAIL_URL === undefined || env.MAIL_URL === '' ? undefined : parseMailUrl(env.MAIL_URL)

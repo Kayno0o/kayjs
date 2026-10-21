@@ -66,6 +66,10 @@ No lint can recognise an environment variable, so kay warns at boot for each old
 - `MAIL_FROM` may go: the sender defaults to `noreply@` the site's host. A server with no `MAIL_FROM`, `from` or site domain stops as it starts.
 - `SESSION_SECRET`, `AUTH_SECRET` and `PREVIEW_SECRET` to `KAY_SECRET`: `session()`, kayjs-auth and `preview` default to it, each under a key of its own. Keep a secret that still seals data in `KAY_SECRET`'s comma list. In production `session()` with no secret now throws at startup, naming `KAY_SECRET`.
 
+### A comma in `KAY_SECRET` splits it, and `kay check` compares deploy files
+
+`KAY_SECRET` (and a string `secret` in kay.config.ts) is now a comma-separated rotation list, so a secret holding a comma fails the boot as too short: drop the comma. With no `env` in kay.config.ts, `kay check` now compares the root production `compose*.yaml` files and `.env.example` with the declared variables, so a deploy file missing a required variable is an error; set `env: { compose, example }` to choose the files.
+
 ### kayjs-auth's `url` defaults to the site
 
 Drop `url` from `createAuth` when it repeats `site` or `SITE_URL`. OAuth sign-in and mailed links with no `url` and no site stop the server as it starts.

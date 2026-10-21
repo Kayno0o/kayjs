@@ -2136,7 +2136,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       if (server.sitemap === 'error')
         sitemap = tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`)
       else if (server.sitemap === 'none')
-        sitemap = tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts, SITE_URL or ORIGIN)')
+        sitemap = tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)')
 
       fact('Sitemap', sitemap)
     }

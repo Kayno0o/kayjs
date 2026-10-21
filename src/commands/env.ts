@@ -51,8 +51,7 @@ export const env: Command = {
     try {
       const { variables, unread, findings } = await withStdoutOnStderr(async () => {
         const listed = await listEnv(root)
-        const config = await loadConfig(root)
-        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : config.env ?? await defaultEnvFiles(root)
+        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : (await loadConfig(root)).env ?? await defaultEnvFiles(root)
 
         if (values.write === true) {
           const path = resolve(root, files?.example ?? '.env.example')
