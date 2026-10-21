@@ -74,3 +74,7 @@ test('a deleted entry is restored through the trash API, which leaves the trash 
   expect((await site.visit('/admin/trash/journal')).find('.kcms-revision').filter(each => each.text.includes('Back soon'))).toHaveLength(0)
   expect(await (await site.fetch(`/api/cms/trash/journal/${id}/restore`, { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'That entry is not in the trash any more' }] })
 })
+
+test('restoring from the trash of an unknown collection is a 404', async () => {
+  expect((await site.fetch('/api/cms/trash/nowhere/1/restore', { method: 'POST' })).status).toBe(404)
+})

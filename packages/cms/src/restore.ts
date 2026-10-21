@@ -29,12 +29,13 @@ export async function restoreRevision(ref: EntryRef, at: number, author?: Identi
 
 // Writes a deleted entry back under its slug, refused as a new entry is if the slug was taken since. `restrained` is for a role that may not publish, whose restored entry is a draft, or held back by a far publish date, as a new entry of that role is.
 export async function restoreTrashed(collection: string, id: string, author?: Identity, { restrained = false }: { restrained?: boolean | undefined } = {}): Promise<SaveOutcome> {
+  // Asked first, so a collection the site lacks is the 404 of the API and not an entry that is gone.
+  const info = await collectionNamed(collection)
   const item = await trashed(collection, id)
 
   if (!item)
     return refused({ collection, slug: id }, wording('cms.trash.gone', 'That entry is not in the trash any more'))
 
-  const info = await collectionNamed(collection)
   const kept = restrained ? keepingPublication(info, item.data, undefined) : item.data
   // Its old place may be taken by now, so it comes back without one.
   const data = info.orderField === undefined ? kept : keepingOrder(info.orderField, kept, undefined)
