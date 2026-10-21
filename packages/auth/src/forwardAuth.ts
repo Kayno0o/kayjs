@@ -76,7 +76,7 @@ function requestedUrl(headers: Headers): string | null {
 
 // A value a header carries: printable ASCII as it is, anything else percent-encoded, as a name with an accent or a line break would be refused or split by the proxy.
 function headerValue(value: string): string {
-  return PLAIN_HEADER.test(value) ? value : encodeURIComponent(value)
+  return PLAIN_HEADER.test(value) ? value : encodeURIComponent(value.toWellFormed())
 }
 
 // The route a reverse proxy asks before it lets a request through to a site it guards, and the one a sign-in comes back through to that site. On kayjs-auth's own plugin: nothing the app declares beyond `forwardAuth`.
@@ -120,7 +120,7 @@ export function serveForwardAuth(plugin: Elysia, core: Core, forward: ForwardAut
       const where = setup ?? `${core.signInPage}${original === undefined ? '' : `?redirect=${encodeURIComponent(`${route}/return?to=${encodeURIComponent(original)}`)}`}`
 
       // A proxy that hands the answer to the browser as it is (Traefik, Caddy) wants the redirect itself; nginx's `auth_request` takes a 401 and its `Location`.
-      return new Response(null, { status: searchParams.has('redirect') ? 302 : 401, headers: { ...headers, location: `${root}${where}` } })
+      return new Response(null, { status: searchParams.get('redirect') === '1' ? 302 : 401, headers: { ...headers, location: `${root}${where}` } })
     })
     // Back from signing in to the guarded site, if it is on the domains the app allows, else home.
     .get(`${route}/return`, ({ query, redirect }) => redirect(returnTarget(typeof query.to === 'string' ? query.to : undefined, forward.domains) ?? homeOf(core), 303))

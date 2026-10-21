@@ -122,6 +122,7 @@ describe('typing a secret', () => {
     expect(typedSecret('', 'abc')).toEqual({ value: 'abc' })
     expect(typedSecret('abc', '\u007F\u007Fx')).toEqual({ value: 'ax' })
     expect(typedSecret('', 'pa\u001B\tss\r')).toEqual({ value: 'pass', end: 'done' })
+    expect(typedSecret('', 'a\u001B[Ab\u001B[1;5Cc')).toEqual({ value: 'abc' })
     expect(typedSecret('ab', '\u0004')).toEqual({ value: 'ab', end: 'done' })
   })
 

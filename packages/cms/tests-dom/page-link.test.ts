@@ -131,7 +131,7 @@ test('fills a link of the app\'s own in place of its button, and keeps it hidden
 test('the loader looks for the hint or kayjs-auth\'s signed-in cookie, and for nothing else', () => {
   expect(SIGNED_IN_COOKIE).toBe('kay_user')
 
-  const cue = new RegExp((/^\/(.*)\/\.test\(document\.cookie\)/).exec(pageLinkLoader())![1]!)
+  const cue = new RegExp((/\/([^/=]*=[^/]*)\/\.test\(document\.cookie\)/).exec(pageLinkLoader())![1]!)
 
   expect([`${HINT_COOKIE}=1`, `a=1; ${SIGNED_IN_COOKIE}=x`, `${SIGNED_IN_COOKIE}=`].map(cookie => cue.test(cookie))).toEqual([true, true, true])
   expect(['', 'session=1', 'kay_users=1'].map(cookie => cue.test(cookie))).toEqual([false, false, false])
@@ -189,4 +189,16 @@ test('asks every page when the tab keeps nothing, and a hint without a sign-in c
 
   await run()
   expect(hinted).toHaveBeenCalledTimes(1)
+})
+
+test('a refusal kept for the tab does not hold once the hint is back, as the guard let the user in since', async () => {
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+  document.cookie = `${HINT_COOKIE}=1; path=/`
+
+  const fetched = answering(200)
+
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(1)
+  expect(document.querySelector(BUTTON)?.textContent).toBe('Edit this page')
 })

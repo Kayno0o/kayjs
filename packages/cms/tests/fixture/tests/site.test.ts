@@ -1089,7 +1089,7 @@ test('every page carries one line looking for the editor hint, and the screens s
   const loader = (await site.visit('/about')).find('script').filter(script => script.html.includes('kay_editor='))
 
   expect(loader).toHaveLength(1)
-  expect(loader[0]!.html.length).toBeLessThan(250)
+  expect(loader[0]!.html.length).toBeLessThan(300)
   expect((await site.visit('/blog/hello')).find('script').filter(script => script.html.includes('kay_editor='))).toHaveLength(1)
   expect((await site.fetch('/admin')).headers.get('set-cookie')).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
   expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()

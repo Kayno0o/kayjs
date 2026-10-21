@@ -7,13 +7,16 @@ import { LOAD_AUTH } from './pages'
 const END_OF_INPUT = '\u0004'
 const INTERRUPT = '\u0003'
 const BACKSPACE = new Set(['\u007F', '\b'])
+// eslint-disable-next-line no-control-regex
+const ESCAPE_SEQUENCE = /\u001B(?:\[[0-9;]*[A-Za-z~]|O[A-Za-z])?/g
 const LINE_END = new Set(['\r', '\n'])
 
 // What a terminal in raw mode typed so far after `chunk`: backspace erases, Enter or Ctrl+D finishes, Ctrl+C cancels, and no other control character is kept.
 export function typedSecret(value: string, chunk: string): { value: string, end?: 'done' | 'cancelled' } {
   let typed = value
 
-  for (const char of chunk) {
+  // An arrow or function key sends an escape sequence, which is no part of a password.
+  for (const char of chunk.replaceAll(ESCAPE_SEQUENCE, '')) {
     if (LINE_END.has(char) || char === END_OF_INPUT)
       return { value: typed, end: 'done' }
 
