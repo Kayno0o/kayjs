@@ -1421,25 +1421,25 @@ describe('kay lsp project checks after a save', () => {
       // The result of a run stands for the next save.
       expect(await save(unrelated, 'p three\n')).toEqual({ content: 7, messages: 1 })
 
-      // A messages file, written and deleted.
-      expect(await save('src/messages/en.ts', 'export default { hello: \'Hi\' }\n')).toEqual({ content: 7, messages: 2 })
-      expect(await removed('src/messages/en.ts')).toEqual({ content: 7, messages: 3 })
-      expect(await save('src/messages/en.ts', 'export default { hello: \'Hello\' }\n')).toEqual({ content: 7, messages: 4 })
+      // A messages file, written and deleted: the content script reads the catalogs too, as it words its refusals in the default locale.
+      expect(await save('src/messages/en.ts', 'export default { hello: \'Hi\' }\n')).toEqual({ content: 8, messages: 2 })
+      expect(await removed('src/messages/en.ts')).toEqual({ content: 9, messages: 3 })
+      expect(await save('src/messages/en.ts', 'export default { hello: \'Hello\' }\n')).toEqual({ content: 9, messages: 4 })
 
       // The config both scripts run under, which also names a catalog the messages newly read.
-      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 8, messages: 5 })
-      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 8, messages: 6 })
-      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 8, messages: 7 })
+      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 10, messages: 5 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 10, messages: 6 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 10, messages: 7 })
 
       // A module the content config starts importing is tracked from then on.
       await Bun.write(join(dir, 'src/extra.ts'), 'export const extra = 1\n')
-      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nimport \'./extra\'\n\nexport'))).toEqual({ content: 9, messages: 7 })
-      expect(await save('src/extra.ts', 'export const extra = 2\n')).toEqual({ content: 10, messages: 7 })
+      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nimport \'./extra\'\n\nexport'))).toEqual({ content: 11, messages: 7 })
+      expect(await save('src/extra.ts', 'export const extra = 2\n')).toEqual({ content: 12, messages: 7 })
 
       // A folder an `import.meta.glob` of the content config searches.
       await Bun.write(join(dir, 'src/cards/a.ts'), 'export default 1\n')
-      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nexport const cards = import.meta.glob(\'./cards/*.ts\')\n\nexport'))).toEqual({ content: 11, messages: 7 })
-      expect(await save('src/cards/b.ts', 'export default 2\n')).toEqual({ content: 12, messages: 7 })
+      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nexport const cards = import.meta.glob(\'./cards/*.ts\')\n\nexport'))).toEqual({ content: 13, messages: 7 })
+      expect(await save('src/cards/b.ts', 'export default 2\n')).toEqual({ content: 14, messages: 7 })
     }
     finally {
       counting.mockRestore()
