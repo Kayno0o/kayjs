@@ -1,6 +1,6 @@
---- <Row>
+--- <Row, Key extends RowKey<Row>>
 import type { JSX } from 'kay'
-import type { Column, RowFilter, RowKey, SortState } from './table'
+import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
 import { effect, memo, persisted, signal } from 'kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
@@ -10,7 +10,7 @@ import { wording } from 'kay/words'
 const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filterLabel', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAllLabel', 'Select all'), selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
-  rowKey: RowKey<Row>
+  rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
   sort?: SortState | undefined
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
@@ -37,11 +37,11 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // A checkbox on each row and, above the rows, a tri-state select-all beside the count of rows picked, in the stacked cards as in the wide table.
   selectable?: boolean | undefined
   // The keys of the rows picked to start from, as `rowKey` reads them; a table whose parent passes another list follows it. A key whose row is no longer in `rows` leaves the selection.
-  selected?: unknown[] | undefined
+  selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, in the rows' order, each time the selection changes, a row leaving `rows` included.
-  onSelect?: ((keys: unknown[]) => void) | undefined
+  onSelect?: ((keys: RowKeyValue<Row, Key>[]) => void) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
-  bulk?: ((keys: unknown[], clear: () => void) => JSX.Element) | undefined
+  bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => JSX.Element) | undefined
   // Names the select-all box, and the column's header for screen readers.
   selectAllLabel?: string | undefined
   // The count of rows picked, read out as it changes: `N selected`.
@@ -60,7 +60,7 @@ effect(() => current.set(sort))
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
 const counted = countLabel ?? ((count: number) => wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }))
-const none: unknown[] = []
+const none: RowKeyValue<Row, Key>[] = []
 const picked = signal(selected ?? none)
 
 effect(() => picked.set(selected ?? none))
@@ -85,12 +85,12 @@ effect(() => {
     commit(next)
 })
 
-function commit(keys: unknown[]) {
+function commit(keys: RowKeyValue<Row, Key>[]) {
   picked.set(keys)
   onSelect?.(keys)
 }
 
-function pick(key: unknown, on: boolean) {
+function pick(key: RowKeyValue<Row, Key>, on: boolean) {
   commit(on ? keyed().filter(other => other === key || chosenSet().has(other)) : chosen().filter(other => other !== key))
 }
 

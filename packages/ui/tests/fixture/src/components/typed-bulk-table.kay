@@ -1,0 +1,28 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Site {
+  name: string
+  port: number
+}
+
+const { sites, disable, enable } = props<{
+  sites: Site[]
+  disable: (names: string[]) => void
+  enable: (ports: number[]) => void
+}>()
+
+const columns: Column<Site>[] = [{ key: 'name', header: 'Name' }]
+const picked: string[] = ['io']
+---
+Table(columns={columns} rows={sites} rowKey="name" selectable selected={picked} onSelect={disable})
+  @bulk(names, clear)
+    Button(label="Disable" onClick={() => { disable(names); clear() }})
+Table(columns={columns} rows={sites} rowKey="port" selectable)
+  @bulk(ports, clear)
+    Button(label="Enable" onClick={() => { enable(ports); clear() }})
+Table(columns={columns} rows={sites} rowKey={site => site.port} selectable)
+  @bulk(ports, clear)
+    Button(label="Enable" onClick={() => { enable(ports); clear() }})

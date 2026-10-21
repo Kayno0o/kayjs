@@ -52,8 +52,11 @@ export function compareValues(a: string | number, b: string | number): number {
   return typeof a === 'number' && typeof b === 'number' ? a - b : COLLATOR.compare(String(a), String(b))
 }
 
-export function rowKeyOf<Row>(row: Row, key: RowKey<Row>): unknown {
-  return typeof key === 'function' ? key(row) : row[key]
+// The type of the keys a table hands back: the row's field the `rowKey` names, or what its function returns.
+export type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+export function rowKeyOf<Row, Key extends RowKey<Row>>(row: Row, key: Key): RowKeyValue<Row, Key> {
+  return (typeof key === 'function' ? key(row) : row[key as keyof Row]) as RowKeyValue<Row, Key>
 }
 
 // What names a row to a screen reader: the text of its first column that has any, or its key.

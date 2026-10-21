@@ -18,7 +18,7 @@ With a `@cell(row, column)` block, every column is drawn by it, except one marke
 
 `selectable` puts a checkbox on each row and a select-all box above the rows, ticked, indeterminate or empty, reading `N selected` once rows are picked. It sits outside the table, so rows stacked as cards have it too. `selected` gives the keys to start from and `onSelect(keys)` hears every change. A key whose row left `rows` is dropped from the selection, which is what an infinite list's rows or a reload need; with a `filter`, select-all picks only the rows it shows.
 
-The `@bulk(keys, clear)` block draws the page's bulk actions beside the count while something is picked, and `clear()` empties the selection. `selectAllLabel`, `selectedLabel(count)` and `selectRowLabel(row)` replace the texts, for another language.
+The `@bulk(keys, clear)` block draws the page's bulk actions beside the count while something is picked, and `clear()` empties the selection. The keys have the type of the `rowKey` field, so a table keyed by a string field hands a `string[]` to an action with no conversion. `selectAllLabel`, `selectedLabel(count)` and `selectRowLabel(row)` replace the texts, for another language.
 
 <Demo name="table/selection" />
 
