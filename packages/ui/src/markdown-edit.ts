@@ -7,6 +7,10 @@ export interface TextEdit {
   selectionEnd: number
 }
 
+// The buttons a MarkdownEditor's toolbar can offer, in the order it offers them by default.
+export const TOOLBAR_ACTIONS = ['bold', 'italic', 'heading', 'bulletList', 'numberedList', 'link', 'image'] as const
+export type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
 export const MARKDOWN_INDENT = '  '
 
 const LIST_ITEM = /^(\s*)(?:([-*+]) (?:\[([ x])\] )?|(\d+)\. )(.*)$/i
@@ -132,8 +136,7 @@ export function enterEdit(value: string, start: number, end: number): TextEdit |
 }
 
 const HEADING_PREFIX = /^#{1,6} /
-const BULLET_PREFIX = /^\s*[-*+] (?!\[)/
-const NUMBER_PREFIX = /^\s*\d+\. /
+const ITEM_START = /^(\s*)(?:([-*+]) (?:\[[ x]\] )?|(\d+)\. )?/i
 
 // Turns the line under the caret into a second-level heading, or back into a paragraph when it is one; any other level becomes the second.
 export function headingEdit(value: string, start: number, end: number): TextEdit {
@@ -146,25 +149,35 @@ export function headingEdit(value: string, start: number, end: number): TextEdit
   return { start: lineStart, end: lineEnd, text, selectionStart: Math.max(lineStart, start + shift), selectionEnd: Math.max(lineStart, end + shift) }
 }
 
-// Makes each line the selection touches an item of a bulleted or numbered list, or takes them out of that kind of list when each already is one; an item of the other kind changes kind.
+// Makes each line the selection touches an item of a bulleted or numbered list, or takes them out of that kind of list when each already is one; an item of the other kind changes kind, a task item losing its box.
+// Blank lines and indents are kept, and a lone blank line is listed so a click then typing writes the first item. A caret stays a caret, after the marker; a selection stays selected.
 export function listEdit(value: string, start: number, end: number, ordered: boolean): TextEdit {
   const lineStart = lineStartOf(value, start)
   const lineEnd = lineEndOf(value, end)
-  const lines = value.slice(lineStart, lineEnd).split('\n')
-  const own = ordered ? NUMBER_PREFIX : BULLET_PREFIX
-  const other = ordered ? BULLET_PREFIX : NUMBER_PREFIX
-  const off = lines.every(line => own.test(line))
-  let number = 0
-  const text = lines.map((line) => {
-    const bare = line.replace(own, '').replace(other, '')
+  const lines = value.slice(lineStart, lineEnd).split('\n').map((line) => {
+    const [marker, indent = '', bullet, number] = ITEM_START.exec(line)!
 
-    if (off)
-      return bare
+    return { line, indent, bullet, number, rest: line.slice(marker.length) }
+  })
+  const worded = lines.filter(({ rest }) => rest.trim() !== '')
+  const listed = worded.length === 0 ? lines : worded
+  const off = listed.every(({ bullet, number }) => ordered ? number !== undefined : bullet !== undefined)
+  const marker = (count: number) => ordered ? `${count}. ` : '- '
+  let count = 0
+  const text = lines.map((item) => {
+    if (!listed.includes(item))
+      return item.line
 
-    number++
+    count++
 
-    return `${ordered ? `${number}. ` : '- '}${bare}`
+    return `${item.indent}${off ? '' : marker(count)}${item.rest}`
   }).join('\n')
+
+  if (start === end) {
+    const caret = Math.max(lineStart, start + text.length - (lineEnd - lineStart))
+
+    return { start: lineStart, end: lineEnd, text, selectionStart: caret, selectionEnd: caret }
+  }
 
   return { start: lineStart, end: lineEnd, text, selectionStart: lineStart, selectionEnd: lineStart + text.length }
 }

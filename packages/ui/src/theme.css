@@ -1050,9 +1050,12 @@
 
   /* The textarea comes first in the markup, for the label a form field puts around the editor, and the grid places the bar above it. The preview sits beside the text where the editor is wide, and replaces it, with the formatting buttons, where it is narrow. */
   .kui-markdown {
+    container: kui-markdown / inline-size;
+  }
+
+  .kui-markdown-grid {
     @apply grid gap-x-3 gap-y-1;
 
-    container: kui-markdown / inline-size;
     grid-template-areas: 'bar' 'text';
 
     &:where([data-preview]) {
@@ -1061,7 +1064,7 @@
     }
   }
 
-  .kui-markdown > .kui-markdown-editor {
+  .kui-markdown-grid > .kui-markdown-editor {
     grid-area: text;
   }
 
@@ -1141,13 +1144,13 @@
   }
 
   @container kui-markdown (width < 36rem) {
-    .kui-markdown:where([data-preview]) {
+    .kui-markdown-grid:where([data-preview]) {
       grid-template-areas: 'bar' 'view';
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .kui-markdown:where([data-preview]) > .kui-markdown-editor,
-    .kui-markdown:where([data-preview]) .kui-markdown-tools {
+    .kui-markdown-grid:where([data-preview]) > .kui-markdown-editor,
+    .kui-markdown-grid:where([data-preview]) .kui-markdown-tools {
       @apply hidden;
     }
   }

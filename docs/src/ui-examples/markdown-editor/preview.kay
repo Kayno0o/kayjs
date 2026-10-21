@@ -1,0 +1,14 @@
+---
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+
+const body = signal('A **bold** start.\n\n- first\n- second')
+
+// A stand-in for a call to the app's server, which renders the text as its pages do.
+async function render(markdown: string): Promise<string> {
+  const safe = markdown.replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+
+  return safe.split('\n\n').map(block => `<p>${block.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</p>`).join('')
+}
+---
+.flex.max-w-3xl.flex-col.gap-2
+  MarkdownEditor(value={body()} onInput={body.set} preview={render})

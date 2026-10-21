@@ -97,6 +97,20 @@ describe('listEdit', () => {
     expect(applied('- a\n- b', listEdit('- a\n- b', 0, 7, false))).toBe('[a\nb]')
   })
 
+  test('keeps a caret a caret, after the marker, so typing goes on after it', () => {
+    expect(applied('', listEdit('', 0, 0, false))).toBe('- []')
+    expect(applied('a b', listEdit('a b', 1, 1, true))).toBe('1. a[] b')
+    expect(applied('- a b', listEdit('- a b', 3, 3, false))).toBe('a[] b')
+  })
+
+  test('keeps indents and blank lines, treats a task item as a bullet, and numbers only the lines it lists', () => {
+    expect(applied('a\n\nb', listEdit('a\n\nb', 0, 4, true))).toBe('[1. a\n\n2. b]')
+    expect(applied('  - a\n  - b', listEdit('  - a\n  - b', 0, 11, false))).toBe('[  a\n  b]')
+    expect(applied('  a\n  b', listEdit('  a\n  b', 0, 7, false))).toBe('[  - a\n  - b]')
+    expect(applied('- [ ] a\n- [x] b', listEdit('- [ ] a\n- [x] b', 0, 15, false))).toBe('[a\nb]')
+    expect(applied('- [ ] a', listEdit('- [ ] a', 0, 7, true))).toBe('[1. a]')
+  })
+
   test('changes the kind of an item of the other list, and lists the rest of a mixed selection', () => {
     expect(applied('1. a\n2. b', listEdit('1. a\n2. b', 0, 9, false))).toBe('[- a\n- b]')
     expect(applied('- a\nb', listEdit('- a\nb', 0, 5, false))).toBe('[- a\n- b]')

@@ -16,7 +16,11 @@ A list keeps only the buttons it names, in its order: `toolbar={['bold', 'italic
 
 ## Preview
 
-`preview` is a function that takes the text and resolves with its HTML. Given, a Preview button shows the result beside the field, or in place of it when the editor is narrow. The editor ships no Markdown parser: the function asks your server, so the preview is made by the same code as your pages.
+`preview` is a function that takes the text and resolves with its HTML. Given, a Preview button shows the result beside the field, or in place of it when the editor is narrow.
+
+<Demo name="markdown-editor/preview" />
+
+The editor ships no Markdown parser: the function asks your server, so the preview is made by the same code as your pages.
 
 ```ts
 // src/routes/api/preview.ts

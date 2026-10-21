@@ -159,6 +159,12 @@ describe('MarkdownEditor', () => {
   })
 })
 
+// Resolves once `ready` holds, polling, as the preview waits for a pause in typing.
+async function until(ready: () => boolean): Promise<void> {
+  for (let tries = 0; tries < 400 && !ready(); tries++)
+    await Bun.sleep(5)
+}
+
 const buttons = (root: Element) => [...root.querySelectorAll<HTMLButtonElement>('.kui-markdown-bar button')]
 const named = (root: Element, label: string) => buttons(root).find(button => button.getAttribute('aria-label') === label)!
 
@@ -206,7 +212,10 @@ describe('MarkdownEditor toolbar', () => {
     const state = await editor('', undefined, { labelled: true })
     const label = state.root.querySelector('label')!
 
+    const naming = state.root.querySelector(`#${state.area.getAttribute('aria-labelledby')}`)
+
     expect(label.control).toBe(state.area)
+    expect(naming?.textContent).toBe('Body')
   })
 })
 
@@ -229,16 +238,14 @@ describe('MarkdownEditor preview', () => {
     expect(state.root.querySelector('.kui-markdown-preview')).toBeNull()
 
     toggle.click()
-    await Bun.sleep(20)
-    await settle()
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one</p>')
 
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(state.root.querySelector('.kui-markdown-preview-body')?.innerHTML).toBe('<p>one</p>')
 
     state.area.setRangeText(' two', 3, 3, 'end')
     state.area.dispatchEvent(new Event('input', { bubbles: true }))
-    await Bun.sleep(350)
-    await settle()
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one two</p>')
 
     expect(state.root.querySelector('.kui-markdown-preview-body')?.innerHTML).toBe('<p>one two</p>')
 
@@ -254,10 +261,10 @@ describe('MarkdownEditor preview', () => {
     const state = await editor('a', undefined, { preview: async () => new Promise<string>(resolve => answers.push(resolve)) })
 
     named(state.root, 'Preview').click()
-    await Bun.sleep(20)
+    await until(() => answers.length === 1)
     state.area.setRangeText('b', 1, 1, 'end')
     state.area.dispatchEvent(new Event('input', { bubbles: true }))
-    await Bun.sleep(350)
+    await until(() => answers.length === 2)
 
     expect(answers).toHaveLength(2)
 
@@ -274,9 +281,12 @@ describe('MarkdownEditor preview', () => {
       throw new Error('down')
     } })
 
+    const log = console.error
+
+    console.error = () => undefined
     named(state.root, 'Preview').click()
-    await Bun.sleep(20)
-    await settle()
+    await until(() => state.root.querySelector('.kui-markdown-preview-failed') !== null)
+    console.error = log
 
     expect(state.root.querySelector('.kui-markdown-preview-failed')?.textContent).toBe('The preview could not be shown')
   })
