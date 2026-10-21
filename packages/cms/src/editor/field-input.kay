@@ -71,9 +71,9 @@ function boundsText(): string | undefined {
     return wording('cms.list.between', 'Between {min} and {max} items', { min, max })
 
   if (min !== undefined)
-    return wording('cms.list.atLeast', min === 1 ? 'At least 1 item' : 'At least {min} items', { min })
+    return wording('cms.list.atLeast', min === 1 ? 'At least 1 item' : 'At least {min} items', { min, count: min })
 
-  return max === undefined ? undefined : wording('cms.list.atMost', max === 1 ? 'At most 1 item' : 'At most {max} items', { max })
+  return max === undefined ? undefined : wording('cms.list.atMost', max === 1 ? 'At most 1 item' : 'At most {max} items', { max, count: max })
 }
 
 // The folds follow the items they were made on: every change of the list says how it moved them.
@@ -182,7 +182,7 @@ function setJson(next: string): void {
                   .kcms-item-controls
                     Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
                     IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                    IconButton(icon="delete" label={wording('cms.list.remove', 'Remove {item}', { item: title })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                    IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
                 else
                   .kcms-item-head
                     IconButton.kcms-fold(icon="chevron" data-kcms-fold label={foldedAt(i) ? wording('cms.list.expand', 'Expand {item}', { item: title }) : wording('cms.list.collapse', 'Collapse {item}', { item: title })} variant="ghost" size="sm" aria-expanded={foldedAt(i) ? 'false' : 'true'} data-kcms-item-control onClick={() => fold(i)})
@@ -190,7 +190,7 @@ function setJson(next: string): void {
                     .kcms-item-controls
                       Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
                       IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                      IconButton(icon="delete" label={wording('cms.list.remove', 'Remove {item}', { item: title })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                      IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
                   .kcms-item-body(role="group" aria-label={title} hidden={foldedAt(i)})
                     if current.item.kind === 'group'
                       for child of current.item.fields key={child.key}

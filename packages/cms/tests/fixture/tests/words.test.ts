@@ -53,7 +53,7 @@ test('the built editor sends the browser the messages it only reads after the pa
   const built = await testSite({ root: ROOT, browser: true })
 
   try {
-    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.list.remove', 'cms.entry.save']))
+    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.field.removeItem', 'cms.entry.save']))
     expect(sent((await built.visit('/fr/admin/collections/posts')).html)).toEqual(expect.arrayContaining(['cms.table.title']))
     expect(sent((await built.visit('/fr/admin/uploads')).html)).toEqual(expect.arrayContaining(['cms.uploads.deleteMany', 'cms.uploads.empty']))
     expect(sent((await built.visit('/admin/page?path=/blog/hello')).html)).toEqual([])
