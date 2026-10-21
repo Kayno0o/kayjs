@@ -283,13 +283,15 @@ import { testSite } from 'kay/test'
 const site = await testSite({ browser: true })
 
 it('counts the clicks', async () => {
-  const page = await site.open('/')
+  await using page = await site.open('/')
 
   await page.click('button.counter')
   await page.waitFor('button.counter', { text: 'Clicked 1' })
   expect(page.errors).toEqual([])
 })
 ```
+
+A page stays open until it is closed, which `await using` does when the test ends. A browser holds six connections to a host and each open page following a live value keeps one, so the seventh page waits for one: its load fails at the timeout, saying how many other pages are open.
 
 The page clicks and types as a user does.
 

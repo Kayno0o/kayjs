@@ -13,7 +13,7 @@ import { testSite } from 'kay/test'
 const site = await testSite({ browser: true })
 
 it('counts the clicks', async () => {
-  const page = await site.open('/')
+  await using page = await site.open('/')
 
   await page.click('button.counter')
   await page.waitFor('button.counter', { text: 'Clicked 1' })
@@ -72,6 +72,7 @@ expect(await page.path()).toBe('/account')
 - `offline()` and `online()` cut the page off the network and restore it: every request fails and `navigator.onLine` is false meanwhile.
 - `initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, as `evaluate` runs one; the current document is left as it is.
 - `cookies` gives the first load of `open` or `browse` a `Cookie` header string (`name=value; other=value`, a value keeping any `=` after the first) or a list of `{ name, value }`, for the site's origin.
+- A page stays open until it is closed, `await using page = await site.open(...)` closing it when the test ends, and each open page holding a live-values connection (`POST /_kay/live`) keeps one of the six a browser opens to a host, so the seventh waits for one; a load that stalls fails at the timeout saying how many other pages are open.
 - Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`.
 - `site.close()` closes the pages, sockets and streams it opened, and stops the site without waiting on any connection.
 

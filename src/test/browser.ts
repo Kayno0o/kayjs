@@ -204,6 +204,8 @@ const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
 // How long the browser outlives its last page, for the next test's and for a pause between a file's tests (a server booting in a beforeAll). Past it, a run that closes nothing after each file does not keep an idle Chrome to its end.
 const IDLE_MS = 5 * 60_000
+// The connections Chrome opens to one host over HTTP/1.1.
+const MAX_HOST_CONNECTIONS = 6
 // What a page's origin keeps in the browser, cleared before each page.
 const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
@@ -588,14 +590,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         }
       }
 
-      // A lenient page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
-      if (options.lenient === true) {
-        if (await within(navigate(), timeout) === TIMED_OUT)
-          throw new Error(`${UNSETTLED} ${timeout}ms waiting for ${target.pathname} to load`)
-      }
-      else {
-        await navigate()
-      }
+      // A page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
+      if (await within(navigate(), timeout) === TIMED_OUT)
+        throw new Error(`${UNSETTLED} ${timeout}ms waiting for ${target.pathname} to load${heldConnections()}`)
 
       await settle(ready, `${target.pathname} to load and hydrate its islands`)
     }),
@@ -804,6 +801,13 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   return page
+}
+
+// What a load that stalls says of the pages left open: a browser holds six connections to a host, and a page following a live value keeps one open for as long as the page lives, so the seventh page waits for a connection none will give.
+function heldConnections(): string {
+  const others = (browser?.pages ?? 1) - 1
+
+  return others < MAX_HOST_CONNECTIONS - 1 ? '' : `; ${others} other pages are still open, and a browser holds only ${MAX_HOST_CONNECTIONS} connections to a host, which a page following a live value keeps open until it is closed: close the pages a test is done with, as \`await using page = await site.open(...)\` does`
 }
 
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
