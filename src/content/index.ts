@@ -6,7 +6,7 @@ import type { Html } from '../runtime/rendered'
 import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
-import type { Migration } from './migrate'
+import type { Carried, Migration } from './migrate'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
 import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
@@ -20,7 +20,7 @@ import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
-import { hasSteps, migrateEntries, migrateLoaded } from './migrate'
+import { hasSteps, migrateEntries, migrateLoaded, writeBack } from './migrate'
 import { ContentError, decodeEntries, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
@@ -240,10 +240,15 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return result
   }
 
-  // What the loader gives, migrated and compiled; an entry the schema refuses is left out and reported, so one stale row does not hide the others. A refused entry is fetched again at the next load, once an editor fixed it.
+  // What the loader gives, migrated and compiled; an entry the schema refuses is left out and reported, so one stale row does not hide the others. The result is kept as any load's is, so an entry an editor fixes shows from that save's `invalidate()`, or at the next load past `ttl`.
   const fetchLoaded = async (preview: boolean) => {
-    const raw = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<TSchema>)
+    const { raw, carried } = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<TSchema>)
     const { entries, problems } = validEntries(raw, options.schema, components, localized)
+
+    // Only an entry that proved valid is written back.
+    const kept = new Set(entries.map(entry => entry.slug))
+
+    await writeBack(loader!, carried.filter(({ entry }) => kept.has(entry.slug)), localized, preview)
 
     if (problems.length > 0) {
       const left = new Set(problems.map(problem => problem.file)).size
@@ -415,13 +420,15 @@ export function collection<Schema extends TSchema, Components extends Record<str
 }
 
 // What a loader gives, compiled as files are: a Markdown body into segments and headings, HTML as one segment; two entries sharing a slug fail the collection.
-async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>, options: CollectionOptions<TSchema>): Promise<RawEntry[]> {
+async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>, options: CollectionOptions<TSchema>): Promise<{ raw: RawEntry[], carried: Carried[] }> {
   let given: unknown = await loader.load({ preview })
 
   if (!Array.isArray(given))
     throw new KayError('loader-result', `kay: the collection ${loader.name}'s load gave ${given === null ? 'null' : typeof given}, where it gives an array of entries`)
 
-  given = await migrateLoaded(loader.name, given as unknown[], options.schema, options.migrations, options.localized === true, loader.save)
+  const migrated = migrateLoaded(loader.name, given as unknown[], options.schema, options.migrations)
+
+  given = migrated.items
 
   const problems: ContentProblem[] = []
   const slugs = new Set<string>()
@@ -460,7 +467,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
   if (problems.length > 0)
     throw new ContentError(problems)
 
-  return entries
+  return { raw: entries, carried: migrated.carried }
 }
 
 // The paths the module's collections serve their feeds at, the ones written as literals.

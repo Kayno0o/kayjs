@@ -1,5 +1,5 @@
 import type { TSchema } from 'elysia'
-import type { LoadedEntry } from './index'
+import type { ContentLoader, LoadedEntry } from './index'
 import type { RawEntry } from './load'
 import { kayLog } from '../runtime/log'
 import { compiledCheck } from '../server/schema-check'
@@ -90,13 +90,19 @@ export function migrateEntries(name: string, entries: RawEntry[], schema: TSchem
   })
 }
 
-// What a loader gave with its stored data migrated; every entry that changed is handed back to the loader's `save` once, so the next read finds it in its new shape. A save that fails leaves the entry migrated for this read, and is tried again at the next.
-export async function migrateLoaded(name: string, given: unknown[], schema: TSchema, migrations: readonly Migration[] | undefined, localized: boolean, save: ((entry: { slug: string, locale?: string | undefined, data: unknown, body?: string | undefined }) => void | Promise<void>) | undefined): Promise<unknown[]> {
-  if (!hasSteps(migrations))
-    return given
+// An entry of a loader whose data migrated: what it held, to write back only while the loader still holds that.
+export interface Carried {
+  entry: LoadedEntry
+  was: unknown
+}
 
-  const result: unknown[] = []
-  const written: LoadedEntry[] = []
+// What a loader gave with its stored data migrated, and the entries that changed, which `writeBack` hands to the loader's `save` once they proved valid.
+export function migrateLoaded(name: string, given: unknown[], schema: TSchema, migrations: readonly Migration[] | undefined): { items: unknown[], carried: Carried[] } {
+  if (!hasSteps(migrations))
+    return { items: given, carried: [] }
+
+  const items: unknown[] = []
+  const carried: Carried[] = []
 
   for (const item of given) {
     const entry = (typeof item === 'object' && item !== null ? item : {}) as Partial<LoadedEntry>
@@ -108,29 +114,48 @@ export async function migrateLoaded(name: string, given: unknown[], schema: TSch
     if (changed) {
       const migrated = { ...entry, data } as LoadedEntry
 
-      result.push(migrated)
-      written.push(migrated)
+      items.push(migrated)
+      carried.push({ entry: migrated, was: entry.data })
     }
     else {
-      result.push(item)
+      items.push(item)
     }
   }
 
-  if (save === undefined || written.length === 0)
-    return result
+  return { items, carried }
+}
 
-  for (const entry of written) {
+// Hands the migrated entries to the loader's `save` once, so the next read finds them in the new shape. An entry the loader no longer holds as it was read, because an editor saved it meanwhile, is left to that save. A save that fails is logged, the entry staying migrated for this read and tried again at the next.
+export async function writeBack(loader: ContentLoader, carried: Carried[], localized: boolean, preview: boolean): Promise<void> {
+  const { save } = loader
+
+  if (save === undefined || carried.length === 0)
+    return
+
+  let written = 0
+
+  for (const { entry, was } of carried) {
     const split = localized ? entry.slug.indexOf('/') : -1
 
     try {
+      const current = await currentOf(loader, entry.slug, preview)
+
+      if (JSON.stringify(current?.data) !== JSON.stringify(was))
+        continue
+
       await save({ slug: split === -1 ? entry.slug : entry.slug.slice(split + 1), ...split !== -1 && { locale: entry.slug.slice(0, split) }, data: entry.data, ...entry.body !== undefined && { body: entry.body } })
+      written++
     }
     catch (error) {
-      kayLog('warn', `kay: ${name}'s save could not write the migrated entry ${entry.slug} back`, error)
+      kayLog('warn', `kay: ${loader.name}'s save could not write the migrated entry ${entry.slug} back`, error)
     }
   }
 
-  kayLog('info', `kay: ${written.length === 1 ? 'an entry' : `${written.length} entries`} of ${name} carried over by its migrations`)
+  if (written > 0)
+    kayLog('info', `kay: ${written === 1 ? 'an entry' : `${written} entries`} of ${loader.name} carried over by its migrations`)
+}
 
-  return result
+// The entry as the loader holds it now: from its `get` when it has one, else from `load`.
+async function currentOf(loader: ContentLoader, slug: string, preview: boolean): Promise<LoadedEntry | undefined> {
+  return loader.get ? loader.get(slug, { preview }) : (await loader.load({ preview })).find(each => each.slug === slug)
 }

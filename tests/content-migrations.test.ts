@@ -48,6 +48,18 @@ afterEach(() => {
   setContentMode({ dev: false, prebuilt: false })
 })
 
+// What a promise rejected with, or undefined once it resolved.
+async function rejection(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise
+  }
+  catch (error) {
+    return error
+  }
+
+  return undefined
+}
+
 const MODES = [{ dev: false, prebuilt: false }, { dev: true, prebuilt: false }]
 
 describe('a stored entry the schema refuses', () => {
@@ -191,6 +203,41 @@ describe('migrations', () => {
     expect(saved).toEqual([{ slug: 'old', locale: 'fr', data: { title: 'Old', price: 1, visible: true } }])
   })
 
+  it('write back only the entries that proved valid, and leave one an editor changed meanwhile', async () => {
+    const { loader, saved, rows } = store('migrated-guarded', [
+      { slug: 'old', data: { name: 'Old', price: 1 } },
+      { slug: 'dup', data: { name: 'One', price: 1 } },
+      { slug: 'dup', data: { name: 'Two', price: 1 } },
+      { data: { name: 'No slug', price: 1 } } as Row,
+    ])
+
+    expect(await rejection(collection(loader, { schema, migrations: steps }).all())).toBeInstanceOf(ContentError)
+    expect(saved).toEqual([])
+
+    rows.splice(1, 3)
+
+    const edited = store('migrated-edited', rows)
+    const packs = collection({ ...edited.loader, load: () => {
+      const given = rows.map(row => structuredClone(row))
+
+      // An editor saves the entry between the load and the write-back.
+      rows[0] = { slug: 'old', data: { title: 'Fixed by hand', price: 2, visible: true } }
+
+      return given
+    } }, { schema, migrations: steps })
+
+    expect((await packs.all()).map(entry => entry.data.title)).toEqual(['Old'])
+    expect(edited.saved).toEqual([])
+    expect(rows[0]!.data).toEqual({ title: 'Fixed by hand', price: 2, visible: true })
+  })
+
+  it('reports a localized entry without a slug as the collection does, not as a crash', async () => {
+    const { loader, saved } = store('migrated-slugless', [{ data: { name: 'No slug', price: 1 } } as Row])
+
+    expect(await rejection(collection(loader, { schema, migrations: steps, localized: true }).all())).toBeInstanceOf(ContentError)
+    expect(saved).toEqual([])
+  })
+
   it('keep a read going when the save fails or a step throws, the entry that cannot be carried over left out', async () => {
     const failing = store('migrated-failing', [{ slug: 'old', data: { name: 'Old', price: 1 } }, { slug: 'odd', data: { name: 'Odd', price: 2 } }], { failSave: true })
     const packs = collection(failing.loader, { schema, migrations: steps })
@@ -271,6 +318,23 @@ describe('a CMS editing a collection with stored entries the schema refuses', ()
 })
 
 describe('a unique field', () => {
+  it('holds for two saves of one value made at once, the second refused in its turn', async () => {
+    const schema = t.Object({ code: unique(t.String()) })
+    const { loader } = store('uniques-race', [])
+    const packs = collection(loader, { schema })
+    const before = registerCollections([['uniquesRace', packs]])
+
+    try {
+      const results = await Promise.all([saveEntry('uniquesRace', { slug: 'a', data: { code: 'X' } }), saveEntry('uniquesRace', { slug: 'b', data: { code: 'X' } })])
+
+      expect(results.filter(result => result.issues !== undefined)).toHaveLength(1)
+      expect((await packs.all()).map(entry => entry.slug)).toEqual(['a'])
+    }
+    finally {
+      registerCollections(before)
+    }
+  })
+
   it('refuses a save that repeats another entry\'s value, the entry itself and other locales excepted', async () => {
     const schema = t.Object({ code: unique(t.String()), name: t.String() })
     const { loader } = store('uniques', [

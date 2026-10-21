@@ -460,6 +460,13 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
       return { issues }
 
     await turn.ready
+
+    // A save ahead in turn may have taken the value.
+    const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>)
+
+    if (taken.length > 0)
+      return { issues: taken }
+
     const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
     if (options.create === true && (await loadedEntries(name, collection, { shared: false })).some(each => each.slug === place))
