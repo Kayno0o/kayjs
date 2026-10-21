@@ -23,15 +23,87 @@
   color: var(--color-kui-subtext0);
 }
 
+.kcms-list,
+.kcms-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .kcms-list-item {
   display: flex;
-  align-items: start;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-kui-surface1);
+  border-radius: 0.5rem;
+}
+
+/* One control and its buttons on a row, wrapping the buttons under the control where the row is narrow. */
+.kcms-list-item[data-compact] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.kcms-list-item[data-compact] > .kcms-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* A compact row repeats no label: the list's own names the group, and the control keeps its label for a screen reader. */
+.kcms-list-item[data-compact] > .kcms-field > .kui-form-field > .kui-form-field-label > .kui-form-field-head {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.kcms-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem;
 }
 
-.kcms-list-item > .kcms-field {
-  flex: 1;
+.kcms-item-title {
+  flex: 1 1 8rem;
   min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kcms-item-controls {
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.kcms-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.kcms-fold svg {
+  transition: transform 0.15s;
+}
+
+.kcms-fold[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.kcms-item-removed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--color-kui-subtext0);
+  font-size: 0.85rem;
 }
 
 .kcms-json {
@@ -112,12 +184,12 @@
 
 .kcms-reorder {
   display: flex;
-  flex-direction: column;
 }
 
 .kcms-move-up svg {
   transform: rotate(180deg);
 }
+
 
 /* A row of the layout: its fields side by side, stacking where there is no room, so a single field fills the row. */
 .kcms-row {
@@ -129,4 +201,9 @@
 
 .kcms-row > * {
   min-width: 0;
+}
+
+/* A select draws its text a few pixels in from its edge, so its padding gives that back to line it up with a text input's. */
+.kcms-field select {
+  padding-inline-start: calc(var(--spacing-kui-field-x) - 0.25rem);
 }

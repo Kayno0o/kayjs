@@ -6,6 +6,8 @@ interface FieldBase {
   label: string
   required: boolean
   hint?: string | undefined
+  // What the schema starts the field as, which a new list item takes.
+  default?: unknown
 }
 
 // `value` is what the select posts, `raw` what the entry holds, a number for a numeric enum.
@@ -19,7 +21,7 @@ export type Field
   = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'image' | 'file' | 'json' }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
-    | FieldBase & { kind: 'list', item: Field, numbered: boolean }
+    | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined }
     | FieldBase & { kind: 'group', fields: Field[] }
     // A kind the app names with `customField`, edited by `src/cms/fields/<name>.kay`.
     | FieldBase & { kind: 'custom', name: string }
@@ -53,6 +55,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     // A field with a default is filled in when left out, so nothing has to be typed in it.
     required: required && !nullable && schema.default === undefined,
     hint: inner.description ?? schema.description,
+    default: inner.default ?? schema.default,
   }
   const hint = inner['x-kay']
 
@@ -86,13 +89,41 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       return { ...base, kind: 'boolean' }
     case 'array':
       // A tuple, items listed one schema per place, is edited as JSON.
-      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined }
+      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems) }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     case undefined:
     default:
       return { ...base, kind: 'json' }
   }
+}
+
+function bound(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined
+}
+
+// The kinds a list shows as one compact row, the control and the buttons side by side; the others get a head with a title and fold away.
+const COMPACT = new Set<Field['kind']>(['text', 'number', 'integer', 'date', 'datetime', 'select', 'boolean', 'reference'])
+
+export function isCompact(list: Field & { kind: 'list' }): boolean {
+  return COMPACT.has(list.item.kind)
+}
+
+// What heads a list's item: a group's first filled text field, else the item's own label ("Item 3", or its schema's title).
+export function itemTitle(list: Field & { kind: 'list' }, value: unknown, index: number): string {
+  const label = itemAt(list, index).label
+
+  if (list.item.kind !== 'group' || typeof value !== 'object' || value === null)
+    return label
+
+  for (const child of list.item.fields) {
+    const text = child.kind === 'text' ? (value as Record<string, unknown>)[String(child.key)] : undefined
+
+    if (typeof text === 'string' && text.trim() !== '')
+      return text.trim()
+  }
+
+  return label
 }
 
 // A list's field for its item at `index`, numbered by its place unless its schema titles it.
@@ -147,8 +178,11 @@ function choicesOf(schema: JsonSchema): Choice[] | undefined {
   return schema.anyOf.map(variant => ({ value: String(variant.const), label: variant.title ?? String(variant.const), raw: variant.const }))
 }
 
-// What a new list item starts as: blank text, an unset number, an empty group or list.
+// What a new list item starts as: the schema's default, else blank text, an unset number or select, an empty group or list.
 export function emptyValue(field: Field): unknown {
+  if (field.default !== undefined)
+    return structuredClone(field.default)
+
   switch (field.kind) {
     case 'boolean':
       return false
@@ -162,7 +196,7 @@ export function emptyValue(field: Field): unknown {
     case 'group':
       return Object.fromEntries(field.fields.map(child => [child.key, emptyValue(child)]))
     case 'select':
-      return field.required ? field.options[0]?.raw : undefined
+      return undefined
     case 'text':
     case 'textarea':
     case 'markdown':

@@ -31,11 +31,12 @@ describe('targetOf', () => {
 })
 
 describe('keyDirection', () => {
-  it('reads Alt with an arrow, and nothing else', () => {
-    expect(keyDirection(key('ArrowUp', { altKey: true }))).toBe('up')
-    expect(keyDirection(key('ArrowDown', { altKey: true }))).toBe('down')
+  it('reads Alt and Shift with an arrow, and nothing else', () => {
+    expect(keyDirection(key('ArrowUp', { altKey: true, shiftKey: true }))).toBe('up')
+    expect(keyDirection(key('ArrowDown', { altKey: true, shiftKey: true }))).toBe('down')
     expect(keyDirection(key('ArrowUp'))).toBeUndefined()
-    expect(keyDirection(key('ArrowUp', { altKey: true, shiftKey: true }))).toBeUndefined()
+    expect(keyDirection(key('ArrowUp', { altKey: true }))).toBeUndefined()
+    expect(keyDirection(key('ArrowUp', { altKey: true, shiftKey: true, ctrlKey: true }))).toBeUndefined()
     expect(keyDirection(key('a', { altKey: true }))).toBeUndefined()
   })
 })
@@ -43,7 +44,7 @@ describe('keyDirection', () => {
 describe('reorderKey', () => {
   function pressed(name: string, held: Partial<KeyboardEvent> = {}) {
     const event = {
-      ...key(name, { altKey: true }),
+      ...key(name, { altKey: true, shiftKey: true }),
       defaultPrevented: false,
       ...held,
       preventDefault() {

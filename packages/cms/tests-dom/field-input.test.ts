@@ -41,10 +41,10 @@ test('the buttons of a list item move it, reorder the saved value and say the it
   expect(said()).toBe('Moved Item 1 to 2 of 3')
 })
 
-test('Alt with an arrow in a field of an item moves it, and a move past either end changes nothing', async () => {
+test('Alt and Shift with an arrow in a field of an item moves it, and a move past either end changes nothing', async () => {
   const { drafts, root } = await open(['a', 'b', 'c'])
   const rows = () => root.querySelectorAll<HTMLElement>('[data-kcms-row]')
-  const press = (row: HTMLElement, key: string) => row.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, bubbles: true, cancelable: true }))
+  const press = (row: HTMLElement, key: string) => row.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, shiftKey: true, bubbles: true, cancelable: true }))
 
   press(rows()[2]!, 'ArrowUp')
   await settle()
@@ -56,6 +56,114 @@ test('Alt with an arrow in a field of an item moves it, and a move past either e
   await settle()
 
   expect(drafts.value(ENTRY, 'tags')).toEqual(['a', 'c', 'b'])
+})
+
+const PEOPLE: Field = { key: 'tags', label: 'People', hint: undefined, required: false, kind: 'list', numbered: true, minItems: 1, maxItems: 3, item: { key: 0, label: 'Person', hint: undefined, required: true, kind: 'group', fields: [{ key: 'name', label: 'Name', hint: undefined, required: false, kind: 'text', default: 'Anon' }, { key: 'role', label: 'Role', hint: undefined, required: true, kind: 'select', options: [{ value: 'a', label: 'A', raw: 'a' }, { value: 'b', label: 'B', raw: 'b' }] }] } }
+
+async function openField(field: Field, data: unknown) {
+  mounted = await mountComponent('src/components/list-state.kay', { data, field })
+  await settle()
+
+  const root = mounted.root
+  const drafted = () => JSON.parse(root.querySelector('.drafted')!.textContent) as unknown
+  const click = async (selector: string, at = 0) => {
+    root.querySelectorAll<HTMLElement>(selector)[at]!.click()
+    await settle()
+  }
+
+  return { drafted, root, click, rows: () => [...root.querySelectorAll<HTMLElement>('[data-kcms-row]')] }
+}
+
+test('a list of strings shows its label once, the rows naming their input for a screen reader only', async () => {
+  const { root } = await openField(TAGS, ['a', 'b'])
+
+  expect(root.querySelectorAll('[data-kcms-row][data-compact]').length).toBe(2)
+  expect(root.querySelector('legend')?.textContent).toContain('Tags')
+  expect(root.querySelectorAll('input')[0]!.closest('label')?.textContent).toContain('Item 1')
+  expect(root.querySelector('.kcms-item-head')).toBeNull()
+})
+
+test('a list of groups heads each item by its first filled text, folds it away, and keeps the fold on the item when it moves', async () => {
+  const { root, click, rows } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }, { name: '', role: 'b' }])
+
+  expect(root.querySelectorAll('.kcms-item-title').length).toBe(2)
+  expect([...root.querySelectorAll('.kcms-item-title')].map(title => title.textContent)).toEqual(['Ada', 'Item 2'])
+  await click('.kcms-fold', 0)
+  expect(rows()[0]!.querySelector('.kcms-item-body')!.hasAttribute('hidden')).toBe(true)
+  expect(rows()[0]!.querySelector('.kcms-fold')!.getAttribute('aria-expanded')).toBe('false')
+  await click('[data-kcms-move="down"]', 0)
+  expect(rows()[1]!.querySelector('.kcms-item-body')!.hasAttribute('hidden')).toBe(true)
+  expect(rows()[0]!.querySelector('.kcms-item-body')!.hasAttribute('hidden')).toBe(false)
+  await click('.kcms-fold', 1)
+  expect(rows()[1]!.querySelector('.kcms-item-body')!.hasAttribute('hidden')).toBe(false)
+})
+
+test('a new item starts from the schema default, a required select left unpicked, and the list shows its count and bounds', async () => {
+  const { drafted, root, click } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }])
+
+  expect(root.textContent).toContain('1 item')
+  expect(root.textContent).toContain('Between 1 and 3 items')
+  await click('[data-kcms-add]')
+  expect(drafted()).toEqual([{ name: 'Ada', role: 'a' }, { name: 'Anon' }])
+  expect(root.querySelectorAll('select')[1]!.value).toBe('')
+})
+
+test('Add and Duplicate stop at maxItems and Remove at minItems', async () => {
+  const { drafted, root, click } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }])
+  const removers = () => [...root.querySelectorAll<HTMLButtonElement>('button[aria-label^="Remove"]')]
+
+  expect(removers()[0]!.disabled).toBe(true)
+  await click('[data-kcms-add]')
+  await click('button[aria-label^="Duplicate"]', 0)
+  expect(drafted()).toHaveLength(3)
+  expect(root.querySelector('[data-kcms-add]')).toBeNull()
+  expect([...root.querySelectorAll<HTMLButtonElement>('button[aria-label^="Duplicate"]')].every(button => button.disabled)).toBe(true)
+  expect(removers().every(button => !button.disabled)).toBe(true)
+  await click('button[aria-label^="Remove"]', 2)
+  await click('button[aria-label^="Remove"]', 1)
+  expect(drafted()).toHaveLength(1)
+  expect(removers()[0]!.disabled).toBe(true)
+})
+
+test('Duplicate copies an item right after it without sharing it', async () => {
+  const { drafted, root, click } = await openField(TAGS, ['a', 'b'])
+
+  await click('button[aria-label^="Duplicate"]', 0)
+  expect(drafted()).toEqual(['a', 'a', 'b'])
+
+  const copy = root.querySelectorAll('input')[1]!
+
+  copy.value = 'z'
+  copy.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(drafted()).toEqual(['a', 'z', 'b'])
+})
+
+test('removing an item can be undone at its place, and focus lands on the item that took its place, else on Add', async () => {
+  const { drafted, root, click, rows } = await openField(TAGS, ['a', 'b', 'c'])
+
+  await click('button[aria-label^="Remove"]', 1)
+  expect(drafted()).toEqual(['a', 'c'])
+  expect(root.querySelector('[role="status"]')?.textContent).toContain('Item 2 removed')
+  expect(document.activeElement).toBe(rows()[1]!.querySelector('input'))
+  await click('.kcms-item-removed button')
+  expect(drafted()).toEqual(['a', 'b', 'c'])
+  expect(root.querySelector('[role="status"]')).toBeNull()
+  expect(document.activeElement).toBe(rows()[1]!.querySelector('input'))
+  await click('button[aria-label^="Remove"]', 2)
+  await click('button[aria-label^="Remove"]', 1)
+  await click('button[aria-label^="Remove"]', 0)
+  expect(drafted()).toEqual([])
+  expect(document.activeElement).toBe(root.querySelector('[data-kcms-add]'))
+})
+
+test('Add puts focus in the new item', async () => {
+  const { root, click, rows } = await openField(TAGS, ['a'])
+
+  await click('[data-kcms-add]')
+  expect(rows()).toHaveLength(2)
+  expect(document.activeElement).toBe(rows()[1]!.querySelector('input'))
+  expect(root.querySelector('.kcms-item-removed')).toBeNull()
 })
 
 const ZONE = process.env.TZ

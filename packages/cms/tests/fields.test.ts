@@ -1,7 +1,7 @@
 import type { Field } from '../src/fields'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { emptyValue, fieldsOf, humanize, itemAt } from '../src/fields'
+import { emptyValue, fieldsOf, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
 
 describe('fieldsOf', () => {
   it('turns each property into a field, in order, with its label and whether it is required', () => {
@@ -168,7 +168,25 @@ describe('emptyValue', () => {
       },
     })
 
-    expect(emptyValue(item as Field)).toEqual({ label: '', on: false, count: undefined, size: 's', tags: [] })
+    expect(emptyValue(item as Field)).toEqual({ label: '', on: false, count: undefined, size: undefined, tags: [] })
+  })
+
+  it('starts a new item from the schema default, a group from its fields\' defaults, never sharing the default', () => {
+    const [links, tags, rows] = fieldsOf({ properties: { links: { type: 'array', items: { type: 'object', properties: { label: { type: 'string', minLength: 1, default: 'Link' }, kind: { enum: ['a', 'b'], default: 'b' } } } }, tags: { type: 'array', items: { type: 'string', default: 'new' } }, rows: { type: 'array', items: { type: 'array', items: { type: 'string' }, default: ['x'] } } } }) as (Field & { kind: 'list' })[]
+
+    expect(emptyValue(links!.item)).toEqual({ label: 'Link', kind: 'b' })
+    expect(emptyValue(tags!.item)).toBe('new')
+
+    const first = emptyValue(rows!.item) as string[]
+
+    first.push('y')
+    expect(emptyValue(rows!.item)).toEqual(['x'])
+  })
+
+  it('leaves a required select unpicked, as it has no default to start from', () => {
+    const [mood] = fieldsOf({ required: ['mood'], properties: { mood: { enum: ['calm', 'busy'] } } })
+
+    expect(emptyValue(mood!)).toBeUndefined()
   })
 })
 
@@ -178,5 +196,31 @@ describe('itemAt', () => {
 
     expect([itemAt(tags!, 0), itemAt(tags!, 1)].map(item => [item.key, item.label])).toEqual([[0, 'Item 1'], [1, 'Item 2']])
     expect(itemAt(links!, 1).label).toBe('Link')
+  })
+})
+
+describe('list bounds', () => {
+  it('reads minItems and maxItems, ignoring what is not a count', () => {
+    const [bounded, loose, odd] = fieldsOf({ properties: { a: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }, b: { type: 'array', items: { type: 'string' } }, c: { type: 'array', minItems: -1, maxItems: 1.5, items: { type: 'string' } } } })
+
+    expect(bounded).toMatchObject({ kind: 'list', minItems: 1, maxItems: 3 })
+    expect(loose).toMatchObject({ kind: 'list', minItems: undefined, maxItems: undefined })
+    expect(odd).toMatchObject({ kind: 'list', minItems: undefined, maxItems: undefined })
+  })
+})
+
+describe('itemTitle and isCompact', () => {
+  const [people, tags, flags] = fieldsOf({ properties: { people: { type: 'array', items: { type: 'object', properties: { age: { type: 'integer' }, name: { type: 'string' }, bio: { type: 'string' } } } }, tags: { type: 'array', items: { type: 'string' } }, flags: { type: 'array', items: { type: 'boolean' } } } }) as (Field & { kind: 'list' })[]
+
+  it('heads a group by its first filled text, else by its place', () => {
+    expect(itemTitle(people!, { name: ' Ada ', bio: 'x' }, 2)).toBe('Ada')
+    expect(itemTitle(people!, { name: '', bio: 'x' }, 2)).toBe('x')
+    expect(itemTitle(people!, { name: '  ', bio: '' }, 2)).toBe('Item 3')
+    expect(itemTitle(people!, undefined, 0)).toBe('Item 1')
+    expect(itemTitle(tags!, 'a', 1)).toBe('Item 2')
+  })
+
+  it('shows single controls as compact rows and the others folded under a head', () => {
+    expect([people, tags, flags].map(list => isCompact(list!))).toEqual([false, true, true])
   })
 })

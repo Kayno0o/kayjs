@@ -139,7 +139,11 @@ A literal with no `title` shows its value.
 
 ## Lists
 
-An array field is a list of items, each with a button to remove it. Up and down buttons beside an item move it, and Alt with the up or down arrow does the same from inside its fields. A screen reader is told where the item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
+An array field is a list of items. A list of single values, such as strings, shows its label once and then one compact row per item. A list of groups folds each item away under a title, the first text field filled in, or `Item 3` when none is. The list shows how many items it holds, and the `minItems` and `maxItems` of the schema: Add and Duplicate stop at the maximum, Remove at the minimum.
+
+A new item starts from the `default` of the item's schema, and a select with no default stays unpicked.
+
+Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
 
 ## Field kinds of your own
 

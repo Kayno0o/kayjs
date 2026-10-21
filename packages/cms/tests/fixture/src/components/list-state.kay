@@ -1,0 +1,16 @@
+--- client
+import FieldInput from '@kaynooo/kayjs-cms/field-input.kay'
+import { createDrafts } from '../../../../src/drafts'
+
+// The editor's list field on drafts of its own, so the page follows the edits as it does in the editor, with the saved value written out for a test to read.
+type Input = Parameters<typeof FieldInput>[0]
+
+const { data, field } = props<{ data: unknown, field: Input['field'] }>()
+const entry = { collection: 'posts', slug: 'hello' }
+const drafts = createDrafts({ show: async () => ({}) })
+
+// Imported by file, so the package's own types see them as another module's.
+drafts.open({ ...entry, data: { tags: data } })
+---
+FieldInput(drafts={drafts as unknown as Input['drafts']} entry={entry} field={field} path="tags")
+pre.drafted {JSON.stringify(drafts.value(entry, 'tags') ?? null)}

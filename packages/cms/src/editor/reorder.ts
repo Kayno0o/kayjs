@@ -4,9 +4,9 @@ import { wording } from 'kay/words'
 
 export type Direction = 'up' | 'down'
 
-// Alt with an arrow moves the item the key was pressed in, the keyboard's answer to the up and down buttons.
+// Alt and Shift with an arrow move the item the key was pressed in, the keyboard's answer to the up and down buttons. Alt with an arrow alone is the browser's history on some systems and a screen reader's or the OS's navigation on others.
 export function keyDirection(event: KeyboardEvent): Direction | undefined {
-  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+  if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey)
     return undefined
 
   if (event.key === 'ArrowUp')
@@ -59,4 +59,17 @@ export function followFocus(row: Element | null, to: number, direction: Directio
 // Focus follows a moved item but a screen reader is not told where it landed, so the move is said through kayjs-ui's shared live region.
 export function announceMove(item: string, to: number, count: number): void {
   announce(wording('cms.reorder.moved', 'Moved {item} to {position} of {count}', { item, position: to + 1, count }))
+}
+
+const CONTROLS = 'input:not([type="hidden"]), select, textarea, button:not([data-kcms-move]):not([data-kcms-item-control])'
+
+// The page shows a list's change after a flush, so focus goes to the first control of the item now at `index` in `rows`, the nearest one when it is past the end, else to `fallback`, such as the list's Add button.
+export function focusItem(rows: Element | null | undefined, index: number, fallback?: Element | null): void {
+  flush()
+
+  const items = rows?.querySelectorAll(':scope > [data-kcms-row]') ?? []
+  const target = items[Math.min(index, items.length - 1)]?.querySelector<HTMLElement>(CONTROLS) ?? fallback
+
+  if (target instanceof HTMLElement)
+    target.focus()
 }
