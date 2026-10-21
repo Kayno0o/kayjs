@@ -179,7 +179,12 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
     if (!prefix && word !== bare)
       continue
 
-    const factor = word === term ? 1 : prefix ? PREFIX_FACTOR + (1 - PREFIX_FACTOR) * term.length / word.length : SINGULAR_FACTOR
+    let factor = SINGULAR_FACTOR
+
+    if (word === term)
+      factor = 1
+    else if (prefix)
+      factor = PREFIX_FACTOR + (1 - PREFIX_FACTOR) * term.length / word.length
 
     for (let i = 0; i < postings.length; i += 2) {
       const score = postings[i + 1]! * factor
@@ -271,7 +276,10 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
 function matched(word: string, terms: string[]): number | undefined {
   const term = terms.find(term => word.startsWith(term))
 
-  return term === undefined ? terms.some(term => word === singular(term)) ? word.length : undefined : term.length
+  if (term !== undefined)
+    return term.length
+
+  return terms.some(term => word === singular(term)) ? word.length : undefined
 }
 
 // The text from `start` to `end` in parts, the hits within it marked.
