@@ -153,4 +153,22 @@ describe('the labels', () => {
       expect((error as ContentError).problems[0]?.line).toBe(5)
     }
   })
+
+  it('give each refused field the line of its own top-level key, escaped or dotted', () => {
+    const odd = t.Object({
+      'a/b': t.String({ minLength: 1 }),
+      'c~d': t.String({ minLength: 1 }),
+      'a.b': t.String({ minLength: 1 }),
+      'a': t.Object({ b: t.String({ minLength: 1 }) }),
+    })
+    const lines = { 'a/b': 2, 'c~d': 3, 'a.b': 4, 'a': 5 }
+
+    try {
+      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a/b': '', 'c~d': '', 'a.b': '', 'a': { b: '' } }, lines, body: '' } as never], odd, {})
+      expect.unreachable()
+    }
+    catch (error) {
+      expect((error as ContentError).problems.map(problem => [problem.line, problem.message.slice(0, problem.message.indexOf(':'))])).toEqual([[2, 'a/b'], [3, 'c~d'], [4, 'a.b'], [5, 'a.b']])
+    }
+  })
 })

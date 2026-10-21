@@ -30,6 +30,8 @@ interface FieldSchema {
   items?: FieldSchema
 }
 
+const unescaped = (segment: string): string => segment.replaceAll('~1', '/').replaceAll('~0', '~')
+
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
 export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
   const { decoded, problems } = readEntries(entries, schema, components, localized)
@@ -74,15 +76,12 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
       continue
     }
 
-    // Each refused field by its own dotted path, on the line its top-level field starts at.
-    const tops = new Map<string, string>()
+    // Each refused field once by its JSON pointer, so `a.b` and `a` > `b` stay apart, on the line its top-level key starts at.
+    for (const [pointer, message] of refusals(check, data, path => path, issue => refusalSentence(schema, issue))) {
+      const path = dottedPath(pointer)
 
-    for (const [path, message] of refusals(check, data, dottedPath, (issue) => {
-      tops.set(dottedPath(issue.path), fieldOf(issue.path))
-
-      return refusalSentence(schema, issue)
-    }))
-      problems.push({ file: entry.file, line: entry.lines[tops.get(path) ?? ''] ?? 1, message: path === '' ? message : `${path}: ${message}` })
+      problems.push({ file: entry.file, line: entry.lines[unescaped(fieldOf(pointer))] ?? 1, message: path === '' ? message : `${path}: ${message}` })
+    }
   }
 
   return { decoded, problems }
@@ -151,7 +150,7 @@ function titleOf(node: SchemaNode | undefined): string | undefined {
 
 // How an entry names a field: its schema `title`, else its key worded (`publishedAt` gives `Published at`), an item of a list as `Tags, item 2`.
 function labelOf(schema: TSchema, pointer: string): string {
-  const segments = pointer.split('/').slice(1).map(segment => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+  const segments = pointer.split('/').slice(1).map(unescaped)
   let node: SchemaNode | undefined = schema
   let label = ''
 
