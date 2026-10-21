@@ -81,6 +81,6 @@ expect(await page.path()).toBe('/account')
 - It runs the executable given as `path`, to `testSite({ browser: { path } })` or `open`, else `BUN_CHROME_PATH`, else the first Chrome or Chromium on the `PATH` or where it usually installs; with none, `open` fails saying so, and `describe.skipIf(browserPath() === undefined)` skips a suite instead.
 - In an Alpine CI image, `apk add chromium` and `BUN_CHROME_PATH=$(command -v chromium)`; as root, as in a container, Chrome runs without its sandbox.
 - Chrome runs on a profile kay makes in the temp directory and removes, with what Bun and Chrome leave beside it, when the browser closes.
-- The browser closes a second after the last page closed, so the next test reuses it, and once the tests ran, as bun test runs no exit handler (after the run, or each file of a parallel one, with `kay/test/preload`; else after the file that loaded `kay/test` first), or at exit outside bun test.
+- A test process starts Chrome once, however long it pauses between pages (a server booting in a `beforeAll`), and closes it once the tests ran, as bun test runs no exit handler (after the run, or each file of a parallel one, with `kay/test/preload`; else after the file that loaded `kay/test` first), or at exit outside bun test.
 - The first page of a later run removes what a killed run left.
 - Closing the browser closes every `Bun.WebView` of the process, one the test made itself included, and kills every process Chrome started, which Alpine's Chromium leaves running otherwise.

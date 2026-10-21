@@ -1326,7 +1326,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browse
   const shortTemp = async () => mkdtemp(join(process.platform === 'darwin' ? '/tmp' : tmpdir(), 'kt-'))
   const server = 'const server = Bun.serve({ port: 0, fetch: () => new Response(\'<p>Hi</p>\', { headers: { \'content-type\': \'text/html\' } }) })\n'
 
-  it('keeps the browser for the next page a moment, then leaves nothing in the temp directory, at exit too, and removes what a killed run left as far as it can', async () => {
+  it('keeps the browser through a pause between pages, then leaves nothing in the temp directory, at exit too, and removes what a killed run left as far as it can', async () => {
     const temp = await shortTemp()
     const script = join(await scratchDir('profile-'), 'run.ts')
 
@@ -1334,12 +1334,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browse
     // A killed run's directory kay cannot remove, which leaves the browser to start.
     await Bun.write(join(temp, LOCKED, 'profile/f'), '')
     await chmod(join(temp, LOCKED, 'profile'), 0o500)
-    await Bun.write(script, `import { readdirSync } from 'node:fs'
+    await Bun.write(script, `import { readdirSync, readlinkSync } from 'node:fs'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
-${server}const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-') && name !== ${JSON.stringify(LOCKED)}).map(name => readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock')))
+const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
 const pages = [await open(), await open()]
 const listed = () => console.log(JSON.stringify(readdirSync(tmpdir())))
 
@@ -1349,12 +1351,12 @@ for (const page of pages)
   page.close()
 
 listed()
-// The browser goes once it has been idle a moment, which the temp directory shows.
-for (const limit = Date.now() + 10_000; readdirSync(tmpdir()).some(name => name !== ${JSON.stringify(LOCKED)}) && Date.now() < limit;)
-  await Bun.sleep(20)
-
+// The browser stays through a pause, and the next page uses the same Chrome.
+const before = chrome()
+await Bun.sleep(1500)
 listed()
 await open()
+console.log(JSON.stringify({ same: JSON.stringify(chrome()) === JSON.stringify(before), count: before.length }))
 await server.stop()
 process.exit(0)
 `)
@@ -1362,15 +1364,17 @@ process.exit(0)
     try {
       const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
       const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-      const listings = out.trim().split('\n').map(line => JSON.parse(line) as string[])
-      const [opened, closed] = listings.map(kinds)
+      const lines = out.trim().split('\n').map(line => JSON.parse(line) as unknown)
+      const listings = lines.slice(0, 3) as string[][]
+      const [opened, closed, paused] = listings.map(kinds)
 
       expect({ code, errors }).toEqual({ code: 0, errors: '' })
       // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
       expect(running(opened!)).toEqual(['bun', 'chrome', 'kay'])
       expect(running(closed!)).toEqual(['bun', 'chrome', 'kay'])
-      // By name, so a directory left behind says what made it.
-      expect(listings[2]?.filter(name => name !== LOCKED)).toEqual([])
+      expect(running(paused!)).toEqual(['bun', 'chrome', 'kay'])
+      // The same Chrome served the page after the pause.
+      expect(lines[3]).toEqual({ same: true, count: 1 })
       // The page opened last, left open, goes at exit.
       expect(kinds(await readdir(temp))).toEqual([])
     }

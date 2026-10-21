@@ -202,13 +202,11 @@ const LOCK_PID = /-(\d+)$/
 // The parent's process in a /proc stat line, read from the end of the command's name.
 const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
-// How long the browser outlives its last page, for the next test's.
-const IDLE_MS = 1000
 // What a page's origin keeps in the browser, cleared before each page.
 const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
-// The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
-let browser: { dir: string, pages: number, ready: Promise<void>, idle?: Timer } | undefined
+// The browser of this process's pages, which outlives them all so a file launches Chrome once, however long it pauses between pages (a boot in a beforeAll): it closes after the file or at exit. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
+let browser: { dir: string, ready: Promise<void> } | undefined
 // The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
@@ -257,26 +255,17 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const { dir, first } = await claimBrowser()
   // `--enable-automation` lets Chrome tell its command line, which names the profile Bun made.
   const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation']
-  let view: Bun.WebView
-
-  try {
-    view = new Bun.WebView({
-      ...options.width === undefined ? {} : { width: options.width },
-      ...options.height === undefined ? {} : { height: options.height },
-      backend: { type: 'chrome', path: executable, argv, url: false },
-      console: (type, ...args) => {
-        if (type === 'error')
-          errors.push(args.map(consoleText).join(' '))
-        else if (type === 'warn' || type === 'warning')
-          warnings.push(args.map(consoleText).join(' '))
-      },
-    })
-  }
-  catch (error) {
-    releaseBrowser()
-
-    throw error
-  }
+  const view = new Bun.WebView({
+    ...options.width === undefined ? {} : { width: options.width },
+    ...options.height === undefined ? {} : { height: options.height },
+    backend: { type: 'chrome', path: executable, argv, url: false },
+    console: (type, ...args) => {
+      if (type === 'error')
+        errors.push(args.map(consoleText).join(' '))
+      else if (type === 'warn' || type === 'warning')
+        warnings.push(args.map(consoleText).join(' '))
+    },
+  })
 
   let closed = false
   let origin = new URL(url).origin
@@ -740,9 +729,6 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       network.close()
       attempt(() => view.close())
 
-      if (!closed)
-        releaseBrowser()
-
       closed = true
     },
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
@@ -809,15 +795,13 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
 async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   if (browser) {
-    clearTimeout(browser.idle)
-    browser.pages++
     await browser.ready
 
     return { dir: browser.dir, first: false }
   }
 
   sweepProfiles()
-  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, ready: killed === undefined ? Promise.resolve() : exited(killed) }
+  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), ready: killed === undefined ? Promise.resolve() : exited(killed) }
   killed = undefined
 
   if (!exitHooked)
@@ -829,32 +813,17 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   return { dir: browser.dir, first: true }
 }
 
-// A while after the last page closed, the browser goes with its profile, and the next page starts another.
-function releaseBrowser() {
-  if (!browser || --browser.pages > 0)
-    return
-
-  const idle = browser
-
-  idle.idle = setTimeout(() => {
-    if (browser === idle)
-      closeBrowser()
-  }, IDLE_MS)
-  idle.idle.unref()
-}
-
 // Pages still open close with it. It never throws, running from a page's close and at exit.
 function closeBrowser() {
   if (!browser)
     return
 
-  const { dir, idle } = browser
+  const { dir } = browser
   const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1]
   // Read before Chrome is killed, which hands what it started to another parent.
   const tree = pid === undefined ? [] : chromeTree(Number(pid), join(dir, 'profile'))
 
   browser = undefined
-  clearTimeout(idle)
   // Closing the views leaves Chrome running, and would leave it writing to the profile.
   attempt(() => Bun.WebView.closeAll())
   killed = pid === undefined ? undefined : Number(pid)
