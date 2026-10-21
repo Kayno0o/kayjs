@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { alive } from './alive'
+import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -24,8 +25,9 @@ class Agent {
   private readonly replies = new Map<number | string | null, (reply: Reply) => void>()
   private nextId = 0
 
-  constructor(cwd: string) {
-    this.process = Bun.spawn([process.execPath, cli, 'mcp'], { cwd, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
+  // `shared` for the one a whole file uses, which a test timing out must not take down.
+  constructor(cwd: string, shared = false) {
+    this.process = shared ? spawnSuiteServer([process.execPath, cli, 'mcp'], { cwd, stdin: 'pipe' }) : Bun.spawn([process.execPath, cli, 'mcp'], { cwd, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
     void this.listen()
   }
 
@@ -87,7 +89,7 @@ beforeAll(async () => {
   await Bun.write(join(root, 'tsconfig.json'), tsconfig)
   await Bun.write(join(root, 'src/routes/index.kay'), 'img(src="/a.png")\n')
   await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
-  agent = new Agent(root)
+  agent = new Agent(root, true)
 })
 
 afterAll(async () => {

@@ -10,6 +10,7 @@ import { check } from '../src/check'
 import * as shadowModule from '../src/check/shadow'
 import { Connection } from '../src/lsp/rpc'
 import { DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
+import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
@@ -19,7 +20,7 @@ const SLOW = 300
 // Drives `kay lsp` over stdio the way an editor does.
 class Editor {
   readonly connection: Connection
-  private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
+  private readonly process = spawnSuiteServer([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stderr: 'ignore' })
   // Who waits for the next diagnostics of a file, of a version of it when they changed it.
   private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version: number | undefined }>()
 

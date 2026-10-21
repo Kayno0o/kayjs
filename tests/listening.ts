@@ -48,3 +48,26 @@ export async function listeningPort(child: Piped & { stdout: ReadableStream<Uint
 
   return pattern.exec(output)![1]!
 }
+
+// Runs the server under a shell ignoring SIGTERM, which is all Bun signals. The server keeps the shell's stdin, `<&0` undoing the null one a shell gives a background job.
+const SUPERVISOR = 'trap "" TERM; "$@" <&0 & child=$!; trap \'kill -KILL $child; exit 0\' HUP; wait $child'
+
+interface SuiteServerOptions<In extends 'ignore' | 'pipe', Err extends 'ignore' | 'pipe'> {
+  cwd?: string
+  env?: Record<string, string | undefined>
+  stdin?: In
+  stderr?: Err
+}
+
+// Starts a process a whole suite shares, started in a `beforeAll`. Bun SIGTERMs every process still running when a test times out, the suite's with it (one handling SIGTERM exits), and the tests after fail on a refused connection: it runs under a shell that ignores the signal, so a timed-out test fails alone. It ends as it would have, when its stdin closes or it exits on its own; `stopSuiteServer` ends one that does not.
+export function spawnSuiteServer<In extends 'ignore' | 'pipe' = 'ignore', Err extends 'ignore' | 'pipe' = 'pipe'>(command: string[], options: SuiteServerOptions<In, Err> = {}): Bun.Subprocess<In, 'pipe', Err> {
+  const { stdin = 'ignore', stderr = 'pipe', ...rest } = options
+
+  return Bun.spawn(['sh', '-c', SUPERVISOR, 'sh', ...command], { ...rest, stdin, stdout: 'pipe', stderr })
+}
+
+// Stops a process `spawnSuiteServer` started, and waits for it to be gone.
+export async function stopSuiteServer(server: Bun.Subprocess<'ignore' | 'pipe', 'pipe', 'ignore' | 'pipe'> | undefined): Promise<void> {
+  server?.kill('SIGHUP')
+  await server?.exited
+}

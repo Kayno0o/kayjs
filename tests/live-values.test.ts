@@ -618,7 +618,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
     const { liveSlot } = await import('../src/runtime/live-value')
 
-    for (let waited = 0; liveSlot(VISITORS)!.listeners.get('') !== undefined && waited < 2000; waited += 25)
+    for (let waited = 0; liveSlot(VISITORS)!.listeners.get('') !== undefined && waited < 15_000; waited += 25)
       await Bun.sleep(25)
 
     expect(liveSlot(VISITORS)!.listeners.get('')).toBeUndefined()

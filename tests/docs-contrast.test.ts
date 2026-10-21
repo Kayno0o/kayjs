@@ -4,6 +4,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
 import { takeDocsBuild } from './docs-build'
+import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const CLI = resolve('src/cli.ts')
 // Home, a guide, a UI component's page with its demos and a Structure page: each layout the docs have; the chat panel is opened on the last.
@@ -41,7 +42,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
     const port = probe.port!
 
     await probe.stop(true)
-    server = Bun.spawn([process.execPath, CLI, 'start', 'docs', '--port', String(port)], { stdout: 'ignore', stderr: 'ignore' })
+    server = spawnSuiteServer([process.execPath, CLI, 'start', 'docs', '--port', String(port)])
+    drainOutput(server)
     origin = `http://localhost:${port}/`
 
     for (let tries = 0; tries < 100 && !await reachable(origin); tries++)
@@ -56,8 +58,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
   afterAll(async () => {
     page?.close()
-    server?.kill()
-    await server?.exited
+    await stopSuiteServer(server)
     await release?.()
   })
 

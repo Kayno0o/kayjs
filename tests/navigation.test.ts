@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
-import { listeningPort } from './listening'
+import { listeningPort, spawnSuiteServer, stopSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
 const LISTENING = /port (\d+)/
@@ -20,7 +20,7 @@ let origin: string
 
 // A server of the navigation fixture on a port of its own, and the origin it answers on.
 async function startFixture(): Promise<{ server: Fixture, origin: string }> {
-  const started: Fixture = Bun.spawn(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+  const started: Fixture = spawnSuiteServer(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
 
   return { server: started, origin: `http://localhost:${await listeningPort(started, 'the navigation fixture', LISTENING)}` }
 }
@@ -168,11 +168,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     page = await open('/')
   }, 60_000)
 
-  // SIGTERM would have the server finish the requests the tests leave open first, which outlasts the hook.
+  // The server is killed outright: SIGTERM would have it finish the requests the tests leave open first, which outlasts the hook.
   afterAll(async () => {
     page?.close()
-    server?.kill('SIGKILL')
-    await server?.exited
+    await stopSuiteServer(server)
   })
 
   it('swaps the next page in, a persistent island keeping its state and its element', async () => {
@@ -2043,8 +2042,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     try {
       await own.waitUntil(async () => (await navigator.serviceWorker.ready).active?.state === 'activated' && navigator.serviceWorker.controller !== null, { timeout: 10_000 })
       await own.goto('/second')
-      worker.server.kill()
-      await worker.server.exited
+      await stopSuiteServer(worker.server)
 
       await own.goto('/')
       expect(await own.text('h1')).toBe('Home')
@@ -2078,8 +2076,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
     finally {
       own.close()
-      worker.server.kill()
-      await worker.server.exited
+      await stopSuiteServer(worker.server)
     }
   }, 30_000)
 })

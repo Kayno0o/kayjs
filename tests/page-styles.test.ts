@@ -19,7 +19,7 @@ import { INLINE_LIMIT, readClient, readInlineStyles } from '../src/server/client
 import { sourceHash } from '../src/server/csp'
 import { prerenderPages } from '../src/server/prerender'
 import { browse, browserPath } from '../src/test'
-import { listeningPort } from './listening'
+import { listeningPort, spawnSuiteServer, stopSuiteServer } from './listening'
 import { fixtureCopy } from './scratch'
 
 // Many arbitrary values, each its own rule, so the app's one stylesheet passes what a head may inline.
@@ -630,7 +630,7 @@ describe('a page kept at build time under a mount point', () => {
 // Starts the fixture's server in production in a copy of it, and tells where it listens.
 async function startFixture(env: Record<string, string> = {}): Promise<{ dir: string, server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>, origin: string }> {
   const dir = await copyOfFixture()
-  const server = Bun.spawn(['bun', 'server.ts'], { cwd: dir, env: { ...process.env, NODE_ENV: 'production', ...env }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+  const server = spawnSuiteServer(['bun', 'server.ts'], { cwd: dir, env: { ...process.env, NODE_ENV: 'production', ...env } })
 
   return { dir, server, origin: `http://localhost:${await listeningPort(server, 'the fixture', LISTENING)}` }
 }
@@ -645,8 +645,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
   }, 120_000)
 
   afterAll(async () => {
-    server?.kill()
-    await server?.exited
+    await stopSuiteServer(server)
     await rm(appDir, { recursive: true, force: true })
   })
 
@@ -767,8 +766,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('lateStyles,
   }, 120_000)
 
   afterAll(async () => {
-    server?.kill()
-    await server?.exited
+    await stopSuiteServer(server)
     await rm(appDir, { recursive: true, force: true })
   })
 

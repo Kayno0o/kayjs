@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
-import { drainOutput } from './listening'
+import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -42,10 +42,8 @@ interface Replica {
 
 async function start(script: string, store: string, behind: number): Promise<Replica> {
   const root = await fixtureCopy('live-cache')
-  const child = Bun.spawn([process.execPath, script], {
+  const child = spawnSuiteServer([process.execPath, script], {
     env: { ...process.env, ROOT: root, STORE: store, BEHIND: String(behind), SRC: join(import.meta.dir, '..'), KAY_SECRET: SECRET },
-    stdout: 'pipe',
-    stderr: 'inherit',
   })
   const reader = child.stdout.getReader()
   const { value } = await reader.read()
@@ -73,8 +71,7 @@ describe('replicas whose clocks disagree', () => {
 
   afterAll(async () => {
     for (const replica of replicas) {
-      replica.child.kill()
-      await replica.child.exited
+      await stopSuiteServer(replica.child)
     }
   })
 

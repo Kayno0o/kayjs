@@ -2,7 +2,7 @@ import type { TestPage } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
-import { listeningPort } from './listening'
+import { listeningPort, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const LISTENING = /port (\d+)/
 const path = browserPath()
@@ -19,15 +19,14 @@ async function marks(): Promise<string[]> {
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page opened from a search hit in Chromium', () => {
   beforeAll(async () => {
-    server = Bun.spawn(['bun', 'tests/fixtures/arrival/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+    server = spawnSuiteServer(['bun', 'tests/fixtures/arrival/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
     origin = `http://localhost:${await listeningPort(server, 'the arrival fixture', LISTENING)}`
     page = await browse(origin, { path })
   }, 60_000)
 
   afterAll(async () => {
     page?.close()
-    server?.kill()
-    await server?.exited
+    await stopSuiteServer(server)
   })
 
   it('marks the words of the section on a full load, scrolling to the first, and injects nothing', async () => {
