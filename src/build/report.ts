@@ -235,7 +235,7 @@ export function formatSizeReport(report: SizeReport, { width = Infinity, previou
       `  ${shorten(name, names).padEnd(names)}  ${size}`,
       ...because === undefined ? [] : [`      ${shorten(because, Math.max(20, width - 8))}`],
       // An island holding nothing but its own file says nothing more broken down.
-      ...(shown !== undefined && shown.length > 1 ? shown : []).map(module => `      ${shorten(module.name, Math.max(20, width - 20))}  ${(module.bytes / 1024).toFixed(1)} KB`),
+      ...(shown !== undefined && shown.length > 1 ? shown : []).map(module => `      ${shorten(module.name, Math.max(20, width - 20))}  ${kb(module.bytes)}`),
     ]),
   ].join('\n')
 }
@@ -389,7 +389,7 @@ export function shorten(text: string, room: number): string {
 }
 
 function kilobytes(size: Size): string {
-  return `${kb(size.gzip)} (${(size.raw / 1024).toFixed(1)} KB)`
+  return `${kb(size.gzip)} (${kb(size.raw)})`
 }
 
 function pagesLabel(pages: number, kept: number): string {
@@ -402,7 +402,7 @@ function pagesLabel(pages: number, kept: number): string {
   return pages === 1 ? 'prerendered' : `prerendered x${pages}`
 }
 
-function kb(bytes: number): string {
+export function kb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
 

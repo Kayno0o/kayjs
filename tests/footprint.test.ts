@@ -17,6 +17,16 @@ describe('the EcoIndex model', () => {
     expect(ecoindexScore({ dom: 387.5, requests: 56, bytes: 1_098_620 })).toBe(65)
   })
 
+  it('matches the results EcoIndex published for its compute package at that commit, sizes in kilobytes', () => {
+    // cnumr/EcoIndex_python 8833bb3, test/components/ecoindex/compute/test_ecoindex.py and the package's README.
+    expect(ecoindexScore({ dom: 100, requests: 100, bytes: 100_000 })).toBe(72)
+    expect(ecoindexGrade(72)).toBe('B')
+    expect(ecoindexScore({ dom: 100, requests: 100, bytes: 1_000_000 })).toBe(67)
+    expect(ecoindexScore({ dom: 200, requests: 200, bytes: 10_000_000 })).toBe(46)
+    expect(ecoindexScore({ dom: 2355, requests: 267, bytes: 2_493_000 })).toBe(10)
+    expect(ecoindexScore({ dom: 240, requests: 20, bytes: 331_000 })).toBe(83)
+  })
+
   it('counts a size in kilobytes of 1000 and rounds a half to the even number, as EcoIndex does', () => {
     // 100 - 5 * 9 / 6 = 92.5 and 100 - 5 * 3 / 6 = 97.5, which Python rounds to 92 and 98.
     expect(ecoindexScore({ dom: 159, requests: 0, bytes: 0 })).toBe(92)
@@ -39,6 +49,9 @@ describe('the Sustainable Web Design model', () => {
     expect(carbonPerView(1e9)).toBeCloseTo(0.3 * 494 * 0.755, 6)
     expect(carbonPerView(2_000_000)).toBeCloseTo(carbonPerView(1_000_000) * 2, 12)
     expect(carbonPerView(0)).toBe(0)
+    // @tgwf/co2 0.19.0, `new co2({ model: 'swd', version: 4 }).perVisitTrace(bytes, false, { firstVisitPercentage: 0.75, returnVisitPercentage: 0.25, dataReloadRatio: 0.02 }).co2`.
+    expect(carbonPerView(1_000_000)).toBeCloseTo(0.111891, 6)
+    expect(carbonPerView(1_234_567)).toBeCloseTo(0.138136936197, 9)
   })
 })
 
@@ -156,6 +169,29 @@ describe('measurePage', () => {
     expect(page.requests).toBe(1)
   })
 
+  it('counts the elements a browser makes up: html, head, body and the tbody around rows written in a table', async () => {
+    const { find } = await site({})
+    const dom = async (html: string) => (await measurePage(html, '/', weighing(find, false))).dom
+
+    expect(await dom('<p>a</p>')).toBe(4)
+    expect(await dom('<html><head></head><body></body></html>')).toBe(3)
+    // html, head, body, table, tbody, tr, td; and the same with the tbody written.
+    expect(await dom('<html><head></head><body><table><tr><td>a</td></tr></table></body></html>')).toBe(7)
+    expect(await dom('<html><head></head><body><table><tbody><tr><td>a</td></tr></tbody></table></body></html>')).toBe(7)
+    // One tbody for the rows, one for those of a table nested in a cell.
+    expect(await dom('<html><head></head><body><table><tr><td><table><tr><td>a</td></tr></table></td></tr><tr><td>b</td></tr></table></body></html>')).toBe(13)
+    expect(await dom('<html><head></head><body><template><table><tr><td>a</td></tr></table></template></body></html>')).toBe(4)
+  })
+
+  it('leaves everything after a template or noscript that is never closed out of the count, as a browser reads it as that element\'s contents', async () => {
+    const { find } = await site({ 'never.png': bytes(10) })
+    const page = async (rest: string) => measurePage(`<html><head></head><body>${rest}`, '/', weighing(find, false))
+
+    expect((await page('<div></div><template><p>a</p><img src="/never.png">')).dom).toBe(5)
+    expect((await page('<div></div><noscript><p>a</p><img src="/never.png">')).dom).toBe(5)
+    expect((await page('<template><p>a</p></template><div></div><img src="/never.png">')).requests).toBe(2)
+  })
+
   it('counts a request of another origin without its weight, and a file the build did not make', async () => {
     const { find } = await site({})
     const page = await measurePage('<html><head><script src="https://cdn.example/x.js"></script><script src="//cdn.example/y.js"></script><link rel="stylesheet" href="https://cdn.example/x.css"></head><body><img src="/_kay/image?src=%2Fuploads%2Fa.png&amp;w=640"><img src="data:image/gif;base64,R0lGOD"></body></html>', '/', weighing(find, false))
@@ -187,10 +223,10 @@ describe('measurePage', () => {
     const { find } = await site({ 'a.avif': bytes(700), 'b.jpg': bytes(900) })
     const weightWith = async (media: string) => (await measurePage(`<html><body><picture><source srcset="/a.avif" type="image/avif" media="${media}"><img src="/b.jpg"></picture></body></html>`, '/', weighing(find, false))).parts.images
 
-    for (const media of ['screen', 'all', 'only screen and (min-width: 600px)', '(min-width: 600px), (max-width: 100px)', '(width >= 600px)', '(width>=600px)', 'print, (min-width: 600px)', '(min-width: 600px) and (max-width: 1280px)'])
+    for (const media of ['screen', 'all', 'only screen and (min-width: 600px)', '(min-width: 600px), (max-width: 100px)', '(width >= 600px)', '(width>=600px)', '(600px <= width)', '(1300px > width)', '(400px <= width <= 2000px)', 'print, (min-width: 600px)', '(min-width: 600px) and (max-width: 1280px)'])
       expect(await weightWith(media)).toBe(700)
 
-    for (const media of ['print', 'screen and (max-width: 600px)', '(width < 600px)', 'not all', '(max-width: 100px), (min-width: 2000px)', 'tv'])
+    for (const media of ['print', 'screen and (max-width: 600px)', '(width < 600px)', '(600px > width)', '(1300px <= width)', '(400px <= width <= 700px)', 'not all', '(max-width: 100px), (min-width: 2000px)', 'tv'])
       expect(await weightWith(media)).toBe(900)
   })
 
@@ -259,7 +295,8 @@ describe('routeFootprints', () => {
 
     expect(found.map(each => [each.route, each.pages, each.path])).toEqual([['/a/:id', 2, '/b'], ['/c', 1, '/c'], ['/missing/:slug', 0, undefined]])
     expect(found[2]!.footprint).toBeUndefined()
-    expect(found[0]!.footprint!.dom).toBe(3)
+    // html, body and p, and the head a browser makes up.
+    expect(found[0]!.footprint!.dom).toBe(4)
   })
 })
 

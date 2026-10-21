@@ -25,7 +25,9 @@ const LENGTH_START = /^[\d.+-]/
 const PRELOAD_KINDS: Record<string, 'css' | 'js' | 'images' | 'fonts'> = { font: 'fonts', script: 'js', style: 'css', image: 'images' }
 // The longest `calc()` or media condition read: a deeper one would only be hostile, and nests as deep as it is long.
 const MAX_EXPRESSION = 1000
-const RANGE = /^(width|resolution)([<>]=?|=)([^<>=]+)$/
+// `width >= 600px`, `600px <= width` or both, `400px <= width <= 700px`; the comparison is read off a condition without its spaces.
+const RANGE = /^(?:([^<>=]+)([<>]=?|=))?(width|resolution)(?:([<>]=?|=)([^<>=]+))?$/
+const FLIPPED: Record<string, string> = { '<': '>', '<=': '>=', '>': '<', '>=': '<=', '=': '=' }
 const FEATURE_NAME = /^[\w-]+$/
 
 // What a page weighs, in the bytes a host serves: text gzipped, an image or a font as the file is.
@@ -83,7 +85,11 @@ interface Weighing {
 // Reads a page's markup once: its elements, and every URL the browser fetches on the page's load. What a template or a `noscript` holds is no part of the DOM a browser with scripts builds.
 async function read(html: string): Promise<Found> {
   const found: Found = { dom: 0, scripts: [], styles: [], preloads: [], images: [], posters: [], inlineStyles: [] }
+  // A `template` or `noscript` never closed holds the rest of the page, as it does in a browser, so the count keeps to what a browser would build.
   let inert = 0
+  // The `table`s open, each with whether its rows already sit in a `tbody` a browser makes up or the page wrote.
+  const tables: { grouped: boolean }[] = []
+  const tags = new Set<string>()
   let picture: PictureSource[] | undefined
   let style = ''
   let collecting = false
@@ -94,7 +100,38 @@ async function read(html: string): Promise<Found> {
   }
 
   await new HTMLRewriter()
-    .on('*', { element: () => void (inert === 0 && found.dom++) })
+    .on('*', {
+      element: (element) => {
+        if (inert > 0)
+          return
+
+        found.dom++
+        tags.add(element.tagName)
+      },
+    })
+    .on('table', {
+      element: (element) => {
+        if (inert > 0)
+          return
+
+        const table = { grouped: false }
+
+        tables.push(table)
+        element.onEndTag(() => void tables.splice(tables.indexOf(table), 1))
+      },
+    })
+    .on('thead, tbody, tfoot', { element: () => void (tables.at(-1) !== undefined && (tables.at(-1)!.grouped = true)) })
+    .on('tr', {
+      element: () => {
+        const table = tables.at(-1)
+
+        // A browser puts a row written straight in a table into a `tbody` of its own.
+        if (inert === 0 && table !== undefined && !table.grouped) {
+          table.grouped = true
+          found.dom++
+        }
+      },
+    })
     .on('template', { element: inertElement })
     .on('noscript', { element: inertElement })
     .on('script[src]', { element: element => void (inert === 0 && found.scripts.push(element.getAttribute('src')!)) })
@@ -146,6 +183,12 @@ async function read(html: string): Promise<Found> {
     })
     .transform(new Response(html))
     .arrayBuffer()
+
+  // A browser builds `html`, `head` and `body` for a document that leaves them out.
+  for (const implied of ['html', 'head', 'body']) {
+    if (!tags.has(implied))
+      found.dom++
+  }
 
   return found
 }
@@ -341,7 +384,11 @@ function conditionHolds(part: string, width: number): boolean {
   const inner = part.slice(1, -1).trim()
   const range = RANGE.exec(inner.toLowerCase().replaceAll(EVERY_WHITESPACE, ''))
 
-  return range === null ? matches(inner, width) : compare(range[1]!, range[2]!, range[3]!, width)
+  if (range === null || (range[1] === undefined && range[4] === undefined))
+    return matches(inner, width)
+
+  // A value on the left reads the other way round: `600px <= width` is `width >= 600px`.
+  return (range[1] === undefined || compare(range[3]!, FLIPPED[range[2]!]!, range[1], width)) && (range[4] === undefined || compare(range[3]!, range[4], range[5]!, width))
 }
 
 function compare(name: string, operator: string, value: string, width: number): boolean {

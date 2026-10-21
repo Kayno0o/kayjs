@@ -9,6 +9,7 @@ import { KayError } from '../compiler/errors'
 import { lintLevel } from '../compiler/lints'
 import { byteSize } from '../runtime/byte-size'
 import { gradeBelow, GRADES } from './footprint-models'
+import { kb } from './report'
 
 // The most a page may load, compressed as a host serves it; a key left out sets no limit.
 export interface BudgetConfig {
@@ -123,8 +124,4 @@ function heaviestOf(route: RouteSize, report: SizeReport | undefined): ModuleSiz
   }
 
   return [...bytes].map(([name, size]) => ({ name, bytes: size })).sort((a, b) => b.bytes - a.bytes).slice(0, SHOWN_MODULES)
-}
-
-function kb(bytes: number): string {
-  return `${(bytes / 1024).toFixed(1)} KB`
 }
