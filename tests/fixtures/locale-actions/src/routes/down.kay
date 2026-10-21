@@ -1,0 +1,22 @@
+--- server
+import { s } from 'kay'
+
+// The wording reads the page's locale and what a lookup finds, the way an address kept in a collection would be read.
+export const loud = action(s.Object({}), () => {
+  throw new Error('mail down')
+}, { messages: { serverError: async (error, ctx) => `${ctx.locale}: ${(error as Error).message}` } })
+
+export const mute = action(s.Object({}), () => {
+  throw new Error('mail down')
+}, { messages: { serverError: () => {
+  throw new Error('words down')
+} } })
+---
+form(action={loud})
+  button Send
+form(action={mute})
+  button Mute
+if loud.error()
+  p.error {loud.error()}
+if mute.error()
+  p.error {mute.error()}

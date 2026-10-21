@@ -74,3 +74,20 @@ describe('an action prop typed with the success output', () => {
     expect([data, typed]).toHaveLength(2)
   })
 })
+
+describe('an action\'s serverError message', () => {
+  it('is typed the error and the context when given as a function, sync or async', () => {
+    const words = action(t.Object({}), () => 'ok', {
+      messages: {
+        serverError: async (error, ctx) => `${ctx.locale}: ${error instanceof Error ? error.message : 'unknown'}`,
+      },
+    })
+    const plain = action(t.Object({}), () => 'ok', { messages: { serverError: () => 'Try again later' } })
+    // @ts-expect-error the message is a text
+    const number = action(t.Object({}), () => 'ok', { messages: { serverError: () => 1 } })
+    // @ts-expect-error the error is not a string
+    const unknown = action(t.Object({}), () => 'ok', { messages: { serverError: (error: string) => error } })
+
+    expect([words, plain, number, unknown]).toHaveLength(4)
+  })
+})

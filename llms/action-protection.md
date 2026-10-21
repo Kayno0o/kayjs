@@ -106,7 +106,7 @@ export default guard(async ({ request, headers, deny }) => {
 - `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `maxAge`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.
 - `bodyLimit` is given the most bytes a post may send, as a number whatever size `bodyLimit` was written as.
-- Each is a string or a function; `serverError` is a string. A function runs in the request's locale, so it may word the refusal with `t()`.
+- Each is a string or a function; `serverError` is given the error and the action's `ctx` (see [Refused posts](actions.md#refused-posts)). A function runs in the request's locale, so it may word the refusal with `t()`.
 
 #### Proof of work
 

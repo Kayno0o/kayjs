@@ -809,8 +809,26 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)
 
-    return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': action.protection?.messages?.serverError ?? kayWord('kay.action.serverError') } }, context.server, back)
+    return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': await serverErrorMessage(action, error, ctx, request, options.onError) } }, context.server, back)
   }
+}
+
+// The action's own wording of a handler that threw, which a function reads the error and the context for; one that throws leaves kay's wording, and is logged beside the error that came first.
+async function serverErrorMessage(action: ServerAction<TSchema, unknown>, error: unknown, ctx: ActionContext, request: Request, onError: ActionOptions['onError']): Promise<string> {
+  const words = action.protection?.messages?.serverError
+
+  if (typeof words === 'string')
+    return words
+
+  try {
+    if (words !== undefined)
+      return await words(error, ctx)
+  }
+  catch (wordsError) {
+    reportServerError(wordsError, request, onError)
+  }
+
+  return kayWord('kay.action.serverError')
 }
 
 // What the handler did is done, a mail sent maybe, so a store failing to count it is reported rather than answered 500, which would invite the visitor to post again.

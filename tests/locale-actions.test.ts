@@ -37,6 +37,17 @@ async function redirectedFrom(app: Elysia, variant: Variant, page: string, how: 
   return where?.startsWith(`${variant.base}/`) ? where.slice(variant.base.length) : where
 }
 
+// Posts the `index`th action of `path` the three ways, answering what the visitor reads and the status.
+async function postDown(app: Elysia, variant: Variant, how: Post, path: string, index: number): Promise<{ status: number, text: string }> {
+  const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
+  const action = [...html.matchAll(/action="([^"]*\/_kay\/action\/[^"]*)"/g)][index]![1]!.slice(variant.base.length)
+  const from = `http://localhost${variant.base}${path}`
+  const sent: Record<string, string> = { form: { referer: from }, swap: { 'referer': from, 'x-kay-action': 'form', 'x-kay-page': from }, island: { 'x-kay-action': '1', 'x-kay-page': from, 'content-type': 'application/json' } }[how]
+  const response = await app.handle(new Request(`http://localhost${action}`, { method: 'POST', headers: { origin: 'http://localhost', ...sent }, body: how === 'island' ? '[{}]' : new FormData() }))
+
+  return { status: response.status, text: await response.text() }
+}
+
 const MOUNTED: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
 
 describe('an action posted from a localized page', () => {
@@ -80,6 +91,51 @@ describe('an action posted from a localized page', () => {
     expect(await post('http://localhost/app/%65n/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/app/english/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/en/app/x')).toBe('/app/dashboard')
+  })
+})
+
+describe('an action\'s serverError message given as a function', () => {
+  for (const base of ['', '/app']) {
+    for (const trailingSlash of ['never', 'always'] as const) {
+      for (const dev of [false, true]) {
+        const variant: Variant = { base, trailingSlash, prefixDefault: false, dev }
+
+        it(`is read the error and the page's locale, whichever way the post is made, base ${base || 'unset'}, trailingSlash ${trailingSlash}, ${dev ? 'dev' : 'production'}`, async () => {
+          const app = await serve(variant)
+          const slash = trailingSlash === 'always' ? '/' : ''
+          const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+          try {
+            for (const how of POSTS) {
+              expect(await postDown(app, variant, how, `/down${slash}`, 0)).toMatchObject({ status: 500, text: expect.stringContaining('fr: mail down') })
+              expect(await postDown(app, variant, how, `/en/down${slash}`, 0)).toMatchObject({ status: 500, text: expect.stringContaining('en: mail down') })
+            }
+          }
+          finally {
+            logged.mockRestore()
+          }
+        })
+      }
+    }
+  }
+
+  it('leaves kay\'s message when the function throws, logging both errors', async () => {
+    const app = await serve(MOUNTED)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      for (const how of POSTS) {
+        expect(await postDown(app, MOUNTED, how, '/down', 1)).toMatchObject({ status: 500, text: expect.stringContaining('Something went wrong on our side') })
+      }
+
+      const text = logged.mock.calls.flat().join('\n')
+
+      expect(text).toContain('mail down')
+      expect(text).toContain('words down')
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 })
 

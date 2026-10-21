@@ -167,8 +167,8 @@ export interface ProtectionMessages {
   proofOfWork?: (string | ((reason: ProofOfWorkRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
-  // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead.
-  serverError?: string | undefined
+  // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead. A function is given the error and the action's `ctx`, so it can read what is loaded per request (a setting, a collection entry) or the page's `ctx.locale`, and may be async; one that throws leaves kay's own message, both errors logged.
+  serverError?: (string | ((error: unknown, ctx: ActionContext) => string | Promise<string>)) | undefined
 }
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
