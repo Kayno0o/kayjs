@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { settle } from 'kay/test'
 import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink } from '../src/page-link'
 
@@ -17,8 +17,15 @@ async function run(): Promise<void> {
 // A document with an address, where a cookie is kept.
 const PAGE = 'https://site.test/about?lang=fr'
 
+// The files after this one share the document, and their requests to a site.test address would never be answered.
+const FIRST = location.href
+
+function goTo(url: string): void {
+  (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+}
+
 beforeEach(() => {
-  (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(PAGE)
+  goTo(PAGE)
   document.body.innerHTML = '<p>Read</p>'
   document.cookie = `${HINT_COOKIE}=1; path=/`
 })
@@ -27,6 +34,10 @@ afterEach(() => {
   document.querySelector(BUTTON)?.remove()
   document.cookie = `${HINT_COOKIE}=; path=/; max-age=0`
   mock.restore()
+})
+
+afterAll(() => {
+  goTo(FIRST)
 })
 
 test('shows a link into edit mode on the page the signed-in editor reads, naming that page', async () => {
