@@ -13,6 +13,7 @@ import { typeLint } from '../compiler/lints'
 import { WRITABLE } from '../compiler/names'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
+import { unknownNameHelp } from './export-homes'
 import { sourceSpan } from './shadow'
 
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
@@ -90,7 +91,12 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
   if (shadow.tsx.slice(diagnostic.start - WRITABLE.length, diagnostic.start) === WRITABLE)
     return { message: diagnostic.message, help: 'only a signal is written by assigning its name: a memo through the signals it derives from, and a plain value declared with `let`', span }
 
-  return unreadSignal(diagnostic) ? { message: diagnostic.message, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, offset)), span } : { message: diagnostic.message, span }
+  if (unreadSignal(diagnostic))
+    return { message: diagnostic.message, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, offset)), span }
+
+  const help = unknownNameHelp(diagnostic.message)
+
+  return help === undefined ? { message: diagnostic.message, span } : { message: diagnostic.message, help, span }
 }
 
 // Outside .kay files, unused code is reported only when the project's tsconfig asks for it, as `--noUnusedLocals` is on for every file.

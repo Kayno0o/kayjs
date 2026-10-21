@@ -9,8 +9,7 @@ Reading the environment typed, and letting an island read a variable. Sessions, 
 `defineEnv` reads `process.env` once against a schema, as the server boots, and a missing or refused variable stops the boot:
 
 ```ts
-import { s } from 'kay'
-import { defineEnv } from 'kay/server'
+import { defineEnv, s } from 'kay/server'
 
 export const env = defineEnv(s.Object({
   DATABASE_URL: s.String(),

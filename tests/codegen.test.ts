@@ -82,6 +82,29 @@ describe('translations', () => {
   })
 })
 
+describe('values of kay without an import', () => {
+  it('imports each value of kay a script or a server fence reads unimported, once', () => {
+    const script = tsx('---\nconst id = uid()\nconst stop = every(\'1s\', () => navigate(\'/x\'))\nconst again = navigate\n---\np {id}')
+
+    expect(script).toMatch(/import \{ (?:uid|every|navigate)(?:, (?:uid|every|navigate)){2} \} from 'kay'/)
+    expect(tsx('--- server\nconst Row = s.Object({ id: s.String() })\nconst path = localPath(\'/x\')\n---\np {path}')).toMatch(/import \{ (?:s, localPath|localPath, s) \} from 'kay'/)
+  })
+
+  it('leaves a name the file declares, imports, destructures or takes from the server fence alone', () => {
+    expect(tsx('---\nconst route = 1\nconst { stream } = props<{ stream: string }>()\nimport { watch } from \'./watch\'\nwatch()\nconst x = route + stream\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
+    expect(tsx('--- server\nconst root = 1\n---\n---\nconst x = root\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
+    expect(tsx('---\nconst x = { route: 1 }.route + other.stream\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
+  })
+
+  it('makes a script an island for a value of kay that holds state, not for one of its static helpers', () => {
+    const island = (body: string) => compileKay(`---\n${body}\n---\np x`, 'test.kay').tsx.includes('Island')
+
+    expect(island('const id = uid()')).toBe(false)
+    expect(island('const count = signal(1)')).toBe(true)
+    expect(island('const stop = listen(window, \'click\', () => undefined)')).toBe(true)
+  })
+})
+
 describe('props', () => {
   it('types the component from props<T>() and reads destructured names off the props object', () => {
     const code = tsx('---\nconst { title, count } = props<{ title: string, count: number }>()\nconst label = () => `${title}: ${count}`\n---\np {label()} {title}')
@@ -341,7 +364,7 @@ describe('islands', () => {
   it('imports what the fences use of kay unimported, which makes the component an island', () => {
     const source = '--- server\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
 
-    expect(tsx(source)).toStartWith('import { signal, memo, action } from \'kay\'\n')
+    expect(tsx(source)).toStartWith('import { signal, memo, action, s } from \'kay\'\n')
     expect(compileKay(source, 'test.kay').island).toBe('test.kay')
     expect(compileKay('---\nconst label = \'signal\'\n---\np {label}\n', 'test.kay').island).toBeUndefined()
   })

@@ -968,6 +968,26 @@ describe('what kay exports to a page that is kept', () => {
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })
   })
 
+  it('judges a value of kay a page reads with no import as it judges an imported one', async () => {
+    const root = await project({
+      'src/routes/free.kay': '---\nconst id = uid()\nconst count = signal(1)\n---\np {id} {count()}\n',
+      'src/routes/local.kay': '---\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '---\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/server.kay': '--- server\nconst origin = publicEnv.SITE\n---\np {origin}\n',
+      'src/routes/declared.kay': '---\nconst live = 1\n---\np {live}\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    expect(await at('src/routes/free.kay')).toBeUndefined()
+    expect(await at('src/routes/local.kay')).toBeUndefined()
+    expect(await at('src/routes/declared.kay')).toBeUndefined()
+    expect(await at('src/routes/cookie.kay')).toMatchObject({ why: expect.stringContaining('`persisted`') })
+    expect(await at('src/routes/server.kay')).toMatchObject({ why: expect.stringContaining('`publicEnv`') })
+  })
+
   it('classes every export of kay/content once', async () => {
     expect(Object.keys(CONTENT_EXPORTS).sort()).toEqual(Object.keys(await import('../src/content')).sort())
   })

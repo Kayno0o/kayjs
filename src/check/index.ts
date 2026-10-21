@@ -18,6 +18,7 @@ import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
+import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
 import { writeShadowTypes } from './shadow-types'
@@ -99,6 +100,13 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
   checkOnly?: boolean | undefined
 }
 
+// A name nothing declares gets the module of kay that exports it, unless the diagnostic already carries a hint.
+function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help'> {
+  const found = help === undefined ? unknownNameHelp(message) : undefined
+
+  return found === undefined ? {} : { help: found }
+}
+
 export function configCheckOptions(config: KayConfig): CheckOptions {
   const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
 
@@ -164,7 +172,7 @@ async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagn
 
     const remapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
-      : diagnostic
+      : { ...diagnostic, ...helped(diagnostic) }
     const generated = generatedProblem(root, remapped, types, content)
 
     if (generated)

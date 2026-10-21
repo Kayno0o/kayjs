@@ -7,6 +7,7 @@ import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
 import { SENDABLE_CLASSES } from './expression'
+import { KAY_VALUES } from './kay-exports'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
@@ -23,10 +24,8 @@ const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
-export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount', 'onCleanup']
-export const SERVER_GLOBALS = ['action']
-// Each of those names written as a name of its own, not a member or part of a longer one.
-const GLOBAL_NAME = new Map([...SCRIPT_GLOBALS, ...SERVER_GLOBALS].map(name => [name, new RegExp(`(?<![\\w$.])${name}(?![\\w$])`)]))
+// Each name written as a name of its own, not a member or part of a longer one.
+const GLOBAL_NAME = new RegExp(`(?<![\\w$.])(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -67,7 +66,7 @@ export interface ScriptAnalysis {
   specifiers: Span[]
   // True when the script imports a value from `kay`: it holds client state, so the component becomes an island.
   reactive: boolean
-  // What the script reads of SCRIPT_GLOBALS without declaring or importing it.
+  // What the script reads of kay's values without declaring or importing it.
   implicit: string[]
   body: Span[]
   props?: PropsDeclaration
@@ -100,14 +99,14 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   if (!script)
     return analysis
 
-  const split = splitFence(source, script, SCRIPT_GLOBALS.filter(name => !serverNames.includes(name)), serverNames, analysis)
+  const split = splitFence(source, script, serverNames, analysis)
 
   if (!split)
     return analysis
 
   const { ast, shift } = split
 
-  analysis.reactive = analysis.implicit.length > 0 || analysis.imports.some(importsReactiveValue)
+  analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
@@ -172,7 +171,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
 
 // Parses a fence once, moves its imports and types to module level and finds which of `globals` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
+function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -197,7 +196,7 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
       analysis.broken.push(span)
   }
 
-  analysis.implicit = undeclared(ast, parsed.code, globals, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'))
+  analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'))
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -292,7 +291,7 @@ export interface ServerAnalysis {
   page?: PageSettings | undefined
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
-  // What the fence reads of SERVER_GLOBALS without declaring or importing it.
+  // What the fence reads of kay's values without declaring or importing it.
   implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
   data: ServerData[]
@@ -311,7 +310,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
     return undefined
 
   const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], separate: [], diagnostics: [] }
-  const split = splitFence(source, server, SERVER_GLOBALS, [], analysis)
+  const split = splitFence(source, server, [], analysis)
 
   if (!split)
     return analysis
@@ -955,17 +954,20 @@ function codeOf(text: string): string {
   return code.replaceAll(OBJECT_KEY, '$1')
 }
 
-// Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read.
-function undeclared(ast: ParseResult<t.File>, code: string, names: string[], typed: string): string[] {
-  const mentioned = names.filter(name => GLOBAL_NAME.get(name)!.test(code) || GLOBAL_NAME.get(name)!.test(typed))
+// Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read.
+function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string): string[] {
+  const written = new Set((typed === '' ? [code] : [code, typed]).flatMap(text => text.match(GLOBAL_NAME) ?? []))
+  const mentioned = [...written].filter(name => !declared.includes(name))
   const found: string[] = []
 
   if (mentioned.length === 0)
     return found
 
+  const inTyped = new Set(typed.match(GLOBAL_NAME) ?? [])
+
   loadTraverse()(ast, {
     Program(path) {
-      found.push(...mentioned.filter(name => (name in path.scope.globals || GLOBAL_NAME.get(name)!.test(typed)) && !path.scope.hasBinding(name)))
+      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name)) && !path.scope.hasBinding(name)))
       path.stop()
     },
   })
@@ -975,8 +977,10 @@ function undeclared(ast: ParseResult<t.File>, code: string, names: string[], typ
 
 // The first value that makes the script reactive, as the script names it and where it comes from: an implicit global such as `signal` comes from `kay`.
 export function reactiveValue(script: ScriptAnalysis): { name: string, source: string } | undefined {
-  if (script.implicit[0] !== undefined)
-    return { name: script.implicit[0], source: 'kay' }
+  const implicit = script.implicit.find(name => !STATIC_EXPORTS.has(name))
+
+  if (implicit !== undefined)
+    return { name: implicit, source: 'kay' }
 
   const binding = script.imports.find(importsReactiveValue)
 

@@ -5,12 +5,13 @@ import { findProjectFiles, resolveFrom } from '../build/files'
 import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
-import { analyzeServer } from '../compiler/script'
+import { analyzeScript, analyzeServer } from '../compiler/script'
 import { neverWritten, parseLiteral } from './literal-writes'
 import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
 
 // Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does.
+// `action` is `free`: it registers a route that answers a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
 // `persisted` is `local`: it reads the request's cookie or query, so it is free only where every use says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
 // One list, so an export missing from it is found by `tests/kept-pages.test.ts`, which holds it to the exports of `kay`.
 export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
@@ -57,7 +58,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   presence: 'request',
   defer: 'request',
   guard: 'request',
-  action: 'request',
+  action: 'free',
   call: 'request',
   dispatch: 'request',
   resource: 'request',
@@ -771,6 +772,16 @@ async function scanned(file: string, root: string | undefined, scans: object): P
 
   for (const match of bare.matchAll(FOR_EFFECT))
     imports.push({ clause: '', specifier: match[1]!, index: match.index, length: match[0].length })
+
+  // What a `.kay` file reads of `kay` with no import is judged as if it imported it.
+  if (file.endsWith('.kay')) {
+    const parts = parseKay(source)
+    const server = analyzeServer(source, parts.server)
+    const implicit = [...new Set([...analyzeScript(source, parts.script, server?.data.map(({ name }) => name)).implicit, ...server?.implicit ?? []])]
+
+    if (implicit.length > 0)
+      imports.push({ clause: `{ ${implicit.join(', ')} }`, specifier: 'kay', index: 0, length: 0 })
+  }
 
   // The first stop in the file is the one named.
   imports.sort((a, b) => a.index - b.index)

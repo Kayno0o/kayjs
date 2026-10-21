@@ -179,10 +179,9 @@ ul
 
 ### Imports kay adds
 
-- `props`, `signal`, `memo`, `effect`, `onMount` and `onCleanup` need no import in a script, nor `action` in a server fence: the compiler imports them from `kay` when the file uses them without declaring or importing a name of its own.
-- The translation `t` of `kay/i18n` needs no import either, in a template or any fence.
-- That is the rule: a name needs no import when it is what a component is written with, `props`, the reactive primitives, a server fence's `action` and `t`; everything else is imported, from `kay` for what pages, components, guards and routes are written with (`persisted`, `context`, `navigate`, `s`, `guard`, `localPath`, `publicEnv`), from `kay/server` for what sets up and runs the server (`defineConfig`, `defineEnv`, `session`, `queue`, `files`), from a topic's own entry for that topic's helpers (`kay/i18n`, `kay/cache`, `kay/content`, `kay/seo`, `kay/image`), components such as `T` included.
-- In a `.ts` module nothing is added, so `action` is imported there.
+- Every value `kay` exports (`signal`, `persisted`, `navigate`, `s`, `action`, `localPath` and the rest) needs no import in a script or a server fence: the compiler imports it from `kay` when the file reads it without declaring or importing a name of its own. A type is still imported, `import type { Signal } from 'kay'`.
+- The translation `t` of `kay/i18n` needs no import either, in a template or any fence. Everything from another entry (`defineConfig` from `kay/server`, `cached` from `kay/cache`, `T` from `kay/i18n`, `collection` from `kay/content`) is imported, and `kay check` names the entry when a name is unknown.
+- In a `.ts` module nothing is added, so `action` is imported there. `kay/server` also exports `s`, so a server module (`env.ts`, an API route) imports `defineEnv` and `s` from one path.
 
 ### Props
 

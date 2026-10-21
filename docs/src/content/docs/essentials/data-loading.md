@@ -142,8 +142,7 @@ Caching a load with `cached()` is covered in [Caching and streaming](/guides/cac
 
 ```ts
 // src/env.ts
-import { s } from 'kay'
-import { defineEnv } from 'kay/server'
+import { defineEnv, s } from 'kay/server'
 
 export const env = defineEnv(s.Object({
   DATABASE_URL: s.String(),

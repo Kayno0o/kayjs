@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { ARCHIVES } from '../scripts/whats-new'
 import { compileKay, formatDiagnostic } from '../src/compiler'
+import { KAY_VALUES } from '../src/compiler/kay-exports'
 import { LINTS } from '../src/compiler/lints'
 import { nativeExe } from '../src/compiler/native-typescript'
-import { SCRIPT_GLOBALS, SERVER_GLOBALS } from '../src/compiler/script'
 import { formatKay } from '../src/format'
 
 // A doc an agent reads whole stays under this many bytes, as a tool output over 30 KB is cut to a preview; a release that grows whats-new.md or upgrading.md past it moves its oldest minor into the archive file, and a library's llms.txt is an index of topic files under llms/.
@@ -115,9 +115,13 @@ describe('llms.txt and its docs', () => {
     const named = new Set([...spec.matchAll(NAMED)].map(match => match[1]!))
     // A default export, such as kay/bun's plugin for bunfig, is imported by no name
     const exported = new Set((await Promise.all(PUBLIC_ENTRIES.map(async entry => Object.keys(await import(entry))))).flat().filter(name => name !== 'default'))
-    const implicit = new Set([...SCRIPT_GLOBALS, ...SERVER_GLOBALS, 't'])
+    const implicit = new Set([...KAY_VALUES, 't'])
 
     expect([...exported].filter(name => named.has(name) && !placed.has(name) && !implicit.has(name)).sort()).toEqual([])
+  })
+
+  it('lists every value of kay for the compiler to import where a file reads it unimported', async () => {
+    expect([...KAY_VALUES].sort()).toEqual(Object.keys(await import('kay')).sort())
   })
 
   it('keeps what generated code and kay\'s own build import off the public entries', async () => {

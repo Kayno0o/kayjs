@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import. A component is written with them. Everything else is imported, and components, such as `T`, are always imported.
+Inside a `.kay` file, everything `kay` exports needs no import, nor do `props` and the translation `t`. Everything from another entry is imported, and components, such as `T`, are always imported. A type is imported with `import type`. In a `.ts` file nothing is added; `kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path.
 
 ## kay
 
@@ -63,6 +63,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `api`, `eventStream` | An API module under `src/api`, and server-sent events |
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
+| `s` | The schema builder `kay` exports, for a server module that imports nothing else from `kay` |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |
 | `crossSiteRefused`, `crossSiteResponse` | Whether a browser's cross-site POST or websocket upgrade should be refused, for code that kay's actions and API do not reach, and the 403 to answer it with. See [Security](/guides/security#a-post-from-another-site) |
 | `toolCall` | Whether a request is a tool call that `/mcp` passed on, and which. See [API routes](/guides/api-routes#telling-a-tool-call-apart) |

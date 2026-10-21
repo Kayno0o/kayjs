@@ -2686,6 +2686,21 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('types a value of kay read with no import and names the module of a name from another entry', async () => {
+    const page = '--- server\nimport { env } from \'../env\'\n\nconst id = uid()\nconst posts = await cached(\'posts\', \'5m\', async () => [id])\n---\np {posts.length} {env.NAME}\n'
+    const env = 'import { defineEnv, s } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ NAME: s.String({ default: \'kay\' }) }))\n'
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/env.ts': env })
+
+    try {
+      const found = (await check(root)).map(d => [d.line, d.message, d.help])
+
+      expect(found).toEqual([[5, expect.stringContaining('Cannot find name \'cached\''), 'did you mean `cached` from `kay/cache`? Add `import { cached } from \'kay/cache\'`']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the head lints of the prerendered pages at their files, without rendering them', async () => {
     const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)
     const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`

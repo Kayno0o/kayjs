@@ -44,7 +44,7 @@ p {greeting}
 Badge(label="new")
 ```
 
-Some names need no import: `props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, the translation `t`, and `action` in a server fence. Import anything else, such as `persisted` from `kay`. [Modules](/reference/modules) says which entry holds what.
+Everything `kay` exports needs no import in a script or a server fence: `signal`, `memo`, `persisted`, `navigate`, `s`, `action` and the rest, as well as `props` and the translation `t`. Import what comes from another entry, such as `cached` from `kay/cache`, and `kay check` names the entry when you forget. [Modules](/reference/modules) says which entry holds what.
 
 ## Props
 
