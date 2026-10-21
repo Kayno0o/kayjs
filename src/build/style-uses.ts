@@ -311,6 +311,20 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     return found
   }
+  // Whether a file reaches a stylesheet of the app and a script naming one of the classes it declares: the script is the vocabulary the value is read from, and the stylesheet keeps the rule of each class whatever builds it.
+  const sheetVouched = (file: string): boolean => {
+    const reach = closure([file], reached)
+    const declared = new Set<string>()
+
+    for (const module of reach) {
+      if (CSS_FILE.test(module)) {
+        for (const name of named(module))
+          declared.add(name)
+      }
+    }
+
+    return declared.size > 0 && [...reach].some(module => SCRIPT_OR_KAY.test(module) && existsSync(module) && [...tokensOf(module).words].some(word => declared.has(word)))
+  }
   let written: Set<string> | undefined
   // The runtime classes of the app's scripts and components that nothing makes the build keep the rules of.
   const unresolvedClasses = (files: Iterable<string>, own: StyleUsesOptions['own'], listed: ReadonlySet<string>, complete: (fragment: string) => string[], client: ReadonlySet<string>, reachedBy: ReadonlyMap<string, Set<string>>) => {
@@ -342,8 +356,8 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
       }
 
       for (const runtime of runtimeClasses(readSource(file).text, judge, file)) {
-        // A value with no part to match is the app's to vouch for with an `@source inline` of its own.
-        if (runtime.part === '' && vouched.length > 0)
+        // A value with no part to match is the app's to vouch for with an `@source inline` of its own, or with a stylesheet its file reaches whose classes a script it reaches names.
+        if (runtime.part === '' && (vouched.length > 0 || sheetVouched(file)))
           continue
 
         found.push({ file, ...runtime, client: client.has(file), by: [...reachedBy.get(file) ?? []] })
