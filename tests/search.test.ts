@@ -448,6 +448,59 @@ describe('the search index', () => {
     expect((await search(dir, 'island')).hits.map(hit => bare(hit.href))).toEqual(['/islands', '/guide#props'])
   })
 
+  it('finds the singular of a plural word below the plural itself, and marks it', async () => {
+    const dir = await index([{
+      path: '/templates',
+      html: '<main><h1>Templates</h1><h2 id="outside">Links to other sites</h2><p>Opens in a new tab.</p></main>',
+    }, {
+      path: '/button',
+      html: '<main><h1>Button</h1><h2 id="as-a-link">As a link</h2><p>Renders an anchor.</p></main>',
+    }, {
+      path: '/chart',
+      html: '<main><h1>LineChart</h1><h2 id="colors">Colors</h2><p>A line per series, the lines drawn over a grid.</p></main>',
+    }])
+    const { hits } = await search(dir, 'links')
+
+    expect(hits.map(hit => bare(hit.href))).toEqual(['/templates#outside', '/button#as-a-link'])
+    expect(hits[1]!.headingParts).toEqual([{ text: 'As a ', hit: false }, { text: 'link', hit: true }])
+    expect((await search(dir, 'ss')).hits).toEqual([])
+    expect((await search(dir, 'tabs')).hits.map(hit => bare(hit.href))).toEqual(['/templates#outside'])
+  })
+
+  it('drops the hits of the last query when the search of the next one fails', async () => {
+    const dir = await index([{ path: '/x', html: '<main><h1>X</h1><h2 id="a">Alpha</h2><p>Beta.</p></main>' }])
+    const { result } = await inBrowser(dir, 'en', async () => {
+      const query = signal('alpha')
+      let results: ReturnType<typeof searchResults> | undefined
+      const dispose = reactiveRoot((dispose) => {
+        results = searchResults(query)
+
+        return dispose
+      })
+
+      flush()
+
+      while (results!.loading())
+        await Bun.sleep(5)
+
+      const before = results!.hits().length
+      const working = globalThis.fetch
+
+      globalThis.fetch = (async (url: string) => String(url).includes('w-') ? new Response('', { status: 500 }) : working(url)) as typeof fetch
+      query.set('beta')
+      flush()
+
+      while (results!.loading())
+        await Bun.sleep(5)
+
+      dispose()
+
+      return { before, after: results!.hits().length, failed: results!.error() !== undefined }
+    })
+
+    expect(result).toEqual({ before: 1, after: 0, failed: true })
+  })
+
   it('counts the words searched for past the snippet', async () => {
     const dir = await index([{ path: '/long', html: `<main><h1>Long</h1><p>Needle first. ${'filler '.repeat(40)}needles again, a needle, and a pin.</p></main>` }])
     const [hit] = (await search(dir, 'needle')).hits

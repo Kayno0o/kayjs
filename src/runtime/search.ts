@@ -24,6 +24,8 @@ export const ARRIVAL_WORDS = 8
 export const ARRIVAL_WORD_LENGTH = 64
 // A word only starting with what was typed counts for less than the word itself, the more so the less of it was typed: `island` finds `Islands` nearly as well as `island`.
 const PREFIX_FACTOR = 0.7
+// The singular of a plural term counts as the term itself nearly: `links` finds `As a link`.
+const SINGULAR_FACTOR = 0.95
 
 export interface SearchManifest {
   dir: string
@@ -152,9 +154,15 @@ function arrivalHref(href: string, terms: string[]): string {
   return `${path}?${ARRIVAL_PARAM}=${encodeURIComponent(words).replaceAll('%20', '+')}${at === -1 ? '' : href.slice(at)}`
 }
 
+// The singular of a term ending in `s`, so `links` also finds `link`; a short term, or one in `ss` such as `access`, has none.
+function singular(term: string): string | undefined {
+  return term.length > 3 && term.endsWith('s') && !term.endsWith('ss') ? term.slice(0, -1) : undefined
+}
+
 // Each section holding a word the term starts, scored by the best such word.
 async function termScores(dir: string, shards: Set<string>, term: string): Promise<Map<number, number>> {
   const scores = new Map<number, number>()
+  const bare = singular(term)
   const two = searchShard(term)
   const longer = [...shards].filter(shard => shard.startsWith(`${two}-`))
   // A term of three letters or more needs only the file of its first three when two letters were split; one of two needs them all.
@@ -166,10 +174,12 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
   const found = await Promise.all(files.filter(shard => shards.has(shard)).map(async shard => load<Record<string, number[]>>(`${dir}w-${shard}.json`)))
 
   for (const [word, postings] of found.flatMap(words => Object.entries(words))) {
-    if (!word.startsWith(term))
+    const prefix = word.startsWith(term)
+
+    if (!prefix && word !== bare)
       continue
 
-    const factor = word === term ? 1 : PREFIX_FACTOR + (1 - PREFIX_FACTOR) * term.length / word.length
+    const factor = word === term ? 1 : prefix ? PREFIX_FACTOR + (1 - PREFIX_FACTOR) * term.length / word.length : SINGULAR_FACTOR
 
     for (let i = 0; i < postings.length; i += 2) {
       const score = postings[i + 1]! * factor
@@ -248,13 +258,20 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
   const hits: [number, number][] = []
 
   for (const word of folded.matchAll(WORD)) {
-    const term = terms.find(term => word[0].startsWith(term))
+    const length = matched(word[0], terms)
 
-    if (term !== undefined)
-      hits.push([from[word.index]!, from[word.index + term.length - 1]! + 1])
+    if (length !== undefined)
+      hits.push([from[word.index]!, from[word.index + length - 1]! + 1])
   }
 
   return hits
+}
+
+// How much of a word a term marks: as much as the term when the word starts with it, all of it when the word is the term's singular.
+function matched(word: string, terms: string[]): number | undefined {
+  const term = terms.find(term => word.startsWith(term))
+
+  return term === undefined ? terms.some(term => word === singular(term)) ? word.length : undefined : term.length
 }
 
 // The text from `start` to `end` in parts, the hits within it marked.

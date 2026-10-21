@@ -58,7 +58,7 @@ The words stay in the URL, where analytics see them, and a refresh marks them ag
 
 `snippet` is a line of that text around the first word found. Its parts mark each word searched for.
 
-A query needs all its words. Each is found as a word or the start of one, with case and accents ignored.
+A query needs all its words. Each is found as a word or the start of one, with case and accents ignored. A word ending in `s` also finds its singular, so `links` finds a heading about a link.
 
 Each hit has `page`, `heading`, `headingParts`, `href`, `snippet`, `more` and a `score`. `heading` is `undefined` for the text above the first heading. `href` is the page's path, then `?kay_q=` with the words searched for, then the heading's anchor. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too. `more` counts the words found in the text past the snippet.
 

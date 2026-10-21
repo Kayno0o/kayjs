@@ -23,8 +23,10 @@ export function searchResults(query: () => string, options?: SearchOptions): Sea
       }
     }
     catch (caught) {
-      if (turn === asked)
+      if (turn === asked) {
+        setHits([])
         setError(caught instanceof Error ? caught : new Error(String(caught)))
+      }
     }
     finally {
       if (turn === asked)

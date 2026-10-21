@@ -221,7 +221,7 @@ ul
 - A link inside the heading to itself is left out when it shows only `#`, `¶`, `§` or nothing visible, and the heading's own text kept as written, `C#` included.
 - Soft hyphens, zero-width joiners and non-joiners join the word they split, in the pages and the query alike, while a zero-width space parts two words, as in Thai.
 - A section is titled by the page's `h1`, or its `title` without one, and each `href` ends in a slash under `trailingSlash: 'always'`.
-- A query needs every word it holds, found as a word or the start of one, with case and accents ignored and words of one letter dropped.
+- A query needs every word it holds, found as a word or the start of one, with case and accents ignored and words of one letter dropped; a word of four letters or more ending in `s` (not `ss`) also finds its singular, a little below the word itself.
 - A word is a run of letters and digits, so a language written without spaces, such as Chinese or Japanese, is indexed by whole runs: a query finds such a run only by its start.
 - A word in the page's title counts most, then in a heading, then in the text, and a word in a title or heading counts a little more the more of it it makes up, so `kay mcp` comes before a long heading naming MCP.
 - A word only starting a longer one counts less the less of it the query holds, so `island` finds the page titled Islands before a heading naming an island.
