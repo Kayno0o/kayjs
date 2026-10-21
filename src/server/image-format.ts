@@ -6,6 +6,9 @@ const AVIF_BRANDS = new Set(['avif', 'avis'])
 // Enough of a file to hold its `ftyp` box and the brands it lists.
 const HEAD = 64
 
+// About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
+export const MAX_UPLOAD_PIXELS = 50_000_000
+
 export function isGif(bytes: Uint8Array): boolean {
   return GIF.every((byte, index) => bytes[index] === byte)
 }

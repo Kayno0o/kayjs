@@ -21,7 +21,7 @@ const GRACE = 24 * 60 * 60 * 1000
 const PRIVATE_FOLDER = /^private$/i
 
 // The 20 hex digits of a key's random id, which a reference to the file holds whatever the URL around it: `/_kay/files/`, the site's base, an origin or a CDN.
-const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+)?\.[a-z\d]{1,10}$/
+const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
 // Every window of 20 hex digits, so an id inside a longer run of them is found too.
 const IDS = /(?=([\da-f]{20}))/g
 

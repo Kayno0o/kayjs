@@ -8,7 +8,8 @@ import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { typeOfName } from './file-type'
-import { imageHeader } from './image-format'
+import { dominantColor, imageColors } from './image-color'
+import { imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
 import { requestUrl } from './request-url'
@@ -53,7 +54,7 @@ export interface UrlOptions {
 
 const DEFAULT_DIR = 'data/files'
 const PRIVATE = 'private/'
-const KEY = /^(?:[\w-]+\/)*[\w-]+(?:\.\d{1,5}x\d{1,5})?\.[a-z\d]{1,10}$/
+const KEY = /^(?:[\w-]+\/)*[\w-]+(?:\.\d{1,5}x\d{1,5}(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
 const FOLDER = /^[\w-]+(?:\/[\w-]+)*$/
 // A folder or key under `private`, whatever its case, since a store matching keys whatever their case reads `Private/` as `private/`.
 const PRIVATE_SEGMENT = /^private(?:\/|$)/i
@@ -247,8 +248,10 @@ export const files = {
     const strip = options.keepMetadata !== true && holdsImageMetadata(await data.slice(0, 12).bytes())
     const stored = strip ? new Blob([stripImageMetadata(await data.bytes())], { type: data.type }) : data
     const size = SIZED.test(extension) ? await imageSize(stored) : undefined
+    // Read once here and kept in the key, so a page paints it with no lookup, whatever the store.
+    const color = size?.animated === false && extension !== 'avif' && imageColors() ? await dominantColor(stored, MAX_UPLOAD_PIXELS) : undefined
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
-    const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}` : ''}.${extension}`
+    const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}${color === undefined ? '' : `-${color}`}` : ''}.${extension}`
     const store = await activeStore()
 
     await store.write(key, stored)
@@ -534,11 +537,11 @@ function fileExtension(data: Blob): string {
   return named?.toLowerCase() ?? EXTENSIONS[data.type.replace(TYPE_PARAMETERS, '')] ?? 'bin'
 }
 
-async function imageSize(data: Blob): Promise<{ width: number, height: number } | undefined> {
+async function imageSize(data: Blob): Promise<{ width: number, height: number, animated: boolean } | undefined> {
   try {
-    const { width, height } = await imageHeader(data)
+    const { width, height, animated } = await imageHeader(data)
 
-    return { width, height }
+    return { width, height, animated }
   }
   catch {
     return undefined

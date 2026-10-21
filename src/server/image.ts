@@ -19,7 +19,7 @@ import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
-import { decodable, imageHeader } from './image-format'
+import { decodable, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -68,8 +68,7 @@ const MOST_ANSWERED = 1024
 // A longer URL is answered without being kept, so junk query strings cannot pin megabytes.
 const LONGEST_ANSWERED = 2048
 
-// About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
-export const MAX_UPLOAD_PIXELS = 50_000_000
+export { MAX_UPLOAD_PIXELS }
 export const DEFAULT_QUALITY = 80
 // Variants and cards drawn on request, each holding its source's decoded pixels, at most this many at once, so a burst of new images cannot take the memory of all of them.
 export const drawing = limiter(4)

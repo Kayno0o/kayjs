@@ -21,7 +21,7 @@ export const IMPORTED = '/_kay/assets/'
 export const VARIANTS = '/_kay/images/'
 // Where stored files are served. An image's key holds its size, `avatars/1f3a.1600x1200.jpg`, so a page sizes it without reading it.
 export const FILES_ROUTE = '/_kay/files/'
-const STORED_SIZE = /\.(\d{1,5})x(\d{1,5})\.[a-z\d]+(?:\?.*)?$/i
+const STORED_SIZE = /\.(\d{1,5})x(\d{1,5})(?:-[\da-f]{6})?\.[a-z\d]+(?:\?.*)?$/i
 const EXTENSION = /\.[^.]+$/
 const QUERY = /\?.*$/
 const FUNCTION_NAME = /[a-z-]*$/i

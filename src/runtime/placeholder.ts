@@ -1,5 +1,7 @@
 // The color an image shows until it loads: six hex digits of its mean color, for an image without transparency.
 // Apart from `image.ts`, which an island's bundle carries: only the server and the build's server bundle read or fill these.
+import { FILES_ROUTE } from './image'
+
 const COLOR = /^[\da-f]{6}$/
 // The most runtime images remembered, the oldest dropped first.
 const MOST_LEARNED = 4096
@@ -17,8 +19,11 @@ export function registerPlaceholder(url: string, color: string): string {
   return url
 }
 
+// The color `files.put` read from an image on upload and kept in its key: `photos/<id>.1600x1200-c86432.jpg`.
+const STORED_COLOR = /\.\d{1,5}x\d{1,5}-([\da-f]{6})\.[a-z\d]+(?:\?.*)?$/i
+
 export function placeholderColor(src: string): string | undefined {
-  const color = built.get(src) ?? learned.get(src)?.color
+  const color = built.get(src) ?? learned.get(src)?.color ?? (src.startsWith(FILES_ROUTE) ? STORED_COLOR.exec(src)?.[1]?.toLowerCase() : undefined)
 
   return color === '' ? undefined : color
 }

@@ -8,13 +8,17 @@ import { testWorker } from '../src/build/assets'
 import { cacheDir } from '../src/project'
 import { image } from '../src/runtime/image'
 import { diskFiles, files, memoryFiles, pages, s3Files } from '../src/server'
+import { encodePng } from '../src/server/png'
 import { linkStoredFiles, setupStorage } from '../src/server/storage'
 import { browserPath, testSite } from '../src/test'
+import { gif } from './gif'
 import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const ROUTES = 'tests/fixtures/storage/src/routes'
 const STATIC_FIXTURE = 'tests/fixtures/storage-static'
+// A PNG of one opaque color, or of a transparent one.
+const flat = (alpha = 255) => new File([new Uint8Array(encodePng(new Uint8Array(40 * 30 * 4).map((_, at) => at % 4 === 3 ? alpha : [200, 100, 50][at % 4]!), 40, 30))], 'flat.png', { type: 'image/png' })
 const hero = async (name = 'Hero.PNG') => new File([await Bun.file(HERO).arrayBuffer()], name, { type: 'image/png' })
 const dir = await mkdtemp(join(tmpdir(), 'kay-storage-'))
 const browser = browserPath()
@@ -252,6 +256,32 @@ describe('the file route', () => {
 })
 
 describe('stored images', () => {
+  it('hold the color they show until they load in their key, read once on upload, none for transparency or an animated GIF', async () => {
+    await serve(memoryFiles())
+
+    const key = await files.put(flat())
+
+    expect(key).toMatch(/^[\da-f]{20}\.40x30-c86432\.png$/)
+    expect(image(files.url(key))).toMatchObject({ width: 40, height: 30, style: 'background-color:#c86432' })
+    expect(image(files.url(key), { placeholder: false }).style).toBeUndefined()
+    expect(await files.put(flat(100))).toMatch(/^[\da-f]{20}\.40x30\.png$/)
+    expect(await files.put(new File([gif(40, 10, [3, 90])], 'moving.gif', { type: 'image/gif' }))).toMatch(/^[\da-f]{20}\.40x10\.gif$/)
+    // A key without a color, such as one stored before, is read as ever.
+    expect(image(files.url('photos/0123456789abcdef0123.4x3.png'))).toMatchObject({ width: 4, height: 3 })
+    expect((await files.list()).map(file => file.key)).toContain(key)
+    expect((await files.get(key))?.size).toBeGreaterThan(0)
+    await files.delete(key)
+    expect(await files.get(key)).toBeUndefined()
+  })
+
+  it('paint the color on the page before the image loads', async () => {
+    const get = await serve(memoryFiles())
+    const key = await files.put(flat())
+    const html = await (await get(`/?key=${encodeURIComponent(key)}`)).text()
+
+    expect(html).toContain('background-color:#c86432')
+  })
+
   it('render as variants of the image route, sized from their key', async () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())

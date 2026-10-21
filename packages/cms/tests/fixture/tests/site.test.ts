@@ -553,7 +553,7 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
   const { path } = await response.json() as { path: string }
 
-  expect(path).toMatch(/^\/_kay\/files\/products\/\w+\.1x1\.png$/)
+  expect(path).toMatch(/^\/_kay\/files\/products\/\w+\.1x1(?:-[\da-f]{6})?\.png$/)
   expect(new Uint8Array(await (await site.fetch(path)).arrayBuffer())).toEqual(PIXEL)
   expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
 
@@ -845,7 +845,7 @@ test('an image pasted into the Markdown body is uploaded to the collection\'s fo
   await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('[data-kcms-body] textarea')!.value.includes('![](/_kay/files/posts/'))
 
   const text = (await page.value(body))!
-  const path = (/!\[\]\((\/_kay\/files\/posts\/\w+\.1x1\.png)\)/).exec(text)![1]!
+  const path = (/!\[\]\((\/_kay\/files\/posts\/\w+\.1x1(?:-[\da-f]{6})?\.png)\)/).exec(text)![1]!
 
   expect(text).not.toContain('Uploading')
   expect(new Uint8Array(await (await built.fetch(path)).arrayBuffer())).toEqual(PIXEL)
@@ -912,7 +912,7 @@ test('a list of images takes several files at once, one item per file in order, 
 
   const paths = await page.evaluate(() => [...document.querySelectorAll('[data-kcms-path="gallery"] .kcms-file-preview')].map(image => image.getAttribute('src')))
 
-  expect(paths.map(path => (/\.1x1\.(png|gif)&/).exec(path ?? '')?.[1])).toEqual(['png', 'gif', 'png'])
+  expect(paths.map(path => (/\.1x1(?:-[\da-f]{6})?\.(png|gif)&/).exec(path ?? '')?.[1])).toEqual(['png', 'gif', 'png'])
   expect(await page.evaluate(() => document.querySelector('[data-kcms-path="gallery"] .kcms-file-error')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take'))).toBe(true)
   expect(page.errors).toEqual([])
 }, 60_000)
