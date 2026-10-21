@@ -1,5 +1,5 @@
-import type { IconProps } from 'kay/icons'
 import type { ToolbarAction } from '@kaynooo/kayjs-ui'
+import type { IconProps } from 'kay/icons'
 import type { Field } from './fields'
 import type { CollectionInfo, FormLayout, GivenLayout, ListLayout, RowAction } from './kay/contract'
 import { wording } from 'kay/words'
