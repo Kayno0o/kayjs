@@ -156,3 +156,12 @@ test('with nothing left from an older release no entry is read, and an unreadabl
   await expect(migrateUploads()).rejects.toThrow()
   expect((await dataOf('posts', 'a'))?.photo).toBe(files.url(old))
 })
+
+test('once an older upload is moved and its file kept, a later run moves nothing and reports nothing pending', async () => {
+  const old = await files.put(png(), { folder: 'posts' })
+
+  await make('posts', 'a', { title: 'A', photo: files.url(old) })
+  await migrateUploads()
+  registerCollections([['posts', collection(join(dir, 'missing-folder'), { schema })]])
+  expect(await migrateUploads()).toEqual({ moved: 0, pending: 0 })
+})

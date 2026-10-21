@@ -2,7 +2,7 @@ import type { EntryRef } from './kay/contract'
 import type { Adoption } from './media'
 import { files, typeOfName } from 'kay/server'
 import { log } from './log'
-import { adoptUploads, contentId, isUploadKey, MEDIA_FOLDER } from './media'
+import { adoptUploads, contentId, isUploadKey, MEDIA_FOLDER, mediaIndex, movedKeys } from './media'
 import { idOf, listUploads, readUploads } from './orphans'
 import { collectionNamed, entryOf, saveEntry } from './store'
 
@@ -57,7 +57,9 @@ export async function migrateUploads(): Promise<Migrated> {
     return { moved: 0, pending: 0 }
   }
 
-  const isOlder = (key: string) => !key.startsWith(`${MEDIA_FOLDER}/`) && isUploadKey(key)
+  // An older file already moved stays in its folder, and no longer counts.
+  const moved = movedKeys(await mediaIndex())
+  const isOlder = (key: string) => !key.startsWith(`${MEDIA_FOLDER}/`) && isUploadKey(key) && !moved.has(key)
 
   // The common case, nothing left from an older release, costs one listing and reads no entry.
   if (!listing.stored.some(file => isOlder(file.key)))
