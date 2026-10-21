@@ -63,6 +63,6 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.56
 - [What's new](llms/whats-new.md): what each recent release adds, newest first
-- [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.60
+- [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.61
 - [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person, analytics and Web Vitals through your origin
 - [Eco-design](llms/eco-design.md): the RGESN criteria kay meets, checks or leaves to the app
