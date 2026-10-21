@@ -11,7 +11,7 @@ const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, f
   retryLabel?: string
 }>()
 
-const feed = infiniteList(first, { size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+const feed = infiniteList(first, { pageSize: size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
 ---
 for row of feed.rows() key={row.id}
   p.row {row.id}

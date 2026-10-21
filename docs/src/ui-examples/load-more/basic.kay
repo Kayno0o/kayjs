@@ -13,7 +13,7 @@ async function page(offset: number) {
   return everyone.slice(offset, offset + SIZE)
 }
 
-const people = infiniteList(everyone.slice(0, SIZE), { size: SIZE, key: person => person.id, load: ({ offset }) => page(offset) })
+const people = infiniteList(everyone.slice(0, SIZE), { pageSize: SIZE, key: person => person.id, load: ({ offset }) => page(offset) })
 ---
 .h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
   for person of people.rows() key={person.id}

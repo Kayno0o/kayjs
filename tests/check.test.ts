@@ -2888,6 +2888,21 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports size in the options of infiniteList as pageSize, and --fix renames it, leaving other size keys', async () => {
+    const root = await scratchProject({
+      'src/a.ts': 'const size = 5\n\nexport const a = infiniteList([{ size: 1 }], { size: 20, key: row => row.id, load: ({ offset }) => offset })\nexport const b = infiniteList(rows, { size, load })\nexport const c = other({ size: 2 })\nexport const d = infiniteList(rows, { pageSize: 3, load: () => [{ size: 1 }] })\n',
+    })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-page-size/g)).toHaveLength(2)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe('const size = 5\n\nexport const a = infiniteList([{ size: 1 }], { pageSize: 20, key: row => row.id, load: ({ offset }) => offset })\nexport const b = infiniteList(rows, { pageSize: size, load })\nexport const c = other({ size: 2 })\nexport const d = infiniteList(rows, { pageSize: 3, load: () => [{ size: 1 }] })\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({

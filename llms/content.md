@@ -265,7 +265,7 @@ article
 #### Pagination
 
 - `isCollection` and `isPaginated` from `kay/content`, and the symbol marking a collection, are how kay recognizes a collection or a paginated result in a module's exports: kay's own, not API for an app.
-- `paginate(posts, 10)` from `kay/content` splits a collection, an array, or a function returning one into pages, for a page whose one param is optional, `blog/[[page=integer]].kay`: `const blog = paginate(posts, 10)`, `export const page = { prerender: blog }`, then `const list = await blog.page(ctx.params.page) ?? ctx.notFound()`.
+- `paginate(posts, 10)` from `kay/content` splits a collection, an array, or a function returning one into pages, for a page whose one param is optional, `blog/[[page=integer]].kay`: `const blog = paginate(posts, 10)`, `export const page = { prerender: blog }`, then `const list = await blog.page(ctx.params.page) ?? ctx.notFound()`; `blog.pageSize` is the 10 (`size` is its old name, kept three minors).
 - `list` has `items`, `page` and `pages`, from 1, `prev` and `next`, links undefined at the ends, and `href(n)`.
 - Page 1 is the list's own path, `/blog`, and `page()` gives `undefined` for `/blog/1`, a page past the last, or anything but a whole number from 1.
 - Its links are in the request's locale, under `base`, with a trailing slash under `trailingSlash: 'always'`.

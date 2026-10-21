@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
+import { paginate } from '../src/content/paginate'
 
 const CLI = resolve('src/cli.ts')
 
@@ -186,5 +187,14 @@ describe('a paginated list', () => {
 
   it('passes kay check, its page typed by its source', async () => {
     expect((await check(projects.get('paged')!, { site: 'https://example.com', base: '/docs' })).filter(diagnostic => diagnostic.severity !== 'warning')).toEqual([])
+  })
+})
+
+describe('paginate, the size of a page', () => {
+  it('names it pageSize, and keeps size as its old name', () => {
+    const list = paginate([1, 2, 3], 2)
+
+    expect(list.pageSize).toBe(2)
+    expect(list.size).toBe(2)
   })
 })

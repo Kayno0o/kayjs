@@ -24,6 +24,8 @@ export interface Page<Item> {
 
 export interface Paginated<Item> {
   readonly [PAGINATED]: true
+  readonly pageSize: number
+  // The old name of `pageSize`, kept three minors.
   readonly size: number
   // The page a route's optional param asks for, `ctx.params.page`: undefined when it is no page of the list, `1` included, which is the list's own path.
   page: (param: string | number | undefined) => Promise<Page<Item> | undefined>
@@ -50,6 +52,7 @@ export function paginate<Item>(source: Collection<unknown, Record<string, Compon
 
   return {
     [PAGINATED]: true,
+    pageSize: size,
     size,
     page: async (param) => {
       const number = pageNumber(param)

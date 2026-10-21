@@ -107,6 +107,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, from the registration 1.70 replaced |
 | `deprecated-body-limit` | warn | deprecated | `bodyLimit` in the config, an action, `api()` or a route's `detail`, now `maxSize` |
+| `deprecated-page-size` | warn | deprecated | `size` in the options of kayjs-ui's `infiniteList()`, now `pageSize` |
 | `deprecated-identity-key` | warn | deprecated | A `kay-allow identity-key` comment or an `identity-key` entry in `lints`, from the lint dropped in 1.69 |
 | `deprecated-rate-limit` | warn | deprecated | `limit`, `visitor` and `limits` of kayjs-ai and kayjs-auth, now `rateLimit` and `key`, and kayjs-mail's `rateLimit: 5`, now `{ max, window }` |
 | `deprecated-renamed-export` | warn | deprecated | An import of `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` or `MailNotConfigured`, renamed in 1.70 to end in `Error` |

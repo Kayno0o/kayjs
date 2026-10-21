@@ -8,7 +8,7 @@ const { onLoad, onSelect } = props<{
   onSelect: (keys: unknown[]) => void
 }>()
 
-const feed = infiniteList([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }], { size: 2, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+const feed = infiniteList([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }], { pageSize: 2, key: row => row.id, load: ({ offset }) => onLoad(offset) })
 ---
 button.more(type="button" onClick={feed.more}) More
 Table(columns={[{ key: 'name', header: 'Name' }]} rows={feed.rows()} rowKey="id" selectable onSelect={onSelect})

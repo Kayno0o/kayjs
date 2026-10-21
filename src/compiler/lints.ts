@@ -570,6 +570,15 @@ export const LINTS = {
     wrong: 'action(schema, handler, { bodyLimit: \'20mb\' })',
     right: 'action(schema, handler, { maxSize: \'20mb\' })',
   },
+  'deprecated-page-size': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: '`size` in the options of kayjs-ui\'s `infiniteList()`, now `pageSize` like every list paged by number (`limit` and `offset` stay for a window onto a list); the old name works three minors. The fix renames the key.',
+    wrong: 'infiniteList(first, { size: 20, load })',
+    right: 'infiniteList(first, { pageSize: 20, load })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

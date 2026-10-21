@@ -27,6 +27,10 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 
 `bodyLimit` in `kay.config.ts`, an action's options and its `messages`, `api({ ... })` and a route's `detail` is `maxSize`, as kayjs-cms's `uploads: { maxSize }` is. The old name works three minors, and `kay upgrade` renames it (the `deprecated-body-limit` lint). The `kay.action.bodyLimit` catalog key keeps its name.
 
+### Lists paged by number take `pageSize`
+
+`infiniteList(first, { size })` of kayjs-ui is `pageSize`, and the `size` of what `paginate()` returns is `pageSize` too; `limit` and `offset` stay for a window onto a list. The old names work three minors, and `kay upgrade` renames the `infiniteList` option (the `deprecated-page-size` lint); no lint can tell a read of `.size` from another object's, so rename those by hand.
+
 ## 1.69.0
 
 ### `guards` and `layouts` held in a variable, and a spread in an endpoint or `api()`, are errors

@@ -29,14 +29,14 @@ describe('infiniteList', () => {
   test('a first page shorter than size, or empty, ends the list at once', () => {
     const { load } = source()
 
-    expect(infiniteList(bans(1, 2), { size: 3, load }).ended()).toBe(true)
-    expect(infiniteList([], { size: 3, load }).ended()).toBe(true)
-    expect(infiniteList(bans(1, 3), { size: 3, load }).ended()).toBe(false)
+    expect(infiniteList(bans(1, 2), { pageSize: 3, load }).ended()).toBe(true)
+    expect(infiniteList([], { pageSize: 3, load }).ended()).toBe(true)
+    expect(infiniteList(bans(1, 3), { pageSize: 3, load }).ended()).toBe(false)
   })
 
   test('retry loads nothing when no page failed', async () => {
     const { asked, load } = source(bans(4, 3))
-    const list = infiniteList(bans(1, 3), { size: 3, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
 
     await list.retry()
 
@@ -45,7 +45,7 @@ describe('infiniteList', () => {
 
   test('an ended list never calls load', async () => {
     const { asked, load } = source(bans(1, 3))
-    const list = infiniteList(bans(1, 2), { size: 3, load })
+    const list = infiniteList(bans(1, 2), { pageSize: 3, load })
 
     await list.more()
 
@@ -54,7 +54,7 @@ describe('infiniteList', () => {
 
   test('asks for the next page by offset and last row, and a short page ends the list', async () => {
     const { asked, load } = source(bans(4, 3), bans(7, 1))
-    const list = infiniteList(bans(1, 3), { size: 3, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
 
     await list.more()
 
@@ -71,7 +71,7 @@ describe('infiniteList', () => {
 
   test('an exact-size last page is followed by one empty page, which ends the list', async () => {
     const { asked, load } = source(bans(4, 3), [])
-    const list = infiniteList(bans(1, 3), { size: 3, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
 
     await list.more()
     await list.more()
@@ -84,7 +84,7 @@ describe('infiniteList', () => {
 
   test('a failure waits for a retry, which asks for the same page again and clears it', async () => {
     const { asked, load } = source(new Error('down'), undefined, bans(4, 3))
-    const list = infiniteList(bans(1, 3), { size: 3, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
 
     await list.more()
 
@@ -108,7 +108,7 @@ describe('infiniteList', () => {
 
   test('a row already shown is dropped by its key, and the offset still counts it', async () => {
     const { asked, load } = source([{ id: 3 }, { id: 4 }, { id: 4 }], bans(7, 1))
-    const list = infiniteList(bans(1, 3), { size: 3, key: ban => ban.id, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
 
     await list.more()
 
@@ -122,7 +122,7 @@ describe('infiniteList', () => {
 
   test('a page of nothing but duplicates moves the offset on rather than asking again for it', async () => {
     const { asked, load } = source(bans(1, 3), [])
-    const list = infiniteList(bans(1, 3), { size: 3, key: ban => ban.id, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
 
     await list.more()
     await list.more()
@@ -132,7 +132,7 @@ describe('infiniteList', () => {
 
   test('a cursor source continues after the last row fetched, so a page of duplicates moves it on', async () => {
     const { asked, load } = source([{ id: 3 }, { id: 2 }, { id: 1 }], bans(4, 3))
-    const list = infiniteList(bans(1, 3), { size: 3, key: ban => ban.id, load })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
 
     await list.more()
     await list.more()
@@ -144,7 +144,7 @@ describe('infiniteList', () => {
   test('calls load once while a page is on its way, whoever asks', async () => {
     let release: (page: Ban[]) => void = () => undefined
     let calls = 0
-    const list = infiniteList(bans(1, 3), { size: 3, load: async () => {
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load: async () => {
       calls++
 
       return new Promise<Ban[]>(resolve => release = resolve)

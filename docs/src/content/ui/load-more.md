@@ -4,7 +4,7 @@ description: The end of an infinite-scroll list that loads its pages by offset o
 
 <Demo name="load-more/basic" />
 
-`infiniteList(firstRows, { size, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.rows()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(list={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
+`infiniteList(firstRows, { pageSize, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.rows()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(list={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
 
 `load({ offset, last })` resolves to the next page. A source paging by offset skips `offset` rows, which counts every row fetched so far, duplicates included; one paging by cursor continues after `last`, the last row fetched. A page of fewer than `size` rows ends the list, and a list whose last page was exactly `size` ends on the one empty page after it. One page loads at a time, however often the sentinel fires.
 

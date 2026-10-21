@@ -15,7 +15,7 @@ async function page(offset: number) {
   return Array.from({ length: offset < 30 ? SIZE : 3 }, (_, index) => ({ id: offset + index + 1 }))
 }
 
-const rows = infiniteList(Array.from({ length: SIZE }, (_, index) => ({ id: index + 1 })), { size: SIZE, key: row => row.id, load: ({ offset }) => page(offset) })
+const rows = infiniteList(Array.from({ length: SIZE }, (_, index) => ({ id: index + 1 })), { pageSize: SIZE, key: row => row.id, load: ({ offset }) => page(offset) })
 ---
 .h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
   for row of rows.rows() key={row.id}
