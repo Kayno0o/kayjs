@@ -49,10 +49,11 @@ function allowComments(source: string, name: string): { start: number, end: numb
     if (names.length === 1) {
       const lineStart = source.lastIndexOf('\n', comment.index - 1) + 1
       const lineEnd = source.indexOf('\n', comment.index)
-      const alone = source.slice(lineStart, comment.index).trim() === '' && source.slice(comment.index + comment[0].length, lineEnd === -1 ? undefined : lineEnd).trim() === ''
-      const commentStart = comment.index - (source.slice(lineStart, comment.index).length - source.slice(lineStart, comment.index).trimEnd().length)
+      const before = source.slice(lineStart, comment.index)
+      const commentStart = comment.index - (before.length - before.trimEnd().length)
 
-      edit = alone ? { start: lineStart, end: lineEnd === -1 ? source.length : lineEnd + 1, text: '' } : { start: commentStart, end: comment.index + comment[0].length, text: '' }
+      // The rest of the line is the comment's reason, which goes with it.
+      edit = before.trim() === '' ? { start: lineStart, end: lineEnd === -1 ? source.length : lineEnd + 1, text: '' } : { start: commentStart, end: lineEnd === -1 ? source.length : lineEnd, text: '' }
     }
     else if (at === 0) {
       edit = { start, end: listStart + names[1]!.index, text: '' }
