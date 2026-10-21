@@ -168,6 +168,8 @@ const FAILED_WAIT_MS = 1000
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
+// What a navigation says when the page navigated on its own meanwhile, as a dev server's live reload does.
+const NAVIGATED = /navigated or closed/
 // How long a click or a hover waits for a loading page to finish before it scrolls: a page that never finishes, as with a stalled image, is acted on after it.
 const LOAD_WAIT_MS = 1000
 // What the message of a wait that ran out of time starts with.
@@ -512,13 +514,26 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       origin = target.origin
 
+      // Navigated again once when the page navigated on its own meanwhile.
+      const navigate = async () => {
+        try {
+          await live(async () => view.navigate(target.href))
+        }
+        catch (error) {
+          if (gone || !NAVIGATED.test(error instanceof Error ? error.message : String(error)))
+            throw error
+
+          await live(async () => view.navigate(target.href))
+        }
+      }
+
       // A lenient page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
       if (options.lenient === true) {
-        if (await within(live(async () => view.navigate(target.href)), timeout) === TIMED_OUT)
+        if (await within(navigate(), timeout) === TIMED_OUT)
           throw new Error(`${UNSETTLED} ${timeout}ms waiting for ${target.pathname} to load`)
       }
       else {
-        await live(async () => view.navigate(target.href))
+        await navigate()
       }
 
       await settle(ready, `${target.pathname} to load and hydrate its islands`)
