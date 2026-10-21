@@ -50,6 +50,7 @@ const content: typeof Content = {
 
     return collectionList.find(collection => collection.name === name)
   },
+  translations: async () => new Map(),
   entries: async (collection, filter) => failing ? Promise.reject(new Error('kay: products\'s load threw: password for db.internal')) : (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }

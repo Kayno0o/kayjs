@@ -1,12 +1,12 @@
 import type { CollectionInfo, CollectionLayout, EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
-import { collections, entries } from './kay/content'
+import { collections, entries, translations } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows, rowsOf, statusOf } from './listing'
 import { log } from './log'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
-import { groupEntries, pairKey, translationReport } from './translations'
+import { pairKey, translationReport } from './translations'
 
 export interface EntryScreen {
   prefix: string
@@ -48,7 +48,7 @@ export async function listScreen({ collection: name, q = '', page = 1, status, s
 
   const { prefix, pageSize } = settings()
 
-  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir })
+  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name) })
 
   return { prefix, collection, ...listed }
 }
@@ -57,21 +57,26 @@ function paired(entry: Pick<SourceEntry, 'locale' | 'slug' | 'data' | 'body'> | 
   return entry?.locale === undefined ? undefined : { locale: entry.locale, slug: entry.slug, data: entry.data, body: entry.body }
 }
 
-// The translations of a localized entry, undefined for an entry that is not one or a site with a single locale: which locales have it, the default locale's entry it is marked against, and the locale asked to be shown beside it. Reads every entry of the collection, as a translation may carry another slug.
+// The translations of a localized entry, undefined for an entry that is not one or a site with a single locale: which locales have it, the default locale's entry it is marked against, and the locale asked to be shown beside it. Finds the translations through the collection's translation index, as a translation may carry another slug.
 export async function entryTranslations(collection: ScreenCollection, entry: StoredEntry, compare?: string): Promise<EntryTranslations | undefined> {
   const locales = collection.locales ?? []
 
   if (!collection.localized || locales.length < 2 || entry.locale === undefined)
     return undefined
 
-  const group = groupEntries(await entries(collection.name, {})).get(pairKey(entry)) ?? new Map<string, SourceEntry>()
+  const group = (await translations(collection.name)).get(pairKey(entry))
   const base = collection.defaultLocale ?? locales[0]
-  const other = compare === undefined || compare === entry.locale ? undefined : group.get(compare)
+  const slugIn = (locale: string) => locale === entry.locale ? entry.slug : group?.get(locale)
+  const read = async (locale: string | undefined) => {
+    const slug = locale === undefined ? undefined : group?.get(locale)
+
+    return locale === undefined || slug === undefined ? undefined : paired((await entries(collection.name, { slug, locale }))[0])
+  }
 
   return {
-    locales: locales.map(locale => ({ locale, slug: locale === entry.locale ? entry.slug : group.get(locale)?.slug })),
-    source: base === undefined || base === entry.locale ? undefined : paired(group.get(base)),
-    compare: paired(other),
+    locales: locales.map(locale => ({ locale, slug: slugIn(locale) })),
+    source: base === undefined || base === entry.locale ? undefined : await read(base),
+    compare: compare === undefined || compare === entry.locale ? undefined : await read(compare),
   }
 }
 

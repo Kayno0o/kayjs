@@ -401,6 +401,8 @@ A CMS that runs in your app's server reads the collections with `collections()` 
 
 `entrySource(name, slug, data)` gives a folder entry's file as the editor wrote it, for the CMS to commit. Kay writes no file. For a loader, `saveEntry` and `removeEntry` hand the entry to the loader's `save` and `remove`, after checking it against the collection. `saveEntries` hands several to its `saveMany` at once, all or none.
 
+`translations(name)` tells a localized collection's translations without reading every entry again: a map of each translation key to the slug written in each locale. It is built once, and rebuilt after a save or remove, an `invalidate()`, the loader's `ttl`, or a change to a folder's files.
+
 These give drafts and files to whoever calls them, so serve them behind a guard or `editRequested(request)`.
 
 <ReadMore href="/llms/content-cms#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>

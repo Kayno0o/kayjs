@@ -11,11 +11,13 @@ import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
+import { onKeysInvalidated } from '../runtime/cache'
+import { durationSeconds } from '../runtime/duration'
 import { iconNames, iconProps } from '../runtime/icons'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
-import { collectionFolder, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, writableFolder } from './load'
+import { collectionFolder, contentKey, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { takeTurn } from './turns'
@@ -26,6 +28,14 @@ import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './va
 
 // The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
 const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
+
+// Each localized collection's translation index, kept until a save or remove here, an `invalidate()` or the loader's `ttl` drops it; a folder's until one of its files changes.
+const indexes = new Map<Collection<unknown>, { index: Promise<TranslationIndex>, stamp?: string | undefined, until?: number | undefined }>()
+let hearing = false
+
+function forgetIndex(collection: Collection<unknown>): void {
+  indexes.delete(collection)
+}
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says; `customField` names any other kind, which the app's own component edits.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name'
@@ -201,6 +211,7 @@ export function registerCollections(named: [string, Collection<unknown>][]): [st
   const previous = registered
 
   registered = named
+  indexes.clear()
 
   return previous
 }
@@ -489,6 +500,83 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
   }))
 }
 
+// A localized collection's entries by what pairs them with their translations, then locale, each holding its slug: what a list reads to show the locales an entry lacks, in place of every entry.
+export type TranslationIndex = ReadonlyMap<string, ReadonlyMap<string, string>>
+
+// The files' names, sizes and times, which hold while no file of the folder changes; undefined while one was written a moment ago, as a second write may keep its stamp.
+async function folderStamp(name: string, dir: string): Promise<string | undefined> {
+  const stamps = await Promise.all((await folderFiles(name, dir)).map(async (file) => {
+    const { mtimeMs, size } = await stat(join(dir, file))
+
+    return { file, mtimeMs, size }
+  }))
+
+  return stamps.some(({ mtimeMs }) => Date.now() - mtimeMs <= STAMP_SETTLED_MS) ? undefined : stamps.map(({ file, mtimeMs, size }) => `${file}:${mtimeMs}:${size}`).join('\n')
+}
+
+// The translation index of the collection exported as `name`, empty for one not localized: built once from its entries, then served until a save or remove through this API, `invalidate()` or the loader's `ttl` for a loaded collection, until a file changes for a folder's. Every entry's pairing, drafts and entries the schema refuses included, as `entries()` gives them.
+export async function translations(name: string): Promise<TranslationIndex> {
+  const collection = collectionNamed(name)
+  const { localized = false } = collection.options
+
+  if (!localized)
+    return new Map()
+
+  if (!hearing) {
+    hearing = true
+    // A webhook or another process dropping a loaded collection's entries drops its index.
+    onKeysInvalidated((_, dropped) => {
+      for (const kept of indexes.keys()) {
+        if (dropped(contentKey(kept.name)))
+          forgetIndex(kept)
+      }
+
+      return []
+    })
+  }
+
+  const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
+  const stamp = dir === undefined ? undefined : await folderStamp(name, dir)
+  const kept = indexes.get(collection)
+
+  if (kept && (kept.until === undefined || kept.until > Date.now()) && (dir === undefined || (stamp !== undefined && kept.stamp === stamp)))
+    return kept.index
+
+  const index = (async () => {
+    const groups = new Map<string, Map<string, string>>()
+
+    for (const entry of await entries(name, {})) {
+      if (entry.locale === undefined)
+        continue
+
+      const key = translationKey(entry)
+
+      groups.set(key, (groups.get(key) ?? new Map<string, string>()).set(entry.locale, entry.slug))
+    }
+
+    return groups
+  })()
+  const ttl = collection.loader?.ttl
+
+  if (dir !== undefined && stamp === undefined) {
+    indexes.delete(collection)
+
+    return index
+  }
+
+  indexes.set(collection, { index, stamp, ...ttl !== undefined && { until: Date.now() + durationSeconds(ttl, `the collection ${name}'s ttl`) * 1000 } })
+
+  try {
+    return await index
+  }
+  catch (error) {
+    if (indexes.get(collection)?.index === index)
+      indexes.delete(collection)
+
+    throw error
+  }
+}
+
 // Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a new `a/index` included, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
 // A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
 export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
@@ -682,6 +770,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 
     await save(options.create === true ? { ...filled, create: true } : filled)
     loading.delete(name)
+    forgetIndex(collection)
     collection.invalidate()
 
     return {}
@@ -737,6 +826,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
     }
     finally {
       loading.delete(name)
+      forgetIndex(collection)
       collection.invalidate()
     }
 
@@ -769,6 +859,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     loading.delete(name)
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
     loading.delete(name)
+    forgetIndex(collection)
     collection.invalidate()
 
     return {}

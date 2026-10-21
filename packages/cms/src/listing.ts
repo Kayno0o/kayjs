@@ -1,4 +1,4 @@
-import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
+import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry, TranslationIndex } from './kay/contract'
 import { wording } from 'kay/words'
 import { referrersNote } from './bulk-message'
 import { publishTime, unpublishTime } from './datetime'
@@ -6,7 +6,7 @@ import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
 import { screenPath } from './paths'
-import { groupEntries, missingLocales } from './translations'
+import { pairKey } from './translations'
 import { contentVersion } from './version'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
@@ -206,7 +206,7 @@ export interface RowsPage {
 
 // A page of the collection's rows: a search, a status filter or a sort reads every entry to match or order them, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone; a loaded entry's is taken from the entries `read` gave.
-export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort: asked, direction = 'asc' }: Omit<ListView, 'search'> = {}): Promise<RowsPage> {
+export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort: asked, direction = 'asc', translations }: Omit<ListView, 'search'> & { translations?: (() => Promise<TranslationIndex>) | undefined } = {}): Promise<RowsPage> {
   const sort = knownSort(collection, asked) ? asked : undefined
 
   if (collection.problem !== undefined)
@@ -223,27 +223,21 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     return found
   }
 
-  // The locales each row's entry lacks, read from every entry of the collection, as a translation may carry another slug.
+  // The locales each row's entry lacks, read from the collection's translation index, as a translation may carry another slug.
   const marked = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
     const locales = collection.locales ?? []
 
-    if (!collection.localized || locales.length < 2 || listed.rows.length === 0)
+    if (translations === undefined || !collection.localized || locales.length < 2 || listed.rows.length === 0)
       return listed
 
-    const groups = groupEntries(await list({}))
-    const lacks = new Map<string, string[]>()
-
-    for (const group of groups.values()) {
-      const missing = missingLocales(locales, group)
-
-      for (const entry of group.values())
-        lacks.set(key(entry.slug, entry.locale), missing)
-    }
+    const index = await translations()
 
     return { ...listed, rows: listed.rows.map((row) => {
-      const missing = lacks.get(key(row.slug, row.locale))
+      const entry = seen.get(key(row.slug, row.locale))
+      const group = index.get(entry === undefined ? row.slug : pairKey(entry))
+      const missing = group === undefined ? [] : locales.filter(locale => !group.has(locale))
 
-      return missing === undefined || missing.length === 0 ? row : { ...row, missing }
+      return missing.length === 0 ? row : { ...row, missing }
     }) }
   }
 

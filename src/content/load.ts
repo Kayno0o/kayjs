@@ -392,6 +392,9 @@ async function importedSource(root: string, configs: (string | undefined)[]): Pr
   return Bun.hash([...hashes].sort(([a], [b]) => a.localeCompare(b)).map(([file, hash]) => `${relative(root, file)}:${hash}`).join('\n')).toString(36)
 }
 
+// The cache key a page that read the collection carries, which `invalidate` refreshes the page for.
+export const contentKey = (name: string) => `kay:content:${name}`
+
 // What pairs an entry with its translations in a localized collection: its `translationKey` field when it sets one, else its slug.
 export function translationKey(entry: { slug: string, data: unknown }): string {
   const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translationKey?: unknown }).translationKey : undefined

@@ -18,13 +18,13 @@ import { kayLog } from '../runtime/log'
 import { previewing, previewState } from '../runtime/preview'
 import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
-import { contentMode, loadEntries, markdownOf, translationKey } from './load'
+import { contentKey, contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, validEntries } from './validate'
 
-export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
-export { collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, unique, untranslated } from './edit'
+export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
+export { collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
@@ -38,8 +38,7 @@ export const COLLECTION = Symbol.for('kay.collection')
 export const PUBLISH_TIMES = Symbol.for('kay.publishTimes')
 // Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.
 declare const FEED_PATH: unique symbol
-// The cache key a page that read the collection carries, which `invalidate` refreshes the page for.
-export const contentKey = (name: string) => `kay:content:${name}`
+export { contentKey }
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
 

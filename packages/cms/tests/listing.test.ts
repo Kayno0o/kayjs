@@ -94,6 +94,34 @@ describe('pageRows', () => {
   })
 })
 
+describe('pageRows of a localized collection', () => {
+  const locales = ['fr', 'en', 'de']
+  const pages: CollectionInfo = { ...posts, kind: 'loaded', localized: true, locales, defaultLocale: 'fr', count: 120 }
+  const stock: SourceEntry[] = Array.from({ length: 120 }, (_, i) => ({ slug: `page-${i}`, locale: 'fr', data: { title: `Page ${i}`, ...i === 0 && { translationKey: 'home' } }, draft: false }))
+  // `home` is also written as `accueil` in en, a translation that carries another slug.
+  const index = new Map([['home', new Map([['fr', 'page-0'], ['en', 'accueil']])], ...stock.slice(1).map(entry => [entry.slug, new Map([['fr', entry.slug], ['de', entry.slug]])] as const)])
+
+  it('marks the missing locales from the translation index, reading the entries of the page alone', async () => {
+    const asked: EntryFilter[] = []
+    const read = async (filter: EntryFilter) => {
+      asked.push(filter)
+
+      return stock.slice(filter.offset ?? 0, filter.limit === undefined ? undefined : (filter.offset ?? 0) + filter.limit)
+    }
+    const reads = { translations: 0 }
+    const translations = async () => {
+      reads.translations++
+
+      return index
+    }
+    const first = await pageRows(pages, '', 1, read, async () => undefined, PAGE_SIZE, { translations })
+    const second = await pageRows(pages, '', 2, read, async () => undefined, PAGE_SIZE, { translations })
+
+    expect([first.rows[0]!.missing, first.rows[1]!.missing, second.rows[0]!.missing]).toEqual([['de'], ['en'], ['en']])
+    expect(asked).toEqual([{ offset: 0, limit: PAGE_SIZE }, { offset: PAGE_SIZE, limit: PAGE_SIZE }])
+  })
+})
+
 describe('pageRows versions', () => {
   it('gives each row of a folder collection the version its file had as listed, and a loaded one a hash of its entry as read', async () => {
     const stock: SourceEntry[] = [{ slug: 'a', data: { title: 'A' }, draft: false, path: 'content/a.md' }, { slug: 'b', data: { title: 'B' }, draft: false, path: 'content/b.md' }]
