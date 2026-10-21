@@ -13,6 +13,7 @@ import type { Publishing } from './publishing'
 import type { Redirect } from './redirects'
 import type { ServedPage } from './render'
 import type { RouteTable } from './route-table'
+import type { Route } from './routes'
 import type { Claim } from './served-paths'
 import type { PageSetup, Scanned } from './setup'
 import { join, resolve } from 'node:path'
@@ -106,7 +107,7 @@ export interface PagesOptions extends KayConfig {
 }
 
 // The routes with their guards loaded.
-async function servedRoutes({ routes }: PageSetup, pages: ServedRoute[], required: boolean | undefined): Promise<ServedRoute[]> {
+async function servedRoutes(routes: Route[], pages: ServedRoute[], required: boolean | undefined): Promise<ServedRoute[]> {
   return Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
 }
 
@@ -134,7 +135,7 @@ interface Claimed {
 }
 
 // What the server refuses once the routes, public files, endpoints and collections are read, which is all of it that needs no build, so a refused config starts none.
-// Claims run in the order the server makes them; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
+// Claims run in the order the server makes them, which `kay check` keeps in `src/check/boot.ts` too; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
 function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files, endpoints, collections, i18n, site, base }: Scanned): Claimed {
   if (i18n)
     refuseLocaleClashes(i18n, routes)
@@ -322,7 +323,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned))
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, endpoints, appManifest, extensions, api: apiImport } = setup
-  const routes = await servedRoutes(setup, setup.claimed.routes, options.requireGuards)
+  const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.requireGuards)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const pageMatch = routeMatch(table, matchers, options.trailingSlash)
 

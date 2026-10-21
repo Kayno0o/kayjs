@@ -92,7 +92,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   if (settings)
     refused(config, () => refuseLocaleClashes(settings, routes))
 
-  // Claimed in the order the server claims them.
+  // Claimed in the order the server claims them, in `refuseScanned` (src/server/app.ts), which this keeps in step with.
   const served = new ServedPaths()
 
   refused(routesDir, () => refuseClashes(routesDir, routes, served, settings))
