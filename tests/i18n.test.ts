@@ -155,7 +155,7 @@ describe('locale prefixes', () => {
     const english = (await get('/en/about')).html
     const french = (await get('/about')).html
 
-    expect(english).toContain('<nav class="links"><a class="post" href="/en/blog/hello?x=1#top">Post</a><a class="self" href="/en/about" aria-current="page">About</a><a class="file" href="/blog/cover.png">Cover</a><a class="out" href="https://example.com/about">Elsewhere</a><a class="kept" href="/about" hreflang="fr">À propos</a><a class="dynamic" href="/en/blog/hello">Post</a><a href="/en/blog/new" class="spread">New</a></nav>')
+    expect(english).toContain('<nav class="links"><a class="post" href="/en/blog/hello?x=1#top">Post</a><a class="self" href="/en/about" aria-current="page">About</a><a class="file" href="/blog/cover.png">Cover</a><a class="out" href="https://example.com/about" target="_blank" rel="noopener">Elsewhere</a><a class="kept" href="/about" hreflang="fr">À propos</a><a class="dynamic" href="/en/blog/hello">Post</a><a href="/en/blog/new" class="spread">New</a></nav>')
     expect(french).toContain('<nav class="links"><a class="post" href="/blog/hello?x=1#top">Post</a><a class="self" href="/about" aria-current="page">About</a>')
     expect((await get('/en')).html).toContain('<a class="island" href="/en/about">About</a>')
   })

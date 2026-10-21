@@ -118,6 +118,22 @@ describe('a link of an island leaving the site', () => {
   })
 })
 
+describe('a dynamic tag naming a link', () => {
+  it('opens in a new tab as the server writes it, unless the props write a target', async () => {
+    const { dynamic } = await import('../src/runtime/dom')
+    const attributesOf = (props: Record<string, unknown>) => {
+      const link = dynamic('a', props) as Element
+
+      return [link.getAttribute('target'), link.getAttribute('rel')]
+    }
+
+    expect(attributesOf({ href: 'https://other.example/x' })).toEqual(['_blank', 'noopener'])
+    expect(attributesOf({ href: '/x' })).toEqual([null, null])
+    expect(attributesOf({ href: 'https://other.example/x', target: '_self' })).toEqual(['_self', null])
+    expect(attributesOf({ href: 'https://other.example/x', rel: 'author' })).toEqual(['_blank', 'author'])
+  })
+})
+
 describe('a link of an island under links.outside same-tab', () => {
   it('leaves every link in the same tab, the page\'s meta telling so', async () => {
     document.head.insertAdjacentHTML('beforeend', '<meta name="kay-same-tab-links">')

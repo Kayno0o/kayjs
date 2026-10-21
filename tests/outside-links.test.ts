@@ -86,6 +86,10 @@ describe('a link leaving the site, in templates', () => {
       expect(tag, name).not.toContain('_blank')
   })
 
+  it('opens links in a new tab with links.outside set to new-tab', async () => {
+    expect((await links({ site: 'https://x.example', links: { outside: 'new-tab' } })).static).toContain(OUT)
+  })
+
   it('opens the page\'s own links as on a localized page too', async () => {
     const tags = await links({ site: 'https://x.example', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }, '/en')
 

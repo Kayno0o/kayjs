@@ -16,6 +16,8 @@ function tag(html: string, href: string): string {
 }
 
 describe('renderMarkdown', () => {
+  afterAll(() => setSite(undefined))
+
   it('opens a link leaving the site in a new tab, leaving the others, a raw tag with its own target and a rel it keeps', async () => {
     setSite('https://x.example')
 

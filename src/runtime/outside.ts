@@ -14,14 +14,26 @@ export function mayLeaveSite(href: string): boolean {
   return LEAVING.test(href)
 }
 
+// The last site's URL, as a page renders every link against the same one.
+let known: { site: string | undefined, base: URL } | undefined
+
 // A browser's opaque origin, `null` on `file:` and `about:blank`, is no site: it reads as an unknown one.
-function originOf(site: string | undefined): URL {
+function baseOf(site: string | undefined): URL {
+  if (known && known.site === site)
+    return known.base
+
+  let base: URL
+
   try {
-    return new URL(site ?? UNKNOWN)
+    base = new URL(site ?? UNKNOWN)
   }
   catch {
-    return new URL(UNKNOWN)
+    base = new URL(UNKNOWN)
   }
+
+  known = { site, base }
+
+  return base
 }
 
 // Whether `href` goes to another origin than `site`, an absolute http(s) URL or a host-relative one; with no known `site`, any absolute http(s) URL does. `mailto:`, `tel:`, a `#hash` and a path of the site stay.
@@ -30,7 +42,7 @@ export function leavesSite(href: unknown, site: string | undefined): boolean {
     return false
 
   try {
-    const base = originOf(site)
+    const base = baseOf(site)
     const url = new URL(href, base)
 
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== base.origin

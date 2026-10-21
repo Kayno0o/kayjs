@@ -1294,7 +1294,9 @@ export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
 
   const element = claim ? claimNode() as Element : createElement(elementName(tag))
 
-  spread(element, () => [spreadAttributes(props)], 'children' in props)
+  const sources = () => [spreadAttributes(props)]
+
+  spread(element, element.localName === 'a' ? () => outsides(sources()) : sources, 'children' in props)
 
   return element
 }

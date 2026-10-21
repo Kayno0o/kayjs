@@ -161,7 +161,7 @@ export function outsideLinks(markup: string): string {
   return keepsSameTab() ? markup : markup.replace(LINK_TAG, outsideTag)
 }
 
-// A link tag written with an `href` leaving the site and no `target` of its own.
+// A link tag written with an `href` leaving the site and no `target` of its own; a raw tag with a single-quoted `href` is left as it is.
 function outsideTag(tag: string): string {
   if (LINK_TARGET.test(tag))
     return tag

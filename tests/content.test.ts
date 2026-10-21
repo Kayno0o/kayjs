@@ -577,7 +577,7 @@ describe('Markdown outside collections', () => {
 
     expect(note.headings).toEqual([{ depth: 2, id: 'hello-world', text: 'Hello world' }])
     expect(note.html).toContain('<h2 id="hello-world"><a href="#hello-world">Hello world</a></h2>')
-    expect(note.html).toContain('<a href="https://example.com">https://example.com</a>')
+    expect(note.html).toContain('<a href="https://example.com" target="_blank" rel="noopener">https://example.com</a>')
     expect(note.html).toContain('<pre class="shout">ts:CONST A = 1\n</pre>')
     expect((await renderMarkdown('```ts\na < b\n```\n')).html).toBe('<pre><code class="language-ts">a &lt; b\n</code></pre>\n')
   })
