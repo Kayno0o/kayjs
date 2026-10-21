@@ -19,6 +19,9 @@ const STAMP = /^\S+Z /
 
 // A file with no measurement starts among the slowest ones until a run measures it.
 export const UNMEASURED_MS = 20_000
+// Runs tried for a measurement, and the seconds a tea call may take before a stalled network stops holding the test run.
+const TRIED = 5
+const FETCH_SECONDS = 30
 const TEST_FILES = new Glob('tests/**/*.test.{ts,tsx,js,jsx}')
 
 interface Timings { version: number, files: Record<string, number> }
@@ -26,7 +29,7 @@ interface Run { id: number, workflow_id: string, event: string }
 interface Job { id: number, name: string }
 
 async function api<T>(path: string): Promise<T> {
-  return JSON.parse(await $`tea api ${`repos/{owner}/{repo}/${path}`}`.quiet().text()) as T
+  return JSON.parse(await $`timeout ${FETCH_SECONDS} tea api ${`repos/{owner}/{repo}/${path}`}`.quiet().text()) as T
 }
 
 // The measurement a run's log carries, if its test step printed one.
@@ -51,12 +54,14 @@ export function merge(known: Record<string, number>, onDisk: string[]): Record<s
   return files
 }
 
+// The newest green runs' logs are tried in turn, as the runs from before CI printed the measurement have none; the answer, empty or not, is kept under the newest run's id so a local run downloads nothing again until a newer run is green.
 async function latestMeasurement(): Promise<Record<string, number> | undefined> {
   if (Bun.which('tea') === null)
     return undefined
 
   const { workflow_runs: runs } = await api<{ workflow_runs: Run[] | null }>('actions/runs?status=success')
-  const newest = (runs ?? []).filter(run => run.workflow_id === WORKFLOW && run.event === 'push').sort((a, b) => b.id - a.id)[0]
+  const candidates = (runs ?? []).filter(run => run.workflow_id === WORKFLOW && run.event === 'push').sort((a, b) => b.id - a.id).slice(0, TRIED)
+  const newest = candidates[0]
 
   if (newest === undefined)
     return undefined
@@ -66,15 +71,20 @@ async function latestMeasurement(): Promise<Record<string, number> | undefined> 
   if (seen.startsWith(`${newest.id} `))
     return JSON.parse(seen.slice(String(newest.id).length + 1)) as Record<string, number>
 
-  const job = (await api<Job[]>(`actions/runs/${newest.id}/jobs`)).find(candidate => candidate.name === TEST_JOB)
+  let files: Record<string, number> = {}
 
-  if (job === undefined)
-    return undefined
+  for (const run of candidates) {
+    const job = (await api<Job[]>(`actions/runs/${run.id}/jobs`)).find(candidate => candidate.name === TEST_JOB)
+    const found = job === undefined ? undefined : measurementOf(await $`timeout ${FETCH_SECONDS} tea api ${`repos/{owner}/{repo}/actions/jobs/${job.id}/logs`}`.quiet().text())
 
-  const files = measurementOf(await $`tea api ${`repos/{owner}/{repo}/actions/jobs/${job.id}/logs`}`.quiet().text())
+    if (found !== undefined) {
+      files = found
 
-  if (files !== undefined)
-    await Bun.write(SEEN, `${newest.id} ${JSON.stringify(files)}`)
+      break
+    }
+  }
+
+  await Bun.write(SEEN, `${newest.id} ${JSON.stringify(files)}`)
 
   return files
 }
