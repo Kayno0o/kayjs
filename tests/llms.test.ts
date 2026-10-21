@@ -53,7 +53,7 @@ describe('llms.txt and its docs', () => {
   })
 
   it('keeps every doc under the size an agent reads with one command', async () => {
-    const files = [...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`), ...new Bun.Glob('packages/*/{llms.txt,llms/*.md}').scanSync({ cwd: root })]
+    const files = [...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`), ...new Bun.Glob('packages/*/llms.txt').scanSync({ cwd: root }), ...new Bun.Glob('packages/*/llms/*.md').scanSync({ cwd: root })]
 
     expect(files.length).toBeGreaterThan(30)
     expect(files.filter(file => Bun.file(join(root, file)).size >= MAX_DOC_BYTES).map(file => `${file}: ${Bun.file(join(root, file)).size}`)).toEqual([])
