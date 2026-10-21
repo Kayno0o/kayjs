@@ -95,15 +95,17 @@ function rateOf(limit: SmtpSettings['rateLimit'], what: string): { rateLimit: nu
   return { rateLimit: limit.max, rateDelta: durationSeconds(limit.window, `${what}'s rateLimit.window`, 'kayjs-mail') * 1000 }
 }
 
-// `SMTP_RATE_LIMIT` as text: `5/1s` is 5 mails a second, a bare `5` the old form of the same.
+// `SMTP_RATE_LIMIT` as text: `5/1s` is 5 mails a second, a bare `5` the same. Throws naming SMTP_RATE_LIMIT for a zero count or a window that is no duration, so the server stops as it boots.
 export function rateFromText(text: string | undefined): { max: number, window: Duration } | undefined {
   if (text === undefined || text === '')
     return undefined
 
   const [max, window = '1s'] = text.split('/')
 
-  if (!WHOLE_NUMBER.test(max!))
-    throw new Error(`kayjs-mail: SMTP_RATE_LIMIT is ${JSON.stringify(text)}; it takes a count and a window, such as 5/1s`)
+  if (!WHOLE_NUMBER.test(max!) || Number(max) < 1)
+    throw new Error(`kayjs-mail: SMTP_RATE_LIMIT is ${JSON.stringify(text)}; it takes a count of at least 1 and a window, such as 5/1s`)
+
+  durationSeconds(window, 'SMTP_RATE_LIMIT\'s window', 'kayjs-mail')
 
   return { max: Number(max), window: window as Duration }
 }
