@@ -313,7 +313,19 @@ async function removeOne(ref: EntryRef, author: Identity | undefined, { version,
 
       const kept = hiddenOf(collection.name, 'trash') && storedState((await entries(collection.name, { slug: ref.slug, locale: ref.locale }))[0])
       const id = kept ? await keepDeleted(ref, kept, author) : undefined
-      const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
+      let removal: Awaited<ReturnType<typeof removeEntry>>
+
+      try {
+        removal = await removeEntry(collection.name, ref.slug, ref.locale)
+      }
+      catch (error) {
+        if (id !== undefined)
+          await discardTrashed(collection.name, id)
+
+        throw error
+      }
+
+      const { issues } = removal
 
       if (issues !== undefined && issues.length > 0) {
         if (id !== undefined)

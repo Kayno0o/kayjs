@@ -39,12 +39,18 @@ async function purge(collection: string): Promise<void> {
     return
 
   try {
-    const expired = (await trash.load({ preview: true })).filter(row => (row.data as Row).at < Date.now() - kept)
+    const rows = await trash.load({ preview: true })
+    const expired = rows.filter(row => (row.data as Row).at < Date.now() - kept)
+    const staying = rows.filter(row => !expired.includes(row))
 
     for (const row of expired) {
       const { slug, locale } = row.data as Row
 
       await trash.remove!({ slug: row.slug })
+
+      // A newer deleted entry under the same slug still needs the history.
+      if (staying.some(other => (other.data as Row).slug === slug && (other.data as Row).locale === locale))
+        continue
 
       if ((await entries(collection, { slug, locale })).length === 0)
         await forgetRevisions({ collection, slug, locale })
@@ -82,12 +88,9 @@ export async function keepDeleted(ref: EntryRef, entry: { data: Record<string, u
     return undefined
 
   try {
-    await purge(ref.collection)
-
-    const taken = new Set((await trash.load({ preview: true })).map(row => row.slug))
     let at = Date.now()
 
-    while (taken.has(String(at)))
+    while (await rowOf(trash, String(at)))
       at++
 
     const row: Row = { at, ...author && { author: author.name }, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, data: entry.data, ...entry.body !== undefined && { body: entry.body } }

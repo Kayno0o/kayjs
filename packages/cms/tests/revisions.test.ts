@@ -281,3 +281,42 @@ describe('history details', () => {
     expect(editedMoment(Date.UTC(2026, 9, 21, 14, 5), 'Not/AZone')).toBe('2026-10-21 14:05 UTC')
   })
 })
+
+describe('the trash, details', () => {
+  test('keeps the history of an entry deleted twice while the first deletion expires', async () => {
+    notes()
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+
+    const clock = spyOn(Date, 'now').mockReturnValue(Date.now() - 31 * 24 * 3600 * 1000)
+
+    try {
+      await deleteEntry(ref)
+    }
+    finally {
+      clock.mockRestore()
+    }
+
+    await saveEntry({ ...ref, data: { title: 'Two' } }, { create: true })
+    await deleteEntry(ref)
+
+    const items = await trashOf('notes')
+
+    expect(items.length).toBe(1)
+    await restoreTrashed('notes', items[0]!.id)
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Two'])
+  })
+
+  test('puts a restored entry back without the place it held', async () => {
+    const ordered = s.Object({ title: s.String(), position: s.Optional(s.Number()) })
+    const table = `notes_${++count}`
+
+    restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema: ordered, order: 'position' })]])
+    await saveEntry({ ...ref, data: { title: 'One', position: 3 } }, { create: true })
+    await deleteEntry(ref)
+
+    const [item] = await trashOf('notes')
+
+    await restoreTrashed('notes', item!.id)
+    expect((await entryOf(ref))?.data?.position).toBeUndefined()
+  })
+})

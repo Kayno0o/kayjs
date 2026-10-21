@@ -108,6 +108,11 @@ describe('roles', () => {
     expect(await statusOf(editor)).toBe(200)
     expect(await statusOf(publisher)).toBe(200)
     expect([isRestrained(editor.request), isRestrained(publisher.request)]).toEqual([true, false])
+
+    const trashed = ask({ path: '/trash/posts/123/restore', user: { roles: ['editor'] } })
+
+    expect(await statusOf(trashed)).toBe(200)
+    expect(isRestrained(trashed.request)).toBe(true)
   })
 
   test('a role allows exactly the actions it lists', async () => {

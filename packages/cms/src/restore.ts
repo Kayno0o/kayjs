@@ -34,7 +34,10 @@ export async function restoreTrashed(collection: string, id: string, author?: Id
   if (!item)
     return refused({ collection, slug: id }, wording('cms.trash.gone', 'That entry is not in the trash any more'))
 
-  const data = restrained ? keepingPublication(await collectionNamed(collection), item.data, undefined) : item.data
+  const info = await collectionNamed(collection)
+  const kept = restrained ? keepingPublication(info, item.data, undefined) : item.data
+  // Its old place may be taken by now, so it comes back without one.
+  const data = info.orderField === undefined ? kept : keepingOrder(info.orderField, kept, undefined)
   const outcome = await saveEntry({ collection, slug: item.slug, locale: item.locale, data, body: item.body }, { create: true, verb: 'restore', author, revived: true })
 
   if ('saved' in outcome)
