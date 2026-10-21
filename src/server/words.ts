@@ -14,8 +14,8 @@ export const KAY_ENGLISH = {
   'kay.entry.tooLong': '{field} takes {max} characters at most',
   'kay.entry.pattern': '{field} is not in the expected form',
   'kay.entry.format': '{field} is not a valid {format}',
-  'kay.entry.tooFewItems': '{field} needs at least {min} items',
-  'kay.entry.tooManyItems': '{field} takes {max} items at most',
+  'kay.entry.tooFewItems': '{field}: at least {min} items',
+  'kay.entry.tooManyItems': '{field}: at most {max} items',
   'kay.entry.tooSmall': '{field} must be at least {min}',
   'kay.entry.tooBig': '{field} must be at most {max}',
   'kay.entry.type': '{field} is not valid',
@@ -71,8 +71,10 @@ function matches(pattern: string, text: string): boolean {
   }
 }
 
+type RefusalKind = 'required' | 'tooShort' | 'tooLong' | 'pattern' | 'format' | 'tooFewItems' | 'tooManyItems' | 'tooSmall' | 'tooBig' | 'type'
+
 export interface Refusal {
-  kind: InvalidWord
+  kind: RefusalKind
   params?: Record<string, string | number> | undefined
 }
 
@@ -82,47 +84,60 @@ export function schemaRefusal(issue: { schema?: unknown, value?: unknown }): Ref
   const { value } = issue
 
   if (value === undefined)
-    return { kind: 'kay.invalid.required' }
+    return { kind: 'required' }
 
   if (typeof value === 'string') {
     if (value === '' && schema.minLength === 1)
-      return { kind: 'kay.invalid.required' }
+      return { kind: 'required' }
 
     if (schema.minLength !== undefined && value.length < schema.minLength)
-      return { kind: 'kay.invalid.tooShort', params: { min: schema.minLength } }
+      return { kind: 'tooShort', params: { min: schema.minLength } }
 
     if (schema.maxLength !== undefined && value.length > schema.maxLength)
-      return { kind: 'kay.invalid.tooLong', params: { max: schema.maxLength } }
+      return { kind: 'tooLong', params: { max: schema.maxLength } }
 
     if (schema.pattern !== undefined && !matches(schema.pattern, value))
-      return { kind: 'kay.invalid.pattern' }
+      return { kind: 'pattern' }
 
     if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format) && !INTERNAL_FORMATS.has(schema.format))
-      return { kind: 'kay.invalid.format', params: { format: schema.format } }
+      return { kind: 'format', params: { format: schema.format } }
   }
 
   if (Array.isArray(value)) {
     if (schema.minItems !== undefined && value.length < schema.minItems)
-      return { kind: 'kay.invalid.tooFewItems', params: { min: schema.minItems } }
+      return { kind: 'tooFewItems', params: { min: schema.minItems } }
 
     if (schema.maxItems !== undefined && value.length > schema.maxItems)
-      return { kind: 'kay.invalid.tooManyItems', params: { max: schema.maxItems } }
+      return { kind: 'tooManyItems', params: { max: schema.maxItems } }
   }
 
   if (typeof value === 'number') {
     if (schema.minimum !== undefined && value < schema.minimum)
-      return { kind: 'kay.invalid.tooSmall', params: { min: schema.minimum } }
+      return { kind: 'tooSmall', params: { min: schema.minimum } }
 
     if (schema.maximum !== undefined && value > schema.maximum)
-      return { kind: 'kay.invalid.tooBig', params: { max: schema.maximum } }
+      return { kind: 'tooBig', params: { max: schema.maximum } }
   }
 
-  return { kind: 'kay.invalid.type' }
+  return { kind: 'type' }
+}
+
+const ENTRY_KEYS: Record<RefusalKind, KayWord> = {
+  required: 'kay.entry.required',
+  tooShort: 'kay.entry.tooShort',
+  tooLong: 'kay.entry.tooLong',
+  pattern: 'kay.entry.pattern',
+  format: 'kay.entry.format',
+  tooFewItems: 'kay.entry.tooFewItems',
+  tooManyItems: 'kay.entry.tooManyItems',
+  tooSmall: 'kay.entry.tooSmall',
+  tooBig: 'kay.entry.tooBig',
+  type: 'kay.entry.type',
 }
 
 // The sentence for a refused field of an entry: the `kay.entry.*` text of the keyword it fails in the request's locale, naming the field by its label, its own English when the site words none.
 export function entryRefusal(label: string, issue: { schema?: unknown, value?: unknown }): string {
   const { kind, params } = schemaRefusal(issue)
 
-  return kayWord(`kay.entry.${kind.slice('kay.invalid.'.length)}` as KayWord, { field: label, ...params })
+  return kayWord(ENTRY_KEYS[kind], { field: label, ...params })
 }

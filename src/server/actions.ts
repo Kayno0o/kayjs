@@ -957,7 +957,7 @@ function encodeOrExplain(value: unknown, what: string): string {
 function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
   const { kind, params } = schemaRefusal(issue)
 
-  return invalidWord(kind, issue.summary, params)
+  return invalidWord(`kay.invalid.${kind}`, issue.summary, params)
 }
 
 // Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.

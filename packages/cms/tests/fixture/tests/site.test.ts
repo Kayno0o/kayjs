@@ -574,7 +574,7 @@ test('a save the schema refuses names each field by its label, nested ones on th
     return ((await response.json()) as { issues: { path: string, message: string }[] }).issues.map(({ path, message }) => [path, message])
   }
 
-  expect(await save({ referer: 'http://localhost/products' }, { name: '', gallery: [3] })).toEqual([['name', 'Name is required'], ['gallery.0', 'Gallery, item 1 is not valid']])
+  expect(await save({ referer: 'http://localhost/products' }, { name: '', gallery: [3] })).toEqual([['name', 'Name is required'], ['gallery.0', 'must be a path or an http(s) address']])
   expect(await save({ referer: 'http://localhost/products' }, { name: 'Lamp', color: 'red' })).toEqual([['color', 'Color is not in the expected form']])
 })
 

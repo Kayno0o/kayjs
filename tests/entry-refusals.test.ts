@@ -1,6 +1,7 @@
 import type { LocaleState } from '../src/runtime/locale-state'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
+import { humanize } from '../packages/cms/src/fields'
 import { ContentError, dataIssues, decodeEntries } from '../src/content/validate'
 import { runInLocale } from '../src/runtime/locale-state'
 
@@ -45,7 +46,7 @@ describe('an entry the schema refuses', () => {
       slug: 'Slug is not in the expected form',
       publishedAt: 'Date de parution is not a valid date-time',
       rating: 'Rating must be at most 5',
-      tags: 'Tags takes 2 items at most',
+      tags: 'Tags: at most 2 items',
       flag: 'Flag is not valid',
       seoURL: 'Seo URL needs at least 4 characters',
     })
@@ -55,7 +56,7 @@ describe('an entry the schema refuses', () => {
     expect(messagesOf({ ...VALID, rating: 0, summary: 'abcdefg', tags: [] })).toEqual({
       rating: 'Rating must be at least 1',
       summary: 'Summary takes 5 characters at most',
-      tags: 'Tags needs at least 1 items',
+      tags: 'Tags: at least 1 items',
     })
   })
 
@@ -123,6 +124,33 @@ describe('the entries a build reads', () => {
     }
     catch (error) {
       expect((error as ContentError).problems[0]?.message).toBe('The data is not valid')
+    }
+  })
+})
+
+describe('the labels', () => {
+  it('are the CMS editor\'s: the same words for a key, a numeric key an object property rather than an item', () => {
+    for (const key of ['publishedAt', 'seoURL', 'snake_case', 'kebab-case', 'a/b~c'])
+      expect(dataIssues(t.Object({ [key]: t.String({ minLength: 9 }) }), { [key]: '' })[0]!.message).toStartWith(humanize(key))
+
+    expect(dataIssues(t.Object({ 2024: t.String({ minLength: 2 }) }), { 2024: 'a' })[0]!.message).toBe('2024 needs at least 2 characters')
+  })
+
+  it('give the inner type\'s title before the nullable field\'s own, and a field\'s own error the last word', () => {
+    const titled = t.Object({ handle: t.Union([t.String({ title: 'Inner', minLength: 2 }), t.Null()], { title: 'Outer' }), slug: t.String({ pattern: '^a$', error: 'Use a.' }) })
+
+    expect(dataIssues(titled, { handle: 3, slug: 'b' }).map(issue => issue.message)).toEqual(['Inner is not valid', 'Use a.'])
+  })
+
+  it('give a line to a top-level key holding a dot', () => {
+    const dotted = t.Object({ 'a.b': t.String({ minLength: 1 }) })
+
+    try {
+      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a.b': '' }, lines: { 'a.b': 5 }, body: '' } as never], dotted, {})
+      expect.unreachable()
+    }
+    catch (error) {
+      expect((error as ContentError).problems[0]?.line).toBe(5)
     }
   })
 })
