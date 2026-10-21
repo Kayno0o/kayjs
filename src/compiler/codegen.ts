@@ -171,7 +171,6 @@ class ModuleShell {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
-      identityKeys: this.kind === 'island' || this.kind === 'inside island',
     }, this.sites)
   }
 

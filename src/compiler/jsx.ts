@@ -22,8 +22,6 @@ export interface JsxOptions {
   staticLoops: boolean
   // The props passed an island reach the browser as they are written, so `kay check` asserts they can.
   sendsIslandProps: boolean
-  // An island renders its lists again, so `kay check` reports rows matched by their objects.
-  identityKeys: boolean
 }
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
@@ -372,16 +370,10 @@ export class JsxTemplate {
     const tag = 'KayLoopFor'
     const positional = keyedByPosition(node, this.src)
 
-    // Only an island renders a list again, so only there do rows matched by their objects cost anything.
-    const identityChecked = this.options.check && this.options.identityKeys && !node.key
-
     b.wrap(node, () => {
       b.add(`<${tag} each={`)
 
-      if (identityChecked)
-        b.add('KayIdentityKey((').addSource(node.each).add('))')
-      else
-        b.addSource(node.each)
+      b.addSource(node.each)
 
       b.add('} keyed={')
 
@@ -439,10 +431,7 @@ export class JsxTemplate {
     b.wrap(node, () => {
       b.add('{(() => { const kayEach = (')
 
-      if (!staticLoop && this.options.identityKeys && !node.key)
-        b.add('KayIdentityKey((').addSource(node.each).add('))')
-      else
-        b.addSource(node.each)
+      b.addSource(node.each)
 
       b.add('); return ')
 

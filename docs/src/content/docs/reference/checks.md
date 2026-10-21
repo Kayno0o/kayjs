@@ -57,7 +57,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unbounded-string` | deny | forms | A string field of an action with no `maxLength` |
 | `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |
 | `incomplete-match` | warn | code | A `match` with no `else` that leaves members of a union out |
-| `identity-key` | warn | islands | An island `for` over objects with no `id` or `key` |
 | `missing-label` | warn | a11y | A form field with no label |
 | `skipped-heading` | warn | a11y | An `h3` right after an `h1` |
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog` |

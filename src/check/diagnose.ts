@@ -72,7 +72,7 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
   const offset = span?.start ?? 0
   const lint = typeLint(diagnostic.message, propBefore(shadow.source, span))
 
-  // A lint the types find, as `identity-key`.
+  // A lint the types find, as `uncalled-signal`.
   if (lint) {
     const level = levelAt(lint.code, offset)
 

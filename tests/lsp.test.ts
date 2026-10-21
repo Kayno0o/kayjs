@@ -341,7 +341,7 @@ describe('kay lsp', () => {
     const checked = (await check(join(workspace, 'site'))).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
 
     // The index of a positionally keyed for whose rows do not read it is no unread name.
-    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[7, 2, 'positional-key'], [9, 2, 'positional-key'], [11, 2, 'identity-key'], [13, 1, 2774]])
+    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[7, 2, 'positional-key'], [9, 2, 'positional-key'], [13, 1, 2774]])
     expect(published).toEqual(checked)
     // That index renames with its key.
     expect(spots((await editor.rename(page, 9, 10, 'index'))[page]!)).toEqual([[9, 10, 11], [9, 26, 27]])

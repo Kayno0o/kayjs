@@ -250,14 +250,6 @@ export const LINTS = {
     wrong: 'for todo, i of todos key={i}\n  TodoRow(id={todo.id} title={todo.title})',
     right: 'for todo of todos\n  TodoRow(id={todo.id} title={todo.title})',
   },
-  'identity-key': {
-    level: 'warn',
-    group: 'islands',
-    typed: true,
-    summary: 'A `for` in an island over objects with no `id` and no `key`: its rows are matched by the objects themselves, so a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew and drops their state.',
-    wrong: 'for post of posts\n  PostRow(slug={post.slug} title={post.title})',
-    right: 'for post of posts key={post.slug}\n  PostRow(slug={post.slug} title={post.title})',
-  },
   'incomplete-match': {
     level: 'warn',
     group: 'code',
@@ -744,7 +736,6 @@ export interface TypeLint {
   help: string
 }
 
-const IDENTITY_KEY = 'kayLint: "identity-key"'
 const INCOMPLETE_MATCH = 'IncompleteMatch<'
 const MISSING = /^Argument of type '(.+?)' is not assignable to parameter of type/
 const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
@@ -803,15 +794,7 @@ export function typeLint(message: string, prop?: string): TypeLint | undefined {
     }
   }
 
-  if (!message.includes(IDENTITY_KEY))
-    return undefined
-
-  return {
-    code: 'identity-key',
-    message: 'These rows are matched by the objects themselves, which have no `id`',
-    note: 'a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew, and their state goes with them',
-    help: 'name what tells the rows apart, `for post of posts key={post.slug}`',
-  }
+  return undefined
 }
 
 const FIRST_SENTENCE = /^.*?\.(?=\s|$)/

@@ -129,7 +129,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, LocalsOf, PublicEnvOf, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
@@ -145,7 +145,6 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayFormError<Target extends string | Action<never, unknown>>(target: Target, field?: FieldName<Target>): null',
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
-    '  function KayIdentityKey<Each>(each: Each & IdentityKeyed<Each>): Each',
     '  function KayRow<Item>(each: readonly Item[] | null | undefined | false): Item',
     '  function KayTruthy<Value>(value: Value): Truthy<Value>',
     '  function KayUnmatched<Rest>(rest: Rest & Unmatched<Rest>): void',

@@ -148,11 +148,6 @@ type MissingDay<Day, Month extends string, Weekday> = Weekday extends '*'
   ? Day extends '30' | '31' ? Uppercase<Month> extends '2' | '02' | 'FEB' ? true : Day extends '31' ? Uppercase<Month> extends '4' | '04' | '6' | '06' | '9' | '09' | '11' | 'APR' | 'JUN' | 'SEP' | 'NOV' ? true : false : false : false
   : false
 
-type RowOf<Each> = Each extends Iterable<infer Item> ? Item : never
-
-// An island's `for` with no key matches its rows by `item.id`, else by the item itself: objects without an `id`, made afresh as the list is rebuilt, would make every row anew. `kay check` reports it as the `identity-key` lint.
-export type IdentityKeyed<Each> = [RowOf<Each>] extends [object] ? [RowOf<Each>] extends [{ id: unknown }] ? unknown : { kayLint: 'identity-key' } : unknown
-
 type Finite<Member> = Member extends string | number ? Record<never, never> extends Record<Member, 1> ? false : true : Member extends boolean | bigint | symbol | null | undefined ? true : false
 
 // What a `match` with no `else` leaves out: `Rest` is the subject narrowed by its `when` lines, and a member of a finite union (literals, enum members, booleans, `null`, `undefined`) left in it is a value the template renders nothing for. `kay check` reports it as the `incomplete-match` lint.

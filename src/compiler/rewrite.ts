@@ -13,7 +13,7 @@ const LIVE_WRITES = new Set(['set', 'delete'])
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
-// The names the compiler gives its own helpers and tags, `KayIdentityKey` or `KayLoopFor`.
+// The names the compiler gives its own helpers and tags, `KayRow` or `KayLoopFor`.
 const COMPILER_NAME = /^Kay[A-Z]/
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
 const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo' }
@@ -738,7 +738,7 @@ function isCall(node: t.Node): node is t.CallExpression | t.OptionalCallExpressi
   return node.type === 'CallExpression' || node.type === 'OptionalCallExpression' || node.type === 'NewExpression'
 }
 
-// A helper the compiler wraps a template expression in, such as `KayIdentityKey`, which hands nothing on.
+// A helper the compiler wraps a template expression in, such as `KayTruthy`, which hands nothing on.
 function compilerCall(callee: t.Node): boolean {
   return callee.type === 'Identifier' && COMPILER_NAME.test(callee.name)
 }
