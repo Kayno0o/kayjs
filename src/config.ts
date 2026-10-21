@@ -133,7 +133,7 @@ export interface KayConfig {
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string> | undefined
-  // Deprecated since 1.70, dropped in 1.73: mark the field `s.Public` in `defineEnv` instead. Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
+  /** Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser. @deprecated Since 1.70, dropped in 1.73: mark the field `s.Public` in `defineEnv` instead. */
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
@@ -482,7 +482,7 @@ export function defineConfig<Config extends KayConfig>(config: Config): Config {
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
-  return withSiteUrl(withExtensions(withPublicFields(root, withLibraryMessages(root, await importConfig(root, fresh)))))
+  return withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh)))))
 }
 
 const SERVER_SPECIFIER = /(['"])kay\/server\1/g
@@ -654,7 +654,7 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return mergeConfig(withPublicFields(root, withLibraryMessages(root, await importConfig(root))), options)
+  return withPublicFields(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), options))
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

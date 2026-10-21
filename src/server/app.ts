@@ -46,7 +46,7 @@ import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
-import { PUBLIC_ENV_PATH } from './env-state'
+import { PUBLIC_ENV_PATH, publicEnvFiles } from './env-state'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
@@ -409,8 +409,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
   }
 
-  if (options.publicEnv)
+  if (options.publicEnv) {
+    // The modules declaring an `s.Public` field run first, so the values are there before a page or the browser reads them.
+    await Promise.all(publicEnvFiles(root).map(async (file): Promise<void> => void await import(join(root, file))))
     servePublicEnv(app, options.publicEnv)
+  }
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)

@@ -5,6 +5,7 @@ import process from 'node:process'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
+import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
 import { building, PUBLIC_ENV_PATH, recordEnv } from './env-state'
@@ -157,6 +158,9 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
 // Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret, a token, an API key or a database address never is.
 const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
 
+// Public variables `kay build` could not read, which the module the browser loads must not silently leave out.
+const unreadInBuild = new Set<string>()
+
 // Hands the browser the variables of `schema` marked `s.Public`, or all of them for the `publicEnv` of kay.config.ts: the server refuses a name meant for the server alone, and an island reads the values as `publicEnv` from `kay`.
 // A variable the build could not read is left out here and throws where a page reads it.
 function exposePublic(schema: EnvSchema, values: Record<string, unknown>, owner: string, all = false): void {
@@ -175,7 +179,9 @@ function exposePublic(schema: EnvSchema, values: Record<string, unknown>, owner:
   for (const name of names) {
     const descriptor = Object.getOwnPropertyDescriptor(values, name)
 
-    if (descriptor !== undefined && 'value' in descriptor && descriptor.value !== undefined)
+    if (descriptor?.get !== undefined)
+      unreadInBuild.add(name)
+    else if (descriptor !== undefined && descriptor.value !== undefined)
       held[name] = descriptor.value
   }
 }
@@ -183,12 +189,29 @@ function exposePublic(schema: EnvSchema, values: Record<string, unknown>, owner:
 // Reads the `publicEnv` of kay.config.ts as `defineEnv` reads the server's, and serves the module the browser loads with it and every `s.Public` field `defineEnv` has read.
 // The boot claims its path before any build.
 export function servePublicEnv(app: Elysia, schema: EnvSchema): void {
-  if (Object.keys(schema.properties).length > 0)
+  if (Object.keys(schema.properties).length > 0) {
+    warnDeprecated()
     exposePublic(schema, defineEnv(schema) as Record<string, unknown>, 'publicEnv', true)
+  }
 
   let reply: ReturnType<typeof fixedReply> | undefined
 
-  app.get(PUBLIC_ENV_PATH, async ({ request }) => (reply ??= fixedReply(publicEnvModule((globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV] ?? {}), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }))(request))
+  app.get(PUBLIC_ENV_PATH, async ({ request }) => {
+    if (unreadInBuild.size > 0)
+      throw new KayError('env-invalid', `kay: ${[...unreadInBuild].join(', ')} is public and the environment does not give it, so the browser would get none; set it for kay build`)
+
+    return (reply ??= fixedReply(publicEnvModule((globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV] ?? {}), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }))(request)
+  })
+}
+
+let warned = false
+
+function warnDeprecated(): void {
+  if (warned)
+    return
+
+  warned = true
+  kayLog('warn', 'publicEnv in kay.config.ts is read until 1.73 only: mark the fields s.Public in defineEnv instead')
 }
 
 export function publicEnvModule(values: Record<string, unknown>): string {

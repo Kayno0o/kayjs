@@ -68,7 +68,7 @@ No lint can recognise an environment variable, so kay warns at boot for each old
 
 ### `publicEnv` in kay.config.ts is deprecated
 
-No lint can recognise it, as its fields move to another file. Until 1.73 it works as before; mark the same fields `s.Public(...)` in `defineEnv` and drop the key.
+No lint can fix it safely, as its fields move to another file, so kay warns at boot. Until 1.73 it works as before; mark the same fields `s.Public(...)` in `defineEnv` and drop the key.
 
 ### A comma in `KAY_SECRET` splits it, and `kay check` compares deploy files
 

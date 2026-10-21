@@ -151,13 +151,14 @@ describe('s.Public', () => {
     expect(() => defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.Secret()) }), { NODE_ENV: 'test' })).toThrow('kay: s.Public declares KAY_TEST_MAP_KEY')
   })
 
-  it('leaves a public field the build could not read out, as the page reading it throws', () => {
+  it('leaves a public field the build could not read out, as the page reading it throws, and fails the browser module', async () => {
     buildingWithoutEnv()
 
     try {
       const env = defineEnv(s.Object({ KAY_TEST_MISSING_PUBLIC: s.Public(s.String()) }), {})
 
       expect(() => env.KAY_TEST_MISSING_PUBLIC).toThrow('KAY_TEST_MISSING_PUBLIC')
+      expect((await servePublicApp().handle(new Request('http://localhost/_kay/env.js'))).status).toBe(500)
     }
     finally {
       ;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.building')] = undefined
