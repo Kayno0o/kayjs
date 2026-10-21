@@ -15,7 +15,7 @@ import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
-import { drafts } from './drafts'
+import { drafts, rebuilding, watchRebuild } from './drafts'
 import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
 import './editor.css'
@@ -44,6 +44,8 @@ const room = signal({ width: 0, height: 0 })
 // What the dev tool's docked drawer holds along the right and bottom edges, and how far down a fixed header holds the top of the window.
 const held = signal({ right: 0, bottom: 0 })
 const clear = signal(0)
+// The page the edits were last shown on: a render of the drafts swaps the page as well, which leaves its path as it was.
+let shownPath = ''
 let panel: HTMLElement | undefined
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = false
@@ -118,6 +120,9 @@ onMount(() => {
   measure()
   ready = true
 
+  shownPath = location.pathname + location.search
+  watchRebuild()
+
   // A docked dev tool pads the page, which the root's content shows at the side and its border box at the bottom.
   const content = new ResizeObserver(measureSoon)
   const border = new ResizeObserver(measureSoon)
@@ -129,6 +134,22 @@ onMount(() => {
     border.disconnect()
     cancelAnimationFrame(frame)
   })
+})
+
+// Another page replaced the one the edits were shown on, so they are shown on it too.
+effect(() => {
+  const navigated = () => {
+    const path = location.pathname + location.search
+
+    if (path === shownPath)
+      return
+
+    shownPath = path
+    drafts.reapply()
+  }
+
+  document.addEventListener('kay:navigate', navigated)
+  onCleanup(() => document.removeEventListener('kay:navigate', navigated))
 })
 
 listen(() => window, 'resize', measureSoon)
@@ -325,6 +346,13 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
   if open()
     .kcms-editor-body
+      .kcms-editor-status(role="status" aria-live="polite")
+        if drafts.rendering()
+          p {wording('cms.editor.rendering', 'Updating the page…')}
+        else if drafts.stale().length > 0
+          p.kcms-editor-failure {wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => entry.slug).join(', ') })}
+        if rebuilding()
+          p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
       if drafts.failure() as failure
         p.kcms-editor-failure(role="alert") {wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })}
       for entry of entries key={entryKey(entry)}

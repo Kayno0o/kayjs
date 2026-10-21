@@ -7,7 +7,7 @@ import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import { collectionTitle } from '../listing'
 import { BODY } from '../markers'
-import { drafts } from './drafts'
+import { drafts, rebuildStarted } from './drafts'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
@@ -63,7 +63,12 @@ async function save(): Promise<void> {
   saving = true
 
   try {
-    await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => lastSave.set({ at: Date.now(), rebuilding }) })
+    await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => {
+      lastSave.set({ at: Date.now(), rebuilding })
+
+      if (rebuilding)
+        rebuildStarted()
+    } })
   }
   finally {
     saving = false

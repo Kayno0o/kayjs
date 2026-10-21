@@ -35,6 +35,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const saved = new Map<string, DraftEntry>()
   // What `open` was last given for each entry, so being given it again changes nothing.
   const offered = new Map<string, string>()
+  // Each saved entry as text, so an edit is compared with it by stringifying the edited entry alone.
+  const savedText = new Map<string, string>()
   // The version of each entry's file its saved state was read from, which the next save names.
   const versions = new Map<string, string | undefined>()
   // The entries whose file the other side deleted and whose edits were kept: their next save creates the file, and is refused if one was made meanwhile.
@@ -139,7 +141,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     const original = saved.get(key) as DraftEntry
     const next = change(entry)
     // An edit typed back to the saved text leaves the entry unchanged.
-    const same = next === undefined || JSON.stringify(next) === JSON.stringify(original)
+    const same = next === undefined || JSON.stringify(next) === savedText.get(key)
 
     current.set(new Map(current()).set(key, same ? original : next))
     persist(key)
@@ -180,6 +182,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       const start = recover(key, entry, version)
 
       saved.set(key, entry)
+      savedText.set(key, JSON.stringify(entry))
       versions.set(key, version)
       current.set(new Map(current()).set(key, start))
 
@@ -217,6 +220,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       const key = entryKey(ref)
 
       saved.set(key, sent)
+      savedText.set(key, JSON.stringify(sent))
       versions.set(key, version)
       recreated.delete(key)
       current.set(new Map(current()))
@@ -294,6 +298,17 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     // Whether the entry's next save creates its file, its edits kept over a file deleted meanwhile.
     recreating(ref: EntryRef): boolean {
       return recreated.has(entryKey(ref))
+    },
+    // Renders the page again with the unsaved edits, once another page replaced the one they were last shown on; nothing to render while no entry has an edit.
+    reapply(): void {
+      if (changed().length > 0)
+        schedule()
+    },
+    // The entries with unsaved edits the page does not show, as the schema refuses them: it shows their saved text instead, the other drafts still in place.
+    stale(): EntryRef[] {
+      const keys = new Set(issues().map(entryKey))
+
+      return changed().filter(entry => keys.has(entryKey(entry)))
     },
     // Shows the issues a save was refused with, as a render's are shown.
     report(refusals: readonly Issue[]): void {

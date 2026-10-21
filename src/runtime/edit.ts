@@ -33,7 +33,7 @@ export interface EditorProps {
 
 let latest: AbortController | undefined
 
-// Shows the page with `entries` in place of the saved ones, keeping scroll, focus and every island whose props did not change; or resolves where they fail their schemas, showing nothing.
+// Shows the page with `entries` in place of the saved ones, keeping scroll, focus and every island whose props did not change; an entry failing its schema is left out, showing its saved text, and resolves where it fails.
 // A newer call cancels this one, which then resolves `{}` and shows nothing, as does going to another page before it shows.
 export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[] }> {
   if (typeof document === 'undefined')
@@ -46,14 +46,19 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
   const page = shownPage()
   // A navigation started since, or one already underway that has shown its page, wins over the draft of the page it left.
   const isCurrent = () => controller === latest && token === navigation.current && shownPage() === page
-  let response: Response
-  let text: string
+  let answer: Answer
+  let refused: DraftIssue[] = []
 
   latest = controller
 
   try {
-    response = await fetch(withBase(DRAFT_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json', [NAVIGATE_HEADER]: '1' }, body: JSON.stringify({ path: withoutBase(location.pathname) + location.search, entries }), signal: controller.signal })
-    text = await response.text()
+    answer = await post(entries, controller.signal)
+
+    // One entry the schema refuses leaves the others their preview: the page renders again without it, showing its saved text.
+    if (answer.response.status === 422) {
+      refused = (JSON.parse(answer.text) as { issues: DraftIssue[] }).issues
+      answer = await post(entries.filter(entry => !refused.some(issue => issue.collection === entry.collection && issue.slug === entry.slug && issue.locale === entry.locale)), controller.signal)
+    }
   }
   catch (error) {
     if (controller.signal.aborted)
@@ -61,6 +66,8 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
 
     throw error
   }
+
+  const { response, text } = answer
 
   if (!isCurrent())
     return {}
@@ -78,7 +85,15 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
 
   await show({ url: location.href, type: response.headers.get('content-type') ?? '', html: text }, '', { intent: 'refresh', focused: document.activeElement }, isCurrent)
 
-  return {}
+  return refused.length > 0 ? { issues: refused } : {}
+}
+
+interface Answer { response: Response, text: string }
+
+async function post(entries: DraftEntry[], signal: AbortSignal): Promise<Answer> {
+  const response = await fetch(withBase(DRAFT_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json', [NAVIGATE_HEADER]: '1' }, body: JSON.stringify({ path: withoutBase(location.pathname) + location.search, entries }), signal })
+
+  return { response, text: await response.text() }
 }
 
 function shownPage(): string {

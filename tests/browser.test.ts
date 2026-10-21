@@ -1025,7 +1025,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
       await editor.click('button.refused')
       await editor.waitFor('p.issues', { text: '[{"collection":"news","slug":"launch","path":"title","message":"Title is not valid"}]' })
 
-      expect(await editor.text('h1')).toBe('Draft title')
+      // The entry the schema refuses shows its saved text.
+      await editor.waitFor('h1', { text: 'Launch day' })
+
+      // One entry refused leaves the other its preview.
+      await editor.click('button.mixed')
+      await editor.waitFor('h1', { text: 'Mixed title' })
+      await editor.waitFor('p.issues', { text: '"slug":"roadmap"' })
 
       // A field typed in inside the editor keeps the focus and the caret across the swap each key shows, typed at its end or in its middle.
       const typed = async (key: string, title: string, caret: number) => {

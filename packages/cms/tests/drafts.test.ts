@@ -281,4 +281,57 @@ describe('saving', () => {
     expect(calls).toHaveLength(2)
     expect(drafts.issues(post, '')).toEqual([])
   })
+
+  it('names the entries with edits the page does not show, as the schema refuses them', async () => {
+    const { drafts } = setup(async () => ({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Too short' }] }))
+
+    expect(drafts.stale()).toEqual([])
+    drafts.set(post, 'title', '')
+    await settled()
+    expect(drafts.stale().map(entry => entry.slug)).toEqual(['hello'])
+    drafts.reset(post)
+    await settled()
+    expect(drafts.stale()).toEqual([])
+  })
+
+  it('says it is rendering from the edit to the answer', async () => {
+    let answer: (result: DraftResult) => void = () => undefined
+    const { drafts } = setup(async () => new Promise<DraftResult>((resolve) => {
+      answer = resolve
+    }))
+
+    expect(drafts.rendering()).toBe(false)
+    drafts.set(post, 'title', 'A')
+    await settled()
+    expect(drafts.rendering()).toBe(true)
+    answer({})
+    await settled()
+    expect(drafts.rendering()).toBe(false)
+  })
+
+  it('shows the edits again on request, and renders nothing when there are none', async () => {
+    const { drafts, calls } = setup()
+
+    drafts.reapply()
+    await settled()
+    expect(calls).toEqual([])
+    drafts.set(post, 'title', 'Kept')
+    await settled()
+    drafts.reapply()
+    await settled()
+    expect(calls).toHaveLength(2)
+    expect(calls[1]).toEqual([{ ...post, data: { title: 'Kept', tags: ['a'] } }])
+  })
+
+  it('compares an edit with the saved text of the entry saved last', async () => {
+    const { drafts } = setup()
+
+    drafts.set(post, 'title', 'Saved')
+    drafts.markSaved(post, drafts.entry(post) as DraftEntry)
+    expect(drafts.changed(post)).toBe(false)
+    drafts.set(post, 'title', 'Hello')
+    expect(drafts.changed(post)).toBe(true)
+    drafts.set(post, 'title', 'Saved')
+    expect(drafts.changed(post)).toBe(false)
+  })
 })

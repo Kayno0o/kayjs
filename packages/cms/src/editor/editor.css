@@ -65,6 +65,15 @@ html.kcms-dock-side .kcms-editor-open {
   top: var(--kcms-top, 0px);
 }
 
+.kcms-editor-status p {
+  margin: 0.5rem 1rem;
+  color: var(--color-kui-subtext0);
+}
+
+.kcms-editor-status p.kcms-editor-failure {
+  color: var(--color-kui-error);
+}
+
 .kcms-editor-failure,
 .kcms-entry-failure {
   margin: 1rem;

@@ -1,6 +1,7 @@
 ---
 import type { EditorProps } from 'kay/edit'
 import { signal } from 'kay'
+import type { DraftEntry } from 'kay/edit'
 import { showDraft } from 'kay/edit'
 import './draft-editor.css'
 
@@ -9,11 +10,13 @@ const { entries } = props<EditorProps>()
 
 const clicks = signal(0)
 const issues = signal('')
-const draft = async (data: unknown, body?: string) => issues.set(JSON.stringify((await showDraft([{ collection: 'news', slug: 'launch', data, body }])).issues ?? []))
+const show = async (entries: DraftEntry[]) => issues.set(JSON.stringify((await showDraft(entries)).issues ?? []))
+const draft = async (data: unknown, body?: string) => show([{ collection: 'news', slug: 'launch', data, body }])
 ---
 button.count(onClick={() => clicks.set(n => n + 1)}) Clicked {clicks()}
 button.draft(onClick={async () => draft({ title: 'Draft title', published: true, tags: ['draft'] }, '## Drafted')}) Draft
 button.refused(onClick={async () => draft({ title: 3, published: true, tags: [] })}) Refused
+button.mixed(onClick={async () => show([{ collection: 'news', slug: 'roadmap', data: { title: 3, published: true, tags: [] } }, { collection: 'news', slug: 'launch', data: { title: 'Mixed title', published: true, tags: [] } }])}) Mixed
 button.slow(onClick={async () => draft({ title: 'Slow draft', published: true, tags: [] })}) Slow
 p.issues {issues()}
 input.title(aria-label="Title" onInput={async kayEvent => draft({ title: kayEvent.currentTarget.value, published: true, tags: [] })})
