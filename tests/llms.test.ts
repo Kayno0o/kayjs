@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -22,6 +23,7 @@ const MENTION = /((?:`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`(?:, | and | or ))*`\w+(?:<
 // The entry points an app imports from, without what compiled files import (llms/project.md).
 const PUBLIC_ENTRIES = ['kay', 'kay/bun', 'kay/cache', 'kay/compiler', 'kay/content', 'kay/dev-tool', 'kay/edit', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/markdown', 'kay/mount', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
 const NEGATED_SKIP = /!\s*browserPath\(\)/
+const MARKDOWN_OR_TS = /\.(?:md|ts)$/
 const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
@@ -135,10 +137,22 @@ describe('llms.txt and its docs', () => {
   })
 })
 
+// The markdown and TypeScript files under `dir`, a folder named node_modules never entered.
+function withoutModules(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+
+    if (entry.isDirectory())
+      return entry.name === 'node_modules' ? [] : withoutModules(path)
+
+    return MARKDOWN_OR_TS.test(entry.name) ? [path] : []
+  })
+}
+
 describe('the browser test skip', () => {
   // `browserPath()` is a string or undefined, which the lint preset refuses as a condition.
   it('is written where the docs, the examples and the source say it as the lint preset accepts it', async () => {
-    const files = ['llms', 'docs/src/content/docs', 'examples', 'src/test'].flatMap(folder => [...new Bun.Glob('**/*.{md,ts}').scanSync({ cwd: join(root, folder) })].filter(file => !file.includes('node_modules')).map(file => join(root, folder, file)))
+    const files = ['llms', 'docs/src/content/docs', 'examples', 'src/test'].flatMap(folder => withoutModules(join(root, folder)))
     const negated = (await Promise.all(files.map(async file => NEGATED_SKIP.test(await Bun.file(file).text()) ? file : ''))).filter(file => file !== '')
 
     expect(negated).toEqual([])

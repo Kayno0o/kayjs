@@ -351,6 +351,60 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }
   })
 
+  it('names an element no alignment brings into the view as out of view', async () => {
+    for (const javaScript of [true, false]) {
+      const own = await site.open('/', { javaScript, timeout: 600 })
+
+      try {
+        // Above the top of the page, where no scroll reaches.
+        await own.evaluate(() => {
+          document.body.insertAdjacentHTML('afterbegin', '<a id="above" href="#above" style="position:absolute;top:-3000px;left:0;display:block;height:30px">above</a>')
+        })
+        await expect(own.click('#above')).rejects.toThrow('kay: #above is out of view, waiting for it to be actionable')
+        expect(await own.evaluate(() => location.hash)).toBe('')
+      }
+      finally {
+        own.close()
+      }
+    }
+  })
+
+  it('waits for an element to keep still before it clicks a point other than its middle', async () => {
+    const own = await site.open('/', { timeout: 3000 })
+
+    try {
+      // A thin strip covers the middle of the link's box, so the click is aimed at another point of it while it slides.
+      await own.evaluate(() => {
+        document.body.insertAdjacentHTML('afterbegin', `
+          <style>#slide { position: fixed; top: 200px; left: 20px; width: 10px; height: 80px; display: block; background: #ccc } #strip { position: fixed; top: 238px; left: 0; width: 700px; height: 4px; background: #fff }</style>
+          <a id="slide" href="#slide">slide</a><div id="strip"></div>`)
+
+        // It slides half a pixel a millisecond for 700 ms, then stays.
+        const slide = document.getElementById('slide')!
+        const started = performance.now()
+        const jump = () => {
+          const elapsed = performance.now() - started
+          const moving = elapsed < 700
+
+          slide.style.left = `${20 + Math.min(elapsed, 700) / 2}px`
+
+          if (moving)
+            requestAnimationFrame(jump)
+        }
+
+        slide.addEventListener('click', () => document.body.setAttribute('data-clicked-at', String(performance.now() - started)))
+        jump()
+      })
+      await own.click('#slide')
+      expect(await own.evaluate(() => location.hash)).toBe('#slide')
+      // The click landed once the slide ended, not while it went on.
+      expect(Number(await own.evaluate(() => document.body.getAttribute('data-clicked-at')))).toBeGreaterThanOrEqual(700)
+    }
+    finally {
+      own.close()
+    }
+  })
+
   it('clicks an element of a page with JavaScript off that draws a declarative shadow root, and names what covers it', async () => {
     const plain = await site.open('/', { javaScript: false, timeout: 500 })
 

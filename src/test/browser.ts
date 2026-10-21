@@ -465,19 +465,19 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }, [selector, options.javaScript !== false]))
 
   // Where a click reaches the element: scrolled to each alignment in turn, the point of its box that nothing covers first at the middle and then nearer each side, and whether it is the middle. What keeps a click from reaching it (nothing drawn, another element over every point) comes back as a reason instead.
+  // The element is waited on for stillness once, at the alignment where a point reaches it, as Bun's own click does for the middle: its box must stay put across two frames, and the point is found again where it stopped.
   const reach = async (selector: string) => inView<[number, number, boolean] | string>(script(async (target: string, frames: boolean, alignments: string[], points: number[][]) => {
     const element = document.querySelector(target)!
     let covered = 'out of view'
 
-    for (const block of alignments) {
-      element.scrollIntoView({ block: block as ScrollLogicalPosition, inline: 'center', behavior: 'instant' })
+    const frame = async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const box = () => {
+      const { left, top, width, height } = element.getBoundingClientRect()
 
-      if (frames)
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-
-      if (element.getClientRects().length === 0)
-        return 'not visible'
-
+      return `${left},${top},${width},${height}`
+    }
+    // The first point of the box that reaches the element, or what covers the point tried first.
+    const look = (): [number, number, boolean] | undefined => {
       const { left, top, width, height } = element.getBoundingClientRect()
 
       for (const [at, [across, down]] of points.entries()) {
@@ -497,6 +497,39 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
           covered = `${tagName.toLowerCase()}${id === '' ? '' : `#${id}`}${classList.length === 0 ? '' : `.${classList[0]}`}`
         }
       }
+
+      return undefined
+    }
+
+    for (const block of alignments) {
+      element.scrollIntoView({ block: block as ScrollLogicalPosition, inline: 'center', behavior: 'instant' })
+
+      if (element.getClientRects().length === 0)
+        return 'not visible'
+
+      let found = look()
+
+      if (found === undefined)
+        continue
+
+      if (frames) {
+        for (let tries = 0; tries < 30; tries++) {
+          const before = box()
+
+          await frame()
+
+          if (box() === before)
+            break
+        }
+
+        if (element.getClientRects().length === 0)
+          return 'not visible'
+
+        found = look()
+      }
+
+      if (found !== undefined)
+        return found
     }
 
     return covered === 'out of view' ? covered : `covered by ${covered}`
