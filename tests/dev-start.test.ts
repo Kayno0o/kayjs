@@ -126,6 +126,13 @@ it('answers a burst of inert package.json edits with one scan, and one more for 
   const root = await project('dev-burst-', { ...PAGES, 'package.json': JSON.stringify({ name: 'burst', version: '1.0.0', imports: { '#label': './src/label-a.ts' } }) })
   const lines: string[] = []
   const edit = async (version: string) => Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'burst', version, imports: { '#label': './src/label-a.ts' } }))
+  // The watcher hands events over in order: once an edit of another file is answered, those before it were seen, so a scan they would start has started.
+  const sentinel = async (mark: string) => {
+    const seen = lines.length
+
+    await Bun.write(join(root, 'src/label-a.ts'), `export const label = 'LABEL_A'\n// ${mark}\n`)
+    await until(() => lines.slice(seen).some(line => line.includes('label-a.ts')))
+  }
   const { promise: gate, resolve: release } = Promise.withResolvers<void>()
   const scans = spyOn(fingerprint, 'mentionsPackage').mockImplementation(async () => {
     await gate
@@ -143,12 +150,12 @@ it('answers a burst of inert package.json edits with one scan, and one more for 
     await edit('1.0.2')
     await edit('1.0.3')
     await edit('1.0.4')
-    await Bun.sleep(1000)
+    await sentinel('one')
     expect(scans).toHaveBeenCalledTimes(1)
 
     release()
     await until(() => scans.mock.calls.length === 2)
-    await Bun.sleep(1000)
+    await sentinel('two')
     expect(scans).toHaveBeenCalledTimes(2)
     expect(lines.filter(line => line.includes('package.json: restarted'))).toEqual([])
   }
