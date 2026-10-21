@@ -187,7 +187,7 @@ export async function deleteUnusedUploads(keys: string[]): Promise<{ deleted: st
       await forgetUploads(deleted)
     }
     catch (error) {
-      // The files are gone; a record left behind is dropped with the next write that finds none of its files.
+      // The files are gone; a record left behind is harmless, as the library lists the files that exist.
       log.error('dropping the deleted uploads from the media index failed', error)
     }
   }
