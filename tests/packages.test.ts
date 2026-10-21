@@ -131,3 +131,144 @@ describe('the TypeScript packages', () => {
     expect((root as Manifest & { bin: Record<string, string> }).bin.tsgo).toBe('./src/tsgo.ts')
   })
 })
+
+// The naming rules of llms/component-libraries.md ("Conventions") that a scan can check. A rule whose rename has not landed lists its known drift in `known`, each entry naming the issue that removes it: the test is green today, fails for any new drift, and fails for an entry whose drift is gone, so the entry goes with the fix.
+interface Drift { library: string, match: RegExp, issue: string }
+
+const folders = libraries.map(({ path }) => path.slice('packages/'.length, path.lastIndexOf('/')))
+const sources = await Promise.all(folders.map(async library => ({
+  library,
+  files: await Promise.all((await Array.fromAsync(new Glob(`packages/${library}/src/**/*.{ts,kay,css}`).scan())).sort().map(async file => ({ file, text: await Bun.file(file).text() }))),
+})))
+
+function drift(find: (library: string, file: string, text: string) => string[], known: Drift[]): string[] {
+  const unexpected: string[] = []
+  const unused = new Set(known)
+
+  for (const { library, files } of sources) {
+    for (const { file, text } of files) {
+      for (const found of find(library, file, text)) {
+        const excuse = known.find(entry => entry.library === library && entry.match.test(found))
+
+        if (excuse)
+          unused.delete(excuse)
+        else
+          unexpected.push(`${file}: ${found}`)
+      }
+    }
+  }
+
+  return [...unexpected, ...[...unused].map(entry => `known drift of ${entry.issue} is gone, remove ${entry.match} from the list`)]
+}
+
+describe('the naming conventions', () => {
+  const others = folders.join('|')
+
+  it('prefix a library\'s classes and ids with k<library>-, never kayjs-<library>-', () => {
+    expect(drift((_, __, text) => text.match(new RegExp(`(?<![\\w@/.-])kayjs-(?:${others})-[\\w-]*`, 'g')) ?? [], [
+      { library: 'auth', match: /^kayjs-auth-/, issue: '#1691' },
+      { library: 'mail', match: /^kayjs-mail-/, issue: '#1691' },
+    ])).toEqual([])
+  })
+
+  it('define a library\'s stylesheet classes under its own k<library>- prefix', () => {
+    const find = (library: string, file: string, text: string): string[] => {
+      if (!file.endsWith('.css'))
+        return []
+
+      const bare = text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/(["'])(?:(?!\1).)*\1|url\([^)]*\)/g, '')
+
+      // A stylesheet may restyle another library's classes (cms styles kui-form-field), ui's charts are drawn by chartist whose own `ct-` classes the theme styles, and `group` is Tailwind's.
+      const foreign = new RegExp(`^k(?:${others})-`)
+
+      return [...bare.matchAll(/(?<![\w)\]-])\.([a-z][\w-]*)/g)].map(([, name]) => name!).filter(name => !foreign.test(name) && !(library === 'ui' && (name.startsWith('ct-') || name === 'group')))
+    }
+
+    expect(drift(find, [])).toEqual([])
+  })
+
+  it('prefix a library\'s data attributes with data-k<library>-, never data-<library>-', () => {
+    const find = (library: string, _: string, text: string): string[] => [
+      ...text.match(new RegExp(`data-(?:${others}|kayjs)-[\\w-]*`, 'g')) ?? [],
+      ...(text.match(new RegExp(`data-k(?:${others})-[\\w-]*`, 'g')) ?? []).filter(attribute => !attribute.startsWith(`data-k${library}-`)),
+    ]
+
+    expect(drift(find, [{ library: 'cms', match: /^data-cms-edit-page$/, issue: '#1691' }])).toEqual([])
+  })
+
+  it('mount a library\'s internal routes under /_kay/<library>, outside /api', () => {
+    const find = (_: string, __: string, text: string): string[] => text.match(/['"`]\/api\/[\w-]+/g) ?? []
+
+    expect(drift(find, [{ library: 'cms', match: /^.\/api\/cms$/, issue: '#1691' }])).toEqual([])
+  })
+
+  it('name cookies and tables with kay_, a library\'s own tables included', () => {
+    const find = (_: string, __: string, text: string): string[] => [
+      ...(text.match(/['"`]k(?!ay_)[a-z]+_[a-z_]+['"`]/g) ?? []),
+      ...[...text.matchAll(/defineTable\(\s*['"`]([^'"`]+)['"`]/g)].map(([, table]) => table!).filter(table => !table.startsWith('kay_')),
+    ]
+
+    expect(drift(find, [
+      { library: 'cms', match: /^.kcms_session.$/, issue: '#1691' },
+      { library: 'auth', match: /^auth_/, issue: '#1691' },
+    ])).toEqual([])
+  })
+
+  it('end the name of an error class a library exports with Error', () => {
+    const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends (\w+)/g)].filter(([, name, base]) => base!.endsWith('Error') && !name!.endsWith('Error')).map(([, name]) => name!)
+
+    expect(drift(find, [
+      { library: 'cms', match: /^SaveConflict$/, issue: '#1684' },
+      { library: 'cms', match: /^UnreadReferrers$/, issue: '#1684' },
+      { library: 'cms', match: /^UnknownCollection$/, issue: '#1684' },
+      { library: 'mail', match: /^MailNotConfigured$/, issue: '#1684' },
+    ])).toEqual([])
+  })
+})
+
+// Topic files open with the tasks and keep the facts under Reference, for kay and for each library alike.
+describe('the llms topic files', () => {
+  // #1693 lists the kay topic files still to gain both sections.
+  const knownKay = new Set(['analytics', 'content-edit', 'dev-tool', 'editor-and-agent-commands', 'errors', 'project-new-and-add', 'queues', 'routing-endpoints-and-base', 'testing-setup'].map(topic => `llms/${topic}.md`))
+  // The release logs are written by `just patch` and `just minor`, not as a topic.
+  const logs = /^llms\/(?:whats-new|upgrading)(?:-archive)?\.md$/
+  const topics = async () => [...await Array.fromAsync(new Glob('llms/*.md').scan()), ...await Array.fromAsync(new Glob('packages/*/llms/*.md').scan())].sort().filter(file => !logs.test(file))
+  // Every library topic file as of #1693, to gain both sections.
+  const knownLibraries = new Set('ai/asking ai/chat ai/limits ai/personal-data ai/testing-and-errors ai/tools ai/translating auth/admin-and-organizations auth/hardening-and-testing auth/oauth-passkeys-two-factor auth/oauth-server-and-tokens auth/passwords-and-mails auth/setup cms/fields cms/history cms/loaders cms/options cms/page-links cms/rename cms/screens cms/uploads cms/words mail/contact-form-and-testing mail/writing-and-sending ui/basics ui/charts-drag-and-media ui/forms ui/setup ui/tables-navigation-and-layout ui/words'.split(' ').map(topic => topic.replace('/', '/llms/')).map(path => `packages/${path}.md`))
+
+  it('open with Common tasks and hold a Reference section', async () => {
+    const lacking: string[] = []
+
+    for (const file of await topics()) {
+      const text = await Bun.file(file).text()
+      const opens = (/^## Common tasks$/m).test(text) && (/^## Reference$/m).test(text) && text.indexOf('## Common tasks') < text.indexOf('## Reference')
+      const known = knownKay.has(file) || knownLibraries.has(file)
+
+      if (opens === known)
+        lacking.push(opens ? `${file}: has both sections, remove it from the list of #1693` : file)
+    }
+
+    expect(lacking).toEqual([])
+  })
+
+  // A library's llms.txt is a title, a one-line quote and a list of links, like kay's own.
+  it('keep each library\'s llms.txt an index without a rules dump', async () => {
+    const ceilings: Record<string, number> = { ai: 6334, auth: 3419, cms: 24772, mail: 2067, ui: 5201 }
+    const found: string[] = []
+
+    for (const library of folders) {
+      const text = await Bun.file(`packages/${library}/llms.txt`).text()
+      const bytes = new TextEncoder().encode(text).length
+      const dump = (/^## Rules that are easy to get wrong$/m).test(text)
+
+      // #1693 turns these into indexes; until then they may not grow.
+      if (bytes > ceilings[library]!)
+        found.push(`${library}: ${bytes} bytes, over the ${ceilings[library]} it had when #1693 was filed`)
+
+      if (!dump && library in ceilings)
+        found.push(`${library}: no rules dump any more, remove it from the list of #1693`)
+    }
+
+    expect(found).toEqual([])
+  })
+})

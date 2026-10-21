@@ -128,3 +128,45 @@ export default function shopTab(tool: DevTool): void {
 - It runs on dev pages only: `kay build` and a production server serve and write none of it. Two extensions naming one file load it once, in the order the extensions come, and a module that fails to load, throws or exports no function is logged as a problem naming its extension, the tool and the other tabs staying.
 - Nothing bundles its imports, so a module imports types only. Its data and actions come from a route of the library's own, mounted under `kay dev` alone (`underKayDev()` from `kay/library`), under the `/_kay/` prefix; a module reads `<meta name="kay-base">` for the base. A route that answers 404, as outside `kay dev`, shows an empty tab saying so.
 - kayjs-auth, kayjs-mail and kayjs-cms bring one each (see their pages), and kay adds the i18n tab itself.
+
+### Conventions
+
+How kay and its libraries name the same idea, written before the renames land: a new option, export, class or file follows the target form, and each `(#n)` is the issue moving the existing code to it. `tests/packages.test.ts` checks the prefixes, error class names and doc headings, listing the drift still waiting on its issue, so a new violation fails.
+
+**Options**
+- `site` is a public origin and defaults to kay's `site`; `name` is a display name. A library's other origin options (`origin`, `host`, `publicUrl`) are spelled `site` (#1680). A third-party service's API root is `baseUrl`, not `url` (#1696).
+- A duration is one `Duration` type: a number of seconds or a string with its unit (`'250ms'`, `'5m'`), in every option of kay and the libraries. A number elsewhere (a store's `set(id, data, maxAge)`, a test helper's timeout) either takes `Duration` or carries its unit in its name (`timeoutMs`) (#1639).
+- How long something stays valid is `maxAge`, how long to wait is `timeout`, an absolute date is `expires`; never `expiresIn` or `lifetime`, and a second lifetime is a nested `maxAge`, not `rememberMaxAge` (#1685).
+- A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`); `bodyLimit` and `maxBytes` go (#1686).
+- A rate limit is `rateLimit: { max, window, store?, key?, count? }`, `key` naming who is counted (not `visitor`), and a library with several limits nests them: `rateLimit: { signIn: { max, window } }` (#1683).
+- Paging by page number takes `pageSize` and `page`; a window onto a list takes `limit` and `offset`. An API is one or the other (#1689).
+- Look goes in the library's settings module (`kay.settings`), behaviour in the call or extension options. A logo is `{ src, alt, width?, height?, href? }` (#1690).
+
+**Hooks and switches**
+- An `on*` hook takes one event object, `onSave({ ... })`, and returns nothing. A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).
+- A switch is `false` to turn off what is on by default and `true` to turn on what is off by default, with an object where it takes options; the default is the first line of its doc. `optional` on mail is reviewed against this (#1694).
+
+**Errors**
+- A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through the one message helper kay exports (#1684).
+- A runtime error class ends in `Error`, extends `Error`, and carries `code` (`kind` and bare `status` become `code`). Exported classes named otherwise keep their old name as an alias for three minors (#1684).
+
+**Prefixes**
+- Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api` (#1691).
+- CSS classes and ids are `k<library>-` (`kui-`, `kcms-`, `kai-`, `kauth-`, `kmail-`), kay's own `kay-`; a data attribute that names an element or marker is `data-k<library>-`, kay's `data-kay-`. A bare `data-tone` or `data-size` is the state of the component's own element (#1691).
+- Cookies are `kay_<name>` and tables `kay_<plural name>`, the default session cookie included (#1691).
+- An export name two libraries share is prefixed with its library (`authMemoryStore`), and a Postgres entry or helper is spelled `pg`, not `postgres` (#1692).
+
+**Texts**
+- A library looks text up with `wording('<library>.<area>.<name>', 'English')` from `kay/words`, ships a `fr.ts` and no `en.ts`, and registers its catalogs by `"kay": { "messages": "./src/messages" }` in package.json, never through an extension. Keys have no `Label` suffix. Props such as `*Label` stay as overrides (#1681, #1682).
+
+**Docs**
+- A topic file under `llms/` or a library's `llms/` opens with `## Common tasks` and holds `## Reference`. A library's `llms.txt` is a title, a one-line summary and links, like kay's, with no rules in it (#1693).
+
+**Methods and props**
+- A library's methods: `list<Things>()` for a collection, `get<Thing>(id)` for one, `revoke<Thing>` for a credential (a token, a session, a passkey), `delete<Thing>` for a record, and `{ ok }` as the result of anything that can be refused (#1688).
+- kayjs-ui props: `variant`, `tone` and `size` are enums (no `solid` or `compact` booleans); `busy` shows a pending state; open state is `open` with `onOpenChange(open)`; `onSelect` gives the thing selected and its payload is documented; callbacks return `unknown`; `current` is `string | URL` everywhere (#1695).
+- Results say `ok`, never `failed`, and `errors` hold messages the user can read (#1696).
+
+**CLI and environment**
+- A command that writes takes `--dry-run`; `--quiet` and `--format text|json` go to every command that prints; `-p` is `--project` alone; one spelling per flag, an alias kept three minors (#1696).
+- `lang` is the language of a document, `locale` a language an app serves or formats for. Environment variables are the option's name in capitals, prefixed by the library (`AI_`, `MAIL_`), with `SITE_URL` for the origin (#1696).

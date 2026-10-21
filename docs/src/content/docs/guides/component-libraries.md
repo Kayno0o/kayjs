@@ -127,4 +127,47 @@ The module is one file and nothing bundles its imports, so import types only. Ge
 
 Nothing of this reaches `kay build` or a production server.
 
+## Naming conventions
+
+kay and its libraries name the same idea the same way. A new option, export or file follows these rules. Some older code still uses another name, and each such name is being moved to the rule.
+
+### Options
+
+- `site` is the public address of the site, and it defaults to kay's own `site`. `name` is a display name.
+- A duration is a number of seconds or a string with its unit, such as `'5m'`. Every option takes the same type.
+- `maxAge` is how long something stays valid. `timeout` is how long to wait. `expires` is a date.
+- `maxSize` is a size limit. It takes bytes or a string such as `'2mb'`.
+- `rateLimit` sets a rate limit with `max` and `window`. `key` says who is counted. A library with several limits nests them under `rateLimit`.
+- A list by page uses `page` and `pageSize`. A window onto a list uses `limit` and `offset`.
+- Look goes in the library's settings module. Behaviour goes in the call.
+
+### Hooks and switches
+
+- An `on*` hook takes one event object and returns nothing.
+- A callback that returns data is named for what it returns, such as `profileFields`.
+- `false` turns off something that is on by default. `true` turns on something that is off by default.
+
+### Errors
+
+- A wrong option at start-up throws `KayError('config-invalid')`, in a library too.
+- An error class ends in `Error` and has a `code`.
+
+### Prefixes
+
+- A library mounts its own routes under `/_kay/<library>`, not under `/api`.
+- CSS classes start with `k<library>-`, such as `kui-` or `kcms-`. Data attributes start with `data-k<library>-`.
+- Cookies and tables start with `kay_`. Table names are plural.
+- A name that two libraries would both export is prefixed with the library. A Postgres entry is spelled `pg`.
+
+### Texts and docs
+
+- A library looks text up with `wording`, ships a French catalog, and names its catalogs in `package.json` under `kay.messages`.
+- Each topic file in `llms/` has `## Common tasks` first and `## Reference` after it. A library's `llms.txt` is a short index of links.
+
+### Methods, props and the command line
+
+- A library lists with `list<Things>`, reads one with `get<Thing>`, revokes a credential with `revoke<Thing>`, and deletes a record with `delete<Thing>`. A call that can be refused returns `{ ok }`.
+- A kayjs-ui prop that picks a style is an enum: `variant`, `tone` or `size`. A pending state is `busy`. Open state is `open` with `onOpenChange`.
+- A command that writes takes `--dry-run`. A command that prints takes `--quiet` and `--format`.
+
 <ReadMore href="/llms/component-libraries">Using a library, pruned stylesheets, extension checks, layouts, the dev tool's classes and every option.</ReadMore>

@@ -22,7 +22,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 
 - [Build a site](llms/site.md): a small site: config, layout and nav, a Markdown collection, the 404 page, islands, a form checked on both sides
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`
-- [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, and the pages, dev tool tabs and commands a library adds
+- [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, the pages, dev tool tabs and commands a library adds, and the naming conventions of kay and its libraries
 - [Template lines](llms/templates.md): elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots, snippets
 - [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards
 - [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): sitemap, robots.txt, favicon, web manifest, offline, search, fonts
