@@ -51,11 +51,11 @@ function socket(address: string): Server<unknown> {
 
 // What a post was refused with, a honeypot pretending aside.
 // What a script prints, run in a process of its own, as a test file run before may have given this one a stamp secret already.
-async function isolated(script: string): Promise<unknown> {
+async function isolated(script: string, warned = ''): Promise<unknown> {
   const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
   const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
 
-  expect({ code: await run.exited, err }).toEqual({ code: 0, err: '' })
+  expect({ code: await run.exited, err }).toEqual({ code: 0, err: warned })
 
   return JSON.parse(out)
 }
@@ -1013,7 +1013,10 @@ console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
 
     try {
       await Bun.write(`${path}.key`, 'short')
-      await sqliteRates(path).hit('a', 60_000)
+      // In a process of its own, as a file run before in this one may have set the app's secret, which leaves the key file alone.
+      expect(await isolated(`import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
+console.log(JSON.stringify(sqliteRates(${JSON.stringify(path)}).hit('a', 60_000).count))
+`, `[kay] kay: ${path}.key held no rate-limit key and was replaced\n`)).toBe(1)
       expect((await Bun.file(`${path}.key`).text()).length).toBe(43)
       expect((await readdir(dir)).filter(name => name.includes('.key'))).toEqual(['rates.sqlite.key'])
     }
