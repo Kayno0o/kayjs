@@ -35,6 +35,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },
   query: entry.locale === undefined ? {} : { locale: entry.locale },
 })
+// A single collection's entry is the collection: no slug under its title, its locale still shown.
+const subtitle = memo(() => source.value()?.collection.single === true ? entry.locale : entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`)
 // The page editor asks no author, so its editors are counted, and named ones are told of them.
 const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
@@ -113,7 +115,8 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
   header.kcms-entry-head
     hgroup
       h3.kcms-entry-title {collectionTitle({ name: entry.collection, title: source.value()?.collection.title })}
-      p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
+      if subtitle() !== undefined
+        p.kcms-entry-slug {subtitle()}
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
       ResetButton(disabled={saving() || !unsaved()} onReset={() => drafts.reset(entry)})

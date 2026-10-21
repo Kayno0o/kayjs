@@ -241,9 +241,33 @@ html.kcms-dock-bottom .kcms-editor-grip {
   cursor: ns-resize;
 }
 
-.kcms-editor-grip:hover,
-.kcms-editor-grip:focus-visible {
-  background: color-mix(in srgb, var(--color-kui-accent) 40%, transparent);
+/* The hit zone stays wide; what shows is a thin line on the panel's edge, ringed in the panel's own colour so it reads on a light accent and a dark one. */
+.kcms-editor-grip::after {
+  content: '';
+  position: absolute;
+  background: var(--color-kui-accent);
+  box-shadow: 0 0 0 1px var(--color-kui-mantle);
+  opacity: 0;
+  pointer-events: none;
+}
+
+html.kcms-dock-side .kcms-editor-grip::after {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+html.kcms-dock-bottom .kcms-editor-grip::after {
+  top: calc(50% - 1px);
+  right: 0;
+  left: 0;
+  height: 2px;
+}
+
+.kcms-editor-grip:hover::after,
+.kcms-editor-grip:focus-visible::after {
+  opacity: 1;
 }
 
 .kcms-editor-grip:focus-visible {

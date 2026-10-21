@@ -484,3 +484,59 @@ test('the editor says a forge save may still be rebuilding, and sends the edits 
   expect(body.entries[0]!.slug).toBe('hello')
   expect(body.entries[0]!.data.title).toContain('Edited')
 })
+
+test('the edge draws a thin line on hover and focus in both docks, its hit zone staying 1.5rem', async () => {
+  for (const [width, height, dock] of [[1280, 800, 'side'], [800, 700, 'bottom']] as const) {
+    const page = await open(width, height)
+    const line = () => page.evaluate(() => {
+      const grip = document.querySelector<HTMLElement>('.kcms-editor-grip')!
+      const style = getComputedStyle(grip, '::after')
+      const zone = grip.getBoundingClientRect()
+
+      return { opacity: style.opacity, width: Number.parseFloat(style.width), height: Number.parseFloat(style.height), background: getComputedStyle(grip).backgroundColor, zone: Math.min(zone.width, zone.height) }
+    })
+
+    expect(await page.evaluate((name: string) => document.documentElement.classList.contains(`kcms-dock-${name}`), dock)).toBe(true)
+
+    const idle = await line()
+
+    expect(idle.opacity).toBe('0')
+    expect(idle.zone).toBe(24)
+
+    const centre = await page.evaluate(() => {
+      const zone = document.querySelector('.kcms-editor-grip')!.getBoundingClientRect()
+
+      return { x: zone.left + zone.width / 2, y: zone.top + zone.height / 2 }
+    })
+
+    await page.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', ...centre })
+    expect((await line()).opacity).toBe('1')
+    await page.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 2, y: 2 })
+    expect((await line()).opacity).toBe('0')
+
+    // A key made it keyboard focus, which draws the line as well.
+    await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor-grip')!.focus())
+    await page.press(dock === 'side' ? 'ArrowLeft' : 'ArrowUp')
+
+    const focused = await line()
+
+    expect(focused.opacity).toBe('1')
+    // Never the old band over the hit zone.
+    expect(focused.background).toBe('rgba(0, 0, 0, 0)')
+    expect(dock === 'side' ? [focused.width, focused.height] : [focused.height, focused.width]).toEqual([2, expect.any(Number)])
+    expect(dock === 'side' ? focused.height : focused.width).toBeGreaterThan(100)
+    expect(focused.zone).toBe(24)
+  }
+})
+
+test('a single collection\'s entry shows no slug under its title in the editor', async () => {
+  const page = await built.open('/admin/page?path=/welcome')
+
+  opened.push(page)
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.waitUntil(() => document.querySelector('.kcms-entry-title')?.textContent === 'Welcome page')
+
+  expect(await page.evaluate(() => document.querySelector('.kcms-entry-slug'))).toBeNull()
+  expect(page.errors).toEqual([])
+})
