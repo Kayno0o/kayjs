@@ -285,7 +285,7 @@ The loader takes more than `load`.
 | `load({ preview })` | Gives the entries as `{ slug, data, body }` or `{ slug, data, html }`. `body` is Markdown, `html` is rendered as it is. `preview` is true in preview mode and in development |
 | `ttl` | How long the entries are served before the next read refreshes them in the background. Without it they are kept until `invalidate()` or a restart |
 | `store` | A `sqliteCache(path)` that keeps them across restarts and lets `invalidate()` reach every process sharing it |
-| `save(entry)`, `remove(entry)` | Write an entry back to the CMS, for a CMS editing the collections |
+| `save(entry)`, `remove(entry)` | Write an entry back to the CMS, for a CMS editing the collections. The `data` of `save` is typed from the collection's `schema`, so it needs no cast |
 
 `data` is read against the schema, with defaults filled in and dates decoded. An entry with no slug or a slug another entry has fails the read and names every problem. The next read loads again.
 

@@ -74,7 +74,8 @@ export interface LoadedEntry {
 }
 
 // Where a collection takes its entries from instead of a folder: an API, a headless CMS, a database.
-export interface ContentLoader {
+// `Data` is what the collection's schema types an entry's data as, which `save` is handed.
+export interface ContentLoader<Data = unknown> {
   // Names the collection in messages and keys its cache.
   name: string
   // Every entry, drafts included; `preview` is true for a visitor in preview mode and in `kay dev`, for a CMS that serves drafts apart.
@@ -89,8 +90,8 @@ export interface ContentLoader {
   ttl?: Duration | undefined
   // Keeps the entries across restarts and processes, as `cached` does.
   store?: CacheStore | undefined
-  // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `create` is true for an entry the CMS creates: throw when it exists, or another process's new entry is overwritten.
-  save?: ((entry: { slug: string, locale?: string | undefined, data: unknown, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
+  // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `data` is typed from the collection's `schema`, which kay has checked it against. `create` is true for an entry the CMS creates: throw when it exists, or another process's new entry is overwritten.
+  save?: ((entry: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }
@@ -180,11 +181,12 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string>(source: string | ContentLoader, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string>(source: string | ContentLoader<Static<Schema>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
-  const loader = typeof source === 'string' ? undefined : source
+  // Its `save` is typed from the schema for the app; kay hands it data it checked against that schema.
+  const loader = typeof source === 'string' ? undefined : source as ContentLoader
   const name = typeof source === 'string' ? source : source.name
   const key = contentKey(name)
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()

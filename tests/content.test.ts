@@ -707,3 +707,31 @@ describe('Markdown outside collections', () => {
     }
   })
 })
+
+describe('a loaded collection\'s save', () => {
+  it('is handed the data typed from the collection\'s schema, with no cast', () => {
+    const saved: string[] = []
+    const products = collection({
+      name: 'products',
+      load: () => [],
+      save: ({ data, locale }) => {
+        saved.push(`${data.name}:${data.price.toFixed(2)}:${data.tags?.join(',') ?? ''}${locale ?? ''}`)
+      },
+    }, { schema: t.Object({ name: t.String(), price: t.Number(), tags: t.Optional(t.Array(t.String())) }) })
+
+    expect(products.loader?.name).toBe('products')
+
+    collection({
+      name: 'wrong',
+      load: () => [],
+      // @ts-expect-error the schema has no such field
+      save: ({ data }) => void data.cost,
+    }, { schema: t.Object({ name: t.String() }) })
+
+    // A loader built apart, with a save taking any data, still fits.
+    const apart = { name: 'apart', load: () => [], save: (_entry: { slug: string, data: unknown }) => undefined }
+
+    expect(collection(apart, { schema: t.Object({ name: t.String() }) }).loader).toBe(apart)
+    expect(saved).toEqual([])
+  })
+})
