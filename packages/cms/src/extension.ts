@@ -12,6 +12,9 @@ import { configure, settings } from './settings'
 // The API path the editor and the screens call, under `/api`.
 export const API_PREFIX = 'cms'
 
+// Where a cms at the root prefix mounts its screens: a group, which adds nothing to a URL but keeps the screens' layout and guard from being the app's own at the top of the routes, where an app root layout would win over the cms's and the cms's would wrap and guard every page of the app.
+const ROOT_MOUNT = '/(admin)'
+
 // Where `kay dev` answers the dev tool's CMS tab.
 const DEV_PATH = '/_kay/cms'
 
@@ -21,7 +24,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
 
   return {
     name: '@kaynooo/kayjs-cms',
-    routes: { dir: `${import.meta.dir}/routes`, prefix },
+    routes: { dir: `${import.meta.dir}/routes`, prefix: prefix === '/' ? ROOT_MOUNT : prefix },
     api: { dir: `${import.meta.dir}/api`, prefix: API_PREFIX },
     editor: `${import.meta.dir}/editor/editor.kay`,
     // An editor's browser, marked once the guard let it into the screens, finds an "Edit this page" link on the pages it reads; any other browser loads nothing more than this line.

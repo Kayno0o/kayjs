@@ -27,6 +27,12 @@ test('the screens read `cms.*` messages in the page\'s locale, plural ones inclu
   expect((await site.visit('/fr/admin/collections/posts')).text('main')).toContain('Brouillon')
 })
 
+test('an entry screen\'s crumbs are labelled in the page\'s locale', async () => {
+  const page = await site.visit('/fr/admin/collections/posts/hello')
+
+  expect(page.find('nav').map(nav => nav.attributes['aria-label'])).toEqual(['Administration du contenu', 'Fil d\'Ariane'])
+})
+
 test('a message with parameters and a plural reads the locale\'s form, a key the app\'s catalog lacks reading the French the package ships', async () => {
   const page = await site.visit('/fr/admin/collections/posts')
 

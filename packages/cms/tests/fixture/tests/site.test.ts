@@ -467,7 +467,7 @@ test('an entry\'s screen is headed by its title as the page\'s title, its slug b
 
   expect(page.find('h1.kcms-entry-name').map(heading => heading.text)).toEqual(['Hello world'])
   expect(page.find('.kcms-entry-subtitle').map(line => line.text)).toEqual(['hello'])
-  expect(page.find('.kcms-entry-crumb').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts']])
+  expect(page.find('.kcms-entry-crumb').map(link => [link.text, link.attributes.href])).toEqual([['Content', '/admin'], ['Posts', '/admin/collections/posts']])
   expect(page.find('.kcms-entry-header button[type=submit]')).toHaveLength(1)
   expect((await site.visit('/admin/new/products')).find('h1.kcms-entry-name').map(heading => heading.text)).toEqual(['New entry'])
   expect((await site.visit('/admin/collections/products')).find('h1').map(heading => heading.text)).toEqual(['Our products'])

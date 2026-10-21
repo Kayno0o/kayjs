@@ -12,7 +12,7 @@ const SCREENS_OF_CONTENT = /\/(?:collections|new)\//
 // The screens are the CMS's own: none of the app's layouts above wraps them, so the editor sees no header, nav or footer of the site, and none of its pages is indexed.
 export const page = { layouts: false, noindex: true }
 
-const { prefix } = settings()
+const { prefix, logo } = settings()
 // kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
 const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 // The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
@@ -20,7 +20,12 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 .kcms-admin
   a.kcms-skip(href="#kcms-main") {wording('cms.admin.skip', 'Skip to the content')}
   header.kcms-admin-head
-    a.kcms-admin-home(href={screenPath(prefix)}) {wording('cms.admin.brand', 'Content admin')}
+    a.kcms-admin-home(href={screenPath(prefix)})
+      if logo
+        // The logo's size is the app's, so its box is the height CSS gives it.
+        // kay-allow unsized-image
+        img.kcms-admin-logo(src={logo} alt="")
+      | {wording('cms.admin.brand', 'Content admin')}
     nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}
       a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}

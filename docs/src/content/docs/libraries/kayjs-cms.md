@@ -39,7 +39,7 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. They stay closed without a `guard`. They fit a phone, so a client can edit from one: the entry lists stack as cards and the controls stay big enough to tap.
+The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. At `/` the screens keep their own chrome and guard even when your app has a root layout or guard: they mount in a `(admin)` group, which adds nothing to a URL. They stay closed without a `guard`. They fit a phone, so a client can edit from one: the entry lists stack as cards and the controls stay big enough to tap.
 
 `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
@@ -422,13 +422,13 @@ The date and time input shows the time of the editor's own time zone, whatever t
 
 ## Replacing a screen
 
-Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. The cms guard still runs before your page.
+Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. The cms guard still runs before your page. With `prefix: '/'` the path is under the group, `src/routes/(admin)/collections/shop/[...slug].kay`.
 
 The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
 
-There is no logo slot, so a logo means your own `_layout.kay`. The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
+Give the header a logo with `cms({ logo: '/logo.svg' })`, a file of `public/` or an https URL, shown before the name. The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 
-A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
+An entry screen heads its title with crumbs: Content, then the collection, each a link. A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
 
 In the page, read what the screen reads with `entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms`, then render a component of your own, or the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
 

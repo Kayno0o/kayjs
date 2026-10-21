@@ -15,6 +15,8 @@ export interface UploadOptions {
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
+  // An image shown before the name in the admin's header, a path of the site (`/logo.svg` from `public/`) or an https URL; the name is `cms.admin.brand`, `Content admin` unless the app words it.
+  logo?: string | undefined
   // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through.
   guard?: Guard | LazyGuard | undefined
   // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`.
@@ -35,6 +37,7 @@ export interface CmsOptions {
 
 export interface CmsSettings {
   prefix: string
+  logo: string | undefined
   guard: Guard | undefined
   files: FileSaver
   uploads: string[]
@@ -59,16 +62,21 @@ export const ENVELOPE = 64 * 1024
 const LARGEST_MAX_SIZE = BUN_BODY_LIMIT - ENVELOPE
 
 const TRAILING_SLASHES = /\/+$/
+// A path of the site, never one a browser reads as another host (`//`, `/\`), or an https URL.
+const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
+  if (logo !== undefined && !LOGO.test(logo))
+    throw new Error(`kayjs-cms: \`cms({ logo })\` is ${JSON.stringify(logo)}; it takes a path of the site such as '/logo.svg', or an https URL`)
+
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, layouts: checkLayouts(collections) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, layouts: checkLayouts(collections) }
 
   return current
 }

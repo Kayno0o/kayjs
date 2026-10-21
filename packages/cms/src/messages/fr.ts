@@ -7,6 +7,7 @@ export default defineMessages({
       brand: 'Administration du contenu',
       collectionUnreadable: 'Cette collection ne peut pas être lue',
       content: 'Contenu',
+      crumbs: 'Fil d\'Ariane',
       entryCount: { one: '{count} entrée', other: '{count} entrées' },
       navigation: 'Administration du contenu',
       newEntry: 'Nouvelle entrée',

@@ -53,7 +53,7 @@ test('a collection that is not single keeps its slug field, its Delete and its l
   const root = await open(written, { ...home, single: undefined, seed: undefined })
 
   expect(root.querySelector('h1')?.textContent).toBe('Hello')
-  expect(root.querySelector('.kcms-entry-crumb')?.getAttribute('href')).toBe('/admin/collections/home')
+  expect([...root.querySelectorAll('.kcms-entry-crumb')].map(link => link.getAttribute('href'))).toEqual(['/admin', '/admin/collections/home'])
   expect(buttons(root)).toContain('Delete')
 })
 

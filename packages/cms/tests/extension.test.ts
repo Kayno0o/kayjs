@@ -18,7 +18,24 @@ afterEach(() => {
     process.env.NODE_ENV = environment
 })
 
+describe('cms({ logo })', () => {
+  test('takes a path of the site or an https URL', () => {
+    for (const logo of ['/logo.svg', '/brand/logo 1.svg'.replace(' ', '%20'), 'https://cdn.example/logo.svg'])
+      expect(() => cms({ logo })).not.toThrow()
+  })
+
+  test.each(['logo.svg', '//evil.example/logo.svg', '/\\evil.example/logo.svg', 'http://cdn.example/logo.svg', 'javascript:alert(1)', '', '/a b.svg'])('refuses %p when the config loads', (logo) => {
+    expect(() => cms({ logo })).toThrow('cms({ logo })')
+  })
+})
+
 describe('cms()', () => {
+  test('mounts a root prefix as a group, which adds nothing to a URL', () => {
+    expect(cms({ prefix: '/' }).routes?.prefix).toBe('/(admin)')
+    expect(cms({ prefix: '/studio' }).routes?.prefix).toBe('/studio')
+    expect(cms().routes?.prefix).toBe('/admin')
+  })
+
   test('refuses to boot a production server that would save to the working tree by default', () => {
     process.env.NODE_ENV = 'production'
 
