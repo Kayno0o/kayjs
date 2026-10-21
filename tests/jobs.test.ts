@@ -1067,6 +1067,47 @@ describe('queue', () => {
     forgetQueue(work)
   })
 
+  it('counts a run a worker took once, whichever drains waited for it', async () => {
+    let started = false
+    const work = queue('work', async () => {
+      started = true
+      await Bun.sleep(100)
+    }, { store: memoryJobs() })
+    const app = new Elysia().use(work).listen(0)
+
+    try {
+      await work.enqueue('a')
+      await until(() => started, 2000)
+
+      const counts = await Promise.all([work.drain(), work.drain()])
+
+      expect(counts.reduce((sum, count) => sum + count, 0)).toBe(1)
+    }
+    finally {
+      await shutdown(app)
+      forgetQueue(work)
+    }
+  })
+
+  it('treats a drain started by work a job spawned as inside the job: it does not wait for the run', async () => {
+    const log: string[] = []
+    const work = queue('work', async () => {
+      void (async () => {
+        await Bun.sleep(10)
+        await work.drain()
+        log.push('spawned drained')
+      })()
+      await Bun.sleep(100)
+      log.push('job done')
+    }, { store: memoryJobs() })
+
+    await work.enqueue('a')
+    await work.drain()
+    await Bun.sleep(20)
+    expect(log).toEqual(['spawned drained', 'job done'])
+    forgetQueue(work)
+  })
+
   it('runs each job in one of the processes sharing the store', async () => {
     const path = await jobsPath()
     const ran: number[] = []

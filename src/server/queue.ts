@@ -707,14 +707,21 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
   // Every run in flight, a worker's included: a drain cannot claim a job a worker holds, so it waits for these instead.
   const running = new Set<Promise<boolean>>()
+  // The runs a drain already counted, which another drain waiting for the same run does not count again.
+  const counted = new WeakSet<Promise<boolean>>()
 
-  const runNext = async (): Promise<boolean> => {
+  const runNext = async (byDrain = false): Promise<boolean> => {
     const run = inJob.run(true, runOne)
 
     running.add(run)
 
     try {
-      return await run
+      const ran = await run
+
+      if (byDrain && ran)
+        counted.add(run)
+
+      return ran
     }
     finally {
       running.delete(run)
@@ -882,16 +889,20 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       await purgeFailed()
 
       for (;;) {
-        while (await runNext())
+        while (await runNext(true))
           ran++
 
         if (running.size === 0 || inJob.getStore())
           return ran
 
         // A job a worker holds may enqueue another, so the queue is looked at again once it ends, and counts as run, so `drainQueues` looks at every queue again too.
-        for (const settled of await Promise.allSettled(running)) {
-          if (settled.status === 'fulfilled' && settled.value)
+        const waited = [...running]
+
+        for (const [at, settled] of (await Promise.allSettled(waited)).entries()) {
+          if (settled.status === 'fulfilled' && settled.value && !counted.has(waited[at]!)) {
+            counted.add(waited[at]!)
             ran++
+          }
         }
       }
     },
