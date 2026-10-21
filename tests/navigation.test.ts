@@ -1312,6 +1312,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('leaves a TabNav of #section links without data-keep-scroll, so the section is scrolled to', async () => {
+    await page.goto(`${origin}/tabbed-hash`)
+
+    expect(await page.evaluate(() => document.querySelector('.kui-tab-nav')!.hasAttribute('data-keep-scroll'))).toBe(false)
+  })
+
   it('keeps the scroll when a TabNav tab is followed, and restores it going back', async () => {
     const fresh = await open('/')
 
