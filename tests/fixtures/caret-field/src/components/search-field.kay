@@ -1,0 +1,18 @@
+---
+import { navigate } from 'kay'
+
+const { value, area } = props<{ value: string, area?: boolean }>()
+let timer: ReturnType<typeof setTimeout> | undefined
+
+// Searches as you type, the way a live search page does: the value comes back from the URL, so each swap hydrates the field afresh.
+const search = (event: Event) => {
+  const { value: q } = event.currentTarget as HTMLInputElement
+
+  clearTimeout(timer)
+  timer = setTimeout(() => void navigate({ query: { q } }, { replace: true }), 40)
+}
+---
+if area
+  textarea.field(name="q" aria-label="Search" onInput={search}) {value}
+else
+  input.field(name="q" aria-label="Search" value={value} onInput={search})

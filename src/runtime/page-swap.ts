@@ -993,8 +993,10 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
 
     const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName(before)
 
-    if (again instanceof HTMLElement)
+    if (again instanceof HTMLElement) {
       again.focus({ preventScroll: true })
+      carryCaret(before, again)
+    }
 
     return
   }
@@ -1013,6 +1015,29 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   }
 
   announce(document.title)
+}
+
+// A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. Where the text is not the same, a caret that was at the end stays at the end and any other is kept within the new text.
+function carryCaret(from: Element | null, to: HTMLElement): void {
+  if (!(from instanceof HTMLInputElement || from instanceof HTMLTextAreaElement) || !(to instanceof HTMLInputElement || to instanceof HTMLTextAreaElement))
+    return
+
+  const { selectionStart, selectionEnd, selectionDirection, scrollLeft, scrollTop, value } = from
+
+  if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
+    return
+
+  const length = to.value.length
+  const place = (offset: number) => {
+    if (value === to.value)
+      return offset
+
+    return offset >= value.length ? length : Math.min(offset, length)
+  }
+
+  to.setSelectionRange(place(selectionStart), place(selectionEnd), selectionDirection ?? undefined)
+  to.scrollLeft = scrollLeft
+  to.scrollTop = scrollTop
 }
 
 // The form is read before the chunk loads, which a navigation may outlast. A chunk a deploy replaced fails to load: the focus then goes the way a page without a refusal takes.

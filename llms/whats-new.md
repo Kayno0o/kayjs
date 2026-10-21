@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-cms's entries list shows Last modified and Author columns that sort, the content list shows a collection's last edit and its `icon`, and a new entry has Cancel and Create and add another ([kayjs-cms](../packages/cms/llms/screens.md)).
 - `site.runJobs()` waits for a `queue.enqueue()` or a kayjs-mail `send`/`enqueue` an action left unawaited, with nothing declared ([Testing](testing.md)).
+- A text field replaced by a query `navigate()`, such as a live search box whose island gets the new value, keeps its caret and selection instead of restarting at 0 ([Navigation](navigation.md)).
 
 ## 1.63.0
 
