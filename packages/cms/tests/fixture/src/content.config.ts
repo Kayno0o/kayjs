@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, imageField } from 'kay/content'
-import { footerDown, sections as blocks, partners as friends, outage, shop as shelf, products as stock } from './products'
+import { sections as blocks, footerDown, partners as friends, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),

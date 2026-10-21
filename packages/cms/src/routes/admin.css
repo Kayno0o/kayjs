@@ -167,3 +167,8 @@ body {
   align-items: center;
   gap: 0.25rem 0.5rem;
 }
+
+/* A section's title and its buttons wrap on a narrow screen instead of reaching past it. */
+.kcms-admin .kui-page-section-head {
+  flex-wrap: wrap;
+}
