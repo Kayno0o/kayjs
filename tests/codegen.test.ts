@@ -300,8 +300,8 @@ describe('elements', () => {
     expect(errors('p(class="a" class="b")')).toEqual([expect.stringContaining('one `class`')])
   })
 
-  it('refuses bind: on a component, and on an element that already handles the event', () => {
-    expect(errors('Field(bind:value={v})')).toEqual([expect.stringContaining('`bind:` works on')])
+  it('refuses bind: on a component that names no signal, and on an element that already handles the event', () => {
+    expect(errors('Field(bind:value={v + 1})')).toEqual([expect.stringContaining('needs a signal or a `Bindable` prop')])
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
   })
 

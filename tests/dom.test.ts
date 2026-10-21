@@ -3052,3 +3052,49 @@ describe('shortcut', () => {
     expect(() => shortcut('', () => undefined)).toThrow('no key')
   })
 })
+
+describe('bind: on a component in the browser', () => {
+  const toggle = '---\nimport { type Bindable } from \'kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) {open ? \'on\' : \'off\'}\n'
+  const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nToggle(bind:open={open})\n'
+  const mountBound = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(bind:open={open})\np.out {open() ? \'yes\' : \'no\'}\n',
+    'Toggle.kay': toggle,
+  })
+  const mountPlain = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(open={open()})\np.out {open() ? \'yes\' : \'no\'}\n',
+    'Toggle.kay': toggle,
+  })
+  const mountDeep = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Middle from \'./Middle.kay\'\nconst open = signal(false)\n---\nMiddle(bind:open={open})\np.out {open() ? \'yes\' : \'no\'}\n',
+    'Middle.kay': middle,
+    'Toggle.kay': toggle,
+  })
+
+  async function pressed(mount: typeof mountBound) {
+    const { root, dispose } = await mount()
+
+    try {
+      const before = [root.querySelector('button')!.textContent, root.querySelector('.out')!.textContent]
+
+      root.querySelector('button')!.click()
+      await settle()
+
+      return { before, after: [root.querySelector('button')!.textContent, root.querySelector('.out')!.textContent] }
+    }
+    finally {
+      await dispose()
+    }
+  }
+
+  it('writes the parent signal when the child assigns the prop', async () => {
+    expect(await pressed(mountBound)).toEqual({ before: ['off', 'no'], after: ['on', 'yes'] })
+  })
+
+  it('keeps the write in the child when the parent passes a plain value', async () => {
+    expect(await pressed(mountPlain)).toEqual({ before: ['off', 'no'], after: ['on', 'no'] })
+  })
+
+  it('passes the binding through two levels', async () => {
+    expect(await pressed(mountDeep)).toEqual({ before: ['off', 'no'], after: ['on', 'yes'] })
+  })
+})

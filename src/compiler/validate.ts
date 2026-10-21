@@ -23,6 +23,8 @@ const CLASS_MEMBER = /^class\??\s*:/
 const MEMBER_START = /[\s{;,]/
 const TYPE_OPENERS = '{[(<'
 const TYPE_CLOSERS = '}])>'
+// The name a `bind:` on a component writes: a signal, a prop of the component, or a member of one.
+const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
 // `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
@@ -445,7 +447,13 @@ class Validator {
       return
 
     if (attribute.kind !== 'expression') {
-      this.error(attribute.name, '`bind:` needs a signal', { help: '`bind:value={name}`' })
+      this.error(attribute.name, element.component ? '`bind:` needs a signal or a `Bindable` prop' : '`bind:` needs a signal', { help: element.component ? '`bind:open={open}`' : '`bind:value={name}`' })
+
+      return
+    }
+
+    if (element.component) {
+      this.componentBind(attribute, name)
 
       return
     }
@@ -464,6 +472,14 @@ class Validator {
 
     if (handler)
       this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
+  }
+
+  // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.
+  private componentBind(attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string): void {
+    if (name === 'bind:')
+      this.error(attribute.name, '`bind:` names the prop it binds', { help: '`bind:open={open}`' })
+    else if (!BOUND_NAME.test(this.text(attribute.expression)))
+      this.error(attribute.expression, `\`${name}\` needs a signal or a \`Bindable\` prop`, { help: 'name the signal, or the prop of this component, that it writes' })
   }
 
   // `onclick` and `on:click` attach nothing, and the component would not become an island either.

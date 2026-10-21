@@ -1,5 +1,5 @@
 import type { Signal } from './core'
-import { isSignal, untrack } from './reactive'
+import { createSignal, isSignal, untrack } from './reactive'
 
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions, reviveActions } from './action'
@@ -96,4 +96,43 @@ export function updateBack<Current, Next>(current: Current, update: (current: Wr
     current.set(next)
 
   return (typeof next === 'function' ? next : current) as Kept<Current, Next>
+}
+
+// The props of a component with `Bindable` props: a write goes through the parent's setter when it bound the prop with `bind:`, else it is kept here and read back in place of the parent's value.
+export function bindable<Props extends object>(props: Props, keys: readonly string[]): Props {
+  const local = new Map<PropertyKey, [read: () => { value: unknown } | undefined, write: (next: { value: unknown } | undefined) => void]>()
+  const cell = (key: PropertyKey) => {
+    let held = local.get(key)
+
+    if (!held) {
+      held = createSignal<{ value: unknown } | undefined>(undefined)
+      local.set(key, held)
+    }
+
+    return held
+  }
+
+  return new Proxy(props, {
+    get(target, key, receiver) {
+      if (keys.includes(key as string)) {
+        const override = cell(key)[0]()
+
+        if (override)
+          return override.value
+      }
+
+      return Reflect.get(target, key, receiver)
+    },
+    set(target, key, value) {
+      if (!keys.includes(key as string))
+        return Reflect.set(target, key, value)
+
+      if (Object.getOwnPropertyDescriptor(target, key)?.set)
+        return Reflect.set(target, key, value)
+
+      cell(key)[1]({ value })
+
+      return true
+    },
+  })
 }

@@ -1,7 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
-import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
+import { actionOf, bindsOwnProp, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
@@ -926,6 +926,12 @@ export class JsxTemplate {
   private emitBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, property: string) {
     const { b } = this
 
+    if (element.component) {
+      this.emitComponentBind(element, attribute, property)
+
+      return
+    }
+
     if (bindProblem(element, property))
       return
 
@@ -936,6 +942,21 @@ export class JsxTemplate {
     b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => `)
     addBindWrite(b, attribute.expression, bindRead(property, inputType))
     b.add('}')
+  }
+
+  // `bind:open={open}` on a component passes the prop the signal's value and, to the types, the way to write it back, which only a prop typed `Bindable` takes; the name of a `Bindable` prop of this component stands for itself.
+  private emitComponentBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, prop: string) {
+    const { b } = this
+    const passedOn = bindsOwnProp(this.facts, this.text(attribute.expression))
+
+    b.wrap(attribute.name, () => b.add(prop))
+    b.add('={KayBound(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add(JSON.stringify(prop))).add(', (').addSource(attribute.expression).add(passedOn ? ')' : ')()')
+    b.add(', (kayValue) => ')
+
+    if (passedOn)
+      b.add('{ (').addSource(attribute.expression).add(') = kayValue })}')
+    else
+      b.add('(').addSource(attribute.expression).add(').set(kayValue))}')
   }
 
   private emitText(node: TextNode) {

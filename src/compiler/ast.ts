@@ -481,6 +481,8 @@ export interface TemplateFacts {
   forms: Map<Node, Span>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
+  // The names of the props the script types `Bindable<T>`, which only the script tells: set where the code is generated.
+  bindables: ReadonlySet<string>
 }
 
 export interface KayFile {
@@ -588,6 +590,13 @@ export interface PartFacts {
   merges: boolean
 }
 
+const ANY_WHITESPACE = /\s+/g
+
+// Whether the expression of a `bind:` is a prop of this component typed `Bindable<T>`, which it passes on as it reads and writes it, rather than a signal.
+export function bindsOwnProp(facts: TemplateFacts, expression: string): boolean {
+  return facts.bindables.has(expression.replaceAll(ANY_WHITESPACE, ''))
+}
+
 // The attribute that names a part, when it is written as a plain string.
 export function partAttribute(element: ElementNode, source: string): Extract<NamedAttribute, { kind: 'static' }> | undefined {
   return element.attributes.find((attribute): attribute is Extract<NamedAttribute, { kind: 'static' }> => attribute.kind === 'static' && source.slice(attribute.name.start, attribute.name.end) === 'part')
@@ -653,7 +662,7 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map() }
+  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map(), bindables: new Set() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {

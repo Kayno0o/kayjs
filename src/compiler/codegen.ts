@@ -4,7 +4,7 @@ import type { Rewrite } from './mapping'
 import type { WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
-import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
+import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
 import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
@@ -145,6 +145,17 @@ function islandKind(options: GenerateOptions): IslandKind {
   return options.promote === undefined ? 'static' : 'promotable'
 }
 
+// The ways the template names a prop typed `Bindable<T>`: its destructured name, or the props name and its key.
+function bindableNames(source: string, props: PropsDeclaration | undefined): Set<string> {
+  const text = (span: Span) => source.slice(span.start, span.end)
+  const alias = props?.name && text(props.name)
+
+  return new Set([
+    ...props?.bindings.filter(binding => binding.bindable === true).map(binding => text(binding.local)) ?? [],
+    ...alias === undefined ? [] : props!.bindable.map(key => `${alias}.${key}`),
+  ])
+}
+
 export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: GenerateOptions): Generated {
   return new ModuleShell(file, script, server, options).run()
 }
@@ -172,7 +183,7 @@ class ModuleShell {
     this.mode = outputMode(options)
     this.kind = islandKind(options)
     this.fence = options.includeServer === false ? undefined : server
-    const facts = templateFacts(file, script.recipe)
+    const facts = { ...templateFacts(file, script.recipe), bindables: bindableNames(file.source, script.props) }
 
     this.facts = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
     this.deferred = deferredData(this.facts, this.fence)
@@ -258,6 +269,9 @@ class ModuleShell {
 
     if (this.deferred.size > 0)
       kayHelpers.push('autoDefer')
+
+    if (runs && script.props && script.props.bindable.length > 0)
+      kayHelpers.push('bindable')
 
     for (const write of this.options.writes ?? [])
       kayHelpers.push(WRITE_NAMES[write])
@@ -671,6 +685,9 @@ class ModuleShell {
 
     b.add('\n')
 
+    if (this.runs && props.bindable.length > 0)
+      b.add(`${PROPS} = ${helperName('bindable')}(${PROPS}, ${JSON.stringify(props.bindable)});\n`)
+
     if (props.name)
       b.add('const ').addSource(props.name).add(` = ${PROPS};\n`)
 
@@ -948,7 +965,7 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

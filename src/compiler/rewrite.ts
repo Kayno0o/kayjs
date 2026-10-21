@@ -440,6 +440,23 @@ class RewriteFinder {
     this.insert(rightEnd! + 1, operator === '' ? ')' : '))')
   }
 
+  // An assignment to a `Bindable` prop writes the property of the props object it is read from.
+  private bindableWrite(violation: NodePath, name: string, target: Rewrite) {
+    const { node } = violation
+    const identifier = assignedIdentifier(node, name)
+    const at = identifier && this.input.map.isExact(identifier.start!) ? this.input.map.toSource(identifier.start!) : undefined
+
+    if (at === undefined)
+      return
+
+    const written = node.type === 'UpdateExpression' ? node.argument : (node as { left?: unknown }).left
+
+    if (written !== identifier)
+      this.diagnostics.push({ start: at, end: at + name.length, message: `\`${name}\` is a \`Bindable\` prop, written by assigning its name`, help: `\`${name} = value\`` })
+    else
+      this.rewrites.set(at, { ...target, end: at + name.length })
+  }
+
   // Text that opens a call at `at`, ahead of anything a rewrite starting there writes.
   private open(at: number, text: string) {
     const found = this.rewrites.get(at)
@@ -626,6 +643,7 @@ class RewriteFinder {
     const { name } = local
     const access = propRead(prop.binding, prop.index, name, this.input.check === true)
     const { signal } = prop.binding
+    const bindable = prop.binding.bindable === true
 
     // A prop typed `Signal<T>` or `Memo<T>` reads as the script's own signals do.
     const read = (reference: NodePath): Rewrite => {
@@ -648,13 +666,21 @@ class RewriteFinder {
       return this.handed(reference) === undefined ? access : this.handedRead(access)
     }
 
-    this.visitBinding(path.scope, name, reference => withShorthand(reference, name, read(reference)), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
+    this.visitBinding(path.scope, name, reference => withShorthand(reference, name, read(reference)), signal || bindable ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
 
     const binding = path.scope.getBinding(name)
 
     if (signal) {
       for (const violation of binding?.constantViolations ?? [])
         this.signalWrite(violation, name, signal, access)
+    }
+
+    // A `Bindable` prop is assigned on the props object, whose setter writes what a parent bound or keeps the value in the component; a default is read, never assigned.
+    if (bindable) {
+      const target = propRead({ ...prop.binding, fallback: undefined }, prop.index, name, this.input.check === true)
+
+      for (const violation of binding?.constantViolations ?? [])
+        this.bindableWrite(violation, name, target)
     }
 
     if (binding && valueReferences(binding).length === 0)

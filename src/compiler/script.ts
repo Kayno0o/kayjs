@@ -23,6 +23,7 @@ const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHt
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
+const BINDABLE_TYPE = 'Bindable'
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 // Each name written as a name of its own, not a member or part of a longer one.
@@ -37,6 +38,8 @@ export interface PropsBinding {
   removal?: Span | undefined
   // Typed `Signal<T>` or `Memo<T>` where the props are declared, so the template reads the value by the name and writes it by assigning.
   signal?: SignalKind | undefined
+  // Typed `Bindable<T>`: read as a plain value, and written by assigning it, which a parent's `bind:` takes.
+  bindable?: boolean | undefined
 }
 
 export interface PropsDeclaration {
@@ -46,6 +49,8 @@ export interface PropsDeclaration {
   name?: Span | undefined
   bindings: PropsBinding[]
   rest?: Span | undefined
+  // The keys of the props typed `Bindable<T>`, destructured or not.
+  bindable: string[]
 }
 
 // One name an import brings in, with the specifier's own span so a duplicate of it can be left out.
@@ -1288,7 +1293,8 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
     return undefined
 
   const typeArgument = declarator.init.typeParameters?.params[0]
-  const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), bindings: [] }
+  const { signals, bindable } = signalProps(typeArgument, body)
+  const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), bindings: [], bindable: [...bindable] }
 
   if (declarator.init.arguments.length > 0)
     diagnostics.push({ ...shift(declarator.init), message: '`props<T>()` takes no arguments', help: 'give defaults in the destructuring: `const { size = \'md\' } = props<T>()`' })
@@ -1309,7 +1315,6 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
   }
 
   const properties = declarator.id.properties
-  const signals = signalProps(typeArgument, body)
 
   for (const [index, property] of properties.entries()) {
     if (property.type === 'RestElement') {
@@ -1332,16 +1337,18 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
     const previous = properties[index - 1]
     const removal = next ? { start: shift(property).start, end: shift(next).start } : previous && { start: shift(previous).end, end: shift(property).end }
 
-    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal, signal: signals.get(key) })
+    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal, signal: signals.get(key), bindable: bindable.has(key) })
   }
 
   return declaration
 }
 
-// The props a props type writes as `Signal<T>` or `Memo<T>` from `kay`, inline or through an interface or a type alias of the script: those the component writes by assigning, and reads by calling.
-function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<string, SignalKind> {
+// The props a props type writes as `Signal<T>` or `Memo<T>` from `kay`, inline or through an interface or a type alias of the script: those the component writes by assigning, and reads by calling. Those written `Bindable<T>` are read as values and written by assigning too.
+function signalProps(type: t.TSType | undefined, body: t.Statement[]): { signals: Map<string, SignalKind>, bindable: Set<string> } {
   const kinds = new Map<string, SignalKind>()
   const found = new Map<string, SignalKind>()
+  const bindable = new Set<string>()
+  const bindableNames = new Set<string>()
 
   for (const statement of body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
@@ -1354,6 +1361,9 @@ function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<strin
 
       if (kind)
         kinds.set(specifier.local.name, kind)
+
+      if (name === BINDABLE_TYPE)
+        bindableNames.add(specifier.local.name)
     }
   }
 
@@ -1364,15 +1374,19 @@ function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<strin
   const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literalMembers
 
   for (const member of members) {
-    const annotation = member.type === 'TSPropertySignature' && !member.optional && !member.computed ? member.typeAnnotation?.typeAnnotation : undefined
+    const written = member.type === 'TSPropertySignature' && !member.computed ? member.typeAnnotation?.typeAnnotation : undefined
+    const annotation = member.type === 'TSPropertySignature' && !member.optional ? written : undefined
     const key = member.type === 'TSPropertySignature' ? keyName(member.key) : undefined
     const kind = annotation?.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' ? kinds.get(annotation.typeName.name) : undefined
 
     if (key !== undefined && kind)
       found.set(key, kind)
+
+    if (key !== undefined && written?.type === 'TSTypeReference' && written.typeName.type === 'Identifier' && bindableNames.has(written.typeName.name))
+      bindable.add(key)
   }
 
-  return found
+  return { signals: found, bindable }
 }
 
 function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (node: t.Node) => Span) {

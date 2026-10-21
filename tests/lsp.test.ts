@@ -299,6 +299,14 @@ describe('kay lsp', () => {
     expect(JSON.stringify((await editor.request<Hover>('textDocument/hover', 'site/src/components/list.kay', 0, 5)).contents)).toContain('T')
   })
 
+  it('reports a bind: on a prop not typed Bindable at the attribute', async () => {
+    await editor.open('site/src/routes/about.kay')
+
+    const diagnostics = await editor.change('site/src/routes/about.kay', '---\nimport List from \'../components/list.kay\'\n\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
+
+    expect(brief(diagnostics).map(d => [d.start.line, d.code])).toEqual([[5, 2345], [5, 2345]])
+  })
+
   it('shows the signature of the call under the cursor', async () => {
     const help = await editor.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'site/src/components/quick-add.kay', 9, 28)
 

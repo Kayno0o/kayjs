@@ -69,6 +69,30 @@ if open()
   p Details
 ```
 
+### Bind a prop to the parent's signal
+
+A prop typed `Bindable<T>` from `kay` is read and assigned as a plain name, with no call. The parent binds it to a signal with `bind:`, and an assignment in the child writes that signal; with a plain value, `Toggle(open={false})`, the assignment stays in the child:
+
+```kay
+---
+import type { Bindable } from 'kay'
+
+const { open } = props<{ open: Bindable<boolean> }>()
+---
+button(onClick={() => open = !open}) {open ? 'Hide' : 'Show'}
+```
+
+```kay
+---
+import Toggle from './toggle.kay'
+
+const open = signal(false)
+---
+Toggle(bind:open={open})
+if open()
+  p Details
+```
+
 ### Run code when a value changes
 
 `effect` runs once the render is done, in the browser, and again whenever a signal it read changes:
@@ -216,6 +240,7 @@ ul
 - Assigning works on any signal a `const` or an import holds, wherever it was made: the script's own, a module's, a re-export, one a function returns or a destructuring gives, and a prop the props type, inline or a script `interface` or `type`, writes as `Signal<T>` from `kay`.
 - `kay check` reports assigning a memo, or a `const` or an import holding no signal, at its name; a `const` plainly holding none, `const n = 1` or `const seen = new Set()`, is a compile error.
 - Assigning writes a signal wherever it sits: one a `const`, an import, a `let` or `var` set to `signal(...)` or a prop typed `Signal<T>` holds, and also one in an object's property or an array element, `box.count = 1`, `list[2]++`, or in a `let` set from a function's result. The compiler cannot tell those from a plain write, so the runtime does: a signal there is written, anything else assigned, and `kay check` types the write by what the target holds, `box.count = 'x'` being a type error for a `Signal<number>`. A function assigned there, a signal included, replaces what was held. A target kay sees holds no signal, a literal or `new Map()`, is assigned as written, and so is a field of `this`, a write beside an `await` or another write, and a `let` update whose value is read: use `.set` there.
+- `bind:name={signal}` on a component needs a signal and a prop typed `Bindable<T>`; a child hands it on with `bind:name={name}`, through any number of levels. `bind:` on a component makes the parent an island. `kay check` reports a prop not typed `Bindable`, and a memo or a value that is no signal.
 - A prop typed `Signal<T>` or `Memo<T>` from `kay` takes the signal a parent hands by name, `Toggle(open={open})`; one typed `T` takes its value, `Toggle(open={open()})`, kept current.
 - `persisted`, `queryParam` and `linked` signals read and write as `signal` ones do; a `selection`, a `resource` or a `socket` is called or read through its members.
 - `kay check` narrows a signal or memo a template expression calls within that expression: `{error() && error().message}`, with `error` a `signal<Error>()`, checks.

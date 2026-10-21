@@ -6,12 +6,30 @@ import type { Component, JSX } from './jsx'
 // Types behind the checks `kay check` adds to generated code; nothing here runs but the one message `kay check` reads back.
 
 declare const ISLAND: unique symbol
+declare const BINDABLE: unique symbol
 
 // When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport; `client` renders it in the browser only, right away.
 export type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
 
 // What an `if` renders its block on, its condition's type without the falsy values, `false` and `0` included as `NonNullable` keeps them.
 export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
+
+// What a `Bindable<T>` prop carries beyond its value, so `kay check` can tell a prop a parent may bind from any other.
+export interface BindableMark { readonly [BINDABLE]?: true }
+
+// A prop the component reads as a plain `T` and writes by assigning it. A parent passing a value leaves the write local to the component; `bind:open={open}` writes the parent's signal.
+export type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
+
+type PropsOfComponent<Tag> = Tag extends (props: infer Props) => unknown ? Props : never
+
+// The props of a component typed `Bindable`, which `bind:` takes.
+export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: [NonNullable<PropsOfComponent<Tag>[Key]>] extends [never] ? never : NonNullable<PropsOfComponent<Tag>[Key]> extends BindableMark ? Key : never }[keyof PropsOfComponent<Tag>]
+
+// What `bind:name` demands of the prop it names.
+export type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }
+
+// What a component writes to a bound prop, which the parent's signal takes.
+export type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
 
 // Lets the checker tell islands from plain components.
 export interface IslandBrand { readonly [ISLAND]: true }

@@ -621,7 +621,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports a signal written by assigning where it is held in a property or in a let from a function, which would replace it', async () => {
+  it('types a signal written by assigning where it is held in a property or in a let from a function as a write', async () => {
     const page = [
       '---',
       'import { signal } from \'kay\'',
@@ -644,7 +644,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[9, 'TS2322'], [10, 'TS2322']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -905,6 +905,41 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('types bind: on a component against the props it names', async () => {
+    const toggle = '---\nimport { type Bindable } from \'kay\'\nconst { open, label = \'x\' } = props<{ open: Bindable<boolean>, label?: Bindable<string> }>()\n---\nbutton(onClick={() => open = !open}) {label}\n'
+    const plain = '---\nconst { open } = props<{ open: boolean }>()\n---\nspan {open}\n'
+
+    const page = [
+      '---',
+      'import { memo, signal } from \'kay\'',
+      'import Plain from \'../Plain.kay\'',
+      'import Toggle from \'../Toggle.kay\'',
+      '',
+      'const open = signal(false)',
+      'const name = signal(\'a\')',
+      'const count = signal(0)',
+      'const double = memo(() => count() * 2)',
+      'const fixed = false',
+      '---',
+      'Toggle(bind:open={open} bind:label={name})',
+      'Toggle(bind:open={open} bind:label={count})',
+      'Toggle(bind:open={double})',
+      'Toggle(bind:open={fixed})',
+      'Plain(bind:open={open})',
+      'Toggle(bind:missing={open})',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/Toggle.kay': toggle, 'src/Plain.kay': plain, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[13, 'TS2322'], [13, 'TS2345'], [14, 'TS2322'], [14, 'TS2339'], [15, 'TS2349'], [15, 'TS2339'], [16, 'TS2345'], [17, 'TS2322'], [17, 'TS2345']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

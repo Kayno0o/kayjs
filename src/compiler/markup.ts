@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf } from './ast'
+import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
 
@@ -392,6 +392,30 @@ export abstract class TemplateWriter {
         entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)
     }
 
+    // `bind:open={open}` hands a component the value and the way to write it back: a getter and a setter, the setter reaching the signal, or the `Bindable` prop of this component the name stands for.
+    const boundEntry = (attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string) => {
+      const passedOn = bindsOwnProp(this.facts, this.source(attribute.expression))
+      const target = () => b.add('(').addSource(attribute.expression).add(')')
+      const read = () => passedOn ? target() : target().add('()')
+
+      if (!getters) {
+        entry(name, read, false)
+
+        return
+      }
+
+      entry(name, read, true)
+      separate()
+      b.add(`set ${JSON.stringify(name)}(kayValue) { `)
+
+      if (passedOn)
+        target().add(' = kayValue')
+      else
+        target().add('.set(kayValue)')
+
+      b.add(' }')
+    }
+
     const lastSpread = element.attributes.findLastIndex(attribute => attribute.kind === 'spread')
     const ownStyle = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'style')
 
@@ -421,6 +445,12 @@ export abstract class TemplateWriter {
       // Takes the color a spread brings off the image, which the attributes after it cannot unset.
       if (element.name === 'img' && name === NO_PLACEHOLDER) {
         entry('style', () => b.add('undefined'), false)
+
+        continue
+      }
+
+      if (element.component && name.startsWith('bind:') && attribute.kind === 'expression') {
+        boundEntry(attribute, name.slice(5))
 
         continue
       }

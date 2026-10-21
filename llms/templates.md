@@ -310,6 +310,7 @@ for product of products
 - Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
 - A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
 - A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
+- `bind:name={signal}` on a component binds a prop typed `Bindable<T>` ([Components](components.md#bind-a-prop-to-the-parents-signal)).
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
 - On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.

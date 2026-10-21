@@ -164,6 +164,8 @@ A component using signals or handlers becomes an island: see [Islands](/essentia
 
 Handed to a component as a prop, `Toggle(open={open})`, a signal passes as itself. The prop is typed `Signal<boolean>`, and the component reads and writes it.
 
+A prop typed `Bindable<boolean>` is read and assigned as a plain name. The parent binds it with `bind:open={open}`, and the child's assignment writes the parent's signal. Given a plain value instead, the assignment stays in the child. A child passes it on with `bind:open={open}`, through any number of levels, and a bind makes the parent an island.
+
 Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal is an error, `uncalled-signal`. Call it there.
 
 Assigning works on a signal held in a `const`, an import, a `let`, an object's property, an array element or a `Signal<boolean>` prop: `box.count = 1`, `list[2]++`. Where kay cannot tell a signal from a plain value, the runtime does, writing a signal and assigning anything else, and `kay check` types the write by what the target holds, so `box.count = 'x'` is a type error for a `Signal<number>`.
