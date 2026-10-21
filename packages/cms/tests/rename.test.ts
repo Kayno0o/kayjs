@@ -144,6 +144,13 @@ describe('renaming a folder entry', () => {
     expect(await Bun.file(join(dir, 'authors/ada.md')).exists() || await Bun.file(join(dir, 'authors/ada.json')).exists()).toBe(true)
   })
 
+  test('requires the version of a folder entry when the editor is meant to name one', async () => {
+    await make('posts', 'first')
+
+    expect(await renameEntry({ collection: 'posts', slug: 'first' }, 'second', { required: true })).toMatchObject({ issues: [{ message: expect.stringContaining('older than the server') }] })
+    expect(redirects()).toEqual([])
+  })
+
   test('refuses a saver that cannot move files', async () => {
     await make('posts', 'first')
     configure({ files: { save: workingTree().save } })

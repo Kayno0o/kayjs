@@ -1,0 +1,45 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { wording } from 'kay/words'
+import type { EntryForm } from '../form'
+import { slugify } from '../slug'
+
+// The Rename button of a saved entry and its dialog: a new slug to type, cleaned as it is typed. The old page redirects to the new one by itself.
+// Edits not saved yet disable it, as the rename acts on the entry as saved.
+const { form } = props<{ form: EntryForm }>()
+
+const open = signal(false)
+const typed = signal('')
+const pending = signal(false)
+const entry = form.stored
+
+const clean = () => slugify(typed(), { final: true })
+const unchanged = () => clean() === '' || clean() === entry?.slug
+
+function start(): void {
+  typed = entry?.slug ?? ''
+  open = true
+}
+
+async function rename(): Promise<void> {
+  pending = true
+
+  try {
+    if (await form.rename(clean()))
+      open = false
+  }
+  finally {
+    pending = false
+  }
+}
+---
+Button(label={wording('cms.entry.rename', 'Rename')} disabled={form.saving() || form.dirty()} data-tooltip={form.dirty() ? wording('cms.entry.renameDirty', 'Save or reset your edits first') : undefined} onClick={start})
+Dialog(open={open()} title={wording('cms.entry.renameTitle', 'Rename {slug}', { slug: entry?.slug ?? '' })} dirty={pending()} onOpenChange={shown => { if (!shown) open = false }})
+  @footer
+    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => open = false})
+    Button(label={wording('cms.entry.rename', 'Rename')} tone="accent" busy={pending()} disabled={pending() || unchanged()} onClick={rename})
+  form(onSubmit={(event) => { event.preventDefault(); if (!unchanged() && !pending()) void rename() }})
+    TextInput(autofocus value={typed()} onInput={text => typed = slugify(text)} aria-label={wording('cms.entry.renameSlug', 'New slug')} size={32})
+    p {wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.')}

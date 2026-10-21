@@ -79,5 +79,5 @@ The screens fit a 375 px phone: no sideways scroll, lists stacked as cards, cont
 - [Loaders and a live CMS](llms/loaders.md): `sqliteLoader` and `postgresLoader`, seeding, all-or-nothing saves of several entries, the steps to wire editors saving on a running site, how other processes and outside edits are followed (`watch`), and `onSave`
 - [Edit this page link](llms/page-links.md): the link an editor's browser finds on each page, `pageLink: false`, a link of your own, and how an entry finds its page
 - [Field kinds and entering a field](llms/fields.md): `fieldInput` (placeholder, unit, rows, labels, lines, when), what the schema sets, `customField`, `blocks`, ready-made kinds (`colorField`, `moneyField`, `tagsField`, `linkField`, `geoField`, `iconField`)
-- [Renaming an entry's slug](llms/rename.md): a saver's `move`
+- [Renaming an entry's slug](llms/rename.md): the Rename button, the old URL redirecting by itself, a saver's `move`
 - [Texts and languages](llms/words.md): the `cms.*` messages that word every text of the screens and the editor

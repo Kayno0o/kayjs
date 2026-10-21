@@ -13,7 +13,7 @@ import { createDrafts } from './drafts'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
-import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
+import { deleteSaved, refuseUnsaved, renameSaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
 import { fieldsOf } from './fields'
@@ -86,6 +86,8 @@ export interface EntryForm extends FormScope {
   // The entries naming this one in a reference field, as `Collection: title`, read by `askReferrers` when the delete confirmation opens.
   referrers: () => string[]
   askReferrers: () => Promise<void>
+  // Renames the saved entry's slug, then opens it under the new one; the entry must have no edits not saved yet. True once renamed.
+  rename: (slug: string) => Promise<boolean>
   remove: () => Promise<void>
   reset: () => void
 }
@@ -368,6 +370,16 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     async remove() {
       if (await deleteSaved(ref, drafts.version(ref)))
         await navigate(collectionPath(prefix, collection.name), { replace: true })
+    },
+    async rename(next) {
+      const renamed = await renameSaved(ref, next, drafts.version(ref))
+
+      if (renamed === undefined)
+        return false
+
+      await navigate(entryPath(prefix, { ...ref, slug: renamed }), { replace: true })
+
+      return true
     },
     reset: () => drafts.reset(ref),
   }

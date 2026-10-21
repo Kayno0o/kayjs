@@ -6,6 +6,7 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import { collectionPath, deleteMessage, historyPath, onPagePath } from '../listing'
+import EntryRename from './entry-rename.kay'
 import Refused from './refused.kay'
 import EntrySaveState from './entry-save-state.kay'
 import ResetButton from './reset-button.kay'
@@ -43,6 +44,8 @@ else if form.ends() as at
       Button(href={onPagePath(form.prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')})
     if form.collection.history
       Button(href={historyPath(form.prefix, { collection: form.collection.name, slug: entry.slug, locale: entry.locale })} label={wording('cms.history.open', 'History')})
+    if !form.collection.single
+      EntryRename(form={form})
     if form.isDraft()
       if denied.publish !== undefined
         Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})

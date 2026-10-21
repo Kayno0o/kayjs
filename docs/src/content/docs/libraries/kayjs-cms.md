@@ -189,6 +189,18 @@ const { headline } = await home.one()
 
 `one()` gives the entry's data, else the `seed`, else `undefined`. Give it a fallback to get the data typed, `await home.one({ headline: '', intro: '' })`. A single collection cannot be `localized`. If it already holds several entries, such as a list you turned into one, the admin and `one()` show the first and the others are out of its reach, so keep one.
 
+## Renaming an entry
+
+The Rename button in an entry's header changes its slug. Type the new slug and the entry opens under it. The button is off for a collection of one entry and while the form has edits you have not saved.
+
+The old address of the page redirects to the new one, with nothing to write in `kay.config.ts`. It works per language and survives a restart, because the redirect joins the ones the Not found screen lists, where you can make it permanent.
+
+Rename twice and both old addresses go straight to the last one. Rename back and the redirect from the address that exists again is removed, so nothing loops.
+
+A folder entry's file is moved and keeps its format. With `forgejo()` it is one commit. A saver of your own needs `move` to allow it. A loaded entry is saved under the new slug and removed from the old one, with its history, and it does not go to the trash.
+
+A rename is refused if the new slug is taken or names another place, or if another entry refers to this one by its slug: change those first. Entries of a language are paired by `translationKey`, or by the slug without one, so set it before renaming one language.
+
 ## Ordering entries
 
 A collection listed in a hand-picked order names a number field with `order`:
@@ -546,7 +558,7 @@ It writes `to`, then removes `from`; `forgejo()` does both in one commit. It thr
 
 The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
 
-`POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
+`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 

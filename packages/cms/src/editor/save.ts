@@ -240,6 +240,18 @@ export async function renameMedia(key: string, name: string): Promise<boolean> {
   return true
 }
 
+// Renames a saved entry's slug, naming the version the editor showed, and says how it went; the new slug, or undefined once refused or failed.
+export async function renameSaved(ref: EntryRef, slug: string, version?: string | undefined): Promise<string | undefined> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/rename', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: { ...localeOf(ref), ...versionOf(version) },
+    body: { slug },
+  }), wording('cms.save.renameFailure', 'Could not rename'))
+
+  return settled(outcome, wording('cms.save.renamed', 'Renamed'), wording('cms.save.notRenamed', 'Not renamed')) ? slug : undefined
+}
+
 // Turns a draft entry public and says how it went; true once published.
 export async function publishSaved(ref: EntryRef): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/publish', {

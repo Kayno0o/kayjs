@@ -326,3 +326,43 @@ test('Create and add another creates the entry, then visits the new entry page',
   expect(JSON.parse(String((posts[0]![1] as RequestInit).body))).toMatchObject({ create: true })
   expect(window.location.pathname).toBe('/admin/new/posts')
 })
+
+test('Rename types a cleaned slug in a dialog, sends it with the version, and opens the entry under it', async () => {
+  const { fetched } = server({ saved: true, slug: 'new-name' })
+  const root = await open(stored({}))
+
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/collections/posts/hello')
+  button(root, 'Rename')!.click()
+  await settle()
+
+  const input = document.querySelector<HTMLInputElement>('dialog input')!
+
+  expect(input.value).toBe('hello')
+  input.value = 'New Name!'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(input.value).toBe('new-name-')
+  ;[...document.querySelectorAll('dialog button')].find(each => each.textContent?.trim() === 'Rename')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+
+  const posts = fetched.mock.calls.filter(call => (call[1])?.method === 'POST')
+
+  expect(posts).toHaveLength(1)
+  expect(String(posts[0]![0])).toContain('/rename')
+  expect(String(posts[0]![0])).toContain('version=v1')
+  expect(JSON.parse(String((posts[0]![1] as RequestInit).body))).toEqual({ slug: 'new-name' })
+  expect(window.location.pathname).toBe('/admin/collections/posts/new-name')
+})
+
+test('Rename is off for a single collection, and with edits not saved yet', async () => {
+  const single = await open(stored({}), { ...POSTS, single: true })
+
+  expect(buttons(single)).not.toContain('Rename')
+  mounted?.unmount()
+
+  const root = await open(stored({}))
+
+  expect(button(root, 'Rename')!.disabled).toBe(false)
+  await type(root, 'Edited')
+  expect(button(root, 'Rename')!.disabled).toBe(true)
+})
