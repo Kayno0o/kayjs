@@ -24,7 +24,7 @@ import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack }
 import { ContentError, decodeEntries, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
-export { collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntry, tagsField, unique, untranslated } from './edit'
+export { collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
@@ -95,6 +95,8 @@ export interface ContentLoader<Data = unknown> {
   store?: CacheStore | undefined
   // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `data` is typed from the collection's `schema`, which kay has checked it against, with each missing default filled in and a date as its text. `create` is true for an entry the CMS creates: throw when it exists, or another process's new entry is overwritten.
   save?: ((entry: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
+  // Writes several entries a CMS saved together, such as the two a move swaps, all or none: what `saveEntries` from `kay/content` hands on, in a transaction for a database. Without it they go to `save` one at a time, so a failure in between leaves the earlier ones written.
+  saveMany?: ((entries: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined }[]) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }

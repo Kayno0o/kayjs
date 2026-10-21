@@ -361,6 +361,43 @@ export const news = collection({
 
 kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, after checking the entry against the schema. Never call those two from inside `save` or `remove` of the same collection, as they wait for each other.
 
+A loader may also give `saveMany(entries)`, which writes the entries of one action together, all or none, such as the two a reorder swaps. Without it they go to `save` one at a time. [A live site with a database](#a-live-site-with-a-database) needs none of this written.
+
+## A live site with a database
+
+Editors saving on a running site need a loader with `save` and `remove`. kayjs-cms ships two, so you write none: `sqliteLoader` on `bun:sqlite` and `postgresLoader` on Bun's own `SQL`. Each keeps its entries in one table of JSON, creates it when first used, and adds no dependency.
+
+```ts
+import { s } from 'kay'
+import { collection } from 'kay/content'
+import { sqliteLoader } from '@kaynooo/kayjs-cms/sqlite'
+
+export const posts = collection(sqliteLoader({
+  name: 'posts',
+  database: 'data/content.db',
+  seed: [{ slug: 'hello', data: { title: 'Hello', order: 1 }, body: 'First post.' }],
+}), {
+  schema: s.Object({ title: s.String(), order: s.Number() }),
+  order: 'order',
+})
+```
+
+For Postgres, import `postgresLoader` from `@kaynooo/kayjs-cms/postgres` and give it `sql`, a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`.
+
+The `seed` is your initial content. It is written once, the first time the loader meets the collection, so an entry an editor deletes stays deleted and a new seed never overwrites their work. Several collections can share the table, each keyed by its `name`. Pass `table` to name another.
+
+A reorder saves two entries, and the loader writes them in one transaction: it never half-applies.
+
+To wire the whole thing:
+
+1. Run `kay add cms` and set `preview.secret`.
+2. Declare each editable collection over a loader, as above.
+3. Add `cms({ guard })` to `extensions`, with the guard of who may edit. A loader needs no `files` saver, which is for folder entries.
+4. Keep the database where a deploy leaves it: a volume for the SQLite file, your `DATABASE_URL` for Postgres.
+5. Read the collections in your pages as usual. Add `live: true` to the collection so open pages follow a save.
+
+A save refreshes the collection in the server that handled it. Other servers keep their entries until the loader's `ttl` passes.
+
 ## Where files are saved
 
 A folder entry is a file, and `files` says where it goes. `forgejo()` commits it. `workingTree()` writes it in place, which is the default under `kay dev`. The token travels with every request, so `forgejo()` throws for a plain `http:` address unless it is `localhost`, `127.0.0.1` or `[::1]`.

@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-cms ships `sqliteLoader` and `postgresLoader`, a seeded table of JSON entries editors can save to on a live site, with a loader's new `saveMany` making a reorder all-or-nothing ([loaders](../packages/cms/llms/loaders.md)).
 - kayjs-cms lists get Add at the top, a jump menu from eight items and an issue count on a folded item, and Reset asks before dropping edits ([fields](../packages/cms/llms/fields.md)).
 - kayjs-cms pairs a text field called `alt` with the image beside it with no hint, and asks before the page is left over a running upload ([uploads](../packages/cms/llms/uploads.md)).
 - The CMS tab of the dev tool speaks the page's language, from new `cms.dev.*` words (French shipped; see [the words](../packages/cms/llms/words.md)).

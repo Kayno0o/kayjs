@@ -108,6 +108,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   entries: 'request',
   entrySource: 'request',
   entryFile: 'request',
+  saveEntries: 'request',
   saveEntry: 'request',
   removeEntry: 'request',
   repositoryRoot: 'request',

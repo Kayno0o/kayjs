@@ -2,7 +2,7 @@ import type { Commit, FileChange, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
-import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
+import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
@@ -261,7 +261,7 @@ export async function unpublishEntry(ref: EntryRef, author?: Identity): Promise<
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: true }, body: existing.body }, { version: existing.version, verb: 'unpublish', author, bodyKept: true })
 }
 
-// Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change; saving stops at the first that is refused.
+// Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
 export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
   const field = collection.orderField
@@ -275,12 +275,26 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
   if (changes === undefined)
     return group.some(entry => entry.slug === ref.slug) ? { saved: true } : refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
+  if (collection.kind === 'loaded') {
+    const written = changes.map((change) => {
+      const entry = group.find(each => each.slug === change.slug)!
+
+      return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body }
+    })
+
+    return inTurn(collection.name, async () => {
+      const { issues } = await saveLoadedMany(collection.name, written)
+
+      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+    })
+  }
+
   let outcome: SaveOutcome = { saved: true }
 
   for (const change of changes) {
     const entry = group.find(each => each.slug === change.slug)!
     const target = { collection: collection.name, slug: entry.slug, locale: entry.locale }
-    const version = collection.kind === 'loaded' ? undefined : await versionOf(target)
+    const version = await versionOf(target)
 
     outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version, verb: 'move', author, bodyKept: true })
 

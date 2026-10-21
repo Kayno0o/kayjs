@@ -691,6 +691,62 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
   }
 }
 
+// Hands several entries of a loaded collection to its loader's `saveMany` as one all-or-nothing write, a loader without it getting them one `save` at a time; or resolves the issues of the first entry the collection refuses, saving none.
+export async function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[] }> {
+  const collection = collectionNamed(name)
+  const { loader } = collection
+
+  if (loader === undefined)
+    throw new KayError('content-api-misuse', `kay: ${name} is a folder collection, whose files a CMS commits itself: entrySource() gives an entry's file`)
+
+  const saveMany = loader.saveMany
+  const save = saveMany === undefined ? writer(name, collection, 'save') : undefined
+  const turn = takeTurn(collection.name)
+
+  try {
+    const checked: WrittenEntry[] = []
+
+    for (const entry of written) {
+      const { issues } = await entryIssues(name, collection, entry)
+
+      if (issues.length > 0)
+        return { issues }
+
+      checked.push({ ...entry, data: withDefaults(entry.data, collection.options.schema) })
+    }
+
+    await turn.ready
+
+    for (const entry of written) {
+      const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>)
+
+      if (taken.length > 0)
+        return { issues: taken }
+    }
+
+    loading.delete(name)
+
+    try {
+      if (saveMany === undefined) {
+        for (const entry of checked)
+          await save!(entry)
+      }
+      else {
+        await saveMany(checked)
+      }
+    }
+    finally {
+      loading.delete(name)
+      collection.invalidate()
+    }
+
+    return {}
+  }
+  finally {
+    turn.done()
+  }
+}
+
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
 export async function removeEntry(name: string, slug: string, locale?: string): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)

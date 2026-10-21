@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, removeEntry, saveEntry, tagsField } from '../src/content'
+import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -1111,6 +1111,29 @@ describe('the collections a CMS edits', () => {
   it('names the method a loader lacks to save or remove its entries', async () => {
     expect(await rejection(saveEntry('notes', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }))).toMatchObject({ message: 'kay: notes\'s loader declares no save, which saveEntry() hands the entry to' })
     expect(await rejection(removeEntry('notes', 'hello', 'en'))).toMatchObject({ message: 'kay: notes\'s loader declares no remove, which removeEntry() hands the entry to' })
+  })
+
+  it('hands several entries to a loader\'s saveMany whole, or to save one at a time without it, refusing all when one fails the schema', async () => {
+    const schema = t.Object({ title: t.String() })
+    const batches: string[][] = []
+    const singles: string[] = []
+    const batched = collection({ name: 'batched', load: () => [], saveMany: (entries) => {
+      batches.push(entries.map(entry => entry.slug))
+    } }, { schema })
+    const single = collection({ name: 'single', load: () => [], save: (entry) => {
+      singles.push(entry.slug)
+    } }, { schema })
+    const bare = collection({ name: 'bare', load: () => [] }, { schema })
+
+    await exporting([['batched', batched], ['single', single], ['bare', bare]], async () => {
+      expect(await saveEntries('batched', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
+      expect(batches).toEqual([['a', 'b']])
+      expect(await saveEntries('batched', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 3 } }])).toMatchObject({ issues: [{ slug: 'b', path: 'title' }] })
+      expect(batches).toEqual([['a', 'b']])
+      expect(await saveEntries('single', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
+      expect(singles).toEqual(['a', 'b'])
+      expect(await rejection(saveEntries('bare', [{ slug: 'a', data: { title: 'A' } }]))).toMatchObject({ message: expect.stringContaining('declares no save') })
+    })
   })
 
   it('forgets the site a server registered once it stops', async () => {

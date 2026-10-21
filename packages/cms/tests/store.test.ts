@@ -32,6 +32,8 @@ function validSource(collection: string, slug: string, data: unknown, body: stri
 let saved: FileChange[]
 let loaded: { slug: string, locale?: string | undefined, data: unknown }[]
 let removed: string[]
+// The sizes of the batches a loaded collection was handed whole.
+let batches: number[]
 let stored: Record<string, SourceEntry[]>
 let infoCalls: unknown[]
 let failing = false
@@ -68,6 +70,12 @@ const content: typeof Content = {
 
     return {}
   },
+  saveEntries: async (_collection, entries) => {
+    batches.push(entries.length)
+    loaded.push(...entries)
+
+    return {}
+  },
   entryFile: async (collection, slug) => {
     if (collectionList.find(each => each.name === collection)?.kind === 'loaded')
       throw new Error(`kay: entryFile() gives a folder collection's files, and ${collection} is loaded`)
@@ -98,6 +106,7 @@ beforeEach(() => {
   saved = []
   loaded = []
   removed = []
+  batches = []
   infoCalls = []
   failing = false
   keeping = false
@@ -538,6 +547,7 @@ describe('moveEntry', () => {
 
     expect(await moveEntry({ collection: 'catalog', slug: 'c' }, 'up')).toHaveProperty('saved', true)
     expect(loaded.map(entry => [entry.slug, (entry.data as { order: number }).order])).toEqual([['c', 2], ['b', 3]])
+    expect(batches).toEqual([2])
   })
 
   test('writes nothing for an entry at the end it moves toward', async () => {

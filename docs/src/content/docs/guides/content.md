@@ -399,7 +399,7 @@ A field the page shows changed (`toUpperCase()`, a joined list), in an island or
 
 A CMS that runs in your app's server reads the collections with `collections()` and `entries(name)` from `kay/content`. They give each collection's schema as JSON Schema, its folder, its draft field and its entries, drafts included.
 
-`entrySource(name, slug, data)` gives a folder entry's file as the editor wrote it, for the CMS to commit. Kay writes no file. For a loader, `saveEntry` and `removeEntry` hand the entry to the loader's `save` and `remove`, after checking it against the collection.
+`entrySource(name, slug, data)` gives a folder entry's file as the editor wrote it, for the CMS to commit. Kay writes no file. For a loader, `saveEntry` and `removeEntry` hand the entry to the loader's `save` and `remove`, after checking it against the collection. `saveEntries` hands several to its `saveMany` at once, all or none.
 
 These give drafts and files to whoever calls them, so serve them behind a guard or `editRequested(request)`.
 
