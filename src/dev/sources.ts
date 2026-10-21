@@ -28,7 +28,7 @@ const ANY_FILE = /^/
 // A variable the shell set to the very value its `.env` holds cannot be told from one the file set, and follows the file.
 // The probe runs twice: the first, on no variables, names the keys the files hold; the second keeps the shell's others, so a value expanding `$HOME` or another key resolves as it does for the real process and follows the file rather than looking set by the shell.
 export async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
-  const base = process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }
+  const base: Record<string, string> = process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }
   const first = await dotenvProbe(base)
 
   if (first === undefined)
