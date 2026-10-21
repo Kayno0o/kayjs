@@ -234,6 +234,35 @@ describe('a guard the app wraps', () => {
     expect(await visit('/admin/collections', { auth: { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` } })).toBe('/login?redirect=%2Fadmin%2Fcollections')
   })
 
+  test('another passwordGuard of the app, run outside the cms guard, changes nothing', async () => {
+    const { configure } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const mine = passwordGuard('cms-pw')
+    const other = passwordGuard('other-pw')
+
+    configure({ guard: async (ctx: GuardContext) => {
+      await mine(ctx)
+    } })
+    await visit('/admin/collections')
+    expect(await statusOf(context(), other)).toBe(401)
+
+    expect(activePasswords()?.match('cms-pw')).toBe('editor')
+    expect(activePasswords()?.match('other-pw')).toBeUndefined()
+  })
+
+  test('a passwordGuard run elsewhere does not turn a kayjs-auth app to the cms sign-in', async () => {
+    const { configure } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const other = passwordGuard('other-pw')
+    const auth = { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` }
+
+    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    await statusOf(context(), other)
+
+    expect(activePasswords()).toBeUndefined()
+    expect(await visit('/admin/collections', { auth })).toBe('/login?redirect=%2Fadmin%2Fcollections')
+  })
+
   test('a wrapped kayjs-auth guard sends to the auth sign-in page', async () => {
     const { configure } = await import('../src/settings')
     const auth = { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` }

@@ -131,6 +131,8 @@ export class Passwords {
 }
 
 const passwordsOf = new WeakMap<Guard, Passwords>()
+// The passwords of the `passwordGuard()` that ran on a request, which the cms promotes only when its own guard made the call, so another `passwordGuard()` of the app changes nothing.
+const ranFor = new WeakMap<Request, Passwords>()
 let installed: Passwords | undefined
 
 // The passwords of the guard `cms({ guard })` was given, when it is a `passwordGuard()`, which the sign-in screen checks a password against. A guard loaded lazily, or wrapped by the app, is known once it has run.
@@ -138,19 +140,34 @@ export function activePasswords(): Passwords | undefined {
   return installed
 }
 
+// Runs the app's guard, then notes the passwords of the `passwordGuard()` it ran, wrapped or not.
+function adopting(inner: Guard): Guard {
+  return async (ctx) => {
+    try {
+      await inner(ctx)
+    }
+    finally {
+      installed = ranFor.get(ctx.request) ?? installed
+    }
+  }
+}
+
 // Notes which passwords the app's guard holds, if it is a password guard, and hands the guard back.
 export function trackPasswords(given: Guard | LazyGuard | undefined): Guard | LazyGuard | undefined {
   installed = typeof given === 'function' ? passwordsOf.get(given) : undefined
 
-  if (given === undefined || typeof given === 'function')
+  if (given === undefined)
     return given
+
+  if (typeof given === 'function')
+    return adopting(given)
 
   return { load: async () => {
     const loaded = await given.load()
 
     installed = passwordsOf.get(loaded)
 
-    return loaded
+    return adopting(loaded)
   } }
 }
 
@@ -159,8 +176,8 @@ export function passwordGuard(passwords: string | Record<string, string>, { maxA
   const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret)
 
   const checked = guard((ctx) => {
-    // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so.
-    installed = known
+    // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so for the cms guard that called it.
+    ranFor.set(ctx.request, known)
 
     const role = known.read(ctx.cookies.get(SESSION_COOKIE))
 
