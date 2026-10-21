@@ -2872,12 +2872,14 @@ describe.concurrent('kay check, unused code', () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default {\n  bodyLimit: "4mb",\n}\n',
       'src/api/up.ts': 'const bodyLimit = 1024\n\nexport default api({ bodyLimit }).post("/", () => 1, { detail: { bodyLimit: "4kb" } })\n',
+      'src/other.ts': 'const bodyLimit = 1\n\nexport const a = [bodyLimit, bodyLimit]\nexport const b = `max ${bodyLimit}`\nexport const c = "{ bodyLimit: 1 }" // { bodyLimit: 2 }\nexport const d = { bodyLimit }\n',
       'src/routes/index.kay': '--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", bodyLimit: "20mb", messages: { bodyLimit: bytes => String(bytes) } })\n---\np bodyLimit in prose\n',
     })
 
     try {
       expect((await runCheck(root)).output.match(/deprecated-body-limit/g)).toHaveLength(5)
       await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe('const bodyLimit = 1\n\nexport const a = [bodyLimit, bodyLimit]\nexport const b = `max ${bodyLimit}`\nexport const c = "{ bodyLimit: 1 }" // { bodyLimit: 2 }\nexport const d = { bodyLimit }\n')
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  maxSize: "4mb",\n}\n')
       expect(await Bun.file(join(root, 'src/api/up.ts')).text()).toBe('const bodyLimit = 1024\n\nexport default api({ maxSize: bodyLimit }).post("/", () => 1, { detail: { maxSize: "4kb" } })\n')
       expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", maxSize: "20mb", messages: { maxSize: bytes => String(bytes) } })\n---\np bodyLimit in prose\n')
@@ -2914,6 +2916,13 @@ describe.concurrent('kay check, unused code', () => {
         '  const ended = await auth.endSession(open[0].id)',
         '  return auth.endSession(mine.id)',
         '}',
+        'export async function b(auth: any) {',
+        '  const x = 1',
+        '  await auth.endSession(x)',
+        '  await auth.endSession(x).catch(() => undefined)',
+        '  // auth.sessions() in a comment, and "auth.tokens()" in a string',
+        '  await auth.sessions() // kay-allow deprecated-auth-method',
+        '}',
         '',
       ].join('\n'),
     })
@@ -2921,7 +2930,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-auth-method/g)).toHaveLength(5)
+      expect(output.match(/deprecated-auth-method/g)).toHaveLength(7)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe([
         'export async function a(ctx: { locals: { auth: any } }, auth: any, rooms: any) {',
@@ -2931,6 +2940,13 @@ describe.concurrent('kay check, unused code', () => {
         '  await auth.revokePasskey(id, { password: "x" })',
         '  const ended = (await auth.revokeSession(open[0].id)).ok',
         '  return auth.endSession(mine.id)',
+        '}',
+        'export async function b(auth: any) {',
+        '  const x = 1',
+        '  await auth.revokeSession(x)',
+        '  await auth.endSession(x).catch(() => undefined)',
+        '  // auth.sessions() in a comment, and "auth.tokens()" in a string',
+        '  await auth.sessions() // kay-allow deprecated-auth-method',
         '}',
         '',
       ].join('\n'))

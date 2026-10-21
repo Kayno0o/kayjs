@@ -34,6 +34,12 @@ describe('infiniteList', () => {
     expect(infiniteList(bans(1, 3), { pageSize: 3, load }).ended()).toBe(false)
   })
 
+  test('size, the old name of pageSize, still sizes a page', () => {
+    const { load } = source()
+
+    expect(infiniteList(bans(1, 2), { size: 3, load }).ended()).toBe(true)
+    expect(infiniteList(bans(1, 3), { size: 3, load }).ended()).toBe(false)
+  })
   test('retry loads nothing when no page failed', async () => {
     const { asked, load } = source(bans(4, 3))
     const list = infiniteList(bans(1, 3), { pageSize: 3, load })

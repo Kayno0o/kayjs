@@ -69,7 +69,7 @@ export interface KayConfig {
   proxy?: ProxyConfig | number | boolean | undefined
   // The most a request to an action or an API route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   maxSize?: ByteSize | undefined
-  // The old name of `maxSize`, kept three minors; `kay upgrade` renames it.
+  /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined

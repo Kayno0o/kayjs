@@ -17,7 +17,7 @@ export type InfiniteListOptions<Row> = InfinitePageSize & {
   load: (at: PageAt<Row>) => Promise<InfinitePage<Row>> | InfinitePage<Row>
 }
 
-// The rows a full page holds: a page of fewer ends the list. `size` is the old name of `pageSize`, kept three minors.
+// The rows a full page holds: a page of fewer ends the list. `size` is the deprecated old name of `pageSize`, kept three minors.
 type InfinitePageSize = { pageSize: number, size?: never } | { size: number, pageSize?: never }
 
 export interface InfiniteList<Row> {

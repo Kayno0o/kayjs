@@ -153,7 +153,7 @@ export interface ActionProtection<Field extends string = never> {
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.
   maxSize?: ByteSize | undefined
-  // The old name of `maxSize`, kept three minors.
+  /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
   messages?: ProtectionMessages | undefined
@@ -169,7 +169,7 @@ export interface ProtectionMessages {
   proofOfWork?: (string | ((reason: ProofOfWorkRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   maxSize?: (string | ((bytes: number) => string)) | undefined
-  // The old name of `maxSize`, kept three minors.
+  /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
   // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead. A function is given the error and the action's `ctx`, so it can read what is loaded per request (a setting, a collection entry) or the page's `ctx.locale`, and may be async; one that throws leaves kay's own message, both errors logged.
   serverError?: (string | ((error: unknown, ctx: ActionContext) => string | Promise<string>)) | undefined

@@ -1,7 +1,7 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { LintName } from '../compiler/lints'
 import { findProjectFiles } from '../build/files'
-import { lintLevel } from '../compiler/lints'
+import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
 const SOURCE_FILE = /\.(?:kay|[cm]?tsx?)$/
@@ -12,9 +12,9 @@ const AWAIT_BEFORE = /await\s+$/
 export interface RenamedName {
   from: string
   to: string
-  // `key` is an object key (`{ from: 1 }` or the shorthand `{ from }`), `method` a call on any object (`.from(`).
+  // `key` is an object key (`{ from: 1 }`; the shorthand `{ from }` only with `call`), `method` a call on any object (`.from(`).
   kind: 'key' | 'method'
-  // Only the key of an object literal passed straight to this function, for a name too common to rename everywhere.
+  // Only the key of an object literal passed straight to this function, the shorthand included, for a name too common to rename everywhere.
   call?: string
   // Only a method called on an `auth` (`auth.from()`, `ctx.locals.auth.from()`), for a name other objects share.
   receiver?: boolean
@@ -24,16 +24,56 @@ export interface RenamedName {
   why: string
 }
 
-// A key after `{` or `,`, followed by its colon or the end of a shorthand.
+// A key after `{` or `,` with its colon: a shorthand cannot be told from a variable in a list or a template.
 function keyPattern(name: string): RegExp {
-  return new RegExp(`(?<=[{,]\\s*)${name}(?=\\s*[:,}])`, 'g')
+  return new RegExp(`(?<=[{,]\\s*)${name}(?=\\s*:)`, 'g')
+}
+
+// The source with strings, template literals and comments blanked out, offset for offset, so a name in one is never matched.
+function mask(source: string): string {
+  const out = source.split('')
+  const blank = (from: number, to: number) => {
+    for (let at = from; at < to; at++) {
+      if (out[at] !== '\n')
+        out[at] = ' '
+    }
+  }
+  let at = 0
+
+  while (at < source.length) {
+    const char = source[at]!
+    const next = source[at + 1]
+
+    if (char === '/' && (next === '/' || next === '*')) {
+      const stop = next === '/' ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
+      const end = stop === -1 ? source.length : stop + (next === '*' ? 2 : 0)
+
+      blank(at, end)
+      at = end
+    }
+    else if (char === '"' || char === '\'' || char === '`') {
+      let end = at + 1
+      const stops = char === '`' ? char : `${char}\n`
+
+      while (end < source.length && !stops.includes(source[end]!))
+        end += source[end] === '\\' ? 2 : 1
+
+      blank(at, Math.min(end + 1, source.length))
+      at = end + 1
+    }
+    else {
+      at++
+    }
+  }
+
+  return out.join('')
 }
 
 // The offsets of `name` as a key of an object literal passed directly to a call of `callee`, skipping strings and comments.
 function callKeys(source: string, callee: string, name: string): number[] {
   const found: number[] = []
-  const open = new RegExp(`(?<![\\w$.])${callee}\\s*\\(`, 'g')
-  const key = new RegExp(`^${name}(?=\\s*[:,}])`)
+  const open = new RegExp(`(?<![\\w$.])${callee}\\s*(?:<[^>]*>)?\\s*\\(`, 'g')
+  const key = new RegExp(`^${name}(?![\\w$])(?=\\s*[:,}])`)
 
   for (const call of source.matchAll(open)) {
     const stack: string[] = ['(']
@@ -92,8 +132,19 @@ function methodPattern(name: string): RegExp {
 }
 
 // `auth.from(` or `ctx.locals.auth.from(`: the receiver chain, then the name.
+const authPatterns = new Map<string, RegExp>()
+
 function authMethodPattern(name: string): RegExp {
-  return new RegExp(`(?<![\\w$.])((?:[\\w$]+\\s*\\??\\.\\s*)*auth)\\s*\\??\\.\\s*(${name})(?=\\s*\\()`, 'g')
+  const known = authPatterns.get(name)
+
+  if (known)
+    return known
+
+  const pattern = new RegExp(`(?<![\\w$.])((?:[\\w$]+\\s*\\??\\.\\s*)*auth)\\s*\\??\\.\\s*(${name})(?=\\s*\\()`, 'g')
+
+  authPatterns.set(name, pattern)
+
+  return pattern
 }
 
 // The offset after the parenthesis closing the one at `open`.
@@ -126,37 +177,56 @@ interface Place {
   edits: { start: number, end: number, text: string }[] | undefined
 }
 
-function placesOf(source: string, rename: RenamedName): Place[] {
+const STATEMENT_END = /^[ \t]*(?:;|\r?\n|$|\})/
+const AFTER_CALL = /^\s*(?:\?\.|[.[(])/
+
+// The places `rename` matches in `scan`, `source` with its strings and comments blanked, the edits written from `source`.
+function placesOf(source: string, scan: string, rename: RenamedName): Place[] {
   const { from, to, kind, call, receiver, answersOk } = rename
+  const key = (start: number): Place => ({ start, edits: [{ start, end: start + from.length, text: scan.slice(start + from.length).trimStart().startsWith(':') ? to : `${to}: ${from}` }] })
 
   if (call !== undefined)
-    return callKeys(source, call, from).map(start => ({ start, edits: [{ start, end: start + from.length, text: source.slice(start + from.length).trimStart().startsWith(':') ? to : `${to}: ${from}` }] }))
+    return callKeys(scan, call, from).map(key)
 
   if (kind === 'key')
-    return [...source.matchAll(keyPattern(from))].map(match => ({ start: match.index, edits: [{ start: match.index, end: match.index + from.length, text: source.slice(match.index + from.length).trimStart().startsWith(':') ? to : `${to}: ${from}` }] }))
+    return [...scan.matchAll(keyPattern(from))].map(match => key(match.index))
 
   if (!receiver)
-    return [...source.matchAll(methodPattern(from))].map(match => ({ start: match.index, edits: [{ start: match.index, end: match.index + from.length, text: to }] }))
+    return [...scan.matchAll(methodPattern(from))].map(match => ({ start: match.index, edits: [{ start: match.index, end: match.index + from.length, text: to }] }))
 
-  return [...source.matchAll(authMethodPattern(from))].map((match) => {
+  return [...scan.matchAll(authMethodPattern(from))].map((match) => {
     const start = match.index + match[0].length - from.length
     const end = start + from.length
 
     if (!answersOk)
       return { start, edits: [{ start, end, text: to }] }
 
-    const awaited = AWAIT_BEFORE.exec(source.slice(0, match.index))
-    const stop = closing(source, end + source.slice(end).indexOf('('))
+    const awaited = AWAIT_BEFORE.exec(scan.slice(0, match.index))
+    const stop = closing(scan, end + scan.slice(end).indexOf('('))
 
-    return { start, edits: awaited === null || stop === -1 ? undefined : [{ start: match.index - awaited[0].length, end: stop, text: `(await ${source.slice(match.index, start)}${to}${source.slice(end, stop)}).ok` }] }
+    if (awaited === null || stop === -1 || AFTER_CALL.test(scan.slice(stop)))
+      return { start, edits: undefined }
+
+    const from_ = match.index - awaited[0].length
+    const call_ = `${source.slice(match.index, start)}${to}${source.slice(end, stop)}`
+    const lineStart = scan.lastIndexOf('\n', from_ - 1) + 1
+    const alone = scan.slice(lineStart, from_).trim() === '' && STATEMENT_END.test(scan.slice(stop))
+
+    // A statement keeps no `.ok`, which a line starting with a parenthesis would also join to the one before it.
+    return { start, edits: [{ start: from_, end: stop, text: alone ? `await ${call_}` : `(await ${call_}).ok` }] }
   })
 }
 
-// The renames a minor made to an option or a method name: each place the project writes the old name is reported with a safe fix, the old name working three minors (a shorthand `{ from }` becomes `to: from`).
-export async function renamedNames(root: string, options: CheckOptions, lint: LintName, renames: RenamedName[]): Promise<CheckDiagnostic[]> {
-  const level = lintLevel(lint, options.lints)
+export interface RenameGroup {
+  lint: LintName
+  renames: RenamedName[]
+}
 
-  if (level === 'allow')
+// The renames a minor made to an option or a method name: each place the project writes the old name is reported with a safe fix, the old name working three minors. Strings and comments are never matched, and a `// kay-allow` comment allows a lint on its line.
+async function renamedNames(root: string, options: CheckOptions, groups: RenameGroup[]): Promise<CheckDiagnostic[]> {
+  const active = groups.filter(({ lint }) => lintLevel(lint, options.lints) !== 'allow')
+
+  if (active.length === 0)
     return []
 
   const found: CheckDiagnostic[] = []
@@ -164,26 +234,36 @@ export async function renamedNames(root: string, options: CheckOptions, lint: Li
 
   for (const file of files) {
     const source = await Bun.file(file).text()
+    const scan = mask(source)
+    const levelAt = lintLevels(source, options.lints)
+    const seen = new Set<string>()
 
-    for (const rename of renames) {
-      const { from, to, why } = rename
+    for (const { lint, renames } of active) {
+      for (const rename of renames) {
+        const { from, to, why } = rename
 
-      if (!source.includes(from))
-        continue
+        if (!source.includes(from))
+          continue
 
-      for (const { start, edits } of placesOf(source, rename)) {
-        const end = start + from.length
+        for (const { start, edits } of placesOf(source, scan, rename)) {
+          const level = levelAt(lint, start)
 
-        found.push({
-          file,
-          ...positionAt(source, start),
-          end,
-          message: `\`${from}\` is \`${to}\` now: ${why}; the old name keeps working for three minors`,
-          help: edits === undefined ? `write \`${to}\` and read \`.ok\` of its answer` : `write \`${to}\``,
-          code: lint,
-          severity: level === 'warn' ? 'warning' : 'error',
-          ...edits && { fixes: [{ title: `Rename ${from} to ${to}`, edits, safe: true }] },
-        })
+          if (level === 'allow' || seen.has(`${lint}:${start}`))
+            continue
+
+          seen.add(`${lint}:${start}`)
+
+          found.push({
+            file,
+            ...positionAt(source, start),
+            end: start + from.length,
+            message: `\`${from}\` is \`${to}\` now: ${why}; the old name keeps working for three minors`,
+            help: edits === undefined ? `write \`${to}\` and read \`.ok\` of its answer` : `write \`${to}\``,
+            code: lint,
+            severity: level === 'warn' ? 'warning' : 'error',
+            ...edits && { fixes: [{ title: `Rename ${from} to ${to}`, edits, safe: true }] },
+          })
+        }
       }
     }
   }
@@ -192,8 +272,11 @@ export async function renamedNames(root: string, options: CheckOptions, lint: Li
 }
 
 // Every size limit is `maxSize`, whatever it limits.
+const BODY_LIMIT_WHY = 'every size limit of kay and its libraries is `maxSize`'
 const BODY_LIMIT: RenamedName[] = [
-  { from: 'bodyLimit', to: 'maxSize', kind: 'key', why: 'every size limit of kay and its libraries is `maxSize`' },
+  { from: 'bodyLimit', to: 'maxSize', kind: 'key', why: BODY_LIMIT_WHY },
+  { from: 'bodyLimit', to: 'maxSize', kind: 'key', call: 'api', why: BODY_LIMIT_WHY },
+  { from: 'bodyLimit', to: 'maxSize', kind: 'key', call: 'action', why: BODY_LIMIT_WHY },
 ]
 
 // A list paged by number takes `pageSize`; `limit` and `offset` stay for a window onto a list.
@@ -224,9 +307,9 @@ const AUTH_METHODS: RenamedName[] = [
 
 // The renames of the 1.70 naming conventions, each under its own lint.
 export async function renameChecks(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return [
-    ...await renamedNames(root, options, 'deprecated-body-limit', BODY_LIMIT),
-    ...await renamedNames(root, options, 'deprecated-page-size', PAGE_SIZE),
-    ...await renamedNames(root, options, 'deprecated-auth-method', AUTH_METHODS),
-  ]
+  return renamedNames(root, options, [
+    { lint: 'deprecated-body-limit', renames: BODY_LIMIT },
+    { lint: 'deprecated-page-size', renames: PAGE_SIZE },
+    { lint: 'deprecated-auth-method', renames: AUTH_METHODS },
+  ])
 }

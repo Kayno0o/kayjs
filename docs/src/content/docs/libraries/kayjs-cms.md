@@ -400,7 +400,7 @@ Storage serves anything but a PNG, JPEG, WebP, GIF, AVIF, video, audio, PDF or p
 
 An upload may weigh 20 MB by default. `uploads: { types, maxSize }` sets either, `maxSize` in bytes or as a string such as `'50mb'`, for a site of videos or large PDFs, or `'2mb'` for a portfolio that wants less; a part left out keeps its default.
 
-The upload route takes `maxSize` whatever the app's `maxSize` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative, not a whole number of bytes or over 128 MB less 64 KB stops `kay.config.ts` from loading: Bun refuses a request body over 128 MB before the route sees it, and the upload is buffered in memory.
+The upload route takes the upload's `maxSize` whatever the app's `maxSize` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative, not a whole number of bytes or over 128 MB less 64 KB stops `kay.config.ts` from loading: Bun refuses a request body over 128 MB before the route sees it, and the upload is buffered in memory.
 
 `pageSize` sets how many entries a collection's list shows on a page, 50 by default.
 

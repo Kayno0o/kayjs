@@ -101,7 +101,9 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       const path = withoutSlash(apiRoutePath(module.mount, route.path))
 
       // Every route is listed, so a static sibling of a route with a limit of its own is not taken for it.
-      routeLimits.push({ method, path, limit: (detail?.maxSize ?? detail?.bodyLimit) === undefined ? undefined : { bytes: detail?.maxSize ?? detail?.bodyLimit, refuse } })
+      const routeMax = detail?.maxSize ?? detail?.bodyLimit
+
+      routeLimits.push({ method, path, limit: routeMax === undefined ? undefined : { bytes: routeMax, refuse } })
 
       if (detail?.rateLimit !== undefined)
         routeRates.set(`${method} ${path}`, rateLimitsOf(detail.rateLimit, `${method} ${path}`))
@@ -578,7 +580,7 @@ declare module 'elysia' {
   interface DocumentDecoration {
     // The most a request to this route may send, bytes or a size such as `'20mb'`, in place of the module's and the app's `maxSize`; a bigger one answers 413 before it is read.
     maxSize?: ByteSize | undefined
-    // The old name of `maxSize`, kept three minors.
+    /** @deprecated The old name of `maxSize`, kept three minors. */
     bodyLimit?: ByteSize | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
     rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
@@ -594,7 +596,7 @@ type Empty = Record<never, never>
 export interface ApiOptions {
   // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a function is read once the server mounts the module, after the config's extensions ran.
   maxSize?: ByteSize | (() => ByteSize) | undefined
-  // The old name of `maxSize`, kept three minors.
+  /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | (() => ByteSize) | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
   cors?: CorsOptions | false | undefined

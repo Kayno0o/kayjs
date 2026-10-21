@@ -33,7 +33,7 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 
 ### kayjs-auth names its methods by the kind of thing
 
-A collection is `list*` (`listSessions`, `listPasskeys`, `listTokens`, `listMembers`, `listOrganizations`, `listInvitations`, `listMyInvitations`, `listOAuthClients`, `listIdentities`, `listAuditLog`, `listAdminAuditLog`), one item `get*` (`getOrganization`, `getInvitation`), a credential `revoke*` (`revokePasskey`, `revokeSession`) and a record `delete*` (`deleteMember`). `revokeSession(id)` answers `{ ok }` where `endSession(id)` answered a boolean. The old names work three minors, and `kay upgrade` renames the calls on `auth` (the `deprecated-auth-method` lint), `await auth.endSession(id)` becoming `(await auth.revokeSession(id)).ok`; any other use of `endSession`, and `revokeToken`, which still answers a boolean, are left as they are.
+A collection is `list*` (`listSessions`, `listPasskeys`, `listTokens`, `listMembers`, `listOrganizations`, `listInvitations`, `listMyInvitations`, `listOAuthClients`, `listIdentities`, `listAuditLog`, `listAdminAuditLog`), one item `get*` (`getOrganization`, `getInvitation`), a credential `revoke*` (`revokePasskey`, `revokeSession`) and a record `delete*` (`deleteMember`). `revokeSession(id)` answers `{ ok }` where `endSession(id)` answered a boolean. The old names work three minors, and `kay upgrade` renames the calls on `auth` (the `deprecated-auth-method` lint), `await auth.endSession(id)` becoming `(await auth.revokeSession(id)).ok`; any other use of `endSession`, and `revokeToken`, `revokeOAuthClient`, `renamePasskey`, `declineInvitation` and `setLocale`, which still answer a boolean, are left as they are.
 
 ## 1.69.0
 
