@@ -43,6 +43,8 @@ export interface PutOptions {
   folder?: string | undefined
   // The key of a file this one replaces, deleted once the new one is stored.
   replace?: string | undefined
+  // The id the key is made of in place of a random one, letters, digits, - and _ up to 64: the same id and bytes give the same key, so a file named by its hash is stored once, and a key already stored under it is written over.
+  id?: string | undefined
   // A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where the photo was taken; `true` stores it byte for byte.
   keepMetadata?: boolean | undefined
 }
@@ -55,6 +57,7 @@ export interface UrlOptions {
 const DEFAULT_DIR = 'data/files'
 const PRIVATE = 'private/'
 const KEY = /^(?:[\w-]+\/)*[\w-]+(?:\.\d{1,5}x\d{1,5}(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
+const ID = /^[\w-]{1,64}$/
 const FOLDER = /^[\w-]+(?:\/[\w-]+)*$/
 // A folder or key under `private`, whatever its case, since a store matching keys whatever their case reads `Private/` as `private/`.
 const PRIVATE_SEGMENT = /^private(?:\/|$)/i
@@ -242,6 +245,9 @@ export const files = {
     if (options.folder !== undefined && (!FOLDER.test(options.folder) || PRIVATE_SEGMENT.test(options.folder)))
       throw new KayError('config-invalid', `kay: files.put() was given the folder ${JSON.stringify(options.folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
 
+    if (options.id !== undefined && !ID.test(options.id))
+      throw new KayError('config-invalid', `kay: files.put() was given the id ${JSON.stringify(options.id)}: an id is 1 to 64 letters, digits, - and _`)
+
     const extension = fileExtension(data)
 
     // Read off the bytes rather than the name the uploader gave, which may say anything.
@@ -250,13 +256,13 @@ export const files = {
     const size = SIZED.test(extension) ? await imageSize(stored) : undefined
     // Read once here and kept in the key, so a page paints it with no lookup, whatever the store.
     const color = size?.animated === false && extension !== 'avif' && imageColors() ? await drawing(async () => dominantColor(stored, MAX_UPLOAD_PIXELS)) : undefined
-    const id = Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
+    const id = options.id ?? Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
     const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}${color === undefined ? '' : `-${color}`}` : ''}.${extension}`
     const store = await activeStore()
 
     await store.write(key, stored)
 
-    if (options.replace !== undefined)
+    if (options.replace !== undefined && options.replace !== key)
       await files.delete(options.replace)
 
     return key

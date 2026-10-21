@@ -1,31 +1,33 @@
 import { s } from 'kay'
 import { api, files, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
+import { authors } from '../authors'
+import { storeUpload } from '../media'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
 import { emptyFile, sizeOfPath, tooLarge } from '../upload-text'
-import { uploadBodyLimit, uploadFolder, uploadRefusal, uploadRules } from '../uploads'
+import { uploadBodyLimit, uploadFolders, uploadRefusal, uploadRules } from '../uploads'
 
 // The most uploads a picker lists, the newest first.
 const PICKABLE = 200
 
-// Stores an upload public, in a folder named for its collection, and answers the path a page renders it from, which the field keeps, and the size of an image.
+// Stores an upload public, in the folder every collection shares and named by its hash, and answers the path a page renders it from, which the field keeps, and the size of an image.
 // Read when kay mounts the route, as `cms()` has run by then and an import before it does not throw.
 export default api({ bodyLimit: uploadBodyLimit })
   .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
   .get('/rules', () => uploadRules())
-  // The uploads of a collection's folder, for a field to pick one again; `images` leaves out the others.
+  // The shared uploads and those an older release kept in the collection's folder, for a field to pick one again; `images` leaves out the others.
   .get('/:collection', async ({ params, query }) => {
     const collection = await collectionNamed(params.collection)
-    const stored = await files.list({ folder: uploadFolder(collection.name) })
+    const stored = (await Promise.all(uploadFolders(collection.name).map(async folder => files.list({ folder })))).flat()
     const wanted = stored.filter(file => query.images !== 'true' || typeOfName(file.key).startsWith('image/'))
 
     return wanted.toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: file.key.split('/').at(-1) ?? file.key }))
   }, { query: s.Object({ images: s.Optional(s.String()) }) })
-  .post('/:collection', async ({ params, body, status }) => {
-    const collection = await collectionNamed(params.collection)
+  .post('/:collection', async ({ params, body, status, request }) => {
+    await collectionNamed(params.collection)
 
     if (body.file.size === 0)
       return status(400, emptyFile(body.file.name))
@@ -41,8 +43,7 @@ export default api({ bodyLimit: uploadBodyLimit })
     if (refusal !== undefined)
       return status(415, refusal)
 
-    const key = await files.put(body.file, { folder: uploadFolder(collection.name) })
-
+    const key = await storeUpload(body.file, authors.get(request)?.name)
     const path = files.url(key)
 
     return { path, ...sizeOfPath(path) }

@@ -49,6 +49,26 @@ describe('files', () => {
     expect((await get('/_kay/files/nothing.png')).status).toBe(404)
   })
 
+  it('names a key by the id it is given, the same one twice giving one file', async () => {
+    await serve(diskFiles(join(dir, 'ids')))
+    const id = 'a'.repeat(20)
+    const first = await files.put(flat(), { folder: 'media', id })
+    const again = await files.put(flat(), { folder: 'media', id, replace: first })
+
+    expect(first).toMatch(/^media\/a{20}\.40x30-[\da-f]{6}\.png$/)
+    expect(again).toBe(first)
+    expect((await files.get(first))?.size).toBeGreaterThan(0)
+    expect(await files.list({ folder: 'media' })).toHaveLength(1)
+
+    const notes = await files.put(new Blob(['one'], { type: 'text/plain' }), { private: true, id: 'media-index' })
+
+    expect(notes).toBe('private/media-index.txt')
+    await files.put(new Blob(['two'], { type: 'text/plain' }), { private: true, id: 'media-index' })
+    expect(await (await files.get(notes))?.text()).toBe('two')
+    for (const bad of ['', '../x', 'a/b', 'a b', 'x'.repeat(65)])
+      await expect(files.put(new Blob(['x']), { id: bad })).rejects.toThrow('files.put() was given the id')
+  })
+
   it('refuses a folder that is not plain segments or would pass for private', async () => {
     for (const folder of ['../up', 'a//b', 'private', 'private/x', 'Private', 'with space'])
       await expect(files.put(new Blob(['x']), { folder })).rejects.toThrow('files.put() was given the folder')

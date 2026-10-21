@@ -1,5 +1,6 @@
 import { holdsType, SNIFFED_BYTES, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
+import { MEDIA_FOLDER } from './media'
 import { ENVELOPE, settings } from './settings'
 
 const NAME_EXTENSION = /\.[a-z\d]{1,10}$/i
@@ -15,6 +16,11 @@ export function uploadBodyLimit(): number {
 // The folder of kay's file storage a collection's uploads go to.
 export function uploadFolder(collection: string): string {
   return collection.replace(NOT_FOLDER, '_')
+}
+
+// The folders a collection's uploads are looked for in: the shared one new uploads go to, then the collection's own, where an older release stored them.
+export function uploadFolders(collection: string): string[] {
+  return [MEDIA_FOLDER, uploadFolder(collection)]
 }
 
 // Why the CMS refuses the upload, or undefined when `uploads` takes its type and its bytes are that type: the type is the one kay's storage serves it as, its name's extension's in any case, else the type it was sent with.

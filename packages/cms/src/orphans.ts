@@ -2,6 +2,7 @@ import { files } from 'kay/server'
 import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
 import { log } from './log'
+import { forgetUploads, MEDIA_FOLDER } from './media'
 import { uploadFolder } from './uploads'
 
 export interface UnusedUpload {
@@ -25,14 +26,14 @@ const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
 // Every window of 20 hex digits, so an id inside a longer run of them is found too.
 const IDS = /(?=([\da-f]{20}))/g
 
-// The uploads of the CMS's folders that no entry of any collection, locale or draft mentions.
+// The uploads of the CMS's folders, the shared one and each collection's older one, that no entry of any collection, locale or draft mentions.
 // An upload modified less than a day ago, or that the store dates not at all, is held back.
 // A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
 export async function unusedUploads(): Promise<UploadScan> {
   const blocked: string[] = []
   // Only the names: a loaded collection's loader runs once, in `entries`, and not again to count its entries.
   const listed = await collections({ counts: false })
-  const folders = [...new Set(listed.map(collection => uploadFolder(collection.name)))].filter(folder => !PRIVATE_FOLDER.test(folder))
+  const folders = [...new Set([MEDIA_FOLDER, ...listed.map(collection => uploadFolder(collection.name))])].filter(folder => !PRIVATE_FOLDER.test(folder))
   const stored: string[] = []
   const now = Date.now()
 
@@ -104,6 +105,9 @@ export async function deleteUnusedUploads(keys: string[]): Promise<{ deleted: st
     await files.delete(key)
     deleted.push(key)
   }
+
+  if (deleted.length > 0)
+    await forgetUploads(deleted)
 
   return { deleted, kept }
 }
