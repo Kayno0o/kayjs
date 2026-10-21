@@ -50,4 +50,8 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
     expect(await problems(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain({...rest} class={{ on: true }})\n`)).toEqual([])
   })
+
+  it('reads a condition object with a string-typed value beside a shorthand as a parts object, which the docs say', async () => {
+    expect(await problems(`${IMPORTS}Plain.mt-4(class={{ 'p-4': rest.id }})\n`)).toEqual([expect.stringContaining('cannot be merged')])
+  })
 })

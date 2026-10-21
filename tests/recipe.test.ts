@@ -198,12 +198,46 @@ describe('a component with a recipe, as an island', () => {
   })
 })
 
+describe('a recipe the compiler cannot read', () => {
+  const messages = (source: string, options = {}) => compileKay(source, 'src/chip.kay', { check: true, ...options }).diagnostics.map(diagnostic => diagnostic.message)
+  const head = '---\nimport { recipe } from \'kay\'\n'
+
+  it('reads a recipe cast with as or checked with satisfies', () => {
+    expect(compileKay(`${head}const a = recipe({ variants: { tone: { x: 'y' } } }) as Recipe<any>\n---\nspan a\n`, 'src/chip.kay', { check: true }).tsx).toContain('KayRecipeProps<typeof a>')
+    expect(compileKay(`${head}const a = recipe({ variants: { tone: { x: 'y' } } }) satisfies object\n---\nspan a\n`, 'src/chip.kay', { check: true }).tsx).toContain('KayRecipeProps<typeof a>')
+  })
+
+  it('reports a recipe that shares its const, or is not a const, as one that types no props', () => {
+    expect(messages(`${head}const a = recipe({ parts: 'x' }), b = 1\n---\nspan a\n`)).toContain('A recipe is a `const` of its own')
+    expect(messages(`${head}let a = recipe({ parts: 'x' })\n---\nspan a\n`)).toContain('A recipe is a `const` of its own')
+  })
+
+  it('reports a recipe that reads a name the script declares', () => {
+    const found = messages(`${head}const { size } = props<{ size: string }>()\nconst gap = 'gap-2'\nconst a = recipe({ parts: gap, variants: { tone: { x: size } } })\n---\nspan a\n`)
+
+    expect(found.filter(message => message.includes('A recipe is built once'))).toHaveLength(2)
+    expect(messages(`${head}import { base } from './base'\nconst other = recipe({ parts: 'x' })\nconst a = recipe({ parts: base, variants: { tone: { x: (name: string) => name } } })\n---\nspan a\n`).filter(message => message.includes('A recipe is built once'))).toEqual([])
+  })
+
+  it('reports a recipe that styles a root the template has no part for', () => {
+    expect(messages(`${head}const a = recipe({ parts: 'rounded' })\n---\nheader a\nfooter b\n`)).toContain('The recipe styles the root, which the template has no part for')
+    expect(messages(`${head}const a = recipe({ parts: { head: 'p-4' }, variants: { tone: { x: { head: 'p-2' } } } })\n---\nheader(part="head") a\nfooter b\n`)).toEqual([])
+    expect(messages(`${head}const a = recipe({ parts: 'rounded' })\n---\nheader(part="root") a\nfooter b\n`)).toEqual([])
+    expect(messages(`${head}const a = recipe({ variants: { tone: { x: 'p-2' } } })\n---\nheader a\nfooter b\n`)).toContain('The recipe styles the root, which the template has no part for')
+  })
+
+  it('reports a recipe in a server fence', () => {
+    const found = messages('--- server\nimport { recipe } from \'kay\'\nconst c = recipe({ parts: \'a\' })\n---\nmain a\n', { page: true })
+
+    expect(found).toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
+    expect(messages('--- server\nconst c = recipe({ parts: \'a\' })\n---\nmain a\n', { page: true })).toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
+  })
+})
+
 describe('compiling a recipe', () => {
-  it('leaves a recipe in a server fence where it is, and reports one in a page', () => {
-    const server = compileKay('--- server\nimport { recipe } from \'kay\'\nconst c = recipe({ parts: ctx.url.pathname })\n---\nmain a\n', 'src/routes/index.kay', { check: true })
+  it('reports a recipe in a page', () => {
     const page = compileKay('---\nimport { recipe } from \'kay\'\nconst c = recipe({ parts: \'a\' })\n---\nmain a\n', 'src/routes/index.kay', { check: true, page: true })
 
-    expect(server.tsx.indexOf('ctx.url.pathname')).toBeGreaterThan(server.tsx.indexOf('function'))
     expect(page.diagnostics.map(diagnostic => diagnostic.message)).toContain('A page or a layout takes no variants')
   })
 
@@ -239,7 +273,7 @@ async function problems(page: string): Promise<string[]> {
   const root = await scratchDir('recipe-check-')
 
   try {
-    const sources = { 'tsconfig.json': tsconfig, 'src/card.kay': CARD, 'src/chip.kay': '---\nimport { recipe } from \'kay\'\nconst chip = recipe({ variants: { tone: { a: \'x\', b: \'y\' }, cols: { 1: \'grid-cols-1\', 2: \'grid-cols-2\' } }, defaults: { cols: 1 } })\n---\nspan.chip a\n', 'src/routes/index.kay': page }
+    const sources = { 'tsconfig.json': tsconfig, 'src/card.kay': CARD, 'src/chip.kay': '---\nimport { recipe } from \'kay\'\nconst chip = recipe({ variants: { tone: { a: \'x\', b: \'y\' }, cols: { 1: \'grid-cols-1\', 2: \'grid-cols-2\' }, level: { low: \'a\', 1: \'b\' } }, defaults: { cols: 1 } })\n---\nspan.chip a\n', 'src/routes/index.kay': page }
 
     await Promise.all(Object.entries(sources).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
@@ -258,6 +292,11 @@ describe('kay check on a component with a recipe', () => {
   it('reports an unknown variant value at the call', async () => {
     expect(await problems(`${CARD_IMPORT}Card(title="a" tone="nope")\n`)).toEqual([expect.stringContaining('nope')])
     expect(await problems(`${CHIP_IMPORT}Chip(tone="c")\n`)).toEqual([expect.stringContaining('"c"')])
+  })
+
+  it('takes a number from a variant mixing text and numeric keys', async () => {
+    expect(await problems(`${CHIP_IMPORT}Chip(level={1})\nChip(level="low")\n`)).toEqual([])
+    expect(await problems(`${CHIP_IMPORT}Chip(level={2})\n`)).toEqual([expect.stringContaining('2')])
   })
 
   it('reports a number no numeric variant has', async () => {

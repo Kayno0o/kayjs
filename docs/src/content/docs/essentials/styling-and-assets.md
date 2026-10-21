@@ -124,6 +124,8 @@ section.rounded.border
 
 A part that is a component, `Button(part="action")`, hands its entry to that component's own `class`, a string or an object of its parts: `class={{ action: { icon: 'size-5' } }}`. A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(class={{ head: 'p-6' }})`: `kay check` reports it, so write the root's classes as `root`.
 
+Any `{ name: string }` object there counts as a parts object, a condition value typed `string` included.
+
 `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. A page or a layout has no `class` prop: its parts render `data-part` only.
 
 ### Give a component variants
@@ -152,7 +154,9 @@ section
 
 `Card(title="Hi" tone="danger" compact)` renders the danger classes on the root and the head, and the compact ones on the head and the body. A variant with only `true` and `false` values is a boolean prop, and `kay check` reports a value no variant has at the call, `Card(tone="nope")`.
 
-Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6`. The recipe reaches the same parts `class` does, and in an island a variant changed at runtime swaps its classes. A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props or signals.
+Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6`. The recipe reaches the same parts `class` does, and in an island a variant changed at runtime swaps its classes.
+
+A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props, signals or any name the script declares. `kay check` reports one that does, a recipe that shares its `const` or sits in a `--- server` fence, and root classes in a template with no `part="root"`.
 
 ## Public files
 

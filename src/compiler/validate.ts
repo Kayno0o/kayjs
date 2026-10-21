@@ -12,13 +12,17 @@ type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check'
 
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const TRANSITION_PART = 'transition:'
+
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
 // A part's name, which becomes a key of the component's `class` type.
 const PART_NAME = /^[A-Z][\w-]*$/i
-// A props type declaring a `class` member of its own.
-const PROPS_CLASS = /(?:^|[\s{;,])class\??\s*:/
+// A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
+const CLASS_MEMBER = /^class\??\s*:/
+const MEMBER_START = /[\s{;,]/
+const TYPE_OPENERS = '{[(<'
+const TYPE_CLOSERS = '}])>'
 // `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
@@ -95,6 +99,26 @@ export function bindEvent(element: ElementNode, property: string): string {
   return property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
 }
 
+// Whether a props type, written as text, has a `class` member of its own: one at the first level of a `{ ... }`, not inside a type nested in it, as `style: { class?: string }` is.
+function declaresClass(type: string): boolean {
+  const open: string[] = []
+
+  for (let index = 0; index < type.length; index++) {
+    const char = type[index]!
+
+    if (TYPE_OPENERS.includes(char))
+      open.push(char)
+    else if (char === '>' && type[index - 1] === '=')
+      continue
+    else if (TYPE_CLOSERS.includes(char))
+      open.pop()
+    else if (open.length === 1 && open[0] === '{' && MEMBER_START.test(type[index - 1] ?? '{') && CLASS_MEMBER.test(type.slice(index)))
+      return true
+  }
+
+  return false
+}
+
 class Validator {
   private readonly diagnostics: Diagnostic[] = []
   // The `html` tags of the `head` block, the only place one sets attributes.
@@ -131,12 +155,17 @@ class Validator {
     if (this.options.pageFile === true && script.recipeSpan)
       this.error(script.recipeSpan, 'A page or a layout takes no variants', { note: 'a recipe types the props of a component, which a page does not have', help: 'move the recipe to a component' })
 
-    if (this.options.pageFile !== true && templateFacts(this.file, script.recipe).parts) {
+    const parts = this.options.pageFile === true ? undefined : templateFacts(this.file, script.recipe).parts
+
+    if (parts) {
       const type = script.props?.type
-      const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && PROPS_CLASS.test(this.text(type)) ? type : undefined)
+      const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && declaresClass(this.text(type)) ? type : undefined)
 
       if (taken)
         this.error(taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+
+      if (parts.root === 'none' && script.recipeRoot === true && script.recipeSpan)
+        this.error(script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })
     }
 
     if (server && script.props)

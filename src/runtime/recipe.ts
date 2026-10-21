@@ -7,7 +7,10 @@ type VariantTable = Readonly<Record<string, Readonly<Record<string, VariantClass
 type ValueNames<Values> = `${keyof Values & (string | number)}`
 
 // The values a variant takes as a prop: a variant with only `true` and `false` entries is a boolean, and a numeric key takes the number as well as its text.
-type VariantValue<Values> = [ValueNames<Values>] extends [never] ? never : [ValueNames<Values>] extends ['true' | 'false'] ? boolean : ValueNames<Values> | (ValueNames<Values> extends `${infer Number extends number}` ? Number : never)
+type VariantValue<Values> = [ValueNames<Values>] extends [never] ? never : [ValueNames<Values>] extends ['true' | 'false'] ? boolean : ValueNames<Values> | NumberOf<ValueNames<Values>>
+
+// The number a name reads as, for each name of a union: `'1' | 'a'` gives `1`.
+type NumberOf<Name> = Name extends `${infer Number extends number}` ? Number : never
 
 type VariantValues<Variants extends VariantTable> = { [Name in keyof Variants]?: VariantValue<Variants[Name]> | undefined }
 

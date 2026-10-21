@@ -361,7 +361,8 @@ class ModuleShell {
         if (component === undefined || !imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined)))
           return 'string'
 
-        helper = true
+        // A server page never types its props from its parts.
+        helper ||= this.server === undefined
 
         return `KayPartOf<typeof ${component}>`
       }))

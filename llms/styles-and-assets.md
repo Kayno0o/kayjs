@@ -55,7 +55,7 @@ section.rounded.border
 
 - A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities; one name may sit on several elements, every row of a `for`, and inside an `if` or a slot.
 - A part that is a component, `Button(part="action")`, hands its entry to that component's own `class`, a string or an object of its parts: `class={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread there.
-- A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(class={{ head: 'p-6' }})`, as it could be a `{ cls: condition }` one: `kay check` reports it, so write the root's classes as `root`.
+- A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(class={{ head: 'p-6' }})`, as it could be a `{ cls: condition }` one: `kay check` reports it, so write the root's classes as `root`. Any `{ name: string }` object there counts as a parts object, a condition value typed `string` included.
 - `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. `...rest` leaves `class` out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 
@@ -88,7 +88,7 @@ section
 - Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6` ([Override a class a component sets](#override-a-class-a-component-sets)).
 - The recipe reaches the same parts `class` does: `part="head"` elements, the root, and a part that is a component, which takes its entry as a string. The variant props never reach `...rest`.
 - In an island, a variant changed at runtime swaps its classes. `kay check` reports a value no variant has at the call, `Card(tone="nope")`.
-- A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props or signals. As with parts, it also declares no `class` prop.
+- A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props, signals or any name the script declares, and `kay check` reports one that does, a recipe that shares its `const` or sits in a `--- server` fence, and root classes in a template with no `part="root"`. As with parts, it also declares no `class` prop.
 - Give a variant its default in the recipe's `defaults`, not in the props destructuring, which the recipe does not read. A numeric value is written as a key, `cols: { 1: 'grid-cols-1' }`, and passed as `cols={1}` or `cols="1"`. A page or a layout takes no recipe.
 - `recipe(...)` is a function too: `card({ tone: 'danger' }, 'head')` returns the classes of a part, `root` when none is named.
 

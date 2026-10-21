@@ -204,6 +204,19 @@ describe('kay check on parts', () => {
     expect(diagnostics('---\nconst all = props<{ class?: string }>()\n---\nsection\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
   })
 
+  it('takes class from the top-level members of the props type only', () => {
+    expect(diagnostics('---\nconst all = props<{ style: { class?: string } }>()\n---\nsection\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(false)
+    expect(diagnostics('---\nconst all = props<{ title: string } & { class?: string }>()\n---\nsection\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
+  })
+
+  it('imports the helper type for a component part in a component, and not in a server page that never uses it', () => {
+    const call = '---\nimport Card from \'./card.kay\'\n---\nsection\n  Card(part="card") a\n'
+    const server = '--- server\nimport Card from \'./card.kay\'\n---\nsection\n  Card(part="card") a\n'
+
+    expect(compileKay(call, 'src/panel.kay', { check: true }).tsx).toContain('KayPartOf')
+    expect(compileKay(server, 'src/routes/index.kay', { check: true, page: true }).tsx).not.toContain('KayPartOf')
+  })
+
   it('reads a part\'s own entry only', () => {
     expect(partClass({ class: { head: 'p-6' } }, 'constructor')).toBeUndefined()
     expect(partClass({ class: 'mt-4' }, 'head')).toBeUndefined()
