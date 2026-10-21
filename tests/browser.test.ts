@@ -1023,7 +1023,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
       expect(await editor.path()).toBe('/marks/launch')
 
       await editor.click('button.refused')
-      await editor.waitFor('p.issues', { text: '[{"collection":"news","slug":"launch","path":"title","message":"Expected property \'title\' to be string but found: 3"}]' })
+      await editor.waitFor('p.issues', { text: '[{"collection":"news","slug":"launch","path":"title","message":"Title is not valid"}]' })
 
       expect(await editor.text('h1')).toBe('Draft title')
 
