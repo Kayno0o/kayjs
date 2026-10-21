@@ -568,6 +568,8 @@ In the form, `fields` come first, in that order. A list inside it is a row of co
 
 The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Over every Markdown box, the body and the `markdown` fields, sits a toolbar of bold, italic, heading, lists, link and image buttons. `toolbar: false` removes it and `toolbar: ['bold', 'italic', 'link']` keeps those buttons, in that order.
 
+Each Markdown box also has a Preview button. It shows the text rendered by your site's own Markdown code, beside the box, or in place of it where there is no room. Nothing in your app is needed for it. The preview shows the text's structure, not your page's styles, and shows a short reason when the text cannot be read, such as a component left open.
+
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
 To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts, when it was last edited and a New entry button. `icon` takes an icon imported from `~icons/<prefix>/<name>`, drawn before the collection: `shop: { icon: cart }`.

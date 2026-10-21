@@ -29,29 +29,29 @@ test('the body is labelled Body with every button, until the collection words it
 
   expect(plain.querySelector('.kui-label-text')?.textContent).toBe('Body')
   expect(plain.querySelector('.kui-form-field-hint')).toBeNull()
-  expect(buttons(plain)).toEqual(['Bold', 'Italic', 'Heading', 'Bulleted list', 'Numbered list', 'Link', 'Image'])
+  expect(buttons(plain)).toEqual(['Bold', 'Italic', 'Heading', 'Bulleted list', 'Numbered list', 'Link', 'Image', 'Preview'])
   mounted?.unmount()
 
   const worded = await body({ body: { label: 'Article', hint: 'Plain text, no HTML' }, toolbar: ['bold', 'link'] })
 
   expect(worded.querySelector('.kui-label-text')?.textContent).toBe('Article')
   expect(worded.querySelector('.kui-form-field-hint')?.textContent).toBe('Plain text, no HTML')
-  expect(buttons(worded)).toEqual(['Bold', 'Link'])
+  expect(buttons(worded)).toEqual(['Bold', 'Link', 'Preview'])
   mounted?.unmount()
 
-  expect(buttons(await body({ toolbar: false }))).toEqual([])
+  expect(buttons(await body({ toolbar: false }))).toEqual(['Preview'])
 })
 
 test('the collection\'s toolbar reaches a Markdown field as it reaches the body', async () => {
   mounted = await mountComponent('src/components/entry-field-probe.kay', { name: 'intro', collection: collectionWith({ toolbar: ['italic'] }) })
   await settle()
 
-  expect(buttons(mounted.root)).toEqual(['Italic'])
+  expect(buttons(mounted.root)).toEqual(['Italic', 'Preview'])
 })
 
 test('and one inside a group', async () => {
   mounted = await mountComponent('src/components/entry-field-probe.kay', { name: 'extra', collection: collectionWith({ toolbar: ['heading'] }) })
   await settle()
 
-  expect(buttons(mounted.root)).toEqual(['Heading'])
+  expect(buttons(mounted.root)).toEqual(['Heading', 'Preview'])
 })
