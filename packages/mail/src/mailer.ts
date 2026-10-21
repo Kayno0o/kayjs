@@ -6,7 +6,7 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
-import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
+import { configError, callHook, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -472,9 +472,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queueOptions.redact ?? withoutBody,
-    onFailed: async (mail, error) => {
+    onFailed: async ({ payload: mail, error }) => {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
-      await onFailed?.(mail, error)
+
+      if (onFailed)
+        await callHook(onFailed, { payload: mail, error }, [mail, error])
     },
   })
   const plugin = new Elysia().use(jobs)

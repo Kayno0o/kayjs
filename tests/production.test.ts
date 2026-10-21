@@ -2529,7 +2529,7 @@ describe('request logging', () => {
     const ids: string[] = []
     const passed = { 'x-request-id': 'edge-42' }
     const open = await pages({ routes, prebuilt: false, rewrite: url => url.pathname === '/old-contact' ? '/contact' : undefined })
-    const behind = await pages({ routes, prebuilt: false, proxy: { hops: 1 }, onError: (_, request) => void ids.push(requestId(request!)) })
+    const behind = await pages({ routes, prebuilt: false, proxy: { hops: 1 }, onError: ({ request }) => void ids.push(requestId(request!)) })
     const idOf = async (app: typeof open, path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path}`, { headers }))).headers.get('x-request-id')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 

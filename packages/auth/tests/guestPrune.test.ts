@@ -24,7 +24,7 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
     onAuthEvent: (info) => {
       heard.push(info)
     },
-    onDelete: async (user) => {
+    onDelete: async ({ user }) => {
       deleted.push(user.id)
       await options.onDelete?.(user)
     },

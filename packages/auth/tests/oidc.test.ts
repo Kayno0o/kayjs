@@ -76,7 +76,7 @@ function setup(name: string, oauthProvider: OAuthProvider, clientSecret: string 
     url: 'https://site.test',
     signInPage: '/login',
     oauth: { [name]: { provider: oauthProvider, clientId: 'client-id', ...clientSecret === undefined ? {} : { clientSecret } } },
-    onSignUp: (_user, profile) => {
+    onSignUp: ({ profile }) => {
       signUps.push(profile!)
     },
   })

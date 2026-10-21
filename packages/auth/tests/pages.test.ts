@@ -223,7 +223,7 @@ afterEach(() => {
 
 describe('exporting a user\'s data', () => {
   test('gives what kayjs-auth keeps about the user, no secret among it, with the app\'s own', async () => {
-    const { browser, store } = testApp({ audit: true, onExport: user => ({ posts: [`by ${user.email}`] }) })
+    const { browser, store } = testApp({ audit: true, exportData: ({ user }) => ({ posts: [`by ${user.email}`] }) })
     const ada = browser()
     const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 

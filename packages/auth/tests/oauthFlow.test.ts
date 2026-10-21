@@ -60,7 +60,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
       discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 'discord-secret', keepTokens: true },
       github: { provider: githubProvider(), clientId: 'github-id', clientSecret: 'github-secret' },
     },
-    onSignUp: (user, profile) => {
+    onSignUp: ({ user, profile }) => {
       signUps.push({ user, profile })
     },
     ...options,
@@ -154,7 +154,7 @@ describe('coming back from the provider', () => {
   test('hands the app the provider\'s profile on every sign-in, the first included, and on a link', async () => {
     providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
     const profiles: string[] = []
-    const { browser, signUps } = setup({ onProviderProfile: (user, profile) => void profiles.push(`${user.id} ${profile.provider} ${profile.username}`) })
+    const { browser, signUps } = setup({ profileFields: ({ user, profile }) => void profiles.push(`${user.id} ${profile.provider} ${profile.username}`) })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -169,7 +169,7 @@ describe('coming back from the provider', () => {
   test('hands over the user as the provider left them, its email adopted on a link', async () => {
     providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh', email: 'ada@example.com' } })
     const heard: User[] = []
-    const { browser } = setup({ onProviderProfile: user => void heard.push(user) })
+    const { browser } = setup({ profileFields: ({ user }) => void heard.push(user) })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -182,7 +182,7 @@ describe('coming back from the provider', () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const heard: string[] = []
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
-    const { browser } = setup({ onProviderProfile: (user) => {
+    const { browser } = setup({ profileFields: ({ user }) => {
       heard.push(user.id)
 
       throw new Error('profile store down')

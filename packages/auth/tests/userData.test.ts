@@ -47,7 +47,7 @@ function setup(options: Record<string, unknown> = {}) {
       github: { provider: githubProvider(), clientId: 'g', clientSecret: 'g' },
     },
     user: schema,
-    onProviderProfile: (_user: unknown, profile: Profile) => ({ avatar: profile.avatar ?? undefined }),
+    profileFields: ({ profile }: { profile: Profile }) => ({ avatar: profile.avatar ?? undefined }),
     ...options,
   } as never)
 }
@@ -93,7 +93,7 @@ describe('app data and provider ids on the user', () => {
 
   test('a field the callback leaves out keeps its value', async () => {
     providers({ 1: { id: '1', username: 'ada', avatar: 'a.png' } })
-    const { browser, store } = setup({ onProviderProfile: () => ({}) })
+    const { browser, store } = setup({ profileFields: () => ({}) })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -123,7 +123,7 @@ describe('app data and provider ids on the user', () => {
   test('a callback result the schema refuses is logged and not stored, and the sign-in goes on', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
-    const { browser } = setup({ onProviderProfile: () => ({ level: 'high' }) })
+    const { browser } = setup({ profileFields: () => ({ level: 'high' }) })
     const ada = browser()
 
     try {
@@ -140,7 +140,7 @@ describe('app data and provider ids on the user', () => {
   test('keys the schema does not declare are dropped, whatever their name', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const hostile = JSON.parse('{"avatar":"a.png","__proto__":{"polluted":true},"constructor":"x","roles":["admin"],"passwordHash":"h"}') as Record<string, unknown>
-    const { browser, store } = setup({ onProviderProfile: () => hostile })
+    const { browser, store } = setup({ profileFields: () => hostile })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -168,7 +168,7 @@ describe('app data and provider ids on the user', () => {
 
   test('without a schema the user has no data, and the callback may return nothing', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
-    const { browser } = setup({ user: undefined, onProviderProfile: () => undefined })
+    const { browser } = setup({ user: undefined, profileFields: () => undefined })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -241,7 +241,7 @@ describe('app data and provider ids on the user', () => {
 
   test('an event reads no identities without onAuthEvent, and a failing read keeps the audit entry', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
-    const { browser, store } = setup({ audit: true, onProviderProfile: undefined })
+    const { browser, store } = setup({ audit: true, profileFields: undefined })
     const ada = browser()
     const listed = spyOn(store.identities, 'listByUser')
 
@@ -249,7 +249,7 @@ describe('app data and provider ids on the user', () => {
 
     expect(listed).not.toHaveBeenCalled()
 
-    const failing = setup({ audit: true, onProviderProfile: undefined, onAuthEvent: () => undefined })
+    const failing = setup({ audit: true, profileFields: undefined, onAuthEvent: () => undefined })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
 
     spyOn(failing.store.identities, 'listByUser').mockImplementation(async () => {
@@ -270,7 +270,7 @@ describe('app data and provider ids on the user', () => {
   test('a result over the size cap is not stored and is logged', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
-    const { browser, store } = setup({ onProviderProfile: () => ({ avatar: 'é'.repeat(9000) }) })
+    const { browser, store } = setup({ profileFields: () => ({ avatar: 'é'.repeat(9000) }) })
     const ada = browser()
 
     try {
@@ -286,7 +286,7 @@ describe('app data and provider ids on the user', () => {
 
   // Checked by `bun run check`: the schema types `data`.
   test('the schema types the user\'s data', () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), store: memoryStore(), user: schema, onProviderProfile: (_user, profile) => ({ avatar: profile.avatar ?? undefined }) })
+    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), store: memoryStore(), user: schema, profileFields: ({ profile }) => ({ avatar: profile.avatar ?? undefined }) })
 
     new Elysia().use(auth.plugin).get('/', async ({ auth }) => {
       const user = await auth.user()

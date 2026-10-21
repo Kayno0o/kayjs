@@ -111,7 +111,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `requestIdHeader` | The header a request's id goes out on and a trusted proxy's comes in on, `x-request-id` by default. See [Deployment](/guides/deployment) |
 | `live` | `{ connections, perMinute }`: how many live connections one client address holds at once (20) and opens a minute (120). See [Live values and realtime](/guides/live-and-realtime) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
-| `onError` | Receives every error a load, render, guard, action, API route, job or island throws, for an error tracker; the request is `undefined` outside one |
+| `onError` | Receives `{ error, request }` for every error a load, render, guard, action, API route, job or island throws, for an error tracker; the request is `undefined` outside one |
 | `serverTiming` | A `Server-Timing` header on pages rendered per request. On in development, off otherwise unless set |
 | `tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
 

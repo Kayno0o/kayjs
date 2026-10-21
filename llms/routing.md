@@ -277,6 +277,6 @@ p.status {todo.done ? 'Done' : 'Open'}
 import { defineConfig, requestId } from 'kay/server'
 
 export default defineConfig({
-  onError: (error, request) => tracker.capture(error, request && { path: new URL(request.url).pathname, id: requestId(request) }),
+  onError: ({ error, request }) => tracker.capture(error, request && { path: new URL(request.url).pathname, id: requestId(request) }),
 })
 ```

@@ -1832,7 +1832,7 @@ describe('special pages', () => {
 
   it('hands every error it logs to onError with its request, and logs a reporter that throws', async () => {
     const reported: string[] = []
-    const watched = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, onError: (error, request) => {
+    const watched = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, onError: ({ error, request }) => {
       reported.push(`${new URL(request!.url).pathname}${new URL(request!.url).search}: ${(error as Error).message}`)
 
       if (reported.length === 1)
@@ -1861,7 +1861,7 @@ describe('special pages', () => {
     try {
       await Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/broken\', () => { throw new Error(\'Secret detail\') })\n  .get(\'/teapot\', ({ status }) => { throw status(418, \'Short and stout\') })\n  .post(\'/\', ({ body }) => body, { body: t.Object({ name: t.String() }) })\n')
       await Bun.write(join(dir, 'api/own.ts'), 'import { api } from \'kay/server\'\n\nexport default api().onError(() => \'Answered by the module\').get(\'/\', () => { throw new Error(\'Handled\') })\n')
-      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, onError: (error, request) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) })
+      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) })
       const broken = await served.handle(new Request('http://localhost/api/items/broken'))
 
       expect(broken.status).toBe(500)

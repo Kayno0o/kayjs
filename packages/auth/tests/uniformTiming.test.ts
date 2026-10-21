@@ -192,12 +192,12 @@ describe('registering under requireVerified', () => {
     const slow = gate()
     let armed = false
     const ran: string[] = []
-    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async (user) => {
+    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async ({ user }) => {
       if (armed) {
         await slow.closed
         ran.push(`signed-up:${user.email}`)
       }
-    }, onDelete: async (user) => {
+    }, onDelete: async ({ user }) => {
       if (armed) {
         await slow.closed
         ran.push(`deleted:${user.email}`)

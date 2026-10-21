@@ -375,7 +375,7 @@ describe('the log', () => {
       throw new Error('550 mailbox unavailable')
     } }
     const failed: string[] = []
-    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onFailed: (mail) => {
+    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onFailed: ({ payload: mail }) => {
       failed.push(mail.subject)
     } } })
     const lines = await logged(async () => {

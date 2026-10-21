@@ -83,7 +83,7 @@ export const welcomeMails = queue(
 
 The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 
-A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed` as `{ payload, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
 Some failures are nobody's fault: a full disk, a service asking you to slow down. To try again later without spending an attempt, throw `retryLater` with how long to wait.
 

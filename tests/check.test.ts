@@ -3190,6 +3190,27 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports an on* hook with positional arguments and --fix destructures it, leaving a typed or other-module one alone', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {\n  onError: (err, req) => report(err, req),\n}\n',
+      'src/auth.ts': 'import { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({\n  onSignUp: async (user, profile) => seed(user, profile),\n  onDelete: user => drop(user),\n  onExport: (u) => ({ u }),\n  onProviderProfile: (user: User, profile) => ({}),\n  onAuthEvent: info => log(info),\n})\n',
+      'src/other.ts': 'export const x = { onDelete: user => drop(user) }\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-hook-shape/g)).toHaveLength(5)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  onError: ({ error: err, request: req }) => report(err, req),\n}\n')
+      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe('import { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({\n  onSignUp: async ({ user, profile }) => seed(user, profile),\n  onDelete: ({ user }) => drop(user),\n  exportData: ({ user: u }) => ({ u }),\n  onProviderProfile: (user: User, profile) => ({}),\n  onAuthEvent: info => log(info),\n})\n')
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe('export const x = { onDelete: user => drop(user) }\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a library registered the old way, and --fix rewrites the calls and the import together where it can', async () => {
     const root = await scratchProject({
       'src/auth.ts': 'export const auth = 1\n',

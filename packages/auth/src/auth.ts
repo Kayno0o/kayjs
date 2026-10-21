@@ -29,7 +29,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { asConfigError, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { asConfigError, callHook, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -153,18 +153,22 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: true by default. Without it users come from `auth.createUser` alone, and the prebuilt pages offer no registering.
   signUp?: boolean | undefined
-  // Called once a new user exists, to create the app's own records for them.
-  onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
-  // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar.
+  // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, and the provider's `profile` for a sign-up by a provider account.
+  onSignUp?: ((event: { user: User, profile: Profile | undefined }) => void | Promise<void>) | undefined
+  // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
   // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `onProviderProfile` fills it, and a store keeps it as JSON.
   user?: (TSchema & { static: UserData }) | undefined
-  // Called on every provider sign-in, the first and a link included, with the user as the app has them and the provider's profile. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there.
+  // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.
+  profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
+  // The old name of `profileFields`, called with `user` and `profile` as two arguments; read until 1.73.
   onProviderProfile?: ((user: User<UserData>, profile: Profile) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
-  onDelete?: ((user: User) => void | Promise<void>) | undefined
+  onDelete?: ((event: { user: User }) => void | Promise<void>) | undefined
   // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
-  // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders.
+  // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
+  exportData?: ((event: { user: User }) => unknown) | undefined
+  // The old name of `exportData`, called with the user alone; read until 1.73.
   onExport?: ((user: User) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
@@ -208,6 +212,11 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: ((user: BareUser | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+}
+
+// A hook of the options as the positional function the core calls, given its event object or, in the old shape, its arguments.
+function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Result) | undefined, event: (...args: Args) => object): ((...args: Args) => Result) | undefined {
+  return hook && ((...args: Args) => callHook(hook, event(...args), args))
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
@@ -1760,13 +1769,13 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     signUp: options.signUp ?? true,
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
-    onSignUp: options.onSignUp,
-    onProviderProfile: options.onProviderProfile as Core['onProviderProfile'],
+    onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
+    onProviderProfile: hooked(options.profileFields ?? options.onProviderProfile, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
-    onDelete: options.onDelete,
+    onDelete: hooked(options.onDelete, user => ({ user })),
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
-    onExport: options.onExport,
+    onExport: hooked(options.exportData ?? options.onExport, user => ({ user })),
     onAuthEvent: options.onAuthEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },

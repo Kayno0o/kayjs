@@ -229,7 +229,7 @@ A failed send is retried, 5 times by default, each wait twice the last. A mail g
 ```ts
 export const mail = mailer({
   from: 'Site <contact@example.com>',
-  queue: { onFailed: async (mail, error) => reportError(error) },
+  queue: { onFailed: async ({ payload: mail, error }) => reportError(error) },
 })
 ```
 

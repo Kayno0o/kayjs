@@ -1,4 +1,5 @@
 import type { KayConfig } from '../config'
+import { callHook } from '../runtime/hook'
 import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
@@ -46,7 +47,7 @@ export function reportServerError(error: unknown, request: Request, onError: Kay
 
 async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<KayConfig['onError']>): Promise<void> {
   try {
-    await onError(error, request)
+    await callHook(onError, { error, request }, [error, request])
   }
   // A failing reporter is logged, never left to crash the process as an unhandled rejection.
   catch (failure) {

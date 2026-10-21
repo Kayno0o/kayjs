@@ -116,6 +116,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-rate-limit` | warn | deprecated | `limit`, `visitor` and `limits` of kayjs-ai and kayjs-auth, now `rateLimit` and `key`, and kayjs-mail's `rateLimit: 5`, now `{ max, window }` |
 | `deprecated-renamed-export` | warn | deprecated | An import of `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` or `MailNotConfigured`, renamed in 1.70 to end in `Error` |
 | `deprecated-markup-prop` | warn | deprecated | A markup prop typed `JSX.Element` or a function returning it, now a `Snippet` from `kay` |
+| `deprecated-hook-shape` | warn | deprecated | An `on*` hook with positional arguments, which takes one event object since 1.70 |
 
 ## Errors
 

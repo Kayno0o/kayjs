@@ -623,6 +623,15 @@ export const LINTS = {
     wrong: 'export const profile = await cached("profile", 300, loadProfile)',
     right: 'export const profile = await cached("profile", "5m", loadProfile)',
   },
+  'deprecated-hook-shape': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'An `on*` hook written with positional arguments, which keeps working until 1.73: `onSignUp`, `onDelete`, `onError` and a queue\'s `onFailed` take one event object, and `onExport` and `onProviderProfile` are `exportData` and `profileFields` now. The fix destructures the parameters by their old names and renames the option; a parameter with a type annotation or a default gets no fix. Found in the project\'s `.ts` files importing kayjs-auth, `kay/server` or kayjs-mail, and in `kay.config.ts`.',
+    wrong: 'auth({ onSignUp: (user, profile) => seed(user) })',
+    right: 'auth({ onSignUp: ({ user, profile }) => seed(user) })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

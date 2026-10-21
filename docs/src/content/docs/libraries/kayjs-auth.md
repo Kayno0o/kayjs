@@ -110,13 +110,13 @@ p Hello {user.email}
 
 ### Your own data on the user
 
-Give `createAuth` a `user` schema to keep your own fields on the user, such as a provider's avatar. `onProviderProfile` returns what to store on every provider sign-in, and `user().data` gives it back typed.
+Give `createAuth` a `user` schema to keep your own fields on the user, such as a provider's avatar. `profileFields` returns what to store on every provider sign-in, and `user().data` gives it back typed.
 
 ```ts
 createAuth({
   // ...
   user: s.Object({ avatar: s.Optional(s.String()) }),
-  onProviderProfile: (user, profile) => ({ avatar: profile.avatar ?? undefined }),
+  profileFields: ({ user, profile }) => ({ avatar: profile.avatar ?? undefined }),
 })
 ```
 
@@ -126,7 +126,7 @@ The patch is all or nothing: one field the schema refuses, or a result over 16 K
 
 `user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`.
 
-It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `register` give a `BareUser`, which has no `providers`, so they cost no query.
+It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `onDelete`, `exportData`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `register` give a `BareUser`, which has no `providers`, so they cost no query.
 
 `user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 

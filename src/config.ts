@@ -147,7 +147,7 @@ export interface KayConfig {
   store?: AppStore | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
-  onError?: ((error: unknown, request: Request | undefined) => void | Promise<void>) | undefined
+  onError?: ((event: { error: unknown, request: Request | undefined }) => void | Promise<void>) | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.

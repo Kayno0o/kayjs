@@ -883,7 +883,7 @@ describe('errors outside a request', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const caught: [string, unknown][] = []
 
-    useAppOnError((error, request) => {
+    useAppOnError(({ error, request }) => {
       caught.push([(error as Error).message, request])
 
       if ((error as Error).message === 'stop failed')
@@ -1186,9 +1186,9 @@ describe('queue', () => {
       tries.push(n)
 
       throw new Error('mail server down')
-    }, { store: memoryJobs(), attempts: 3, backoff: '10s', onFailed: (n, error) => void gaveUp.push([n, (error as Error).message]) })
+    }, { store: memoryJobs(), attempts: 3, backoff: '10s', onFailed: ({ payload: n, error }) => void gaveUp.push([n, (error as Error).message]) })
 
-    useAppOnError((error, request) => void tracked.push([(error as Error).message, request]))
+    useAppOnError(({ error, request }) => void tracked.push([(error as Error).message, request]))
 
     try {
       await flaky.enqueue(1)
@@ -1454,7 +1454,7 @@ describe('queue', () => {
     const store = memoryJobs()
     const runs: string[] = []
     const gaveUp: string[] = []
-    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onFailed: (name, error) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
+    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onFailed: ({ payload: name, error }) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
 
     try {
       await crashing.enqueue('huge import')

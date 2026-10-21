@@ -286,7 +286,7 @@ describe('deleting the account', () => {
   test('needs the password, deletes the user, tells the app and signs out', async () => {
     const deleted: User[] = []
     const { ada, browser, store } = await registered({
-      onDelete: (user) => {
+      onDelete: ({ user }) => {
         deleted.push(user)
       },
     })

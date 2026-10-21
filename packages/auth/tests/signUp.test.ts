@@ -7,7 +7,7 @@ const PASSWORD = 'correct horse battery'
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const signUps: User[] = []
   const app = testApp({
-    onSignUp: (user) => {
+    onSignUp: ({ user }) => {
       signUps.push(user)
     },
     ...options,
@@ -81,5 +81,19 @@ describe('createUser', () => {
 
     await expect(auth.createUser({ username: 'ada', roles: ['ghost' as 'admin'] })).rejects.toThrow('\'ghost\', which the `roles` option does not declare')
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(0)
+  })
+})
+
+describe('hooks in their positional shape, read until 1.73', () => {
+  test('onSignUp with two parameters still runs', async () => {
+    const seen: string[] = []
+    const { auth } = testApp({
+      // @ts-expect-error The positional shape is no longer typed.
+      onSignUp: (user: User, profile: unknown) => void seen.push(`signUp ${user.email} ${String(profile)}`),
+    })
+    const created = await auth.createUser({ email: 'ada@example.com', password: PASSWORD })
+
+    expect(created.ok).toBe(true)
+    expect(seen).toEqual(['signUp ada@example.com undefined'])
   })
 })

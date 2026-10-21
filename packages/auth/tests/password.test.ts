@@ -8,7 +8,7 @@ const PASSWORD = 'correct horse battery'
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const signUps: User[] = []
   const app = testApp({
-    onSignUp: (user) => {
+    onSignUp: ({ user }) => {
       signUps.push(user)
     },
     ...options,

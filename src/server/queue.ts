@@ -7,6 +7,7 @@ import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
+import { callHook } from '../runtime/hook'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
@@ -93,7 +94,7 @@ export interface QueueOptions<Payload> {
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
-  onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
+  onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
 }
 
 export interface EnqueueOptions {
@@ -548,7 +549,11 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
   const reportFailed = async (job: StoredJob, error: unknown) => {
     try {
-      await options.onFailed?.(parse(job.payload) as Payload, error)
+      if (options.onFailed) {
+        const payload = parse(job.payload) as Payload
+
+        await callHook(options.onFailed, { payload, error }, [payload, error])
+      }
     }
     catch (failure) {
       kayLog('error', `onFailed of queue('${name}') failed`, failure)
