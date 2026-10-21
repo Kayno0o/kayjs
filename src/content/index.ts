@@ -371,23 +371,19 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return withDrafts(await (loader ? fromLoader : fromFolder)())
   }
-  // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
-  const ended = (entry: Entry<Data> | undefined) => {
-    if (entry === undefined || unpublishAt === undefined || (draft !== undefined && isDraft(draft, entry)))
-      return false
-
+  const notYet = (entry: Entry<Data>) => {
     const live = publishAt === undefined ? undefined : publishTime(publishAt, entry)
-    const down = publishTime(unpublishAt, entry)
 
-    return down !== undefined && down <= Date.now() && !(live !== undefined && live > Date.now())
+    return live !== undefined && live > Date.now()
   }
-  const scheduled = (entry: Entry<Data>) => {
-    const now = Date.now()
-    const live = publishAt === undefined ? undefined : publishTime(publishAt, entry)
+  const over = (entry: Entry<Data>) => {
     const down = unpublishAt === undefined ? undefined : publishTime(unpublishAt, entry)
 
-    return (live !== undefined && live > now) || (down !== undefined && down <= now)
+    return down !== undefined && down <= Date.now()
   }
+  const scheduled = (entry: Entry<Data>) => notYet(entry) || over(entry)
+  // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
+  const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
   const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined

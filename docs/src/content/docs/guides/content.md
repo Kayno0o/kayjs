@@ -104,7 +104,7 @@ From that time the entry is left out of `all()`, `get()`, the sitemap, the feed 
 
 The server builds again the pages that read the collection when the date passes, the same way as for `publishAt`, and does it as it starts when it was down at that time. The page of the ended entry is rendered again too, so its URL answers what its code does when `get()` finds nothing: `?? ctx.notFound()` answers 410 Gone for an ended entry (404 for a slug that never existed, and for a draft or an entry not yet published), and `?? ctx.redirect('/offers')` sends visitors to the list.
 
-A redirect from the path, in `redirects` or added from the Missing pages screen, wins over the 410.
+A redirect from the path, in `redirects` or added from the Missing pages screen, wins over the 410, and a visit to an ended entry is listed on that screen so an editor can add one. A `ctx.notFound()` that comes after the page read an ended entry answers 410 too, even for something unrelated, and a 410 your own code answers can be redirected the same way.
 
 A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start. kayjs-cms shows `Ends` or `Ended` beside the entry's date field and can clear the date.
 

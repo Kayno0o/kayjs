@@ -537,4 +537,27 @@ inBrowser('a Select with submit on a served page', () => {
     expect(await posts()).toBe('1')
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('shows the tooltip of a disabled fieldset over the fieldset and over a disabled control inside it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/locked-tooltip')
+    const shown = async () => page.evaluate(() => document.querySelector('#kui-tooltip')!.matches(':popover-open') ? document.querySelector('#kui-tooltip')!.textContent : null)
+
+    await page.hover('#locked-input')
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+    expect(await shown()).toBe('Your role may not publish')
+
+    await page.hover('#elsewhere')
+    await page.waitUntil(() => !document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+
+    // The fieldset's own box, left of the control it wraps.
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('#locked')!.style.padding = '2rem'
+    })
+    await page.hover('#locked')
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+    expect(await shown()).toBe('Your role may not publish')
+    expect(page.errors).toEqual([])
+  }, 120_000)
 })

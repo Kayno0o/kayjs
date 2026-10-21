@@ -4,7 +4,7 @@ import { guardLeave } from 'kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { wording } from 'kay/words'
-import { uploadFile, uploading, uploadRefusal } from '../editor/upload'
+import { uploadFile, uploading } from '../editor/upload'
 import { BODY } from '../markers'
 import { fieldId } from '../paths'
 
@@ -14,8 +14,8 @@ const { form } = props<{ form: FormScope }>()
 // An image dropped or pasted into the body is an upload too.
 guardLeave(uploading)
 
-// The refusal the page loaded with when the form holds it, else asked.
-const uploadRefused = form.denied ? () => form.denied?.upload : uploadRefusal()
+// Read from the form as it changes: a screen holds it from the server, the on-page editor once its own question is answered.
+const uploadRefused = () => form.denied?.upload
 
 effect(() => {
   onCleanup(form.shown.add('#body'))

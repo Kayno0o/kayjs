@@ -69,10 +69,16 @@ async function dropped(root: HTMLElement): Promise<boolean> {
   return event.defaultPrevented
 }
 
+let asked = 0
+
 async function withRole(denied: Record<string, string>, open: () => Promise<HTMLElement>): Promise<boolean> {
   const request = globalThis.XMLHttpRequest
 
-  spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ denied })) as unknown as typeof fetch)
+  spyOn(globalThis, 'fetch').mockImplementation((async () => {
+    asked++
+
+    return Response.json({ denied })
+  }) as unknown as typeof fetch)
   Object.assign(globalThis, { XMLHttpRequest: CountingRequest })
 
   try {
@@ -109,6 +115,12 @@ test.each([['a Markdown field', markdownField], ['the entry\'s body', bodyField]
   expect(await withRole({ upload: 'Your role may not do this: upload' }, open)).toBe(false)
   mounted?.unmount()
   expect(await withRole({}, open)).toBe(true)
+})
+
+test('the entry\'s body reads the role from the one question its form asked', async () => {
+  asked = 0
+  expect(await withRole({ upload: 'Your role may not do this: upload' }, bodyField)).toBe(false)
+  expect(asked).toBe(1)
 })
 
 test('the role is asked again by every field that opens, so a role changed meanwhile shows without a reload', async () => {

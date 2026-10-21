@@ -532,6 +532,13 @@ export function storeFile(file?: string): string {
   return file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : NOT_FOUND_FILE)
 }
 
+// The requests an editor's 410 answered, which are not counted again as a path nobody found.
+const editorGone = new WeakSet<Request>()
+
+export function markEditorGone(request: Request): void {
+  editorGone.add(request)
+}
+
 export function isPageRequest(request: Request): boolean {
   return pageRequests.has(request)
 }
@@ -541,7 +548,7 @@ export function missingPaths(): MissingPath[] {
   return current?.list() ?? []
 }
 
-// Counts the pages a visitor asked for with a GET that answered 404, in production: the path without its query, the host of the referrer and, for a link on the site itself, its page, never an address, a query or a header.
+// Counts the pages a visitor asked for with a GET that answered 404, or 410 for an ended entry (an editor's redirect then wins over it), in production: the path without its query, the host of the referrer and, for a link on the site itself, its page, never an address, a query or a header.
 // The file is opened by the first one, so a site nobody mistypes a URL of writes nothing.
 export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, trailingSlash?: TrailingSlash | undefined, file?: string | undefined }): App {
   let suggest: ReturnType<typeof suggester> | undefined
@@ -553,7 +560,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
     const answered = responseValue instanceof Response ? responseValue : undefined
     const status = answered ? answered.status : set.status
 
-    if (status !== 404 || request.method !== 'GET' || (route && !pageRequests.has(request)) || answered?.headers.get('content-type')?.includes('json') === true)
+    if ((status !== 404 && status !== 410) || editorGone.has(request) || request.method !== 'GET' || (route && !pageRequests.has(request)) || answered?.headers.get('content-type')?.includes('json') === true)
       return
 
     const path = countedPath(pathOf(request.url))

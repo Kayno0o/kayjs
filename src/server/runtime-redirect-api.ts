@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs'
 import { joinBase } from '../runtime/base'
 import { kayLog } from '../runtime/log'
 import { pathOf } from './log'
-import { countedPath, dropStore, isPageRequest, missingStore, NOT_FOUND_FILE, sharedStore, storeFile } from './not-found'
+import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, NOT_FOUND_FILE, sharedStore, storeFile } from './not-found'
 import { requestUrl } from './request-url'
 import { answerFor } from './runtime-redirects'
 
@@ -148,8 +148,11 @@ export function missingRedirector(options: { file?: string | undefined, trailing
     if (!found)
       return undefined
 
-    if (found.status === 410)
+    if (found.status === 410) {
+      markEditorGone(request)
+
       return new Response('Gone', { status: 410, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    }
 
     // A location Bun refuses as a header answers the 404 it would have, and leaves the store open.
     try {
