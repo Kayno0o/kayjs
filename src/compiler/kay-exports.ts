@@ -3,6 +3,7 @@
 export const KAY_VALUES: readonly string[] = [
   'ActionError',
   'ActionRedirect',
+  'ActionRedirectError',
   'ApiError',
   'action',
   'batch',
