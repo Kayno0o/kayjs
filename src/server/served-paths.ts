@@ -105,6 +105,11 @@ export class ServedPaths {
     return [...this.#claims.values()].flat().map(claim => claim.path)
   }
 
+  // The paths something other than a page serves for a GET, as the router reads them.
+  apart(): string[] {
+    return [...this.#claims.values()].flat().filter(claim => claim.kind !== 'page' && ['GET', 'ALL'].includes(claim.method ?? 'GET')).map(claim => claim.path)
+  }
+
   // The GET paths a static export writes, in the order they were claimed.
   async exported(): Promise<string[]> {
     const paths: string[] = []

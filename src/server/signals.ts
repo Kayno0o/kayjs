@@ -1,5 +1,6 @@
 import type { RequestContext } from '../runtime'
 import { leavesSite } from '../runtime/base'
+import { localizedLink } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { nodeHttp } from './builtins'
 
@@ -41,7 +42,11 @@ export class Redirect {
     if (!isOwnHost(location) && (path.startsWith('\\') || (path.startsWith('/') && leavesSite(path))))
       throw new TypeError(`kay: the redirect to ${JSON.stringify(location)} is a path which a browser reads as another site; redirect to a full https:// URL for another site, and pass a ?next= param through localPath()`)
 
-    this.location = location.toWellFormed().replace(NON_ASCII, encodeURI)
+    // A page of the site goes to in the locale of the page that redirects, as any link of it is.
+    const state = localeState()
+    const target = state === undefined || state.implicit ? location : localizedLink(state.settings, location, state.locale, state.host)
+
+    this.location = target.toWellFormed().replace(NON_ASCII, encodeURI)
   }
 }
 

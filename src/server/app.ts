@@ -62,6 +62,7 @@ import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
+import { redirectSpelling } from './redirect-spelling'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
@@ -266,6 +267,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // The route a request reaches is the most specific that matches: static before a parameter, a parameter before a catch-all, as the router prefers them.
   const bySpecificity = routes.map(route => ({ route, label: pageMatch.served(route) })).toSorted((a, b) => labelWeight(a.label) - labelWeight(b.label))
 
+  // A redirect to a page goes out as a visit to it is answered, in the locale and with the trailing slash its page has.
+  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => served.apart())
+
+  renderOptions.redirectSpelling = spell
+
   setSiteFacts(app, {
     pageRoute: path => bySpecificity.find(({ route }) => pageMatch.posted(route, path))?.label,
     base,
@@ -364,7 +370,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security, base }))
     filePaths.add(path)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards, cors: options.cors }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: spell, requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0

@@ -166,6 +166,8 @@ export interface RenderOptions {
   islandPreloads?: { drop: ReadonlySet<string>, wait: readonly string[] } | undefined
   // A page rendered without its guards, as a prerender does, still being one a guard covers.
   guarded?: boolean | undefined
+  // How a redirect a guard or the page threw is spelled, with the trailing slash its page has.
+  redirectSpelling?: ((location: string) => string) | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
   editor?: string | undefined
 }
@@ -818,7 +820,7 @@ function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
 async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<Response> {
   if (error instanceof Redirect) {
     rendering.headers.delete('content-type')
-    rendering.headers.set('location', error.location)
+    rendering.headers.set('location', options.redirectSpelling?.(error.location) ?? error.location)
     rendering.writeCookies()
     keepPersonal(rendering)
 

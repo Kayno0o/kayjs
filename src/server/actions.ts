@@ -130,6 +130,8 @@ export interface ActionOptions {
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: boolean | undefined
+  // How a redirect is spelled, with the trailing slash its page has.
+  redirectSpelling?: ((location: string) => string) | undefined
   // The app's `cors`, the rule of every API module that sets none.
   cors?: CorsOptions | undefined
 }
@@ -917,9 +919,11 @@ function pretended(action: ServerAction<TSchema, unknown>, request: Request, bas
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
-export function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, { dev, onError }: ActionOptions): Response {
+export function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, options: ActionOptions): Response {
+  const { dev, onError } = options
+
   if (error instanceof Redirect) {
-    headers.set(redirectHeader(request), error.location)
+    headers.set(redirectHeader(request), options.redirectSpelling?.(error.location) ?? error.location)
     jar.writeTo(headers)
 
     return new Response(null, { status: error.status, headers })
