@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A text field replaced by a query `navigate()`, such as a live search box whose island gets the new value, keeps its caret and selection instead of restarting at 0 ([Navigation](navigation.md)).
 - A text field replaced by a query `navigate()`, such as a live search box whose island gets the new value, keeps its caret, selection and the keys typed while the page was fetched instead of restarting at 0 ([Navigation](navigation.md)).
 - kayjs-ui's MarkdownEditor has a toolbar (bold, italic, heading, lists, link, image; `toolbar` turns it down) and, given a `preview` function, a Preview button showing the server-rendered text beside the field or in its place on a narrow one ([MarkdownEditor](../packages/ui/llms/forms.md#markdowneditor)).
+- kayjs-cms's Markdown boxes carry kayjs-ui's toolbar, and `cms({ collections: { posts: { form: { body: { label, hint }, toolbar } } } })` words the body and cuts the toolbar down per collection ([Arranging and replacing the screens](../packages/cms/llms/screens.md#arrange-a-collection)).
 
 ## 1.63.0
 

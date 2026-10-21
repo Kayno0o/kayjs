@@ -1,7 +1,8 @@
 import type { CollectionInfo, ScreenCollection } from '../src/kay/contract'
 import { describe, expect, test } from 'bun:test'
+import { TOOLBAR_ACTIONS } from '../../ui/src/markdown-edit'
 import { fieldsOf } from '../src/fields'
-import { cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, whenProblems } from '../src/layout'
+import { cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, TOOLBAR_BUTTONS, whenProblems } from '../src/layout'
 import { rowsOf } from '../src/listing'
 import { configure, settings } from '../src/settings'
 
@@ -136,6 +137,19 @@ describe('rowActions', () => {
     expect([...rowActions()]).toEqual(['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete'])
     expect([...rowActions({ actions: ['delete'] })]).toEqual(['delete'])
     expect([...rowActions({ actions: [] })]).toEqual([])
+  })
+})
+
+describe('the form\'s Markdown settings', () => {
+  test('are checked as the config loads, and name the buttons kayjs-ui has', () => {
+    expect([...TOOLBAR_BUTTONS]).toEqual([...TOOLBAR_ACTIONS])
+    expect(checkLayouts({ posts: { form: { body: { label: 'Article', hint: 'Plain text' }, toolbar: ['bold', 'link'] } } }).get('posts')?.form).toMatchObject({ body: { label: 'Article', hint: 'Plain text' }, toolbar: ['bold', 'link'] })
+    expect(checkLayouts({ posts: { form: { toolbar: false } } }).get('posts')?.form?.toolbar).toBe(false)
+    expect(() => checkLayouts({ posts: { form: { toolbar: ['bold', 'underline'] } } })).toThrow('underline')
+    expect(() => checkLayouts({ posts: { form: { toolbar: ['bold', 'bold'] } } })).toThrow('twice')
+    expect(() => checkLayouts({ posts: { form: { toolbar: 'bold' } } })).toThrow('toolbar')
+    expect(() => checkLayouts({ posts: { form: { body: { label: ' ' } } } })).toThrow('label')
+    expect(() => checkLayouts({ posts: { form: { body: { title: 'x' } } } })).toThrow('title')
   })
 })
 

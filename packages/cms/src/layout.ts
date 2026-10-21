@@ -1,4 +1,5 @@
 import type { IconProps } from 'kay/icons'
+import type { ToolbarAction } from '@kaynooo/kayjs-ui'
 import type { Field } from './fields'
 import type { CollectionInfo, FormLayout, GivenLayout, ListLayout, RowAction } from './kay/contract'
 import { wording } from 'kay/words'
@@ -6,6 +7,9 @@ import { fieldsOf, pairedFields } from './fields'
 
 export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
+
+// MarkdownEditor's buttons, which tests/layout.test.ts holds to kayjs-ui's list; kept here so the editor's bundle does not take kayjs-ui's index for a list of names.
+export const TOOLBAR_BUTTONS: readonly ToolbarAction[] = ['bold', 'italic', 'heading', 'bulletList', 'numberedList', 'link', 'image']
 
 // What a field named `#body` stands for, and `body` too unless the schema has a data field of that name.
 export const BODY_ID = '#body'
@@ -51,8 +55,35 @@ function rowOf(where: string, row: unknown): string | string[] {
   return Array.isArray(row) ? strings(where, row) : strings(where, [row])[0]!
 }
 
+function checkBody(where: string, value: unknown): NonNullable<FormLayout['body']> {
+  const { label, hint } = plain(where, value, ['label', 'hint'])
+
+  for (const [key, text] of Object.entries({ label, hint })) {
+    if (text !== undefined && (typeof text !== 'string' || text.trim() === ''))
+      throw new Error(`kayjs-cms: \`${where}.${key}\` takes a text, got ${JSON.stringify(text)}`)
+  }
+
+  return { label: label as string | undefined, hint: hint as string | undefined }
+}
+
+function checkToolbar(where: string, value: unknown): boolean | ToolbarAction[] {
+  if (typeof value === 'boolean')
+    return value
+
+  const names = strings(where, value)
+
+  distinct(where, names)
+
+  for (const name of names) {
+    if (!(TOOLBAR_BUTTONS as readonly string[]).includes(name))
+      throw new Error(`kayjs-cms: \`${where}\` names ${JSON.stringify(name)}; the buttons are ${TOOLBAR_BUTTONS.join(', ')}`)
+  }
+
+  return names as ToolbarAction[]
+}
+
 function checkForm(where: string, value: unknown): FormLayout {
-  const { fields, hide } = plain(where, value, ['fields', 'hide'])
+  const { fields, hide, body, toolbar } = plain(where, value, ['fields', 'hide', 'body', 'toolbar'])
 
   if (fields !== undefined && !Array.isArray(fields))
     throw new Error(`kayjs-cms: \`${where}.fields\` takes a list of field names, or of lists of them for a row, got ${JSON.stringify(fields)}`)
@@ -69,7 +100,7 @@ function checkForm(where: string, value: unknown): FormLayout {
       throw new Error(`kayjs-cms: \`${where}\` both shows and hides ${JSON.stringify(name)}`)
   }
 
-  return { fields: rows, hide: hidden }
+  return { fields: rows, hide: hidden, body: body === undefined ? undefined : checkBody(`${where}.body`, body), toolbar: toolbar === undefined ? undefined : checkToolbar(`${where}.toolbar`, toolbar) }
 }
 
 function checkList(where: string, value: unknown): ListLayout {

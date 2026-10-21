@@ -1,4 +1,5 @@
 // The shapes kayjs-cms passes around: kay's own from kay/content, and the entry references and issues its forms and API share.
+import type { ToolbarAction } from '@kaynooo/kayjs-ui'
 import type { CollectionInfo, SourceEntry } from 'kay/content'
 import type { IconProps } from 'kay/icons'
 
@@ -8,6 +9,10 @@ export type { CollectionInfo, DataValue, EntryFile, EntryFilter, FieldHint, Fiel
 export interface FormLayout {
   fields?: (string | string[])[] | undefined
   hide?: string[] | undefined
+  // The words over the Markdown body: its label (`Body` by default, translated) and a hint under it.
+  body?: { label?: string | undefined, hint?: string | undefined } | undefined
+  // The formatting buttons over every Markdown box of the collection, the body included: `false` for none, else the buttons to keep, in order; all by default.
+  toolbar?: boolean | ToolbarAction[] | undefined
 }
 
 // What a row of a collection's list can offer beside its title.

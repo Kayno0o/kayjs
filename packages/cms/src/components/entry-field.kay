@@ -4,12 +4,15 @@ import FieldInput from '../editor/field-input.kay'
 import type { Field } from '../fields'
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from '../fields'
+import { markdownToolbar } from '../editor/markdown-options'
 import { resolve } from '../layout'
 import { gapOf, translatable } from '../translations'
 
 // One field of an entry's form by its key in the schema, a group or a list with the fields inside it, or by its dotted path to a field inside a group, `address.street`. Unknown names throw, naming the schema's.
 // `field` is the form layout's own copy of it, a group without the fields the layout placed elsewhere.
 const { form, name, field: given } = props<{ form: FormScope, name: string, field?: Field | undefined }>()
+
+markdownToolbar.provide(form.collection.layout?.form?.toolbar)
 
 const field = memo(() => {
   if (given)

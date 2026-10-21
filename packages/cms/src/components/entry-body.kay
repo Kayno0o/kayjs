@@ -6,6 +6,7 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { wording } from 'kay/words'
 import { uploadFile, uploading } from '../editor/upload'
 import { BODY } from '../markers'
+import { markdownToolbar } from '../editor/markdown-options'
 import { fieldId } from '../paths'
 
 // The Markdown body of an entry whose collection has one.
@@ -16,6 +17,9 @@ guardLeave(uploading)
 
 // Read from the form as it changes: a screen holds it from the server, the on-page editor once its own question is answered.
 const uploadRefused = () => form.denied?.upload
+const layout = form.collection.layout?.form
+
+markdownToolbar.provide(layout?.toolbar)
 
 effect(() => {
   onCleanup(form.shown.add('#body'))
@@ -23,5 +27,5 @@ effect(() => {
 ---
 if form.collection.body
   .kcms-field(data-kcms-body id={fieldId(form.entry, 'b')})
-    FormField(label={wording('cms.entry.body', 'Body')} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
-      MarkdownEditor(value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadRefused() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})
+    FormField(label={layout?.body?.label ?? wording('cms.entry.body', 'Body')} hint={layout?.body?.hint} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
+      MarkdownEditor(toolbar={layout?.toolbar} value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadRefused() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})

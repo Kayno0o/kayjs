@@ -566,6 +566,8 @@ cms({ collections: { shop: {
 
 In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
 
+The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Over every Markdown box, the body and the `markdown` fields, sits a toolbar of bold, italic, heading, lists, link and image buttons. `toolbar: false` removes it and `toolbar: ['bold', 'italic', 'link']` keeps those buttons, in that order.
+
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
 To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts, when it was last edited and a New entry button. `icon` takes an icon imported from `~icons/<prefix>/<name>`, drawn before the collection: `shop: { icon: cart }`.
