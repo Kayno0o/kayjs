@@ -464,7 +464,7 @@ A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warnin
 
 A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Two things change. An empty value now takes the default, as `defineEnv` treats it as unset. And the files you read from now import the schema, which reads and checks the environment as it loads. `kay upgrade` does not do this.
 
-`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely. With neither, kay compares the production compose files at the project root (`compose*.yaml` and `docker-compose*.yaml`, leaving out a name with `dev`, `development`, `test`, `local` or `override` in it) and `.env.example`, those that exist.
+`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely. With neither, kay compares the production compose files at the project root (`compose*.yaml` and `docker-compose*.yaml`, leaving out a name with `dev`, `development`, `test`, `local` or `override` in it) and `.env.example`, those that exist. Set `env: false` in `kay.config.ts` to compare nothing.
 
 A module under `src` that does not load is reported, and nothing is then called undeclared. A variable set to an empty string counts as not set.
 

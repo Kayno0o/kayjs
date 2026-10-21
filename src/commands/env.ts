@@ -1,6 +1,7 @@
 import type { EnvVariable } from '../server/env'
 import type { EnvSchemaRecord } from '../server/env-state'
 import type { Command } from './command'
+import type { EnvFiles } from './env-compare'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { loadConfig } from '../config'
@@ -51,7 +52,7 @@ export const env: Command = {
     try {
       const { variables, unread, findings } = await withStdoutOnStderr(async () => {
         const listed = await listEnv(root)
-        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : (await loadConfig(root)).env ?? await defaultEnvFiles(root)
+        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : await configuredEnvFiles(root)
 
         if (values.write === true) {
           const path = resolve(root, files?.example ?? '.env.example')
@@ -85,6 +86,13 @@ export const env: Command = {
       return 1
     }
   },
+}
+
+// The files kay.config.ts names, else the project's own; none when `env` is `false`.
+async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
+  const { env } = await loadConfig(root)
+
+  return env === false ? undefined : env ?? await defaultEnvFiles(root)
 }
 
 export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {

@@ -462,6 +462,18 @@ describe('kay env against compose and .env.example', () => {
     expect(findings).toHaveLength(1)
   })
 
+  it('has kay check compare the root compose files by default, and env: false turns it off for kay check and kay env', async () => {
+    const broken = { ...files, 'app.env': '' }
+    const problems = async (root: string) => (JSON.parse((await kay(['check', '--format', 'json'], root)).stdout) as { problems: { message: string }[] }).problems.map(({ message }) => message)
+    const off = { ...broken, 'kay.config.ts': 'export default { favicon: false, env: false }\n' }
+
+    expect(await problems(await project(broken))).toContain('DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it')
+    expect(await problems(await project(files))).not.toContain('DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it')
+    expect((await problems(await project(off))).filter(message => message.includes('compose.yaml'))).toEqual([])
+    expect((await run(await project(off), [])).findings).toBeUndefined()
+    expect((await run(await project(off), ['--compose', 'compose.yaml'])).findings).toHaveLength(1)
+  })
+
   it('leaves a development or test compose file out of the default comparison', async () => {
     const root = await project({ 'kay.config.ts': files['kay.config.ts'], 'src/env.ts': env, 'compose.dev.yaml': 'services:\n  db:\n    image: postgres\n', 'compose.test.yaml': 'services: {}\n' })
 

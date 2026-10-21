@@ -148,8 +148,8 @@ export interface KayConfig {
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
   onError?: ((error: unknown, request: Request | undefined) => void | Promise<void>) | undefined
-  // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared.
-  env?: { compose?: string | string[] | undefined, example?: string | undefined } | undefined
+  // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
+  env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
@@ -558,14 +558,14 @@ function checkedConfig({ checks, env }: KayConfig): void {
   if (notFunction >= 0)
     throw new KayError('config-invalid', `kay: \`checks[${notFunction}]\` in ${CONFIG_FILE} is not a function`)
 
-  if (env === undefined)
+  if (env === undefined || env === false)
     return
 
   const { compose, example } = (typeof env === 'object' && env !== null ? env : {}) as { compose?: unknown, example?: unknown }
   const files = Array.isArray(compose) ? compose : [compose]
 
   if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
-    throw new KayError('config-invalid', `kay: \`env\` in ${CONFIG_FILE} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them)`)
+    throw new KayError('config-invalid', `kay: \`env\` in ${CONFIG_FILE} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), or \`false\``)
 }
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.

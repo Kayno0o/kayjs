@@ -72,7 +72,7 @@ No lint can fix it safely, as its fields move to another file, so kay warns at b
 
 ### A comma in `KAY_SECRET` splits it, and `kay check` compares deploy files
 
-`KAY_SECRET` (and a string `secret` in kay.config.ts) is now a comma-separated rotation list, so a secret holding a comma fails the boot as too short: drop the comma. With no `env` in kay.config.ts, `kay check` now compares the root production `compose*.yaml` files and `.env.example` with the declared variables, so a deploy file missing a required variable is an error; set `env: { compose, example }` to choose the files.
+`KAY_SECRET` (and a string `secret` in kay.config.ts) is now a comma-separated rotation list, so a secret holding a comma fails the boot as too short: drop the comma. With no `env` in kay.config.ts, `kay check` now compares the root production `compose*.yaml` files and `.env.example` with the declared variables, so a deploy file missing a required variable is an error; set `env: { compose, example }` to choose the files, or `env: false` to compare none.
 
 ### kayjs-auth's `url` defaults to the site
 
