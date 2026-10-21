@@ -129,7 +129,7 @@ onMount(() => {
   })
 })
 
-listen(() => window, 'resize', measure)
+listen(() => window, 'resize', measureSoon)
 listen(() => window, 'scroll', measureSoon, { passive: true })
 
 effect(() => {

@@ -52,7 +52,7 @@ html.kcms-editing {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--kay-dev-bar-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Hidden until the editor has read how it was left, so a collapsed one does not flash open. */
@@ -60,10 +60,9 @@ html.kcms-editing {
   visibility: hidden;
 }
 
-/* The side dock starts under a header fixed across the top of the page and under the dev tool's bar if that sits there, so neither covers the other. */
+/* The side dock starts under a header fixed across the top of the page, so it stays visible. */
 html.kcms-dock-side .kcms-editor-open {
   top: var(--kcms-top, 0px);
-  padding-top: var(--kay-dev-bar-top, 0px);
 }
 
 .kcms-editor-failure,
@@ -125,6 +124,15 @@ html.kcms-dock-side .kcms-editor-open {
   color: var(--color-kui-subtext0);
 }
 
+/* What the open editor holds, for the dev tool's bar and floating drawer to keep out of. */
+html.kcms-editing.kcms-dock-side {
+  --kay-panel-right: var(--kcms-width);
+}
+
+html.kcms-editing.kcms-dock-bottom {
+  --kay-panel-bottom: var(--kcms-height);
+}
+
 /* The page makes room for the open editor on the edge it is docked to, so no site content hides under it. */
 html.kcms-editing.kcms-dock-side body {
   margin-right: var(--kcms-width);
@@ -146,12 +154,20 @@ html.kcms-dock-bottom .kcms-editor-open {
 
 /* Before the editor has read where it was left, the window's width picks: the side from 64rem, the bottom below. */
 @media (min-width: 64rem) {
+  html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) {
+    --kay-panel-right: var(--kcms-width);
+  }
+
   html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) body {
     margin-right: var(--kcms-width);
   }
 }
 
 @media (max-width: 63.999rem) {
+  html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) {
+    --kay-panel-bottom: var(--kcms-height);
+  }
+
   html.kcms-editing:not(.kcms-dock-side):not(.kcms-dock-bottom) body {
     padding-bottom: var(--kcms-height);
   }

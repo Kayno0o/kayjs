@@ -83,8 +83,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 .mono { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.bar { position: fixed; bottom: 12px; left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); max-width: calc(100vw - 24px); }
-.right .bar { left: auto; right: 12px; }
+.bar { position: fixed; bottom: calc(12px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); max-width: calc(100vw - 24px); }
+.right .bar { left: auto; right: calc(12px + var(--kay-panel-right, 0px)); }
 .bar > button { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
 .bar > button:hover { background: var(--mantle); }
 .bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
@@ -103,15 +103,15 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .bar .pill { font-size: 12px; }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: 56px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
-.right .drawer { left: auto; right: 12px; }
-.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 68px); }
+.drawer { position: fixed; bottom: calc(56px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px - var(--kay-panel-right, 0px))); height: min(28rem, 60vh); max-height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
+.right .drawer { left: auto; right: calc(12px + var(--kay-panel-right, 0px)); }
+.max .drawer { width: calc(100vw - 24px - var(--kay-panel-right, 0px)); height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); }
 .top .bar { bottom: auto; top: 12px; }
 .top .drawer { bottom: auto; top: 56px; }
 .ui.dock-bottom .drawer { inset: auto 0 0; width: auto; height: var(--dock); border-width: 1px 0 0; border-radius: 0; }
 .ui.dock-right .drawer { inset: 0 0 0 auto; width: min(var(--dock), 100vw); height: auto; border-width: 0 0 0 1px; border-radius: 0; }
-.dock-bottom.open:not(.top) .bar { bottom: calc(var(--dock) + 12px); }
-.dock-right.open.right .bar { right: calc(var(--dock) + 12px); }
+.dock-bottom.open:not(.top) .bar { bottom: calc(var(--dock) + 12px + var(--kay-panel-bottom, 0px)); }
+.dock-right.open.right .bar { right: calc(var(--dock) + 12px + var(--kay-panel-right, 0px)); }
 .floating .head { cursor: move; touch-action: none; }
 .grip { position: absolute; z-index: 1; touch-action: none; }
 .grip.n, .grip.s { left: 8px; right: 8px; height: 5px; cursor: ns-resize; }
@@ -295,7 +295,7 @@ td .copy { margin-left: 4px; }
 }
 @media (max-width: 480px) {
   .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; }
-  .max .drawer { height: calc(100vh - 68px); }
+  .max .drawer { height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); }
 }
 `
 
@@ -767,7 +767,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const status = make('span', 'sr')
   const copies = make('div', 'sr copies')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
-  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it, with the room the bar takes as `--kay-dev-bar-<edge>`.
+  // A docked drawer pads the page by its size, so none of the page hides under it, and publishes it as `--kay-dev-inset-<edge>` for a panel of the page to sit beside it, with the room the bar takes as `--kay-dev-bar-<edge>`. The bar and a floating drawer keep out of what a panel of the page holds, which it publishes as `--kay-panel-right` or `-bottom`.
   const pageSheet = new CSSStyleSheet()
   const save = () => writeState(win, state)
   const saveLayout = () => writeLayout(win, layout)
