@@ -65,7 +65,7 @@ export interface EntryForm extends FormScope {
   // Whether a published entry's `unpublishAt` date passed: the site no longer shows it.
   ended: () => boolean
   save: () => Promise<void>
-  // Publish, Unpublish, Publish now and Clear schedule change the entry alone: with edits not saved yet they refuse, saving nothing, and a refused save leaves the form as it was.
+  // Publish, Unpublish, Publish now, Clear schedule and Clear end change the entry alone: with edits not saved yet they refuse, saving nothing, and a refused save leaves the form as it was.
   publish: () => Promise<void>
   unpublish: () => Promise<void>
   publishNow: () => Promise<void>

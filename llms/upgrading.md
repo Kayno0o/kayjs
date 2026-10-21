@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
+### An entry's page takes its head from the entry
+
+A page with `prerender` or `sitemap` of a collection on a one-param route now writes the entry's `title` and `description` fields over its layout's, and a `Date` field named `publishAt`, `date`, `publishedAt` or `published` makes `og:type` an `article`. A collection whose `title` or `date` means something else (an event date) sets the tags in the page's `head` block, which replaces them ([Head](head.md#site-defaults-and-social-cards)).
+
 ### A test site saves content into a copy
 
 `testSite()` moves a folder collection to a copy under `.kay/scratch` once a save, a delete or a CMS screen reaches it, so a test that writes a file into `src/content` after that, or reads the file a save wrote there, no longer sees it. Write a file for the test with `site.content.write(collection, file, text)` and read what a save wrote through the site. No lint can see it, as it is a test's behavior ([Reset or seed content](testing.md#reset-or-seed-content)).

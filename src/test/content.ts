@@ -37,7 +37,8 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   const folders = named.filter((entry): entry is [string, Collection<unknown> & { dir: string }] => entry[1].dir !== undefined)
   const copies = new Map<string, string>()
   const originals = new Map<Collection<unknown>, Partial<Methods>>()
-  const base = await scratchDir('content-', root)
+  let scratch: Promise<string> | undefined
+  const baseDir = async () => scratch ??= scratchDir('content-', root)
   let released = false
 
   const indexOf = (real: string) => folders.findIndex(([, collection]) => resolve(contentPlace().base, collection.dir) === real)
@@ -52,7 +53,7 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
       return
 
     const pending = isolating.get(real) ?? (async () => {
-      const target = join(base, String(index))
+      const target = join(await baseDir(), String(index))
 
       await rm(target, { recursive: true, force: true })
 
@@ -66,7 +67,15 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
     })()
 
     isolating.set(real, pending)
-    await pending
+
+    try {
+      await pending
+    }
+    catch (error) {
+      isolating.delete(real)
+
+      throw error
+    }
   }
 
   const restoreLoader = (collection: Collection<unknown>) => {
@@ -136,7 +145,7 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   // Gives a folder collection an empty copy, then writes the entries as the CMS would, each checked against the collection's schema.
   const seedFolder = async (name: string, dir: string, seeded: SeedEntry[]) => {
     const real = resolve(contentPlace().base, dir)
-    const target = join(base, String(indexOf(real)))
+    const target = join(await baseDir(), String(indexOf(real)))
 
     await rm(target, { recursive: true, force: true })
     await mkdir(target, { recursive: true })
@@ -194,8 +203,11 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
 
     copies.clear()
     isolating.clear()
-    await rm(base, { recursive: true, force: true })
-    await mkdir(base, { recursive: true })
+
+    if (scratch !== undefined)
+      await rm(await scratch, { recursive: true, force: true })
+
+    scratch = undefined
 
     for (const [, collection] of named)
       collection.invalidate()
@@ -222,7 +234,8 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
       for (const [, collection] of named)
         collection.invalidate()
 
-      await rm(base, { recursive: true, force: true })
+      if (scratch !== undefined)
+        await rm(await scratch, { recursive: true, force: true })
     },
   }
 }

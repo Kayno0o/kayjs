@@ -201,7 +201,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const { draft, localized = false, publishAt, unpublishAt } = options
 
   if (publishAt !== undefined)
-    checkPublishField(name, options.schema, publishAt)
+    checkPublishField(name, options.schema, publishAt, 'publishAt')
 
   if (unpublishAt !== undefined)
     checkPublishField(name, options.schema, unpublishAt, 'unpublishAt')
