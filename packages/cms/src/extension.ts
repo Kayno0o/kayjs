@@ -46,7 +46,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
     devTool: { module: `${import.meta.dir}/devTool.ts` },
     // What the server logs or stops at as it listens, for `kay check` and the editor to show without one.
     check: async () => {
-      // A collection loader that fails is a warning as at boot, not an error of the check.
+      // A collection loader that fails is a warning, as the boot logs it, not an error of the check; it hides a bodyless-layout error that was to be found beside it.
       try {
         const stop = await bodyProblem()
 

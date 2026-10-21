@@ -237,6 +237,16 @@ describe('the naming conventions', () => {
     expect(known.filter(name => !found.some(line => line.endsWith(`: ${name}`)))).toEqual([])
   })
 
+  it('keep the old name of a renamed error class as a @deprecated alias', async () => {
+    for (const [file, name] of [['src/runtime/dom.ts', 'HydrationMismatch'], ['packages/cms/src/files.ts', 'SaveConflict'], ['packages/mail/src/mailer.ts', 'MailNotConfigured']] as const) {
+      const text = await Bun.file(file).text()
+
+      expect(text).toContain(`/** @deprecated Renamed \`${name}Error\``)
+      expect(text).toContain(`export const ${name} = ${name}Error\n`)
+      expect(text).toContain(`export type ${name} = ${name}Error\n`)
+    }
+  })
+
   it('give the error class a library exports a code, as kay\'s KayError carries one', () => {
     const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends \w*Error \{\n([\s\S]*?)\n\}/g)].filter(([, , body]) => !(/\bcode\b/).test(body!)).map(([, name]) => name!)
 
