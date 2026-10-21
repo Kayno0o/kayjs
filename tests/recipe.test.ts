@@ -232,6 +232,7 @@ describe('a recipe the compiler cannot read', () => {
     expect(found).toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
     expect(messages('--- server\nconst c = recipe({ parts: \'a\' })\n---\nmain a\n', { page: true })).toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
     expect(messages('--- server\nimport { recipe } from \'./db\'\nconst c = recipe(1)\n---\nmain a\n', { page: true })).not.toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
+    expect(messages('--- server\nexport function recipe(id: number) { return id }\nconst c = recipe(1)\n---\nmain a\n', { page: true })).not.toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
     expect(messages('--- server\nfunction recipe(id: number) { return id }\nconst c = recipe(1)\n---\nmain a\n', { page: true })).not.toContain('A recipe belongs to a component\'s script, not to a `--- server` fence')
   })
 })

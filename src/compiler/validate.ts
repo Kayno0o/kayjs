@@ -19,7 +19,7 @@ const WHITESPACE = /\s+/
 // A part's name, which becomes a key of the component's `class` type.
 const PART_NAME = /^[A-Z][\w-]*$/i
 // A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
-const CLASS_MEMBER = /^class\??\s*:/
+const CLASS_MEMBER = /^(?:class|'class'|"class")\??\s*:/
 const MEMBER_START = /[\s{;,]/
 const TYPE_OPENERS = '{[(<'
 const TYPE_CLOSERS = '}])>'
@@ -101,6 +101,18 @@ export function bindEvent(element: ElementNode, property: string): string {
   return property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
 }
 
+// The index of the quote closing the string literal opened at `start`.
+function literalEnd(type: string, start: number): number {
+  for (let index = start + 1; index < type.length; index++) {
+    if (type[index] === '\\')
+      index++
+    else if (type[index] === type[start])
+      return index
+  }
+
+  return type.length
+}
+
 // Whether a props type, written as text, has a `class` member of its own: one at the first level of a `{ ... }`, not inside a type nested in it, as `style: { class?: string }` is.
 function declaresClass(type: string): boolean {
   const open: string[] = []
@@ -108,14 +120,25 @@ function declaresClass(type: string): boolean {
   for (let index = 0; index < type.length; index++) {
     const char = type[index]!
 
-    if (TYPE_OPENERS.includes(char))
+    if (char === '\'' || char === '"' || char === '`') {
+      // A string literal type: a member name is tested first, then the literal is skipped whole, so a brace or `>` inside it counts for nothing.
+      if (open.length === 1 && open[0] === '{' && MEMBER_START.test(type[index - 1] ?? '{') && CLASS_MEMBER.test(type.slice(index)))
+        return true
+
+      index = literalEnd(type, index)
+    }
+    else if (TYPE_OPENERS.includes(char)) {
       open.push(char)
-    else if (char === '>' && type[index - 1] === '=')
+    }
+    else if (char === '>' && type[index - 1] === '=') {
       continue
-    else if (TYPE_CLOSERS.includes(char))
+    }
+    else if (TYPE_CLOSERS.includes(char)) {
       open.pop()
-    else if (open.length === 1 && open[0] === '{' && MEMBER_START.test(type[index - 1] ?? '{') && CLASS_MEMBER.test(type.slice(index)))
+    }
+    else if (open.length === 1 && open[0] === '{' && MEMBER_START.test(type[index - 1] ?? '{') && CLASS_MEMBER.test(type.slice(index))) {
       return true
+    }
   }
 
   return false

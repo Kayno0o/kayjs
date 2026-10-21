@@ -221,7 +221,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   const recipeCalls = recipeNames(ast.program.body)
 
   // A `recipe` written in a server fence with no import and no declaration of its own is kay's, missing its import.
-  if (!withRecipes && !ast.program.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(statement).some(identifier => identifier.name === 'recipe')))
+  if (!withRecipes && !ast.program.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(unexported(statement)).some(identifier => identifier.name === 'recipe')))
     recipeCalls.add('recipe')
 
   let cursor = fence.start
@@ -701,6 +701,11 @@ function nameSpan(identifier: t.Identifier, shift: (node: t.Node) => Span): Span
   const { start } = shift(identifier)
 
   return { start, end: start + identifier.name.length }
+}
+
+// The declaration an `export` wraps, the statement itself otherwise.
+function unexported(statement: t.Statement): t.Statement {
+  return statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
 }
 
 // A `const enum` is no value to hand on, and an ambient declaration only describes something that exists elsewhere.

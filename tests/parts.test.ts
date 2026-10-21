@@ -200,6 +200,15 @@ describe('kay check on parts', () => {
     expect(diagnostics('---\nconst { class: className } = props<{ class?: string }>()\n---\nsection(class={className})\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
   })
 
+  it('reads a quoted class member and skips string literals in the props type', () => {
+    const taken = (type: string) => diagnostics(`---\nconst all = props<${type}>()\n---\nsection\n  div(part="head") a\n`).some(message => message.includes('takes `class` from its parts'))
+
+    expect(taken('{ \'class\'?: string }')).toBe(true)
+    expect(taken('{ "class": string }')).toBe(true)
+    expect(taken('{ mode: \'}\' | \'>\', class?: string }')).toBe(true)
+    expect(taken('{ mode: \'{\' | \'class: x\', title: string }')).toBe(false)
+  })
+
   it('reports a component with parts whose props type declares class', () => {
     expect(diagnostics('---\nconst all = props<{ class?: string }>()\n---\nsection\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
   })
