@@ -64,6 +64,12 @@ describe('marking a section on arrival', () => {
     expect(painted()).toEqual(['install', 'ÉTÉ', 'install'])
   })
 
+  it('marks the singular of a plural word searched for', () => {
+    mount('<main><h2 id="a">Setup</h2><p>One link, two links and a linker.</p></main>')
+    arrival.markArrival('?kay_q=links', '#a')
+    expect(painted()).toEqual(['link', 'links'])
+  })
+
   it('marks the text above the first heading when the hit has no anchor, never the nav or a script', () => {
     arrival.markArrival('?kay_q=install', '')
     expect(painted()).toEqual(['install'])

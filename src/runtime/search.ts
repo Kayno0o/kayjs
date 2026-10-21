@@ -67,7 +67,7 @@ export interface SearchPart {
 }
 
 export interface SearchResults {
-  // The latest query's hits, kept until the next one's arrive.
+  // The latest query's hits, kept until the next one's arrive, and dropped when that search fails.
   hits: () => SearchHit[]
   loading: () => boolean
   // Why the index could not load for the latest query.
@@ -94,7 +94,7 @@ export function searchShard(word: string, letters = MIN_WORD): string {
   return [...word].slice(0, letters).map(char => char.codePointAt(0)!.toString(36)).join('-')
 }
 
-// Searches the pages `kay build` indexed with `search` on, loading only the words the query starts and the texts of its best hits; every word has to be found in a section, as a word or the start of one.
+// Searches the pages `kay build` indexed with `search` on, loading only the words the query starts and the texts of its best hits; every word has to be found in a section, as a word, the start of one or the singular of a plural term.
 export async function searchSite(query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
   const terms = [...new Set(searchWords(query))].filter(term => term.length >= MIN_WORD)
 
@@ -159,7 +159,7 @@ function singular(term: string): string | undefined {
   return term.length > 3 && term.endsWith('s') && !term.endsWith('ss') ? term.slice(0, -1) : undefined
 }
 
-// Each section holding a word the term starts, scored by the best such word.
+// Each section holding a word the term starts, or its singular, scored by the best such word.
 async function termScores(dir: string, shards: Set<string>, term: string): Promise<Map<number, number>> {
   const scores = new Map<number, number>()
   const bare = singular(term)
@@ -234,7 +234,7 @@ function fold(text: string): string {
   return text.normalize('NFKD').replace(MARK, '').replace(INVISIBLE, '').toLowerCase()
 }
 
-// About a line around the first word found, each word starting as a term does marked, and how many such words lie past it.
+// About a line around the first word found, each word starting as a term does (or its singular) marked, and how many such words lie past it.
 function snippet(text: string, terms: string[]): { snippet: SearchPart[], more: number } {
   const hits = wordHits(text, terms)
   const start = Math.max(0, (hits[0]?.[0] ?? 0) - SNIPPET_BEFORE)
@@ -246,7 +246,7 @@ function snippet(text: string, terms: string[]): { snippet: SearchPart[], more: 
   }
 }
 
-// Where each word starting as a term does sits in the text, by the term's length.
+// Where each word starting as a term does, or being its singular, sits in the text, by the term's length.
 export function wordHits(text: string, terms: string[]): [number, number][] {
   // Folding can change a character's length, so each folded character keeps the index of the one it came from.
   let folded = ''
@@ -261,9 +261,10 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
   }
 
   const hits: [number, number][] = []
+  const singulars = new Set(terms.flatMap(term => singular(term) ?? []))
 
   for (const word of folded.matchAll(WORD)) {
-    const length = matched(word[0], terms)
+    const length = matched(word[0], terms, singulars)
 
     if (length !== undefined)
       hits.push([from[word.index]!, from[word.index + length - 1]! + 1])
@@ -273,13 +274,13 @@ export function wordHits(text: string, terms: string[]): [number, number][] {
 }
 
 // How much of a word a term marks: as much as the term when the word starts with it, all of it when the word is the term's singular.
-function matched(word: string, terms: string[]): number | undefined {
+function matched(word: string, terms: string[], singulars: Set<string>): number | undefined {
   const term = terms.find(term => word.startsWith(term))
 
   if (term !== undefined)
     return term.length
 
-  return terms.some(term => word === singular(term)) ? word.length : undefined
+  return singulars.has(word) ? word.length : undefined
 }
 
 // The text from `start` to `end` in parts, the hits within it marked.

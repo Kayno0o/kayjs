@@ -463,7 +463,8 @@ describe('the search index', () => {
 
     expect(hits.map(hit => bare(hit.href))).toEqual(['/templates#outside', '/button#as-a-link'])
     expect(hits[1]!.headingParts).toEqual([{ text: 'As a ', hit: false }, { text: 'link', hit: true }])
-    expect((await search(dir, 'ss')).hits).toEqual([])
+    expect((await search(dir, 'sites')).hits.map(hit => bare(hit.href))).toEqual(['/templates#outside'])
+    expect((await search(dir, 'otherss')).hits).toEqual([])
     expect((await search(dir, 'tabs')).hits.map(hit => bare(hit.href))).toEqual(['/templates#outside'])
   })
 
