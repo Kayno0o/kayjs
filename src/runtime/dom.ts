@@ -1294,9 +1294,7 @@ export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
 
   const element = claim ? claimNode() as Element : createElement(elementName(tag))
 
-  const sources = () => [spreadAttributes(props)]
-
-  spread(element, element.localName === 'a' ? () => outsides(sources()) : sources, 'children' in props)
+  spread(element, () => [spreadAttributes(props)], 'children' in props, element.localName === 'a')
 
   return element
 }
@@ -1347,14 +1345,12 @@ export function outside<T>(element: Element, href: T, ownRel = false): T {
   return href
 }
 
-// The sources of a link's spread, with the `target` and `rel` of a link leaving the site after them, unless one writes its own.
-export function outsides(sources: readonly object[]): readonly object[] {
-  const props = merge(...sources)
-
+// A link's spread props, getters kept, with the `target` and `rel` of a link leaving the site, unless it writes its own.
+function outsideProps(props: Record<string, unknown>): Record<string, unknown> {
   if (Object.hasOwn(props, 'target') || !leavesInBrowser(props.href))
-    return sources
+    return props
 
-  return [...sources, Object.hasOwn(props, 'rel') ? { target: '_blank' } : { target: '_blank', rel: 'noopener' }]
+  return merge(props, Object.hasOwn(props, 'rel') ? { target: '_blank' } : { target: '_blank', rel: 'noopener' })
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
@@ -1459,7 +1455,8 @@ export function ref(element: Element, target: unknown): void {
 }
 
 // Attributes and handlers from objects only known at render time; with `content`, a `children`, `innerHTML` or `textContent` among them sets the element's content.
-export function spread(element: Element, sources: () => readonly object[], content = false): void {
+// `link` is for an `a`, whose attributes gain the `target` and `rel` of a link leaving the site.
+export function spread(element: Element, sources: () => readonly object[], content = false, link = false): void {
   const set = new Map<string, unknown>()
 
   // Children render in a part of their own, so a change to another prop does not build them again.
@@ -1470,7 +1467,8 @@ export function spread(element: Element, sources: () => readonly object[], conte
   const owner = getOwner()
 
   renderEffect(() => {
-    const props = merge(...sources())
+    const merged = merge(...sources())
+    const props = link ? outsideProps(merged) : merged
     const seen = new Set<string>()
 
     for (const name of Object.keys(props)) {

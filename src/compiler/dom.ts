@@ -11,7 +11,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'outsides', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -645,12 +645,12 @@ export class DomTemplate extends TemplateWriter {
 
     const link = element.name === 'a'
 
-    b.add(`KaySpread(${variable}, () => ${link ? 'KayOutsides(' : ''}[`)
+    b.add(`KaySpread(${variable}, () => [`)
     this.leadingImageDefaults(element)
     this.sources(element, false)
     this.formDefaults(element)
 
-    b.add(`]${link ? ')' : ''}${content ? ', true' : ''});`)
+    b.add(`]${content || link ? `, ${content}` : ''}${link ? ', true' : ''});`)
   }
 
   private component(element: ElementNode): void {

@@ -134,6 +134,41 @@ describe('a dynamic tag naming a link', () => {
   })
 })
 
+describe('a spread link whose href changes', () => {
+  it('rebuilds no children and keeps target and rel in step', async () => {
+    const { dynamic, render } = await import('../src/runtime/dom')
+    const { signal } = await import('../src/runtime/core')
+    const href = signal('https://other.example/x')
+    const container = document.createElement('div')
+    let renders = 0
+    const props = {
+      get href() {
+        return href()
+      },
+      get children() {
+        renders++
+
+        return 'label'
+      },
+    }
+    const dispose = render(() => dynamic('a', props), container)
+    const link = container.querySelector('a')!
+    const state = () => [link.getAttribute('target'), link.getAttribute('rel')]
+
+    expect(state()).toEqual(['_blank', 'noopener'])
+    expect(renders).toBe(1)
+    href.set('/inside')
+    await settle()
+    expect(state()).toEqual([null, null])
+    href.set('https://other.example/y')
+    await settle()
+    expect(state()).toEqual(['_blank', 'noopener'])
+    expect(link.getAttribute('href')).toBe('https://other.example/y')
+    expect(renders).toBe(1)
+    dispose()
+  })
+})
+
 describe('a link of an island under links.outside same-tab', () => {
   it('leaves every link in the same tab, the page\'s meta telling so', async () => {
     document.head.insertAdjacentHTML('beforeend', '<meta name="kay-same-tab-links">')

@@ -309,7 +309,7 @@ describe('links leaving the site', () => {
     expect(compileKay('a(href={href}) x\n', 'page.kay', { output: 'html' }).tsx).toContain('KayLinkHref(')
     expect(compileKay('a({...props}) x\n', 'page.kay', { output: 'html' }).tsx).not.toContain('KayLinkHref(')
     expect(compileKay(`${ISLAND}a(href={href}) x\n`, 'page.kay', { output: 'dom' }).tsx).toContain('KayOutside(')
-    expect(compileKay(`${ISLAND}a({...{ href }}) x\n`, 'page.kay', { output: 'dom' }).tsx).toContain('KayOutsides(')
+    expect(compileKay(`${ISLAND}a({...{ href }}) x\n`, 'page.kay', { output: 'dom' }).tsx).toMatch(/KaySpread\([^;]*\], false, true\);/)
 
     for (const link of ['a(href={href} target="_self") x', 'a(href="https://other.example" target="") x', 'a(href={href} target={n}) x']) {
       expect(compileKay(`${link}\n`, 'page.kay', { output: 'html' }).tsx, link).not.toMatch(/KayLinkHref\(|KayOutsideLink\(/)
