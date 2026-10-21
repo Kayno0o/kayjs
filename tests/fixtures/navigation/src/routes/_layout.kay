@@ -29,6 +29,6 @@ div#drawer(popover) Drawer
 if wrapped
   section.wrapper
     Player(persist page={page})
-else
+else if page !== '/bare'
   Player(persist page={page})
 slot

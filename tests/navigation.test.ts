@@ -266,6 +266,161 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   }
 
+  // A refresh keeps the focus where it was, which a link followed moves to the new page's heading.
+  async function refreshed(on: TestPage): Promise<void> {
+    const before = await on.text('p.bumps')
+
+    await on.evaluate(() => document.querySelector<HTMLElement>('button.bump')!.click())
+    await on.waitUntil((text: string | null) => document.querySelector('p.bumps')!.textContent !== text, {}, before)
+  }
+
+  // A browser without `moveBefore`, whose swap puts nodes back with `insertBefore`.
+  async function withoutMoveBefore(on: TestPage): Promise<void> {
+    await on.initScript(() => {
+      for (const prototype of [Element.prototype, Document.prototype, DocumentFragment.prototype])
+        Reflect.deleteProperty(prototype, 'moveBefore')
+    })
+  }
+
+  describe('scrolled panels of the persistent island', () => {
+    // Each as [top, left].
+    const SCROLLS = { outer: [300, 40], inner: [120, 25] }
+
+    // A panel scrolled both ways with another scrolled in it, and a field in the inner one holding the focus.
+    async function scrolledInIsland(on: TestPage, smooth = false): Promise<void> {
+      await on.evaluate(([scrolls, behavior]: [typeof SCROLLS, string]) => {
+        const island = document.querySelector('slot[data-persist]')!
+        const outer = document.createElement('div')
+        const inner = document.createElement('div')
+        const input = document.createElement('input')
+
+        outer.className = 'outer'
+        outer.setAttribute('style', `display: block; width: 200px; height: 100px; overflow: auto; scroll-behavior: ${behavior}`)
+        inner.className = 'inner'
+        inner.setAttribute('style', `width: 400px; height: 60px; overflow: auto; margin: 4px; scroll-behavior: ${behavior}`)
+        input.setAttribute('aria-label', 'inside')
+
+        const wide = document.createElement('div')
+        const filler = document.createElement('div')
+
+        wide.setAttribute('style', 'width: 1200px; height: 600px')
+        filler.setAttribute('style', 'width: 900px; height: 500px')
+        inner.append(filler, input)
+        outer.append(inner, wide)
+        island.append(outer)
+        outer.scrollTo(scrolls.outer[1]!, scrolls.outer[0]!)
+        inner.scrollTo(scrolls.inner[1]!, scrolls.inner[0]!)
+      }, [SCROLLS, smooth ? 'smooth' : 'auto'] as [typeof SCROLLS, string])
+      // A smooth scroll to its place takes a moment.
+      await on.waitUntil((expected: typeof SCROLLS) => {
+        const outer = document.querySelector('.outer')!
+        const inner = document.querySelector('.inner')!
+
+        return outer.scrollTop === expected.outer[0] && inner.scrollTop === expected.inner[0]
+      }, {}, SCROLLS)
+    }
+
+    async function scrollsOf(on: TestPage): Promise<{ outer: number[], inner: number[], focused: boolean }> {
+      return on.evaluate(() => {
+        const outer = document.querySelector('.outer')!
+        const inner = document.querySelector('.inner')!
+
+        return { outer: [outer.scrollTop, outer.scrollLeft], inner: [inner.scrollTop, inner.scrollLeft], focused: document.activeElement?.getAttribute('aria-label') === 'inside' }
+      })
+    }
+
+    for (const moving of [true, false]) {
+      describe(moving ? 'with moveBefore' : 'without moveBefore', () => {
+        let fresh: TestPage
+
+        // One page for the tests of a mode, loaded afresh by each: every page a test opens is a tab the later tests of this file pay for.
+        beforeAll(async () => {
+          fresh = await open('/')
+
+          if (!moving)
+            await withoutMoveBefore(fresh)
+        })
+
+        beforeEach(async () => {
+          await fresh.goto(origin)
+        })
+
+        afterAll(() => {
+          fresh.close()
+        })
+
+        it('keeps the scroll of a panel and of one nested in it, both ways, through a refresh', async () => {
+          await scrolledInIsland(fresh)
+          await refreshed(fresh)
+
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+          expect(fresh.errors).toEqual([])
+        })
+
+        it('keeps them through a link followed and Back, in the same element', async () => {
+          await scrolledInIsland(fresh)
+          await fresh.evaluate(() => {
+            document.querySelector('.inner')!.id = 'same'
+          })
+          await fresh.evaluate(() => document.querySelector<HTMLElement>('a.second')!.click())
+          await fresh.waitFor('h1', { text: 'Second' })
+
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+          expect(await fresh.count('#same')).toBe(1)
+          await fresh.back()
+          await fresh.waitFor('h1', { text: 'Home' })
+
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+          expect(fresh.errors).toEqual([])
+        })
+
+        it('puts a panel with smooth scrolling back at once', async () => {
+          await scrolledInIsland(fresh, true)
+          await refreshed(fresh)
+
+          // Read in the frame after the swap, before a smooth scroll from the top could have reached its place.
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
+        })
+
+        it('keeps the focus in a field of the panel and the scroll of the panel around it', async () => {
+          await scrolledInIsland(fresh)
+          await fresh.evaluate(() => document.querySelector<HTMLInputElement>('[aria-label="inside"]')!.focus({ preventScroll: true }))
+          await refreshed(fresh)
+
+          expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: true })
+        })
+
+        it('reads no scroll from the page when the next page keeps no island', async () => {
+          await scrolledInIsland(fresh)
+          await fresh.evaluate(() => {
+            const read = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')! as { get: () => number, set: (value: number) => void }
+            const state = window as { kayScrollReads?: number }
+            const link = Object.assign(document.createElement('a'), { href: '/bare', className: 'bare' })
+
+            state.kayScrollReads = 0
+            Object.defineProperty(Element.prototype, 'scrollTop', {
+              configurable: true,
+              get() {
+                state.kayScrollReads!++
+
+                return read.get.call(this)
+              },
+              set(value: number) {
+                read.set.call(this, value)
+              },
+            })
+            document.querySelector('nav')!.append(link)
+            link.click()
+          })
+          await fresh.waitFor('h1', { text: 'Bare' })
+
+          expect(await fresh.count('slot[data-persist]')).toBe(0)
+          expect(await fresh.evaluate(() => (window as { kayScrollReads?: number }).kayScrollReads)).toBe(0)
+        })
+      })
+    }
+  })
+
   // A page of its own, as the tests after these count on the document and the history the shared page holds.
   describe('nodes moved in place', () => {
     let own: TestPage
@@ -329,22 +484,6 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       })
     }
 
-    // A refresh keeps the focus where it was, which a link followed moves to the new page's heading.
-    async function refreshed(on: TestPage): Promise<void> {
-      const before = await on.text('p.bumps')
-
-      await on.evaluate(() => document.querySelector<HTMLElement>('button.bump')!.click())
-      await on.waitUntil((text: string | null) => document.querySelector('p.bumps')!.textContent !== text, {}, before)
-    }
-
-    // A browser without `moveBefore`, whose swap puts nodes back with `insertBefore`.
-    async function withoutMoveBefore(on: TestPage): Promise<void> {
-      await on.initScript(() => {
-        for (const prototype of [Element.prototype, Document.prototype, DocumentFragment.prototype])
-          Reflect.deleteProperty(prototype, 'moveBefore')
-      })
-    }
-
     it('moves the persistent island in place, its iframe loaded and its field focused, and still closes a popover left open', async () => {
       await stateInIsland(own)
       await refreshed(own)
@@ -394,157 +533,6 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       finally {
         fresh.close()
       }
-    })
-
-    describe('scrolled panels of the persistent island', () => {
-      // Each as [top, left].
-      const SCROLLS = { outer: [300, 40], inner: [120, 25] }
-
-      // A panel scrolled both ways with another scrolled in it, and a field in the inner one holding the focus.
-      async function scrolledInIsland(on: TestPage, smooth = false): Promise<void> {
-        await on.evaluate(([scrolls, behavior]: [typeof SCROLLS, string]) => {
-          const island = document.querySelector('slot[data-persist]')!
-          const outer = document.createElement('div')
-          const inner = document.createElement('div')
-          const input = document.createElement('input')
-
-          outer.className = 'outer'
-          outer.setAttribute('style', `display: block; width: 200px; height: 100px; overflow: auto; scroll-behavior: ${behavior}`)
-          inner.className = 'inner'
-          inner.setAttribute('style', `width: 400px; height: 60px; overflow: auto; margin: 4px; scroll-behavior: ${behavior}`)
-          input.setAttribute('aria-label', 'inside')
-
-          const wide = document.createElement('div')
-          const filler = document.createElement('div')
-
-          wide.setAttribute('style', 'width: 1200px; height: 600px')
-          filler.setAttribute('style', 'width: 900px; height: 500px')
-          inner.append(filler, input)
-          outer.append(inner, wide)
-          island.append(outer)
-          outer.scrollTo(scrolls.outer[1]!, scrolls.outer[0]!)
-          inner.scrollTo(scrolls.inner[1]!, scrolls.inner[0]!)
-        }, [SCROLLS, smooth ? 'smooth' : 'auto'] as [typeof SCROLLS, string])
-        // A smooth scroll to its place takes a moment.
-        await on.waitUntil((expected: typeof SCROLLS) => {
-          const outer = document.querySelector('.outer')!
-          const inner = document.querySelector('.inner')!
-
-          return outer.scrollTop === expected.outer[0] && inner.scrollTop === expected.inner[0]
-        }, {}, SCROLLS)
-      }
-
-      async function scrollsOf(on: TestPage): Promise<{ outer: number[], inner: number[], focused: boolean }> {
-        return on.evaluate(() => {
-          const outer = document.querySelector('.outer')!
-          const inner = document.querySelector('.inner')!
-
-          return { outer: [outer.scrollTop, outer.scrollLeft], inner: [inner.scrollTop, inner.scrollLeft], focused: document.activeElement?.getAttribute('aria-label') === 'inside' }
-        })
-      }
-
-      for (const moving of [true, false]) {
-        describe(moving ? 'with moveBefore' : 'without moveBefore', () => {
-          let fresh: TestPage
-
-          beforeEach(async () => {
-            fresh = await open('/')
-
-            if (!moving) {
-              await withoutMoveBefore(fresh)
-              await fresh.goto(origin)
-            }
-          })
-
-          afterEach(() => {
-            fresh.close()
-          })
-
-          it('keeps the scroll of a panel and of one nested in it, both ways, through a refresh', async () => {
-            await scrolledInIsland(fresh)
-            await refreshed(fresh)
-
-            expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
-            expect(fresh.errors).toEqual([])
-          })
-
-          it('keeps them through a link followed and Back, in the same element', async () => {
-            await scrolledInIsland(fresh)
-            await fresh.evaluate(() => {
-              document.querySelector('.inner')!.id = 'same'
-            })
-            await fresh.evaluate(() => document.querySelector<HTMLElement>('a.second')!.click())
-            await fresh.waitFor('h1', { text: 'Second' })
-
-            expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
-            expect(await fresh.count('#same')).toBe(1)
-            await fresh.back()
-            await fresh.waitFor('h1', { text: 'Home' })
-
-            expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
-            expect(fresh.errors).toEqual([])
-          })
-
-          it('puts a panel with smooth scrolling back at once', async () => {
-            await scrolledInIsland(fresh, true)
-            await refreshed(fresh)
-
-            // Read in the frame after the swap, before a smooth scroll from the top could have reached its place.
-            expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: false })
-          })
-
-          it('keeps the focus in a field of the panel and the scroll of the panel around it', async () => {
-            await scrolledInIsland(fresh)
-            await fresh.evaluate(() => document.querySelector<HTMLInputElement>('[aria-label="inside"]')!.focus({ preventScroll: true }))
-            await refreshed(fresh)
-
-            expect(await scrollsOf(fresh)).toEqual({ ...SCROLLS, focused: true })
-          })
-        })
-      }
-
-      it('reads no scroll from the page when the next page keeps no island', async () => {
-        const fresh = await open('/')
-
-        try {
-          await withoutMoveBefore(fresh)
-          await fresh.initScript(() => {
-            const read = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')! as { get: () => number, set: (value: number) => void }
-            const state = window as { kayScrollReads?: number }
-
-            state.kayScrollReads = 0
-            Object.defineProperty(Element.prototype, 'scrollTop', {
-              configurable: true,
-              get() {
-                state.kayScrollReads!++
-
-                return read.get.call(this)
-              },
-              set(value: number) {
-                read.set.call(this, value)
-              },
-            })
-          })
-          await fresh.route(`${origin}/second`, async (request) => {
-            const response = await request.fetch()
-
-            await request.fulfill({ status: response.status, headers: response.headers, body: response.text().replace(/<slot [^>]*data-persist[^>]*>.*?<\/slot>/s, '') })
-          })
-          await fresh.goto(origin)
-          await scrolledInIsland(fresh)
-          await fresh.evaluate(() => {
-            (window as { kayScrollReads?: number }).kayScrollReads = 0
-            document.querySelector<HTMLElement>('a.second')!.click()
-          })
-          await fresh.waitFor('h1', { text: 'Second' })
-
-          expect(await fresh.count('slot[data-persist]')).toBe(0)
-          expect(await fresh.evaluate(() => (window as { kayScrollReads?: number }).kayScrollReads)).toBe(0)
-        }
-        finally {
-          fresh.close()
-        }
-      })
     })
 
     describe('rows moved in a keyed list', () => {
