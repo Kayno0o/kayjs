@@ -337,3 +337,32 @@ test('a tab stop that gains children loses its button role, and a focus rewrites
   await page.evaluate(() => document.querySelector('#plain')!.append(document.createElement('b')))
   await page.waitUntil(() => !document.querySelector('#plain')!.hasAttribute('role'))
 }, 60_000)
+
+test('a tab stop whose children were all removed again gets its button role back', async () => {
+  const page = await open()
+
+  await addMarked(page, '<div id="plain" data-kay-field="posts:hello:title">Plain</div>')
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
+  await page.evaluate(() => document.querySelector('#plain')!.append(document.createElement('b')))
+  await page.waitUntil(() => !document.querySelector('#plain')!.hasAttribute('role'))
+  await page.evaluate(() => document.querySelector('#plain b')!.remove())
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
+}, 60_000)
+
+test('a choice taller than the window scrolls instead of clipping its last field', async () => {
+  const page = await open()
+
+  await page.evaluate((selector: string) => {
+    document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title')
+    document.head.insertAdjacentHTML('beforeend', '<style>.kcms-marker-item { min-height: 40rem !important }</style>')
+  }, TITLE)
+  await page.click(TITLE)
+  await page.waitUntil((selector: string) => document.querySelector(selector) !== null, undefined, MENU)
+
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getBoundingClientRect().bottom <= innerHeight + 0.5, undefined, MENU)
+  expect(await page.evaluate((selector: string) => {
+    const menu = document.querySelector(selector)!
+
+    return menu.scrollHeight > menu.clientHeight
+  }, MENU)).toBe(true)
+}, 60_000)

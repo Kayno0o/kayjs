@@ -211,7 +211,8 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
       if (found.length === 0)
         continue
 
-      const reached = element.matches(`[tabindex], ${CONTROLS}, a[href]`)
+      // The tab stop given here does not count as the page's own.
+      const reached = element.matches(`${given.get(element)?.includes('tabindex') ? '' : '[tabindex], '}${CONTROLS}, a[href]`)
       const description = describe(found)
 
       // The form may have loaded since, which names the field by its label instead of its path.
@@ -248,8 +249,13 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
         continue
       }
 
-      if (record.target instanceof HTMLElement && record.target.childElementCount > 0)
-        drop(record.target, 'role')
+      // An element whose children all went is the text of one field again, so it gets the role back.
+      if (record.target instanceof HTMLElement) {
+        if (record.target.childElementCount > 0)
+          drop(record.target, 'role')
+        else
+          give(record.target)
+      }
 
       for (const node of record.addedNodes) {
         if (node instanceof Element)
