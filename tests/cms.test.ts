@@ -17,7 +17,7 @@ import { ContentError } from '../src/content/validate'
 import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, unclickableFields, withFieldMarks } from '../src/runtime/fields'
-import { child, loop } from '../src/runtime/html'
+import { child, element, loop, spreadAttributes } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { navigation } from '../src/runtime/navigation'
@@ -1458,6 +1458,35 @@ describe('preview mode', () => {
       expect([...marks.unrendered.keys()]).toEqual([])
       expect(placeFieldMarks(html, marks)).toContain('</slot><p>Delphine</p><p>Pilot</p>')
       expect(placeFieldMarks(html, marks)).not.toContain('data-kay-field')
+    }, true)
+  })
+
+  it('queues no text for a field passed to an island by name', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { name: 'Delphine' }, Content: () => renderedHtml('') })
+      const Card = island('card.kay', (_props: { name: string }) => null)
+      // What a page's `Card(name={entry.data.name})` hands the island: a getter.
+      const html = withFieldMarks(marks, () => `${child(Card({ get name() {
+        return entry.data.name
+      } }))}<p>${child('Delphine')}</p>`)
+
+      expect([...marks.unrendered.keys()]).toEqual([])
+      expect(placeFieldMarks(html, marks)).not.toContain('data-kay-field')
+    }, true)
+  })
+
+  it('reads the handlers and innerHTML an element spread drops unmarked, and marks the attributes it keeps', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { title: 'Pilot', onclick: 'steal()', innerHTML: '<b>raw</b>' }, Content: () => renderedHtml('') })
+      const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const html = withFieldMarks(marks, () => `${child(element('a', [spreadAttributes(entry.data)]))}<p>${child('steal()')}</p><p>${child('<b>raw</b>')}</p>`)
+
+      warned.mockRestore()
+      expect([...marks.unrendered.keys()]).toEqual(['Pilot'])
+      expect(html).not.toContain('onclick')
+      expect(placeFieldMarks(html, marks)).toContain('<p>steal()</p><p>&lt;b>raw&lt;/b></p>')
     }, true)
   })
 

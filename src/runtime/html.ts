@@ -22,7 +22,7 @@ import { isRendered, html as renderedHtml } from './rendered'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
-import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes, styleText } from './values'
+import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes as keepAttributes, styleText } from './values'
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
@@ -30,7 +30,7 @@ export { memo, untrack } from './reactive'
 export { html, isRendered } from './rendered'
 
 export type { Html } from './rendered'
-export { componentClass, merge, omit, spreadAttributes } from './values'
+export { componentClass, merge, omit } from './values'
 
 // Leads the markup of a `try` block the server rendered its `catch` block for.
 export const FAILED_MARKER = `<!--${FAILED}-->`
@@ -52,6 +52,14 @@ const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>'
 const LINK_TAG = /<a\s[^>]*>/gi
 const LINK_HREF = /(\shref=")([^"]*)"/i
 const HREFLANG = /\shreflang=/i
+
+// A spread onto an element in edit mode: the fields it drops, handlers and `innerHTML`, are read unmarked, as a text no one renders would wait to mark a later equal one.
+export function spreadAttributes<T>(source: T): T {
+  if (fieldMarks.marking === undefined || source == null || typeof source !== 'object')
+    return keepAttributes(source)
+
+  return keepAttributes(new Proxy(source, { get: (target, key, receiver) => typeof key === 'string' && (key === 'innerHTML' || handlerName(key)) ? withFieldMarks(undefined, () => Reflect.get(target, key, receiver)) : Reflect.get(target, key, receiver) }))
+}
 
 // A child value's markup: text escaped, any other object as the markup it holds.
 export function child(value: unknown): string {

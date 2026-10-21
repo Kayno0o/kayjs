@@ -8,7 +8,7 @@ const ENTRY = { collection: 'posts', slug: 'hello' }
 let mounted: Mounted | undefined
 
 // happy-dom has no caret lookup, which the editor's click handler asks.
-Object.assign(document, { caretPositionFromPoint: () => null })
+Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(() => {
   mounted?.unmount()
@@ -169,6 +169,43 @@ test('closing or reloading the tab with edits not saved gets the browser prompt,
   await settle()
 
   expect(unload()).toBe(false)
+})
+
+test('asks before a leave only for the entries the page shows, not for edits left on an earlier one', async () => {
+  server()
+
+  // The mounted bundle has its own reactivity, so the props are plain and the guard is asked again by an edit.
+  let shown = [ENTRY]
+
+  mounted = await mountComponent(EDITOR, { get entries() {
+    return shown
+  }, unclickable: [] })
+  await settle()
+  await Bun.sleep(50)
+
+  const title = mounted.root.querySelector<HTMLInputElement>('input')!
+  const type = async (value: string) => {
+    title.value = value
+    title.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    await Bun.sleep(200)
+  }
+  const unload = () => {
+    const event = new Event('beforeunload', { cancelable: true })
+
+    window.dispatchEvent(event)
+
+    return event.defaultPrevented
+  }
+
+  await type('Mine')
+  expect(unload()).toBe(true)
+  shown = [{ collection: 'posts', slug: 'other' }]
+  await type('Mine again')
+  expect(unload()).toBe(false)
+  shown = [ENTRY]
+  await type('Mine once more')
+  expect(unload()).toBe(true)
 })
 
 test('names the fields of an entry the page does not let the editor click, and those of a frozen object', async () => {
