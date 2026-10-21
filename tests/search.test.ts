@@ -352,7 +352,7 @@ describe('the search index', () => {
   })
 
   it('splits a large file of two letters by three, and keeps one of three letters whole however large', async () => {
-    const words = 'product project process program provide professional property protect'
+    const words = 'product project process program provide professional property protect pry'
     const huge = 'pr'.padEnd(40_000, 'x')
     const dir = await index([...Array.from({ length: 700 }, (_, n) => ({ path: `/p${n}`, html: `<main><h1>Page ${n}</h1><p>${words}</p></main>` })), { path: '/blob', html: `<main><h1>Blob</h1><pre>${huge}</pre></main>` }])
     const manifest = await Bun.file(join(dir, 'search.json')).json() as SearchManifest
@@ -360,6 +360,7 @@ describe('the search index', () => {
 
     expect(shards).toContain(`w-${searchShard('pro', 3)}.json`)
     expect((await search(dir, 'protect')).hits).toHaveLength(20)
+    expect((await search(dir, 'pries')).hits).toHaveLength(20)
     expect((await search(dir, huge)).hits.map(hit => bare(hit.href))).toEqual(['/blob'])
   }, 60_000)
 
@@ -470,14 +471,16 @@ describe('the search index', () => {
 
   it('folds es and ies plurals to their singular, and leaves words that are no plural alone', async () => {
     const dir = await index([
-      { path: '/a', html: '<main><h1>A</h1><h2 id="c">The class</h2><h2 id="e">An entry</h2><h2 id="b">One box</h2><h2 id="n">Something new</h2><h2 id="l">The len</h2></main>' },
+      { path: '/a', html: '<main><h1>A</h1><h2 id="m">One menu</h2><h2 id="n2">This is not it</h2><h2 id="c">The class</h2><h2 id="e">An entry</h2><h2 id="b">One box</h2><h2 id="n">Something new</h2><h2 id="l">The len</h2></main>' },
     ])
     const found = async (query: string) => (await search(dir, query)).hits.map(hit => hit.heading)
 
     expect(await found('classes')).toEqual(['The class'])
     expect(await found('entries')).toEqual(['An entry'])
     expect(await found('boxes')).toEqual(['One box'])
+    expect(await found('menus')).toEqual(['One menu'])
     expect(await found('news')).toEqual([])
+    expect(await found('notes')).toEqual([])
     expect(await found('lens')).toEqual([])
   })
 

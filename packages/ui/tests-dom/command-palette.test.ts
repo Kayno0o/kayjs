@@ -23,7 +23,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean } = {}) {
+async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean } = {}) {
   mounted = await mountComponent('src/components/palette.kay', {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -261,6 +261,23 @@ describe('CommandPalette with siteSearch', () => {
 
     expect(dialog.open).toBe(false)
     expect(seen.recent).toEqual([])
+  })
+
+  test('lists an entry matching by characters in order after the sections found, and walks the arrows through all three', async () => {
+    const { input, labels, active } = await palette({ siteSearch: true, loose: true })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'table')
+    await until(() => labels().includes('Sorting'))
+
+    expect(labels()).toEqual(['Table', '# In the pages', 'Sorting', 'Tab left'])
+
+    press(input()!, 'ArrowDown')
+    press(input()!, 'ArrowDown')
+    await settle()
+
+    expect(active()).toBe('Tab left')
   })
 
   test('marks the words found in a section\'s heading, and shows a heading with none found as it reads', async () => {

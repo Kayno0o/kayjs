@@ -155,20 +155,19 @@ function arrivalHref(href: string, terms: string[]): string {
 }
 
 // Words ending in `s` that are no plural of the word without it.
-const NOT_PLURAL = new Set(['news', 'lens', 'series', 'species', 'does', 'goes', 'ours', 'yours', 'this', 'thus', 'plus', 'bonus', 'status', 'canvas', 'alias', 'atlas', 'bias', 'gas', 'always', 'perhaps', 'across', 'its', 'has', 'was', 'his', 'yes'])
+const NOT_PLURAL = new Set(['news', 'lens', 'series', 'species', 'does', 'goes', 'ours', 'yours', 'this', 'thus', 'plus', 'bonus', 'status', 'canvas', 'alias', 'atlas', 'bias', 'always', 'perhaps', 'across', 'analysis', 'basis', 'axis', 'focus', 'virus', 'campus', 'corpus', 'radius'])
+const ES_PLURAL = /(?:[sxzo]|ch|sh)es$/
 
-const NOT_PLURAL_END = /(?:ss|us|is)$/
-
-// The words a plural term may come from, so `links` also finds `link`, `entries` `entry` and `classes` `class`; a short term, one in `ss`, `us` or `is`, and a few such as `news` have none.
+// The words a plural term may come from, so `links` also finds `link`, `entries` `entry` and `classes` `class`; a short term, one in `ss` and a few such as `news` have none.
 function singulars(term: string): string[] {
-  if (term.length <= 3 || !term.endsWith('s') || NOT_PLURAL.has(term) || NOT_PLURAL_END.test(term))
+  if (term.length <= 3 || !term.endsWith('s') || term.endsWith('ss') || NOT_PLURAL.has(term))
     return []
 
   const found = [term.slice(0, -1)]
 
   if (term.endsWith('ies'))
     found.push(`${term.slice(0, -3)}y`)
-  else if (term.endsWith('es'))
+  else if (ES_PLURAL.test(term))
     found.push(term.slice(0, -2))
 
   return found.filter(word => word.length >= 3)
@@ -180,11 +179,11 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
   const bare = new Set(singulars(term))
   const two = searchShard(term)
   const longer = [...shards].filter(shard => shard.startsWith(`${two}-`))
-  // A term of three letters or more needs only the file of its first three when two letters were split; one of two needs them all.
+  // A term of three letters or more needs only the file of its first three, and its singulars', when two letters were split; one of two needs them all.
   let files = [two]
 
   if (longer.length > 0)
-    files = term.length > MIN_WORD ? [searchShard(term, MIN_WORD + 1)] : [two, ...longer]
+    files = term.length > MIN_WORD ? [...new Set([term, ...bare].map(word => searchShard(word, MIN_WORD + 1)))] : [two, ...longer]
 
   const found = await Promise.all(files.filter(shard => shards.has(shard)).map(async shard => load<Record<string, number[]>>(`${dir}w-${shard}.json`)))
 
