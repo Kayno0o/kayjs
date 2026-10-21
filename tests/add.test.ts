@@ -75,7 +75,7 @@ it('names what a feature needs, and writes nothing', async () => {
     const before = await snapshot(dir)
 
     await expect(addFeatures(dir, ['ws'], { install: false })).rejects.toThrow('kay add: ws needs server: run `kay add server,ws` to add them together')
-    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('postgres needs server: run `kay add server,postgres`')
+    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('postgres brings kayjs-auth, which needs server: run `kay add server,postgres`')
     await expect(addFeatures(dir, ['bogus'], { install: false })).rejects.toThrow('kay add: bogus is none of the features')
     expect(await snapshot(dir)).toEqual(before)
   }
@@ -707,7 +707,7 @@ it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () 
   }
 })
 
-it('adds postgres to a project without the demo sign-in, which it plans under it', async () => {
+it('adds postgres to a project without kayjs-auth, which it plans under it', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {
@@ -722,7 +722,7 @@ it('adds postgres to a project without the demo sign-in, which it plans under it
   }
 })
 
-it('adds kayjs-auth over the Postgres database postgres sets up, with no demo sign-in', async () => {
+it('adds kayjs-auth over the Postgres database postgres sets up, with no second sign-in', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {

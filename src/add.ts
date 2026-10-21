@@ -316,8 +316,10 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
       throw new Error(`kay add: ${feature} needs ${missing.join(' and ')}: run \`kay add ${[...missing, feature].join(',')}\` to add them together`)
   }
 
-  if (implied && !wanted.has('server'))
-    throw new Error('kay add: postgres needs server: run `kay add server,postgres` to add them together')
+  for (const need of implied ? ['server', 'tailwind'] as const : []) {
+    if (!wanted.has(need))
+      throw new Error(`kay add: postgres brings kayjs-auth, which needs ${need}: run \`kay add ${need},postgres\` to add them together`)
+  }
 
   const { writes, conflicts, notes } = plan
   // The project may have been renamed since `kay new` named its package after the directory, so the templates take its own name.

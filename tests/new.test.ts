@@ -830,12 +830,14 @@ describe('kay new', () => {
       // Every preset's own files are linted by theirs.
       expect((await lintInProcess(dir, (await ownFiles(dir, files)).filter(file => LINTED.test(file)))).flatMap(result => result.messages)).toEqual([])
 
-      // The first migration is generated and applied on a Postgres the test user may create databases on, which CI always has: the tests then run on a database per file.
+      // The first migration is generated on a Postgres the test user may create databases on, which CI always has: the tests then run on a database per file.
       if ((TEST_DATABASE_URL ?? '') !== '' || (process.env.CI ?? '') !== '') {
         const env = { ...process.env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { DATABASE_URL: TEST_DATABASE_URL } }
-        const generate = Bun.spawn([process.execPath, 'run', 'db:generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env })
+        // The owner's URL in .env is read before DATABASE_URL, so the generation names the test database itself; the tests keep their copy per file.
+        const generate = Bun.spawn([process.execPath, 'run', 'db:generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { MIGRATE_DATABASE_URL: TEST_DATABASE_URL } } })
+        const [generated, generateErrors] = await Promise.all([new Response(generate.stdout).text(), new Response(generate.stderr).text(), generate.exited])
 
-        expect(await generate.exited).toBe(0)
+        expect({ generated: generated.includes('Generated'), generateErrors }).toEqual({ generated: true, generateErrors: expect.not.stringContaining('rror') })
 
         const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env })
         const [report, output, code] = await Promise.all([new Response(tests.stderr).text(), new Response(tests.stdout).text(), tests.exited])

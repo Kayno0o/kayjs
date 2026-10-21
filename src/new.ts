@@ -12,6 +12,8 @@ import { agentsFile, templateFiles } from './templates'
 const KAY_ROOT = resolve(import.meta.dir, '..')
 const INVALID_NAME_CHARS = /[^a-z0-9._~-]+/g
 const NAME_EDGES = /^[-._~]+|[-._~]+$/g
+const NAME_TAIL = /[^a-z0-9]+/i
+const SCOPE = /^@[^/]+\//
 
 export const GITHUB_REMOTE = /(?:@|\/\/)github\.com[:/]/
 
@@ -141,9 +143,6 @@ export async function refuseTarget(target: string): Promise<void> {
   if (existsSync(dir) && (await readdir(dir)).length > 0)
     throw new Error(`kay: ${target} is not empty`)
 }
-
-const NAME_TAIL = /[^a-z0-9]+/i
-const SCOPE = /^@[^/]+\//
 
 // Scaffolds a project that \`kay dev\` runs and \`kay check\` passes as it is; refuses a directory that already holds files.
 export async function createProject(target: string, options: NewOptions = {}): Promise<string[]> {

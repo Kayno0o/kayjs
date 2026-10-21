@@ -576,7 +576,7 @@ const APP_COMPOSE = `services:
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
       # The public origin of the site, which the mailed links and the OAuth callbacks start from.
-      SITE_URL: \${SITE_URL:-}
+      SITE_URL: \${SITE_URL:?set SITE_URL}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -597,7 +597,7 @@ const SQLITE_COMPOSE = `services:
       # At least 32 characters, kept out of the repository: it seals the sessions.
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       # The public origin of the site, which the mailed links and the OAuth callbacks start from.
-      SITE_URL: \${SITE_URL:-}
+      SITE_URL: \${SITE_URL:?set SITE_URL}
     volumes:
       - data:/app/data
 
