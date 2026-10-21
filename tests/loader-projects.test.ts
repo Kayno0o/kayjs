@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { plugin } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { registerLoader } from '../src/server/loader'
+import { registerEarlyLoader, registerLoader } from '../src/server/loader'
 import { renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -74,6 +74,24 @@ describe('the .kay loader with several projects', () => {
 
     expect(await badge(root)).toContain('hi app-d:hi')
     expect((await import(file) as { default: number }).default).toBe(42)
+  })
+
+  it('starts over from a guess with other settings, keeping the plugins other code registered and the projects loaded since', async () => {
+    plugin({ name: 'marker-start-over', setup: (build) => {
+      build.onLoad({ filter: /\.again$/ }, () => ({ contents: 'export default 7', loader: 'js' }))
+    } })
+
+    const [guessed, other] = await Promise.all([project('f', 'app-f'), project('g', 'app-g')])
+    const file = join(guessed, 'thing.again')
+
+    await Bun.write(file, '')
+    await registerEarlyLoader(guessed)
+    await registerLoader(other)
+    await registerLoader(guessed, {})
+
+    expect(await badge(guessed)).toContain('hi default:hi')
+    expect(await badge(other)).toContain('hi app-g:hi')
+    expect((await import(file) as { default: number }).default).toBe(7)
   })
 
   it('loads a project again for the same settings, and refuses other settings for a root already loaded', async () => {

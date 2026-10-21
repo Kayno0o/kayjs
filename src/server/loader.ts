@@ -58,10 +58,9 @@ function ownerOf(path: string): Project | undefined {
 }
 
 // Bun runs the first callback whose filter matches and wants an object from it, so each callback a project's plugin registers hands the file to the callback of the project owning it, which a project's plugin registered for the same kind of file.
+// A library's file under another project's root, such as one linked into a fixture below the checkout, loads for that root's project, and one under no root for the last registered: Bun keeps the first compile of a file, so two projects cannot differ on one shared library file.
 // A shared file the owner has no callback for, such as a linked library's settings module under a project setting none, loads as it is.
 function scoped(project: Project, inner: BunPlugin): BunPlugin {
-  const live = () => projects.get(project.root) === project
-
   return {
     name: inner.name,
     async setup(build) {
@@ -72,7 +71,7 @@ function scoped(project: Project, inner: BunPlugin): BunPlugin {
           project.loads.push({ filter: options.filter, namespace: options.namespace, callback })
 
           return build.onLoad(options, async (args) => {
-            const owner = live() ? ownerOf(args.path) : current
+            const owner = ownerOf(args.path)
             const load = owner?.loads.find(one => one.namespace === options.namespace && one.filter.test(args.path))
 
             if (load !== undefined)

@@ -507,7 +507,7 @@ function withoutServer(source: string): string | undefined {
 
 // A runtime plugin cannot resolve a bare specifier, so the config's source is rewritten as it loads.
 // The plugin takes only this file, and only when it is light, as a loader answering nothing for a file fails and one answering for every config would keep later plugins from theirs.
-// `plugin.clearAll()` of the server loader drops it, after which the config loads the server as before.
+// It stays registered for that one file, which the server loader's plugin also answers for.
 async function readConfigLightly(file: string): Promise<void> {
   const real = realpathSync(file)
 
