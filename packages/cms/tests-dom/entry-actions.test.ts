@@ -365,4 +365,24 @@ test('Rename is off for a single collection, and with edits not saved yet', asyn
   expect(button(root, 'Rename')!.disabled).toBe(false)
   await type(root, 'Edited')
   expect(button(root, 'Rename')!.disabled).toBe(true)
+  expect(button(root, 'Rename')!.closest('[data-tooltip]')?.getAttribute('data-tooltip')).toBe('Save or reset your edits first')
+})
+
+test('a refused Rename keeps the dialog open and the page where it is', async () => {
+  server({ saved: false, issues: [{ field: 'slug', message: 'taken' }] })
+
+  const root = await open(stored({}))
+
+  button(root, 'Rename')!.click()
+  await settle()
+
+  const input = document.querySelector<HTMLInputElement>('dialog input')!
+
+  input.value = 'other'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  ;[...document.querySelectorAll('dialog button')].find(each => each.textContent?.trim() === 'Rename')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await pause()
+  expect(document.querySelector('dialog[open]')).not.toBeNull()
+  expect(window.location.pathname).not.toContain('/other')
 })

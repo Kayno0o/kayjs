@@ -3,12 +3,14 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
+import type { Denials } from '../access'
 import type { EntryForm } from '../form'
+import Refused from './refused.kay'
 import { slugify } from '../slug'
 
 // The Rename button of a saved entry and its dialog: a new slug to type, cleaned as it is typed. The old page redirects to the new one by itself.
 // Edits not saved yet disable it, as the rename acts on the entry as saved.
-const { form } = props<{ form: EntryForm }>()
+const { form, denied = {} } = props<{ form: EntryForm, denied?: Denials }>()
 
 const open = signal(false)
 const typed = signal('')
@@ -35,11 +37,18 @@ async function rename(): Promise<void> {
   }
 }
 ---
-Button(label={wording('cms.entry.rename', 'Rename')} disabled={form.saving() || form.dirty()} data-tooltip={form.dirty() ? wording('cms.entry.renameDirty', 'Save or reset your edits first') : undefined} onClick={start})
+if denied.redirects !== undefined
+  Refused(label={wording('cms.entry.rename', 'Rename')} reason={denied.redirects})
+else if form.dirty()
+  span.kcms-refused(data-tooltip={wording('cms.entry.renameDirty', 'Save or reset your edits first')} tabindex="0")
+    Button(label={wording('cms.entry.rename', 'Rename')} disabled)
+else
+  Button(label={wording('cms.entry.rename', 'Rename')} disabled={form.saving()} onClick={start})
 Dialog(open={open()} title={wording('cms.entry.renameTitle', 'Rename {slug}', { slug: entry?.slug ?? '' })} dirty={pending()} onOpenChange={shown => { if (!shown) open = false }})
   @footer
     Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => open = false})
     Button(label={wording('cms.entry.rename', 'Rename')} tone="accent" busy={pending()} disabled={pending() || unchanged()} onClick={rename})
   form(onSubmit={(event) => { event.preventDefault(); if (!unchanged() && !pending()) void rename() }})
     TextInput(autofocus value={typed()} onInput={text => typed = slugify(text)} aria-label={wording('cms.entry.renameSlug', 'New slug')} size={32})
-    p {wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.')}
+    if entry?.url
+      p {wording('cms.entry.renameHint', 'The old address of the page redirects to the new one.')}

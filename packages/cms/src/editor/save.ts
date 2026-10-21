@@ -249,7 +249,10 @@ export async function renameSaved(ref: EntryRef, slug: string, version?: string 
     body: { slug },
   }), wording('cms.save.renameFailure', 'Could not rename'))
 
-  return settled(outcome, wording('cms.save.renamed', 'Renamed'), wording('cms.save.notRenamed', 'Not renamed')) ? slug : undefined
+  if (!settled(outcome, wording('cms.save.renamed', 'Renamed'), wording('cms.save.notRenamed', 'Not renamed')))
+    return undefined
+
+  return outcome && 'slug' in outcome && typeof outcome.slug === 'string' ? outcome.slug : slug
 }
 
 // Turns a draft entry public and says how it went; true once published.

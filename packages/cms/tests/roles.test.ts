@@ -73,6 +73,7 @@ const RESTRICTED = [
   ['POST', '/files/unused/delete', 'delete'],
   ['POST', '/files/posts', 'upload'],
   ['POST', '/files/media/rename', 'upload'],
+  ['POST', '/entries/posts/hello/rename', 'redirects'],
   ['POST', '/redirects', 'redirects'],
   ['POST', '/redirects/remove', 'redirects'],
   ['POST', '/redirects/dismiss', 'redirects'],

@@ -45,7 +45,7 @@ else if form.ends() as at
     if form.collection.history
       Button(href={historyPath(form.prefix, { collection: form.collection.name, slug: entry.slug, locale: entry.locale })} label={wording('cms.history.open', 'History')})
     if !form.collection.single
-      EntryRename(form={form})
+      EntryRename(form={form} denied={denied})
     if form.isDraft()
       if denied.publish !== undefined
         Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})

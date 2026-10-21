@@ -24,8 +24,9 @@ const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
 const DEV_STATE = /\/api\/cms\/dev$/
 const EDITOR_CAN = /\/api\/cms\/editor\/can$/
 
-// What a role may be limited from, by the route: publishing, deleting, uploading and the redirects.
+// What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
 const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
+const ENTRY_RENAME = /\/api\/cms\/entries\/[^/]+\/[^/]+\/rename$/
 const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
 const UPLOAD = /\/api\/cms\/files\/[^/]+$/
 const MEDIA_RENAME = /\/api\/cms\/files\/media\/rename$/
@@ -34,7 +35,7 @@ const UNUSED_UPLOADS = /\/api\/cms\/files\/unused\/delete$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
 function actionOf(method: string, path: string): Action | undefined {
-  if (REDIRECTS.test(path))
+  if (REDIRECTS.test(path) || (method === 'POST' && ENTRY_RENAME.test(path)))
     return 'redirects'
 
   if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path))
