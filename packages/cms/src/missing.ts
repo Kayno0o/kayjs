@@ -80,7 +80,7 @@ export function missingRows(paths: MissingPath[]): { rows: MissingRow[], total: 
     path,
     hits,
     lastSeen: minute(lastAt),
-    pages: referrers.flatMap(({ page }) => page === undefined ? [] : [page]).slice(0, REFERRERS_SHOWN),
+    pages: [...new Set(referrers.flatMap(({ page }) => page === undefined ? [] : [page]))].slice(0, REFERRERS_SHOWN),
     from: hostsOf(referrers),
     target,
     reason: target === undefined ? undefined : reasonText(reason),

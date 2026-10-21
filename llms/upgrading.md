@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 The screens no longer render inside the app's root layout, so the site's header, footer, CSS and `@theme` no longer reach them: they draw their own chrome with kayjs-ui's default theme, and kayjs-cms now lists `tailwindcss` as a peer. To keep the old look, write `src/routes/admin/_layout.kay` (at your prefix) without `layouts: false`, rendering the Content link, `Toaster` and `TooltipHost` and importing `@kaynooo/kayjs-cms/admin.css` ([kayjs-cms](../packages/cms/llms/screens.md)).
 
+### kayjs-cms's calls take `status` and `froms`
+
+`POST /api/cms/redirects` takes `{ from, to, status? }` (307, 308 or 410) and `/remove` takes `{ froms }`; `permanent` and a single `from` still work. At `prefix: '/'` the screens mount in a `(admin)` group, so a page of yours replacing a screen goes in `src/routes/(admin)/`: outside it the cms guard and layout no longer reach it ([kayjs-cms](../packages/cms/llms/screens.md)).
+
 ## 1.61.0
 
 ### kayjs-cms's delete confirmation names the entry

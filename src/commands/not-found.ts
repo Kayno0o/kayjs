@@ -129,8 +129,9 @@ function formatListing(missing: MissingPath[], redirected: boolean): string {
     return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in data/not-found.sqlite.'
 
   return missing.map(({ path, hits, referrers, target, reason }) => {
-    const from = referrers.slice(0, REFERRER_LIMIT).map(({ host }) => host).join(', ')
-    const lines = [`${String(hits).padStart(6)}  ${path}${from === '' ? '' : `  (from ${from}${referrers.length > REFERRER_LIMIT ? ', ...' : ''})`}`]
+    const hosts = [...new Set(referrers.map(({ host }) => host))]
+    const from = hosts.slice(0, REFERRER_LIMIT).join(', ')
+    const lines = [`${String(hits).padStart(6)}  ${path}${from === '' ? '' : `  (from ${from}${hosts.length > REFERRER_LIMIT ? ', ...' : ''})`}`]
 
     if (target !== undefined)
       lines.push(`        -> ${target}  (${reason}) kay not-found --redirect ${shellQuote(path)}`)

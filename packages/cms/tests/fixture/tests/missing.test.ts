@@ -140,6 +140,11 @@ test('marks a path gone: it answers 410 with no location, and is listed with its
   expect((await post('/remove', { froms: ['/retired-cms'] })).status).toBe(200)
   expect((await site.fetch('/retired-cms')).status).toBe(404)
   expect((await post('', { from: '/retired-cms', to: '/empty', status: 200 })).status).toBe(422)
+
+  // The earlier shapes still work.
+  expect((await post('', { from: '/retired-cms', to: '/empty', permanent: true })).status).toBe(200)
+  expect((await site.fetch('/retired-cms', { redirect: 'manual' })).status).toBe(308)
+  expect((await post('/remove', { from: '/retired-cms' })).status).toBe(200)
 })
 
 test('dismisses missing paths one by one or all at once, behind the guard', async () => {

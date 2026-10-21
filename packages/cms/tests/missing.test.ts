@@ -16,6 +16,7 @@ describe('missingRows', () => {
     const [shown] = missingRows([row('/old', 5, { referrers: [{ host: 'site.example', page: '/blog/a', hits: 3 }, { host: 'search.example', hits: 2 }, { host: 'site.example', page: '/blog/b', hits: 1 }, { host: 'site.example', page: '/c', hits: 1 }, { host: 'site.example', page: '/d', hits: 1 }] })]).rows
 
     expect(shown?.pages).toEqual(['/blog/a', '/blog/b', '/c'])
+    expect(missingRows([row('/dup', 1, { referrers: [{ host: 'www.site.example', page: '/a', hits: 2 }, { host: 'site.example', page: '/a', hits: 1 }] })]).rows[0]?.pages).toEqual(['/a'])
     expect(shown?.from).toBe('search.example')
   })
 

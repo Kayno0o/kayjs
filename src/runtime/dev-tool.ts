@@ -3303,7 +3303,7 @@ function notFoundTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const row = entry(tool, 'missing', {
       name: missing.path,
       after: [pill(tool, `${missing.hits} hit${missing.hits === 1 ? '' : 's'}`, 'accent')],
-      chips: missing.referrers.slice(0, REFERRER_LIMIT).map(({ host }) => `from ${host}`).concat(missing.referrers.length > REFERRER_LIMIT ? ['...'] : []),
+      chips: [...new Set(missing.referrers.map(({ host }) => host))].slice(0, REFERRER_LIMIT).map(host => `from ${host}`).concat(new Set(missing.referrers.map(({ host }) => host)).size > REFERRER_LIMIT ? ['...'] : []),
       note: missing.target === undefined ? 'No target suggested: name one to redirect.' : `Suggested target (${missing.reason}): ${missing.target}`,
     })
 

@@ -186,6 +186,14 @@ describe('a path that is gone', () => {
     expect(set.list().map(({ to, status }) => [to, status])).toEqual([['', 410]])
   })
 
+  it('refuses a target that is gone', () => {
+    const set = setOf()
+
+    set.add('/retired', '', 410, rules)
+
+    expect(() => set.add('/a', '/retired', undefined, rules)).toThrow(/gone/)
+  })
+
   it('still refuses a path that is not one, and a path of the config', () => {
     const set = setOf()
 

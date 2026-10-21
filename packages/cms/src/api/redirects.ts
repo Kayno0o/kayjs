@@ -17,13 +17,13 @@ export default api()
     if (!settings().guard)
       return status(403, needsGuard())
 
-    const refusal = addRedirect(body.from, body.to, body.status)
+    const refusal = addRedirect(body.from, body.to, body.status ?? (body.permanent ? 308 : 307))
 
     return refusal === undefined ? { added: true } : status(400, refusal)
-  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }), status: STATUS }) })
+  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }), status: STATUS, permanent: s.Optional(s.Boolean()) }) })
   .post('/remove', ({ body, status }) => {
-    return !settings().guard ? status(403, needsGuard()) : { removed: removeRedirects(body.froms) }
-  }, { body: s.Object({ froms: PATHS }) })
+    return !settings().guard ? status(403, needsGuard()) : { removed: removeRedirects([...body.froms ?? [], ...body.from === undefined ? [] : [body.from]]) }
+  }, { body: s.Object({ froms: s.Optional(PATHS), from: s.Optional(s.String({ maxLength: 512 })) }) })
   .post('/dismiss', ({ body, status }) => {
     return !settings().guard ? status(403, needsGuard()) : { dismissed: dismissPaths(body.paths) }
   }, { body: s.Object({ paths: PATHS }) })

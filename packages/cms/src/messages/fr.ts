@@ -166,7 +166,7 @@ export default defineMessages({
       hits: 'Visites',
       lastSeen: 'Dernière visite (UTC)',
       locale: 'Dans une autre langue',
-      notice: 'Les pages demandées par les visiteurs et introuvables, les plus visitées d\'abord, telles que le serveur en production les a comptées. Les adresses qu\'une redirection couvre n\'y figurent pas. Ajoutez ici une redirection suggérée et elle répond aussitôt, ou copiez-la dans les redirections de kay.config.ts, ou lancez kay not-found --redirect avec l\'adresse.',
+      notice: 'Les pages demandées par les visiteurs et introuvables, les plus visitées d\'abord, telles que le serveur en production les a comptées. Les adresses qu\'une redirection couvre n\'y figurent pas. Ajoutez ici une redirection suggérée et elle répond aussitôt, dites qu\'une adresse a disparu (410), écartez-la de la liste, ou copiez-la dans les redirections de kay.config.ts, ou lancez kay not-found --redirect avec l\'adresse.',
       path: 'Adresse',
       permanent: 'Permanente',
       permanentLabel: 'Rendre permanente la redirection depuis {path} (308)',

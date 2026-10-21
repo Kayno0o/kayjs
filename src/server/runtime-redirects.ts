@@ -168,7 +168,12 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
 
     seen.add(path)
 
-    const next = rules.configured[path] ?? set.find(path)?.to
+    const row = set.find(path)
+
+    if (row?.status === 410 && rules.configured[path] === undefined)
+      throw new RedirectRefused(`${to} is gone (410): redirect to a page that exists`)
+
+    const next = rules.configured[path] ?? row?.to
 
     if (next === undefined || isPattern(path))
       break
