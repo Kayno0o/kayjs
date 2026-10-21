@@ -3,7 +3,7 @@ import type { Duration } from './duration'
 import { parse, stringify } from 'devalue'
 import { durationSeconds } from './duration'
 import { kayLog } from './log'
-import { previewing } from './preview'
+import { renderingForVisitor } from './preview'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
 // A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
@@ -80,7 +80,7 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
     noteLive(key)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
-  if (previewing())
+  if (renderingForVisitor())
     return load()
 
   const { store } = options

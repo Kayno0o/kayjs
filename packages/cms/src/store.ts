@@ -2,6 +2,7 @@ import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
 import { redirectMovedPage } from 'kay/library'
+import { previewUrl } from 'kay/server'
 import { wording } from 'kay/words'
 import { recordActivity } from './activity'
 import { forgetCounts } from './counts'
@@ -93,6 +94,28 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
 }
 
 // `kind` is the collection's when the caller has it, else it is read.
+// How long a share link lasts.
+const SHARE_TTL = '7d'
+
+// A link showing the entry's draft alone, on its own page, to whoever it is sent to: the page of the entry as saved. Refused for an entry the site gives no page, or an app without `preview` in kay.config.ts.
+export async function shareLink(ref: EntryRef): Promise<{ link: string } | { issues: Issue[] }> {
+  const entry = await entryOf(ref)
+
+  if (!entry)
+    return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+  if (entry.url === undefined)
+    return refused(ref, wording('cms.share.noPage', 'This entry has no page to share'))
+
+  try {
+    return { link: previewUrl(entry.url, { ttl: SHARE_TTL, entry: { collection: ref.collection, slug: ref.slug, locale: ref.locale } }) }
+  }
+  catch (error) {
+    // `previewUrl` throws for an app without `preview`, saying so.
+    return refused(ref, error instanceof Error ? error.message : String(error))
+  }
+}
+
 export async function entryOf(ref: EntryRef, bare?: CollectionInfo): Promise<StoredEntry | undefined> {
   const entry = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 

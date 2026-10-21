@@ -3,7 +3,7 @@ import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
 import { withHold } from '../publishing'
-import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, UnknownCollection, unpublishEntry } from '../store'
+import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, shareLink, UnknownCollection, unpublishEntry } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
 const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional(s.String()) })
@@ -33,6 +33,7 @@ export default api()
   })
   .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/unpublish', async ({ params, query, request }) => unpublishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
+  .post('/:collection/:slug/share', async ({ params, query }) => shareLink({ collection: params.collection, slug: params.slug, locale: query.locale }), { query: locale })
   .post('/:collection/:slug/duplicate', async ({ params, query, request }) => duplicateEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/rename', async ({ params, query, body, request }) => renameEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.slug, { author: authors.get(request), version: query.version, required: true }), { query: versioned, body: s.Object({ slug: s.String() }) })
   .post('/:collection/:slug/move', async ({ params, query, request }) => moveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, query.direction, authors.get(request)), { query: s.Object({ locale: s.Optional(s.String()), direction: s.Union([s.Literal('up'), s.Literal('down')]) }) })

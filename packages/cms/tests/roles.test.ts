@@ -69,6 +69,7 @@ function auth(): void {
 const RESTRICTED = [
   ['POST', '/entries/posts/hello/publish', 'publish'],
   ['POST', '/entries/posts/hello/unpublish', 'publish'],
+  ['POST', '/entries/posts/hello/share', 'publish'],
   ['DELETE', '/entries/posts/hello', 'delete'],
   ['POST', '/files/unused/delete', 'delete'],
   ['POST', '/files/posts', 'upload'],

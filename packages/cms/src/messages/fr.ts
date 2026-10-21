@@ -411,6 +411,15 @@ export default defineMessages({
       title: 'Connexion',
       wrong: 'Ce n\'est pas le bon mot de passe.',
     },
+    share: {
+      copied: 'Lien copié : il montre ce brouillon à qui le reçoit, pendant une semaine',
+      dirty: 'Enregistrez ou annulez vos modifications d\'abord',
+      failure: 'Impossible de créer le lien',
+      label: 'Partager l\'aperçu',
+      noPage: 'Cette entrée n\'a pas de page à partager',
+      refused: 'Pas de lien',
+      shown: 'Lien valable une semaine : {link}',
+    },
     slug: {
       creates: 'Crée le dossier {folder}',
       empty: 'Le titre n\'a ni lettre ni chiffre pour écrire une adresse : saisissez-en une',

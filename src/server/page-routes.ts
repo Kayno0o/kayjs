@@ -26,7 +26,7 @@ import { answeringPage } from './log'
 import { pageRequested } from './not-found'
 import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
-import { inPreview, previewRequested, requestDrafts } from './preview'
+import { inPreview, inSharedDraft, previewRequested, requestDrafts, sharedEntry } from './preview'
 import { requestId } from './protection'
 import { hasFlash, renderPage, renderUncaught, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
 import { reportServerError } from './report'
@@ -113,6 +113,18 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     // Drafts shown, past any prerendered or cached copy.
     if (preview !== undefined)
       return forVisitor(async () => preview === 'edit' ? inPreview(render, true, requestDrafts(context.request)) : inPreview(render))
+
+    const shared = sharedEntry(context.request)
+
+    // One entry's draft on its own page, kept out of search engines and referrers as the link is a secret.
+    if (shared !== undefined) {
+      const response = await forVisitor(async () => inSharedDraft(render, shared))
+
+      response.headers.set('x-robots-tag', 'noindex, nofollow')
+      response.headers.set('referrer-policy', 'no-referrer')
+
+      return response
+    }
 
     const copies = prerendered.get(route.pattern)
 

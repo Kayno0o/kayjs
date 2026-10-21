@@ -306,6 +306,32 @@ export async function restoreDeleted(collection: string, id: string): Promise<bo
   return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }
 
+// Asks for a link showing the entry's saved draft to whoever it is sent to and copies it, the link toasted when the browser refuses the clipboard; true once made.
+export async function shareDraft(ref: EntryRef): Promise<boolean> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/share', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }), wording('cms.share.failure', 'Could not make the link'))
+
+  if (!outcome)
+    return false
+
+  if ('issues' in outcome) {
+    toast.error(wording('cms.save.issues', '{refused}: {issues}', { refused: wording('cms.share.refused', 'No link'), issues: outcome.issues.map(issue => issue.message).join('; ') }))
+
+    return false
+  }
+
+  const link = new URL(outcome.link, location.origin).href
+
+  try {
+    await navigator.clipboard.writeText(link)
+    toast.success(wording('cms.share.copied', 'Link copied: it shows this draft to anyone who has it for a week'))
+  }
+  catch {
+    toast.success(wording('cms.share.shown', 'Link, valid for a week: {link}', { link }))
+  }
+
+  return true
+}
+
 // Moves an entry one place up or down in its collection's order and says how it went; true once moved.
 export async function moveSaved(ref: EntryRef, direction: 'up' | 'down'): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/move', {

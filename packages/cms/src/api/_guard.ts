@@ -25,7 +25,8 @@ const DEV_STATE = /\/api\/cms\/dev$/
 const EDITOR_CAN = /\/api\/cms\/editor\/can$/
 
 // What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
-const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
+// Sharing a draft shows what is not published, so it is a publisher's.
+const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
 const ENTRY_RENAME = /\/api\/cms\/entries\/[^/]+\/[^/]+\/rename$/
 const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
 const UPLOAD = /\/api\/cms\/files\/[^/]+$/

@@ -16,7 +16,7 @@ import { editableEntries } from '../runtime/fields'
 import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
-import { previewing, previewState } from '../runtime/preview'
+import { previewing, previewState, sharedDraft } from '../runtime/preview'
 import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentKey, contentMode, loadEntries, markdownOf, translationKey } from './load'
@@ -386,7 +386,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const scheduled = (entry: Entry<Data>) => notYet(entry) || over(entry)
   // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
   const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
-  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && !sharedDraft(name, entry.slug, entry.locale) && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry))
   const blockItem = (data: unknown, path: string[]) => isBlockItem(options.schema, data, path)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined

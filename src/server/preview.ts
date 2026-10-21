@@ -5,7 +5,7 @@ import type { Collection } from '../content'
 import type { Duration } from '../runtime/duration'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { EntryRef } from '../runtime/fields'
-import type { EntryDraft, PreviewMode, PreviewState } from '../runtime/preview'
+import type { EntryDraft, PreviewMode, PreviewScope, PreviewState } from '../runtime/preview'
 import type { BodyLimit } from './body'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { KayError } from '../compiler/errors'
@@ -27,6 +27,9 @@ import { visitAs } from './visit'
 export const PREVIEW_ROUTE = '/_kay/preview'
 export const PREVIEW_COOKIE = 'kay_preview'
 const EDIT = 'edit'
+
+// The query param of a share link, `until.entry.sig`.
+export const SHARE_PARAM = 'kay_preview'
 const DEFAULT_MAX_AGE = 3600
 const DEFAULT_LINK_TTL = 3600
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
@@ -86,6 +89,11 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
 // Renders for a visitor in preview mode, in edit mode too when `edit` is set, with the entries `drafts` holds standing in for theirs.
 export function inPreview<T>(run: () => T, edit = false, drafts?: Map<string, EntryDraft[]>): T {
   return store.run({ loads: new Map(), edit, ...drafts && { drafts } }, run)
+}
+
+// Renders for a visitor a share link let see one entry's draft, and nothing else of preview mode.
+export function inSharedDraft<T>(run: () => T, scope: PreviewScope): T {
+  return store.run({ loads: new Map(), edit: false, scope }, run)
 }
 
 // The drafts `/_kay/draft` renders the page of `request` with.
@@ -325,8 +333,29 @@ export function exitPreview(ctx: { cookies: CookieMap }): void {
   ctx.cookies.delete({ name: PREVIEW_COOKIE, path: settingsFor('exitPreview()').base || '/' })
 }
 
+// The entry a request's share link names, when the link is signed by this site and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
+export function sharedEntry(request: Request): PreviewScope | undefined {
+  if (!settings)
+    return undefined
+
+  const [until, entry, sig, ...extra] = requestUrl(request).searchParams.get(SHARE_PARAM)?.split('.') ?? []
+
+  if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !sameText(sig, sign(settings, shareText(until, entry))))
+    return undefined
+
+  try {
+    const [collection, slug, locale] = JSON.parse(Buffer.from(entry, 'base64url').toString()) as unknown[]
+
+    return typeof collection === 'string' && typeof slug === 'string' && typeof locale === 'string' ? { collection, slug, ...locale !== '' && { locale } } : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // A link that puts whoever follows it in preview mode, edit mode too with `edit`, and opens `path`, a path of the site written without the base, until `ttl` runs out, an hour by default.
-export function previewUrl(path: string, options: { ttl?: Duration, edit?: boolean } = {}): string {
+// With `entry` the link shows that entry's draft alone, on the page `path` (the entry's own), and puts the visitor in no mode: every other page and entry stays as published.
+export function previewUrl(path: string, options: { ttl?: Duration, edit?: boolean, entry?: PreviewScope } = {}): string {
   const current = settingsFor('previewUrl()')
 
   if (!SITE_PATH.test(path))
@@ -335,6 +364,19 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
   const until = Math.floor(Date.now() / 1000) + wholeSeconds(options.ttl ?? DEFAULT_LINK_TTL, 'previewUrl()\'s ttl')
 
   const edit = options.edit === true
+
+  if (options.entry) {
+    if (edit)
+      throw new KayError('config-invalid', 'kay: previewUrl() was given `entry` and `edit`: a link to one entry\'s draft does not open edit mode')
+
+    const { collection, slug, locale = '' } = options.entry
+    const entry = Buffer.from(JSON.stringify([collection, slug, locale])).toString('base64url')
+    const link = new URL(path, 'http://site')
+
+    link.searchParams.set(SHARE_PARAM, [until, entry, sign(current, shareText(String(until), entry))].join('.'))
+
+    return `${current.base}${link.pathname}${link.search}${link.hash}`
+  }
 
   return `${current.base}${PREVIEW_ROUTE}?${new URLSearchParams({ path, until: String(until), ...edit && { edit: '' }, sig: sign(current, linkText(path, String(until), edit)) })}`
 }
@@ -377,6 +419,10 @@ function validLink(current: PreviewSettings, path: string, edit: boolean, until:
 // What a cookie and a link sign: edit mode is signed apart, so a preview link cannot be turned into an edit one.
 function cookieText(until: string, edit: boolean): string {
   return `cookie\n${until}${edit ? `\n${EDIT}` : ''}`
+}
+
+function shareText(until: string, entry: string): string {
+  return `share\n${until}\n${entry}`
 }
 
 function linkText(path: string, until: string, edit: boolean): string {

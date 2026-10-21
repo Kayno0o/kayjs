@@ -11,6 +11,7 @@ import { projectSource } from './source'
 
 export type { KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
+export type { PreviewScope } from '../runtime/preview'
 export { crossSiteRefused, crossSiteResponse } from './actions'
 export type { ApiOptions } from './api'
 export { api } from './api'

@@ -112,3 +112,13 @@ test('the activity screen pages at the page size', async () => {
   expect(second.find('.kcms-revision').length).toBeLessThan(50)
   expect(first.find('a[href*="page=2"]').length).toBeGreaterThan(0)
 })
+
+test('an entry is shared by a signed link to its own page, and an entry with no page is refused', async () => {
+  expect(await post('journal/pageless', { data: { title: 'No page' }, create: true })).toMatchObject({ saved: true })
+
+  const shared = await (await site.fetch('/api/cms/entries/posts/hello/share', { method: 'POST' })).json() as { link: string }
+
+  expect(shared.link).toStartWith('/blog/hello?kay_preview=')
+  expect((await site.fetch(shared.link)).status).toBe(200)
+  expect((await site.fetch('/api/cms/entries/journal/pageless/share', { method: 'POST' })).json()).resolves.toMatchObject({ issues: [{ message: 'This entry has no page to share' }] })
+})

@@ -535,6 +535,12 @@ When a collection keeps a history, the content list has an Activity button. It o
 
 Each line links to the entry, except a deleted one. The log keeps the last 500 events of each collection, and a collection left out with `history: false` adds nothing to it.
 
+### Sharing a draft
+
+A draft with a page has a Share preview button. It copies a link that shows that draft, and nothing else, to whoever you send it to. They need no account, and the rest of the site stays as published for them.
+
+The link works for a week and ends if you rename the entry. It needs `preview: { secret }` in `kay.config.ts`, and with `roles` it is a publisher's action. Save your edits first, as the link shows the saved draft.
+
 ### After a save
 
 `cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one.
