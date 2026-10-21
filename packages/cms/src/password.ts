@@ -133,7 +133,7 @@ export class Passwords {
 const passwordsOf = new WeakMap<Guard, Passwords>()
 let installed: Passwords | undefined
 
-// The passwords of the guard `cms({ guard })` was given, when it is a `passwordGuard()`, which the sign-in screen checks a password against. A guard loaded lazily is known once it has loaded.
+// The passwords of the guard `cms({ guard })` was given, when it is a `passwordGuard()`, which the sign-in screen checks a password against. A guard loaded lazily, or wrapped by the app, is known once it has run.
 export function activePasswords(): Passwords | undefined {
   return installed
 }
@@ -159,6 +159,9 @@ export function passwordGuard(passwords: string | Record<string, string>, { maxA
   const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret)
 
   const checked = guard((ctx) => {
+    // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so.
+    installed = known
+
     const role = known.read(ctx.cookies.get(SESSION_COOKIE))
 
     if (role === undefined)

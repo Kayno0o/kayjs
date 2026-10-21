@@ -157,3 +157,92 @@ describe('signing out', () => {
     expect(await statusOf(context(activePasswords()!.issue('editor', false).value), guard)).toBe(200)
   })
 })
+
+describe('a guard the app wraps', () => {
+  class Redirected {
+    constructor(readonly location: string) {}
+  }
+
+  async function visit(path: string, locals: object = {}): Promise<string | number> {
+    const { default: screenGuard } = await import('../src/routes/_guard')
+    const url = new URL(`http://site.test${path}`)
+    const ctx = {
+      request: new Request(url),
+      url,
+      cookies: new Bun.CookieMap(),
+      locals,
+      redirect: (location: string) => {
+        throw new Redirected(location)
+      },
+      deny: (status: number, message?: string) => {
+        throw new Denied(status, message)
+      },
+    } as unknown as GuardContext
+
+    try {
+      await screenGuard(ctx)
+
+      return 200
+    }
+    catch (error) {
+      return error instanceof Redirected ? error.location : (error as Denied).status
+    }
+  }
+
+  const SIGN_IN = '/admin/sign-in?redirect=%2Fadmin%2Fcollections'
+
+  test('a passwordGuard inside the guard keeps its sign-in screen', async () => {
+    const { configure } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const pg = passwordGuard('wrapped-pw')
+    const extra = (_ctx: GuardContext): boolean => true
+
+    configure({ guard: async (ctx: GuardContext) => {
+      if (extra(ctx))
+        await pg(ctx)
+    } })
+
+    expect(await visit('/admin/collections')).toBe(SIGN_IN)
+    expect(activePasswords()?.match('wrapped-pw')).toBe('editor')
+  })
+
+  test('so does one wrapped in a guard returned from { load }', async () => {
+    const { configure } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const pg = passwordGuard('wrapped-pw')
+
+    configure({ guard: { load: async () => async (ctx: GuardContext) => {
+      await pg(ctx)
+    } } })
+
+    expect(await visit('/admin/collections')).toBe(SIGN_IN)
+    expect(activePasswords()?.match('wrapped-pw')).toBe('editor')
+  })
+
+  test('a wrapped guard leaves a configure of another guard with no password sign-in', async () => {
+    const { configure } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const pg = passwordGuard('wrapped-pw')
+
+    configure({ guard: async (ctx: GuardContext) => {
+      await pg(ctx)
+    } })
+    await visit('/admin/collections')
+    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+
+    expect(activePasswords()).toBeUndefined()
+    expect(await visit('/admin/collections', { auth: { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` } })).toBe('/login?redirect=%2Fadmin%2Fcollections')
+  })
+
+  test('a wrapped kayjs-auth guard sends to the auth sign-in page', async () => {
+    const { configure } = await import('../src/settings')
+    const auth = { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` }
+    const inner = ({ deny }: GuardContext): never => deny(401, 'Sign in')
+
+    configure({ guard: async (ctx: GuardContext) => {
+      await inner(ctx)
+    } })
+
+    expect(await visit('/admin/collections', { auth })).toBe('/login?redirect=%2Fadmin%2Fcollections')
+  })
+})
