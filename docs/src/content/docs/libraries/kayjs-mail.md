@@ -92,7 +92,7 @@ Layout(preheader="Your account is ready")
   Button(href={url}) Confirm my address
 ```
 
-`Layout` shows its `@header` above the card, a logo say. To put the same logo on every mail, the built-in auth and contact ones included, set `logo` in the settings instead: `{ ...defaults, logo: { src: 'https://example.com/logo.png', alt: 'Example', width: 120 } }`, with an optional `height` and `href`.
+`Layout` shows its `@header` above the card, a logo say. To put the same logo on every mail, the built-in auth and contact ones included, set `logo` in the settings instead: `{ ...defaults, logo: { src: 'https://example.com/logo.png', alt: 'Example', width: 120 } }`, with an optional `height` and `href`, and a `width` in pixels, which Outlook sizes the image by.
 
 A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 

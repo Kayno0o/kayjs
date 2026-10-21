@@ -1,5 +1,5 @@
 import type { Duration, Guard, GuardContext } from 'kay'
-import type { ByteSize, LazyGuard } from 'kay/library'
+import type { ByteSize, LazyGuard, Logo } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout } from './kay/contract'
 import type { Action } from './roles'
@@ -38,7 +38,8 @@ export interface MemberInfo {
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
-  // An image shown before the name in the admin's header, a path of the site (`/logo.svg` from `public/`) or an https URL; the name is `cms.admin.brand`, `Content admin` unless the app words it.
+  // Moved to the settings module: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` with a `logo` of `{ src, alt }` in it (see `Settings`). Still read until 1.73, as a path of the site or an https URL, with an empty `alt`; a `logo` in the settings wins over it.
+  // @deprecated
   logo?: string | undefined
   // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through.
   guard?: Guard | LazyGuard | undefined
@@ -75,7 +76,7 @@ export interface HistorySettings {
 
 export interface CmsSettings {
   prefix: string
-  logo: string | undefined
+  logo: Logo | undefined
   guard: Guard | undefined
   files: FileSaver
   uploads: string[]
@@ -119,16 +120,33 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
 
-  if (logo !== undefined && !LOGO.test(logo))
-    throw configError('`cms({ logo })`', logo, 'a path of the site such as \'/logo.svg\', or an https URL')
+  const given = logoOf(logo, '`cms({ logo })`')
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo: given, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history) }
 
   return current
+}
+
+// The logo the admin header draws: `own`, the settings module's, else the one `cms({ logo })` still gives. The layout passes it, as that module is the app's only where a .kay file imports it.
+export function adminLogo(own: Logo | undefined): Logo | undefined {
+  return own === undefined ? settings().logo : logoOf(own, 'the `logo` of the cms settings')
+}
+
+// A `src` of the site or over https; a bare string is the deprecated option's, with the empty `alt` of an image beside the name.
+function logoOf(given: string | Logo | undefined, what: string): Logo | undefined {
+  if (given === undefined)
+    return undefined
+
+  const logo = typeof given === 'string' ? { src: given, alt: '' } : given
+
+  if (!LOGO.test(logo.src))
+    throw configError(`${what}'s src`, logo.src, 'a path of the site such as \'/logo.svg\', or an https URL')
+
+  return logo
 }
 
 function checkHistory(history: CmsOptions['history']): HistorySettings | undefined {

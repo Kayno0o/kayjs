@@ -142,7 +142,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 - A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`); `bodyLimit` and `maxBytes` go (#1686).
 - A rate limit is `rateLimit: { max, window, store?, key?, count? }`, `key` naming who is counted (not `visitor`), and a library with several limits nests them: `rateLimit: { signIn: { max, window } }` (#1683).
 - Paging by page number takes `pageSize` and `page`; a window onto a list takes `limit` and `offset`. An API is one or the other (#1689).
-- Look goes in the library's settings module (`kay.settings`), behaviour in the call or extension options. A logo is `{ src, alt, width?, height?, href? }` (#1690).
+- Look goes in the library's settings module (`kay.settings`), behaviour in the call or extension options. A logo is `{ src, alt, width?, height?, href? }`, the `Logo` type of `kay/library`: mail and cms read theirs from the settings module, kayjs-ui and kayjs-auth have no logo of their own and kayjs-ai restyles through CSS properties (#1690).
 
 **Hooks and switches**
 - An `on*` hook takes one event object, `onSave({ ... })`, and returns nothing. A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).

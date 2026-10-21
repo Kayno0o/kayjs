@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
+import { branding } from '../src/cms-settings'
 
 const ROOT = join(import.meta.dir, '..')
 
@@ -24,6 +25,32 @@ test('shows the logo before the name in the header, the name staying the link\'s
   expect(page.find('.kcms-admin-logo').map(logo => [logo.attributes.src, logo.attributes.alt])).toEqual([['/logo.svg', '']])
   expect(page.find('.kcms-admin-home')[0]?.text).toBe('Content admin')
   expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/admin')
+})
+
+test('draws the logo of the settings module with its alt and size, over the one cms({ logo }) gives', async () => {
+  branding.logo = { src: '/brand.svg', alt: 'Acme', width: 40, height: 24 }
+
+  try {
+    const page = await (await adminSite({ logo: '/logo.svg' })).visit('/admin')
+
+    expect(page.find('.kcms-admin-logo').map(logo => [logo.attributes.src, logo.attributes.alt, logo.attributes.width, logo.attributes.height])).toEqual([['/brand.svg', 'Acme', '40', '24']])
+  }
+  finally {
+    branding.logo = undefined
+  }
+})
+
+test('refuses a settings logo that points at another host', async () => {
+  branding.logo = { src: '//evil.example/logo.svg', alt: 'x' }
+
+  try {
+    const response = await (await adminSite({})).visit('/admin')
+
+    expect(response.status).toBe(500)
+  }
+  finally {
+    branding.logo = undefined
+  }
 })
 
 test('has no logo unless the app gives one', async () => {

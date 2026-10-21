@@ -1,3 +1,5 @@
+export { default as defaults } from './defaults'
+export type { Logo, Settings } from './defaults'
 export { browserKeeper } from './draft-storage'
 export type { DraftKeeper, KeptDraft } from './draft-storage'
 export { createDrafts } from './drafts'

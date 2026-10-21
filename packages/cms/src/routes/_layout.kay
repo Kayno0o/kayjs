@@ -7,7 +7,8 @@ import { wording } from 'kay/words'
 import { denials, memberOf } from '../access'
 import { screenPath } from '../paths'
 import { signOut } from './_actions.kay'
-import { settings } from '../settings'
+import look from '../look'
+import { adminLogo, settings } from '../settings'
 import './admin.css'
 
 const SCREENS_OF_CONTENT = /\/(?:collections|new)\//
@@ -15,7 +16,8 @@ const SCREENS_OF_CONTENT = /\/(?:collections|new)\//
 // The screens are the CMS's own: none of the app's layouts above wraps them, so the editor sees no header, nav or footer of the site, and none of its pages is indexed.
 export const page = { layouts: false, noindex: true }
 
-const { prefix, logo } = settings()
+const { prefix } = settings()
+const logo = adminLogo(look.logo)
 // kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
 // Who is signed in, when the guard let the request in: the sign-in screen, which no guard covers, shows no one.
 const member = await memberOf(ctx)
@@ -28,9 +30,9 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
   header.kcms-admin-head
     a.kcms-admin-home(href={screenPath(prefix)})
       if logo
-        // The logo's size is the app's, so its box is the height CSS gives it.
+        // A logo giving no size takes the height CSS gives its box.
         // kay-allow unsized-image
-        img.kcms-admin-logo(src={logo} alt="")
+        img.kcms-admin-logo(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height})
       | {wording('cms.admin.brand', 'Content admin')}
     nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}

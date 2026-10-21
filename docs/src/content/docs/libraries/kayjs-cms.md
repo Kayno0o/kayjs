@@ -721,7 +721,11 @@ Write a page at the screen's path, such as `src/routes/admin/collections/shop/[.
 
 The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages, Media and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
 
-Give the header a logo with `cms({ logo: '/logo.svg' })`, a file of `public/` or an https URL, shown before the name. The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
+Give the header a logo in the cms settings: name a module in `kay.config.ts` as `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kaynooo/kayjs-cms`).
+
+`src` is a file of `public/` or an https URL, shown before the name, and `width`, `height` and `href` are optional (`href` is not used here, as the header links to the admin). `cms({ logo: '/logo.svg' })` still works until 1.73 and gives an image with no `alt`; the settings win when both are set.
+
+The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 
 An entry screen heads its title with crumbs: Content, then the collection, each a link. A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
 

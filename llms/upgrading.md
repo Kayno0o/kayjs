@@ -94,6 +94,9 @@ Use `--outdir` for `kay migrate astro`, `--forge` for `kay new`, and `ok` for a 
 ### Hooks take one event object
 
 `onError` (kay.config.ts), a queue's `onFailed` (kayjs-mail's `queue.onFailed` too), kayjs-auth's `onSignUp` and `onDelete` take one object, `onError({ error, request })`, `onFailed({ payload, error })`, `onSignUp({ user, profile })`, `onDelete({ user })`, and the two that return data are named for it: `onExport` is `exportData({ user })` and `onProviderProfile` is `profileFields({ user, profile })`. The old shape (two parameters, or one that is not destructured) and the old names are read until 1.73, and the `deprecated-hook-shape` lint reports them: `kay upgrade` destructures the parameters it can read as plain names. A new-shape hook written `(event) => ...` is read as the old one until then: destructure it. The options are typed with the new shape only, so `kay check` reports old code as a type error at once, and `kay upgrade` rewrites what it can. The switches already follow the rule (`false` turns off what is on, `true` turns on what is off), mail's `optional: true` included, so none changes.
+### kayjs-cms's `logo` moves to its settings module
+
+Give the admin logo in a settings module instead of `cms({ logo })`: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` in `kay.config.ts`, and `export default { ...defaults, logo: { src: '/logo.svg', alt: 'Acme' } }` there (`defaults` from `@kaynooo/kayjs-cms`). `cms({ logo })` works until 1.73, with an empty `alt`. No lint can recognise it, as the fix writes a module the app owns.
 
 ## 1.69.0
 

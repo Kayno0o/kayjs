@@ -3,6 +3,18 @@
 import type { Highlighter } from '../content/markdown'
 
 export type { Highlighter }
+
+// An image a library draws for the app, set in the library's settings module: `src` and `alt` always, the size and the link when the place has use for them.
+export interface Logo {
+  // The image's URL: a path of the site, or an absolute URL where the place is away from the site, such as a mail.
+  src: string
+  // What a reader without the image gets in its place.
+  alt: string
+  width?: number | undefined
+  height?: number | undefined
+  // Where a click on it goes.
+  href?: string | undefined
+}
 export { KAY_DIR, underKayDev } from '../build/assets'
 export type { KayCommand, Parsed } from '../commands/command'
 export type { DataValue, JsonSchema } from '../content/edit'

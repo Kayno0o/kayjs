@@ -40,6 +40,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.69.0
 
 - Every duration is a `Duration` string, `'5m'` or `'250ms'`, never a bare number: `kay check --fix` rewrites the old ones (`deprecated-bare-duration`) ([Lints](lints.md), [Upgrading](upgrading.md)).
+- kayjs-cms: the admin logo is set in the cms settings module as `{ src, alt, width?, height? }`, like kayjs-mail's, whose `width` is now optional; `cms({ logo })` works until 1.73 ([Options](../packages/cms/llms/options.md)).
 - A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
 - `s.Public(...)` on a `defineEnv` field lets an island read it as `publicEnv`, with no config key; `publicEnv` in kay.config.ts is deprecated ([Environment](environment.md)).
 - `kay dev` sets the site to `http://localhost:<port>` when `SITE_URL` is unset, so kayjs-auth OAuth and mailed links need no `SITE_URL` in development ([Head](head.md)).

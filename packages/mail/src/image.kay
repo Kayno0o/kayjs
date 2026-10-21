@@ -1,5 +1,5 @@
 ---
-const { src, alt, width, height } = props<{ src: string, alt: string, width: number, height?: number | undefined }>()
+const { src, alt, width, height } = props<{ src: string, alt: string, width?: number | undefined, height?: number | undefined }>()
 ---
 // Outlook sizes an image by its attributes alone; other clients scale it down to a narrow screen. Mail clients ignore `loading` and `decoding`, so kay's image defaults are left off.
 img(src={src} alt={alt} width={width} height={height} loading={undefined} decoding={undefined} style="display:block;max-width:100%;height:auto;border:0;outline:none;text-decoration:none")
