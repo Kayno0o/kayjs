@@ -32,6 +32,8 @@ const WHITESPACE = /\s+/g
 const LOC = /<loc>([^<]*)<\/loc>/g
 // What holds text a visitor never reads.
 const UNREAD = new Set(['script', 'style', 'template'])
+// The elements a browser lays out apart from the text around them, so the text of two siblings does not run together.
+const APART = new Set(['address', 'article', 'aside', 'blockquote', 'br', 'button', 'caption', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'main', 'nav', 'ol', 'optgroup', 'option', 'p', 'pre', 'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'])
 // Comments set around what an element holds, to read it back off the output, then taken out; their text carries a token the page does not hold, so a comment of the page's own never reads as one.
 const marker = (token: string, kind: 'open' | 'close', index: number) => `<!--${token}-${kind}-${index}-->`
 
@@ -132,6 +134,15 @@ function matches(html: string, selector: string, visible = false, markup = false
       before.before(marker(token, 'close', entry.index), { html: true })
   }
 
+  // A space in the text of the elements being read: `squash` folds it into the whitespace around.
+  const apart = (tag: string) => {
+    if (hidden > 0 || !APART.has(tag))
+      return
+
+    for (const match of open)
+      match.raw += ' '
+  }
+
   rewriter
     .on(selector, {
       element: (element) => {
@@ -155,6 +166,8 @@ function matches(html: string, selector: string, visible = false, markup = false
 
         selected = undefined
 
+        apart(tag)
+
         const closes = closing(stack, tag)
 
         if (closes !== undefined) {
@@ -177,6 +190,8 @@ function matches(html: string, selector: string, visible = false, markup = false
 
         stack.push(entry)
         element.onEndTag((end) => {
+          apart(tag)
+
           const at = stack.lastIndexOf(entry)
 
           if (at === -1)

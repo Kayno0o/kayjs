@@ -218,7 +218,7 @@ it('shows why a todo was refused', async () => {
 - `page.text(selector)` is the text a visitor reads in the first element a selector matches, or in the whole body without one, scripts, styles and templates left out, or `undefined` when nothing matches.
 - `page.settled` is the page as a visitor ends up seeing it, for one whose `await` blocks stream: each block's last part put in place of its pending markup and the swap script left out, read with the same `title`, `find` and `text`, and an `html` without the streamed templates; `page.text()` and `page.html` keep the pending markup and the templates, `expect(page.settled.text('.score')).toBe('42')`, no browser needed.
 - Assert on text through `text` or `find`, never on `page.html`: an island's markup holds hydration markers between the parts of an interpolated text, so `p Thanks, {name}!` renders `Thanks, <!--[-->Ada<!--]-->!`, and `expect(page.text('.success')).toBe('Thanks, Ada!')` is what passes.
-- Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`.
+- Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, sibling blocks (`li`, `p`, `div`, table cells, headings, `br`) kept apart by a space as a visitor reads them and inline elements (`b`, `span`, `a`) joined, and what the page lacks reads `undefined`.
 - `site.sitemap()` resolves with the URLs `/sitemap.xml` lists, or the sitemap at another path, failing when it does not answer 200.
 
 ### Requests, jobs, sockets and sessions
