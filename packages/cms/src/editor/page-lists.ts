@@ -64,8 +64,11 @@ export interface Removed {
 
 const LIST_ATTRIBUTE = 'data-kay-list'
 
+// The size of a bar, which the places above and below an item are told by.
 const BAR_TOP = 4
 const BAR_GAP = 36
+const BAR_HEIGHT = 30
+const BAR_WIDTH = 108
 
 function targetOfElement(element: Element): ListTarget | undefined {
   const value = element.getAttribute(LIST_ATTRIBUTE)
@@ -193,7 +196,18 @@ function room(): { right: number, bottom: number } {
   return room
 }
 
-// The bars for the items around the pointer and the focus, and for each empty list in view: next to the top right corner of an item, so a bar is reached from the item it acts on, and at the start of an empty list.
+// Where a bar sits, outside its item and touching its edge so the pointer going to it never leaves the page's items: above, else below, else (an item filling the window) inside its top. `level` stacks nested bars, the outer one further from its item.
+function barTop(box: DOMRect, level: number, bottom: number): number {
+  const above = box.top - (level + 1) * BAR_HEIGHT
+  const below = box.bottom + level * BAR_HEIGHT
+
+  if (above >= 0)
+    return above
+
+  return below + BAR_HEIGHT <= bottom ? below : Math.min(Math.max(box.top, 0), bottom - BAR_GAP) + BAR_TOP + level * BAR_GAP
+}
+
+// The bars for the items around the pointer and the focus, and for each empty list in view: above the top right corner of an item (see barTop), so a bar is reached from the item it acts on, and at the start of an empty list.
 export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emptyLists(drafts)): ListBar[] {
   const space = room()
   const root = document.documentElement
@@ -217,9 +231,8 @@ export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emp
       continue
 
     const items = itemsOf(drafts, list.target)
-    // Nested items stack their bars, the outer one lower, so none covers another.
     const level = hits.filter(other => other !== hit && member.contains(other.member)).length
-    const top = Math.min(Math.max(box.top, 0), space.bottom - BAR_GAP) + BAR_TOP + level * BAR_GAP
+    const top = barTop(box, level, space.bottom)
 
     bars.push({
       key: keyOf(list.target, index),
@@ -232,7 +245,7 @@ export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emp
       up: targetOf('up', index, items.length) !== undefined,
       down: targetOf('down', index, items.length) !== undefined,
       ...limits(list, items.length),
-      style: `top:${top}px;right:${root.clientWidth - Math.min(box.right, space.right) + BAR_TOP}px`,
+      style: `top:${top}px;right:${root.clientWidth - Math.max(Math.min(box.right, space.right), BAR_WIDTH)}px`,
     })
   }
 

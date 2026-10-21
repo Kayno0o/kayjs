@@ -331,7 +331,7 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
     return { right: box.right, bottom: box.bottom }
   }))
 
-  expect(Math.abs(bar!.right - (item!.right - 4))).toBeLessThan(1)
+  expect(Math.abs(bar!.right - item!.right)).toBeLessThan(1)
 
   // The item lies under the editor: the bar stays above its edge.
   await page.evaluate(() => {
@@ -349,6 +349,122 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
   const [under, covered] = await page.evaluate(() => [document.querySelector('.kcms-list-bar')!.getBoundingClientRect().bottom, document.querySelector('.kcms-editor-open')!.getBoundingClientRect().top])
 
   expect(under).toBeLessThanOrEqual(covered! + 0.5)
+}, 60_000)
+
+interface Box { left: number, right: number, top: number, bottom: number }
+
+// The boxes of the first element each selector matches.
+function boxes(page: Page, ...selectors: string[]) {
+  return page.evaluate((all: string[]) => all.map((selector) => {
+    const { left, right, top, bottom } = document.querySelector(selector)!.getBoundingClientRect()
+
+    return { left, right, top, bottom }
+  }), selectors) as Promise<Box[]>
+}
+
+const overlaps = (a: Box, b: Box) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5
+
+// Scrolls the item to `top` pixels under the window's top and puts the pointer on it.
+async function showBarAt(page: Page, selector: string, top: number, bars = 1) {
+  await page.evaluate((target: string, at: number) => {
+    const element = document.querySelector(target)!
+
+    window.scrollBy({ top: element.getBoundingClientRect().top - at })
+
+    const box = element.getBoundingClientRect()
+
+    element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + 4, clientY: box.top + box.height / 2 }))
+  }, selector, top)
+  await page.waitUntil((count: number) => document.querySelectorAll('.kcms-list-bar').length === count, undefined, bars)
+}
+
+// Whether the element at the item's top left corner is the item or inside it, so the pointer that called the bar still reaches the page.
+function pointerOnItem(page: Page, selector: string) {
+  return page.evaluate((target: string) => {
+    const box = document.querySelector(target)!.getBoundingClientRect()
+
+    return document.elementFromPoint(box.left + 2, box.top + 2)?.closest(target) != null
+  }, selector)
+}
+
+test('the bar sits above its item\'s top right corner, below it with no room above, and never over the item or the pointer', async () => {
+  const page = await open()
+
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+
+  const [item, bar] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
+
+  expect(bar.bottom).toBeLessThanOrEqual(item.top + 0.5)
+  expect(Math.abs(bar.right - item.right)).toBeLessThan(1)
+  expect(await pointerOnItem(page, 'ol.steps li:first-child')).toBe(true)
+
+  await showBar(page, 'ol.steps li:first-child')
+
+  const [top, under] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
+
+  expect(under.top).toBeGreaterThanOrEqual(top.bottom - 0.5)
+}, 60_000)
+
+test('the bar of a small item, a chip say, covers no part of it', async () => {
+  const page = await open()
+
+  await page.evaluate(() => {
+    const style = document.createElement('style')
+
+    style.textContent = 'ol.steps li { display: inline-block; margin: 0 1rem 0 0 }'
+    document.head.append(style)
+  })
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+
+  const [chip, bar] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
+
+  expect(overlaps(chip, bar)).toBe(false)
+  expect(await pointerOnItem(page, 'ol.steps li:first-child')).toBe(true)
+}, 60_000)
+
+test('an item at the window\'s left edge gets a bar that stays in the window', async () => {
+  const page = await open()
+
+  await page.evaluate(() => {
+    const style = document.createElement('style')
+
+    style.textContent = 'ol.steps { padding: 0; margin: 0; list-style: none } ol.steps li { width: 3rem }'
+    document.head.append(style)
+  })
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+
+  const [item, bar] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
+
+  expect(bar.left).toBeGreaterThanOrEqual(0)
+  expect(overlaps(item, bar)).toBe(false)
+}, 60_000)
+
+test('nested bars stack outside their items, covering neither each other nor the item they act on', async () => {
+  const page = await open()
+
+  await showBarAt(page, '.columns .cells li:first-child', 150, 2)
+
+  const [cell, column, inner, outer] = await boxes(page, '.columns .cells li:first-child', '.columns .column:first-child', `${BAR}:nth-child(1)`, `${BAR}:nth-child(2)`) as [Box, Box, Box, Box]
+
+  expect(overlaps(cell, inner)).toBe(false)
+  expect(overlaps(column, outer)).toBe(false)
+  expect(overlaps(inner, outer)).toBe(false)
+}, 60_000)
+
+test('the focus on an item puts its bar outside it as well', async () => {
+  const page = await open()
+
+  await page.evaluate(() => {
+    const element = document.querySelector<HTMLElement>('ol.steps li')!
+
+    window.scrollBy({ top: element.getBoundingClientRect().top - 120 })
+    element.focus()
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-list-bar') !== null)
+
+  const [item, bar] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
+
+  expect(overlaps(item, bar)).toBe(false)
 }, 60_000)
 
 test('Tab goes from an item to its bar and on, Shift+Tab comes back', async () => {
