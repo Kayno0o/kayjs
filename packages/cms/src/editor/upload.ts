@@ -1,4 +1,5 @@
-import { ActionError, ApiError, call } from 'kay'
+import type { Signal } from 'kay'
+import { ActionError, ApiError, call, signal } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import filesApi from '../api/files'
@@ -44,20 +45,32 @@ function track(change: 1 | -1): void {
 
 let denial: Promise<string | undefined> | undefined
 
-// Why the signed-in person's role may not upload, asked once; undefined when it may, or when it could not be asked, the server then refusing in its own words.
+// Why the signed-in person's role may not upload, asked again once the last answer is in, so a role changed meanwhile shows without a reload; fields mounting together share one question. undefined when it may, or when it could not be asked, the server then refusing in its own words.
 export async function uploadDenied(): Promise<string | undefined> {
   denial ??= (async () => {
     try {
       return (await call(editorApi, '/can')).denied.upload
     }
     catch {
-      denial = undefined
-
       return undefined
+    }
+    finally {
+      denial = undefined
     }
   })()
 
   return denial
+}
+
+// The reason uploads are refused to the signed-in person's role, filled in once the server has said; a control offering an upload reads it.
+export function uploadRefusal(): Signal<string | undefined> {
+  const reason = signal<string>()
+
+  void (async () => {
+    reason.set(await uploadDenied())
+  })()
+
+  return reason
 }
 
 let rules: Promise<UploadRules | undefined> | undefined

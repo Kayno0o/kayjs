@@ -1,4 +1,5 @@
 import type { Signal } from 'kay'
+import type { Denials } from './access'
 import type { Drafts } from './drafts'
 import type { SavedState } from './editor/live'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
@@ -29,6 +30,8 @@ export interface FormScope {
   // In a locale other than the default's, the default locale's entry, which a field still saying the same is marked against.
   source?: PairedEntry | undefined
   shown: Shown
+  // The actions the signed-in person's role may not do, whose controls the form disables.
+  denied?: Denials | undefined
 }
 
 // The fields a screen renders, so an issue on one it does not render is still shown.
@@ -108,8 +111,8 @@ export function createShown(): Shown {
   }
 }
 
-export function formScope(drafts: Drafts, entry: EntryRef, collection: ScreenCollection, problem?: string, source?: PairedEntry): FormScope {
-  return { drafts, entry, collection, problem, source, shown: createShown() }
+export function formScope(drafts: Drafts, entry: EntryRef, collection: ScreenCollection, problem?: string, source?: PairedEntry, denied?: Denials): FormScope {
+  return { drafts, entry, collection, problem, source, denied, shown: createShown() }
 }
 
 function slugLine(entry: StoredEntry): string {
@@ -119,7 +122,7 @@ function slugLine(entry: StoredEntry): string {
 // An entry's form on its own screen, or a new entry's when `entry` is left out: the drafts, the save, publish and delete, and the guard against leaving with edits. Called in a component's script, it is what the default screen runs.
 // `entry` may be a function returning it, read each time the form needs it: for a screen that stays when the page refreshes in place (a `persist` island) and takes new props, `entry: () => all.entry`, so `stored`, `name` and `subtitle` follow the refreshed entry.
 // `copy` starts a new entry as a copy of a translation, `source` is the default locale's entry the form marks untranslated fields against.
-export function createEntryForm({ prefix, collection, entry, locale, copy, source }: { prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
+export function createEntryForm({ prefix, collection, entry, locale, copy, source, denied }: { denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
   const read = typeof entry === 'function' ? entry : () => entry
   const first = read()
 
@@ -315,7 +318,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   })
 
   return {
-    ...formScope(drafts, ref, collection, undefined, source),
+    ...formScope(drafts, ref, collection, undefined, source, denied),
     prefix,
     get problem() {
       return stored()?.problem

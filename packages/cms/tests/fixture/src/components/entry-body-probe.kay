@@ -1,0 +1,17 @@
+--- client
+import EntryBody from '@kaynooo/kayjs-cms/entry-body.kay'
+import { createDrafts } from '../../../../src/drafts'
+import { formScope } from '../../../../src/form'
+
+// The Markdown body of an entry on a form of its own, for a test of what its image drop does.
+type Input = Parameters<typeof EntryBody>[0]
+
+const { collection } = props<{ collection: Parameters<typeof formScope>[2] }>()
+const entry = { collection: 'posts', slug: 'hello' }
+const drafts = createDrafts({ show: async () => ({}) })
+
+drafts.open({ ...entry, data: {}, body: '' })
+
+const form = formScope(drafts, entry, collection) as unknown as Input['form']
+---
+EntryBody(form={form})

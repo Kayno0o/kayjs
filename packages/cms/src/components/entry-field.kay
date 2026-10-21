@@ -48,5 +48,13 @@ const note = () => {
 effect(() => {
   onCleanup(form.shown.add(name))
 })
+
+// The draft flag and the publish and end dates are the role's to change when it may publish: the others see them, locked with the reason.
+const { draftField, publishField, unpublishField } = form.collection
+const locked = [draftField, publishField, unpublishField].includes(name as never) ? form.denied?.publish : undefined
 ---
-FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name} note={note()})
+if locked
+  fieldset.kcms-locked(disabled data-tooltip={locked} tabindex="0")
+    FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name} note={note()})
+else
+  FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name} note={note()})

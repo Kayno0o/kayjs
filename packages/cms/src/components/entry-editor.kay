@@ -18,7 +18,7 @@ import EntryPresence from './entry-presence.kay'
 // An app's own screen builds the same from `createEntryForm` and the parts this one is made of.
 const { prefix, collection, entry, locale, presence, translations, copy, source, denied } = props<{ denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined, locale?: string | undefined, presence?: Editors | undefined, translations?: EntryTranslations | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }>()
 
-const form = createEntryForm({ prefix, collection, entry, locale, copy, source: translations?.source ?? source })
+const form = createEntryForm({ prefix, collection, entry, locale, copy, denied, source: translations?.source ?? source })
 ---
 form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => { event.preventDefault(); void form.save() }})
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})

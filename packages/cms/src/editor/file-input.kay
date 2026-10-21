@@ -7,7 +7,7 @@ import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { guardLeave } from 'kay'
 import { sizeText, wording } from 'kay/words'
 import { atLeast, typeName } from '../upload-text'
-import { listUploads, uploadDenied, uploadFile, uploadRules } from './upload'
+import { listUploads, uploadFile, uploadRefusal, uploadRules } from './upload'
 
 type Size = { width: number, height: number } | undefined
 
@@ -32,7 +32,7 @@ const accept = signal<string>()
 const maxBytes = signal<number>()
 
 // Why the signed-in person's role may not upload, when it may not; the zone is then disabled with this as its tooltip.
-const denied = signal<string>()
+const denied = uploadRefusal()
 
 // The uploads already stored, listed when the picker is first opened; undefined until then.
 const stored = signal<{ path: string, name: string }[]>()
@@ -50,12 +50,6 @@ async function offer(): Promise<void> {
 }
 
 void offer()
-
-async function askRole(): Promise<void> {
-  denied = await uploadDenied()
-}
-
-void askRole()
 
 // An address the CMS stored: its path says nothing an editor needs to read or type.
 const stays = () => value.startsWith('/_kay/files/')

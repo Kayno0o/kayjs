@@ -3,16 +3,16 @@ import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
 import { createDrafts } from '../../../../src/drafts'
 import { formScope } from '../../../../src/form'
 
-// One EntryField on a form of its own, for a test of what it throws for a name the form does not render.
+// One EntryField on a form of its own, for a test of what it throws for a name the form does not render, or of what a role's denials lock.
 type Input = Parameters<typeof EntryField>[0]
 
-const { name, collection } = props<{ name: string, collection: Parameters<typeof formScope>[2] }>()
+const { name, collection, denied } = props<{ name: string, collection: Parameters<typeof formScope>[2], denied?: Parameters<typeof formScope>[5] }>()
 const entry = { collection: 'posts', slug: 'hello' }
 const drafts = createDrafts({ show: async () => ({}) })
 
 drafts.open({ ...entry, data: {} })
 
 // Imported by file, so the package's own types see them as another module's.
-const form = formScope(drafts, entry, collection) as unknown as Input['form']
+const form = formScope(drafts, entry, collection, undefined, undefined, denied) as unknown as Input['form']
 ---
 EntryField(form={form} name={name})

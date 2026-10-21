@@ -18,8 +18,10 @@ const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { t
 const shelf: CollectionInfo = { ...posts, name: 'shelf', dir: 'content/shelf', orderField: 'order' }
 const catalog: CollectionInfo = { ...products, name: 'catalog', orderField: 'order' }
 const home: CollectionInfo = { ...posts, name: 'home', dir: 'content/home', single: true }
-const dated: CollectionInfo = { ...posts, name: 'dated', dir: 'content/dated', draftField: undefined, publishField: 'publishAt' }
-const collectionList = [posts, products, outside, shelf, catalog, home, dated]
+const publishedOn = (format: string): CollectionInfo['schema'] => ({ type: 'object', properties: { title: { type: 'string' }, publishAt: { type: 'string', format } } })
+const stamped: CollectionInfo = { ...posts, name: 'stamped', dir: 'content/stamped', draftField: undefined, publishField: 'publishAt', schema: publishedOn('date-time') }
+const dated: CollectionInfo = { ...stamped, name: 'dated', dir: 'content/dated', schema: publishedOn('date') }
+const collectionList = [posts, products, outside, shelf, catalog, home, stamped, dated]
 
 const TAKEN = 'names an entry the collection already holds'
 const MISSING = 'names no entry of the collection'
@@ -103,6 +105,8 @@ const content: typeof Content = {
 void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
+const { default: entriesApi } = await import('../src/api/entries')
+const { leavesPublication } = await import('../src/publishing')
 const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
@@ -659,24 +663,40 @@ describe('duplicateEntry', () => {
     expect(frontmatter(saved[0]!)).toEqual({ title: 'A', draft: true })
   })
 
-  test('holds the copy of an entry with only a publish date back, so it does not go live at once', async () => {
+  test('holds the copy of an entry with only a publish date back, so it does not go live at once, in the format of the field', async () => {
+    stored.stamped = [
+      { slug: 'past', path: 'content/stamped/past.md', data: { title: 'P', publishAt: '2020-01-01T00:00:00.000Z' }, draft: false },
+      { slug: 'plain', path: 'content/stamped/plain.md', data: { title: 'N' }, draft: false },
+      { slug: 'soon', path: 'content/stamped/soon.md', data: { title: 'S', publishAt: '2999-01-01T00:00:00.000Z' }, draft: false },
+    ]
     stored.dated = [
-      { slug: 'past', path: 'content/dated/past.md', data: { title: 'P', publishAt: '2020-01-01T00:00:00.000Z' }, draft: false },
+      { slug: 'past', path: 'content/dated/past.md', data: { title: 'P', publishAt: '2020-01-01' }, draft: false },
       { slug: 'plain', path: 'content/dated/plain.md', data: { title: 'N' }, draft: false },
-      { slug: 'day', path: 'content/dated/day.md', data: { title: 'D', publishAt: '2020-01-01' }, draft: false },
-      { slug: 'soon', path: 'content/dated/soon.md', data: { title: 'S', publishAt: '2999-01-01T00:00:00.000Z' }, draft: false },
     ]
 
-    for (const slug of ['past', 'plain', 'day', 'soon'])
-      await duplicateEntry({ collection: 'dated', slug })
+    for (const collection of ['stamped', 'dated']) {
+      for (const slug of collection === 'stamped' ? ['past', 'plain', 'soon'] : ['past', 'plain'])
+        await duplicateEntry({ collection, slug })
+    }
 
-    expect(saved.map(change => frontmatter(change).publishAt)).toEqual(['9999-12-31T00:00:00.000Z', '9999-12-31T00:00:00.000Z', '9999-12-31', '2999-01-01T00:00:00.000Z'])
+    expect(saved.map(change => frontmatter(change).publishAt)).toEqual(['9999-12-31T00:00:00.000Z', '9999-12-31T00:00:00.000Z', '2999-01-01T00:00:00.000Z', '9999-12-31', '9999-12-31'])
   })
 
   test('refuses an entry that does not exist and a single collection', async () => {
     expect(await duplicateEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(await duplicateEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'Home holds one entry, which cannot be duplicated')
     expect(saved).toEqual([])
+  })
+})
+
+describe('a new entry saved by a role that may not publish, through the entries route', () => {
+  test.each([['stamped', '9999-12-31T00:00:00.000Z'], ['dated', '9999-12-31']])('is held back by a date in the format of the %s collection\'s publish field', async (collection, held) => {
+    const path = `/${collection}/new`
+    const request = new Request(`http://site.test${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: { title: 'New' }, create: true }) })
+
+    expect(await leavesPublication(request, `/api/cms/entries${path}`)).toBe(true)
+    expect(await (await entriesApi.handle(request)).json()).toMatchObject({ saved: true })
+    expect(frontmatter(saved[0]!)).toEqual({ title: 'New', publishAt: held })
   })
 })
 
