@@ -24,7 +24,7 @@ const sources = new Map<string, InlineSource>()
 // Elements whose own keys and clicks act on a page, left to the form.
 const CONTROLS = 'button, summary, input, select, textarea, label'
 // The elements that mean nothing by themselves, which the editor gives the button role once it makes them a tab stop.
-const GENERIC = new Set(['div', 'span', 'p', 'li', 'strong', 'em', 'small', 'b', 'i', 'td', 'th', 'dt', 'dd', 'blockquote', 'figcaption'])
+const GENERIC = new Set(['div', 'span', 'p', 'strong', 'em', 'small', 'b', 'i'])
 const LINE_BREAKS = /[\r\n]+/g
 const EDGE_BREAKS = /^[\r\n]+|[\r\n]+$/g
 
@@ -181,7 +181,7 @@ export function markedLabel({ marker }: MarkedField, drafts: Drafts): string | u
   return collection ? fieldAtPath(fieldsOf(collection.schema), drafts.entry(marker)?.data, path)?.label : undefined
 }
 
-// Gives each marked element, an attribute's or a text's, a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text, and says what it edits. A plain text element gets the button role too, as a link, a control or an element with a role of its own keeps what it has. The page renders again and may drop them.
+// Gives each marked element, an attribute's or a text's, a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text, and says what it edits. An element holding only the text of one field gets the button role too, which a Markdown body, a list or an attribute's element never does, as a link, a control or an element with a role of its own keeps what it has. The page renders again and may drop them.
 export function reachMarked(describe: (found: MarkedField[]) => string): () => void {
   const given = new Map<HTMLElement, string[]>()
   const set = (element: HTMLElement, name: string, value: string) => {
@@ -193,7 +193,7 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
   }
   const give = (root: Element) => {
     for (const element of [root, ...root.querySelectorAll('*')]) {
-      if (!(element instanceof HTMLElement))
+      if (!(element instanceof HTMLElement) || isTypingInline(element))
         continue
 
       const found = markersOf(element)
@@ -203,19 +203,25 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
 
       const reached = element.matches(`[tabindex], ${CONTROLS}, a[href]`)
 
-      set(element, 'aria-description', describe(found))
+      // The form may have loaded since, which names the field by its label instead of its path.
+      if (given.get(element)?.includes('aria-description'))
+        element.setAttribute('aria-description', describe(found))
+      else
+        set(element, 'aria-description', describe(found))
 
       if (!reached)
         set(element, 'tabindex', '0')
 
-      if (!reached && GENERIC.has(element.localName))
+      const [only] = found
+
+      if (!reached && GENERIC.has(element.localName) && found.length === 1 && only?.attribute === undefined && only?.marker.path !== BODY && element.childElementCount === 0)
         set(element, 'role', 'button')
     }
   }
   // Only what changed is looked at, and not the text being typed in, whose every keystroke is a mutation.
   const observer = new MutationObserver((records) => {
     for (const record of records) {
-      if (isTypingInline(record.target))
+      if (isTypingInline(record.target) || (record.target instanceof Element && record.target.closest('.kcms-editor, .kcms-marks')))
         continue
 
       if (record.type === 'attributes') {
@@ -232,11 +238,18 @@ export function reachMarked(describe: (found: MarkedField[]) => string): () => v
     }
   })
 
+  const refresh = (event: FocusEvent) => {
+    if (event.target instanceof Element)
+      give(event.target)
+  }
+
   give(document.documentElement)
+  document.addEventListener('focusin', refresh)
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
 
   return () => {
     observer.disconnect()
+    document.removeEventListener('focusin', refresh)
     for (const [element, names] of given) {
       for (const name of names)
         element.removeAttribute(name)

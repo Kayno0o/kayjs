@@ -110,23 +110,29 @@ test('a screen with no hover has the outlines on until the editor turns them off
 test('marked elements are tab stops that say what they edit, and a plain text one is a button', async () => {
   const page = await open()
 
-  await addMarked(page, '<div id="plain" data-kay-field-title="posts:hello:title">Plain</div><a id="link" href="#x" data-kay-field-title="posts:hello:title">Link</a>')
+  await addMarked(page, '<div id="plain" data-kay-field="posts:hello:title">Plain</div><a id="link" href="#x" data-kay-field-title="posts:hello:title">Link</a><div id="body" data-kay-body="posts:hello"><h2>Inside</h2></div><div id="attr" data-kay-field-title="posts:hello:title">Attr</div>')
   await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('tabindex') === '0')
 
   const read = (selector: string) => page.evaluate((target: string) => {
-    const element = document.querySelector(target)!
+    const element = document.querySelector<HTMLElement>(target)!
+
+    element.focus()
 
     return [element.getAttribute('tabindex'), element.getAttribute('role'), element.getAttribute('aria-description')]
   }, selector)
 
-  expect(await read('#plain')).toEqual(['0', 'button', 'Edit Title (title)'])
+  // The description names the field by its label once the form has loaded, as the focus brings it up to date (`read` focuses).
+  expect(await read('#plain')).toEqual(['0', 'button', 'Edit Title'])
+  // What holds more than one field's text keeps its own role, so the content inside stays readable.
+  expect(await read('#body')).toEqual(['0', null, 'Edit Body'])
+  expect(await read('#attr')).toEqual(['0', null, 'Edit Title (title)'])
   expect(await read('#link')).toEqual([null, null, 'Edit Title (title)'])
   expect(await read(TITLE)).toEqual(['0', null, 'Edit Title'])
 
   // Space on a button-role element acts as Enter does.
   await page.evaluate(() => document.querySelector<HTMLElement>('#plain')!.focus())
   await page.press(' ')
-  await page.waitUntil(() => document.querySelector('.kcms-marker-menu') === null)
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('contenteditable') === 'plaintext-only')
 }, 60_000)
 
 test('an element with several fields asks which one, by click and by key', async () => {
@@ -206,4 +212,32 @@ test('the role of a tab stop comes back after the text in it was typed', async (
   await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'textbox')
   await page.press('Enter')
   await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
+}, 60_000)
+
+test('typing keeps the textbox role and the outline layer survives the page taking it away', async () => {
+  const page = await open()
+
+  await addMarked(page, '<div id="plain" data-kay-field="posts:hello:title">Plain</div>')
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
+  await page.click('#plain')
+  await page.type('abc')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-status p') === null)
+  expect(await page.evaluate(() => document.querySelector('#plain')!.getAttribute('role'))).toBe('textbox')
+  await page.press('Enter')
+
+  await page.click(OUTLINE_ALL)
+  await page.waitUntil(() => document.querySelector('.kcms-marks') !== null)
+  await page.evaluate(() => document.querySelector('.kcms-marks')!.remove())
+  await page.evaluate(() => document.body.append(document.createElement('i')))
+  await page.waitUntil(() => document.querySelectorAll('.kcms-mark').length >= 2)
+}, 60_000)
+
+test('the keyboard focus is outlined as an attribute marker, and the default outline state is not kept', async () => {
+  const page = await open('unset')
+
+  await addMarked(page, '<p id="alt" data-kay-field-title="posts:hello:title">Attribute</p>')
+  await page.waitUntil(() => document.querySelector('#alt')!.getAttribute('tabindex') === '0')
+  await page.evaluate(() => document.querySelector<HTMLElement>('#alt')!.focus())
+  await page.waitUntil(() => document.querySelectorAll('.kcms-mark[data-focus]').length === 1)
+  expect(await page.evaluate(() => localStorage.getItem('kcms-marks'))).toBeNull()
 }, 60_000)

@@ -123,7 +123,8 @@ test('a click in the text already being typed in acts on nothing, and leaving it
 
   title!.blur()
   expect(title!.hasAttribute('contenteditable')).toBe(false)
-  expect(title!.hasAttribute('role')).toBe(false)
+  // The tab stop's button role is what comes back, not the textbox of the edit.
+  expect(title!.getAttribute('role')).not.toBe('textbox')
 })
 
 test('a text inside a block, and an item of a list of texts, are typed in place', async () => {

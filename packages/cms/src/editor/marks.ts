@@ -6,6 +6,8 @@ import { isTypingInline } from './inline'
 export interface Marks {
   // The fields under the pointer, none to clear them.
   hover: (fields: MarkedField[] | undefined) => void
+  // The fields of the element holding the keyboard focus.
+  focus: (fields: MarkedField[] | undefined) => void
   destroy: () => void
 }
 
@@ -30,10 +32,17 @@ export function writeMarking(storage: Pick<Storage, 'setItem'> | undefined, on: 
   catch {}
 }
 
+function same(next: MarkedField[], current: MarkedField[]): boolean {
+  return next.length === current.length && next.every((field, index) => field.element === current[index]?.element && field.start === current[index]?.start && field.attribute === current[index]?.attribute)
+}
+
 export function createMarks(all: boolean): Marks {
   const layer = document.createElement('div')
   const follow = new AbortController()
   let hovered: MarkedField[] = []
+  let focused: MarkedField[] = []
+  // The marked fields of the page, walked again only once the page's elements or markers changed, not on a scroll.
+  let known: MarkedField[] | undefined
   let frame = 0
 
   layer.className = 'kcms-marks'
@@ -43,8 +52,12 @@ export function createMarks(all: boolean): Marks {
   const draw = () => {
     frame = 0
 
+    // A page swap takes the layer away with the rest of the body it does not hold.
+    if (!layer.isConnected)
+      document.body.append(layer)
+
     const boxes: HTMLElement[] = []
-    const add = (field: MarkedField, isHovered: boolean) => {
+    const add = (field: MarkedField, state?: 'hover' | 'focus') => {
       const box = markedBox(field)
 
       if (!box || box.bottom < 0 || box.right < 0 || box.top > innerHeight || box.left > innerWidth)
@@ -53,18 +66,26 @@ export function createMarks(all: boolean): Marks {
       const mark = document.createElement('div')
 
       mark.className = 'kcms-mark'
-      mark.toggleAttribute('data-hover', isHovered)
+
+      if (state)
+        mark.setAttribute(`data-${state}`, '')
+
       mark.style.cssText = `left:${box.left - GROW}px;top:${box.top - GROW}px;width:${box.width + GROW * 2}px;height:${box.height + GROW * 2}px`
       boxes.push(mark)
     }
 
     if (all) {
-      for (const field of allMarked())
-        add(field, false)
+      known ??= allMarked()
+
+      for (const field of known)
+        add(field)
     }
 
+    for (const field of focused)
+      add(field, 'focus')
+
     for (const field of hovered)
-      add(field, true)
+      add(field, 'hover')
 
     layer.replaceChildren(...boxes)
   }
@@ -74,7 +95,21 @@ export function createMarks(all: boolean): Marks {
   }
   // The text being typed in changes on every keystroke, which moves no outline worth drawing again.
   const observer = new MutationObserver((records) => {
-    if (records.some(record => !isTypingInline(record.target) && !layer.contains(record.target) && !(record.target.parentElement ?? record.target as Element).closest?.('.kcms-editor')))
+    let changed = false
+
+    for (const record of records) {
+      const element = record.target instanceof Element ? record.target : record.target.parentElement
+
+      if (isTypingInline(record.target) || layer.contains(record.target) || element?.closest('.kcms-editor'))
+        continue
+
+      changed = true
+
+      if (record.type === 'childList' || record.attributeName?.startsWith('data-kay-'))
+        known = undefined
+    }
+
+    if (changed)
       redraw()
   })
 
@@ -88,13 +123,16 @@ export function createMarks(all: boolean): Marks {
 
   return {
     hover(fields) {
-      const next = fields ?? []
+      if (!same(fields ?? [], hovered))
+        redraw()
 
-      if (next.length === hovered.length && next.every((field, index) => field.element === hovered[index]?.element && field.start === hovered[index]?.start && field.attribute === hovered[index]?.attribute))
-        return
+      hovered = fields ?? []
+    },
+    focus(fields) {
+      if (!same(fields ?? [], focused))
+        redraw()
 
-      hovered = next
-      redraw()
+      focused = fields ?? []
     },
     destroy() {
       follow.abort()
