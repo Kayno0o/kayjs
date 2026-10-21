@@ -41,6 +41,7 @@ export const auth = createAuth({
           return { errors: { displayName: 'Pick another name.' } }
 
         profiles.set(user.id, values)
+
         return undefined
       },
     },
