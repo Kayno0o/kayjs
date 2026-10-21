@@ -24,7 +24,7 @@ A span under a day labels the x-axis with times. The tooltip keeps its width and
 
 ## Stacking series
 
-`stacked` draws each series on top of the ones before it and fills the band between two lines, so the top line reads the total. It suits parts of a whole, such as one line per CPU core, each its share of the machine. The y-axis starts at 0 and reaches the highest total (`options.low` overrides the start).
+`stacked` draws each series on top of the ones before it and fills the band between two lines, so the top line reads the total. Every line is solid, the bands telling the series apart; the palette still cycles every six, so pass a `color` per series beyond that. It suits parts of a whole, such as one line per CPU core, each its share of the machine. The y-axis starts at 0 and reaches the highest total (`options.low` overrides the start).
 
 The tooltip, the keyboard announcements and the table for screen readers still read each series' own value through `formatValue`, never the running sum, and add a total. A `null` reads `-` and counts as 0 in the total, so a stacked line never breaks at a gap. The axis reaches below 0 when a total does. `totalLabel` renames the total, which is `Total` by default and read from the `ui.lineChart.total` word.
 

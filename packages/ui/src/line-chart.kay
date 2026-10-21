@@ -45,7 +45,8 @@ const headingTexts = memo(() => headings(labels, times(), formatLabel))
 // The heights the series are drawn at: their own values, or each laid on the ones before it when stacked.
 const heights = memo(() => stacked ? stackValues(series.map(item => item.values)) : series.map(item => item.values))
 const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
-const dashes = memo(() => series.map((_, index) => SERIES_DASHES[index % SERIES_DASHES.length]!))
+// A stacked chart draws every line solid: its filled bands tell the series apart, and the dash cycle would repeat every six.
+const dashes = memo(() => series.map((_, index) => stacked ? '' : SERIES_DASHES[index % SERIES_DASHES.length]!))
 
 const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}

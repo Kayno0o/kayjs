@@ -207,6 +207,8 @@ inBrowser('LineChart stacked far above one series', () => {
 
     const rows = await page.evaluate(() => [...document.querySelectorAll('#cores .kui-line-chart-tooltip-row')].map(row => row.textContent)) as string[]
 
+    expect(await page.evaluate(() => [...document.querySelectorAll('#cores .ct-line')].map(line => line.getAttribute('style') ?? ''))).toSatisfy((styles: string[]) => styles.length === 12 && styles.every(style => !style.includes('stroke-dasharray')))
+    expect(await page.evaluate(() => [...document.querySelectorAll('#seconds .ct-line')].map(line => line.getAttribute('style') ?? '').some(style => style.includes('stroke-dasharray')))).toBe(true)
     expect(rows).toHaveLength(13)
     expect(rows[0]).toBe('Core 0100%')
     expect(rows.at(-1)).toBe('Total1200%')
