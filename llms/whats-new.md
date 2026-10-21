@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page swap keeps a fetched deferred server island on screen while its next copy is fetched, so a post back to the same page no longer swaps the form for its inert copy and back, which jumped the scroll ([Prerendering](prerendering.md#prerendering)).
 - kayjs-cms ships the French of every `cms.*` text, the screens, the editor and its messages, read on a French page after the app's own catalog with no setup, so a French site no longer words each one itself; another language is a `cms` block in the app's `src/messages/<locale>.ts`, and `tests/words.test.ts` fails for a new key without its French ([Texts and languages](../packages/cms/llms/words.md)).
 - `ctx.redirect()` to a page puts on its `trailingSlash` spelling and, on a site with `i18n`, the page's locale, as `llms/routing.md` said it did, so a native post, a page swap or an island call lands on the page in one response instead of after a slash redirect ([Pages and routing](routing.md)).
+- `ctx.redirect()` to a page puts on its `trailingSlash` spelling and, on a site with `i18n`, the page's locale, as `llms/routing.md` said it did (a redirect to `/login` from an English page now goes to `/en/login`, and one on a host no locale names stays as written), so a native post, a page swap or an island call lands on the page in one response instead of after a slash redirect ([Pages and routing](routing.md)).
 
 ## 1.61.0
 

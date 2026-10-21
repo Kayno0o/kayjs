@@ -100,7 +100,7 @@ h1 {post.title}
 
 All three throw. At the top of a page they are statements. In a guard or an action you `return` them.
 
-Guards, endpoints and actions use the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post, unless you give a status.
+Guards, endpoints and actions use the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post, unless you give a status. A path to a page of your site gets what a link to it has: your `base`, the locale of the page and the `trailingSlash` spelling, so the visitor takes one request to get there.
 
 <Callout type="warning">
 

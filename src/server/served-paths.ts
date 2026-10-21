@@ -1,5 +1,7 @@
 import { routerKey } from './routes'
 
+const GET_METHODS = new Set(['GET', 'ALL'])
+
 // What serves a path: a page, a public file, an endpoint, a redirect, an API module's route, or kay itself.
 export type ClaimKind = 'page' | 'public' | 'endpoint' | 'redirect' | 'api' | 'kay'
 
@@ -105,9 +107,14 @@ export class ServedPaths {
     return [...this.#claims.values()].flat().map(claim => claim.path)
   }
 
-  // The paths something other than a page serves for a GET, as the router reads them.
+  // The paths something other than a page serves for a GET, as the router reads them; a suffixed endpoint's claim is its pattern without the suffix, whose real paths all carry a dot.
   apart(): string[] {
-    return [...this.#claims.values()].flat().filter(claim => claim.kind !== 'page' && ['GET', 'ALL'].includes(claim.method ?? 'GET')).map(claim => claim.path)
+    return [...this.#claims.values()].flat().filter(claim => claim.kind !== 'page' && claim.suffix === undefined && GET_METHODS.has(claim.method ?? 'GET')).map(claim => claim.path)
+  }
+
+  // The patterns a suffixed endpoint registers, which take only paths ending in its suffix.
+  suffixed(): Set<string> {
+    return new Set([...this.#claims.values()].flat().filter(claim => claim.suffix !== undefined).map(claim => claim.path))
   }
 
   // The GET paths a static export writes, in the order they were claimed.

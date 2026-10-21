@@ -1,0 +1,4 @@
+--- server
+const path: string = ctx.params.path
+---
+p Rest {path}

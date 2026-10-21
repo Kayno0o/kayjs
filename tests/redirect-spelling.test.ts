@@ -1,7 +1,11 @@
 import type { I18nConfig } from '../src/config'
+import type { LocaleSettings } from '../src/runtime/i18n'
+import type { LocaleState } from '../src/runtime/locale-state'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
+import { Redirect } from '../src/server/signals'
 
 const routes = 'tests/fixtures/redirect-spelling/src/routes'
 const messages = 'tests/fixtures/i18n/src/messages'
@@ -141,5 +145,44 @@ describe('a redirect to a path that is hostile or odd', () => {
         expect(where, `${way} ${to}`).toBe(expected)
       }
     }
+  })
+})
+
+describe('a redirect on a site whose root catch-all page could take any path', () => {
+  const shadowed = 'tests/fixtures/redirect-shadow/src/routes'
+  const api = 'tests/fixtures/redirect-shadow/src/api'
+  const extension = { name: 'kay-test-auth', server: new Elysia({ name: 'kay-test-auth' }).get('/auth/:provider', () => 'auth') }
+
+  for (const dev of [false, true]) {
+    it(`spells a page and leaves what else serves the path as written, ${dev ? 'dev' : 'production'}`, async () => {
+      const app = new Elysia().use(await pages({ routes: shadowed, api, publicDir: 'tests/fixtures/redirect-shadow/public', prebuilt: false, security: false, trailingSlash: 'always', dev, extensions: [extension] }))
+
+      const where = async (to: string) => {
+        const response = await app.handle(new Request(`http://localhost/bounce/?to=${encodeURIComponent(to)}`))
+
+        return response.headers.get('location')
+      }
+
+      // Pages, the catch-all's included, next to a `[slug].json` endpoint whose pattern is `/:slug`.
+      expect(await where('/about')).toBe('/about/')
+      expect(await where('/anything/else')).toBe('/anything/else/')
+      expect(await where('/')).toBe('/')
+
+      // An API module's route, an extension's, a public file with no extension and kay's own.
+      for (const to of ['/api/ping/hello', '/auth/github', '/plain', '/_kay/x', '/x.json'])
+        expect(await where(to), to).toBe(to)
+    })
+  }
+})
+
+describe('a redirect on a site with locales by domain', () => {
+  const settings: LocaleSettings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false, hosts: { fr: 'fr.example', en: 'en.example' }, paths: { '/about': { fr: '/a-propos', en: '/about-us' } }, pages: ['/', '/about'] }
+  const at = (host: string, locale: string) => runInLocale({ settings, locale, host, path: '/', messages: {} } as unknown as LocaleState, () => new Redirect('/about', 302).location)
+
+  it('stays on a host the app does not name, and follows the page on one it does', () => {
+    expect(at('localhost:3000', 'fr')).toBe('/about')
+    expect(at('staging.example', 'en')).toBe('/about')
+    expect(at('en.example', 'en')).toBe('/about-us')
+    expect(at('fr.example', 'fr')).toBe('/a-propos')
   })
 })

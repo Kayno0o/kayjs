@@ -1,0 +1,7 @@
+--- server
+const to = ctx.url.searchParams.get('to')
+
+if (to)
+  ctx.redirect(to)
+---
+h1 Bounce

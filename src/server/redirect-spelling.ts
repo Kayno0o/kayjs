@@ -26,7 +26,7 @@ export function redirectSpelling(trailingSlash: TrailingSlash, routes: ServedRou
   if (trailingSlash === 'ignore')
     return location => location
 
-  let others: string[] | undefined
+  let others: string[][] | undefined
 
   return (location) => {
     if (!location.startsWith('/') || location.startsWith('//'))
@@ -38,9 +38,11 @@ export function redirectSpelling(trailingSlash: TrailingSlash, routes: ServedRou
     if (path === '/' || path.includes('\\') || path.slice(path.lastIndexOf('/')).includes('.'))
       return location
 
-    others ??= apart()
+    others ??= apart().map(pattern => pattern.split(SLASHES).filter(Boolean))
 
-    if (others.some(pattern => takes(pattern.split(SLASHES).filter(Boolean), path.split(SLASHES).filter(Boolean))))
+    const segments = path.split(SLASHES).filter(Boolean)
+
+    if (segments[0] === '_kay' || others.some(pattern => takes(pattern, segments)))
       return location
 
     for (const route of routes) {

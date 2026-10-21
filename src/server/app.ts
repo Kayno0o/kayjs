@@ -267,8 +267,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // The route a request reaches is the most specific that matches: static before a parameter, a parameter before a catch-all, as the router prefers them.
   const bySpecificity = routes.map(route => ({ route, label: pageMatch.served(route) })).toSorted((a, b) => labelWeight(a.label) - labelWeight(b.label))
 
-  // A redirect to a page goes out as a visit to it is answered, in the locale and with the trailing slash its page has.
-  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => served.apart())
+  // A redirect to a page goes out as a visit to it is answered, with the trailing slash its page has; a route something else registered, such as an extension's or an API module's, is not one.
+  const pagePaths = new Set(table.paths.keys())
+  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...app.routes.filter(route => (route.method === 'GET' || route.method === 'ALL') && !pagePaths.has(route.path) && !served.suffixed().has(route.path)).map(route => route.path)])
 
   renderOptions.redirectSpelling = spell
 

@@ -26,6 +26,13 @@ function isOwnHost(location: string): boolean {
   return host !== '' && Object.values(hosts).some(own => own.toLowerCase() === host)
 }
 
+// With locales by domain, a request on a host the app does not configure (a staging one, localhost) stays there rather than being sent to a configured domain.
+function onOwnHost(state: NonNullable<ReturnType<typeof localeState>>): boolean {
+  const hosts = state.settings.hosts
+
+  return hosts === undefined || Object.values(hosts).some(own => own.toLowerCase() === state.host?.toLowerCase())
+}
+
 export class Redirect {
   readonly location: string
 
@@ -44,7 +51,7 @@ export class Redirect {
 
     // A page of the site goes to in the locale of the page that redirects, as any link of it is.
     const state = localeState()
-    const target = state === undefined || state.implicit ? location : localizedLink(state.settings, location, state.locale, state.host)
+    const target = state === undefined || state.implicit || !onOwnHost(state) ? location : localizedLink(state.settings, location, state.locale, state.host)
 
     this.location = target.toWellFormed().replace(NON_ASCII, encodeURI)
   }
