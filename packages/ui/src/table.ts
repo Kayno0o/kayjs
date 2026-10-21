@@ -130,6 +130,9 @@ export function csvField(value: unknown): string {
   if (value === undefined || value === null)
     return ''
 
+  if (value instanceof Date && Number.isNaN(value.getTime()))
+    return ''
+
   let text = value instanceof Date ? value.toISOString() : String(value)
 
   if (typeof value !== 'number' && FORMULA_START.test(text))
@@ -148,7 +151,10 @@ export function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string {
 // The address of a table's CSV endpoint for what is on screen: the sort as `sort` and `direction`, and the typed filter text under `param`, in the query the address already has.
 export function exportHref(href: string, sort: SortState | undefined, param: string, text: string): string {
   const hash = href.indexOf('#')
-  const [path = '', query = ''] = (hash === -1 ? href : href.slice(0, hash)).split('?')
+  const bare = hash === -1 ? href : href.slice(0, hash)
+  const mark = bare.indexOf('?')
+  const path = mark === -1 ? bare : bare.slice(0, mark)
+  const query = mark === -1 ? '' : bare.slice(mark + 1)
   const params = new URLSearchParams(query)
 
   if (sort) {

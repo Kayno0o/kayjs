@@ -32,7 +32,12 @@ afterEach(() => {
 const rowsOf = (root: HTMLElement, selector: string) => [...root.querySelectorAll(selector)]
 
 async function scrollTo(box: Element, top: number) {
-  Object.defineProperty(box, 'scrollTop', { value: top, configurable: true })
+  Object.defineProperty(box, 'scrollTop', { value: top, configurable: true, writable: true })
+  // A browser moves the content up as the box scrolls; happy-dom lays nothing out.
+  const content = box.querySelector('[role="presentation"], tbody')!
+  const rect = { top: -top, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: -top, toJSON: () => ({}) }
+
+  content.getBoundingClientRect = () => rect
   box.dispatchEvent(new Event('scroll'))
   await settle()
 }
@@ -91,6 +96,24 @@ describe('VirtualList', () => {
     // The taller first row pushes the others down, so fewer fit the window.
     expect(drawn).toBeLessThan(before)
     expect(rooms).toBe(`0px ${(100 - drawn) * 20}px`)
+  })
+
+  test('scrolls by the height a row above the window changes by, so what is in view stays put', async () => {
+    mounted = await mountComponent('src/components/virtual-list.kay', { count: 1000 })
+
+    const { root } = mounted
+    const box = root.querySelector('[role="list"]') as HTMLElement
+
+    await scrollTo(box, 20 * 500)
+
+    const above = rowsOf(root, '[role="listitem"]')[0]!
+
+    expect(Number(above.getAttribute('data-virtual-index'))).toBeLessThan(500)
+
+    Resize.made.at(-1)!.callback([{ target: above, borderBoxSize: [{ blockSize: 50 }] }])
+    await settle()
+
+    expect(box.scrollTop).toBe(20 * 500 + 30)
   })
 })
 

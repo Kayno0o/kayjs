@@ -34,7 +34,7 @@ A `filter` adds a search box. `filterLabel` names it, `Filter` by default, and `
 
 ## Exporting
 
-`exportable` adds an Export CSV button that downloads the rows as they are on screen, with the filter and the sort applied. Each column writes the row's own value at its `key`, headers first, and a text a spreadsheet would run as a formula (starting with `=`, `+`, `-` or `@`) gets a leading apostrophe. `exportLabel` and `exportName` replace the button's text and the file's name.
+`exportable` adds an Export CSV button that downloads the rows as they are on screen, with the filter and the sort applied. Each column writes the row's own value at its `key`, headers first, and a text a spreadsheet would run as a formula (starting with `=`, `+`, `-`, `@`, a tab or a carriage return) gets a leading apostrophe. `exportLabel` and `exportName` replace the button's text and the file's name.
 
 <Demo name="table/export" />
 
@@ -46,7 +46,7 @@ When the page holds only a part of the rows, give `exportable` an address: the b
 
 <Demo name="table/virtual" />
 
-The box takes the focus to scroll by keyboard. Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus, so pair a long table with `filter`.
+The choice is made once, when the table is made, and the server draws the first screenful only: the rest shows once the page has loaded its script. Name the scroll box with an `aria-label`. The box takes the focus to scroll by keyboard. Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus, so pair a long table with `filter`.
 
 ## Narrow screens
 

@@ -116,6 +116,7 @@ describe('toCsv', () => {
 
   test('writes dates as ISO text and booleans and missing values plainly', () => {
     expect(csvField(new Date(0))).toBe('1970-01-01T00:00:00.000Z')
+    expect(csvField(new Date(Number.NaN))).toBe('')
     expect(csvField(true)).toBe('true')
     expect(csvField(null)).toBe('')
     expect(csvField(undefined)).toBe('')
@@ -126,6 +127,7 @@ describe('exportHref', () => {
   test('adds the sort and the typed text to the address, keeping the query and hash it has', () => {
     expect(exportHref('/planets.csv', { key: 'moons', direction: 'desc' }, 'q', 'ma rs')).toBe('/planets.csv?sort=moons&direction=desc&q=ma+rs')
     expect(exportHref('/planets.csv?team=a#top', undefined, 'q', '  ')).toBe('/planets.csv?team=a#top')
+    expect(exportHref('/p.csv?next=/a?b', undefined, 'q', 'x')).toBe('/p.csv?next=%2Fa%3Fb&q=x')
     expect(exportHref('/planets.csv?q=old', undefined, 'q', 'new')).toBe('/planets.csv?q=new')
   })
 })

@@ -2080,6 +2080,11 @@
 
   /* A narrow table stacks each row as a card, a line per cell with its header beside it, the labels as wide as the longest up to 40%, and keeps only its sortable headers, as sort buttons tall enough to tap. */
   @container kui-table (width < 30rem) {
+    /* The headers are one row of sort buttons in a block of their own, which is what stays on top. */
+    .kui-table-wrap:where([data-virtual]) .kui-table thead {
+      @apply sticky top-0 z-1 bg-kui-surface0;
+    }
+
     .kui-table,
     .kui-table :where(thead, tbody, tr),
     .kui-table-empty-cell {

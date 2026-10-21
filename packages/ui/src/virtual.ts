@@ -86,8 +86,10 @@ export function virtualRows<Item>(options: VirtualOptions<Item>) {
 
   // Follows `box`'s scroll and size and measures the rows `content` holds, each marked `data-virtual-index`, as they come and resize. Returns what stops it.
   function attach(box: HTMLElement, content: HTMLElement): () => void {
+    // Where the rows start inside the scrolled content: the filter bar and the headers of a table sit above them.
+    const rowsStart = () => content.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
     const sync = () => {
-      top.set(box.scrollTop)
+      top.set(box.scrollTop - rowsStart())
 
       if (box.clientHeight > 0)
         viewport.set(box.clientHeight)
@@ -95,6 +97,8 @@ export function virtualRows<Item>(options: VirtualOptions<Item>) {
 
     const resize = new ResizeObserver((entries) => {
       let changed = false
+      // How much the rows above the window changed in height: scrolling by as much keeps what the visitor looks at in place, where a browser without scroll anchoring would jump.
+      let shift = 0
 
       for (const entry of entries) {
         if (entry.target === box) {
@@ -112,14 +116,23 @@ export function virtualRows<Item>(options: VirtualOptions<Item>) {
 
         const key = keyOf(item, index)
 
-        if (heights.get(key) !== height) {
+        const known = heights.get(key) ?? estimate
+
+        if (known !== height) {
+          if (offsets()[index + 1]! <= top())
+            shift += height - known
+
           heights.set(key, height)
           changed = true
         }
       }
 
-      if (changed)
+      if (changed) {
         version.set(version() + 1)
+
+        if (shift !== 0)
+          box.scrollTop += shift
+      }
     })
     const watch = (node: Node) => {
       if (node instanceof HTMLElement && node.dataset.virtualIndex !== undefined)

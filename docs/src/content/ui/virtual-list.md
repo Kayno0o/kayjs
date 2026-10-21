@@ -12,6 +12,8 @@ A row starts at `estimate` pixels (48) and takes the height it measures once dra
 
 `itemKey` names a row across updates, so a measured height stays with it when the list shifts; without it the row's index is its key.
 
+A row's height is its border box, so give its content padding or a gap rather than a margin. The server draws the first screenful, so the rest shows once the page has loaded its script.
+
 ## Keyboard, screen readers and find
 
 The list is `role="list"` named by `label`, and each row a `listitem` with its position among all, so a screen reader hears "3 of 10000". The box takes the focus to scroll by keyboard: arrows, Page Up and Down, Home and End.

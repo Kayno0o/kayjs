@@ -56,7 +56,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   exportLabel?: string | undefined
   // The file name the download is saved as.
   exportName?: string | undefined
-  // Draws only the rows in view, between room standing for the others, so a table of ten thousand rows and more stays as light as a short one. The table scrolls in a box of its own (`--kui-table-height`, 70vh by default) with its headers kept on top. Find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window loses its focus.
+  // Draws only the rows in view, between room standing for the others, so a table of ten thousand rows and more stays as light as a short one. The table scrolls in a box of its own (`--kui-table-height`, 70vh by default) with its headers kept on top. Decided once, when the table is made. The server draws the first screenful, so the rest shows once the page loads its script. Find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window loses its focus. Name the scroll box with an `aria-label`.
   virtual?: boolean | undefined
   class?: string | undefined
 }>()
@@ -138,7 +138,7 @@ function download() {
   link.href = url
   link.download = exportName
   link.click()
-  setTimeout(() => URL.revokeObjectURL(url))
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 function toggle(column: Column<Row>) {
@@ -161,19 +161,19 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
       span.kui-label-text {filterLabel}
       input.kui-field-input.kui-table-filter-input(type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
     p.kui-table-count(role="status") {typed() ? counted(kept().length) : ''}
-  if selectable
+  if selectable || exportable
     .kui-table-selection
-      Checkbox(label={selectAllLabel} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
-      p.kui-table-selected(role="status") {chosen().length > 0 ? countChosen(chosen().length) : ''}
-      if chosen().length > 0 && bulk
-        .kui-table-bulk
-          | {bulk(chosen(), () => commit([]))}
-  if exportable
-    .kui-table-selection
-      if endpoint() as address
-        Button(href={exportHref(address, current(), filterParam ?? 'q', typed())} download={exportName} label={exportLabel} variant="ghost" size="sm")
-      else
-        Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
+      if selectable
+        Checkbox(label={selectAllLabel} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
+        p.kui-table-selected(role="status") {chosen().length > 0 ? countChosen(chosen().length) : ''}
+        if chosen().length > 0 && bulk
+          .kui-table-bulk
+            | {bulk(chosen(), () => commit([]))}
+      if exportable
+        if endpoint() as address
+          Button(href={exportHref(address, current(), filterParam ?? 'q', typed())} download={exportName} label={exportLabel} variant="ghost" size="sm")
+        else
+          Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
   table.kui-table(aria-rowcount={virtual ? shown().length + 1 : undefined})
     thead
       tr(aria-rowindex={virtual ? 1 : undefined})
