@@ -12,8 +12,19 @@ interface Variant { base: string, dev: boolean, locale: boolean }
 
 const variants: Variant[] = [false, true].flatMap(dev => ['', '/repo'].flatMap(base => [false, true].map(locale => ({ dev, base, locale }))))
 
+// One app per variant and security setting, served for every request of the file: a request changes nothing a later one reads.
+const apps = new Map<string, ReturnType<typeof pages>>()
+
 async function get(variant: Variant, path: string, security = false): Promise<{ status: number, html: string, headers: Headers }> {
-  const app = await pages({ routes: `${FIXTURE}/src/routes`, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+  const key = JSON.stringify([variant, security])
+  let held = apps.get(key)
+
+  if (!held) {
+    held = pages({ routes: `${FIXTURE}/src/routes`, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    apps.set(key, held)
+  }
+
+  const app = await held
   const response = await app.handle(new Request(`http://localhost${variant.locale ? '/fr' : ''}${path}`))
 
   return { status: response.status, html: await response.text(), headers: response.headers }

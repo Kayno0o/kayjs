@@ -18,7 +18,8 @@ const LARGE = 'lorem ipsum dolor sit amet\n'.repeat(40_000)
 let dir: string
 
 async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (error: unknown) => void } = {}) {
-  return pages({ routes: 'tests/fixtures/site/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, ...options })
+  // `prebuilt: false` is what a test run means by default, spelled out so the client build is the one shared for the file.
+  return pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, publicDir: join(dir, 'public'), compress: true, log: false, ...options })
 }
 
 async function get(app: Awaited<ReturnType<typeof serve>>, path: string, headers: Record<string, string> = {}, method = 'GET') {
