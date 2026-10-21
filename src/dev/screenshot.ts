@@ -8,7 +8,7 @@ import { browse, browserPath } from '../test/browser'
 import { readDevAddress } from './address'
 import { mountedAt } from './base-proxy'
 import { diffPngs } from './screenshot-diff'
-import { checkSize, MAX_DIFF_PIXELS, MAX_HEIGHT, MAX_WIDTH, ShotRefused } from './screenshot-limits'
+import { checkSize, MAX_DIFF_PIXELS, MAX_HEIGHT, MAX_WIDTH, ShotRefusedError } from './screenshot-limits'
 
 export const SCREENSHOTS_DIR = join(KAY_DIR, 'screenshots')
 export const DEFAULT_WIDTHS = [375, 1280]
@@ -77,7 +77,7 @@ export interface ShotReport {
 // The path a visitor types for the page, under the site's mount point, or why it is refused: only a path of the dev server itself is shot, never another host's.
 export function pagePath(input: string, base = ''): string {
   if (!input.startsWith('/') || input.startsWith('//') || CONTROL.test(input))
-    throw new ShotRefused(`a page is named by its path on the dev server, such as /about, not ${JSON.stringify(input)}`)
+    throw new ShotRefusedError(`a page is named by its path on the dev server, such as /about, not ${JSON.stringify(input)}`)
 
   for (const segment of input.split(QUERY_OR_HASH, 1)[0]!.split('/')) {
     let decoded: string
@@ -86,11 +86,11 @@ export function pagePath(input: string, base = ''): string {
       decoded = decodeURIComponent(segment)
     }
     catch {
-      throw new ShotRefused(`${JSON.stringify(input)} has a malformed percent escape`)
+      throw new ShotRefusedError(`${JSON.stringify(input)} has a malformed percent escape`)
     }
 
     if (decoded === '..')
-      throw new ShotRefused(`${JSON.stringify(input)} leaves the page's path with ${segment}`)
+      throw new ShotRefusedError(`${JSON.stringify(input)} leaves the page's path with ${segment}`)
   }
 
   const pathname = input.split(QUERY_OR_HASH, 1)[0]!
@@ -99,7 +99,7 @@ export function pagePath(input: string, base = ''): string {
 
   // The proxy takes the base off, and what is left must not read as a host.
   if (routerPath(mounted, base).startsWith('//'))
-    throw new ShotRefused(`${JSON.stringify(input)} has a second slash after the base`)
+    throw new ShotRefusedError(`${JSON.stringify(input)} has a second slash after the base`)
 
   return mounted
 }
@@ -133,7 +133,7 @@ export async function screenshot(root: string, input: string, options: ShotOptio
   const origin = readDevAddress(root)
 
   if (origin === undefined)
-    throw new ShotRefused('no `kay dev` is running in this project: start it, then shoot its pages')
+    throw new ShotRefusedError('no `kay dev` is running in this project: start it, then shoot its pages')
 
   const mounted = options.base !== undefined && options.base !== '' ? mountedAt(origin, options.base) : undefined
   const served = mounted?.origin ?? origin
@@ -143,12 +143,12 @@ export async function screenshot(root: string, input: string, options: ShotOptio
 
     // The path was checked, so this holds; a path that moves the origin never reaches the browser.
     if (url.origin !== new URL(served).origin)
-      throw new ShotRefused(`${JSON.stringify(input)} names another host than the dev server's`)
+      throw new ShotRefusedError(`${JSON.stringify(input)} names another host than the dev server's`)
 
     const chromePath = process.env.BUN_CHROME_PATH
 
     if (browserPath() === undefined)
-      throw new ShotRefused(`kay screenshot needs Chrome or Chromium, and none was found; install one, or give its path as BUN_CHROME_PATH${chromePath === undefined || chromePath === '' ? '' : ` (${chromePath} is none)`}`)
+      throw new ShotRefusedError(`kay screenshot needs Chrome or Chromium, and none was found; install one, or give its path as BUN_CHROME_PATH${chromePath === undefined || chromePath === '' ? '' : ` (${chromePath} is none)`}`)
 
     const status = await reach(url)
     const report: ShotReport = { url: url.href, status, shots: [], console: [], problems: [] }
@@ -161,7 +161,7 @@ export async function screenshot(root: string, input: string, options: ShotOptio
         // The shot goes on in the background, its page closed rather than left to the end of the process.
         open.page?.close()
 
-        throw new ShotRefused(`${url.href} was not shot within ${SHOT_MS / 1000} s at ${width} px, the browser stopped answering`)
+        throw new ShotRefusedError(`${url.href} was not shot within ${SHOT_MS / 1000} s at ${width} px, the browser stopped answering`)
       }
 
       report.shots.push(taken.shot)
@@ -183,7 +183,7 @@ async function reach(url: URL): Promise<number> {
     return (await fetch(url, { signal: AbortSignal.timeout(REACH_MS), redirect: 'follow' })).status
   }
   catch {
-    throw new ShotRefused(`the dev server does not answer at ${url.origin}: it may be starting, or have stopped`)
+    throw new ShotRefusedError(`the dev server does not answer at ${url.origin}: it may be starting, or have stopped`)
   }
 }
 

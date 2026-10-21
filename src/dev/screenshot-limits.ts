@@ -7,11 +7,11 @@ export const MAX_HEIGHT = 8000
 export const MAX_DIFF_PIXELS = 12_000_000
 
 // Refused arguments and a setup that cannot shoot say so in their message, which a command prints as it is.
-export class ShotRefused extends Error {}
+export class ShotRefusedError extends Error {}
 
 export function checkSize(name: string, value: number, max: number): number {
   if (!Number.isInteger(value) || value < MIN_SIZE || value > max)
-    throw new ShotRefused(`${name} takes a whole number of pixels from ${MIN_SIZE} to ${max}, not ${value}`)
+    throw new ShotRefusedError(`${name} takes a whole number of pixels from ${MIN_SIZE} to ${max}, not ${value}`)
 
   return value
 }

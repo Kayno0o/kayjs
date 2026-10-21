@@ -4,12 +4,12 @@ import { KayError } from '../compiler/errors'
 const STACK_FRAME = /^at (?:.* \()?((?:\/|[A-Z]:[\\/]).+?):(\d+):\d+\)?$/i
 const THIS_FOLDER = `${import.meta.dir}/`
 
-// The `onError` handlers of a build judging a page it renders once, which take a `RequestRead` for their own instead of its being logged as a failure.
+// The `onError` handlers of a build judging a page it renders once, which take a `RequestReadError` for their own instead of its being logged as a failure.
 export const judgingReads = new WeakSet<object>()
 
 // What a page read of its request while it was rendered at build time, where only a request holds it.
 // `file` and `line` are where the read is written: a page, a layout, a component or a module, off the stack of the read.
-export class RequestRead extends KayError {
+export class RequestReadError extends KayError {
   readonly file: string | undefined
   readonly line: number | undefined
 

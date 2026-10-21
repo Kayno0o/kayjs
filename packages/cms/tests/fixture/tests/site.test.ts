@@ -28,7 +28,10 @@ beforeAll(async () => {
 test('kay check passes on the fixture, the editor\'s components included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', '..', '..', 'src', 'cli.ts'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
-  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
+  // The one warning is the mood kind the fixture has no component for on purpose, which extension.test.ts reads.
+  const output = await new Response(check.stdout).text() + await new Response(check.stderr).text()
+
+  expect(output.replace(/^warning: no editor for the mood kind[^\n]*\n --> kay.config.ts:1:1\n(?:[^\n]*\n){3}\n1 warning\n$/, '')).toMatch(CLEAN)
   expect(await check.exited).toBe(0)
 }, 60_000)
 

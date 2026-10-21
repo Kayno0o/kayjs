@@ -12,7 +12,7 @@ import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
 import { liveLimits } from './config-limits'
 import { readCapped } from './errors'
-import { eventStream, StreamRefused } from './event-stream'
+import { eventStream, StreamRefusedError } from './event-stream'
 import { presenceEntry } from './presence'
 import { clientAddress, overLimit } from './protection'
 import { signedText, signText } from './stamp'
@@ -259,7 +259,7 @@ function updates(watched: Watched[], lifetime: number, client: string, most: num
   return {
     [Symbol.asyncIterator]() {
       if ((open.get(client) ?? 0) >= most)
-        return { next: async () => Promise.reject(new StreamRefused('kay: the client holds too many live connections')) }
+        return { next: async () => Promise.reject(new StreamRefusedError('kay: the client holds too many live connections')) }
 
       open.set(client, (open.get(client) ?? 0) + 1)
 

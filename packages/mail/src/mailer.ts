@@ -85,6 +85,11 @@ export class MailNotConfiguredError extends Error {
   }
 }
 
+/** @deprecated Renamed `MailNotConfiguredError` in 1.70; the old name goes in 1.73. */
+export const MailNotConfigured = MailNotConfiguredError
+/** @deprecated Renamed `MailNotConfiguredError` in 1.70; the old name goes in 1.73. */
+export type MailNotConfigured = MailNotConfiguredError
+
 export type Mailer = Elysia & {
   // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
   configured: boolean

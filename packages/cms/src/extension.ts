@@ -30,6 +30,8 @@ async function setupWarnings(): Promise<string[]> {
   return [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)]
 }
 
+const UNCHECKED = 'the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none'
+
 // The one line an app adds to kay.config.ts. `editor` is the island kay renders at the end of every page in edit mode only.
 export function cms(options: CmsOptions = {}): KayExtension {
   const { prefix } = configure(options)
@@ -44,9 +46,15 @@ export function cms(options: CmsOptions = {}): KayExtension {
     devTool: { module: `${import.meta.dir}/devTool.ts` },
     // What the server logs or stops at as it listens, for `kay check` and the editor to show without one.
     check: async () => {
-      const stop = await bodyProblem()
+      // A collection loader that fails is a warning as at boot, not an error of the check.
+      try {
+        const stop = await bodyProblem()
 
-      return [...stop === undefined ? [] : [{ message: stop, severity: 'error' as const }], ...(await setupWarnings()).map(message => ({ message }))]
+        return [...stop === undefined ? [] : [{ message: stop, severity: 'error' as const }], ...(await setupWarnings()).map(message => ({ message }))]
+      }
+      catch (error) {
+        return [{ message: `${UNCHECKED}: ${error instanceof Error ? error.message : String(error)}` }]
+      }
     },
     // Run as the server boots, never by `kay build` or `kay check`.
     server: () => {
@@ -73,7 +81,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
             log.warn(line)
         }
         catch (error) {
-          log.warn('the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none', error)
+          log.warn(UNCHECKED, error)
         }
 
         // Uploads an older release kept in a folder per collection move to the shared folder, once and without the app asking.

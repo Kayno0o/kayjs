@@ -2990,20 +2990,41 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('shows an extension\'s problem at the file it names, relative to the project root or absolute', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {\n  extensions: [{ name: \'lib\', check: () => [{ message: \'the page greets nobody\', file: \'src/routes/index.kay\', severity: \'warning\' }, { message: \'the layout is bare\', file: new URL(\'./src/routes/layout.kay\', import.meta.url).pathname }] }],\n}\n',
+      'src/routes/index.kay': 'h1 Hi\n',
+      'src/routes/layout.kay': 'slot\n',
+    })
+
+    try {
+      const { report } = await runCheck(root, '--format', 'json')
+      const found = (JSON.parse(report) as { problems: { file: string, message: string }[] }).problems
+
+      expect(found.find(({ message }) => message === 'the page greets nobody')?.file).toBe(relative(process.cwd(), join(root, 'src/routes/index.kay')))
+      expect(found.find(({ message }) => message === 'the layout is bare')?.file).toBe(relative(process.cwd(), join(root, 'src/routes/layout.kay')))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports an import of a renamed library export, and --fix renames the import and its uses, keeping an alias', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default {}\n',
       'src/mail.ts': 'import { mailer, MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nexport const refused = (error: unknown) => error instanceof MailNotConfigured\nexport const note = \'MailNotConfigured is a word\'\nexport const seen = (error: { MailNotConfigured?: boolean }) => error.MailNotConfigured\nexport { mailer }\n',
       'src/save.ts': 'import type { SaveConflict as Conflict } from \'@kaynooo/kayjs-cms\'\n\nexport type Seen = Conflict\n',
       'src/reexport.ts': 'import { SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n',
+      'src/hydrate.ts': 'import { HydrationMismatch } from \'kay/dom\'\n\nexport const mismatch = (error: unknown) => error instanceof HydrationMismatch\n',
       'src/other.ts': 'import { MailNotConfigured } from \'./mine\'\n\nexport const same = MailNotConfigured\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(3)
+      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(4)
       await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/hydrate.ts')).text()).toBe('import { HydrationMismatchError } from \'kay/dom\'\n\nexport const mismatch = (error: unknown) => error instanceof HydrationMismatchError\n')
       expect(await Bun.file(join(root, 'src/reexport.ts')).text()).toBe('import { SaveConflictError as SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n')
       expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe('import { mailer, MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nexport const refused = (error: unknown) => error instanceof MailNotConfiguredError\nexport const note = \'MailNotConfigured is a word\'\nexport const seen = (error: { MailNotConfigured?: boolean }) => error.MailNotConfigured\nexport { mailer }\n')
       expect(await Bun.file(join(root, 'src/save.ts')).text()).toBe('import type { SaveConflictError as Conflict } from \'@kaynooo/kayjs-cms\'\n\nexport type Seen = Conflict\n')

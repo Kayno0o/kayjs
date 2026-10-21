@@ -30,7 +30,7 @@ import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
 import { renderPage, renderUnmatched } from './render'
-import { judgingReads, RequestRead } from './request-read'
+import { judgingReads, RequestReadError } from './request-read'
 import { routeChain, scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
@@ -158,7 +158,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
         // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
-        const refusal: { read?: RequestRead } = {}
+        const refusal: { read?: RequestReadError } = {}
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, guarded: guardedPage(route, config.requireGuards) })
         const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
         // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
@@ -484,9 +484,9 @@ function unkeptBy(island: boolean, stamps: boolean, live: boolean): string {
 }
 
 // An `onError` for a render at build time that keeps the first read of a request it meets in `refusal`.
-function judged(refusal: { read?: RequestRead }): (error: unknown) => void {
+function judged(refusal: { read?: RequestReadError }): (error: unknown) => void {
   const handler = (error: unknown) => {
-    if (error instanceof RequestRead)
+    if (error instanceof RequestReadError)
       refusal.read ??= error
   }
 

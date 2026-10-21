@@ -60,7 +60,7 @@ import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
-import { RequestRead } from './request-read'
+import { RequestReadError } from './request-read'
 import { guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
 import { askedForEndedEntry, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
@@ -785,7 +785,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
 function needsRequest(name: string): () => never {
   return () => {
-    throw new RequestRead(name)
+    throw new RequestReadError(name)
   }
 }
 

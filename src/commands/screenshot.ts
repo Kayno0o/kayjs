@@ -2,7 +2,7 @@ import type { Shot } from '../dev/screenshot'
 import type { Command } from './command'
 import { loadConfig } from '../config'
 import { screenshot } from '../dev/screenshot'
-import { checkSize, MAX_HEIGHT, MAX_WIDTH, ShotRefused } from '../dev/screenshot-limits'
+import { checkSize, MAX_HEIGHT, MAX_WIDTH, ShotRefusedError } from '../dev/screenshot-limits'
 import { basePath } from '../server/base'
 import { formatOption, printDocument, projectRoot } from './command'
 import { USAGES } from './usages'
@@ -87,7 +87,7 @@ export const screenshotCommand: Command = {
       return 0
     }
     catch (error) {
-      if (!(error instanceof ShotRefused))
+      if (!(error instanceof ShotRefusedError))
         throw error
 
       console.error(`kay screenshot: ${error.message}`)

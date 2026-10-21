@@ -12,8 +12,8 @@ const HEARTBEAT = new TextEncoder().encode(':\n\n')
 export const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
 
 // Thrown by a source that cannot serve its stream after all: the stream closes with no end or error event, which a browser takes as a drop and opens again after its backoff.
-export class StreamRefused extends Error {
-  override name = 'StreamRefused'
+export class StreamRefusedError extends Error {
+  override name = 'StreamRefusedError'
 }
 
 // What a stream reads: an iterable, or a function making one from a signal aborted when the browser goes away, which a source blocked on a quiet feed passes to what it waits on.
@@ -99,7 +99,7 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
         if (cancelled)
           return
 
-        if (error instanceof StreamRefused) {
+        if (error instanceof StreamRefusedError) {
           clearInterval(heartbeat)
           controller.close()
 

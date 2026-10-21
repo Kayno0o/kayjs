@@ -144,3 +144,58 @@ describe('cms() missing field kinds', () => {
     }
   })
 })
+
+describe('cms() check', () => {
+  async function withCollections(config: Record<string, unknown>, run: () => Promise<void>): Promise<void> {
+    const { registerCollections } = await import('../../../src/content/edit')
+    const { setContentPlace } = await import('../../../src/content/load')
+    const before = registerCollections(Object.entries(config) as Parameters<typeof registerCollections>[0])
+
+    try {
+      setContentPlace(`${import.meta.dir}/fixture`, `${import.meta.dir}/fixture/src`)
+      await run()
+    }
+    finally {
+      registerCollections(before)
+    }
+  }
+
+  test('finds each of the four setup warnings', async () => {
+    const { s } = await import('kay')
+    const { collection, customField, fieldInput } = await import('kay/content')
+    const { check } = cms({ files: workingTree(), guard: () => undefined, collections: { shelves: { form: { fields: ['title', 'ghost'] } }, nowhere: {} } })
+    const shelves = collection({ name: 'shelves', load: () => [] }, {
+      schema: s.Object({
+        title: s.String(),
+        mood: s.Optional(customField('mood', s.String())),
+        odd: s.Optional(s.String({ 'x-kay': 5 })),
+        extra: s.Optional(fieldInput(s.String(), { when: 'missing' })),
+      }),
+    })
+
+    await withCollections({ shelves }, async () => {
+      expect(await check!()).toEqual([
+        { message: 'shelves: odd has an `x-kay` that is neither a kind name nor `{ kind }`: set it with `fieldInput`, or remove it' },
+        { message: 'no editor for the mood kind that shelves uses: add src/cms/fields/mood.kay, until then it is edited as JSON' },
+        { message: 'shelves\'s form names ghost, which its schema lacks' },
+        { message: 'cms({ collections }) names nowhere, which is no collection of the site' },
+        { message: 'shelves: extra waits for missing (fieldInput `when`), which is no field beside it, so it stays hidden' },
+      ])
+    })
+  })
+
+  test('stops a layout wording a body on a collection that has none, as an error', async () => {
+    const { s } = await import('kay')
+    const { collection } = await import('kay/content')
+    const { check } = cms({ files: workingTree(), guard: () => undefined, collections: { tags: { form: { body: { label: 'Article' } } } } })
+    const tags = collection({ name: 'tags', load: () => [{ slug: 'a', data: { name: 'A' } }] }, { schema: s.Object({ name: s.String() }) })
+
+    await withCollections({ tags }, async () => {
+      const found = await check!()
+
+      expect(found).toHaveLength(1)
+      expect(found[0]?.severity).toBe('error')
+      expect(found[0]?.message).toContain('`tags.form.body`')
+    })
+  })
+})

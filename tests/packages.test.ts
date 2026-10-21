@@ -220,6 +220,23 @@ describe('the naming conventions', () => {
     expect(drift(find, [])).toEqual([])
   })
 
+  it('end the name of an error class kay exports with Error', async () => {
+    const found: string[] = []
+
+    for (const file of await Array.fromAsync(new Glob('src/**/*.ts').scan())) {
+      for (const [, name, base] of (await Bun.file(file).text()).matchAll(/export (?:abstract )?class (\w+) extends (\w+)/g)) {
+        if (base!.endsWith('Error') && !name!.endsWith('Error'))
+          found.push(`${file}: ${name}`)
+      }
+    }
+
+    // The classes #1754 renames.
+    const known = ['ActionRedirect', 'CspViolation', 'RedirectRefused', 'ConfigRefused', 'InspectorAddressInUse']
+
+    expect(found.filter(line => !known.some(name => line.endsWith(`: ${name}`)))).toEqual([])
+    expect(known.filter(name => !found.some(line => line.endsWith(`: ${name}`)))).toEqual([])
+  })
+
   it('give the error class a library exports a code, as kay\'s KayError carries one', () => {
     const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends \w*Error \{\n([\s\S]*?)\n\}/g)].filter(([, , body]) => !(/\bcode\b/).test(body!)).map(([, name]) => name!)
 

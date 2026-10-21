@@ -39,9 +39,14 @@ interface Claim {
   next: Node | null
 }
 
-export class HydrationMismatch extends Error {
-  override name = 'HydrationMismatch'
+export class HydrationMismatchError extends Error {
+  override name = 'HydrationMismatchError'
 }
+
+/** @deprecated Renamed `HydrationMismatchError` in 1.70; the old name goes in 1.73. */
+export const HydrationMismatch = HydrationMismatchError
+/** @deprecated Renamed `HydrationMismatchError` in 1.70; the old name goes in 1.73. */
+export type HydrationMismatch = HydrationMismatchError
 
 const TAG_END = /[\s>]/
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
@@ -124,7 +129,7 @@ function claimNode(): Node {
   const node = claim!.next
 
   if (!node)
-    throw new HydrationMismatch('the server markup ended before the island did')
+    throw new HydrationMismatchError('the server markup ended before the island did')
 
   claim!.next = node.nextSibling
 
@@ -171,7 +176,7 @@ export function close(start: Node): Node {
       return node
   }
 
-  throw new HydrationMismatch('a dynamic part of the server markup has no end')
+  throw new HydrationMismatchError('a dynamic part of the server markup has no end')
 }
 
 // ---- building
@@ -186,7 +191,7 @@ export function template(html: string): () => Element {
       const claimed = claimNode()
 
       if (claimed.nodeName.toUpperCase() !== tag)
-        throw new HydrationMismatch(`expected <${tag.toLowerCase()}> where the server markup holds ${claimed.nodeName.toLowerCase()}`)
+        throw new HydrationMismatchError(`expected <${tag.toLowerCase()}> where the server markup holds ${claimed.nodeName.toLowerCase()}`)
 
       return claimed as Element
     }
@@ -278,7 +283,7 @@ export function markers(parent: Node): [start: Node, end: Node] {
     const start = claimNode()
 
     if (start.nodeType !== 8 || (start as Comment).data !== PART_START)
-      throw new HydrationMismatch(`expected the start of a dynamic part where the server markup holds ${start.nodeName}`)
+      throw new HydrationMismatchError(`expected the start of a dynamic part where the server markup holds ${start.nodeName}`)
 
     const end = close(start)
 
@@ -1258,7 +1263,7 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
     }
     catch (error) {
       // Markup the island would not claim is the island's to recover from, rendering it afresh, not the block's to fall back from.
-      if (error instanceof HydrationMismatch)
+      if (error instanceof HydrationMismatchError)
         throw error
 
       fail(error)

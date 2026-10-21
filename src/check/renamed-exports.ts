@@ -5,10 +5,11 @@ import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
-// The exports a library renamed, whose old names it keeps as aliases for three minors: the lint goes with the alias, and a row with it.
+// The exports kay or a library renamed, whose old names it keeps as aliases for three minors: the lint goes with the alias, and a row with it.
 const RENAMED: { module: string, from: string, to: string }[] = [
   { module: '@kaynooo/kayjs-cms', from: 'SaveConflict', to: 'SaveConflictError' },
   { module: '@kaynooo/kayjs-mail', from: 'MailNotConfigured', to: 'MailNotConfiguredError' },
+  { module: 'kay/dom', from: 'HydrationMismatch', to: 'HydrationMismatchError' },
 ]
 
 const SOURCE_FILE = /\.(?:kay|[cm]?tsx?)$/

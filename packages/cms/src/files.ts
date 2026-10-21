@@ -63,6 +63,11 @@ export class SaveConflictError extends Error {
   }
 }
 
+/** @deprecated Renamed `SaveConflictError` in 1.70; the old name goes in 1.73. */
+export const SaveConflict = SaveConflictError
+/** @deprecated Renamed `SaveConflictError` in 1.70; the old name goes in 1.73. */
+export type SaveConflict = SaveConflictError
+
 // The git blob sha of a file's bytes, which Forgejo names a file's version by.
 export function fileVersion(bytes: Uint8Array | string): string {
   const content = typeof bytes === 'string' ? Buffer.from(bytes) : bytes

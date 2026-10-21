@@ -2,7 +2,7 @@ import type { KayConfig } from '../config'
 import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
-import { judgingReads, RequestRead } from './request-read'
+import { judgingReads, RequestReadError } from './request-read'
 
 const ELYSIA_CODES = new Set(['NOT_FOUND', 'PARSE', 'VALIDATION', 'INVALID_COOKIE_SIGNATURE', 'INVALID_FILE_TYPE'])
 
@@ -31,7 +31,7 @@ export function reportServerError(error: unknown, request: Request, onError: Kay
     reported.set(request, new Set([error]))
 
   // A read of what a request holds, met while the build renders a page once, is for the build to judge: it is no failure of a request.
-  if (error instanceof RequestRead && onError && judgingReads.has(onError)) {
+  if (error instanceof RequestReadError && onError && judgingReads.has(onError)) {
     void deliver(error, request, onError)
 
     return

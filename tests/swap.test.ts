@@ -10,7 +10,7 @@ import { resolveProject } from '../src/project'
 import { navigate, persisted, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
-import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
+import { attempt, hydrate, HydrationMismatchError } from '../src/runtime/dom'
 import { formInput } from '../src/runtime/form'
 import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
@@ -640,7 +640,7 @@ describe('page swap, checking a form in the browser', () => {
     element.innerHTML = '<p>changed</p>'
 
     expect(() => hydrate(() => attempt(element, null, null, () => {
-      throw new HydrationMismatch('the markup changed')
+      throw new HydrationMismatchError('the markup changed')
     }, () => 'fallback'), element)).toThrow('the markup changed')
   })
 
