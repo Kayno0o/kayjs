@@ -1,0 +1,14 @@
+--- server
+import { contactForm, mailer } from '@kaynooo/kayjs-mail'
+import { s } from 'kay'
+
+const down = mailer({ from: 'Fixture <hello@fixture.test>' })
+
+export const consented = action(...contactForm(down, { to: 'team@fixture.test', honeypot: 'nectar', consent: true, fields: { website: s.Optional(s.String({ maxLength: 100 })) } }))
+---
+form(action={consented} novalidate)
+  input(field="name" aria-label="Name")
+  input(field="email" aria-label="Email")
+  input(field="website" aria-label="Website")
+  textarea(field="message" aria-label="Message")
+  input(field="consent" type="checkbox" aria-label="Consent")

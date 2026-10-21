@@ -5,7 +5,7 @@ import Button from './button.kay'
 import FormField from './form-field.kay'
 import Notice from './notice.kay'
 
-const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), rows = 6, class: className } = props<{
+const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consentLabel', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacyLabel', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, rows = 6, class: className } = props<{
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
   action: Action<never, unknown>
   // The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language, English and French, which these replace.
@@ -15,10 +15,18 @@ const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.co
   submitLabel?: string | undefined
   // Shown once the message went out.
   sentLabel?: string | undefined
+  // The consent checkbox, drawn when the action asks for one (`consent: true` in `contactForm`), and the link after it to the privacy page, drawn when `privacy` is given.
+  consentLabel?: string | undefined
+  privacyLabel?: string | undefined
+  // Where the privacy page is, such as `/privacy`.
+  privacy?: string | undefined
   // The message box's height, in lines.
   rows?: number | undefined
   class?: string | undefined
 }>()
+
+// Server actions carry their schema; the consent checkbox is drawn when it holds a `consent` field.
+const asksConsent = (action as { schema?: { properties?: Record<string, unknown> } }).schema?.properties?.consent !== undefined
 ---
 // Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action. Fields beyond those three go in as children, between the email and the message.
 form.kui-contact-form(action={action} novalidate class={className})
@@ -29,6 +37,16 @@ form.kui-contact-form(action={action} novalidate class={className})
   slot
   FormField(label={messageLabel} required issue={action.error('message')})
     textarea(field="message" rows={rows})
+  if asksConsent
+    .kui-contact-consent
+      label.kui-checkbox
+        input.kui-checkbox-input(field="consent" type="checkbox")
+        span.kui-checkbox-label {consentLabel}
+      if privacy
+        a(href={privacy}) {privacyLabel}
+      span.kui-form-field-issues(aria-live="polite" data-field="consent")
+        if action.error('consent') as issue
+          span.kui-form-field-issue {issue}
   Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()
     Notice(tone="success" compact) {sentLabel}

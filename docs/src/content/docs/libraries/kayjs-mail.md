@@ -281,13 +281,19 @@ Use `labels` to rename a field in the mail. Use `subject` and `view` to replace 
 
 A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes. `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. Set `protection` to replace the limits.
 
+Set `honeypot: 'nectar'` to name the honeypot field yourself, under a name no browser or password manager autofills, so a person is never refused. The form renders it by itself, and `website` becomes free to be a field of yours.
+
+### Consent
+
+A form collecting personal data often needs a consent checkbox. Set `consent: true` and the action requires a ticked `consent` field: an unticked one is refused with the `mail.contact.errors.consent` message, and the field is checked but never put in the mail. [ContactForm](/ui/contact-form) draws the checkbox when the action asks for one, and links your privacy page when you give it `privacy="/privacy"`. A form of your own writes `input(field="consent" type="checkbox")`.
+
 ### Refusals and wording
 
 A mailer that is `optional` and not set up answers 503. A mail that fails to send answers 502. Each comes with a refusal the form shows, and `reach` adds how else to reach the site, such as `hello@example.com` or a phone number.
 
 The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with the package, so a kay app that installs kayjs-mail reads them with or without `mailExtension`; a plain Elysia app with `.use(mail)` reads English. The mail itself is written in the page's language, not the recipient's.
 
-The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message }` to replace the field messages with a text or a function. ContactForm's label props replace its labels.
+The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message, consent }` to replace the field messages with a text or a function. ContactForm's label props replace its labels.
 
 ## Previewing
 

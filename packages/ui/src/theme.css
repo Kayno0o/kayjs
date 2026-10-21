@@ -733,6 +733,10 @@
     @apply flex flex-col items-start gap-4;
   }
 
+  .kui-contact-consent {
+    @apply flex flex-col gap-1;
+  }
+
   :where(.kui-form-field, .kui-form-field-label) > * {
     @apply basis-full;
   }

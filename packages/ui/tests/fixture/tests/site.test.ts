@@ -590,6 +590,23 @@ describe('ContactForm', () => {
     expect(refused.html).toContain('<span class="kui-form-field-issue">Merci d\'écrire une adresse e-mail valide.</span>')
   })
 
+  test('draws the consent checkbox of an action asking for one, with the privacy link and the renamed honeypot, and no box without', async () => {
+    const { contact } = await import('../src/routes/contact-consent.kay')
+    const { html } = await site.visit('/contact-consent')
+
+    expect(html).toContain('name="consent"')
+    expect(html).toContain('type="checkbox"')
+    expect(html).toContain('I agree that my details are used to answer my message.')
+    expect(html).toContain('<a href="/privacy">Privacy policy</a>')
+    expect(html).toContain('name="nectar"')
+    expect((await site.visit('/fr/contact-consent')).html).toContain('Politique de confidentialité')
+    expect((await site.visit('/contact-words')).html).not.toContain('name="consent"')
+
+    const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
+
+    expect(refused.html).toContain('class="kui-form-field-issue">Please tick the box to send your message.</span>')
+  })
+
   test('shows each refused field\'s message under it and the thanks once a post goes through', async () => {
     const { contact } = await import('../src/routes/contact.kay')
     const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })

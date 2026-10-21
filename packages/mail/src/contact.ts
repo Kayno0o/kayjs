@@ -23,17 +23,18 @@ export interface ContactMailProps {
 const ONE_LINE = '^[^\\r\\n]*\\S[^\\r\\n]*$'
 const LINK = /https?:\/\//gi
 const WORDS = /[-_]+/g
-const RESERVED = ['name', 'email', 'message', 'website']
-const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
+const RESERVED = new Set(['name', 'email', 'message'])
+const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.', consent: 'Please tick the box to send your message.' }
 
 // The refusal of each field in the page's language, or the English text when the language has none or the app does not run through kay, which is what reads the catalog from kayjs-mail's package.json.
 const ERROR_WORDS = {
   name: () => wording('mail.contact.errors.name', DEFAULT_ERRORS.name),
   email: () => wording('mail.contact.errors.email', DEFAULT_ERRORS.email),
   message: () => wording('mail.contact.errors.message', DEFAULT_ERRORS.message),
+  consent: () => wording('mail.contact.errors.consent', DEFAULT_ERRORS.consent),
 }
 
-export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>> {
+export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>, Honeypot extends string = 'website', Consent extends boolean = false> {
   // The fields beyond `name`, `email` and `message`, as schemas: `{ phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }`. They go in the mail, after the email, in this order.
   fields?: Extra | undefined
   // What each of those is called in the mail, the field's name with its words apart and a capital by default.
@@ -41,7 +42,7 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   // Where the mail goes, the mailer's `to` or `MAIL_TO` when left out.
   to?: Address | Address[] | undefined
   // The mail's subject, the `mail.contact.subject` message by default.
-  subject?: ((input: ContactInput<Extra>) => string) | undefined
+  subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
   // The mail's own `.kay` view, given `ContactMailProps`, in place of kayjs-mail's.
   view?: ((props: ContactMailProps) => JSX.Element) | undefined
   // How else to reach the site, `hello@example.com` or a phone number, which a refusal due to the mail not going out names after its own words.
@@ -52,24 +53,32 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   maxLength?: number | undefined
   // The messages the schema refuses a field with, a text or a function of the page's language; by default, like the other refusals, the `mail.contact` messages in the page's language.
   errors?: Partial<Record<keyof typeof DEFAULT_ERRORS, string | (() => string)>> | undefined
-  // Replaces the defaults of the protection, `rateLimit` 30 posts every 10 minutes and 5 that went through, `minTime` of 3 seconds; the honeypot is the `website` field.
-  protection?: Omit<ActionProtection<'website'>, 'honeypot' | 'messages'> | undefined
+  // The name of the honeypot field, `website` by default: under a name no browser or password manager autofills, such as `nectar`, a person is never refused. A post filling it is answered as if it worked, and `website` is then free to be a field of yours.
+  honeypot?: Honeypot | undefined
+  // A required `consent` checkbox, for a form collecting personal data: a post with it unticked is refused with the `mail.contact.errors.consent` message, and it is left out of the mail. `ContactForm` from kayjs-ui renders it, linking its `privacy` page.
+  consent?: Consent | undefined
+  // Replaces the defaults of the protection, `rateLimit` 30 posts every 10 minutes and 5 that went through, `minTime` of 3 seconds.
+  protection?: Omit<ActionProtection<Honeypot>, 'honeypot' | 'messages'> | undefined
 }
 
-export type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>> = { name: string, email: string, message: string } & Static<ReturnType<typeof s.Object<Extra>>>
+export type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
 
 // The object schema built below, typed by the input it validates.
-type ContactSchema<Extra extends Record<string, TSchema>> = TSchema & { static: ContactInput<Extra> }
+type ContactSchema<Extra extends Record<string, TSchema>, Consent extends boolean> = TSchema & { static: ContactInput<Extra, Consent> }
 
 // The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))`. A post is checked, mailed to the site with the visitor in `replyTo` and answered with a refusal worded in the page's language when the mail cannot go out, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
-export function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>>(mail: Pick<Mailer, 'send'>, options: ContactOptions<Extra> = {}): [
-  schema: ContactSchema<Extra>,
-  handler: (input: ContactInput<Extra>, ctx: ActionContext) => Promise<Failure<string> | undefined>,
-  protection: ActionProtection<'website'>,
+export function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'send'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
+  schema: ContactSchema<Extra, Consent>,
+  handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext) => Promise<Failure<string> | undefined>,
+  protection: ActionProtection<Honeypot>,
 ] {
-  const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000 } = options
+  const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000, consent = false } = options
+  const honeypot = options.honeypot ?? 'website' as Honeypot
   const refusal = (key: keyof typeof DEFAULT_ERRORS) => ({ error: options.errors?.[key] ?? ERROR_WORDS[key] })
-  const reserved = RESERVED.filter(key => key in fields)
+  const reserved = [...RESERVED, honeypot, ...consent ? ['consent'] : []].filter(key => key in fields)
+
+  if (honeypot === '' || RESERVED.has(honeypot) || (consent && honeypot === 'consent'))
+    throw new Error(`kayjs-mail: contactForm cannot use \`${honeypot}\` as its honeypot, a field the form already has`)
 
   if (reserved.length > 0)
     throw new Error(`kayjs-mail: contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
@@ -80,10 +89,11 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     name: s.String({ pattern: ONE_LINE, maxLength: 100, ...refusal('name') }),
     email: s.String({ format: 'email', maxLength: 254, ...refusal('email') }),
     ...fields,
+    ...consent ? { consent: s.Literal(true, refusal('consent')) } : {},
     message: s.String({ pattern: '\\S', maxLength, ...refusal('message') }),
-  }) as unknown as ContactSchema<Extra>
+  }) as unknown as ContactSchema<Extra, Consent>
 
-  const handler = async (input: ContactInput<Extra>, ctx: ActionContext): Promise<Failure<string> | undefined> => {
+  const handler = async (input: ContactInput<Extra, Consent>, ctx: ActionContext): Promise<Failure<string> | undefined> => {
     const name = input.name.trim()
     const message = input.message.trim()
     const { email } = input
@@ -130,11 +140,11 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     return undefined
   }
 
-  const protection: ActionProtection<'website'> = {
+  const protection: ActionProtection<Honeypot> = {
     rateLimit: [{ max: 30, window: '10m' }, { max: 5, window: '10m', count: 'succeeded' }],
     minTime: '3s',
     ...options.protection,
-    honeypot: { field: 'website', pretend: true },
+    honeypot: { field: honeypot, pretend: true },
     messages: {
       rateLimit: () => reach === undefined ? t('mail.contact.rateLimit') : t('mail.contact.rateLimitReach', words),
       minTime: reason => t(reason === 'early' ? 'mail.contact.early' : 'mail.contact.expired'),

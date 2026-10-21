@@ -19,7 +19,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
 - `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
 - `ui.confirmDelete.*`: `cancelLabel` (`Cancel`), `confirmLabel` (`Confirm`), `deleteLabel` (`Delete`), `pendingLabel` (`Deleting…`), `title` (`Confirm Deletion`)
-- `ui.contactForm.*`: `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
+- `ui.contactForm.*`: `consentLabel` (`I agree that my details are used to answer my message.`), `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `privacyLabel` (`Privacy policy`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)
 - `ui.dnd.*`: `handleItemLabel` (`Reorder {item}`), `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)

@@ -31,9 +31,11 @@ export default defineMessages({
       title: 'Confirmer la suppression',
     },
     contactForm: {
+      consentLabel: 'J\'accepte que mes informations servent à répondre à mon message.',
       emailLabel: 'E-mail',
       messageLabel: 'Message',
       nameLabel: 'Nom',
+      privacyLabel: 'Politique de confidentialité',
       sentLabel: 'Merci, votre message a bien été envoyé.',
       submitLabel: 'Envoyer',
     },
