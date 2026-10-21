@@ -10,6 +10,19 @@ const UNKNOWN = 'http://kay-site.invalid'
 export const OUTSIDE_ATTRIBUTES = ' target="_blank" rel="noopener"'
 export const OUTSIDE_TARGET = ' target="_blank"'
 
+// The meta a page writes under `links: { outside: 'same-tab' }`, for an island to read.
+const SAME_TAB_META = 'meta[name="kay-same-tab-links"]'
+
+// Whether the page an island runs in keeps links leaving the site in the same tab; false where there is no document.
+export function browserKeepsSameTab(): boolean {
+  return typeof document !== 'undefined' && document.querySelector(SAME_TAB_META) !== null
+}
+
+// The origin an island compares links with; `undefined` where there is no location, which takes any absolute link as leaving.
+export function browserOrigin(): string | undefined {
+  return typeof location === 'undefined' ? undefined : location.origin
+}
+
 export function mayLeaveSite(href: string): boolean {
   return LEAVING.test(href)
 }

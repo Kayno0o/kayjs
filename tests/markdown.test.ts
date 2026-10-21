@@ -6,6 +6,7 @@ import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
 import { markdownHtml as islandMarkdown } from '../src/runtime/markdown.client'
 import { markdownHtml } from '../src/runtime/markdown.server'
+import { leavesSite } from '../src/runtime/outside'
 
 // GFM as a user writes it, with the edges where marked and Bun.markdown part by default.
 const CORPUS = [
@@ -87,7 +88,7 @@ describe('markdownHtml', () => {
       const { html } = await renderMarkdown(markdown)
 
       if (!html.includes('<h'))
-        expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html))
+        expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html, href => leavesSite(href, undefined)))
     }
 
     for (const render of [markdownHtml, islandMarkdown])
@@ -176,7 +177,7 @@ describe('markdownHtml', () => {
       expect(marked(counter!.modules)).toBe(false)
       expect(marked(report!.entry!.modules)).toBe(false)
       // marked and the renderer matching Bun.markdown's HTML, minified and gzipped, plus the runtime modules only the note uses, which its own chunk carries.
-      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_000)
+      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_300)
     }
     finally {
       await rm(root, { recursive: true, force: true })

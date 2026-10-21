@@ -2,6 +2,7 @@ import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
 import { Marked, Tokenizer } from 'marked'
 import { sanitizedMarkdown } from './markdown'
+import { browserKeepsSameTab, browserOrigin, leavesSite } from './outside'
 import { vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
@@ -153,13 +154,16 @@ const marked = new Marked({ gfm: true, async: false, renderer, tokenizer })
 
 const asWritten = (markdown: string) => vouch(`<p>${escape(markdown)}</p>\n`)
 
-// Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, sync so it renders again on each chunk of a stream.
+// Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, a link leaving the site opening in a new tab, sync so it renders again on each chunk of a stream.
 export function markdownHtml(markdown: string): SafeHtml {
   if (markdown.length > MAX_LENGTH)
     return asWritten(markdown)
 
   try {
-    return sanitizedMarkdown(marked.parse(markdown) as string)
+    const origin = browserOrigin()
+    const sameTab = browserKeepsSameTab()
+
+    return sanitizedMarkdown(marked.parse(markdown) as string, href => !sameTab && leavesSite(href, origin))
   }
   // Thousands of nested quotes overflow marked's stack.
   catch {

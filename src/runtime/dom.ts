@@ -6,7 +6,7 @@ import { rebasedAttribute } from './base'
 import { frenchText, frenchTree } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
-import { leavesSite } from './outside'
+import { browserKeepsSameTab, leavesSite } from './outside'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
@@ -1324,7 +1324,7 @@ export function attribute(element: Element, name: string, value: unknown, writte
 let keepsSameTab: boolean | undefined
 
 function leavesInBrowser(href: unknown): boolean {
-  keepsSameTab ??= document.querySelector('meta[name="kay-same-tab-links"]') !== null
+  keepsSameTab ??= browserKeepsSameTab()
 
   return !keepsSameTab && leavesSite(href, location.origin)
 }

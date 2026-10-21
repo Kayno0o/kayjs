@@ -379,6 +379,8 @@ textarea(aria-label="Note" value={text()} onInput={e => text.set(e.currentTarget
 div(innerHTML={markdownHtml(text())})
 ```
 
+A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `links: { outside: 'same-tab' }`.
+
 The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped.
 
 It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
