@@ -1,14 +1,27 @@
 ---
 import type { AddedRedirect, MissingRow } from '../src/missing'
+import type { ScreenCollection } from '../src/kay/contract'
+import type { EntryRow } from '../src/listing'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import AddedRedirects from '../src/components/added-redirects.kay'
+import EntryBulk from '../src/components/entry-bulk.kay'
+import EntryTable from '../src/components/entry-table.kay'
 import MissingPaths from '../src/components/missing-paths.kay'
 
-// A screen of the redirects with the toaster beside it, in one bundle, so the toasts a failure raises show where a test can read them.
-const { rows, redirects } = props<{ rows?: MissingRow[], redirects?: AddedRedirect[] }>()
+// A screen of the redirects or of an entries list with the toaster beside it, in one bundle, so the toasts a failure raises show where a test can read them.
+const { rows, redirects, bar, table } = props<{
+  rows?: MissingRow[]
+  redirects?: AddedRedirect[]
+  bar?: { collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }
+  table?: { collection: ScreenCollection, rows: EntryRow[] }
+}>()
 ---
 Toaster
 if rows
   MissingPaths(rows={rows} hint="")
 if redirects
   AddedRedirects(redirects={redirects})
+if bar
+  EntryBulk(collection={bar.collection} rows={bar.rows} actions={bar.actions} clear={bar.clear})
+if table
+  EntryTable(prefix="/admin" collection={table.collection} rows={table.rows} searched={false})

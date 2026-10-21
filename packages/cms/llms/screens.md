@@ -26,7 +26,7 @@ cms({ collections: { shop: {
 
 State is in the URL, so a view of the list is a link: `?q=` searches (accents and case ignored, in the title, the text fields, the cells and the body), `?status=draft|scheduled|published` filters a collection that has a draft or publish field, `?sort=<column>&dir=asc|desc` sorts and `?page=` pages. Sort, search and filter run on every entry of the collection, not on the page shown, and the count of results shows under the search once one is on. A header click sorts by that column (`title`, `locale`, `draft` for the status, `cell:<field>` for a field's column). A sorted ordered collection shows no move buttons.
 
-- Ticking rows offers Publish, Unpublish and Delete on them (as many as `list.actions` keeps), one request each; the delete confirmation names the entries that refer to any of them. Duplicate saves a draft copy under `<slug>-copy`, `-copy-2`... and opens it; a collection with no draft field copies as it is.
+- Ticking rows offers Publish, Unpublish and Delete on them (as many as `list.actions` keeps), one request each; the delete confirmation names the entries that refer to any of them. Duplicate saves a draft copy under `<slug>-copy`, `-copy-2`... and opens it; a collection with only a `publishAt` field dates the copy `9999-12-31` until an editor picks a date, so it does not go live at once, and an ordered collection numbers it after its last entry. A failed bulk row or duplicate toasts the server's reason (the first, for a bulk run).
 - An empty collection offers New entry.
 
 

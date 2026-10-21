@@ -36,6 +36,7 @@ export default defineMessages({
       deleted: { one: '{count} entrée supprimée', other: '{count} entrées supprimées' },
       deleteMessage: { one: 'Supprimer {count} entrée ? C\'est définitif.', other: 'Supprimer {count} entrées ? C\'est définitif.' },
       failed: { one: '{count} entrée n\'a pas pu être modifiée', other: '{count} entrées n\'ont pas pu être modifiées' },
+      failedWhy: { one: '{count} entrée n\'a pas pu être modifiée : {reason}', other: '{count} entrées n\'ont pas pu être modifiées, la première : {reason}' },
       published: { one: '{count} entrée publiée', other: '{count} entrées publiées' },
       unpublished: { one: '{count} entrée dépubliée', other: '{count} entrées dépubliées' },
       unpublishMessage: { one: 'Dépublier {count} entrée ? Les visiteurs ne la verront plus tant que vous ne l\'aurez pas publiée à nouveau.', other: 'Dépublier {count} entrées ? Les visiteurs ne les verront plus tant que vous ne les aurez pas publiées à nouveau.' },

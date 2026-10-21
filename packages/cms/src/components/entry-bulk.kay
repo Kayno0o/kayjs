@@ -37,7 +37,7 @@ async function askReferrers(): Promise<void> {
 }
 
 async function run(action: BulkAction): Promise<void> {
-  const { done, failed } = await bulk(action, targets(action))
+  const { done, failed, reason } = await bulk(action, targets(action))
 
   if (done > 0) {
     if (action === 'publish')
@@ -48,7 +48,9 @@ async function run(action: BulkAction): Promise<void> {
       toast.success(wording('cms.bulk.deleted', done === 1 ? '1 entry deleted' : '{count} entries deleted', { count: done }))
   }
 
-  if (failed > 0)
+  if (failed > 0 && reason !== undefined)
+    toast.error(wording('cms.bulk.failedWhy', failed === 1 ? '1 entry could not be changed: {reason}' : '{count} entries could not be changed, the first: {reason}', { count: failed, reason }))
+  else if (failed > 0)
     toast.error(wording('cms.bulk.failed', failed === 1 ? '1 entry could not be changed' : '{count} entries could not be changed', { count: failed }))
 
   clear()

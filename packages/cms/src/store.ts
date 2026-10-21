@@ -1,6 +1,8 @@
 import type { Commit, FileChange, Identity } from './files'
-import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, StoredEntry } from './kay/contract'
+import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
+import { forgetCounts } from './counts'
+import { publishTime } from './datetime'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
@@ -132,7 +134,25 @@ async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Pro
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
-export async function saveEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined, heldData?: Record<string, unknown> | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+export async function saveEntry(entry: DraftEntry, options: SaveOptions = {}): Promise<SaveOutcome> {
+  try {
+    return await writeEntry(entry, options)
+  }
+  finally {
+    forgetCounts()
+  }
+}
+
+interface SaveOptions extends VersionRule {
+  create?: boolean | undefined
+  version?: string | undefined
+  verb?: string | undefined
+  author?: Identity | undefined
+  bodyKept?: boolean | undefined
+  heldData?: Record<string, unknown> | undefined
+}
+
+async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined, heldData?: Record<string, unknown> | undefined } & VersionRule = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
@@ -195,7 +215,16 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
   return 'issues' in committed ? committed : { saved: true, commit: committed.commit, version: fileVersion(source.file.text) }
 }
 
-export async function deleteEntry(ref: EntryRef, author?: Identity, { version, required = false }: { version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+export async function deleteEntry(ref: EntryRef, author?: Identity, options: { version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+  try {
+    return await removeOne(ref, author, options)
+  }
+  finally {
+    forgetCounts()
+  }
+}
+
+async function removeOne(ref: EntryRef, author: Identity | undefined, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.single)
@@ -303,6 +332,36 @@ export function copySlug(slug: string, taken: ReadonlySet<string>): string {
   return copy
 }
 
+// The date a copy of a scheduled-only entry waits for until an editor picks one: it has no draft field to hide behind, and a copy dated in the past or undated would show on the site at once.
+const HELD_UNTIL = '9999-12-31T00:00:00.000Z'
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+// The data a copy starts with: a draft when the collection has a draft field, else held back by its publish date; last in the order, not alongside the original.
+function copyData(collection: CollectionInfo, data: Record<string, unknown>, siblings: SourceEntry[]): Record<string, unknown> {
+  const copy = { ...data }
+  const { draftField, publishField, orderField } = collection
+
+  if (draftField !== undefined) {
+    copy[draftField] = true
+  }
+  else if (publishField !== undefined && !((publishTime(collection, data) ?? 0) > Date.now())) {
+    const current = data[publishField]
+
+    copy[publishField] = typeof current === 'string' && DATE_ONLY.test(current) ? HELD_UNTIL.slice(0, 10) : HELD_UNTIL
+  }
+
+  if (orderField !== undefined) {
+    const values = siblings.map(entry => orderValue(entry, orderField)).filter(value => value !== undefined)
+
+    if (values.length > 0)
+      copy[orderField] = Math.max(...values) + 1
+    else
+      delete copy[orderField]
+  }
+
+  return copy
+}
+
 // Saves a copy of an entry as a draft, when the collection has a draft field, under a free slug; the outcome names the slug.
 export async function duplicateEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome & { slug?: string }> {
   const collection = await collectionNamed(ref.collection)
@@ -318,9 +377,9 @@ export async function duplicateEntry(ref: EntryRef, author?: Identity): Promise<
   if (!existing.data)
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
-  const taken = new Set((await entries(collection.name, { locale: ref.locale })).map(entry => entry.slug))
-  const slug = copySlug(ref.slug, taken)
-  const data = collection.draftField === undefined ? existing.data : { ...existing.data, [collection.draftField]: true }
+  const siblings = await entries(collection.name, { locale: ref.locale })
+  const slug = copySlug(ref.slug, new Set(siblings.map(entry => entry.slug)))
+  const data = copyData(collection, existing.data, siblings)
   const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data, body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true, heldData: existing.data })
 
   return 'issues' in outcome ? outcome : { ...outcome, slug }

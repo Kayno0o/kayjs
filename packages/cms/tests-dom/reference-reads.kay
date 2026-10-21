@@ -1,0 +1,8 @@
+---
+import { referenceChoices } from '../src/editor/references'
+
+// Hands a test the reader of the picker's choices as the bundle holds it, so the reads it makes share that bundle's cache.
+const { expose } = props<{ expose: (read: typeof referenceChoices) => void }>()
+
+expose(referenceChoices)
+---

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
+import { countEntries } from '../src/counts'
 import { fileVersion, ForgeError, SaveConflict } from '../src/files'
 import { configure } from '../src/settings'
 import { contentVersion } from '../src/version'
@@ -17,7 +18,8 @@ const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { t
 const shelf: CollectionInfo = { ...posts, name: 'shelf', dir: 'content/shelf', orderField: 'order' }
 const catalog: CollectionInfo = { ...products, name: 'catalog', orderField: 'order' }
 const home: CollectionInfo = { ...posts, name: 'home', dir: 'content/home', single: true }
-const collectionList = [posts, products, outside, shelf, catalog, home]
+const dated: CollectionInfo = { ...posts, name: 'dated', dir: 'content/dated', draftField: undefined, publishField: 'publishAt' }
+const collectionList = [posts, products, outside, shelf, catalog, home, dated]
 
 const TAKEN = 'names an entry the collection already holds'
 const MISSING = 'names no entry of the collection'
@@ -605,12 +607,70 @@ describe('references on save', () => {
   })
 })
 
+describe('counts of the content list', () => {
+  test('a save or a delete drops the kept counts, so the list shows it at once', async () => {
+    let reads = 0
+    const read = async () => {
+      reads++
+
+      return []
+    }
+
+    await countEntries(posts, read)
+    await countEntries(posts, read)
+    expect(reads).toBe(1)
+
+    await saveEntry({ collection: 'posts', slug: 'x', data: { title: 'X' } })
+    await countEntries(posts, read)
+    expect(reads).toBe(2)
+
+    stored.posts = [{ slug: 'x', path: 'content/posts/x.md', data: { title: 'X' }, draft: false }]
+    await deleteEntry({ collection: 'posts', slug: 'x' })
+    await countEntries(posts, read)
+    expect(reads).toBe(3)
+  })
+})
+
+// The data the fake validator wrote as the first line of a saved file.
+const frontmatter = (change: FileChange) => JSON.parse(change.text!.slice(0, change.text!.indexOf('\n'))) as Record<string, unknown>
+
 describe('duplicateEntry', () => {
   test('saves a draft copy of the entry under a free slug and names it', async () => {
     stored.posts = [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: false }, body: 'Hi', draft: false }, { slug: 'hello-copy', path: 'content/posts/hello-copy.md', data: { title: 'Hello', draft: true }, draft: true }]
 
     expect(await duplicateEntry({ collection: 'posts', slug: 'hello' })).toMatchObject({ saved: true, slug: 'hello-copy-2' })
     expect(saved.map(change => [change.repoPath, change.message, change.text])).toEqual([['content/posts/hello-copy-2.md', 'content(posts): duplicate hello-copy-2', '{"title":"Hello","draft":true}\nHi']])
+  })
+
+  test('puts the copy last in an ordered collection, in its own locale', async () => {
+    stored.shelf = [
+      { slug: 'a', path: 'content/shelf/a.md', data: { title: 'A', order: 1 }, draft: false },
+      { slug: 'b', path: 'content/shelf/b.md', data: { title: 'B', order: 4 }, draft: false },
+    ]
+
+    expect(await duplicateEntry({ collection: 'shelf', slug: 'a' })).toMatchObject({ saved: true, slug: 'a-copy' })
+    expect(frontmatter(saved[0]!)).toEqual({ title: 'A', order: 5, draft: true })
+  })
+
+  test('leaves the copy unnumbered when no sibling holds a number, rather than ahead of them', async () => {
+    stored.shelf = [{ slug: 'a', path: 'content/shelf/a.md', data: { title: 'A', order: 'x' }, draft: false }]
+
+    await duplicateEntry({ collection: 'shelf', slug: 'a' })
+    expect(frontmatter(saved[0]!)).toEqual({ title: 'A', draft: true })
+  })
+
+  test('holds the copy of an entry with only a publish date back, so it does not go live at once', async () => {
+    stored.dated = [
+      { slug: 'past', path: 'content/dated/past.md', data: { title: 'P', publishAt: '2020-01-01T00:00:00.000Z' }, draft: false },
+      { slug: 'plain', path: 'content/dated/plain.md', data: { title: 'N' }, draft: false },
+      { slug: 'day', path: 'content/dated/day.md', data: { title: 'D', publishAt: '2020-01-01' }, draft: false },
+      { slug: 'soon', path: 'content/dated/soon.md', data: { title: 'S', publishAt: '2999-01-01T00:00:00.000Z' }, draft: false },
+    ]
+
+    for (const slug of ['past', 'plain', 'day', 'soon'])
+      await duplicateEntry({ collection: 'dated', slug })
+
+    expect(saved.map(change => frontmatter(change).publishAt)).toEqual(['9999-12-31T00:00:00.000Z', '9999-12-31T00:00:00.000Z', '9999-12-31', '2999-01-01T00:00:00.000Z'])
   })
 
   test('refuses an entry that does not exist and a single collection', async () => {

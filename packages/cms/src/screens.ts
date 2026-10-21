@@ -1,8 +1,9 @@
 import type { CollectionInfo, CollectionLayout, EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
+import { countEntries } from './counts'
 import { collections, entries, translations } from './kay/content'
-import { collectionPath, entryPath, newEntryPath, pageRows, rowsOf, statusOf } from './listing'
+import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
 import { log } from './log'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
@@ -151,22 +152,22 @@ export async function indexRows(): Promise<IndexRow[]> {
     const href = await openPath(collection)
     const layout = layouts.get(collection.name)
     const counted = collection.problem === undefined && !collection.single && (collection.draftField !== undefined || collection.publishField !== undefined)
-    const rows = counted ? await readRows(collection) : undefined
+    const found = counted ? await countEntries(collection, async () => readEntries(collection)) : undefined
 
     return {
       collection,
       layout,
       href,
       newHref: collection.problem === undefined && !collection.single ? newEntryPath(prefix, collection.name) : undefined,
-      drafts: rows?.filter(row => statusOf(row) === 'draft').length,
-      scheduled: collection.publishField === undefined ? undefined : rows?.filter(row => statusOf(row) === 'scheduled').length,
+      drafts: found?.drafts,
+      scheduled: collection.publishField === undefined ? undefined : found?.scheduled,
     }
   }))
 }
 
-async function readRows(collection: CollectionInfo): Promise<ReturnType<typeof rowsOf> | undefined> {
+async function readEntries(collection: CollectionInfo): Promise<SourceEntry[] | undefined> {
   try {
-    return rowsOf({ ...collection }, await entries(collection.name, {}))
+    return await entries(collection.name, {})
   }
   catch (error) {
     log.error(`${collection.name}'s entries failed to read for the content list`, error)

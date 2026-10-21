@@ -7,6 +7,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.bulk.deleteMessage',
   'cms.bulk.deleted',
   'cms.bulk.failed',
+  'cms.bulk.failedWhy',
   'cms.bulk.published',
   'cms.bulk.unpublishMessage',
   'cms.bulk.unpublished',
