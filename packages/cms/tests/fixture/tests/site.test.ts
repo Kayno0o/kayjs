@@ -352,7 +352,7 @@ test('the on-page editor shows each issue of a refused save beside its field and
   await page.click(body)
   await page.type('<script>alert(1)</script>')
   await page.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-actions button:last-child') !== null)
-  await page.click('.kcms-editor .kcms-entry-actions button:last-child')
+  await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('.kcms-editor .kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save')!.click())
   await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)
   await Bun.sleep(200)
 
@@ -920,7 +920,7 @@ test('picking a colour in the browser sets the draft and a save writes it', asyn
     input.value = '#0000ff'
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  await page.click('.kcms-entry-actions button:last-child')
+  await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('.kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save')!.click())
 
   for (let waited = 0; products[0]?.data.color !== '#0000ff' && waited < 5000; waited += 50)
     await Bun.sleep(50)
@@ -962,7 +962,7 @@ test('an image pasted into the Markdown body is uploaded to the shared folder an
   expect(text).not.toContain('Uploading')
   expect(new Uint8Array(await (await built.fetch(path)).arrayBuffer())).toEqual(PIXEL)
 
-  await page.click('.kcms-entry-actions button:last-child')
+  await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('.kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save')!.click())
 
   for (let waited = 0; saved.length === 0 && waited < 5000; waited += 50)
     await Bun.sleep(50)
