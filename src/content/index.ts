@@ -156,7 +156,7 @@ export interface CollectionOptions<Schema extends TSchema> {
   seed?: Static<Schema> | undefined
 }
 
-export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
+export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean> {
   readonly [COLLECTION]: true
   readonly [FEED_PATH]?: FeedPath
   // The dates `publishAt` and `unpublishAt` read from the entries, in order and once each.
@@ -178,8 +178,8 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   translation: (entry: { slug: string, data: unknown }, locale: string) => Promise<Entry<Data> | undefined>
   // Loads the entries afresh on the next read: for a webhook a CMS calls once an entry changed. A loader's `store` passes it to every process sharing it.
   invalidate: () => void
-  // For a `single` collection, its entry's data, else `fallback`, else the `seed`; undefined with none of them. Throws for a collection not declared `single`.
-  one: <Fallback extends Data | undefined = undefined>(fallback?: Fallback) => Promise<Fallback extends undefined ? Data | undefined : Data>
+  // For a `single` collection, its entry's data, else `fallback`, else the `seed`; undefined with none of them, so typed as the data when the collection has a `seed` or a fallback is given. Throws for a collection not declared `single`.
+  one: <Fallback extends Data | undefined = undefined>(fallback?: Fallback) => Promise<Fallback extends undefined ? Seeded extends true ? Data : Data | undefined : Data>
 }
 
 interface Entries<Data> {
@@ -193,7 +193,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}

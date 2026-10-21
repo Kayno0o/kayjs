@@ -515,12 +515,17 @@ describe('the collections a CMS edits', () => {
     const bare = collection({ name: 'bare', load: () => [] }, { schema: t.Object({ title: t.String() }), single: true })
 
     expect(await home.one()).toEqual({ title: 'Welcome' })
-    // Typed: the data with a fallback, possibly undefined without.
+    // Typed: the data with a fallback or a seed, possibly undefined with neither.
     const typed: { title: string } = await home.one({ title: 'Fallback' })
-    const maybe: { title: string } | undefined = await home.one()
+    const seeded: { title: string } = await home.one()
+    // @ts-expect-error a collection without a seed may have no entry
+    const missing: { title: string } = await bare.one()
+    const maybe: { title: string } | undefined = await bare.one()
 
     expect(typed).toEqual({ title: 'Fallback' })
-    expect(maybe).toEqual({ title: 'Welcome' })
+    expect(seeded).toEqual({ title: 'Welcome' })
+    expect(maybe).toBeUndefined()
+    expect(missing).toBeUndefined()
     expect(await bare.one()).toBeUndefined()
 
     given.push({ slug: 'index', data: { title: 'Written' } })
