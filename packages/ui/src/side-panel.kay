@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { effect } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
@@ -9,8 +9,8 @@ const { open, title, actions, footer, onOpenChange, closeLabel = wording('ui.sid
   open: boolean
   title: string
   // Controls in the head line, before its close button, such as previous and next.
-  actions?: JSX.Element
-  footer?: JSX.Element
+  actions?: Snippet
+  footer?: Snippet
   closeLabel?: string | undefined
   class?: string | undefined
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.

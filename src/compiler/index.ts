@@ -14,6 +14,7 @@ import { asyncReplies, cssImportsWithoutText, separatePageSettings, serverOnlyIm
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
+import { markupProps } from './markup-props'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer } from './script'
@@ -228,7 +229,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? script.fence : undefined
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...script.fence ? markupProps(script.fence, source) : [], ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
   }
 
   if (file.client && routeFile)

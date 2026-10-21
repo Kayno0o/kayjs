@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import SiteNav from './site-nav.kay'
 
@@ -12,9 +12,9 @@ const { links, current, label, menuLabel, brand, end, sticky = true, class: clas
   // Names the button opening the links on a narrow screen.
   menuLabel?: string | undefined
   // At the start: a logo and the site's name, usually a link home.
-  brand?: JSX.Element
+  brand?: Snippet
   // At the far end: a user menu, a theme toggle.
-  end?: JSX.Element
+  end?: Snippet
   // Stays at the top of the page while it scrolls; `false` lets it scroll away.
   sticky?: boolean | undefined
   class?: string | undefined

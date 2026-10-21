@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 
 const { title, level, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
   title: string
@@ -7,7 +7,7 @@ const { title, level, description, actions, class: className, ...rest } = props<
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   description?: string | undefined
   // Below the description: a button or a link leading out of the empty list, such as the one that adds the first item.
-  actions?: JSX.Element
+  actions?: Snippet
   class?: string | undefined
 }>()
 ---

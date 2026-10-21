@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 import { CARD_PADDING_X } from './card'
 import { darkStyle } from './dark'
 import Image from './image.kay'
@@ -7,7 +7,7 @@ import { ghostTable, msoFonts } from './mso'
 import settings from './settings'
 
 // `header` sits above the card and replaces the settings' `logo`, which every mail wears when it gives none.
-const { preheader, header, footer } = props<{ preheader?: string | undefined, header?: JSX.Element, footer?: JSX.Element }>()
+const { preheader, header, footer } = props<{ preheader?: string | undefined, header?: Snippet, footer?: Snippet }>()
 const { logo } = settings
 const [open, close] = ghostTable(settings.width)
 // Invisible characters filling the inbox preview past the preheader, which clients would otherwise fill with the mail's first lines.

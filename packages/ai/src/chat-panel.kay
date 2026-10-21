@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 import { signal, uid } from 'kay'
 
 const { label = 'Chat', openLabel = 'Open the chat', closeLabel = 'Close the chat', icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = 'New conversation', expandLabel = 'Enlarge the chat', collapseLabel = 'Shrink the chat', class: className } = props<{
@@ -9,12 +9,12 @@ const { label = 'Chat', openLabel = 'Open the chat', closeLabel = 'Close the cha
   openLabel?: string | undefined
   closeLabel?: string | undefined
   // What the button and the panel's close button draw.
-  icon: JSX.Element
-  closeIcon: JSX.Element
+  icon: Snippet
+  closeIcon: Snippet
   // The header's buttons: one clears the conversation, one switches the panel between its two sizes.
-  newIcon: JSX.Element
-  expandIcon: JSX.Element
-  collapseIcon: JSX.Element
+  newIcon: Snippet
+  expandIcon: Snippet
+  collapseIcon: Snippet
   newLabel?: string | undefined
   expandLabel?: string | undefined
   collapseLabel?: string | undefined

@@ -393,7 +393,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('reports a named slot naming no prop, or calling its block with the wrong arguments', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard\n',
-      'src/card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { row } = props<{ row?: (n: number) => JSX.Element }>()\n---\nslot actions\nslot row(\'x\')\nslot row(1)\n',
+      'src/card.kay': '---\nimport type { Snippet } from \'kay\'\n\nconst { row } = props<{ row?: Snippet<[n: number]> }>()\n---\nslot actions\nslot row(\'x\')\nslot row(1)\n',
     })
 
     try {
@@ -442,7 +442,7 @@ describe.concurrent('kay check, edge cases', () => {
 
   it('types a snippet as a function, reporting at its line a wrong call, an unknown snippet, one used above its declaration or outside its block, and a name taken', async () => {
     const root = await scratchProject({
-      'src/rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: string[], row: (item: string, index: number) => JSX.Element }>()\n---\nfor item, i of items\n  | {row(item, i)}\n',
+      'src/rows.kay': '---\nimport type { Snippet } from \'kay\'\n\nconst { items, row } = props<{ items: string[], row: Snippet<[item: string, index: number]> }>()\n---\nfor item, i of items\n  | {row(item, i)}\n',
       'src/list.kay': [
         '---',
         'import Rows from \'./rows.kay\'',

@@ -1,6 +1,6 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { label } = props<{ label: (count: number) => JSX.Element }>()
+const { label } = props<{ label: Snippet<[count: number]> }>()
 ---
 button(onClick={() => console.log(1)}) {label(1)}

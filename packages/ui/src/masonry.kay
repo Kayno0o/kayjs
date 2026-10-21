@@ -1,5 +1,5 @@
 --- <Item>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { elementSize, memo, onCleanup, onMount, signal } from 'kay'
 import { laneCount, masonryLayout } from './masonry'
 
@@ -14,7 +14,7 @@ const { items, key, minWidth = 256, gap = 12, tile, class: className, style, ...
   // Between two lanes and between two tiles of a lane, in pixels.
   gap?: number | undefined
   // Draws each tile: `@tile(item)`.
-  tile: (item: Item) => JSX.Element
+  tile: Snippet<[item: Item]>
   class?: string | undefined
   style?: string | undefined
 }>()

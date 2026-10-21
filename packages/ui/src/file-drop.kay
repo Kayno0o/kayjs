@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { listen, signal } from 'kay'
 import { acceptsFile } from './accept'
 
@@ -17,7 +17,7 @@ const { accept, multiple = false, paste = false, disabled = false, compact = fal
   // The files dropped or picked that were left out, those missing `accept` and, without `multiple`, the matching ones beyond the first, so the page can say why; never called for pasted files, which may be anything on the clipboard.
   onReject?: ((files: File[]) => void) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
-  content: (zone: { open: () => void, dragging: () => boolean }) => JSX.Element
+  content: Snippet<[zone: { open: () => void, dragging: () => boolean }]>
   class?: string | undefined
 }>()
 

@@ -1,5 +1,5 @@
 ---
-import type { Action, ActionStream, Failure, JSX, SanitizeOptions } from 'kay'
+import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
@@ -65,8 +65,8 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   // What the tools of a reply are called in the one line they fold into, by tool name such as `{ search_docs: 'Searched the docs' }`; a tool without one shows its own name, and a tool called more than once adds `x2`.
   toolLabels?: Record<string, string> | undefined
   // What the send and stop buttons draw, in place of an arrow and a square.
-  sendIcon?: JSX.Element
-  stopIcon?: JSX.Element
+  sendIcon?: Snippet
+  stopIcon?: Snippet
   // The status of a tool call, and the names of its two parts.
   runningLabel?: string | undefined
   doneLabel?: string | undefined

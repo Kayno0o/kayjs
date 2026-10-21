@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { effect, signal } from 'kay'
 
 const { open, title, level = 2, dirty = false, onOpenChange, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
@@ -10,7 +10,7 @@ const { open, title, level = 2, dirty = false, onOpenChange, footer, class: clas
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
-  footer?: JSX.Element
+  footer?: Snippet
   class?: string | undefined
   // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
   onOpenChange: (open: boolean) => void

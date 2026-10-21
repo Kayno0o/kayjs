@@ -1,12 +1,12 @@
 ---
-import type { Component, JSX } from 'kay'
+import type { Component, Snippet } from 'kay'
 const { opts = {}, fmt = v => String(v), size = 'md', list = [], Icon, Wrap, items } = props<{
   opts?: { a?: number }
   fmt?: (v: number) => string
   size?: 'sm' | 'md'
   list?: string[]
   Icon: Component<{ n?: string }>
-  Wrap: Component<{ children?: JSX.Element }>
+  Wrap: Component<{ children?: Snippet }>
   items: Component<{ n?: string }>[]
 }>()
 const n: number = opts.a ?? 0

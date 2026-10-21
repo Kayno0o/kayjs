@@ -1,5 +1,5 @@
 ---
-import type { Component, JSX } from 'kay'
+import type { Component, Snippet } from 'kay'
 import Chat from './chat.kay'
 import Panel from './chat-panel.kay'
 
@@ -12,21 +12,21 @@ const { icon, closeIcon, sendIcon, stopIcon, newIcon, expandIcon, collapseIcon, 
   // The tab's session storage key the conversation is kept under, so a reload finds it; none by default, as the next visitor to use the tab would read it. A site with sign-in gives one per visitor.
   remember?: string | undefined
   // What the button and the panel's close button draw, in place of a chat bubble and a cross.
-  icon?: JSX.Element
-  closeIcon?: JSX.Element
+  icon?: Snippet
+  closeIcon?: Snippet
   // The header's two other buttons, which clear the conversation and enlarge the panel: a new-chat plus, and a pair of arrows out and in.
-  newIcon?: JSX.Element
+  newIcon?: Snippet
   // The chat's round buttons, as `Chat` takes them.
-  sendIcon?: JSX.Element
-  stopIcon?: JSX.Element
-  expandIcon?: JSX.Element
-  collapseIcon?: JSX.Element
+  sendIcon?: Snippet
+  stopIcon?: Snippet
+  expandIcon?: Snippet
+  collapseIcon?: Snippet
   // Names and tooltips of those buttons: `New conversation`, `Enlarge the chat` and `Shrink the chat`.
   newLabel?: string | undefined
   expandLabel?: string | undefined
   collapseLabel?: string | undefined
   // A line under the chat, such as a warning that its answers can be wrong.
-  note?: JSX.Element
+  note?: Snippet
   // On the button and panel's wrapper.
   class?: string | undefined
 }>()

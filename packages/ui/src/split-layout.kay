@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
@@ -7,12 +7,12 @@ import { wording } from 'kay/words'
 const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
 const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resizeLabel', 'Resize list'), backLabel = wording('ui.splitLayout.backLabel', 'Back'), class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
-  list: JSX.Element
-  detail: JSX.Element
-  listHead?: JSX.Element
-  detailHead?: JSX.Element
+  list: Snippet
+  detail: Snippet
+  listHead?: Snippet
+  detailHead?: Snippet
   // A navigation column left of the list, from `md` up; below it, an overlay `sidebarOpen` shows.
-  sidebar?: JSX.Element
+  sidebar?: Snippet
   sidebarTitle?: string | undefined
   // Below `md`, whether the detail pane takes the list's place.
   detailOpen?: boolean | undefined

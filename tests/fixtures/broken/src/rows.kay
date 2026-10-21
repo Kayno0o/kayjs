@@ -1,7 +1,7 @@
 --- <T>
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
+const { items, row } = props<{ items: T[], row: Snippet<[item: T, index: number]> }>()
 ---
 ul.rows
   for item, i of items key={i}

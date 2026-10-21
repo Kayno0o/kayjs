@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 
 const { title, level = 3, head, bare = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   // Engraved along the top, on a rule of its own.
@@ -7,7 +7,7 @@ const { title, level = 3, head, bare = false, class: className, ...rest } = prop
   // The title's heading level, under the page's outline; `1` for a card that is the whole page, such as a sign-in panel.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // The rest of the title's line, held at its far end: a count, a control, a link out.
-  head?: JSX.Element
+  head?: Snippet
   // No inset body, for content that runs to the card's edge: a chart, a table, a console.
   bare?: boolean | undefined
   class?: string | undefined

@@ -1,7 +1,7 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { items, row } = props<{ items: string[], row: (item: string) => JSX.Element }>()
+const { items, row } = props<{ items: string[], row: Snippet<[item: string]> }>()
 const reversed = signal(false)
 ---
 ul.list(onClick={() => reversed.set(!reversed())})

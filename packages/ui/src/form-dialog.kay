@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Answer, FailureData, JSX, Success } from 'kay'
+import type { Action, Answer, FailureData, Snippet, Success } from 'kay'
 import { effect, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -24,7 +24,7 @@ const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.s
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
   onSaved?: ((result: Answer<Success<Output>>) => void) | undefined
   // The left end of the footer, for a delete button.
-  extra?: JSX.Element
+  extra?: Snippet
   // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
   id?: string | undefined
   class?: string | undefined

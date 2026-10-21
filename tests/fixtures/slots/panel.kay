@@ -1,7 +1,7 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { open: initial = true, actions } = props<{ open?: boolean, actions?: JSX.Element, children?: JSX.Element }>()
+const { open: initial = true, actions } = props<{ open?: boolean, actions?: Snippet, children?: Snippet }>()
 const open = signal(initial)
 ---
 section.panel

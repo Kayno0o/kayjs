@@ -597,6 +597,14 @@ export const LINTS = {
     wrong: '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton(onClick={() => open = !open()}) Toggle\n\n// parent\nToggle(open={open})',
     right: '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) Toggle\n\n// parent\nToggle(bind:open={open})',
   },
+  'deprecated-markup-prop': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    summary: 'A prop typed `JSX.Element`, or a function returning it, in the props type of a component: since 1.70 a markup prop is a `Snippet` from `kay`, `Snippet` for the children or a block with no parameters and `Snippet<[Item, number]>` for markup the component calls with values. The fix writes the new type, updates the import and drops `JSX` when nothing else uses it; a `JSX.Element[]` is a list of values and stays. Found in the props type of a `.kay` script and in the interfaces and aliases it names.',
+    wrong: '---\nimport type { JSX } from \'kay\'\n\nconst { actions, row } = props<{ actions?: JSX.Element, row: (item: string, index: number) => JSX.Element }>()\n---\nslot actions\nslot row(\'x\', 0)',
+    right: '---\nimport type { Snippet } from \'kay\'\n\nconst { actions, row } = props<{ actions?: Snippet, row: Snippet<[item: string, index: number]> }>()\n---\nslot actions\nslot row(\'x\', 0)',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

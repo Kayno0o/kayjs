@@ -1,7 +1,7 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { side, note } = props<{ side?: JSX.Element, note?: JSX.Element }>()
+const { side, note } = props<{ side?: Snippet, note?: Snippet }>()
 ---
 div.slot-flag(data-side={side ? '' : undefined})
   span.slot-flag-label {side ? 'with' : 'without'}

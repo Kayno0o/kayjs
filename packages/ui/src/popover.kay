@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { PopoverPlacement, PopoverTriggerProps } from './popover'
 import { effect, signal, uid } from 'kay'
 
@@ -11,7 +11,7 @@ const { id, open = false, placement = 'bottom-start', trigger, onOpenChange, cla
   // Where the panel sits against its trigger, flipped by the browser when there is no room there.
   placement?: PopoverPlacement | undefined
   // Renders the button that toggles the panel, which spreads the attributes it is handed: `@trigger(attributes)`, then `button({...attributes})`.
-  trigger: (attributes: PopoverTriggerProps) => JSX.Element
+  trigger: Snippet<[attributes: PopoverTriggerProps]>
   // Called with the new state whenever the panel shows or hides, however it did.
   onOpenChange?: ((open: boolean) => void) | undefined
   class?: string | undefined

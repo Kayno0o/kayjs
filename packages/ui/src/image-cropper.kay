@@ -1,6 +1,6 @@
 ---
 import type { CropHandle, CropRect } from '@kaynooo/utils/browser/canvas'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { createCenteredCrop, moveCrop, pointerToNatural, resizeCrop } from '@kaynooo/utils/browser/canvas'
 import { effect, elementSize, onMount, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
@@ -31,7 +31,7 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   // The image's natural size, once it has decoded.
   onLoad?: ((size: ImageSize) => void) | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
-  footer?: ((reset: () => void) => JSX.Element) | undefined
+  footer?: Snippet<[reset: () => void]> | undefined
   class?: string | undefined
 }>()
 

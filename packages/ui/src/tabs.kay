@@ -1,5 +1,5 @@
 --- <Value extends string>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
@@ -26,7 +26,7 @@ const { tabs, value, label, onChange, panel, class: className, ...rest } = props
   onChange?: ((value: Value) => void) | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
-  panel: (value: Value) => JSX.Element
+  panel: Snippet<[value: Value]>
   class?: string | undefined
 }>()
 

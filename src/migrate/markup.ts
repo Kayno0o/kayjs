@@ -593,7 +593,7 @@ class Translator {
 
     const slotName = (named.value as t.StringLiteral).value
 
-    this.note(this.line(element), `the named slot \`${slotName}\` renders the \`${slotName}\` prop: add \`${slotName}?: JSX.Element\` to the component's props`)
+    this.note(this.line(element), `the named slot \`${slotName}\` renders the \`${slotName}\` prop: add \`${slotName}?: Snippet\` to the component's props`)
 
     return [`| {${slotName}}`]
   }

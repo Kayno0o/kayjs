@@ -1,7 +1,7 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { rows, empty, noMatch } = props<{ rows: string[], empty?: JSX.Element, noMatch?: JSX.Element }>()
+const { rows, empty, noMatch } = props<{ rows: string[], empty?: Snippet, noMatch?: Snippet }>()
 ---
 table.empty-rows
   tbody

@@ -1,5 +1,5 @@
 --- <Row, Key extends RowKey<Row>>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
 import { effect, memo, onCleanup, onMount, persisted, signal } from 'kay'
 import Button from './button.kay'
@@ -20,9 +20,9 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
   onSort?: ((sort: SortState) => void) | undefined
   // Draws the cells of the columns it covers, see `Column.cell`.
-  cell?: ((row: Row, column: Column<Row>) => JSX.Element) | undefined
+  cell?: Snippet<[row: Row, column: Column<Row>]> | undefined
   // Shown in place of the rows when there are none.
-  empty?: JSX.Element
+  empty?: Snippet
   // A search box above the rows, keeping those where a value it reads holds the typed text: the row's fields named, or what a function of the row returns.
   filter?: RowFilter<Row> | undefined
   // Names the search box.
@@ -33,7 +33,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // How many rows the filter keeps, as screen readers hear it.
   countLabel?: ((count: number) => string) | undefined
   // Shown in place of the rows when the filter hides every one; `empty` otherwise.
-  noMatch?: JSX.Element
+  noMatch?: Snippet
   // Below 30rem of width, rows stack as cards labelled by their headers, or the table scrolls sideways.
   narrow?: 'stack' | 'scroll' | undefined
   // A checkbox on each row and, above the rows, a tri-state select-all beside the count of rows picked, in the stacked cards as in the wide table.
@@ -43,7 +43,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // Called with the keys picked, in the rows' order, each time the selection changes, a row leaving `rows` included.
   onSelect?: ((keys: RowKeyValue<Row, Key>[]) => void) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
-  bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => JSX.Element) | undefined
+  bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
   // Names the select-all box, and the column's header for screen readers.
   selectAllLabel?: string | undefined
   // The count of rows picked, read out as it changes: `N selected`.

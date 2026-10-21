@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 import { fieldLinks, formIssues } from './forms'
 
 const { label, name, issue, hint, required = false, group = false, compact = false, action, class: className } = props<{
@@ -16,7 +16,7 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
   // Sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
   compact?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
-  action?: JSX.Element
+  action?: Snippet
   class?: string | undefined
 }>()
 

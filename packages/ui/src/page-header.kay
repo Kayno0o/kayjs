@@ -1,15 +1,15 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 
 const { title, meta, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
   // The page's one `h1`.
   title: string
   // Beside the title: a badge, a count, a link back.
-  meta?: JSX.Element
+  meta?: Snippet
   // Under the title's line: a sentence saying what the page holds.
   description?: string | undefined
   // After the title, past a divider: a `+` Button, a link, a row of controls.
-  actions?: JSX.Element
+  actions?: Snippet
   class?: string | undefined
 }>()
 ---

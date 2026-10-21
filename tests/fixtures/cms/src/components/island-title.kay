@@ -1,8 +1,8 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 import { signal } from 'kay'
 
-const { title } = props<{ title: string, children?: JSX.Element }>()
+const { title } = props<{ title: string, children?: Snippet }>()
 const open = signal(false)
 ---
 button.island-title(onClick={() => open.set(shown => !shown)}) {title}

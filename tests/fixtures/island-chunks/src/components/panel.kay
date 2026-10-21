@@ -1,7 +1,7 @@
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { children: _children } = props<{ children?: JSX.Element }>()
+const { children: _children } = props<{ children?: Snippet }>()
 const open = signal(true)
 ---
 section.panel

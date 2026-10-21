@@ -1,12 +1,12 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 
 const { title, level = 2, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   title: string
   // The title's heading level, `1` for a section holding a whole page.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // The end of the head line: a `+` IconButton, a link, a row of controls.
-  actions?: JSX.Element
+  actions?: Snippet
   class?: string | undefined
 }>()
 ---

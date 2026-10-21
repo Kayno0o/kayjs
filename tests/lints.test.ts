@@ -750,3 +750,63 @@ describe('server-only-import', () => {
     ])
   })
 })
+
+describe('deprecated-markup-prop', () => {
+  const component = (imports: string, types: string, props = 'props<{ title: string }>()') => `---\n${imports}\n\n${types}const { title } = ${props}\n---\np {title}`
+  const markup = (code: string) => lints(code).filter(d => d.code === 'deprecated-markup-prop')
+  const rewritten = (code: string) => [...new Set(fixed(code))]
+
+  it('rewrites an inline props type, an optional prop and a function with named parameters, and swaps the import', () => {
+    const source = component('import type { JSX } from \'kay\'', '', 'props<{ title: string, actions?: JSX.Element, row: (item: string, index: number) => JSX.Element, empty: () => JSX.Element }>()')
+
+    expect(markup(source).map(d => ({ severity: d.severity, at: d.at }))).toEqual([
+      { severity: 'warning', at: 'JSX.Element' },
+      { severity: 'warning', at: '(item: string, index: number) => JSX.Element' },
+      { severity: 'warning', at: '() => JSX.Element' },
+    ])
+    expect(rewritten(source)).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ title: string, actions?: Snippet, row: Snippet<[item: string, index: number]>, empty: Snippet }>()')])
+  })
+
+  it('reads an interface and a type alias of the script, and follows the props type through an intersection', () => {
+    const imports = 'import type { JSX } from \'kay\''
+
+    expect(rewritten(component(imports, 'interface Props {\n  actions?: JSX.Element\n}\n\n', 'props<Props & { title: string }>()'))).toEqual([component('import type { Snippet } from \'kay\'', 'interface Props {\n  actions?: Snippet\n}\n\n', 'props<Props & { title: string }>()')])
+    expect(rewritten(component(imports, 'type Props = { footer: ((reset: () => void) => JSX.Element) | undefined }\n\n', 'props<Props>()'))).toEqual([component('import type { Snippet } from \'kay\'', 'type Props = { footer: Snippet<[reset: () => void]> | undefined }\n\n', 'props<Props>()')])
+  })
+
+  it('leaves a list of markup, a type nothing props names and a generic or untyped function alone', () => {
+    const imports = 'import type { JSX } from \'kay\''
+
+    expect(markup(component(imports, '', 'props<{ cells: JSX.Element[] }>()'))).toEqual([])
+    expect(markup(component(imports, 'interface Other { view: JSX.Element }\n\n', 'props<{ title: string }>()'))).toEqual([])
+    expect(lints(component(imports, '', 'props<{ row: <T>(item: T) => JSX.Element }>()')).filter(d => d.code === 'deprecated-markup-prop')).toHaveLength(1)
+    expect(rewritten(component(imports, '', 'props<{ row: <T>(item: T) => JSX.Element }>()'))).toEqual([])
+    expect(rewritten(component(imports, '', 'props<{ row: (item) => JSX.Element }>()'))).toEqual([])
+  })
+
+  it('spells destructured and rest parameters, unlabelled when one parameter cannot be', () => {
+    const imports = 'import type { JSX } from \'kay\''
+
+    expect(rewritten(component(imports, '', 'props<{ row: ({ id }: { id: number }, index?: number) => JSX.Element }>()'))).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ row: Snippet<[{ id: number }, number?]> }>()')])
+    expect(rewritten(component(imports, '', 'props<{ row: (first: string, ...rest: number[]) => JSX.Element }>()'))).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ row: Snippet<[first: string, ...rest: number[]]> }>()')])
+  })
+
+  it('keeps JSX in the import while something else uses it, and adds Snippet beside it', () => {
+    const source = component('import type { JSX } from \'kay\'', '', 'props<JSX.IntrinsicElements[\'div\'] & { actions?: JSX.Element }>()')
+
+    expect(rewritten(source)).toEqual([component('import type { JSX, Snippet } from \'kay\'', '', 'props<JSX.IntrinsicElements[\'div\'] & { actions?: Snippet }>()')])
+    expect(rewritten(component('import { type JSX, signal } from \'kay\'', '', 'props<JSX.IntrinsicElements[\'div\'] & { actions?: JSX.Element }>()'))).toEqual([component('import { type JSX, type Snippet, signal } from \'kay\'', '', 'props<JSX.IntrinsicElements[\'div\'] & { actions?: Snippet }>()')])
+  })
+
+  it('drops JSX from an import naming others, or the import alone, and reuses a Snippet already imported', () => {
+    expect(rewritten(component('import type { DurationText, JSX } from \'kay\'', '', 'props<{ actions?: JSX.Element }>()'))).toEqual([component('import type { DurationText, Snippet } from \'kay\'', '', 'props<{ actions?: Snippet }>()')])
+    expect(rewritten(component('import type { JSX, Snippet } from \'kay\'', '', 'props<{ a?: JSX.Element, b?: Snippet }>()'))).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ a?: Snippet, b?: Snippet }>()')])
+  })
+
+  it('has no fix while another Snippet is declared in the file', () => {
+    const source = component('import type { JSX } from \'kay\'', 'type Snippet = string\n\n', 'props<{ actions?: JSX.Element }>()')
+
+    expect(markup(source)).toHaveLength(1)
+    expect(rewritten(source)).toEqual([])
+  })
+})
