@@ -20,7 +20,7 @@ interface Edit {
   text: string
 }
 
-function keyOf(property: t.ObjectProperty): string | undefined {
+export function keyOf(property: t.ObjectProperty): string | undefined {
   if (property.computed)
     return undefined
 

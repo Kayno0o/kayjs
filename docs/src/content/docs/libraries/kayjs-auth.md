@@ -643,7 +643,7 @@ createAuth({
 
 The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
 
-In production, set `site` in `kay.config.ts` or `url` in `createAuth`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `limits: { oauthRegisterAll }` adds a ceiling on all addresses together.
+In production, set `site` in `kay.config.ts` or `url` in `createAuth`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
 
 The new tables are created by `db.sync()` if you use Postgres or SQLite.
 

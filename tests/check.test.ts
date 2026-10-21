@@ -2997,7 +2997,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
-    const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
+    const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
     const root = await scratchProject({
       'kay.config.ts': 'export default {}\n',
       'src/rates.ts': config,
@@ -3007,9 +3007,9 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-rate-limit/g)).toHaveLength(6)
+      expect(output.match(/deprecated-rate-limit/g)).toHaveLength(7)
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/rates.ts')).text()).toBe(config.replace('ai({ limit, visitor:', 'ai({ rateLimit: limit, key:').replace('limits: {', 'rateLimit: {').replace('{ visitor: \'job\' }', '{ key: \'job\' }'))
+      expect(await Bun.file(join(root, 'src/rates.ts')).text()).toBe(config.replace('ai({ limit, visitor:', 'ai({ rateLimit: limit, key:').replace('limits: {', 'rateLimit: {').replace('"limits": {}', 'rateLimit: {}').replace('{ visitor: \'job\' }', '{ key: \'job\' }'))
       expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('ask(\'hi\', { key: \'page\' })')
       expect((await runCheck(root)).output).toContain('deprecated-rate-limit')
     }

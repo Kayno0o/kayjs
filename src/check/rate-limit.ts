@@ -6,6 +6,7 @@ import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
+import { keyOf } from './retired-lint'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const AI_PACKAGE = '@kaynooo/kayjs-ai'
@@ -24,16 +25,6 @@ const AUTH_OPTIONS: Site = { at: 0, renames: { limits: 'rateLimit' } }
 const FUNCTIONS: Record<string, Record<string, Site>> = {
   [AI_PACKAGE]: { ai: AI_OPTIONS, ask: ASK_OPTIONS },
   [AUTH_PACKAGE]: { createAuth: AUTH_OPTIONS },
-}
-
-function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // The options `ai({ limit, visitor })`, `ask(messages, { visitor })` and `createAuth({ limits })` took before 1.70 named `rateLimit` and `key`, as the other rate limits of kay are, as an object literal at the call is written.
@@ -60,7 +51,7 @@ export async function rateLimitNames(root: string, options: CheckOptions): Promi
       let ast: t.File
 
       try {
-        ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'], errorRecovery: true })
+        ast = parse(code, { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true })
       }
       catch {
         continue

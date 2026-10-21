@@ -48,7 +48,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions and stores, `_guard.ts` route guards
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, and the MCP endpoint
-- [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events, streaming actions
+- [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events
 - [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
