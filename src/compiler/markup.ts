@@ -147,6 +147,8 @@ export abstract class TemplateWriter {
     if (element.classes.length > 0)
       plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute) }
 
+    const section = name === 'a' ? sectionOf(element, this.src) : undefined
+
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread' || (plan.classes && attribute === classAttribute) || attribute === sizes)
         continue
@@ -158,7 +160,7 @@ export abstract class TemplateWriter {
         continue
 
       // Read by `currentLink` on the server, and never written.
-      if (name === 'a' && attribute === sectionOf(element, this.src))
+      if (attribute === section)
         continue
 
       if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {

@@ -1205,7 +1205,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
 // Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` island or a deferred server island when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
 // A page without islands needs no hydration script, only the entry swapping pages.
 // `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
-// One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for him even though no link was dropped.
+// One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
   const immediate = saving?.immediate
   const waiting = saving?.waiting
