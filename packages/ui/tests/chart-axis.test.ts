@@ -112,10 +112,14 @@ describe('chart axis', () => {
 
   test('stacks each series on the ones before it, a null counting as 0, and totals a point the same way', () => {
     const series = [[1, 2, 3], [null, 1, 1], [2, 2, null]]
+    const named = series.map(values => ({ values }))
 
     expect(stackValues(series)).toEqual([[1, 2, 3], [1, 3, 4], [3, 5, 4]])
-    expect([0, 1, 2].map(index => totalAt(series, index))).toEqual([3, 5, 4])
+    expect([0, 1, 2].map(index => totalAt(named, index))).toEqual([3, 5, 4])
     expect(series[1]).toEqual([null, 1, 1])
     expect(stackValues([])).toEqual([])
+    expect(stackValues([[null], [null]])).toEqual([[0], [0]])
+    expect(stackValues([[-1, 2], [1, -3]])).toEqual([[-1, 2], [0, -1]])
+    expect(totalAt([], 0)).toBe(0)
   })
 })

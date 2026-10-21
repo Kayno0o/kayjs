@@ -26,7 +26,7 @@ A span under a day labels the x-axis with times. The tooltip keeps its width and
 
 `stacked` draws each series on top of the ones before it and fills the band between two lines, so the top line reads the total. It suits parts of a whole, such as one line per CPU core, each its share of the machine. The y-axis starts at 0 and reaches the highest total (`options.low` overrides the start).
 
-The tooltip, the keyboard announcements and the table for screen readers still read each series' own value through `formatValue`, never the running sum, and add a total. A `null` reads `-` and counts as 0 in the total. `totalLabel` renames the total, which is `Total` by default and read from the `ui.lineChart.total` word.
+The tooltip, the keyboard announcements and the table for screen readers still read each series' own value through `formatValue`, never the running sum, and add a total. A `null` reads `-` and counts as 0 in the total, so a stacked line never breaks at a gap. The axis reaches below 0 when a total does. `totalLabel` renames the total, which is `Total` by default and read from the `ui.lineChart.total` word.
 
 ## Picking a span
 
@@ -36,7 +36,7 @@ The tooltip, the keyboard announcements and the table for screen readers still r
 
 ## Keyboard and screen readers
 
-`label` names the chart. Screen readers read every value from a table only they see, one row per label and one column per series, so a series of thousands of points renders as many rows. The plot is one stop in the tab order: the arrows walk the points, Home and End reach either end, chords such as Alt with an arrow stay the browser's, and each step shows the tooltip and announces the point's label and readings.
+`label` names the chart. Screen readers read every value from a table only they see, one row per label and one column per series (and a total column when stacked), so a series of thousands of points renders as many rows. The plot is one stop in the tab order: the arrows walk the points, Home and End reach either end, chords such as Alt with an arrow stay the browser's, and each step shows the tooltip and announces the point's label and readings.
 
 ## Data and axes
 

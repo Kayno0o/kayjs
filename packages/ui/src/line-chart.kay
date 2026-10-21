@@ -54,7 +54,7 @@ const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
     fullWidth: true,
     showArea: true,
     showPoint: false,
-    ...stacked ? { low: 0 } : {},
+    ...stacked ? { low: Math.min(0, ...heights().flat().map(height => height ?? 0)) } : {},
     ...options,
     chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
     axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
@@ -120,7 +120,7 @@ const reading = (index: number) => {
   return at ? valueText(series[index]!, at.index) : '-'
 }
 
-const totalText = (index: number) => formatValue(totalAt(series.map(item => item.values), index))
+const totalText = (index: number) => formatValue(totalAt(series, index))
 
 const heading = (index: number) => headingTexts()[index] ?? ''
 
@@ -177,7 +177,11 @@ onMount(() => {
     })
     // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
     // A stacked area is the band between its line and the one below: its own area and the one below it, filled with the even-odd rule, leave only the band.
-    const areas: string[] = []
+    let areas: (string | undefined)[] = []
+
+    chart.on('data', () => {
+      areas = []
+    })
 
     chart.on('draw', (event) => {
       const paint = PAINT[event.type]
@@ -187,7 +191,7 @@ onMount(() => {
 
       if (event.type === 'area' && stacked) {
         const own = event.element.attr('d') as string
-        const below = areas[event.seriesIndex - 1]
+        const below = areas.slice(0, event.seriesIndex).findLast(Boolean)
 
         areas[event.seriesIndex] = own
         event.element.attr({ 'd': below ? `${own} ${below}` : own, 'fill-rule': 'evenodd' })

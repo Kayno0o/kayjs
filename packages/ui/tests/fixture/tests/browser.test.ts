@@ -151,8 +151,8 @@ inBrowser('LineChart stacked', () => {
       const lines = [...document.querySelectorAll('#stacked .ct-line')].map(line => (line.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g)!.map(Number))
       const labels = [...document.querySelectorAll('#stacked .ct-label.ct-vertical')].map(label => Number(label.textContent))
 
-      return { first: lines.map(line => line[1]!), last: lines.map(line => line.at(-1)!), labels, areas: document.querySelectorAll('#stacked .ct-area[fill-rule="evenodd"]').length }
-    }) as { first: number[], last: number[], labels: number[], areas: number }
+      return { first: lines.map(line => line[1]!), last: lines.map(line => line.at(-1)!), labels, areas: [...document.querySelectorAll('#stacked .ct-area')].map(area => (area.getAttribute('d') ?? '').split('M').length - 1) }
+    }) as { first: number[], last: number[], labels: number[], areas: number[] }
 
     // A null counts as 0: B starts on A's line, and C rises above both.
     expect(drawn.first[1]).toBe(drawn.first[0]!)
@@ -161,7 +161,8 @@ inBrowser('LineChart stacked', () => {
     expect(drawn.last[2]).toBe(drawn.last[1]!)
     expect(Math.min(...drawn.labels)).toBe(0)
     expect(Math.max(...drawn.labels)).toBeGreaterThanOrEqual(5)
-    expect(drawn.areas).toBeGreaterThan(0)
+    // The first area is its own; each other is its own plus the one below, leaving the band.
+    expect(drawn.areas).toEqual([1, 2, 2])
 
     const read = async (x: number) => {
       await page.evaluate(((at: number) => {
@@ -175,6 +176,8 @@ inBrowser('LineChart stacked', () => {
     }
 
     expect(await read(1)).toEqual(['A1', 'B-', 'C2', 'Total3'])
+    expect(await page.evaluate(() => document.querySelector('#stacked .kui-line-chart-overlay')!.getAttribute('aria-valuetext'))).toEndWith('A 1, B -, C 2, Total 3')
+    expect(await page.evaluate(() => [...document.querySelectorAll('#stacked .kui-line-chart-data th[scope="col"]')].map(th => th.textContent))).toEqual(['A', 'B', 'C', 'Total'])
     expect(page.errors).toEqual([])
   }, 120_000)
 })

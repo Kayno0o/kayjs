@@ -111,8 +111,8 @@ export function stackValues(series: (number | null)[][]): number[][] {
 }
 
 // What every series adds up to at one point, a `null` counting as 0.
-export function totalAt(series: (number | null)[][], index: number): number {
-  return series.reduce((sum, values) => sum + (values[index] ?? 0), 0)
+export function totalAt(series: { values: (number | null)[] }[], index: number): number {
+  return series.reduce((sum, item) => sum + (item.values[index] ?? 0), 0)
 }
 
 export function chartData(labels: string[], series: (number | null)[][], times: number[] | null): LineChartData {
