@@ -7,7 +7,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
-import { ActionRedirect, readActionResponse } from '../src/runtime/action'
+import { ActionRedirectError, readActionResponse } from '../src/runtime/action'
 import { leaveGuards } from '../src/runtime/navigation'
 import { session } from '../src/server/session'
 import { testSite } from '../src/test'
@@ -108,7 +108,7 @@ describe('kay/test', () => {
     // What the handler passed to ctx.fail, and no flash cookie: the island reads the answer itself.
     await expect(signed.call(signIn, form([['name', '']]))).rejects.toMatchObject({ status: 400, data: { error: 'Who are you?' } })
     expect(signed.cookies.has('kay_flash')).toBe(false)
-    await expect(signed.call(signOut, form([]))).rejects.toMatchObject({ name: 'ActionRedirect', location: '/' })
+    await expect(signed.call(signOut, form([]))).rejects.toMatchObject({ name: 'ActionRedirectError', location: '/' })
     expect(await signed.call(limited, form([]))).toBe('ok')
     await expect(signed.call(limited, form([]))).rejects.toMatchObject({ status: 429 })
     // The honeypot catches a form's fields however they are sent.
@@ -220,7 +220,7 @@ describe('kay/test', () => {
     expect(await site.call(add, { title: 'Called from a test' })).toBeNumber()
     await expect(site.call(add, { title: '' })).rejects.toThrow(ActionError)
     expect(await site.call(promote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBe('bob is an admin')
-    await expect(site.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/about' })
+    await expect(site.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirectError', status: 303, location: '/about' })
     expect(await site.call(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBeUndefined()
     await expect(site.call(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).rejects.toMatchObject({ status: 422, data: { error: 'ada stays an admin' } })
   })
@@ -246,7 +246,7 @@ describe('kay/test', () => {
       await site.call(promote, { name: 'bob' })
     }
     catch (error) {
-      expect(error).toMatchObject({ name: 'ActionRedirect' })
+      expect(error).toMatchObject({ name: 'ActionRedirectError' })
       expect(promote.refused(error)).toBe(false)
     }
 
@@ -268,7 +268,7 @@ describe('kay/test', () => {
     // @ts-expect-error: the handler fails with `error` alone.
     expect(refused.data?.message).toBeUndefined()
     await expect(site.refusal(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
-    await expect(site.refusal(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', location: '/about' })
+    await expect(site.refusal(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirectError', location: '/about' })
   })
 
   it('calls an action reading its params from the page it names', async () => {
@@ -368,10 +368,10 @@ describe('kay/test', () => {
 
     try {
       // Kept on the page, the call settles, so its `pending` clears.
-      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')).rejects.toBeInstanceOf(ActionRedirect)
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')).rejects.toBeInstanceOf(ActionRedirectError)
       expect([asked, window.location.href]).toEqual([['/about'], 'http://localhost/admin'])
       // Made on a page the visitor has left since, it takes them nowhere.
-      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go', () => true)).rejects.toBeInstanceOf(ActionRedirect)
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go', () => true)).rejects.toBeInstanceOf(ActionRedirectError)
       expect(asked).toEqual(['/about'])
 
       leaving = true
@@ -395,7 +395,7 @@ describe('testSite under a base', () => {
     try {
       const { promote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as { promote: Action<{ name: string }, string> }
 
-      await expect(mounted.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/app/about' })
+      await expect(mounted.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirectError', status: 303, location: '/app/about' })
     }
     finally {
       await mounted.close()

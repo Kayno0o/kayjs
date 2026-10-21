@@ -2,8 +2,8 @@ import type { Command } from './command'
 import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { ConfigRefused, dev as startDev } from '../dev'
-import { InspectorAddressInUse } from '../dev/inspector'
+import { ConfigRefusedError, dev as startDev } from '../dev'
+import { InspectorAddressInUseError } from '../dev/inspector'
 import { isLoopback } from '../dev/loopback'
 import { isPort, warnOtherKay } from './command'
 import { USAGES } from './usages'
@@ -71,10 +71,10 @@ export const dev: Command = {
         }
         catch (error) {
           // The process that found the config does not load printed why.
-          if (error instanceof ConfigRefused)
+          if (error instanceof ConfigRefusedError)
             return 1
 
-          if (!(error instanceof InspectorAddressInUse))
+          if (!(error instanceof InspectorAddressInUseError))
             throw error
 
           console.error(error.message)

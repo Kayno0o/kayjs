@@ -3,7 +3,7 @@ import type { NavigationHooks } from '../src/runtime/navigation'
 import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
-import { ActionError, ActionRedirect, actionStub } from '../src/runtime/action'
+import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
@@ -1339,7 +1339,7 @@ describe('a tracked action call', () => {
       aborted.abort(new Error('left'))
       await expect(call({ id: 1 }, { signal: aborted.signal })).rejects.toThrow('left')
       expect(call.pending()).toBe(false)
-      await expect(call({ id: 1 })).rejects.toBeInstanceOf(ActionRedirect)
+      await expect(call({ id: 1 })).rejects.toBeInstanceOf(ActionRedirectError)
       expect(call.pending()).toBe(false)
       // A redirect that did not take the page away, there being none here to go, settles the wait too.
       await call.settled()

@@ -19,7 +19,12 @@ const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
-export class RedirectRefused extends Error {}
+export class RedirectRefusedError extends Error {}
+
+/** @deprecated Renamed `RedirectRefusedError` in 1.70; the old name goes in 1.73. */
+export const RedirectRefused = RedirectRefusedError
+/** @deprecated Renamed `RedirectRefusedError` in 1.70; the old name goes in 1.73. */
+export type RedirectRefused = RedirectRefusedError
 
 // What a runtime row answers: a redirect's status, or 410 for a path that is gone for good, which has no target.
 export type RuntimeStatus = RedirectStatus | 410
@@ -77,7 +82,7 @@ export function encoded(text: string): string {
     return text.replace(NON_ASCII, character => encodeURIComponent(character)).replace(PERCENT_ESCAPE, escape => escape.toUpperCase())
   }
   catch {
-    throw new RedirectRefused('a path and a target are text, not broken characters')
+    throw new RedirectRefusedError('a path and a target are text, not broken characters')
   }
 }
 
@@ -89,14 +94,14 @@ function isPattern(from: string): boolean {
 // `/\evil.example` and `//evil.example` are other hosts to a browser.
 function checkTarget(to: string, hosts: readonly string[]): void {
   if (to === '' || to.length > MAX_LENGTH)
-    throw new RedirectRefused(`a target is 1 to ${MAX_LENGTH} characters`)
+    throw new RedirectRefusedError(`a target is 1 to ${MAX_LENGTH} characters`)
 
   if (UNSAFE.test(to))
-    throw new RedirectRefused('a target holds no control character, space nor backslash')
+    throw new RedirectRefusedError('a target holds no control character, space nor backslash')
 
   if (to.startsWith('/')) {
     if (leavesSite(to))
-      throw new RedirectRefused(`${to} is no target: it reads as another site's URL`)
+      throw new RedirectRefusedError(`${to} is no target: it reads as another site's URL`)
 
     return
   }
@@ -107,11 +112,11 @@ function checkTarget(to: string, hosts: readonly string[]): void {
     url = new URL(to)
   }
   catch {
-    throw new RedirectRefused(`${to} is no target: it starts with / or is an allowed site's URL`)
+    throw new RedirectRefusedError(`${to} is no target: it starts with / or is an allowed site's URL`)
   }
 
   if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username !== '' || url.password !== '' || !hosts.includes(url.host.toLowerCase()))
-    throw new RedirectRefused(`${to} is no target: only this site's paths and the hosts of runtimeRedirects.hosts in kay.config.ts are allowed`)
+    throw new RedirectRefusedError(`${to} is no target: only this site's paths and the hosts of runtimeRedirects.hosts in kay.config.ts are allowed`)
 }
 
 // Whether a location a redirect built stays where it may: the same checks as a target, on what a `*` or a param filled in.
@@ -129,13 +134,13 @@ export function safeLocation(location: string, hosts: readonly string[]): boolea
 // Throws, saying why, unless `from` and `to` make a redirect that cannot loop and cannot leave the site but where the app allows.
 function check(set: RedirectSet, from: string, to: string, status: number, rules: RuntimeRules): void {
   if (status !== 301 && status !== 302 && status !== 307 && status !== 308 && status !== 410)
-    throw new RedirectRefused(`status ${String(status)} is none of 301, 302, 307, 308 and 410`)
+    throw new RedirectRefusedError(`status ${String(status)} is none of 301, 302, 307, 308 and 410`)
 
   if (!from.startsWith('/') || from.startsWith('//') || from.length > MAX_LENGTH || UNSAFE.test(from))
-    throw new RedirectRefused(`${from} is no path to redirect: it starts with one / and holds no control character, space nor backslash`)
+    throw new RedirectRefusedError(`${from} is no path to redirect: it starts with one / and holds no control character, space nor backslash`)
 
   if (from.startsWith('/_kay/'))
-    throw new RedirectRefused('the paths under /_kay/ are kay\'s')
+    throw new RedirectRefusedError('the paths under /_kay/ are kay\'s')
 
   // Names the param or `*` a target uses without the path having it; a path that is gone has no target.
   try {
@@ -145,11 +150,11 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
     readRedirects({ [from]: status === 410 ? '/' : to })
   }
   catch (error) {
-    throw new RedirectRefused(error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error))
+    throw new RedirectRefusedError(error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error))
   }
 
   if (rules.configured[plainPath(from)] !== undefined)
-    throw new RedirectRefused(`${from} is a redirect of kay.config.ts already`)
+    throw new RedirectRefusedError(`${from} is a redirect of kay.config.ts already`)
 
   if (status === 410)
     return
@@ -163,7 +168,7 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
     const path = plainPath(at)
 
     if (path === origin)
-      throw new RedirectRefused(`${from} to ${to} is a redirect loop`)
+      throw new RedirectRefusedError(`${from} to ${to} is a redirect loop`)
 
     if (seen.has(path))
       break
@@ -173,7 +178,7 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
     const row = set.find(path)
 
     if (row?.status === 410 && rules.configured[path] === undefined)
-      throw new RedirectRefused(`${to} is gone (410): redirect to a page that exists`)
+      throw new RedirectRefusedError(`${to} is gone (410): redirect to a page that exists`)
 
     const next = rules.configured[path] ?? row?.to
 
@@ -188,7 +193,7 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
     const [problem] = redirectProblems({ [from]: to }, known)
 
     if (problem !== undefined)
-      throw new RedirectRefused(`${problem}; redirect to a page that exists`)
+      throw new RedirectRefusedError(`${problem}; redirect to a page that exists`)
   }
 }
 
@@ -237,7 +242,7 @@ export function redirectSet(db: Database): RedirectSet {
         const key = plainPath(from)
 
         if (!one.get(key) && count.get()!.total >= MAX_RUNTIME_REDIRECTS)
-          throw new RedirectRefused(`the set holds ${MAX_RUNTIME_REDIRECTS} redirects, the most there is room for: remove some, or move them to kay.config.ts`)
+          throw new RedirectRefusedError(`the set holds ${MAX_RUNTIME_REDIRECTS} redirects, the most there is room for: remove some, or move them to kay.config.ts`)
 
         const addedAt = Date.now()
 

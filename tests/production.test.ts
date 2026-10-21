@@ -34,7 +34,7 @@ import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey,
 import { securityHeaders } from '../src/server/security'
 import { sqliteStoreAt } from '../src/server/session'
 import { signStamp } from '../src/server/stamp'
-import { CspViolation } from '../src/server/violations'
+import { CspViolationError } from '../src/server/violations'
 import { testSite } from '../src/test'
 import { parsingRoutes, routePaths } from './elysia'
 import { prerendered, refusedPrerender } from './prerendered'
@@ -381,9 +381,9 @@ describe('security headers', () => {
       expect(await post(batch)).toBe(204)
       expect(await post(legacy)).toBe(204)
 
-      const [script, style] = caught as CspViolation[]
+      const [script, style] = caught as CspViolationError[]
 
-      expect(script).toBeInstanceOf(CspViolation)
+      expect(script).toBeInstanceOf(CspViolationError)
       expect(script).toMatchObject({ directive: 'script-src-elem', blocked: 'https://evil.example/x.js', url: 'https://site.example/about', disposition: 'enforce', source: 'https://site.example/_kay/a.js:3:7' })
       expect(script!.message).toBe('script-src-elem blocked https://evil.example/x.js on https://site.example/about')
       expect(style).toMatchObject({ directive: 'style-src-attr', blocked: 'inline', url: 'https://site.example/ fake line', disposition: 'report', sample: 'color: red' })
@@ -393,7 +393,7 @@ describe('security headers', () => {
       // The report-only policy's copy of a violation the enforced one logged is logged too.
       expect(await post(batch.replace('"disposition":"enforce"', '"disposition":"report"'))).toBe(204)
       expect(caught).toHaveLength(3)
-      expect((caught[2] as CspViolation).disposition).toBe('report')
+      expect((caught[2] as CspViolationError).disposition).toBe('report')
 
       expect(await post('not json')).toBe(400)
       expect(await post('{"csp-report":{}}')).toBe(400)

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it, spyOn } from 'bun:test'
 import { testWorker } from '../src/build/assets'
-import { ConfigRefused, dev } from '../src/dev'
+import { ConfigRefusedError, dev } from '../src/dev'
 import * as fingerprint from '../src/dev/fingerprint'
 import { FINGERPRINT } from '../src/dev/fingerprint'
 
@@ -283,7 +283,7 @@ it('starts the first server without waiting for the config to load again once a 
 
     // Files as they were, but a config that refuses to load now: the types say so, the start ends and no server stays.
     await Bun.write(join(marker, '../refuse.flag'), '')
-    await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
+    await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefusedError)
     expect(childrenRunning(real, 'preload.ts')).toHaveLength(0)
   }
   finally {

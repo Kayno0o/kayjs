@@ -3016,14 +3016,16 @@ describe.concurrent('kay check, unused code', () => {
       'src/save.ts': 'import type { SaveConflict as Conflict } from \'@kaynooo/kayjs-cms\'\n\nexport type Seen = Conflict\n',
       'src/reexport.ts': 'import { SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n',
       'src/hydrate.ts': 'import { HydrationMismatch } from \'kay/dom\'\n\nexport const mismatch = (error: unknown) => error instanceof HydrationMismatch\n',
+      'src/kay.ts': 'import { ActionRedirect } from \'kay\'\nimport { CspViolation } from \'kay/server\'\nimport { RedirectRefused } from \'kay/library\'\n\nexport const all = [ActionRedirect, CspViolation, RedirectRefused]\n',
       'src/other.ts': 'import { MailNotConfigured } from \'./mine\'\n\nexport const same = MailNotConfigured\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(4)
+      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(7)
       await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/kay.ts')).text()).toBe('import { ActionRedirectError } from \'kay\'\nimport { CspViolationError } from \'kay/server\'\nimport { RedirectRefusedError } from \'kay/library\'\n\nexport const all = [ActionRedirectError, CspViolationError, RedirectRefusedError]\n')
       expect(await Bun.file(join(root, 'src/hydrate.ts')).text()).toBe('import { HydrationMismatchError } from \'kay/dom\'\n\nexport const mismatch = (error: unknown) => error instanceof HydrationMismatchError\n')
       expect(await Bun.file(join(root, 'src/reexport.ts')).text()).toBe('import { SaveConflictError as SaveConflict } from \'@kaynooo/kayjs-cms\'\n\nexport { SaveConflict }\n')
       expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe('import { mailer, MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nexport const refused = (error: unknown) => error instanceof MailNotConfiguredError\nexport const note = \'MailNotConfigured is a word\'\nexport const seen = (error: { MailNotConfigured?: boolean }) => error.MailNotConfigured\nexport { mailer }\n')

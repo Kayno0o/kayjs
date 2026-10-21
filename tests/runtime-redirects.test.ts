@@ -8,7 +8,7 @@ import { openSqlite } from '../src/runtime/sqlite.server'
 import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
 import { dropStore, missingPaths, pageRequested, sharedStore } from '../src/server/not-found'
 import { configuredRedirects, knowRuntimeRules, missingRedirector, sitePaths } from '../src/server/runtime-redirect-api'
-import { answerFor, RedirectRefused, redirectSet } from '../src/server/runtime-redirects'
+import { answerFor, RedirectRefusedError, redirectSet } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -481,7 +481,7 @@ describe('the store on disk', () => {
       }
 
       expect(thrown).toBeInstanceOf(Error)
-      expect(thrown).not.toBeInstanceOf(RedirectRefused)
+      expect(thrown).not.toBeInstanceOf(RedirectRefusedError)
     }
     finally {
       await chmod(join(root, 'data'), 0o700)

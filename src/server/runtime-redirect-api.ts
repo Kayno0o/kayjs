@@ -8,7 +8,7 @@ import { kayLog } from '../runtime/log'
 import { pathOf } from './log'
 import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, NOT_FOUND_FILE, sharedStore, storeFile } from './not-found'
 import { requestUrl } from './request-url'
-import { answerFor, plainPath, RedirectRefused } from './runtime-redirects'
+import { answerFor, plainPath, RedirectRefusedError } from './runtime-redirects'
 
 const NOT_FOUND = 404
 // A page whose entry ended answers it, which an editor's redirect for the path still wins over.
@@ -115,7 +115,7 @@ export function redirectMovedPage(from: string | undefined, to: string | undefin
     return
 
   if (UNMATCHABLE.test(old) || UNMATCHABLE.test(now))
-    throw new RedirectRefused(`${old} and ${now} are pages a redirect cannot name: no ?, # or * in them`)
+    throw new RedirectRefusedError(`${old} and ${now} are pages a redirect cannot name: no ?, # or * in them`)
 
   inStore(undefined, true, (store) => {
     const added = store.redirects.move(old, now, rules)

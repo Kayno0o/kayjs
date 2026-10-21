@@ -152,7 +152,7 @@ kay and its libraries name the same idea the same way. A new option, export or f
 ### Errors
 
 - A wrong option at start-up throws `KayError('config-invalid')`, in a library too.
-- An error class ends in `Error` and has a `code`. kay's own are taking it: `HydrationMismatchError` of `kay/dom` was `HydrationMismatch`, which stays as a deprecated alias for three minors.
+- An error class ends in `Error` and has a `code`. kay's own take it too: `HydrationMismatchError`, `ActionRedirectError`, `CspViolationError` and `RedirectRefusedError` were named without it, and the old names stay as deprecated aliases for three minors.
 
 ### Prefixes
 

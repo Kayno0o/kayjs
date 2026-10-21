@@ -230,15 +230,11 @@ describe('the naming conventions', () => {
       }
     }
 
-    // The classes #1754 renames.
-    const known = ['ActionRedirect', 'CspViolation', 'RedirectRefused', 'ConfigRefused', 'InspectorAddressInUse']
-
-    expect(found.filter(line => !known.some(name => line.endsWith(`: ${name}`)))).toEqual([])
-    expect(known.filter(name => !found.some(line => line.endsWith(`: ${name}`)))).toEqual([])
+    expect(found).toEqual([])
   })
 
   it('keep the old name of a renamed error class as a @deprecated alias', async () => {
-    for (const [file, name] of [['src/runtime/dom.ts', 'HydrationMismatch'], ['packages/cms/src/files.ts', 'SaveConflict'], ['packages/mail/src/mailer.ts', 'MailNotConfigured']] as const) {
+    for (const [file, name] of [['src/runtime/dom.ts', 'HydrationMismatch'], ['src/runtime/action.ts', 'ActionRedirect'], ['src/server/violations.ts', 'CspViolation'], ['src/server/runtime-redirects.ts', 'RedirectRefused'], ['packages/cms/src/files.ts', 'SaveConflict'], ['packages/mail/src/mailer.ts', 'MailNotConfigured']] as const) {
       const text = await Bun.file(file).text()
 
       expect(text).toContain(`/** @deprecated Renamed \`${name}Error\``)

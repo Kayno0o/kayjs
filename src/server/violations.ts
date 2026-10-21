@@ -23,8 +23,8 @@ const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}]+/gu
 const QUERY_OR_HASH = /[?#].*$/
 
 // A violation of the site's policy as a browser reported it: what `onError` gets from kay's report route.
-export class CspViolation extends Error {
-  override name = 'CspViolation'
+export class CspViolationError extends Error {
+  override name = 'CspViolationError'
 
   constructor(
     // The directive that blocked it, such as `script-src-elem`.
@@ -44,6 +44,11 @@ export class CspViolation extends Error {
     this.stack = source === undefined ? `${this.name}: ${this.message}` : `${this.name}: ${this.message}\n    at ${source}`
   }
 }
+
+/** @deprecated Renamed `CspViolationError` in 1.70; the old name goes in 1.73. */
+export const CspViolation = CspViolationError
+/** @deprecated Renamed `CspViolationError` in 1.70; the old name goes in 1.73. */
+export type CspViolation = CspViolationError
 
 const seen = new Set<string>()
 
@@ -89,7 +94,7 @@ export function serveViolationReports(app: Elysia, onError: KayConfig['onError']
 }
 
 // The violations a body holds, or undefined when it is no report: a Reporting API batch, its other report types skipped, or one `report-uri` report.
-function readViolations(text: string): CspViolation[] | undefined {
+function readViolations(text: string): CspViolationError[] | undefined {
   let body: unknown
 
   try {
@@ -123,13 +128,13 @@ function readViolations(text: string): CspViolation[] | undefined {
   return violation ? [violation] : undefined
 }
 
-function violationOf(document: unknown, blocked: unknown, directive: unknown, disposition: unknown, file: unknown, line: unknown, column: unknown, sample: unknown): CspViolation | undefined {
+function violationOf(document: unknown, blocked: unknown, directive: unknown, disposition: unknown, file: unknown, line: unknown, column: unknown, sample: unknown): CspViolationError | undefined {
   if (typeof document !== 'string' || typeof directive !== 'string' || directive === '')
     return undefined
 
   const source = typeof file === 'string' && file !== '' ? [file.replace(QUERY_OR_HASH, ''), line, column].filter(part => typeof part === 'number' || typeof part === 'string').join(':') : undefined
 
-  return new CspViolation(
+  return new CspViolationError(
     clean(directiveName(directive)),
     typeof blocked === 'string' && blocked !== '' ? clean(blocked.replace(QUERY_OR_HASH, '')) : 'inline',
     clean(document.replace(QUERY_OR_HASH, '')),

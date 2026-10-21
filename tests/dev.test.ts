@@ -11,9 +11,9 @@ import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
 import { loadConfig } from '../src/config'
-import { ConfigRefused, dev, networkAddress, watchProject } from '../src/dev'
+import { ConfigRefusedError, dev, networkAddress, watchProject } from '../src/dev'
 import { startClientBuilder } from '../src/dev/client'
-import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
+import { InspectorAddressInUseError, inspectorProxy } from '../src/dev/inspector'
 import { TypesProcess } from '../src/dev/types-process'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
@@ -574,7 +574,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
 
     try {
-      await expect(dev(root, { refuseConfig: true, onRestart: child => children.push(child) })).rejects.toBeInstanceOf(ConfigRefused)
+      await expect(dev(root, { refuseConfig: true, onRestart: child => children.push(child) })).rejects.toBeInstanceOf(ConfigRefusedError)
       // No server started to print the same error again.
       expect(children).toHaveLength(0)
 
@@ -645,7 +645,7 @@ describe.concurrent('kay dev', () => {
 
       try {
         await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
-        await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
+        await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefusedError)
         expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
         expect(childrenRunning(real, 'preload.ts')).toHaveLength(0)
         expect(written.filter(text => text.includes('config broke'))).toEqual([])
@@ -1775,7 +1775,7 @@ describe.concurrent('kay dev', () => {
     const held = Bun.listen({ hostname, port: 0, socket: { data: () => undefined } })
 
     try {
-      expect(() => inspectorProxy(`ws://localhost:${held.port}/kay`, () => undefined)).toThrow(InspectorAddressInUse)
+      expect(() => inspectorProxy(`ws://localhost:${held.port}/kay`, () => undefined)).toThrow(InspectorAddressInUseError)
     }
     finally {
       held.stop(true)
@@ -1798,7 +1798,7 @@ describe.concurrent('kay dev', () => {
     }) as typeof Bun.listen)
 
     try {
-      expect(() => inspectorProxy(`ws://localhost:${port}/kay`, () => undefined)).toThrow(InspectorAddressInUse)
+      expect(() => inspectorProxy(`ws://localhost:${port}/kay`, () => undefined)).toThrow(InspectorAddressInUseError)
     }
     finally {
       probed.mockRestore()

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
-import { action, ActionRedirect, encodeCall, SETTLED } from '../src/runtime/action'
+import { action, ActionRedirectError, encodeCall, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
 
@@ -231,8 +231,8 @@ describe('an action returning an async iterable', () => {
       thrown = error
     }
 
-    expect(thrown).toBeInstanceOf(ActionRedirect)
-    expect((thrown as ActionRedirect).location).toBe('/done')
+    expect(thrown).toBeInstanceOf(ActionRedirectError)
+    expect((thrown as ActionRedirectError).location).toBe('/done')
   })
 
   it('stops the iterable once the client goes away', async () => {

@@ -10,6 +10,9 @@ const RENAMED: { module: string, from: string, to: string }[] = [
   { module: '@kaynooo/kayjs-cms', from: 'SaveConflict', to: 'SaveConflictError' },
   { module: '@kaynooo/kayjs-mail', from: 'MailNotConfigured', to: 'MailNotConfiguredError' },
   { module: 'kay/dom', from: 'HydrationMismatch', to: 'HydrationMismatchError' },
+  { module: 'kay', from: 'ActionRedirect', to: 'ActionRedirectError' },
+  { module: 'kay/server', from: 'CspViolation', to: 'CspViolationError' },
+  { module: 'kay/library', from: 'RedirectRefused', to: 'RedirectRefusedError' },
 ]
 
 const SOURCE_FILE = /\.(?:kay|[cm]?tsx?)$/

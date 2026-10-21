@@ -229,7 +229,7 @@ export interface SecurityConfig {
   csp?: Record<string, string[] | false> | false | undefined
   // Directives merged over the enforced policy and sent as `Content-Security-Policy-Report-Only`, to see what a stricter policy would block before enforcing it.
   reportOnly?: Record<string, string[] | false> | undefined
-  // Where browsers report what either policy blocks: `true` for kay's own route, which logs each violation and hands it to `onError` as a `CspViolation`, or a collector's URL.
+  // Where browsers report what either policy blocks: `true` for kay's own route, which logs each violation and hands it to `onError` as a `CspViolationError`, or a collector's URL.
   reports?: true | string | undefined
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false> | undefined

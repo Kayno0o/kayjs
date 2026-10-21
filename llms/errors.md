@@ -10,7 +10,7 @@
 - The codes are stable names, one for a group of messages with one cause.
 - No level applies to them, and no `// kay-allow` comment reaches them.
 - Errors kay raises while serving a request, and the app's own code, carry none.
-- Kay's error classes are taking the `Error` suffix a library's have: `HydrationMismatchError` of `kay/dom` first (its `name` too), whose old name `HydrationMismatch` stays a `@deprecated` alias three minors, and `kay upgrade` renames it.
+- Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too); the old names stay `@deprecated` aliases three minors, and `kay upgrade` renames them.
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |

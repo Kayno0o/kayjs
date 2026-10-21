@@ -319,13 +319,18 @@ export class ActionError<Data = unknown> extends Error {
 }
 
 // Thrown by a call whose action redirected, where there is no browser to send: a test, a script.
-export class ActionRedirect extends ActionError {
-  override name = 'ActionRedirect'
+export class ActionRedirectError extends ActionError {
+  override name = 'ActionRedirectError'
 
   constructor(status: number, readonly location: string) {
     super(status, `Redirected to ${location}`, {}, undefined, `Action redirected with ${status} to ${location}`)
   }
 }
+
+/** @deprecated Renamed `ActionRedirectError` in 1.70; the old name goes in 1.73. */
+export const ActionRedirect = ActionRedirectError
+/** @deprecated Renamed `ActionRedirectError` in 1.70; the old name goes in 1.73. */
+export type ActionRedirect = ActionRedirectError
 
 export function failure<Data>(status: number, data: Data): Failure<Data> {
   // A call reads a success status as the handler's result, so a failure must not carry one.
@@ -707,14 +712,14 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     }
     catch (error) {
       // A redirect leaves the page as it is until the next one shows.
-      if (!posted && !(error instanceof ActionRedirect))
+      if (!posted && !(error instanceof ActionRedirectError))
         undo?.()
 
       // The server may have run a call aborted once it was sent, which the page then shows as it stands.
       if (sent && options?.signal?.aborted === true)
         refreshPage()
 
-      if (error instanceof ActionError && !(error instanceof ActionRedirect))
+      if (error instanceof ActionError && !(error instanceof ActionRedirectError))
         called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
 
       throw error
@@ -842,7 +847,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
       return { ok: true, data }
     }
     catch (error) {
-      if (!(error instanceof ActionError) || error instanceof ActionRedirect || refusedAt.get(error) !== url())
+      if (!(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url())
         throw error
 
       return { ok: false, status: error.status, errors: error.errors, data: error.data }
@@ -963,20 +968,20 @@ export async function readActionResponse<Output>(response: Response, action: str
 
   if (target !== null) {
     if (typeof window === 'undefined')
-      throw new ActionRedirect(response.status, target)
+      throw new ActionRedirectError(response.status, target)
 
     // Only a page goes there: a `javascript:` target would run in this one.
     if (!HTTP_PROTOCOLS.has(new URL(target, window.location.href).protocol))
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     if (left?.() === true)
-      throw new ActionRedirect(response.status, target)
+      throw new ActionRedirectError(response.status, target)
 
     // The page goes away, so whatever awaited the call never resumes; a leave guard keeping the visitor here settles it instead.
     if (await goTo(target))
       return new Promise<never>(() => undefined)
 
-    throw new ActionRedirect(response.status, target)
+    throw new ActionRedirectError(response.status, target)
   }
 
   // Loaded only once an action streams, so a page calling none does not carry it.

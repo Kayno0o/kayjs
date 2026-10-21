@@ -1,5 +1,5 @@
 import type { MissingPath, RuntimeRedirect } from 'kay/library'
-import { addRuntimeRedirect, clearMissing, configuredRedirects, dismissMissing, RedirectRefused, removeRuntimeRedirect, runtimeRedirects, sitePaths, unansweredPaths } from 'kay/library'
+import { addRuntimeRedirect, clearMissing, configuredRedirects, dismissMissing, RedirectRefusedError, removeRuntimeRedirect, runtimeRedirects, sitePaths, unansweredPaths } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -125,7 +125,7 @@ export function addRedirect(from: string, to: string, status: RedirectStatus = 3
     return undefined
   }
   catch (error) {
-    if (error instanceof RedirectRefused)
+    if (error instanceof RedirectRefusedError)
       return error.message
 
     log.warn(`the redirect from ${from} was not added`, error)

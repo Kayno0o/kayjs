@@ -44,12 +44,12 @@ export interface DevOptions {
   // Leaves out the line per restart and stylesheet swap, and the keys' hint: the ready line, the addresses, a restart moving the address and the errors stay.
   quiet?: boolean | undefined
   onQuit?: (() => void) | undefined
-  // Stops the start with `ConfigRefused` when kay.config.ts does not load, as the process writing the first types finds out, rather than going on with the defaults as it does after an edit.
+  // Stops the start with `ConfigRefusedError` when kay.config.ts does not load, as the process writing the first types finds out, rather than going on with the defaults as it does after an edit.
   refuseConfig?: boolean | undefined
 }
 
 // kay.config.ts does not load; the process that found out has printed why.
-export class ConfigRefused extends Error {}
+export class ConfigRefusedError extends Error {}
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
 const DEBOUNCE_MS = 10
@@ -906,7 +906,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   if (configRefused) {
     await stop()
 
-    throw new ConfigRefused()
+    throw new ConfigRefusedError()
   }
 
   return stop

@@ -24,7 +24,7 @@ const SOCKET_PATH_MAX = 103
 const MAX_PAYLOAD = 2 ** 31 - 1
 
 // A second `kay dev` asking for the address the first listens on.
-export class InspectorAddressInUse extends Error {}
+export class InspectorAddressInUseError extends Error {}
 
 interface Link {
   upstream?: WebSocket | undefined
@@ -51,14 +51,14 @@ export function inspectorProxy(address: string, current: () => string | undefine
   let server: Server<Link>
 
   if (url.hostname === 'localhost' && loopbackTaken(Number(url.port)))
-    throw new InspectorAddressInUse(inUse)
+    throw new InspectorAddressInUseError(inUse)
 
   try {
     server = serve(url, current, pagePort, releaseMs)
   }
   catch (error) {
     if ((error as { code?: unknown }).code === 'EADDRINUSE')
-      throw new InspectorAddressInUse(inUse, { cause: error })
+      throw new InspectorAddressInUseError(inUse, { cause: error })
 
     throw error
   }
