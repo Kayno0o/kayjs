@@ -23,3 +23,16 @@ test('the day an entry was last edited is written once the browser says its zone
   expect(time.textContent).toMatch(/2026/u)
   expect(time.textContent).not.toBe('2026-10-20')
 })
+
+test('the sentence form names the day and who edited, and the day alone without an author', async () => {
+  const at = Date.UTC(2026, 9, 20, 12)
+
+  mounted = await mountComponent('../../src/components/entry-edited.kay', { at, sentence: true, author: 'Ada' })
+  await settle()
+  expect(mounted.root.querySelector('time')!.textContent).toMatch(/^Last edited .*2026.* by Ada$/u)
+  mounted.unmount()
+
+  mounted = await mountComponent('../../src/components/entry-edited.kay', { at, sentence: true })
+  await settle()
+  expect(mounted.root.querySelector('time')!.textContent).toMatch(/^Last edited .*2026.*(?<! by Ada)$/u)
+})

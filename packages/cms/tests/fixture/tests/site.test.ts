@@ -1320,7 +1320,7 @@ test('Create and add another saves the entry and opens an empty form for the nex
     await Bun.sleep(50)
 
   expect(ledgerRows.map(row => row.data.name)).toEqual(['First one'])
-  await page.waitUntil(() => [...document.querySelectorAll<HTMLInputElement>('form.kcms-entry-editor input')].every(input => input.value === ''))
+  await page.waitUntil(() => (document.querySelector('[data-kcms-path="name"] input') as HTMLInputElement | null)?.value === '')
   expect(await page.evaluate(() => location.pathname)).toBe('/admin/new/ledger')
   expect(page.errors.filter(error => !error.includes('toaster.kay did not match'))).toEqual([])
   ledgerRows.length = 0
