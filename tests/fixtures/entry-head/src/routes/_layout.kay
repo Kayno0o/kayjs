@@ -1,0 +1,4 @@
+head
+  title Layout title
+  meta(name="description" content="Layout description")
+slot

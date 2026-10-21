@@ -1,0 +1,11 @@
+--- server
+import { notes } from '../../content.config'
+
+export const page = { prerender: notes }
+
+const note = await notes.get(ctx.params.slug) ?? ctx.notFound()
+---
+head
+  title Mine
+  meta(property="og:type" content="website")
+h1 {note.slug}

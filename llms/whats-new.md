@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The dev tool's bar publishes its measured room as `--kay-dev-bar-bottom-left` or `-right` for a bottom corner (see [the dev tool](dev-tool.md)), and kayjs-cms's collapsed editor button is a panel the bar keeps off.
+- A page showing one content entry (`prerender` or `sitemap` of a collection on a one-param route) takes the entry's `title`, `description` and date for its head, with `og:type` `article`; its own `head` tags win ([A page per entry](head.md#site-defaults-and-social-cards)).
 - `testSite()` keeps a test's content saves out of the project's `src/content` (a folder collection is copied under `.kay/scratch` when a save reaches it), and `site.content.reset()`, `seed()` and `write()` start a test from fixtures, loaded collections included ([Reset or seed content](testing.md#reset-or-seed-content)).
 - A collection's `unpublishAt: 'endsAt'` takes an entry down at a set time, beside `publishAt`: it leaves `all()`, `get()`, the sitemap and the feed, the pages that read it render again and the URL answers what the page's code chose; kayjs-cms shows `Ends` or `Ended` on the entry screen and clears the date ([Drafts](content.md#drafts)).
 - The kayjs-cms on-page editor names, above an entry's form, the fields the page cannot let it click (a transformed value, an island's props, a frozen object), from the new `unclickable` of `EditorProps` ([Edit mode](content-edit.md#the-editor)).

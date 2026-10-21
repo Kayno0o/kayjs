@@ -4,7 +4,7 @@ import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
 import type { EntryRef } from '../runtime/fields'
-import type { HeadOptions, RenderedHead } from '../runtime/head'
+import type { HeadOptions, HeadTag, RenderedHead } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
@@ -25,7 +25,7 @@ import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, entriesInPageOrder, placeFieldMarks, unclickableFields, withFieldMarks } from '../runtime/fields'
-import { collectHead } from '../runtime/head'
+import { collectHead, head as setHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
@@ -43,6 +43,7 @@ import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT } from './dev'
 import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
+import { entryHeadOf } from './entry-head'
 import { FLASH_COOKIE, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
@@ -108,6 +109,8 @@ interface LoadedRoute {
   timings: number[] | undefined
   // How long the guards, the imports of the chain's modules and all its loads took, timed along with `timings`.
   phases: ServerPhases | undefined
+  // The tags the entry the page shows gives its head, under the page's own.
+  head?: HeadTag[] | undefined
 }
 
 interface ServerPhases {
@@ -247,7 +250,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
   try {
     const started = performance.now()
-    const body = traced(() => `kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
+    const body = traced(() => `kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options, page.head))
 
     timed(page, rendering, started, options)
 
@@ -426,7 +429,7 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const loading = runLoads(files, modules, rendering.ctx, loaded, timings)
     const data = loading instanceof Promise ? await loading : loading
 
-    return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined }
+    return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
@@ -927,17 +930,24 @@ export function withEditor(page: { editorOwn?: true | undefined }, options: Rend
 }
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
-function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | Pieced | ReadableStream<Uint8Array> {
+function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, entry?: HeadTag[]): string | Pieced | ReadableStream<Uint8Array> {
   const rules = queryRules(chainQuery(files, modules))
 
   // A page a persisted signal's cookie shaped is told apart by it in any cache.
-  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options, rules), () => rendering.headers.append('vary', 'cookie'), rules)
+  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
 }
 
 // The page inside its layouts, each through `component`, so what a layout provides reaches its page.
-function viewOf(modules: PageModule[], data: Record<string, unknown>[]): () => unknown {
+function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: HeadTag[]): () => unknown {
   const page = modules.length - 1
-  let view = () => component(modules[page]!.default, data[page]!)
+
+  // Set after its layouts' heads and before its own, which each replace what the entry gave.
+  let view = () => {
+    if (entry !== undefined)
+      setHead(entry)
+
+    return component(modules[page]!.default, data[page]!)
+  }
 
   for (let index = page - 1; index >= 0; index--) {
     const inner = view
@@ -957,8 +967,8 @@ function noted(request: Request, entries: EntryRef[]): EntryRef[] {
   return entries
 }
 
-function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | Pieced | ReadableStream<Uint8Array> {
-  const view = viewOf(modules, data)
+function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined, entry?: HeadTag[]): string | Pieced | ReadableStream<Uint8Array> {
+  const view = viewOf(modules, data, entry)
   const chunks = islandChunks(client)
   // A prerendered page holds each server island between marks the server splits it at.
   const scan = options.prerendering ? newServerIslands(true) : undefined

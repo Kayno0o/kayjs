@@ -188,7 +188,8 @@ export default defineConfig({
 - `og:title`, `og:description` and `og:url` repeat the page's own title (unwrapped), description and canonical link unless it sets them.
 - `twitter:card` is `summary_large_image` once there is an `og:image`.
 - A canonical link or an `og:image` and `twitter:image` written as a path, `/og.png` or an imported asset's URL, is made absolute against `site`.
-- `og:type` is `website`.
+- `og:type` is `website`, `article` on a page showing one dated content entry (see below).
+- A page that `prerender`s or lists in the `sitemap` a collection by one param takes that entry's `title`, `description` and date for its head: `title`, `meta description`, and, from `publishAt`'s field or else `date`, `publishedAt` or `published`, `og:type` `article` and `article:published_time`. The page's own `head` tags and a missing field leave the layout's.
 - `seo.themeColor` sets every page's `theme-color`: `'#1e1e2e'` for one, `{ light: '#ffffff', dark: '#111111' }` for one meta per colour scheme (`media="(prefers-color-scheme: light)"`, then dark). It defaults to `manifest.themeColor`, which the manifest keeps for the installed app; a page's own `theme-color` meta replaces the site's of the same `media`.
 - An `og:image` written as the path of a public file, an imported image or a `shareImage()` or `shareCard()` card gets `og:image:width` and `og:image:height`, read from the file, so a network draws the card without fetching the image first.
 - `imageAlt` gives `og:image:alt` beside `seo.image`, and `twitter:image:alt` repeats whatever `og:image:alt` is.

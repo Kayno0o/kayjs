@@ -258,7 +258,7 @@ article
 
 #### Pages from a collection
 
-- `export const page = { prerender: posts }` in a page with one param prerenders a page per entry, its slug as the param; `sitemap` takes a collection the same way.
+- `export const page = { prerender: posts }` in a page with one param prerenders a page per entry, its slug as the param; `sitemap` takes a collection the same way. That page's head takes the entry's `title`, `description` and date unless the page sets them ([Head](head.md)).
 - A slug with a slash needs a catch-all page, `[...slug].kay`.
 
 #### Pagination

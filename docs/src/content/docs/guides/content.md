@@ -125,6 +125,8 @@ article
   Content
 ```
 
+The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`) makes `og:type` an `article` with an `article:published_time`. Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
+
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
 
 An entry can set its own slug with a `slug` field in its frontmatter, so a translated post gets a URL in its own language. It is a path of non-empty parts, with no `.` or `..` part, backslash, `?` or `#`, and two entries may not share one. In a localized collection the slug stays under the locale's folder, and `translations` pairs entries by equal slugs.

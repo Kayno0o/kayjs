@@ -1,0 +1,8 @@
+--- server
+import { events } from '../../content.config'
+
+export const page = { prerender: events }
+
+const event = await events.get(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {event.data.name}

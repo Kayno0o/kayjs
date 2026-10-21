@@ -1,0 +1,8 @@
+--- server
+import { deep } from '../../content.config'
+
+export const page = { sitemap: deep }
+
+const note = await deep.get(ctx.params.path) ?? ctx.notFound()
+---
+h1 {note.slug}
