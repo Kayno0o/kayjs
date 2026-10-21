@@ -49,6 +49,24 @@ const kept = () => Object.keys(localStorage).filter(key => key.startsWith('kcms:
 const stop = (root: ParentNode) => [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Stop editing')!
 const labels = (root: ParentNode) => [...root.querySelectorAll('button')].map(button => button.textContent?.trim())
 
+test('the page editor\'s Save is there from the start, disabled with nothing to save, and ready once a field is edited', async () => {
+  server()
+  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  await settle()
+  await Bun.sleep(50)
+
+  const save = () => [...mounted!.root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Save')!
+
+  expect(save().disabled).toBe(true)
+
+  const title = mounted.root.querySelector<HTMLInputElement>('input')!
+
+  title.value = 'Mine'
+  title.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(save().disabled).toBe(false)
+})
+
 test('Stop editing with nothing unsaved leaves at once', async () => {
   const fetched = server()
 
