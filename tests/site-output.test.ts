@@ -5,7 +5,6 @@ import { describe, expect, it } from 'bun:test'
 import { readManifest } from '../src/server/client'
 import { publicCacheRules } from '../src/server/public'
 import { scratchBuild } from './prerendered'
-
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 

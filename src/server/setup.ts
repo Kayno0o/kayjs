@@ -124,7 +124,8 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
 
   setMarkdownDefaults(config.markdown)
 
-  // Started once what refuses a config is done, so a refused one builds nothing; awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
+  // Started once the config's early refusals (images, markdown, i18n locales, matchers, base, preview) are behind; a refusal raised later, by the app or the head, still comes after it.
+  // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
   const loadingClient = loadClient()
 
   void Promise.allSettled([loadingClient])
