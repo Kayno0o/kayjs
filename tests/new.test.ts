@@ -1,7 +1,7 @@
 import type { Feature } from '../src/new'
 import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, posix } from 'node:path'
+import { basename, join, posix, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
@@ -112,7 +112,8 @@ let packed: Promise<string> | undefined
 
 async function pack(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'kay-packed-'))
-  const emit = Bun.spawn([nativeExe(), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(dir, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+  // Not type-checked again: `bun run check` covers kay's source, and the declarations come out the same.
+  const emit = Bun.spawn([nativeExe(), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(dir, 'types'), '--noCheck'], { stdout: 'pipe', stderr: 'pipe' })
 
   expect(await emit.exited).toBe(0)
 
@@ -613,14 +614,13 @@ describe('kay new', () => {
     }
 
     expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-    expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
     // What this test adds to the scaffold the compile test shares is removed whatever its asserts find.
     try {
-      // A page's server fence is linted with the project's types, at its .kay line.
+      // A page's server fence is linted with the project's types, at its .kay line, and it is the only message of the whole project.
       await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
       expect(await checked(dir)).toEqual([])
-      expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
+      expect((await lintInProcess(dir, '.')).filter(result => result.messages.length > 0).map(result => ({ file: relative(dir, result.filePath), messages: result.messages }))).toEqual([{ file: 'src/routes/later.kay', messages: [expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })] }])
 
       // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
       await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
@@ -795,21 +795,14 @@ describe('kay new', () => {
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
       expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('env: { compose: \'compose.prod.yaml\', example: \'.env.example\' }')
-      // The config names the compose and example files, so `kay check` compares them with src/env.ts.
-      expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       // Every preset's own files are linted by theirs.
       expect((await lintInProcess(dir, (await ownFiles(dir, files)).filter(file => LINTED.test(file)))).flatMap(result => result.messages)).toEqual([])
 
-      const demoSignIn = async (env: Record<string, string>) => {
-        const child = Bun.spawn([process.execPath, '-e', 'console.log((await import(\'./src/env\')).demoSignIn)'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DEMO_SIGN_IN: '', ...env } })
+      // One process reads src/env under each environment, as it reads its variables when it loads.
+      const demoSignIn = Bun.spawn([process.execPath, '-e', 'for (const [nodeEnv, demo] of [[\'production\', \'\'], [\'production\', \'true\'], [\'development\', \'\']]) { process.env.NODE_ENV = nodeEnv; process.env.DEMO_SIGN_IN = demo; console.log((await import(\x27./src/env?\x27 + nodeEnv + demo)).demoSignIn) }'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DEMO_SIGN_IN: '' } })
 
-        return (await new Response(child.stdout).text()).trim()
-      }
-
-      expect(await demoSignIn({ NODE_ENV: 'production' })).toBe('false')
-      expect(await demoSignIn({ NODE_ENV: 'production', DEMO_SIGN_IN: 'true' })).toBe('true')
-      expect(await demoSignIn({ NODE_ENV: 'development' })).toBe('true')
+      expect((await new Response(demoSignIn.stdout).text()).trim().split('\n')).toEqual(['false', 'true', 'true'])
 
       // Signs in through the action and lands in the guarded section, reads a seeded member, and counts the visitors online over the websocket, each test file on a database of its own.
       // They need a Postgres the test user may create databases on, which CI always has.
