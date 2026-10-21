@@ -92,7 +92,7 @@ describe('deprecated-signal-prop', () => {
     })
 
     expect(result.fixed).toBe(2)
-    expect(await result.text('src/components/Total.kay')).toBe('---\n\nconst { total } = props<{ total: number }>()\n---\np {total * 2}\n')
+    expect(await result.text('src/components/Total.kay')).toBe('---\nconst { total } = props<{ total: number }>()\n---\np {total * 2}\n')
     expect(await result.text('src/routes/index.kay')).toContain('Total(total={doubled()})')
   })
 
@@ -160,6 +160,69 @@ describe('deprecated-signal-prop', () => {
 
     expect(result.reports).toEqual([])
     expect(await result.text('node_modules/lib/Toggle.kay')).toBe(TOGGLE)
+  })
+
+  it('survives a Signal with no type argument, which it leaves alone', async () => {
+    const result = await migrate({ 'src/components/Toggle.kay': TOGGLE.replace('Signal<boolean>', 'Signal'), 'src/routes/index.kay': PAGE })
+
+    expect(result.fixed).toBe(0)
+    expect(result.reports.map(report => report.note)).toEqual(['not fixed: its type has no type argument'])
+  })
+
+  it('follows a component imported in a server fence, and leaves a prop whose tag it cannot follow', async () => {
+    const server = await migrate({ 'src/components/Toggle.kay': TOGGLE, 'src/routes/index.kay': '--- server\nimport { signal } from \'kay\'\nimport Toggle from \'../components/Toggle.kay\'\n\nconst open = signal(false)\n---\nToggle(open={open})\n' })
+
+    expect(server.fixed).toBe(2)
+    expect(await server.text('src/routes/index.kay')).toContain('Toggle(bind:open={open})')
+
+    const barrel = await migrate({
+      'src/components/Toggle.kay': TOGGLE,
+      'src/components/index.ts': 'export { default as Toggle } from \'./Toggle.kay\'\n',
+      'src/routes/index.kay': '---\nimport { signal } from \'kay\'\nimport { Toggle } from \'../components\'\n\nconst open = signal(false)\n---\nToggle(open={open})\n',
+    })
+
+    expect(barrel.fixed).toBe(0)
+    expect(barrel.reports.map(report => report.note).join('\n')).toContain('kay cannot tell from a component it rewrites')
+  })
+
+  it('leaves a prop it hands to a component taking an optional Signal, and the tags passing it', async () => {
+    const inner = '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open?: Signal<boolean> | undefined }>()\n---\nspan {open?.()}\n'
+    const outer = '---\nimport type { Signal } from \'kay\'\nimport Inner from \'./Inner.kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nInner(open={open})\n'
+    const result = await migrate({ 'src/components/Inner.kay': inner, 'src/components/Outer.kay': outer, 'src/routes/index.kay': PAGE.replace(/Toggle/g, 'Outer') })
+
+    expect(result.fixed).toBe(0)
+    expect(await result.text('src/components/Outer.kay')).toBe(outer)
+  })
+
+  it('migrates a prop handed to a child that is already Bindable with bind:', async () => {
+    const middle = '---\nimport type { Signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nToggle(bind:open={open})\n'
+    const bindable = '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) go\n'
+    const result = await migrate({ 'src/components/Toggle.kay': bindable, 'src/components/Middle.kay': middle, 'src/routes/index.kay': PAGE.replace(/Toggle/g, 'Middle') })
+
+    expect(await result.text('src/components/Middle.kay')).toContain('props<{ open: Bindable<boolean> }>()')
+    expect(result.after).toEqual([])
+  })
+
+  it('swaps an aliased Signal import for Bindable beside the names it keeps', async () => {
+    const child = '---\nimport { type Signal as Sig, signal } from \'kay\'\n\nconst { open } = props<{ open: Sig<boolean> }>()\nconst n = signal(0)\n---\nbutton(onClick={() => { open = !open(); n++ }}) {n()}\n'
+    const result = await migrate({ 'src/components/Toggle.kay': child, 'src/routes/index.kay': PAGE })
+
+    expect(await result.text('src/components/Toggle.kay')).toContain('import { signal, type Bindable } from \'kay\'')
+    expect(result.after).toEqual([])
+  })
+
+  it('fixes the tags too when `--fix` is narrowed to the component\'s file', async () => {
+    const root = await project({ 'src/components/Toggle.kay': TOGGLE, 'src/routes/index.kay': PAGE })
+
+    try {
+      await kayCheck([root, join(root, 'src/components/Toggle.kay'), '--fix', '--since', '1.70'])
+
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('Toggle(bind:open={open})')
+      expect(await Bun.file(join(root, 'src/components/Toggle.kay')).text()).toContain('Bindable<boolean>')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('is silent when the lint is allowed', async () => {

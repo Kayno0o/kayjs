@@ -9,9 +9,10 @@ import { elementsIn } from '../compiler/ast'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
-import { analyzeScript } from '../compiler/script'
+import { analyzeScript, analyzeServer } from '../compiler/script'
 
 const CODE = 'deprecated-signal-prop'
+const FENCE_OR_BLANK = /(?:^|\n)(?:---[^\n]*)?\n$/
 const CALL_PARENS = /^\s*\(\s*\)$/
 const PATH = /^[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*$/i
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
@@ -57,29 +58,33 @@ export async function deprecatedSignalProps(root: string, options: CheckOptions)
     if (!source.includes('props') || !(source.includes('Signal') || source.includes('Memo')))
       continue
 
-    const found = signalPropsOf(path, source, root)
+    const own = signalPropsOf(path, source, root)
 
-    if (found.length > 0)
-      props.set(realPath(path), found)
+    if (own.length > 0)
+      props.set(realPath(path), own)
   }
 
   if (props.size === 0)
     return []
 
-  const sites = [...sources].flatMap(([path, source]) => sitesOf(path, source, props))
+  const found = [...sources].map(([path, source]) => sitesOf(path, source, props))
+  const sites = found.flatMap(entry => entry.sites)
+
+  for (const { prop, reason } of found.flatMap(entry => entry.leaks))
+    prop.blocked ??= reason
 
   settle(sites, root)
 
   const severity = level === 'warn' ? 'warning' : 'error'
-  const found: CheckDiagnostic[] = []
+  const reports: CheckDiagnostic[] = []
 
   for (const list of props.values())
-    found.push(...childReports(list, severity))
+    reports.push(...childReports(list, severity))
 
   for (const site of sites)
-    found.push(...siteReport(site, severity))
+    reports.push(...siteReport(site, severity))
 
-  return found
+  return reports
 }
 
 function signalPropsOf(path: string, source: string, root: string): Prop[] {
@@ -102,27 +107,49 @@ function signalPropsOf(path: string, source: string, root: string): Prop[] {
   })
 }
 
-// Every tag in a file that passes one of the props, resolved through the file's default imports.
-function sitesOf(path: string, source: string, props: Map<string, Prop[]>): Site[] {
+// Every tag in a file that passes one of the props, resolved through the file's default imports, and the props of the file it hands to a component this migration does not rewrite.
+function sitesOf(path: string, source: string, props: Map<string, Prop[]>): { sites: Site[], leaks: { prop: Prop, reason: string }[] } {
   const file = parseKay(source)
   const components = new Map<string, Prop[]>()
+  const known = new Set<string>()
+  const imports = [...analyzeScript(source, file.script).imports, ...analyzeServer(source, file.server)?.imports ?? []]
 
-  for (const binding of analyzeScript(source, file.script).imports) {
+  for (const binding of imports) {
     const resolved = binding.imported === 'default' ? resolveFrom(binding.source, path) : undefined
     const target = resolved === undefined ? undefined : props.get(realPath(resolved))
+
+    if (resolved !== undefined && KAY_FILE.test(resolved))
+      known.add(binding.local)
 
     if (target)
       components.set(binding.local, target)
   }
 
   const own = props.get(realPath(path)) ?? []
+  const everyProp = [...props.values()].flat()
   const sites: Site[] = []
+  const leaks: { prop: Prop, reason: string }[] = []
+  const handled = new Set<Attribute>()
+  const named = (element: ElementNode, key: string) => element.attributes.find((candidate): candidate is Exclude<Attribute, { kind: 'spread' }> => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === key)
 
   for (const element of elementsIn(file.template)) {
-    const target = element.component ? components.get(element.name) : undefined
+    if (!element.component)
+      continue
+
+    const target = components.get(element.name)
+
+    // A tag the pass cannot follow, a named or namespace import or a member tag, may be any component: a prop it is given by a name this migration rewrites stays as it is.
+    if (!target && !known.has(element.name)) {
+      for (const prop of everyProp) {
+        const attribute = named(element, prop.key)
+
+        if (attribute)
+          sites.push({ file: path, source, element, prop, at: attribute.name, blocked: `passes \`${prop.key}\` to \`${element.name}\`, which kay cannot tell from a component it rewrites` })
+      }
+    }
 
     for (const prop of target ?? []) {
-      const attribute = element.attributes.find((candidate): candidate is Exclude<Attribute, { kind: 'spread' }> => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === prop.key)
+      const attribute = named(element, prop.key)
       const site: Site = { file: path, source, element, prop, at: attribute?.name ?? element.tag }
 
       if (attribute === undefined) {
@@ -135,6 +162,7 @@ function sitesOf(path: string, source: string, props: Map<string, Prop[]>): Site
         const text = source.slice(attribute.expression.start, attribute.expression.end).trim()
 
         site.attribute = attribute
+        handled.add(attribute)
 
         if (!PATH.test(text))
           site.blocked = `hands \`${element.name}\` \`${prop.key}\` as \`${text}\`, which is no name or property path`
@@ -147,9 +175,20 @@ function sitesOf(path: string, source: string, props: Map<string, Prop[]>): Site
 
       sites.push(site)
     }
+
+    for (const attribute of element.attributes) {
+      if (attribute.kind !== 'expression' || handled.has(attribute) || source.startsWith('bind:', attribute.name.start))
+        continue
+
+      const text = source.slice(attribute.expression.start, attribute.expression.end).trim()
+      const prop = own.find(candidate => candidate.local === text)
+
+      if (prop)
+        leaks.push({ prop, reason: `it is handed to \`${element.name}\` as \`${source.slice(attribute.name.start, attribute.name.end)}\`, which this migration does not rewrite` })
+    }
   }
 
-  return sites
+  return { sites, leaks }
 }
 
 // A prop with a tag that cannot be rewritten stays as it is, and so does a prop of a component that hands it on to a prop that stays.
@@ -181,6 +220,12 @@ function bindableLocal(imports: ImportBinding[]): string {
   return imports.find(binding => binding.source === SIGNAL_MODULE && binding.imported === BINDABLE)?.local ?? BINDABLE
 }
 
+function helpFor(prop: Prop): string {
+  const argument = prop.argument === undefined ? 'T' : prop.source.slice(prop.argument.start, prop.argument.end)
+
+  return prop.kind === 'memo' ? `type it as the value, \`${prop.key}: ${argument}\`, read as \`${prop.key}\`; a parent passes \`${prop.key}={memo()}\`` : `type it \`Bindable<${argument}>\`, read as \`${prop.key}\`; a parent passes \`bind:${prop.key}={signal}\``
+}
+
 function childReports(list: Prop[], severity: 'warning' | 'error'): CheckDiagnostic[] {
   const free = list.filter(prop => prop.blocked === undefined)
   const edits = free.length === 0 ? [] : childEdits(free)
@@ -199,7 +244,7 @@ function childReports(list: Prop[], severity: 'warning' | 'error'): CheckDiagnos
       ...positionAt(source, prop.type.start),
       end: prop.type.end,
       message: `The prop \`${prop.key}\` is typed \`${type}\`, a form kay 1.70 replaces`,
-      help: memo ? `type it as the value, \`${prop.key}: ${source.slice(prop.argument!.start, prop.argument!.end)}\`, read as \`${prop.key}\`; a parent passes \`${prop.key}={memo()}\`` : `type it \`Bindable<${source.slice(prop.argument!.start, prop.argument!.end)}>\`, read as \`${prop.key}\`; a parent passes \`bind:${prop.key}={signal}\``,
+      help: helpFor(prop),
       ...prop.blocked === undefined ? {} : { note: reasonOf(prop) },
       code: CODE,
       severity,
@@ -273,9 +318,13 @@ function importEdits(source: string, imports: ImportBinding[], free: Prop[], bin
     }
 
     if (texts.length === 0) {
-      const newline = source[declaration.end] === '\n' ? 1 : 0
+      let end = declaration.end + (source[declaration.end] === '\n' ? 1 : 0)
 
-      edits.push({ start: declaration.start, end: declaration.end + newline, text: '' })
+      // The blank line it stood before goes too when it stood first or after another.
+      if (source[end] === '\n' && FENCE_OR_BLANK.test(source.slice(0, declaration.start)))
+        end++
+
+      edits.push({ start: declaration.start, end, text: '' })
     }
     else {
       edits.push({ start: ordered[0]!.span.start, end: ordered.at(-1)!.span.end, text: texts.join(', ') })

@@ -234,8 +234,13 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
 async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
-  const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
-  let diagnostics = await checkScope()
+  let everything = await checkTypes(root, options)
+  const checkScope = async () => {
+    everything = await checkTypes(root, options)
+
+    return everything.filter(diagnostic => inScope(diagnostic, scope))
+  }
+  let diagnostics = everything.filter(diagnostic => inScope(diagnostic, scope))
 
   // A path filter only narrows what is reported, but a run asked for one is not the whole check the entries of deleted components can be judged against.
   if (scope.length === 0)
@@ -243,7 +248,10 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
   // `since` narrows what is fixed and reported to the deprecations of one minor, which `kay upgrade` applies in order.
   const inMinor = (diagnostic: CheckDiagnostic) => isLint(diagnostic.code) && (LINTS[diagnostic.code] as Lint).since === since
-  const fixed = fix ? await applySafeFixes(root, since === undefined ? diagnostics : diagnostics.filter(inMinor)) : 0
+  // A prop's type, its reads and the tags passing it are fixed together, so a run narrowed to one file fixes the others of that migration too.
+  const migration = (diagnostic: CheckDiagnostic) => diagnostic.code === 'deprecated-signal-prop'
+  const fixable = diagnostics.some(migration) ? [...diagnostics, ...everything.filter(diagnostic => migration(diagnostic) && !diagnostics.includes(diagnostic))] : diagnostics
+  const fixed = fix ? await applySafeFixes(root, since === undefined ? fixable : fixable.filter(inMinor)) : 0
 
   if (fixed > 0) {
     // JSON is the whole of stdout; quiet, what is left is all that is said.

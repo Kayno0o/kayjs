@@ -714,10 +714,14 @@ class RewriteFinder {
       const last = parent.type === 'CallExpression' && map.isExact(parent.end! - 1) ? map.toSource(parent.end! - 1) : undefined
       const end = last === undefined ? undefined : last + 1
 
-      if (start === undefined || tagPosition(reference) !== undefined)
+      if (tagPosition(reference) !== undefined)
         continue
 
-      if (parent.type === 'CallExpression' && parent.callee === node && parent.arguments.length === 0 && end !== undefined)
+      if (start === undefined)
+        use.blocked ??= 'one of its reads cannot be located in the source'
+      else if (reference.findParent(ancestor => ancestor.isCallExpression() && isBoundCheck(ancestor.node)))
+        continue
+      else if (parent.type === 'CallExpression' && parent.callee === node && parent.arguments.length === 0 && end !== undefined)
         calls.set(start, { start: start + name.length, end })
       else if (parent.type !== 'UpdateExpression' && !handedToComponent(reference) && !(isPropCheck(parent) && handedToComponent(reference.parentPath!)))
         use.blocked ??= 'it is used other than by calling it or handing it to a component'
@@ -1119,6 +1123,11 @@ function handedToComponent(reference: NodePath): boolean {
   const tag = element.name
 
   return tag.type === 'JSXMemberExpression' || (tag.type === 'JSXIdentifier' && CAPITAL.test(tag.name) && !COMPILER_NAME.test(tag.name))
+}
+
+// `bind:open={open}` on a component is checked through `KayBound(Tag)(key, value, write)`, which hands a signal prop on to a `Bindable` one.
+function isBoundCheck(node: t.Node): boolean {
+  return node.type === 'CallExpression' && node.callee.type === 'CallExpression' && node.callee.callee.type === 'Identifier' && node.callee.callee.name === 'KayBound'
 }
 
 // The type check wraps a component's prop in `KayProp(Tag)(value)`.
