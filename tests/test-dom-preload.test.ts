@@ -52,6 +52,27 @@ it('reads a form into a FormData that Bun can still send', async () => {
   }
 })
 
+it('carries a file input\\'s file into the FormData with its name, type and bytes', async () => {
+  const { File: DomFile } = await import('happy-dom')
+
+  document.body.innerHTML = '<form><input type="file" name="doc"><input type="file" name="own"></form>'
+
+  const [doc, own] = [...document.querySelectorAll('input')] as unknown as { files: unknown }[]
+
+  doc!.files = [new DomFile(['hello'], 'a.txt', { type: 'text/plain' })]
+  own!.files = [new File(['bun'], 'b.txt', { type: 'text/plain' })]
+
+  const data = new FormData(document.querySelector('form')!)
+  const file = data.get('doc') as File
+  const bun = data.get('own') as File
+
+  expect(file.name).toBe('a.txt')
+  expect(file.type).toStartWith('text/plain')
+  expect(await file.text()).toBe('hello')
+  expect(bun.name).toBe('b.txt')
+  expect(await bun.text()).toBe('bun')
+})
+
 it('keeps every web global native, with a document beside them', () => {
   expect(typeof document.createElement).toBe('function')
 
@@ -63,6 +84,6 @@ it('keeps every web global native, with a document beside them', () => {
   const child = Bun.spawn(['bun', 'test', '--preload', join(SRC, 'preload.ts'), '--preload', join(SRC, 'dom.ts'), file], { cwd: dir, stdout: 'pipe', stderr: 'pipe', stdin: 'ignore', env: { ...process.env, KAY_TEST_CHILD: '1' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  expect(`${out}${err}`).toContain('3 pass')
+  expect(`${out}${err}`).toContain('4 pass')
   expect(code).toBe(0)
 }, 60_000)

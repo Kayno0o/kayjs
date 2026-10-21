@@ -16,7 +16,14 @@ for (const [name, descriptor] of kept) {
     Object.defineProperty(globalThis, name, descriptor)
 }
 
-// Bun's FormData ignores a form element, which the runtime and components read forms through, so this one takes happy-dom's reading of the form and stays Bun's class otherwise. A file field comes through empty, as its content is not readable synchronously.
+// Bun's FormData ignores a form element, which the runtime and components read forms through, so this one takes happy-dom's reading of the form and stays Bun's class otherwise. A happy-dom file keeps its name, type and bytes, which it holds under a symbol, and a Bun File set on a file input is passed through, as happy-dom would turn it into text.
+function bytesOf(file: Blob): ArrayBuffer {
+  const symbol = Object.getOwnPropertySymbols(file).find(key => key.description === 'buffer')
+  const bytes = symbol === undefined ? new Uint8Array() : (file as unknown as Record<symbol, Uint8Array>)[symbol]!
+
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
 class FormDataWithForm extends NativeFormData {
   constructor(form?: HTMLFormElement, submitter?: HTMLElement) {
     super()
@@ -24,8 +31,21 @@ class FormDataWithForm extends NativeFormData {
     if (form === undefined)
       return
 
-    for (const [name, value] of new DomFormData(form, submitter) as unknown as Iterable<[string, FormDataEntryValue]>)
-      this.append(name, typeof value === 'string' ? value : new File([], value.name, { type: value.type }))
+    const picked = new Map<string, File[]>()
+
+    for (const input of form.querySelectorAll<HTMLInputElement>('input[type=file]')) {
+      const files = [...(input.files ?? [])].filter(file => file instanceof File)
+
+      if (files.length > 0)
+        picked.set(input.name, [...(picked.get(input.name) ?? []), ...files])
+    }
+
+    for (const [name, value] of new DomFormData(form, submitter) as unknown as Iterable<[string, FormDataEntryValue]>) {
+      if (typeof value === 'string')
+        this.append(name, value.startsWith('[object ') ? (picked.get(name)?.shift() ?? value) : value)
+      else
+        this.append(name, new File([bytesOf(value)], value.name, { type: value.type, lastModified: value.lastModified }))
+    }
   }
 }
 
