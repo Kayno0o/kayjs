@@ -355,7 +355,7 @@ A repository checked out with CRLF line endings, or using SHA-256 object names, 
 
 When the server refuses a save, the form takes you to what is wrong. The focus goes to the first field to fix and the page scrolls to it. Above the form, a list names every field to fix, and each line links to its field.
 
-Fixing one field clears that field's message and leaves the others. A field the form does not show keeps its message in the list, without a link.
+Fixing one field clears that field's message and leaves the others. A field the form does not show gets a message of its own above the form, with no link.
 
 The form also checks as you type. A field with a minimum or maximum length, a pattern, or a minimum or maximum number gets the matching limit on its input, and says what is wrong once you leave it. The server still decides on a save.
 

@@ -37,6 +37,7 @@ const development = process.env.NODE_ENV === 'development'
 const touched = signal(false)
 // The text of a JSON box while it is edited, which the draft's value is formatted from once the box is left.
 const jsonText = signal<string>()
+const jsonFocused = signal(false)
 // The list's items folded away by place, and the last item removed, which Undo puts back.
 const folded = signal<readonly boolean[]>([])
 const removed = signal<{ at: number, title: string, value: unknown }>()
@@ -52,6 +53,13 @@ const starred = () => field.required && typeof field.key === 'string'
 // The schema's refusal of the last save or render, else what the box holds that cannot be saved, else a limit it breaks, the last two once the editor has left the box.
 const issue = () => drafts.issues(entry, path)[0]?.message ?? (touched() ? drafts.blocked(entry, path)[0]?.message ?? checkField(field, value()) : undefined)
 const formatted = () => value() === undefined ? '' : JSON.stringify(value(), null, 2)
+// The text typed stands while it is being edited or does not parse; once the draft is dropped or the box is left, the box shows the draft.
+const jsonShown = () => jsonFocused() || drafts.blocked(entry, path).length > 0 ? jsonText() ?? formatted() : formatted()
+
+// A box that goes (a list item removed) no longer blocks the save.
+effect(() => {
+  onCleanup(() => drafts.block(entry, path, undefined))
+})
 
 // A box typed in is checked once left; any other control, a pick or a choice, at its first change.
 function set(next: unknown, typing = false): void {
@@ -219,6 +227,7 @@ function setJson(next: string): void {
 
 function leaveJson(): void {
   touched = true
+  jsonFocused = false
 
   if (drafts.blocked(entry, path).length === 0)
     jsonText = undefined
@@ -280,7 +289,7 @@ function leaveJson(): void {
         TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} value={text()} onInput={next => set(next ?? undefined, true)} onBlur={() => touched = true})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="date" value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
+        TextInput(type="date" required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
     when 'datetime'
       DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={set})
     when 'select'
@@ -295,10 +304,10 @@ function leaveJson(): void {
         Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={starred()})
       else
         FormField(label={current.label} hint={[current.hint, development ? wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name }) : undefined].filter(Boolean).join(' ')} issue={issue()} required={starred()})
-          Textarea.kcms-json(rows="4" value={jsonText() ?? formatted()} onInput={setJson} onBlur={leaveJson})
+          Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
-        Textarea.kcms-json(rows="4" value={jsonText() ?? formatted()} onInput={setJson} onBlur={leaveJson})
+        Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     else
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(value={text()} onInput={next => set(next, true)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={current.limits?.pattern})

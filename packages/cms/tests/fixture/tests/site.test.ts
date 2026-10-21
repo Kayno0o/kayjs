@@ -334,6 +334,8 @@ test('a field the layout hides still says why a save was refused', async () => {
   await page.click('form.kcms-entry-editor button[type=submit]')
   await page.waitUntil(() => document.querySelector('.kcms-entry-failure[role=alert]') !== null)
 
+  // A browser focuses nothing inside the fieldset a save locks, so the focus lands once the save is over.
+  await page.waitUntil(() => document.activeElement?.classList.contains('kcms-entry-failure') === true)
   expect(shop.map(item => item.slug)).toEqual(['lamp', 'vase'])
   expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-failure[role=alert], p.kcms-entry-failure')].map(node => node.textContent))).toContain('Sku is required')
   expect(page.errors).toEqual([])
@@ -353,6 +355,8 @@ test('the on-page editor shows each issue of a refused save beside its field and
   await page.click('.kcms-editor .kcms-entry-actions button:last-child')
   await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)
   await Bun.sleep(200)
+
+  await page.waitUntil(() => document.activeElement?.getAttribute('aria-invalid') === 'true')
 
   const count = async (selector: string) => page.evaluate((query: string) => [...document.querySelectorAll(`.kcms-editor ${query}`)].filter(node => node.textContent?.includes('would run as the site')).length, selector)
 

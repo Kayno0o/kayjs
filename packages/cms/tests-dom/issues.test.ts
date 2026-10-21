@@ -155,6 +155,22 @@ test('a JSON box that does not parse stops the save, says so by name and follows
   expect(sent(fetched).data.meta).toEqual({ a: 2 })
 })
 
+test('Reset puts a JSON box that does not parse back to the draft, and it blocks nothing any more', async () => {
+  const { box, type, leave, submit, issueOf, root } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
+  const fetched = server(undefined)
+
+  await type('meta', '{ "a": ')
+  await leave('meta')
+  expect(issueOf('meta')).toBe('Meta is not valid JSON')
+  ;[...root.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Reset')!.click()
+  await settle()
+
+  expect(box('meta').value).toContain('"a": 1')
+  expect(issueOf('meta')).toBeUndefined()
+  await submit()
+  expect(fetched).not.toHaveBeenCalled()
+})
+
 test('a JSON box typed in and saved at once, with no blur, saves what it holds', async () => {
   const { type, submit } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
   const fetched = server(undefined)

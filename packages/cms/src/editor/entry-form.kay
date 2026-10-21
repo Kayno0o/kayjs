@@ -14,7 +14,7 @@ import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
 import EntrySaveState from '../components/entry-save-state.kay'
 import { entryRoom } from '../room'
-import { saveDraft } from './save'
+import { saveDraft, showRefusal } from './save'
 import { saveShortcut } from './shortcut'
 
 const { entry, focus } = props<{ entry: EntryRef, focus?: FieldPath | undefined }>()
@@ -57,14 +57,19 @@ effect(() => {
   field?.querySelector<HTMLElement>('input, textarea, select')?.focus()
 })
 
+// A text that does not parse keeps Save and Reset enabled, so pressing Save says what to fix.
+const unsaved = () => drafts.changed(entry) || drafts.blocked(entry).length > 0
+
 async function save(): Promise<void> {
-  if (!drafts.changed(entry) || saving())
+  if (!unsaved() || saving())
     return
 
   saving = true
 
+  let saved = false
+
   try {
-    await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => {
+    saved = await saveDraft(drafts, entry, { onSaved: ({ rebuilding }) => {
       lastSave.set({ at: Date.now(), rebuilding })
 
       if (rebuilding)
@@ -74,6 +79,10 @@ async function save(): Promise<void> {
   finally {
     saving = false
   }
+
+  // The fields are unlocked by now, so the focus can land in one.
+  if (!saved)
+    await showRefusal(drafts, entry)
 }
 
 saveShortcut(save)
@@ -85,8 +94,8 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()})
-      Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving() || !drafts.changed(entry)} onClick={() => drafts.reset(entry)})
-      Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !drafts.changed(entry)} onClick={save})
+      Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving() || !unsaved()} onClick={() => drafts.reset(entry)})
+      Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !unsaved()} onClick={save})
   EntryPresence(room={room.room} member={room.member})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}

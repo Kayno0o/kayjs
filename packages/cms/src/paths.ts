@@ -4,6 +4,7 @@ import { BODY } from './markers'
 // Field paths as kay's markers write them: dotted keys, list indexes as numbers, `sections.1.heading`.
 
 const INDEX = /^\d+$/
+const NOT_ID = /[^\w-]/g
 
 // An address under the prefix the screens are mounted at, which the root prefix `/` adds nothing to: `screenPath('/', '/uploads')` is `/uploads`, `screenPath('/', '')` is `/`.
 export function screenPath(prefix: string, path = ''): string {
@@ -66,7 +67,7 @@ function setIn(container: unknown, segments: string[], value: unknown): unknown 
 
 // The id of the element holding one part of an entry's form, which the summary of the issues links to: a data field by its path (`f:` and the path), the body (`b`), a new entry's slug (`s`) or locale (`l`). Characters an id and a link would trip on become `_`.
 export function fieldId(ref: EntryRef, part: string): string {
-  return `kcms-${[ref.collection, ref.slug, ref.locale ?? '', part].join('-').replaceAll(/[^\w-]/g, '_')}`
+  return `kcms-${[ref.collection, ref.slug, ref.locale ?? '', part].join('-').replaceAll(NOT_ID, '_')}`
 }
 
 // The first key of a dotted path: the field of the entry's data it lies in.

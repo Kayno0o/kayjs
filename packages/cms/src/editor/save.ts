@@ -87,7 +87,6 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   if (blocked.length > 0) {
     drafts.report([...drafts.issues(ref).filter(issue => issue.body === true || !blocked.some(({ path }) => path === issue.path)), ...blocked.map(({ path, message }) => ({ ...ref, path, message }))])
     tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
-    await showRefusal()
 
     return false
   }
@@ -107,14 +106,12 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     if (whole) {
       drafts.refuse(ref, { message: whole.message, conflict: outcome.conflict })
       tell(flight, told, wording('cms.save.refusal', 'Not saved: {message}', { message: whole.message }))
-      await showRefusal()
 
       return false
     }
 
     drafts.report(issues)
     tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
-    await showRefusal()
 
     return false
   }
@@ -129,12 +126,18 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   return true
 }
 
-// Takes the focus to the first field a refusal marked, else to the first notice above the form, so the editor and a screen reader land on what to fix; the page scrolls to it.
-async function showRefusal(): Promise<void> {
+// Takes the focus to what a refused save left to fix: the refusal of the whole entry, else the first field it marked, else the first notice above the form. A caller runs it once its form is unlocked, as a browser focuses nothing inside a disabled fieldset.
+export async function showRefusal(drafts: Drafts, ref: EntryRef): Promise<void> {
   if (typeof document === 'undefined')
     return
 
-  if (!await focusInvalid())
+  if (drafts.refusal(ref)) {
+    document.querySelector<HTMLElement>('.kcms-refusal')?.focus()
+
+    return
+  }
+
+  if (drafts.issues(ref).length > 0 && !await focusInvalid())
     document.querySelector<HTMLElement>('.kcms-entry-failure')?.focus()
 }
 

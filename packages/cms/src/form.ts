@@ -5,7 +5,7 @@ import { guardLeave, navigate, signal } from 'kay'
 import { wording } from 'kay/words'
 import { publishTime, useGoesLive } from './datetime'
 import { createDrafts } from './drafts'
-import { deleteSaved, refuseUnsaved, saveDraft } from './editor/save'
+import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
 import { collectionPath, collectionTitle, entryPath, entryTitle, SINGLE_SLUG } from './listing'
@@ -139,7 +139,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   const lastSave = signal<{ at: number, rebuilding: boolean }>()
   const onSaved = ({ rebuilding }: { rebuilding: boolean }) => lastSave.set({ at: Date.now(), rebuilding })
 
-  async function saveNow(): Promise<boolean> {
+  async function attemptSave(): Promise<boolean> {
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
     if (first && !drafts.changed(ref) && drafts.blocked(ref).length === 0)
       return true
@@ -162,6 +162,16 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     finally {
       saving.set(false)
     }
+  }
+
+  async function saveNow(): Promise<boolean> {
+    const saved = await attemptSave()
+
+    // The fields are unlocked by now, so the focus can land in one.
+    if (!saved)
+      await showRefusal(drafts, ref)
+
+    return saved
   }
 
   async function save(): Promise<void> {
@@ -204,7 +214,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     slug,
     newLocale,
     saving,
-    dirty: () => drafts.changed(ref),
+    dirty: () => drafts.changed(ref) || drafts.blocked(ref).length > 0,
     canSave,
     savedAt: () => lastSave(),
     get stored() {

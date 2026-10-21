@@ -293,12 +293,22 @@ describe('the issues of a refused save', () => {
     drafts.set(post, 'title', 'Hel')
     await settled()
 
-    expect(drafts.issues(post).map(found => found.message)).toEqual(['Tags is not valid', 'Entry level'])
+    expect(drafts.issues(post).map(found => found.message)).toEqual(['Tags is not valid'])
 
     drafts.set(post, 'tags', ['b'])
     await settled()
 
-    expect(drafts.issues(post).map(found => found.message)).toEqual(['Entry level'])
+    expect(drafts.issues(post)).toEqual([])
+  })
+
+  it('lose the one on a field holding the edited one, and the entry\'s as a whole, but not the body\'s or a slug\'s', () => {
+    const { drafts } = setup()
+
+    drafts.report([issue('meta', 'Meta is not valid'), issue('other', 'Other'), issue('', 'Whole'), { ...issue('', 'Body'), body: true }, { ...issue('', 'Taken'), key: 'slug' }])
+    drafts.set(post, 'meta.a.b', 1)
+
+    expect(drafts.issues(post, 'other').map(found => found.message)).toEqual(['Other'])
+    expect(drafts.issues(post).map(found => found.message).sort()).toEqual(['Body', 'Other', 'Taken'])
   })
 
   it('lose the body\'s only to an edit of the body, not to a data field named body', () => {

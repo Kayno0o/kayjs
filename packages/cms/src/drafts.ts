@@ -128,14 +128,24 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     return restored ? kept.entry : entry
   }
 
-  function inEntry(issue: Issue, key: string, path: FieldPath): boolean {
-    return entryKey(issue) === key && (path === BODY ? issue.body === true : issue.body !== true && issue.path === path)
+  // Whether an edit of `path` answers the issue: its own, one on a field holding it, and the entry's as a whole.
+  function answered(issue: Issue, key: string, path: FieldPath): boolean {
+    if (entryKey(issue) !== key)
+      return false
+
+    if (path === BODY)
+      return issue.body === true
+
+    if (issue.body === true || issue.key !== undefined)
+      return false
+
+    return issue.path === path || issue.path === '' || path.startsWith(`${issue.path}.`)
   }
 
-  // Drops the issues of one field, leaving every other field's shown.
+  // Drops the issues an edit answers, leaving every other field's shown.
   function dismiss(key: string, path: FieldPath): void {
-    if (issues().some(issue => inEntry(issue, key, path)))
-      issues.set(issues().filter(issue => !inEntry(issue, key, path)))
+    if (issues().some(issue => answered(issue, key, path)))
+      issues.set(issues().filter(issue => !answered(issue, key, path)))
   }
 
   function block(key: string, path: string, message: string | undefined): void {
