@@ -186,7 +186,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     ? noticeOf(given, SHIPPED_WORDS.consent)
     : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, SHIPPED_WORDS.info)
 
-  const named = Object.fromEntries(Object.entries(words).map(([language, entry]) => [language, { ...entry, text: entry.text.replaceAll('{provider}', name) }]))
+  const named = Object.fromEntries(Object.entries(words).map(([language, entry]) => [language, { ...entry, text: entry.text.replaceAll('{provider}', () => name) }]))
 
   const gate = (asking || informs) && {
     ...asking ? { 'data-consent': '', ...given.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
@@ -259,7 +259,8 @@ function noticeOf(consent: Partial<Record<keyof Words, AnalyticsText | undefined
   const given = values.flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
   const plain = values.some(value => typeof value === 'string')
   const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : value?.[language] ?? fallback
-  const languages = new Set(['en', ...given, ...plain ? Object.keys(shipped) : []])
+  // The app's languages come first: the script reads the first one for a page language nothing names.
+  const languages = new Set([...given, 'en', ...plain ? Object.keys(shipped) : []])
 
   return Object.fromEntries([...languages].map((language) => {
     const defaults = shipped[language] ?? shipped.en!

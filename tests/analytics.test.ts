@@ -192,6 +192,13 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(texts.en).toMatchObject({ agree: 'OK', refuse: 'Opt out' })
   })
 
+  it('keeps the first language the app wrote ahead of the shipped English, for a page language nothing names', async () => {
+    const texts = textsOf(await page(plausible({ consent: { text: { fr: 'Compter ?' } } })))
+
+    expect(Object.keys(texts)[0]).toBe('fr')
+    expect(texts.fr!.text).toBe('Compter ?')
+  })
+
   it('lets a plain string of the app win for every language, French included', async () => {
     const texts = textsOf(await page(plausible({ consent: { agree: 'Yes' } })))
 

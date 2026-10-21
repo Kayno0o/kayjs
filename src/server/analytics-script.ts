@@ -148,7 +148,7 @@ export const NOTICE_SCRIPT = `(() => {
   const { data, scope } = api
   const texts = data.texts ? JSON.parse(data.texts) : {}
   // The words kay ships, for a language the page's tag holds none of: the provider is named here, as the tag names it in the ones it holds.
-  const shipped = Object.fromEntries(Object.entries(${JSON.stringify(SHIPPED_WORDS)}[data.consent !== undefined ? 'consent' : 'info']).map(([language, entry]) => [language, { ...entry, text: entry.text.replace('{provider}', data.provider ?? '') }]))
+  const shipped = Object.fromEntries(Object.entries(${JSON.stringify(SHIPPED_WORDS)}[data.consent !== undefined ? 'consent' : 'info']).map(([language, entry]) => [language, { ...entry, text: entry.text.replace('{provider}', () => data.provider ?? '') }]))
   let banner
   let opener
 
@@ -185,8 +185,8 @@ export const NOTICE_SCRIPT = `(() => {
     if (banner)
       return
 
-    const lang = document.documentElement.lang.split('-')[0]
-    const words = texts[lang] ?? shipped[lang] ?? texts[Object.keys(texts)[0]] ?? shipped.en
+    const lang = document.documentElement.lang.split('-')[0].toLowerCase()
+    const words = (Object.hasOwn(texts, lang) ? texts[lang] : undefined) ?? (Object.hasOwn(shipped, lang) ? shipped[lang] : undefined) ?? texts[Object.keys(texts)[0]] ?? shipped.en
     const make = (tag, text) => Object.assign(document.createElement(tag), { textContent: text })
     const button = (text, value) => {
       const element = make('button', text)
