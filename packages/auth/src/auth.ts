@@ -57,7 +57,7 @@ import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from '.
 import { safeRedirect } from './oauth/redirect'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
-import { DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
+import { AUTH_OF, DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { createUser, register, signInWithPassword } from './password'
 import { pruneWhenDue } from './prune'
@@ -1207,7 +1207,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (core.organizations && create !== undefined)
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
-  return {
+  return withPluginOwner({
     [PAGES_OF]: core.pages && pagesHandle(core, options),
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
@@ -1327,7 +1327,14 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
           ctx.deny(403)
       }
     },
-  }
+  })
+}
+
+// `kay auth create-user` reaches the app's auth through its plugin when the extension was given the plugin alone.
+function withPluginOwner<Auth extends { plugin: object }>(auth: Auth): Auth {
+  Object.defineProperty(auth.plugin, AUTH_OF, { value: auth })
+
+  return auth
 }
 
 // The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.

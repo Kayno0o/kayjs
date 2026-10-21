@@ -224,7 +224,13 @@ An account registered and never verified goes the same way, 30 days after it was
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`.
+`signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`, or the first one from the terminal:
+
+```sh
+kay auth create-user ada@example.com --role admin
+```
+
+It asks for the password twice without showing it, or reads one line from a pipe. A name without `@` is a username, `--email` adds an address, and `--no-password` makes a user who signs in another way. An address typed this way counts as verified. It runs in the project of the current directory with its `.env`, so run it with the production environment to make a user in the production database.
 
 ### Breached passwords
 
