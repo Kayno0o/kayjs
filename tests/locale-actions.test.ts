@@ -137,6 +137,20 @@ describe('an action\'s serverError message given as a function', () => {
       logged.mockRestore()
     }
   })
+
+  it('leaves kay\'s message when the function answers a blank text', async () => {
+    const app = await serve(MOUNTED)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      for (const how of POSTS) {
+        expect(await postDown(app, MOUNTED, how, '/down', 2)).toMatchObject({ status: 500, text: expect.stringContaining('Something went wrong on our side') })
+      }
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
 })
 
 describe('an action posted with kay_back', () => {
