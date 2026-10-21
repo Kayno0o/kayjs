@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
+import { listeningPort } from './listening'
 import { scratchDir } from './scratch'
 
 const LISTENING = /port (\d+)/
@@ -17,40 +18,11 @@ let server: Fixture
 let page: TestPage
 let origin: string
 
-async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
-  try {
-    for await (const chunk of stream)
-      void chunk
-  }
-  catch {}
-}
-
-async function listeningPort(child: Fixture): Promise<string> {
-  const reader = child.stdout.getReader()
-  let output = ''
-
-  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
-    const { value, done } = await reader.read()
-
-    if (done)
-      throw new Error(`the navigation fixture exited without listening: ${await new Response(child.stderr).text()}`)
-
-    output += new TextDecoder().decode(value)
-  }
-
-  reader.releaseLock()
-  // The server logs each request, and a pipe nobody reads fills at 64 KB, after which the server blocks on its next write and every later page hangs.
-  void drain(child.stdout)
-  void drain(child.stderr)
-
-  return LISTENING.exec(output)![1]!
-}
-
 // A server of the navigation fixture on a port of its own, and the origin it answers on.
 async function startFixture(): Promise<{ server: Fixture, origin: string }> {
   const started: Fixture = Bun.spawn(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
-  return { server: started, origin: `http://localhost:${await listeningPort(started)}` }
+  return { server: started, origin: `http://localhost:${await listeningPort(started, 'the navigation fixture', LISTENING)}` }
 }
 
 // A page of the fixture, opened at the size the suite was written for.
