@@ -176,7 +176,7 @@ if (created.ok)
 
 `mountComponent(file, props)` renders one component into `document`. Use it to test what its handlers and effects do.
 
-List `kay/test/dom` after the preload, with `@happy-dom/global-registrator` installed as a dev dependency. It registers happy-dom's DOM for every test file, and adds the popover API happy-dom lacks.
+List `kay/test/dom` after the preload, with `@happy-dom/global-registrator` installed as a dev dependency. It registers happy-dom's DOM for every test file, and adds the popover API happy-dom lacks. The fetch classes stay Bun's, so a test serving with `Bun.serve` still works beside it.
 
 ```toml
 [test]

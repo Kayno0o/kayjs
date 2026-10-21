@@ -1,7 +1,16 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
 // Listed under `[test] preload` in bunfig.toml after `kay/test/preload`, so `mountComponent()` renders into happy-dom's document in every test file.
+// The web globals a server or its fake upstream uses stay Bun's: `Bun.serve` refuses a happy-dom `Response`, and its `fetch` does not reach a Bun server.
+const KEPT = ['fetch', 'Request', 'Response', 'Headers', 'FormData', 'Blob', 'File', 'URL', 'URLSearchParams', 'AbortController', 'AbortSignal', 'WebSocket']
+const kept = KEPT.map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const)
+
 GlobalRegistrator.register()
+
+for (const [name, descriptor] of kept) {
+  if (descriptor !== undefined)
+    Object.defineProperty(globalThis, name, descriptor)
+}
 
 // happy-dom has no popover API: an element shown keeps a flag, which `:popover-open` matches, and `toggle` fires as in a browser.
 if (!('showPopover' in HTMLElement.prototype)) {
