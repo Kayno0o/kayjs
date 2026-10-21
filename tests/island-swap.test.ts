@@ -208,6 +208,54 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
         expect(await labels(page)).toEqual(['one', 'two'])
       })
+
+      describe('holding an island with a pending island of its own', () => {
+        const FORM = 'slot[data-kay-server]:not([inert]) form[action]'
+        const open = async () => {
+          // The failing fetches of the tests above are logged on this page already.
+          page.errors.length = 0
+          await page.goto(`${origin}${path('/deferred-held')}`)
+          await page.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1, {}, FORM)
+        }
+
+        it('ends the pending observers of the held island quietly', async () => {
+          await open()
+
+          // The fetch is held back, so the held island is on screen, scrolled to, when its observers fire.
+          const release = Promise.withResolvers<void>()
+          const pending = /kay_island=0/
+
+          await page.route(pending, async (request) => {
+            await release.promise
+            await request.continue()
+          })
+          await page.click('input#note')
+          await page.press('Enter')
+          await page.waitUntil(() => document.querySelector('slot[data-kay-server][inert]') !== null)
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+          await settled(page)
+          release.resolve()
+          await page.unroute(pending)
+          await page.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1, {}, FORM)
+          await settled(page)
+
+          expect(page.errors).toEqual([])
+          expect(await page.evaluate(() => document.querySelector('button.counter') !== null)).toBe(true)
+        })
+
+        it('keeps the focus on the field of the island once its fetch lands', async () => {
+          await open()
+
+          await page.click('input#note')
+          await page.press('Enter')
+          await page.waitUntil(() => document.querySelector('slot[data-kay-server][inert]') !== null)
+          await page.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1, {}, FORM)
+          await settled(page)
+
+          expect(await page.evaluate(() => document.activeElement?.id)).toBe('note')
+          expect(page.errors).toEqual([])
+        })
+      })
     })
   }
 })

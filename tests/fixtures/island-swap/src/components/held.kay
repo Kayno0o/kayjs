@@ -1,0 +1,11 @@
+---
+import type { Action } from 'kay'
+import Counter from './counter.kay'
+
+const { to } = props<{ to: Action<{}, unknown> }>()
+---
+form(action={to})
+  input#note(name="note")
+  button.send Send
+div(style="height: 1500px")
+Counter(hydrate="visible")

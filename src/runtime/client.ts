@@ -174,7 +174,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   // What was clicked on it is dropped, as it never hydrates.
   if (!load) {
     takeEvents(element)
-    console.error(`[kay] no client chunk for island ${id}`)
+
+    // An island a page swap dropped from a held render has neither, and ends quietly.
+    if (id !== '' || file !== '')
+      console.error(`[kay] no client chunk for island ${id}`)
 
     return
   }
