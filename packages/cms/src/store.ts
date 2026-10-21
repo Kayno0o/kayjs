@@ -1,5 +1,6 @@
 import type { Commit, FileChange, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
+import type { SaveEvent } from './settings'
 import { wording } from 'kay/words'
 import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
@@ -132,21 +133,43 @@ async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Pro
   return entry.slug === SINGLE_SLUG ? undefined : refused(entry, wording('cms.store.singleSlug', '{collection} holds one entry, written as {slug}', { collection: collectionTitle(collection), slug: SINGLE_SLUG }))
 }
 
+// Tells `cms({ onSave })` of a change that went through; its failure is logged, as the change is written.
+async function saved(event: SaveEvent): Promise<void> {
+  const hook = settings().onSave
+
+  if (hook === undefined)
+    return
+
+  try {
+    await hook(event)
+  }
+  catch (error) {
+    log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
+  }
+}
+
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
 export async function saveEntry(entry: DraftEntry, options: SaveOptions = {}): Promise<SaveOutcome> {
+  let outcome: SaveOutcome
+
   try {
-    return await writeEntry(entry, options)
+    outcome = await writeEntry(entry, options)
   }
   finally {
     forgetCounts()
   }
+
+  if ('saved' in outcome)
+    await saved({ collection: entry.collection, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: options.verb ?? (options.create === true ? 'add' : 'update'), ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
+
+  return outcome
 }
 
 interface SaveOptions extends VersionRule {
   create?: boolean | undefined
   version?: string | undefined
-  verb?: string | undefined
+  verb?: SaveEvent['verb'] | undefined
   author?: Identity | undefined
   bodyKept?: boolean | undefined
   heldData?: Record<string, unknown> | undefined
@@ -216,12 +239,19 @@ async function writeEntry(entry: DraftEntry, { create = false, version, required
 }
 
 export async function deleteEntry(ref: EntryRef, author?: Identity, options: { version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+  let outcome: SaveOutcome
+
   try {
-    return await removeOne(ref, author, options)
+    outcome = await removeOne(ref, author, options)
   }
   finally {
     forgetCounts()
   }
+
+  if ('saved' in outcome)
+    await saved({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
+
+  return outcome
 }
 
 async function removeOne(ref: EntryRef, author: Identity | undefined, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
@@ -406,11 +436,18 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
       return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body }
     })
 
-    return inTurn(collection.name, async () => {
+    const moved = await inTurn<SaveOutcome>(collection.name, async () => {
       const { issues } = await saveLoadedMany(collection.name, written)
 
       return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
     })
+
+    if ('saved' in moved) {
+      for (const entry of written)
+        await saved({ collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: 'move', ...author !== undefined && { author } })
+    }
+
+    return moved
   }
 
   let outcome: SaveOutcome = { saved: true }

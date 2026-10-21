@@ -1,6 +1,6 @@
 import type { Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard } from 'kay/library'
-import type { FileSaver, Identity } from './files'
+import type { Commit, FileSaver, Identity } from './files'
 import type { CollectionLayout } from './kay/contract'
 import { byteSize, lazily } from 'kay/library'
 import { workingTree } from './files'
@@ -10,6 +10,18 @@ import { PAGE_SIZE } from './listing'
 export interface UploadOptions {
   types?: string[] | undefined
   maxSize?: ByteSize | undefined
+}
+
+// What a save, a deletion or a move of an editor changed, once it is written.
+export interface SaveEvent {
+  collection: string
+  slug: string
+  locale?: string | undefined
+  // What the editor did: a new entry is `add`, a changed one `update`, and `move` is one entry of a reorder.
+  verb: 'add' | 'update' | 'publish' | 'unpublish' | 'move' | 'duplicate' | 'delete'
+  author?: Identity | undefined
+  // The commit a folder entry's saver made, such as a forge's.
+  commit?: Commit | undefined
 }
 
 export interface CmsOptions {
@@ -33,6 +45,8 @@ export interface CmsOptions {
   pageLink?: false | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
+  // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. The collection's entries, the pages that read them and the sitemap are refreshed already; a throw is logged and never undoes the save.
+  onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
 }
 
 export interface CmsSettings {
@@ -46,6 +60,7 @@ export interface CmsSettings {
   pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
+  onSave: CmsOptions['onSave']
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
   pageLink: boolean
   layouts: ReadonlyMap<string, CollectionLayout>
@@ -69,7 +84,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections, pageLink }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, collections, pageLink }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -78,7 +93,7 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, pageLink: pageLink !== false, layouts: checkLayouts(collections) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, onSave, pageLink: pageLink !== false, layouts: checkLayouts(collections) }
 
   return current
 }

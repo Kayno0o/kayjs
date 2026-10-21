@@ -9,6 +9,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { NotFoundError } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { onKeysInvalidated } from '../runtime/cache'
 import { escape } from '../runtime/escape'
 import { kayLog } from '../runtime/log'
 import { importModule } from './bundle'
@@ -60,8 +61,20 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number, degraded: boolean }>()
   const settings = options.locales
 
-  // An entry published at its time shows in the sitemap then, not up to an hour later.
-  const hear = () => onPublished(() => cached.clear())
+  // An entry published at its time, or saved by a CMS, shows in the sitemap then, not up to an hour later: any invalidation builds it afresh on its next request.
+  const hear = () => {
+    const stopPublished = onPublished(() => cached.clear())
+    const stopInvalidated = onKeysInvalidated(() => {
+      cached.clear()
+
+      return []
+    })
+
+    return () => {
+      stopPublished()
+      stopInvalidated()
+    }
+  }
   let stopHearing: (() => void) | undefined = hear()
 
   app.onStart(() => {

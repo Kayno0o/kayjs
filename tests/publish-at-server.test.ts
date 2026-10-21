@@ -97,6 +97,17 @@ describe('a prerendered site with a scheduled entry', () => {
     })
   })
 
+  it('lists an entry a CMS saved in the sitemap at once, not up to an hour later', async () => {
+    await build(async (scratch) => {
+      const app = await schedulesAfter(scratch, 60_000)
+
+      expect((await visit(app, '/sitemap.xml')).text).not.toContain('/talks/added')
+      schedule.items = [...schedule.items, { slug: 'added', title: 'Added', at: new Date(Date.now() - 1000).toISOString() }]
+      talks.invalidate()
+      expect((await visit(app, '/sitemap.xml')).text).toContain('https://talks.example/talks/added')
+    })
+  })
+
   it('takes an ending entry down at its time from the listing, its prerendered page, the sitemap and the feed, the page then answering what the app chose', async () => {
     await build(async (scratch) => {
       schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: '2999-01-01' }]

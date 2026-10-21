@@ -1,7 +1,7 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf } from './shared'
+import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -39,6 +39,12 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
   const table = tableOf(options.table)
   const key = seededKey(name)
   let ready: Promise<SQL> | undefined
+  // The rows' count and the newest transaction that wrote one: an insert, an update and a delete each move it, whoever made them.
+  const watching = watcher(name, options.watch, '2s', async () => {
+    const [row] = await clientOf(options.sql).unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(max(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
+
+    return row!.signature
+  })
 
   const open = async (): Promise<SQL> => {
     const client = clientOf(options.sql)
@@ -58,6 +64,8 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
       for (const entry of await seedEntries(options.seed))
         await tx.unsafe(`INSERT INTO ${table} (collection, place, data, body) VALUES ($1, $2, $3::text::jsonb, $4) ON CONFLICT DO NOTHING`, [name, placeOf(entry), JSON.stringify(entry.data), entry.body ?? null])
     })
+
+    await watching.start()
 
     return client
   }
@@ -107,6 +115,7 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
     },
     save: async (entry) => {
       await upsert(await database(), entry, entry.create === true)
+      await watching.settle()
     },
     saveMany: async (entries) => {
       const sql = await database()
@@ -115,11 +124,13 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
         for (const entry of entries)
           await upsert(tx, entry, false)
       })
+      await watching.settle()
     },
     remove: async (entry) => {
       const sql = await database()
 
       await sql.unsafe(`DELETE FROM ${table} WHERE collection = $1 AND place = $2`, [name, placeOf(entry)])
+      await watching.settle()
     },
   }
 }

@@ -3,7 +3,7 @@ import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf } from './shared'
+import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -19,6 +19,8 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   const key = seededKey(name)
   let opened: Database | undefined
   let ready: Promise<Database> | undefined
+  // `data_version` moves when another connection committed, a process or the `sqlite3` tool, never for this one's own writes.
+  const watching = watcher(name, options.watch, '1s', () => String(opened!.query<{ data_version: number }, []>('PRAGMA data_version').get()!.data_version))
 
   const open = async (): Promise<Database> => {
     if (opened !== undefined)
@@ -45,6 +47,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     }
 
     opened = db
+    await watching.start()
 
     return db
   }

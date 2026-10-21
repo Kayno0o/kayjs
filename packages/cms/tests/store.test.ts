@@ -679,3 +679,51 @@ describe('duplicateEntry', () => {
     expect(saved).toEqual([])
   })
 })
+
+describe('cms({ onSave })', () => {
+  const author = { name: 'Ada', email: 'ada@example.com' }
+  let events: unknown[]
+
+  beforeEach(() => {
+    events = []
+    configure({ onSave: (event) => {
+      events.push(event)
+    }, files: { save: async () => ({ sha: 'abc' }) } })
+  })
+
+  test('hears each save, publish, duplicate and delete that went through, with the commit of a folder entry', async () => {
+    await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { author })
+    await saveEntry({ collection: 'posts', slug: 'new', data: { title: 'New' }, locale: 'fr' }, { create: true })
+    await publishEntry({ collection: 'posts', slug: 'hello' })
+    await deleteEntry({ collection: 'posts', slug: 'hello' })
+    expect(events).toEqual([
+      { collection: 'posts', slug: 'hello', verb: 'update', author, commit: { sha: 'abc' } },
+      { collection: 'posts', slug: 'new', locale: 'fr', verb: 'add', commit: { sha: 'abc' } },
+      { collection: 'posts', slug: 'hello', verb: 'publish', commit: { sha: 'abc' } },
+      { collection: 'posts', slug: 'hello', verb: 'delete', commit: { sha: 'abc' } },
+    ])
+  })
+
+  test('hears a loaded entry\'s save and delete, and each entry of a reorder', async () => {
+    stored.catalog = [{ slug: 'a', data: { title: 'a', order: 1 }, draft: false }, { slug: 'b', data: { title: 'b', order: 2 }, draft: false }]
+    await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' } })
+    await deleteEntry({ collection: 'products', slug: 'mug' })
+    await moveEntry({ collection: 'catalog', slug: 'b' }, 'up')
+    expect(events).toEqual([
+      { collection: 'products', slug: 'mug', verb: 'update' },
+      { collection: 'products', slug: 'mug', verb: 'delete' },
+      { collection: 'catalog', slug: 'b', verb: 'move' },
+      { collection: 'catalog', slug: 'a', verb: 'move' },
+    ])
+  })
+
+  test('hears nothing of a save that was refused, and a throw does not undo the save', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: '' } })).toHaveProperty('issues')
+    expect(events).toEqual([])
+
+    configure({ onSave: () => {
+      throw new Error('hook down')
+    }, files: { save: async () => ({ sha: 'abc' }) } })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } })).toHaveProperty('saved', true)
+  })
+})

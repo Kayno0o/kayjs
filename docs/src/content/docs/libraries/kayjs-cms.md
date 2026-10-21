@@ -398,7 +398,28 @@ To wire the whole thing:
 4. Keep the database where a deploy leaves it: a volume for the SQLite file, your `DATABASE_URL` for Postgres.
 5. Read the collections in your pages as usual. Add `live: true` to the collection so open pages follow a save.
 
-A save refreshes the collection in the server that handled it. Other servers keep their entries until the loader's `ttl` passes.
+### Other servers and edits made outside the CMS
+
+A save refreshes the collection in the server that handled it. Each loader also looks at its database every second (SQLite) or two (Postgres) and drops the collection's entries when something else changed them. So other servers follow a save, and so does a row you edit with `sqlite3` or `psql`, with nothing to declare. Set `watch` on the loader to change the interval, or `watch: false` to look no more. `ttl` is not needed for this.
+
+The refresh covers the pages that read the collection, the sitemap, `live: true` pages in open tabs and the dates of `publishAt` and `unpublishAt`. A scheduled entry appears on each server's own clock, so replicas need no job. The search index is built by `kay build`, so a new entry is searchable after the next build.
+
+A collection whose entries come from a loader of your own has no database to look at. Call `invalidate()` on it from a webhook route, or restart.
+
+### After a save
+
+`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate` or `delete`), the author and, for a folder entry, the commit.
+
+```ts
+cms({
+  guard,
+  onSave: async ({ collection, slug }) => {
+    await purgeCdn(`/${collection}/${slug}`)
+  },
+})
+```
+
+It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is logged and the save stays.
 
 ## Where files are saved
 

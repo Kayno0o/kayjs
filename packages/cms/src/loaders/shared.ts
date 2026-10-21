@@ -1,4 +1,7 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
+import { invalidate } from 'kay/cache'
+import { contentKey } from 'kay/content'
+import { durationSeconds } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
 export interface SeedEntry {
@@ -18,6 +21,8 @@ export interface LoaderOptions {
   table?: string | undefined
   // How long the entries are served before the next read refreshes them, as `collection()` loaders keep them.
   ttl?: ContentLoader['ttl']
+  // How often the loader looks for a change another process or a hand edit made, so this process serves it without a restart or a `ttl`: `'1s'` for SQLite and `'2s'` for Postgres by default, `false` to look no more. A save made here is not looked for again.
+  watch?: ContentLoader['ttl'] | false | undefined
 }
 
 export interface SavedEntry {
@@ -66,4 +71,56 @@ export async function seedEntries(seed: LoaderOptions['seed']): Promise<readonly
 
 export function existsError(name: string, place: string): Error {
   return new Error(`${name}: ${place} exists already`)
+}
+
+export interface Watcher {
+  // Takes the database's present state as the one the entries were read at, and looks for a change on every interval from then on; a second call does nothing.
+  start: () => Promise<void>
+  // Takes the state a save of this process left as known, so the poll does not report it as someone else's.
+  settle: () => Promise<void>
+}
+
+// Looks at a cheap `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit.
+export function watcher(name: string, watch: LoaderOptions['watch'], fallback: string, signature: () => string | Promise<string>): Watcher {
+  const every = watch === false ? undefined : Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`, 'kayjs-cms') * 1000)
+  let known: string | undefined
+  let timer: ReturnType<typeof setInterval> | undefined
+  let looking = false
+
+  const look = async () => {
+    if (looking)
+      return
+
+    looking = true
+
+    try {
+      const now = await signature()
+
+      if (now !== known) {
+        known = now
+        invalidate(contentKey(name))
+      }
+    }
+    catch {
+      // The next interval looks again; a database that is down fails the entries' own reads loudly.
+    }
+    finally {
+      looking = false
+    }
+  }
+
+  return {
+    start: async () => {
+      if (every === undefined || timer !== undefined)
+        return
+
+      timer = setInterval(() => void look(), every)
+      timer.unref()
+      known = await signature()
+    },
+    settle: async () => {
+      if (timer !== undefined)
+        known = await signature()
+    },
+  }
 }

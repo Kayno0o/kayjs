@@ -145,3 +145,100 @@ describe('as a collection', () => {
     expect((await posts.all()).map(post => post.data.title)).toEqual(['A', 'B', 'X'])
   })
 })
+
+const schema = s.Object({ title: s.String() })
+
+// Waits for the collection's titles to be what `wanted` lists, for a watcher's interval to pass.
+async function titlesBecome(posts: { all: () => Promise<{ data: { title: string } }[]> }, wanted: string[]) {
+  let titles: string[] = []
+
+  for (let wait = 0; wait < 100; wait++) {
+    titles = (await posts.all()).map(post => post.data.title).toSorted()
+
+    if (titles.join() === wanted.join())
+      return titles
+
+    await Bun.sleep(30)
+  }
+
+  return titles
+}
+
+// How many times a collection over the loader reads its entries while `run` goes, and a moment after: more than the first means something dropped them.
+async function readsDuring(loader: ContentLoader, run: () => Promise<void>): Promise<number> {
+  let reads = 0
+  const posts = collection({ ...loader, load: async (context) => {
+    reads++
+
+    return loader.load(context)
+  } }, { schema })
+
+  await posts.all()
+  await run()
+  await Bun.sleep(250)
+  await posts.all()
+
+  return reads
+}
+
+describe('a loader watching its database', () => {
+  test('sqlite follows a save and a hand edit made through another connection, and not its own', async () => {
+    const path = join(await scratchDir('loader-'), 'watch.db')
+    const posts = collection(sqliteLoader({ name: 'watched-sqlite', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
+
+    expect((await posts.all()).map(post => post.data.title)).toEqual(['A'])
+
+    const other = new Database(path)
+    const elsewhere = sqliteLoader({ name: 'watched-sqlite', database: other })
+
+    await elsewhere.save!({ slug: 'b', data: { title: 'B' } })
+    expect(await titlesBecome(posts, ['A', 'B'])).toEqual(['A', 'B'])
+    other.run(`UPDATE kay_content SET data = '{"title":"Edited"}' WHERE collection = 'watched-sqlite' AND place = 'a'`)
+    expect(await titlesBecome(posts, ['B', 'Edited'])).toEqual(['B', 'Edited'])
+    other.run(`DELETE FROM kay_content WHERE collection = 'watched-sqlite' AND place = 'b'`)
+    expect(await titlesBecome(posts, ['Edited'])).toEqual(['Edited'])
+
+    const own = sqliteLoader({ name: 'watched-own', database: path, watch: '40ms' })
+
+    expect(await readsDuring(own, async () => own.save!({ slug: 'x', data: { title: 'X' } }))).toBe(1)
+    other.close()
+  })
+
+  test('watch: false looks no more', async () => {
+    const path = join(await scratchDir('loader-'), 'quiet.db')
+    const quiet = sqliteLoader({ name: 'quiet', database: path, watch: false })
+
+    expect(await readsDuring(quiet, async () => {
+      const other = new Database(path)
+
+      other.run(`INSERT INTO kay_content (collection, place, data) VALUES ('quiet', 'z', '{}')`)
+      other.close()
+    })).toBe(1)
+  })
+
+  postgresTest('postgres follows a save and a hand edit made through another connection, and not its own', async () => {
+    shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
+
+    const posts = collection(postgresLoader({ name: 'watched-pg', sql: shared, table: 'watched', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
+
+    expect((await posts.all()).map(post => post.data.title)).toEqual(['A'])
+
+    const other = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 1 })
+
+    try {
+      await postgresLoader({ name: 'watched-pg', sql: other, table: 'watched' }).save!({ slug: 'b', data: { title: 'B' } })
+      expect(await titlesBecome(posts, ['A', 'B'])).toEqual(['A', 'B'])
+      await other.unsafe(`UPDATE watched SET data = '{"title":"Edited"}' WHERE collection = 'watched-pg' AND place = 'a'`)
+      expect(await titlesBecome(posts, ['B', 'Edited'])).toEqual(['B', 'Edited'])
+      await other.unsafe(`DELETE FROM watched WHERE collection = 'watched-pg' AND place = 'b'`)
+      expect(await titlesBecome(posts, ['Edited'])).toEqual(['Edited'])
+
+      const own = postgresLoader({ name: 'watched-pg-own', sql: shared, table: 'watched', watch: '40ms' })
+
+      expect(await readsDuring(own, async () => own.save!({ slug: 'x', data: { title: 'X' } }))).toBe(1)
+    }
+    finally {
+      await other.close()
+    }
+  })
+})
