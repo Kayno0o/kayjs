@@ -1,6 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
+import type { WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
@@ -19,12 +20,16 @@ import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { reactiveValue } from './script'
 import { headTagProblem, sharedImports } from './validate'
 
+const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
+
 export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
   classMerge?: boolean | undefined
   // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
   translates?: boolean | undefined
+  // The write helpers the rewrites call, imported from the runtime.
+  writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string | undefined
   // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
@@ -253,6 +258,9 @@ class ModuleShell {
 
     if (this.deferred.size > 0)
       kayHelpers.push('autoDefer')
+
+    for (const write of this.options.writes ?? [])
+      kayHelpers.push(WRITE_NAMES[write])
 
     // What fills a form's fields back in once a post was refused.
     if (runs && facts.actionForm)
@@ -940,7 +948,7 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack'
 
 type Helper = TemplateHelper | 'omit'
 

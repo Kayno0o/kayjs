@@ -776,6 +776,68 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types an assignment to a property, an element or a let by what it holds: a signal takes its value, anything else its own type', async () => {
+    const box = [
+      'import { memo, signal } from \'kay\'',
+      '',
+      'export function makeBox() {',
+      '  const count = signal(0)',
+      '',
+      '  return { count, double: memo(() => count() * 2), name: \'a\', n: 0, list: [signal(1)], on: undefined as boolean | undefined }',
+      '}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { makeBox } from \'../box\'',
+      '',
+      'const box = makeBox()',
+      'let picked = makeBox().count',
+      'let label = makeBox().name',
+      'let maybe = makeBox().on',
+      '',
+      'function good() {',
+      '  box.count = 5',
+      '  box.count += 1',
+      '  box.count++',
+      '  --box.count',
+      '  box.name = \'b\'',
+      '  box.n += 2',
+      '  box.n++',
+      '  box.list[0] = 3',
+      '  box.list[box.n]++',
+      '  picked = 4',
+      '  picked++',
+      '  label += \'!\'',
+      '  maybe = box.name === \'b\' ? true : undefined',
+      '}',
+      '',
+      'function bad() {',
+      '  box.count = \'x\'',
+      '  box.double = 3',
+      '  box.name = 3',
+      '  box.count += \'x\'',
+      '  picked = \'x\'',
+      '}',
+      '---',
+      'button(onClick={() => box.count = 1}) {box.count()} {picked()} {label} {maybe}',
+      'button(onClick={() => box.count = \'x\'}) bad',
+      'button(onClick={good}) good',
+      'button(onClick={bad}) bad',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2345'], [34, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 

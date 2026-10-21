@@ -521,6 +521,42 @@ describe('signal writes', () => {
       await dispose()
     }
   })
+
+  const mountWrites = site({
+    'box.ts': 'import { memo, signal } from \'kay\'\n\nexport function makeBox() {\n  const count = signal(0)\n\n  return { count, double: memo(() => count() * 2), plain: 1, handler: Object.assign(() => 0, { set: (_: number) => 0 }), list: [signal(1), signal(2)], name: \'a\' }\n}\n',
+    'main.kay': '---\nimport { makeBox } from \'./box\'\n\nconst box = makeBox()\nlet picked = makeBox().count\nlet label = makeBox().name\nconst plain = { n: 0 }\nconst tick = signal(0)\n\nfunction bump() {\n  box.list[1] = 20\n  label += \'!\'\n}\n---\nbutton.set(onClick={() => box.count = 5}) set\nbutton.add(onClick={() => box.count += 2}) add\nbutton.inc(onClick={() => box.count++}) inc\nbutton.dec(onClick={() => --box.count}) dec\nbutton.list(onClick={bump}) list\nbutton.pick(onClick={() => picked = 7}) pick\nbutton.again(onClick={() => picked++}) again\nbutton.plain(onClick={() => { box.plain = 2; box.name = \'b\'; plain.n++; tick++ }}) plain\nbutton.own(onClick={() => { box.handler = Object.assign(() => 9, { set: (_: number) => 1 }); tick++ }}) own\np.count {box.count()}\np.double {box.double()}\np.list {box.list[0]()} {box.list[1]()}\np.picked {picked()}\np.plain {[tick(), box.plain, box.name, plain.n, label, box.handler()].join(\' \')}\n',
+  })
+
+  it('writes a signal a property, an element or a let holds by assigning it, and assigns anything else', async () => {
+    const { root, dispose } = await mountWrites()
+    const text = (selector: string) => root.querySelector(selector)!.textContent
+    const click = async (selector: string) => {
+      root.querySelector<HTMLElement>(selector)!.click()
+      await settle()
+    }
+
+    try {
+      await click('.set')
+      expect([text('.count'), text('.double')]).toEqual(['5', '10'])
+      await click('.add')
+      await click('.inc')
+      await click('.inc')
+      await click('.dec')
+      expect(text('.count')).toBe('8')
+      await click('.list')
+      expect(text('p.list')).toBe('1 20')
+      await click('.pick')
+      await click('.again')
+      expect(text('.picked')).toBe('8')
+      await click('.plain')
+      expect(text('p.plain')).toBe('1 2 b 1 a! 0')
+      await click('.own')
+      expect(text('p.plain')).toBe('2 2 b 1 a! 9')
+    }
+    finally {
+      await dispose()
+    }
+  })
 })
 
 describe('loops', () => {

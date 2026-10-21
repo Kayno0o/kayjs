@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE } from './names'
+import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
 
 const LIVE_WRITES = new Set(['set', 'delete'])
 
@@ -17,6 +17,13 @@ const CAPITAL = /^[A-Z]/
 const COMPILER_NAME = /^Kay[A-Z]/
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
 const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo' }
+// What a constant is set to that is never a signal: a literal, an object, an array, a function, a class, an instance or an operation.
+const HOLDS_NO_SIGNAL = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'RegExpLiteral', 'TemplateLiteral', 'ObjectExpression', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'BinaryExpression', 'UnaryExpression'])
+const SPACE = /\s/
+// What `new` makes that holds no signal of its own: a collection, a typed array, a date.
+const PLAIN_CLASSES = /^(?:Array|Map|Set|WeakMap|WeakSet|Date|URL|URLSearchParams|FormData|Headers|Image|Audio|ArrayBuffer|DataView|(?:Big)?(?:Int|Uint|Float)(?:8|16|32|64)(?:Clamped)?Array)$/
+// The annotations of a `let` that no signal has.
+const PLAIN_TYPES = new Set(['TSNumberKeyword', 'TSStringKeyword', 'TSBooleanKeyword', 'TSBigIntKeyword', 'TSSymbolKeyword', 'TSArrayType', 'TSLiteralType', 'TSTupleType', 'TSTemplateLiteralType'])
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
@@ -76,6 +83,8 @@ export interface RewritePlan {
   translates: boolean
   // Type checking: the value of each signal the template reads, which `VALUES` holds.
   values: Map<string, string>
+  // The write helpers the rewrites call, which the module imports from the runtime.
+  writes: Set<keyof typeof WRITE_HELPERS>
 }
 
 export interface ConstantSignal {
@@ -117,7 +126,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
     ast = parse(input.code, { sourceType: 'module', attachComment: false, plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
-    return { plan: { rewrites: new Map(), translates: false, values: new Map() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
+    return { plan: { rewrites: new Map(), translates: false, values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
   }
 
   return new RewriteFinder(input).run(ast)
@@ -166,6 +175,11 @@ class RewriteFinder {
   private readonly known = new Set<Binding>()
   // Writes to a constant or an import, handled once every name kay knows is found.
   private readonly assigned: { binding: Binding, path: NodePath<t.AssignmentExpression | t.UpdateExpression> }[] = []
+  // Writes to a property, an element or a `let` that may hold a signal, which only the runtime can tell from a plain write.
+  private readonly mayWrite: NodePath<t.AssignmentExpression | t.UpdateExpression>[] = []
+  private readonly writes = new Set<keyof typeof WRITE_HELPERS>()
+  // The source offsets of the writes already dispatched: the code of a fence may be generated twice, and its rewrites keyed by source apply to both copies.
+  private readonly dispatched = new Set<number>()
   private translates = false
   private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
@@ -199,9 +213,10 @@ class RewriteFinder {
 
     this.unlistedTypeQueries()
     this.constantWrites()
+    this.dispatchedWrites()
 
     return {
-      plan: { rewrites: this.rewrites, translates: this.translates, values: this.values },
+      plan: { rewrites: this.rewrites, translates: this.translates, values: this.values, writes: this.writes },
       findings: { unread: this.unread, serverReads: this.serverReads, constantSignals: [...this.constantSignals.values()], globalReads: this.globalReads },
       diagnostics: this.diagnostics,
     }
@@ -415,6 +430,13 @@ class RewriteFinder {
     rewrites.set(at, { ...access, after: `${access.after ?? ''}.set(${operator === '' ? '' : `(${CURRENT}) => ${CURRENT} ${operator} (`}`, end: span.end })
     rewrites.set(span.end, { replace: '', end: rightStart! })
     this.insert(rightEnd! + 1, operator === '' ? ')' : '))')
+  }
+
+  // Text that opens a call at `at`, ahead of anything a rewrite starting there writes.
+  private open(at: number, text: string) {
+    const found = this.rewrites.get(at)
+
+    this.rewrites.set(at, found ? { ...found, before: `${text}${found.before ?? ''}` } : { before: text, end: at })
   }
 
   // A call reading a signal in the template, `count()`, which type checking reads as the name alone: the source offset of the name.
@@ -655,6 +677,8 @@ class RewriteFinder {
 
     if (target.type === 'Identifier' && (binding?.kind === 'const' || binding?.kind === 'module') && this.input.map.isExact(target.start!))
       this.assigned.push({ binding, path })
+    else if (target.type === 'MemberExpression' || (target.type === 'Identifier' && (binding?.kind === 'let' || binding?.kind === 'var')))
+      this.mayWrite.push(path)
   }
 
   // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
@@ -689,10 +713,236 @@ class RewriteFinder {
         this.signalWrite(path, name, 'signal', this.input.check === true ? CHECKED_WRITE : {})
     }
   }
+
+  // An assignment to a property, an element or a `let` set from something kay cannot see through may write a signal the types know it holds, which `kay dev` and `kay build` run no types to learn: the runtime tells a signal, written, from anything else, assigned.
+  // A target plainly holding no signal is left as written, so plain code pays nothing.
+  private dispatchedWrites() {
+    for (const path of this.mayWrite) {
+      const { node } = path
+      const at = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
+
+      if (at === undefined || this.dispatched.has(at))
+        continue
+
+      this.dispatched.add(at)
+
+      const target = node.type === 'AssignmentExpression' ? node.left : node.argument
+
+      if (target.type === 'MemberExpression')
+        this.dispatchMember(path, node, target)
+      else if (target.type === 'Identifier')
+        this.dispatchBinding(path, node, target)
+    }
+  }
+
+  // The generated offsets of the pieces of an assignment or an update, in the source, or nothing when any of them was not copied from it.
+  private writeSpans(node: t.AssignmentExpression | t.UpdateExpression) {
+    const { map } = this.input
+    const assignment = node.type === 'AssignmentExpression' ? node : undefined
+    const right = assignment?.right
+    const rightFrom = right && ((right.extra?.parenStart as number | undefined) ?? right.start!)
+    const at = (offset: number | undefined) => offset !== undefined && map.isExact(offset) ? map.toSource(offset) : undefined
+
+    return { start: at(node.start!), last: at(node.end! - 1), rightFrom: at(rightFrom) }
+  }
+
+  private dispatchMember(path: NodePath<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.MemberExpression) {
+    const { object, property, computed } = target
+    const { code } = this.input
+    const { rewrites, writes } = this
+
+    if (target.extra?.parenthesized === true || object.type === 'Super' || property.type === 'PrivateName' || holdsNoSignalRoot(path, object))
+      return
+
+    // Where the property is reached: the `.` before its name, or the `[` and `]` around its key.
+    const keyFrom = (property.extra?.parenStart as number | undefined) ?? property.start!
+    const open = lastNonSpace(code, keyFrom)
+    const close = computed ? nextNonSpace(code, property.end!, ')') : -1
+
+    if (code[open] !== (computed ? '[' : '.') || (computed && code[close] !== ']'))
+      return
+
+    const { map } = this.input
+    const objectFrom = (object.extra?.parenStart as number | undefined) ?? object.start!
+    const pieces = [objectFrom, open, ...computed ? [close] : []]
+
+    if (!pieces.every(piece => map.isExact(piece)))
+      return
+
+    const [from, opening, closing] = pieces.map(piece => map.toSource(piece)) as [number, number, number | undefined]
+    const { start, last, rightFrom } = this.writeSpans(node)
+    const key = computed ? undefined : JSON.stringify((property as t.Identifier).name)
+
+    if (start === undefined || last === undefined)
+      return
+
+    if (node.type === 'UpdateExpression') {
+      const update = `${node.operator === '++' ? '+' : '-'} 1`
+      const tail = `(${CURRENT}) => ${CURRENT} ${update}${node.prefix ? '' : ', true'})`
+
+      if (node.prefix)
+        rewrites.set(start, { replace: `${WRITE_HELPERS.update}(`, end: from })
+      else
+        this.open(from, `${WRITE_HELPERS.update}(`)
+
+      if (computed) {
+        rewrites.set(opening, { replace: ', ', end: opening + 1 })
+        rewrites.set(closing!, { replace: `, ${tail}`, end: last + 1 })
+      }
+      else {
+        rewrites.set(opening, { replace: `, ${key}, ${tail}`, end: last + 1 })
+      }
+
+      writes.add('update')
+
+      return
+    }
+
+    if (rightFrom === undefined)
+      return
+
+    const operator = (node).operator.slice(0, -1)
+    const compound = operator !== ''
+    const head = compound ? `, (${CURRENT}) => ${CURRENT} ${operator} (` : ', '
+
+    this.open(from, `${compound ? WRITE_HELPERS.update : WRITE_HELPERS.to}(`)
+
+    if (computed) {
+      rewrites.set(opening, { replace: ', ', end: opening + 1 })
+      rewrites.set(closing!, { replace: head, end: rightFrom })
+    }
+    else {
+      rewrites.set(opening, { replace: `, ${key}${head}`, end: rightFrom })
+    }
+
+    this.insert(last + 1, compound ? '))' : ')')
+    writes.add(compound ? 'update' : 'to')
+  }
+
+  private dispatchBinding(path: NodePath<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.Identifier) {
+    const binding = path.scope.getBinding(target.name)
+    const declarator = binding?.path.node
+
+    if (!binding || this.known.has(binding) || declarator?.type !== 'VariableDeclarator' || declarator.init == null || (declarator.id.type === 'Identifier' && holdsNoSignalType(declarator.id)) || holdsNoSignal(binding))
+      return
+
+    const { rewrites, writes } = this
+    const { map } = this.input
+    const { start, last, rightFrom } = this.writeSpans(node)
+    const name = target.name
+
+    const from = map.isExact(target.start!) ? map.toSource(target.start!) : undefined
+
+    if (from === undefined || start === undefined || last === undefined)
+      return
+
+    const end = from + name.length
+
+    if (node.type === 'UpdateExpression') {
+      // The new value is what the variable takes, so an update whose own value is read keeps its plain form.
+      if (!valueUnused(path))
+        return
+
+      const update = `(${CURRENT}) => ${CURRENT} ${node.operator === '++' ? '+' : '-'} 1`
+
+      if (node.prefix) {
+        rewrites.set(start, { replace: '', end: from })
+        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, ${update})`, end: last + 1 })
+      }
+      else {
+        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, ${update})`, end: last + 1 })
+      }
+
+      writes.add('updateBack')
+
+      return
+    }
+
+    if (rightFrom === undefined)
+      return
+
+    const operator = node.operator.slice(0, -1)
+
+    if (operator === '') {
+      this.open(rightFrom, `${WRITE_HELPERS.back}(${name}, `)
+      this.insert(last + 1, ')')
+      writes.add('back')
+
+      return
+    }
+
+    rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, (${CURRENT}) => ${CURRENT} ${operator} (`, end: rightFrom })
+    this.insert(last + 1, '))')
+    writes.add('updateBack')
+  }
 }
 
-// What a constant is set to that is never a signal: a literal, an object, an array, a function, a class, an instance or an operation.
-const HOLDS_NO_SIGNAL = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'RegExpLiteral', 'TemplateLiteral', 'ObjectExpression', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'BinaryExpression', 'UnaryExpression'])
+// The offset of the last character before `at` that is not a space.
+function lastNonSpace(code: string, at: number): number {
+  let index = at - 1
+
+  while (index >= 0 && SPACE.test(code[index]!))
+    index--
+
+  return index
+}
+
+// The offset of the first character from `at` that is not a space or one of `skipped`.
+function nextNonSpace(code: string, at: number, skipped: string): number {
+  let index = at
+
+  while (index < code.length && (SPACE.test(code[index]!) || skipped.includes(code[index]!)))
+    index++
+
+  return index
+}
+
+// Whether a literal holds nothing that could be a signal: literals, functions and containers of them.
+function plainLiteral(node: t.Node | null | undefined): boolean {
+  if (!node)
+    return false
+
+  if (node.type === 'ObjectExpression')
+    return node.properties.every(property => property.type === 'ObjectMethod' || (property.type === 'ObjectProperty' && !property.computed && plainLiteral(property.value)))
+
+  if (node.type === 'ArrayExpression')
+    return node.elements.every(element => element !== null && element.type !== 'SpreadElement' && plainLiteral(element))
+
+  if (node.type === 'NewExpression')
+    return node.callee.type === 'Identifier' && PLAIN_CLASSES.test(node.callee.name)
+
+  if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
+    return plainLiteral(node.expression)
+
+  return HOLDS_NO_SIGNAL.has(node.type)
+}
+
+// Whether the root of a target, `box` in `box.list[0].count`, is a binding set to a literal holding no signal, so none of its properties can be one.
+function holdsNoSignalRoot(path: NodePath, object: t.Node): boolean {
+  let root = object
+
+  while (root.type === 'MemberExpression' || root.type === 'TSNonNullExpression' || root.type === 'TSAsExpression' || root.type === 'ParenthesizedExpression')
+    root = root.type === 'MemberExpression' ? root.object : root.expression
+
+  const binding = root.type === 'Identifier' ? path.scope.getBinding(root.name) : undefined
+  const declarator = binding?.path.node
+
+  return declarator?.type === 'VariableDeclarator' && declarator.id.type === 'Identifier' && plainLiteral(declarator.init)
+}
+
+// Whether a declaration is annotated with a type no signal has: `let total: number`.
+function holdsNoSignalType(id: t.Identifier): boolean {
+  const annotation = id.typeAnnotation?.type === 'TSTypeAnnotation' ? id.typeAnnotation.typeAnnotation.type : undefined
+
+  return annotation !== undefined && PLAIN_TYPES.has(annotation)
+}
+
+// Whether an update's value is dropped: a statement, an arrow's body or a `for` loop's last part.
+function valueUnused(path: NodePath): boolean {
+  const { parent, node } = path
+
+  return parent.type === 'ExpressionStatement' || (parent.type === 'ArrowFunctionExpression' && parent.body === node) || (parent.type === 'ForStatement' && parent.update === node)
+}
 
 // What leaves the value it wraps as it is; a cast may make a signal of anything, so it is left to the type checker.
 const TRANSPARENT = new Set(['TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])

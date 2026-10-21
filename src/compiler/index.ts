@@ -174,7 +174,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename), check: options.check, fixedPage: routeFile })
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
-  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, values: found.plan.values })
+  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, writes: found.plan.writes, values: found.plan.values })
   // A fence that did not parse at all reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
   const unparsed = script.unparsed !== undefined || server?.unparsed !== undefined
   const diagnostics = [

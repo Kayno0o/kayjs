@@ -12,6 +12,8 @@ export const WRITABLE = 'KayWritable('
 export const DEFAULTED = 'KayDefault('
 // What type checking wraps a signal the template hands on whole, a function's argument or a component's prop, so the types report one handed to a parameter that takes anything: `describe(KayHanded(count))`.
 export const HANDED = 'KayHanded('
+// What an assignment to a property, an element or a `let` that may hold a signal becomes, the signal being told from anything else when it runs: `KayWriteTo(box, "count", 1)`, `c = KayWriteBack(c, 1)`. Type checking imports the same ones, whose signatures type the write by what the target holds.
+export const WRITE_HELPERS = { to: 'KayWriteTo', update: 'KayUpdateTo', back: 'KayWriteBack', updateBack: 'KayUpdateBack' } as const
 // A `case` block's subject, read once for every `when`.
 export const SUBJECT = 'KaySubject'
 // The server fence's function, which hands its data to the template.
@@ -27,4 +29,4 @@ export function defaultName(index: number): string {
 }
 
 // What the editor leaves out of completions: the names above a completion can reach, and what the generated code imports or declares.
-export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, VALUES, CURRENT, 'kayEvent', 'kayMatched', 'kayAwaited', 'kayEach'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:Default|LoopFor|StaticFor|Show|Omit|ComponentClass|PartClass|PartsClass|PartOf|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|Row|Truthy|Unmatched|Writable|Handed|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|ReviveActions|UseHead|Await|Awaited|Try))$`)
+export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, VALUES, CURRENT, 'kayEvent', 'kayMatched', 'kayAwaited', 'kayEach'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:Default|LoopFor|StaticFor|Show|Omit|ComponentClass|PartClass|PartsClass|PartOf|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|Row|Truthy|Unmatched|Writable|WriteTo|UpdateTo|WriteBack|UpdateBack|Handed|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|ReviveActions|UseHead|Await|Awaited|Try))$`)

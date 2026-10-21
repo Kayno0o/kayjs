@@ -166,7 +166,7 @@ Handed to a component as a prop, `Toggle(open={open})`, a signal passes as itsel
 
 Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal is an error, `uncalled-signal`. Call it there.
 
-Assigning works on a signal held in a `const`, an import or a `Signal<boolean>` prop, and on a `let` the script sets to `signal(...)`. For a signal in an object's property, `box.count`, or a `let` set from a function's result, write `.set`. Assigning would replace the property, and `kay check` reports a type error.
+Assigning works on a signal held in a `const`, an import, a `let`, an object's property, an array element or a `Signal<boolean>` prop: `box.count = 1`, `list[2]++`. Where kay cannot tell a signal from a plain value, the runtime does, writing a signal and assigning anything else, and `kay check` types the write by what the target holds, so `box.count = 'x'` is a type error for a `Signal<number>`.
 
 ## Derived and selected state
 

@@ -195,7 +195,10 @@ export class CodeBuilder {
     }
 
     for (let index = low; index < this.sorted.length && this.sorted[index]![0] <= span.end; index++) {
-      if (this.sorted[index]![1].end <= span.end)
+      const [start, rewrite] = this.sorted[index]!
+
+      // Text inserted where two spans meet belongs to one: opening text to the span that starts there, closing text to the one that ends there, which a statement beside an empty one needs.
+      if (rewrite.end <= span.end && !(rewrite.end === start && span.end > span.start && (rewrite.before === undefined ? start === span.start : start === span.end)))
         found.push(this.sorted[index]!)
     }
 

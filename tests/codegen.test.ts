@@ -252,13 +252,13 @@ describe('control flow', () => {
       expect(compileKay('match s\n', 'test.kay', { output }).diagnostics.map(d => d.message)).toEqual(['`match` has no `when` line'])
   })
 
-  it('reads a keyed row\'s key untracked, since a row keeps its key for life, and leaves a write or a call through it as written', () => {
+  it('reads a keyed row\'s key untracked, since a row keeps its key for life, and leaves a call through it as written, a write going through the runtime that tells a signal from a value', () => {
     const dom = compileKay('ul\n  for todo of todos key={todo.id}\n    li(onClick={() => todo.id++}) {todo.id}: {todo.title} {todo.id.toFixed()}', 'test.kay', { output: 'dom' }).tsx
 
     expect(dom).toContain('KayUntrack(() => todo().id)')
     expect(dom).toContain('KayUntrack(() => todo().id).toFixed()')
     expect(dom).toContain('todo().title')
-    expect(dom).toContain('todo().id++')
+    expect(dom).toContain('KayUpdateTo(todo(), "id", (KayCurrent) => KayCurrent + 1, true)')
     expect(compileKay('for row of rows key={row}\n  p {row}', 'test.kay', { output: 'dom' }).tsx).toContain('KayUntrack(() => row())')
   })
 

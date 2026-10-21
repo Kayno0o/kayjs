@@ -505,6 +505,13 @@ describe('kay lsp imports', () => {
     expect(diagnostics.map(diagnostic => [diagnostic.code, diagnostic.tags])).toEqual([['unread-name', [1]], ['unread-name', [1]], ['unread-name', [1]]])
   })
 
+  it('types an assignment to a property by what it holds, as kay check does: a signal takes its value, anything else its own type', async () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst box = { count: signal(0), name: \'a\' }\n\nfunction go() {\n  box.count = 1\n  box.name = 2\n}\n---\nbutton(onClick={go}) {box.count()}\n'
+    const diagnostics = await editor.change(page, source, 8)
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code])).toEqual([[7, 2345]])
+  })
+
   // Last, as opening another file publishes the page's diagnostics again, which a later change would take for its own.
   it('leaves the errors of a library component the app never imports to the library, as kay check does', async () => {
     expect(await editor.open('node_modules/kay-lib/src/unused-pill.kay')).toEqual([])

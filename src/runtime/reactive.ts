@@ -771,9 +771,19 @@ function dispose(node: Owner): void {
 // A function passed to `set` is an updater, and a value reaches the browser as devalue does, so a signal holds no functions.
 export type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
+// What `withSetter` made, so a function with a `set` of its own is not taken for a signal.
+const signals = new WeakSet<object>()
+
+// Whether a value is a signal, written by `set`: not a memo, nor a function that happens to have a `set`.
+export function isSignal(value: unknown): value is Signal<unknown> {
+  return typeof value === 'function' && signals.has(value)
+}
+
 // A read function given the `set` of a signal, which takes a value or a function of the current one.
 export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
   const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)
+
+  signals.add(read)
 
   return Object.assign(read, { set })
 }
