@@ -27,15 +27,15 @@ async function withoutBunBuiltins<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-// Lints `path` of a scaffold in this process with the project's own config, after writing the types `kay lint` writes first: the same rules as the CLI, with ESLint, its plugins and the TypeScript services loaded once for every scaffold of the run instead of once per lint.
-export async function lintInProcess(dir: string, path: string): Promise<LintResult[]> {
+// Lints `paths` of a scaffold in this process with the project's own config, after writing the types `kay lint` writes first: the same rules as the CLI, with ESLint, its plugins and the TypeScript services loaded once for every scaffold of the run instead of once per lint.
+export async function lintInProcess(dir: string, paths: string | string[]): Promise<LintResult[]> {
   await writeShadowTypes(dir, configCheckOptions(await loadConfig(dir)))
 
   const { ESLint } = await import('eslint')
-  const results = await withoutBunBuiltins(async () => new ESLint({ cwd: dir }).lintFiles([path]))
+  const results = await withoutBunBuiltins(async () => new ESLint({ cwd: dir }).lintFiles([paths].flat()))
 
   if (results.length === 0)
-    throw new Error(`lintInProcess: ${path} of ${dir} matched no file`)
+    throw new Error(`lintInProcess: ${[paths].flat().join(', ')} of ${dir} matched no file`)
 
   return results.map(({ filePath, messages }) => ({ filePath, messages: messages.map(({ ruleId, line }) => ({ ruleId, line })) }))
 }

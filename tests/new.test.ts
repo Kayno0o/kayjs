@@ -3,12 +3,14 @@ import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { ASSET_PREFIX, clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { NOTICES_FILE } from '../src/build/licenses'
 import { check, configCheckOptions } from '../src/check'
+import { runCommand } from '../src/commands/command'
+import { USAGES } from '../src/commands/usages'
 import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
@@ -59,6 +61,46 @@ it('changes the accent on a click', async () => {
   }
 })
 `
+
+// The contents each path takes in each preset, to tell what another scaffold generates differently.
+let presetContents: Promise<Map<string, Map<string, string>>> | undefined
+
+async function presetFiles(): Promise<Map<string, Map<string, string>>> {
+  presetContents ??= (async () => {
+    const seen = new Map<string, Map<string, string>>()
+
+    for (const [name, preset] of Object.entries(PRESETS)) {
+      const dir = join(await mkdtemp(join(tmpdir(), 'kay-preset-')), 'my-app')
+
+      try {
+        const files = await createProject(dir, { kay: '^1.0.0', features: preset.features })
+
+        seen.set(name, new Map(await Promise.all(files.map(async file => [file, await Bun.file(join(dir, file)).text()] as const))))
+      }
+      finally {
+        await rm(join(dir, '..'), { recursive: true, force: true })
+      }
+    }
+
+    return seen
+  })()
+
+  return presetContents
+}
+
+// The files of a scaffold that none of the presets `among` write as they are: what their own runs have not checked, linted or tested.
+async function ownFiles(dir: string, files: string[], among: string[] = Object.keys(PRESETS)): Promise<string[]> {
+  const presets = (await presetFiles()).entries().filter(([name]) => among.includes(name)).map(([, contents]) => contents).toArray()
+  const own = await Promise.all(files.map(async (file) => {
+    const text = await Bun.file(join(dir, file)).text()
+
+    return presets.some(contents => contents.get(file) === text) ? undefined : file
+  }))
+
+  return own.filter(file => file !== undefined)
+}
+
+const LINTED = /\.(?:kay|[cm]?[jt]sx?)$/
 
 // What `kay check` reports of the project, kay.config.ts read as it reads it: a warning fails the `check` script a scaffold writes.
 async function checked(dir: string) {
@@ -122,7 +164,7 @@ async function installKay(dir: string) {
 
 // Each feature alone, and the app with each one left out, or put in where the app lacks it.
 const VARIANTS = FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [PRESETS.app.features.includes(feature) ? `the app without ${feature}` : `the app with ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
-// Installed, checked, linted and tested besides the four presets. With them, server runs with auth and ws (app), with ws alone (the app without auth) and with neither (server); starter and tailwind each run with accents (server) and without (the app without tailwind, the app without starter); server, starter and tailwind each run absent, and the tests of a project with neither a server nor the starter pages run in eslint and tests alone. ci and docker write only text files.
+// Installed and type-checked besides the four presets, each linted and tested on the files it generates differently from every preset (`ownFiles`): the app without auth writes none, so it is only checked. With them, server runs with auth and ws (app), with ws alone (the app without auth) and with neither (server); starter and tailwind each run with accents (server) and without (the app without tailwind, the app without starter); server, starter and tailwind each run absent, and the tests of a project with neither a server nor the starter pages run in eslint and tests alone. ci and docker write only text files.
 const INSTALLED: [string, ReadonlySet<Feature>][] = [
   ['the app without starter', toggle(new Set(PRESETS.app.features), 'starter')],
   ['the app without tailwind', toggle(new Set(PRESETS.app.features), 'tailwind')],
@@ -227,40 +269,61 @@ async function kay(args: string[], cwd?: string): Promise<{ stdout: string, stde
   return { stdout, stderr, code }
 }
 
+const COMMANDS = {
+  build: async () => (await import('../src/commands/build')).build,
+  check: async () => (await import('../src/commands/check')).check,
+  dev: async () => (await import('../src/commands/dev')).dev,
+  fmt: async () => (await import('../src/commands/fmt')).fmt,
+  lsp: async () => (await import('../src/commands/lsp')).lsp,
+  new: async () => (await import('../src/commands/new')).scaffold,
+}
+
+// What `kay <name> <args>` prints and answers, through `runCommand` as the CLI runs it, for a command that stops at its usage or a refusal.
+async function inProcess(name: keyof typeof COMMANDS, args: string[]): Promise<{ stdout: string, stderr: string, code: number }> {
+  const out: string[] = []
+  const err: string[] = []
+  const log = spyOn(console, 'log').mockImplementation((...parts: unknown[]) => void out.push(parts.join(' ')))
+  const error = spyOn(console, 'error').mockImplementation((...parts: unknown[]) => void err.push(parts.join(' ')))
+
+  try {
+    const code = await runCommand(await COMMANDS[name](), args, `Usage: kay ${USAGES[name]}`)
+
+    return { stdout: out.map(line => `${line}\n`).join(''), stderr: err.map(line => `${line}\n`).join(''), code }
+  }
+  finally {
+    log.mockRestore()
+    error.mockRestore()
+  }
+}
+
+// One after the other, as they share the console they capture.
+async function inEach(runs: string[][]): Promise<{ args: string[], stdout: string, stderr: string, code: number }[]> {
+  const results = []
+
+  for (const args of runs)
+    results.push({ args, ...await inProcess(args[0] as keyof typeof COMMANDS, args.slice(1)) })
+
+  return results
+}
+
 describe('kay command line', () => {
   it('prints the usage for --help and -h on every command, without running it', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+    // The bare flags go through the CLI's own entry, the rest through the command they follow.
+    const runs = [...await Promise.all([['--help'], ['-h']].map(async args => ({ args, ...await kay(args) }))), ...await inEach([['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']])]
 
-    try {
-      const runs = await Promise.all([['--help'], ['-h'], ['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']].map(async args => ({ args, ...await kay(args, dir) })))
+    for (const { args, stdout, stderr, code } of runs)
+      expect({ args, stdout: stdout.startsWith(`Usage: kay ${args[0] === '--help' || args[0] === '-h' ? 'new' : args[0]}`), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
 
-      for (const { args, stdout, stderr, code } of runs)
-        expect({ args, stdout: stdout.startsWith(`Usage: kay ${args[0] === '--help' || args[0] === '-h' ? 'new' : args[0]}`), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
-
-      expect(runs.find(run => run.args[0] === '--help')!.stdout).toContain('kay lsp --stdio')
-      expect(runs.find(run => run.args[0] === 'build')!.stdout.trimEnd().split('\n')).toHaveLength(1)
-
-      expect(await readdir(dir)).toEqual([])
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-    }
+    expect(runs.find(run => run.args[0] === '--help')!.stdout).toContain('kay lsp --stdio')
+    expect(runs.find(run => run.args[0] === 'build')!.stdout.trimEnd().split('\n')).toHaveLength(1)
   })
 
   it('refuses an option or an argument a command does not take, with the usage', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+    // Refused while the arguments are read, before the command runs: nothing is written.
+    const runs = await inEach([['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']])
 
-    try {
-      const runs = await Promise.all([['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']].map(async args => ({ args, ...await kay(args, dir) })))
-
-      for (const { args, stdout, stderr, code } of runs)
-        expect({ args, stdout, usage: stderr.includes(`Usage: kay ${args[0]}`), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
-
-      expect(await readdir(dir)).toEqual([])
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-    }
+    for (const { args, stdout, stderr, code } of runs)
+      expect({ args, stdout, usage: stderr.includes(`Usage: kay ${args[0]}`), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
   })
 
   it('refuses kay lint in a project with no keslint, writing nothing', async () => {
@@ -672,7 +735,8 @@ describe('kay new', () => {
       // The config names the compose and example files, so `kay check` compares them with src/env.ts.
       expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-      expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
+      // The server preset's own files are linted by its test.
+      expect((await lintInProcess(dir, (await ownFiles(dir, files, ['server'])).filter(file => LINTED.test(file)))).flatMap(result => result.messages)).toEqual([])
 
       // The first start of a fresh app, as in development (bun test sets NODE_ENV=test, which reads .env.test): `pg-orm apply` makes the members table, which the second run finds applied.
       for (let run = 0; run < 2; run++) {
@@ -734,7 +798,8 @@ describe('kay new', () => {
       // The config names the compose and example files, so `kay check` compares them with src/env.ts.
       expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-      expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
+      // Every preset's own files are linted by theirs.
+      expect((await lintInProcess(dir, (await ownFiles(dir, files)).filter(file => LINTED.test(file)))).flatMap(result => result.messages)).toEqual([])
 
       const demoSignIn = async (env: Record<string, string>) => {
         const child = Bun.spawn([process.execPath, '-e', 'console.log((await import(\'./src/env\')).demoSignIn)'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DEMO_SIGN_IN: '', ...env } })
@@ -876,14 +941,17 @@ describe('kay new', () => {
       const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
       try {
-        await createProject(dir, { kay: '^1.0.0', features })
+        const own = await ownFiles(dir, await createProject(dir, { kay: '^1.0.0', features }))
+
         await installKay(dir)
         expect({ features, problems: await checked(dir) }).toEqual({ features, problems: [] })
 
-        if (variant.has('eslint'))
-          expect({ features, messages: (await lintInProcess(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+        const linted = own.filter(file => LINTED.test(file))
 
-        if (variant.has('tests')) {
+        if (variant.has('eslint') && linted.length > 0)
+          expect({ features, messages: (await lintInProcess(dir, linted)).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+
+        if (variant.has('tests') && own.some(file => file.startsWith('src/') || file.startsWith('tests/'))) {
           const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
           const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
