@@ -181,7 +181,9 @@ s.Object({
 })
 ```
 
-The price is a number, stored as `600`, with the euro sign beside the box. `rows` makes a text a box of that many rows that grows as you type. `labels` names the values of an enum. `lines` enters a list of strings in one box, a line each, and emptying it on an optional field leaves the key out. `when` shows a field only once a field next to it has a value, and the server warns at boot when no field is next to it; use it on an optional field, and know that a hidden field the schema refuses is shown with its message. `placeholder`, `prefix`, `suffix` and `type` (`'tel'` say) shape a one-line box, and `titleField` names the field of a list's items that heads each one.
+The price is a number, stored as `600`, with the euro sign beside the box. `rows` makes a text a box of that many rows that grows as you type. `labels` names the values of an enum. `lines` enters a list of strings in one box, a line each, and emptying it on an optional field leaves the key out.
+
+`when` shows a field only once a field next to it has a value, and the server warns at boot when no field is next to it; use it on an optional field, and know that a hidden field the schema refuses is shown with its message. `placeholder`, `prefix`, `suffix` and `type` (`'tel'` say) shape a one-line box, and `titleField` names the field of a list's items that heads each one.
 
 ## Field kinds of your own
 
