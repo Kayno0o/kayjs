@@ -115,7 +115,10 @@ describe('the tail of the pages server', () => {
 
   it('waits for the client build to end before a setup failure reaches the caller', async () => {
     let ended = false
-    const project = resolveProject(root, { routes: 'src/routes', compress: false, images: { maxDensity: 0.5 } }, modeOf({ dev: false, prebuilt: true }))
+    // An extension fails while the client builds: a config refused before the build starts never waits on one (tests/refused-before-build.test.ts).
+    const project = resolveProject(root, { routes: 'src/routes', compress: false, extensions: [{ name: 'broken', server: () => {
+      throw new Error('extension failed')
+    } }] }, modeOf({ dev: false, prebuilt: true }))
     const loadClient = async () => {
       await Bun.sleep(300)
       ended = true
@@ -123,7 +126,7 @@ describe('the tail of the pages server', () => {
       return { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, 'dist') }
     }
 
-    await expect(servePages(project, loadClient)).rejects.toThrow('images.maxDensity is 0.5')
+    await expect(servePages(project, loadClient)).rejects.toThrow('extension failed')
     expect(ended).toBe(true)
   }, 30_000)
 })
