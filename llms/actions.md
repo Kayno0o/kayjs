@@ -214,7 +214,7 @@ form(action={add})
 - A handler that throws, a mail server down say, is logged as any server error, `onError` included, and answered as a refusal with status 500.
 - A plain form post then renders its page with the message under the form and what was typed kept, read by `add.error()`, and a call throws `ActionError` with it in `errors['']`.
 - The message is `Something went wrong on our side; try again later` unless the site words it as `kay.action.serverError` ([Locales](locales.md#texts-from-kay-and-its-libraries)) or the action words its own, `action(schema, handler, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })`, so a handler needs no `try`/`catch` of its own to tell the visitor.
-- `serverError` may be a function given the error and `ctx`, sync or async, to word it from what is loaded per request or the page's `ctx.locale`: `serverError: async () => 'Write to ' + (await settings.one()).email`. Its text is answered with the same status 500; one that throws leaves kay's message and is logged beside the handler's error.
+- `serverError` may be a function given the error and `ctx`, sync or async, to word it from what is loaded per request or the page's `ctx.locale`: `serverError: async () => 'Write to ' + (await settings.one()).email`. Its text is answered with the same status 500; one that throws, or answers a blank text, leaves kay's message (a throw logged beside the handler's error), and a redirect or denial thrown from it is no answer either.
 - A redirect or a guard's denial thrown is no error.
 
 ### Refused fields and their messages

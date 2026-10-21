@@ -357,4 +357,25 @@ describe('a unique field', () => {
       registerCollections(before)
     }
   })
+
+  it('hands a loader\'s save the data with its defaults filled in and a date as its text', async () => {
+    const seen: string[] = []
+    const events = collection({
+      name: 'events',
+      load: () => [],
+      save: ({ data }) => {
+        // A date arrives as the JSON a CMS sends holds it, so it is text, never a `Date`.
+        seen.push(`${data.at.slice(0, 10)}:${data.seats}`)
+      },
+    }, { schema: t.Object({ at: t.Date(), seats: t.Integer({ default: 10 }) }) })
+    const before = registerCollections([['events', events]])
+
+    try {
+      expect(await saveEntry('events', { slug: 'launch', data: { at: '2026-10-21T10:00:00.000Z' } })).toEqual({})
+      expect(seen).toEqual(['2026-10-21:10'])
+    }
+    finally {
+      registerCollections(before)
+    }
+  })
 })

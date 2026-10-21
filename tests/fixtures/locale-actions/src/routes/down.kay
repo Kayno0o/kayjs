@@ -1,7 +1,7 @@
 --- server
 import { s } from 'kay'
 
-// The wording reads the page's locale and what a lookup finds, the way an address kept in a collection would be read.
+// The wording is async and reads the error and the page's locale, as one loading an address kept in a collection would.
 export const loud = action(s.Object({}), () => {
   throw new Error('mail down')
 }, { messages: { serverError: async (error, ctx) => `${ctx.locale}: ${(error as Error).message}` } })

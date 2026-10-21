@@ -821,8 +821,11 @@ async function serverErrorMessage(action: ServerAction<TSchema, unknown>, error:
     return words
 
   try {
-    if (words !== undefined)
-      return await words(error, ctx)
+    const text = words === undefined ? undefined : await words(error, ctx)
+
+    // A blank or non-text answer would show the visitor no message at all.
+    if (typeof text === 'string' && text.trim() !== '')
+      return text
   }
   catch (wordsError) {
     reportServerError(wordsError, request, onError)

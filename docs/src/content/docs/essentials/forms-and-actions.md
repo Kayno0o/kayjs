@@ -209,7 +209,9 @@ if add.failed()?.data as data
 
 A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.
 
-To word it yourself, give the action `{ messages: { serverError: 'Not sent; write to hello@example.com instead' } }`. When the text depends on something loaded per request, such as an address kept in a collection, give a function, sync or async, that is handed the error and the action's `ctx`: `serverError: async (error, ctx) => (await settings.one()).contactText`. Its text is shown with the same status, 500. If the function itself throws, kay's message is shown and both errors are logged.
+To word it yourself, give the action `{ messages: { serverError: 'Not sent; write to hello@example.com instead' } }`. When the text depends on something loaded per request, such as an address kept in a collection, give a function, sync or async, that is handed the error and the action's `ctx`: `serverError: async (error, ctx) => (await settings.one()).contactText`.
+
+Its text is shown with the same status, 500. If the function itself throws, or answers an empty text, kay's message is shown and the errors are logged. A redirect or a denial from it does nothing.
 
 ## Redirecting after success
 

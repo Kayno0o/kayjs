@@ -16,7 +16,7 @@ import { isDraft } from './drafts'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
-import { dataIssues, decodeEntries, unknownComponents } from './validate'
+import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './validate'
 
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
 // It gives drafts and files to whoever calls it: a CMS serves it from routes only an editor reaches.
@@ -546,7 +546,10 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 
     // A load that began before this write must not be joined by a read during or after it.
     loading.delete(name)
-    await save(options.create === true ? { ...entry, create: true } : entry)
+    // The data the schema checked, its defaults filled in, as `save` is typed.
+    const filled = { ...entry, data: withDefaults(entry.data, collection.options.schema) }
+
+    await save(options.create === true ? { ...filled, create: true } : filled)
     loading.delete(name)
     collection.invalidate()
 
