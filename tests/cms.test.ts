@@ -1156,6 +1156,25 @@ describe('preview mode', () => {
     }, true)
   })
 
+  it('opens a text field read again just before it renders, and marks no loop index with a number read in a condition', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { status: 'draft', title: 'T', label: 'draft', rating: 3 }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => {
+        const draft = entry.data.status === 'draft'
+        const title = `<h1>${child(entry.data.title)}</h1>`
+        const label = entry.data.label
+        const status = `${child('')}<h2>${child(entry.data.status)}</h2>`
+        const high = entry.data.rating >= 3
+        const row = `<li>${child(['Row ', 3])}</li>`
+
+        return `${draft ? title : ''}${label === 'draft' ? status : ''}${high ? row : ''}`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">T</h1><h2 data-kay-field="news:a:status">draft</h2><li>Row 3</li>')
+    }, true)
+  })
+
   it('keeps a number\'s mark across a literal text between two numbers of one child', () => {
     inPreview(() => {
       const marks = editMarks()!

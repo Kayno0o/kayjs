@@ -212,9 +212,11 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
   return `${OPEN}${marks.nonce}${KIND_CODE[kind]}${ref}${END}${markup}${CLOSE}${marks.nonce}${END}`
 }
 
+const anyRead = () => true
+
 function fieldOf(value: string | number, part = false): number | undefined {
   const marks = fieldMarks.marking!
-  const ref = typeof value === 'string' ? claim(marks.unrendered.get(value)) : claim(marks.numbers, read => read.value === value)
+  const ref = typeof value === 'string' ? claim(marks.unrendered.get(value), anyRead) : claim(marks.numbers, read => read.value === value)
 
   marks.renders++
 
@@ -227,9 +229,12 @@ function fieldOf(value: string | number, part = false): number | undefined {
 
 // The field whose read a render is, taken off `reads`: of the reads of that value, the latest rendered before them, the first of those when several were read together.
 // A read made before a render this one follows is one nothing rendered, a condition's say, and an equal value read after it is the one rendered, so the earlier reads of that value are forgotten with it.
-function claim<T extends Read>(reads: T[] | undefined, same: (read: T) => boolean = () => true): number | undefined {
-  if (reads === undefined)
+function claim<T extends Read>(reads: T[] | undefined, same: (read: T) => boolean): number | undefined {
+  if (reads === undefined || reads.length === 0)
     return undefined
+
+  if (reads.length === 1 && same(reads[0]!))
+    return reads.pop()!.ref
 
   let latest = -1
 
@@ -244,10 +249,14 @@ function claim<T extends Read>(reads: T[] | undefined, same: (read: T) => boolea
     return undefined
 
   const { ref } = reads[first]!
-  const kept = reads.filter((read, index) => index !== first && (!same(read) || read.epoch === latest))
+  let kept = 0
 
-  reads.length = 0
-  reads.push(...kept)
+  for (const [index, read] of reads.entries()) {
+    if (index !== first && (!same(read) || read.epoch === latest))
+      reads[kept++] = read
+  }
+
+  reads.length = kept
 
   return ref
 }
@@ -301,10 +310,18 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         const field = refIndex(marks, fieldPath(name, [...path, key]))
         const waiting = marks.unrendered.get(read)
 
-        if (!waiting)
+        if (!waiting) {
           marks.unrendered.set(read, [{ ref: field, epoch: marks.renders }])
-        else if (!waiting.some(each => each.ref === field))
+        }
+        else {
+          // A field read again is the one about to render, so it counts as read now.
+          const at = waiting.findIndex(each => each.ref === field)
+
+          if (at >= 0)
+            waiting.splice(at, 1)
+
           waiting.push({ ref: field, epoch: marks.renders })
+        }
       }
 
       return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])

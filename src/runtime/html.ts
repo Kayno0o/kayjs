@@ -66,14 +66,18 @@ export function child(value: unknown): string {
     return rendered(value)
 
   let markup = ''
+  let numbered = false
 
   eachChild(value, (part, original) => {
+    if (typeof original === 'number')
+      numbered = true
+
     if (typeof part !== 'string')
       markup += rendered(part)
     else if (fieldMarks.marking === undefined)
       markup += escape(part)
     else
-      markup += markedText(typeof original === 'number' ? original : part, escape(part), true)
+      markup += markedText(typeof original === 'number' ? original : part, escape(part), numbered)
   })
 
   return markup
