@@ -181,7 +181,7 @@ const drains = new Set<() => Promise<number>>()
 // Work a library started off a response's path, which `drainQueues` waits for before it looks at the queues.
 const detached = new Set<Promise<unknown>>()
 
-// Registers work started off a response's path, such as a mail issued after the answer left, so a test's `runJobs()` finds what it enqueues; a rejection stays the caller's to handle.
+// Registers work started off a response's path, such as a mail issued after the answer left, so a test's `runJobs()` finds what it enqueues; a rejection is ignored here, so the work logs its own failure.
 export function trackDetached(work: Promise<unknown>): void {
   const tracked: Promise<void> = (async () => {
     try {
