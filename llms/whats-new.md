@@ -35,6 +35,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-mail: `mailer({ locale })` and a message's `locale` replace `lang`, as kayjs-auth names the language of a mail; `kay upgrade` renames the mailer's ([kayjs-mail](../packages/mail/llms.txt)).
 - `--dry-run` on `kay check` (with the fixes), `kay fmt`, `kay new`, `kay add`, `kay migrate` and `kay i18n accept`, `--quiet` on `kay start`, `kay render`, `kay routes` and `kay upgrade`, `--format json` on `kay add`, `kay new` and `kay types` ([details](project.md)); a tool outcome says `ok` rather than `failed` ([details](../packages/ai/llms/tools.md)).
 - Hooks take one event object, `onError({ error, request })`, `onFailed({ payload, error })`, `onSignUp({ user, profile })`, `onDelete({ user })`, and kayjs-auth's data-returning ones are `exportData` and `profileFields`: [Upgrading](upgrading.md).
+- kayjs-ai: the dev tool has an AI tab with `ai()` in `extensions`, showing the provider, the limits and the last 50 asks with tokens, time and outcome ([Testing and errors](../packages/ai/llms/testing-and-errors.md#the-dev-tool-tab)).
 
 ## 1.69.0
 

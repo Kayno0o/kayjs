@@ -129,7 +129,7 @@ export default function shopTab(tool: DevTool): void {
 - `make` takes the tool's own classes: `facts` (a `dl`), `row`, `chips` and `chip`, `pill` (with `error`, `warn`, `ok` or `accent`), `mono`, `note`, `empty`, `link`, `error`, `good`, `warn`, `tool` (a button), `actions`.
 - It runs on dev pages only: `kay build` and a production server serve and write none of it. Two extensions naming one file load it once, in the order the extensions come, and a module that fails to load, throws or exports no function is logged as a problem naming its extension, the tool and the other tabs staying.
 - Nothing bundles its imports, so a module imports types only. Its data and actions come from a route of the library's own, mounted under `kay dev` alone (`underKayDev()` from `kay/library`), under the `/_kay/` prefix; a module reads `<meta name="kay-base">` for the base. A route that answers 404, as outside `kay dev`, shows an empty tab saying so.
-- kayjs-auth, kayjs-mail and kayjs-cms bring one each (see their pages), and kay adds the i18n tab itself.
+- kayjs-auth, kayjs-mail, kayjs-cms and kayjs-ai bring one each (see their pages), and kay adds the i18n tab itself.
 
 ### Conventions
 

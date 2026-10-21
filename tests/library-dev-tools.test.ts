@@ -1,6 +1,7 @@
 import type { DevTool } from '../src/runtime/dev-tool'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import aiDevTool from '../packages/ai/src/devTool'
 import authDevTool from '../packages/auth/src/devTool'
 import cmsDevTool from '../packages/cms/src/devTool'
 import mailDevTool from '../packages/mail/src/devTool'
@@ -419,6 +420,45 @@ describe('the libraries\' dev tool tabs', () => {
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-cms')!.click()
     await Bun.sleep(0)
     expect(panel('cms').textContent).toContain('Lecture impossible : le serveur a répondu 500')
+    fetching.mockRestore()
+  })
+
+  it('lists the provider, the limits and the asks newest first, and says when the route is not there', async () => {
+    const state = {
+      provider: 'anthropic',
+      model: 'claude-x',
+      limit: { max: 20, seconds: 600 },
+      budget: { tokens: 100_000, total: null, seconds: 86_400 },
+      asks: [
+        { id: 2, at: '2026-10-22T10:05:00Z', provider: 'anthropic', model: 'claude-x', prompt: 'Second', tokens: 0, ms: 3, outcome: 'refused', error: 'this visitor asked too often' },
+        { id: 1, at: '2026-10-22T10:00:00Z', provider: 'anthropic', model: 'claude-x', prompt: 'First', tokens: 42, ms: 800, outcome: 'ok' },
+      ],
+    }
+    let found = true
+    const fetching = answering({ 'GET /_kay/ai': () => found ? Response.json(state) : new Response(null, { status: 404 }) })
+
+    tool = startDevTool()
+    aiDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-ai')!.click()
+    await Bun.sleep(5)
+    expect(panel('ai').textContent).toContain('anthropic / claude-x')
+    expect(panel('ai').textContent).toContain('20 asks per visitor every 10 min')
+    expect(panel('ai').textContent).toContain('100000 tokens per visitor every 1 d')
+    expect([...panel('ai').querySelectorAll('.row')].map(row => row.textContent)).toEqual([
+      expect.stringContaining('refused'),
+      expect.stringContaining('ok'),
+    ])
+    expect(panel('ai').textContent).toContain('this visitor asked too often')
+
+    found = false
+    tool.stop()
+    tool = startDevTool()
+    aiDevTool(tool)
+    await Bun.sleep(5)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-ai')!.click()
+    await Bun.sleep(5)
+    expect(panel('ai').textContent).toContain('under `kay dev` alone')
     fetching.mockRestore()
   })
 })

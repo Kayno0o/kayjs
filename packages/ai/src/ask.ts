@@ -3,6 +3,7 @@ import type { Offered } from './loop'
 import type { AskOptions, Message, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf } from 'kay/library'
 import { choose } from './config'
+import { recorded } from './dev-log'
 import { AiError } from './errors'
 import { guarded } from './limits'
 import { converse } from './loop'
@@ -132,12 +133,13 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
 
   const asker = { request: answering, visitor: options.key ?? options.visitor, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
+  const about = { provider: provider.name, model, prompt: messages.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars }
 
   if (messageChars > maxInputChars)
     return createReply(() => tooLong(messageChars, maxInputChars), signals)
 
   if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => guarded(() => provider.stream(request, signal), asker, signal), signals)
+    return createReply(signal => recorded(guarded(() => provider.stream(request, signal), asker, signal), about, signal), signals)
 
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
@@ -150,5 +152,5 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     throw configError('tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
 
   // Every step may use `maxTokens`, which is what the budget holds for the reply while it runs.
-  return createReply(signal => guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), signals)
+  return createReply(signal => recorded(guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), about, signal), signals)
 }

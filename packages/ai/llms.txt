@@ -12,4 +12,4 @@ Each topic is one file, read whole with one command:
 - [Personal data and the AI notice](llms/personal-data.md): what goes to the provider (US transfers, DPA, the privacy notice), what kayjs-ai keeps, the disclosure line `Chat` shows and how to word it
 - [`kay i18n translate`](llms/translating.md): filling a locale's missing messages and localized entries as drafts, the checks on the model's reply, how an entry is marked, a run stopped half way
 - [Actions as tools](llms/tools.md): `tools`, `maxSteps`, what the model is told when a call goes wrong, `reply.progress()` and `reply.calls` for a chat to show the calls
-- [The fake, errors and providers](llms/testing-and-errors.md): scripting `fakeAi` in tests, `AiError` kinds, building a provider by hand
+- [The fake, errors and providers](llms/testing-and-errors.md): scripting `fakeAi` in tests, `AiError` kinds, building a provider by hand, the dev tool tab

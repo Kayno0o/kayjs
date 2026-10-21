@@ -140,6 +140,16 @@ export function configureLimits(options: AiOptions): void {
   slot().settings = settingsOf(options, slot().memories)
 }
 
+// The limit and budget `ai()` set, as the dev tool shows them; null where there is none.
+export function limitsInEffect(): { limit: { max: number, seconds: number } | null, budget: { tokens: number, total: number | null, seconds: number } | null } {
+  const { limit, budget } = slot().settings
+
+  return {
+    limit: limit ? { max: limit.max, seconds: limit.ms / 1000 } : null,
+    budget: budget ? { tokens: budget.tokens, total: budget.total ?? null, seconds: budget.ms / 1000 } : null,
+  }
+}
+
 // Forgets the counts kept in memory: for a test.
 export function forgetCounts(): void {
   slot().memories.clear()
@@ -287,7 +297,7 @@ async function record(budget: NonNullable<Settings['budget']>, key: string | und
 }
 
 // The tokens a reply used: the provider's counts, else an estimate from the characters. Nothing at all when nothing came back from a failure, which billed nothing; a reply stopped before anything came still counts its input, as the provider may be reading it.
-function tokensUsed(usage: Partial<Usage>, sent: number, received: number, stopped: boolean): number {
+export function tokensUsed(usage: Partial<Usage>, sent: number, received: number, stopped: boolean): number {
   if (usage.inputTokens === undefined && usage.outputTokens === undefined && received === 0 && !stopped)
     return 0
 

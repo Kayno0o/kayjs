@@ -373,6 +373,10 @@ A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
 
+## In the dev tool
+
+Under `kay dev`, with `ai()` in `extensions`, the dev tool has an AI tab with nothing more to set up. It shows the provider and model an ask uses now, the limit and budget `ai()` set, and the last 50 asks since the server started, newest first: the start of the prompt, the tokens it used, the time it took, and whether it finished, failed, was stopped or was refused by a limit. Nothing is kept in production or under `bun test`.
+
 ## An example
 
 The chat on these docs is built with it: [Ask the docs](/guides/ask-the-docs) says what it reads, and its source is a layout with one `ChatLauncher`.
