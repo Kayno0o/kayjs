@@ -24,12 +24,30 @@ export class ContentError extends Error {
   }
 }
 
-interface ObjectSchema {
-  properties?: Record<string, { default?: unknown }>
+interface FieldSchema {
+  default?: unknown
+  properties?: Record<string, FieldSchema>
+  items?: FieldSchema
 }
 
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
 export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
+  const { decoded, problems } = readEntries(entries, schema, components, localized)
+
+  if (problems.length > 0)
+    throw new ContentError(problems)
+
+  return decoded
+}
+
+// The entries that match the schema, and the problems of those left out, for a collection whose entries someone else edits: one entry the schema refuses must not hide the others.
+export function validEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entries: RawEntry[], problems: ContentProblem[] } {
+  const { decoded, problems } = readEntries(entries, schema, components, localized)
+
+  return { entries: decoded.map(({ entry }) => entry), problems }
+}
+
+function readEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized: boolean): { decoded: { entry: RawEntry, data: unknown }[], problems: ContentProblem[] } {
   const check = compiledCheck(schema)
 
   const problems: ContentProblem[] = []
@@ -38,6 +56,7 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
 
   for (const entry of entries) {
     const data = withDefaults(entry.data, schema)
+    const before = problems.length
 
     if (localized)
       pairingProblem(entry, paired, problems)
@@ -49,7 +68,8 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
       problems.push({ file: entry.file, line, message: `uses <${component}>, which the collection's components do not name` })
 
     if (check.Check(data)) {
-      decoded.push({ entry, data: check.Decode(data) })
+      if (problems.length === before)
+        decoded.push({ entry, data: check.Decode(data) })
 
       continue
     }
@@ -65,10 +85,7 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
       problems.push({ file: entry.file, line: entry.lines[tops.get(path) ?? ''] ?? 1, message: path === '' ? message : `${path}: ${message}` })
   }
 
-  if (problems.length > 0)
-    throw new ContentError(problems)
-
-  return decoded
+  return { decoded, problems }
 }
 
 // A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder.
@@ -163,18 +180,33 @@ function refusalSentence(schema: TSchema, issue: { path: string, schema?: unknow
   return errorText((issue.schema as { error?: unknown } | undefined)?.error) ?? entryRefusal(labelOf(schema, issue.path), issue)
 }
 
-function withDefaults(data: unknown, schema: TSchema): unknown {
-  if (typeof data !== 'object' || data === null || Array.isArray(data))
+// The data with each missing field's default filled in, nested objects and list items too; a default is a whole value, filled as it is.
+export function withDefaults(data: unknown, schema: TSchema): unknown {
+  return filled(data, schema)
+}
+
+const PLAIN = new Set<object | null>([Object.prototype, null])
+
+function filled(data: unknown, schema: FieldSchema): unknown {
+  if (Array.isArray(data))
+    return schema.items === undefined ? data : data.map(item => filled(item, schema.items!))
+
+  if (typeof data !== 'object' || data === null || !PLAIN.has(Object.getPrototypeOf(data) as object | null) || schema.properties === undefined)
     return data
 
-  const filled = { ...data as Record<string, unknown> }
+  const copy = { ...data as Record<string, unknown> }
 
-  for (const [name, field] of Object.entries((schema as ObjectSchema).properties ?? {})) {
-    if (filled[name] === undefined && field.default !== undefined)
-      filled[name] = structuredClone(field.default)
+  for (const [name, field] of Object.entries(schema.properties)) {
+    if (copy[name] === undefined) {
+      if (field.default !== undefined)
+        copy[name] = structuredClone(field.default)
+    }
+    else {
+      copy[name] = filled(copy[name], field)
+    }
   }
 
-  return filled
+  return copy
 }
 
 export function unknownComponents(segments: Segment[], components: Record<string, unknown>, found: ComponentSegment[] = []): ComponentSegment[] {

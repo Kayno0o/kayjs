@@ -75,7 +75,7 @@ describe('defineEnv', () => {
   })
 
   it('names every variable missing or refused in the error that stops the boot', () => {
-    expect(() => defineEnv(schema, { PORT: '80a' })).toThrow(new Error('kay: the environment does not match its schema\n  DATABASE_URL: Property \'DATABASE_URL\' is missing\n  PORT: Property \'PORT\' should be one of: \'integer\', \'integer\''))
+    expect(() => defineEnv(schema, { PORT: '80a' })).toThrow(new Error('kay: the environment does not match its schema\n  DATABASE_URL: Property \'DATABASE_URL\' is missing\n  PORT: Property \'PORT\' should be one of: \'integer\''))
   })
 
   it('lets kay build go on without a variable, a read of it failing instead', () => {

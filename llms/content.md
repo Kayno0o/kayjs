@@ -233,7 +233,8 @@ article
 
 - A Markdown file starts with YAML frontmatter between `---` lines.
 - Every entry's data is read against the schema: defaults filled in, an `s.Date()` decoded from its text.
-- An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
+- An entry it refuses, or one that does not parse, fails `kay check` at the field's line, naming the field's whole path (`packs.0.price`), and fails `kay build` and the first load; a loader's refused entry is instead left out and logged ([Loaded collections](content-cms.md#loaded-collections)).
+- Defaults fill nested objects and list items too, and `migrations: [renameField(...), convertField(...), setField(...)]` on the collection carries entries over after a schema change ([Loaded collections](content-cms.md#loaded-collections)).
 - Headings get ids, deduplicated, and link to themselves.
 - Bare URLs become links.
 - `markdown: { highlight, headingLinks, readingSpeed, imageSizes }` in `kay.config.ts` sets these once for every collection; a collection's option of the same name wins. `headingLinks: false` leaves a heading's text plain, its id kept, and `readingSpeed` is the words a minute `readingTime` counts at, 230 by default.

@@ -6,6 +6,7 @@ import type { Html } from '../runtime/rendered'
 import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
+import type { Migration } from './migrate'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
 import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
@@ -13,18 +14,22 @@ import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
 import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { previewing, previewState } from '../runtime/preview'
 import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
-import { ContentError, decodeEntries } from './validate'
+import { hasSteps, migrateEntries, migrateLoaded } from './migrate'
+import { ContentError, decodeEntries, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
-export { collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, untranslated } from './edit'
+export { collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
+export type { Migration } from './migrate'
+export { convertField, renameField, setField } from './migrate'
 export type { Page, Paginated } from './paginate'
 export { isPaginated, paginate } from './paginate'
 
@@ -104,6 +109,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   title?: string | undefined
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
   schema: Schema
+  // Steps carrying stored entries over when the schema changes, each taking an entry's data in the shape it had and giving the new one: `[renameField('cost', 'price'), convertField('price', Number)]`. They run, in order, only on an entry the schema refuses, until it accepts it; a loader's entry that changed is written back through its `save` once, a folder's entry is migrated as read, the file kept until a CMS saves it. Write a step to leave data in the new shape as it is.
+  migrations?: Migration[] | undefined
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.
   components?: Record<string, Component<never>> | undefined
   // Highlights code blocks when the entries compile, at build time, such as with Shiki; `kay.config.ts`'s `markdown.highlight` unless set here.
@@ -193,6 +200,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   if (options.seed !== undefined && !options.single)
     throw new KayError('config-invalid', `kay: the collection ${name} has a \`seed\` but is not \`single\`; a seed is the data of its only entry`)
 
+  const migrations = options.migrations
   const decodeEach = (raw: RawEntry[]) => {
     const { readingSpeed, imageSizes } = markdownOf(options)
 
@@ -232,17 +240,22 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return result
   }
 
-  // Validated before `cached` keeps them, so entries the schema refuses are fetched again on the next read.
+  // What the loader gives, migrated and compiled; an entry the schema refuses is left out and reported, so one stale row does not hide the others. A refused entry is fetched again at the next load, once an editor fixed it.
   const fetchLoaded = async (preview: boolean) => {
-    const raw = await compileLoaded(loader!, preview, markdownOf(options))
+    const raw = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<TSchema>)
+    const { entries, problems } = validEntries(raw, options.schema, components, localized)
 
-    decodeEntries(raw, options.schema, components)
+    if (problems.length > 0) {
+      const left = new Set(problems.map(problem => problem.file)).size
 
-    return raw
+      kayLog('warn', `kay: ${left === 1 ? 'a stored entry' : `${left} stored entries`} of ${name} ${left === 1 ? 'does' : 'do'} not match its schema and ${left === 1 ? 'is' : 'are'} left out until fixed, in the CMS${hasSteps(migrations) ? '' : ' or with `migrations` on the collection'}\n${problems.map(problem => `  ${problem.file} ${problem.message}`).join('\n')}`)
+    }
+
+    return entries
   }
 
   const fromFolder = async () => {
-    loading ??= (async () => decode(await loadEntries(source as string, { ...markdownOf(options), localized })))()
+    loading ??= (async () => decode(migrateEntries(name, await loadEntries(source as string, { ...markdownOf(options), localized }), options.schema, migrations)))()
 
     try {
       return await loading
@@ -263,7 +276,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       let loads = preview.loads.get(key) as Promise<Entries<Data>> | undefined
 
       if (!loads)
-        preview.loads.set(key, loads = (async () => decode(await compileLoaded(loader!, true, markdownOf(options))))())
+        preview.loads.set(key, loads = (async () => decode(await fetchLoaded(true)))())
 
       return loads
     }
@@ -402,11 +415,13 @@ export function collection<Schema extends TSchema, Components extends Record<str
 }
 
 // What a loader gives, compiled as files are: a Markdown body into segments and headings, HTML as one segment; two entries sharing a slug fail the collection.
-async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>): Promise<RawEntry[]> {
-  const given: unknown = await loader.load({ preview })
+async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>, options: CollectionOptions<TSchema>): Promise<RawEntry[]> {
+  let given: unknown = await loader.load({ preview })
 
   if (!Array.isArray(given))
     throw new KayError('loader-result', `kay: the collection ${loader.name}'s load gave ${given === null ? 'null' : typeof given}, where it gives an array of entries`)
+
+  given = await migrateLoaded(loader.name, given as unknown[], options.schema, options.migrations, options.localized === true, loader.save)
 
   const problems: ContentProblem[] = []
   const slugs = new Set<string>()

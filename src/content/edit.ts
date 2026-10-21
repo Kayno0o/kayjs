@@ -13,6 +13,7 @@ import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
+import { migrateData } from './migrate'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
@@ -217,6 +218,11 @@ export function customField<Schema extends TSchema>(kind: string, schema: Schema
   return { ...schema, 'x-kay': { kind } }
 }
 
+// A field of any schema whose value no other entry of the collection, of its locale in a localized one, holds: saving an entry that repeats it is refused.
+export function unique<Schema extends TSchema>(schema: Schema): Schema {
+  return { ...schema, 'x-kay-unique': true }
+}
+
 // A field of any schema that `kay i18n translate` leaves as it is, such as a category, a brand or a code: the translation keeps the default locale's value. Its kind and every other keyword are kept.
 export function untranslated<Schema extends TSchema>(schema: Schema): Schema {
   return { ...schema, 'x-kay-translate': false }
@@ -273,7 +279,8 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
     throw new KayError('content-api-misuse', `kay: entries() was asked for the ${filter.locale} entries of ${name}, which is not localized`)
 
   const found = collection.dir === undefined ? await loadedFound(name, collection, localized, filter) : await folderEntries(name, folderOf(collection.dir), localized, filter)
-  const placed = found.map(({ slug, ...entry }) => ({ ...placeOf(slug, localized), ...entry }))
+  // An editor opens an entry in the shape the collection's migrations carry it to, so saving it writes that shape.
+  const placed = found.map(({ slug, ...entry }) => ({ ...placeOf(slug, localized), ...entry, data: migrateData(collection.options.schema, collection.options.migrations, entry.data).data as SourceEntry['data'] }))
 
   return Promise.all(placed.map(async (entry) => {
     const decoded = entry.problem === undefined ? decodedData(collection, entry) : undefined
@@ -302,7 +309,31 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
   else
     issues.push({ ...at, path: '', message: `holds ${valueKind(data)} as its data, not an object of fields` })
 
+  if (isFields(data))
+    issues.push(...await uniqueIssues(name, collection, at, data))
+
   return { issues, compiled }
+}
+
+// Each `unique` field whose value another entry of the collection already holds, in the same locale when it is localized.
+async function uniqueIssues(name: string, collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>): Promise<DraftIssue[]> {
+  const properties = (collection.options.schema as { properties?: Record<string, { 'x-kay-unique'?: boolean }> }).properties ?? {}
+  const fields = Object.keys(properties).filter(field => properties[field]!['x-kay-unique'] === true && data[field] !== undefined && data[field] !== null)
+
+  if (fields.length === 0)
+    return []
+
+  const others = (await entries(name, at.locale === undefined ? {} : { locale: at.locale })).filter(other => other.slug !== at.slug)
+  const issues: DraftIssue[] = []
+
+  for (const field of fields) {
+    const taken = others.find(other => isFields(other.data) && JSON.stringify(other.data[field]) === JSON.stringify(data[field]))
+
+    if (taken)
+      issues.push({ ...at, path: field, message: `is already the ${field} of ${taken.slug}` })
+  }
+
+  return issues
 }
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.

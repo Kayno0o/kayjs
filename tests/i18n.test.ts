@@ -11,10 +11,10 @@ import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
-import { ContentError } from '../src/content/validate'
 import { flattenMessages, localeName, localePath, localizedLink, matchLinksWith, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { pages } from '../src/server'
 import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
 import { compiledLinks } from '../src/server/links'
@@ -445,7 +445,19 @@ describe('localized content', () => {
 
     const loose = collection({ name: 'loose', load: () => [{ slug: 'hello', data: {} }] }, { schema: t.Object({}), localized: true })
 
-    await expect(loose.all()).rejects.toThrow(ContentError)
+    const warned: string[] = []
+    const sink = logSink()
+
+    setLogSink((_, message) => void warned.push(message))
+
+    try {
+      expect(await loose.all()).toEqual([])
+    }
+    finally {
+      setLogSink(sink!)
+    }
+
+    expect(warned).toEqual([expect.stringContaining('loose/hello sits outside a locale folder')])
   })
 
   it('has kay check hold a translation to the schema', async () => {

@@ -50,5 +50,12 @@ export function dottedPath(pointer: string): string {
 
 // The schema's own reason for an error, such as `Expected string`.
 export function summaryOf(issue: ValueError): string {
-  return mapValueError(issue)?.summary ?? issue.message
+  return oneOfOnce(mapValueError(issue)?.summary ?? issue.message)
+}
+
+const ONE_OF = /(should be one of: )(.+)$/
+
+// `s.Integer` is two schemas of the one type, which the summary of a union lists twice: each type once.
+function oneOfOnce(summary: string): string {
+  return summary.replace(ONE_OF, (_, lead: string, types: string) => lead + [...new Set(types.split(', '))].join(', '))
 }

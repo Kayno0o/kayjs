@@ -24,6 +24,7 @@ import { entries, registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
 import { draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
+import { migrateEntries } from './migrate'
 import { ContentError, decodeEntries } from './validate'
 
 // Enough of an entry's file to hold its first lines.
@@ -84,7 +85,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
     if (collection.dir === undefined)
       continue
 
-    const entries = await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true })
+    const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
 
     decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized)
     await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
@@ -119,7 +120,7 @@ export async function contentProblems(root: string, config?: string, site = true
     read.push(resolve(dirname(read[0]!), collection.dir))
 
     try {
-      const entries = await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true })
+      const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
 
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))

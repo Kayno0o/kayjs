@@ -18,6 +18,7 @@ import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
 import { child, loop } from '../src/runtime/html'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
 import { html as renderedHtml } from '../src/runtime/rendered'
@@ -136,8 +137,23 @@ describe('loaded collections', () => {
       'notes-refused[2] has no slug: an entry gives a non-empty string',
     ])
 
-    given = [{ slug: 'a', data: { title: 1 } }]
-    expect((await rejection(notes.all()) as ContentError).problems[0]!.message).toStartWith('title:')
+    // An entry the schema refuses is left out and logged, so one stale row does not hide the others.
+    given = [{ slug: 'a', data: { title: 1 } }, { slug: 'b', data: { title: 'B' } }]
+
+    const sink = logSink()
+    const warned: string[] = []
+
+    setLogSink((_, message) => void warned.push(message))
+
+    try {
+      expect((await notes.all()).map(entry => entry.slug)).toEqual(['b'])
+    }
+    finally {
+      setLogSink(sink!)
+    }
+
+    expect(warned).toEqual([expect.stringContaining('notes-refused/a title:')])
+    notes.invalidate()
 
     given = { entries: [] }
     await expect(notes.all()).rejects.toThrow('kay: the collection notes-refused\'s load gave object, where it gives an array of entries')

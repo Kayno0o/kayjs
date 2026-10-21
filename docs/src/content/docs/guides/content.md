@@ -287,7 +287,32 @@ The loader takes more than `load`.
 | `store` | A `sqliteCache(path)` that keeps them across restarts and lets `invalidate()` reach every process sharing it |
 | `save(entry)`, `remove(entry)` | Write an entry back to the CMS, for a CMS editing the collections |
 
-`data` is read against the schema, with defaults filled in and dates decoded. An entry the schema refuses, or one with no slug or a slug another entry has, fails the read and names every problem. The next read loads again.
+`data` is read against the schema, with defaults filled in and dates decoded. An entry with no slug or a slug another entry has fails the read and names every problem. The next read loads again.
+
+An entry the schema refuses is left out instead, and the server logs a warning naming it and each field that is wrong, with its whole path, such as `packs.0.price`. The other entries still load, so one old row does not break every page that reads the collection. The editor still sees the entry in the CMS, can open it, and the page shows it again once it is saved fixed.
+
+### When the schema changes
+
+Entries a database holds keep the shape they had when they were saved. When you change the schema, say how to carry them over with `migrations`. Each step takes an entry's data and gives it back in the new shape.
+
+```ts
+import { collection, convertField, renameField, setField } from 'kay/content'
+
+export const packs = collection(loader, {
+  schema: s.Object({ title: s.String(), price: s.Integer(), visible: s.Boolean() }),
+  migrations: [
+    renameField('name', 'title'),
+    convertField('price', value => typeof value === 'string' ? Number.parseInt(value, 10) : value),
+    setField('visible', true),
+  ],
+})
+```
+
+The steps run, in order, only on an entry the schema refuses, and stop once it accepts the entry. Write each step so that it leaves data already in the new shape alone. `renameField` does nothing when the new field exists, `setField` fills only a missing field and `convertField` only a present one.
+
+An entry that changed is given to the loader's `save` once, so the next read finds it in the new shape and nothing runs again. An entry of a folder is migrated when it is read and its file stays as it is until a CMS saves it. Defaults fill nested objects and list items as well as the top-level fields.
+
+To keep two entries from sharing a value, such as a code, wrap the field in `unique()` from `kay/content`: a save that repeats another entry's value is refused with an issue on that field.
 
 `news.invalidate()` refreshes it, and every prerendered page that read it. Call it from a webhook in an API route. That one line is the whole webhook.
 
