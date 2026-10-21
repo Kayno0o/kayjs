@@ -17,7 +17,7 @@ const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const PACKAGE = /^packages\/([^/]+)\//
 // Read by every test file or by kay itself rather than imported, so `bun test --changed` cannot follow them.
-const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.(?:config|base)\.ts|src\/(?:.*\/)?[^/]+(?<!\.ts))$/
+const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.(?:config|base|slices)\.ts|src\/(?:.*\/)?[^/]+(?<!\.ts))$/
 // Tests reading these folders as files, which an import graph does not show.
 const READERS: [RegExp, string[]][] = [
   [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts']],
