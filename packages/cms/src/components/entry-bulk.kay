@@ -22,9 +22,18 @@ const drafts = () => collection.draftField !== undefined
 // What names the ticked rows, read when the delete confirmation opens.
 const referrers = signal<string[]>([])
 
+let asked = 0
+
 async function askReferrers(): Promise<void> {
+  const mine = ++asked
+
   referrers.set([])
-  referrers.set([...new Set(Object.values(await readReferrers(collection.name, rows.map(row => row.slug))).flat())])
+
+  const found = await readReferrers(collection.name, rows.map(row => row.slug))
+
+  // A later open took over while this one was on its way.
+  if (mine === asked)
+    referrers.set([...new Set(Object.values(found).flat())])
 }
 
 async function run(action: BulkAction): Promise<void> {

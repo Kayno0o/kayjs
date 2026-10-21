@@ -34,9 +34,18 @@ const actions = rowActions(collection.layout?.list)
 // What names the row whose delete confirmation was opened last, read then so it is never older than the click.
 const referrers = signal<Record<string, string[]>>({})
 
+let asked = 0
+
 async function askReferrers(row: EntryRow): Promise<void> {
+  const mine = ++asked
+
   referrers.set({})
-  referrers.set(await readReferrers(collection.name, [row.slug]))
+
+  const found = await readReferrers(collection.name, [row.slug])
+
+  // A later open took over while this one was on its way.
+  if (mine === asked)
+    referrers.set(found)
 }
 
 // A field's column is keyed apart from the built-in ones, so a field named `title` or `actions` clashes with none.

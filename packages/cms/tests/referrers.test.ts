@@ -23,7 +23,6 @@ test('asks the referrers API for the slugs when called, and tells none for a fai
   expect(decodeURIComponent(urls[0]!)).toContain('/api/cms/referrers/people?slugs=["ada"]')
   expect(await readReferrers('people', [])).toEqual({})
 
-  spyOn(globalThis, 'fetch').mockRestore()
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ error: 'down' }, { status: 500 })) as unknown as typeof fetch)
 
   expect(await readReferrers('people', ['ada'])).toEqual({})

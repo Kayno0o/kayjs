@@ -236,13 +236,22 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
 
   const referrers = signal<string[]>([])
 
+  let asked = 0
+
   async function askReferrers(): Promise<void> {
     const slug = stored()?.slug
+    const mine = ++asked
 
     referrers.set([])
 
-    if (slug !== undefined)
-      referrers.set((await readReferrers(collection.name, [slug]))[slug] ?? [])
+    if (slug === undefined)
+      return
+
+    const found = await readReferrers(collection.name, [slug])
+
+    // A later open took over while this one was on its way.
+    if (mine === asked)
+      referrers.set(found[slug] ?? [])
   }
 
   async function attemptSave(): Promise<boolean> {
