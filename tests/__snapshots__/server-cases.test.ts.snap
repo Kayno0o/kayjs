@@ -1355,7 +1355,7 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
     "status": 400,
   },
   "GET /search?n=0": {
-    "body": "Invalid query: n: Property 'n' should be one of: 'integer', 'integer'",
+    "body": "Invalid query: n: Property 'n' should be one of: 'integer'",
     "headers": [
       [
         "content-security-policy",
@@ -2791,7 +2791,7 @@ exports[`the page answers of a site with plain answers every path as pinned 1`] 
     "headers": [
       [
         "content-length",
-        "69",
+        "58",
       ],
       [
         "content-security-policy",
@@ -12719,7 +12719,7 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
     "status": 400,
   },
   "GET /search?n=0": {
-    "body": "Invalid query: n: Property 'n' should be one of: 'integer', 'integer'",
+    "body": "Invalid query: n: Property 'n' should be one of: 'integer'",
     "headers": [
       [
         "content-security-policy",
@@ -14163,7 +14163,7 @@ exports[`the page answers of a site with locales answers every path as pinned 1`
     "headers": [
       [
         "content-length",
-        "69",
+        "58",
       ],
       [
         "content-security-policy",
