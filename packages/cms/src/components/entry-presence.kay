@@ -1,12 +1,16 @@
 ---
 import type { Member } from '../room'
-import { memo, presence } from 'kay'
+import { effect, memo, presence } from 'kay'
 import { wording } from 'kay/words'
-import { editorsOf } from '../room'
+import { editorsOf, watchRoom } from '../room'
 
 // Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` for the on-page editor, which asks no author.
 const { room, member } = props<{ room: string, member: Member }>()
 const here = presence(room, member)
+// Also listed in the room a list watches the entry through, which nothing here shows: a room is joined by reading it.
+const watchedBy = presence(watchRoom(room), member)
+
+effect(() => void watchedBy.count())
 const editors = memo(() => editorsOf(here.others(), here.count(), member))
 const text = memo(() => {
   if (editors().names.length > 0)

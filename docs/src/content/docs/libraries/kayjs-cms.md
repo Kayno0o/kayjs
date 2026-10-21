@@ -74,7 +74,9 @@ author: async ({ locals }) => {
 
 The screen of a saved entry says when someone else has the same entry open, so two editors do not overwrite each other. It names them when `author` gives a name, which is the name the other editor sees for you too, and only counts them when it does not: "1 other editor". The same editor in two tabs is not listed to themselves. A new entry shows nothing, as no one else can have it open.
 
-The editor on a page shows the same line above its form, in the warning colour, and counts its editors as it asks no `author`. The entry list marks an entry "Being edited", by name when the editors have one. A list only watches, so it is no editor of the entry to anyone. A named editor is told of editors without a name as "1 other editor".
+The editor on a page shows the same line above its form, in the warning colour. It asks no `author`, so it counts its editors. The entry list marks an entry "Being edited", by name when the editors have one.
+
+A list watches through a room of its own, so it is no editor of the entry to anyone, and it marks the first 50 rows of a page. It also shows "Being edited" for your own other tab on the page editor. A named editor is told of editors without a name as "1 other editor". Every open tab on one of these holds a live connection, so a browser on HTTP/1 allows a host only a few.
 
 A screen of your own built from the parts shows the same list by passing `presence` to `EntryEditor`, or `room` and `member` to `EntryPresence`. `entryPresence(ctx, collection, entry)` from `@kaynooo/kayjs-cms/presence` returns both.
 
@@ -277,7 +279,7 @@ A save or a delete made over another save is refused rather than writing over it
 
 A loaded entry is protected the same way, and your loader does not have to give a version: kayjs-cms compares what the loader returns for the entry now with what the editor opened. If another editor or your app changed it meanwhile, the save or the delete is refused and the form offers Keep my edits. A save that leaves the content as it was does not count as a change.
 
-Only the fields the schema declares are compared, so a loader that adds computed fields, such as a url or a read time, or that changes them on every read, causes no false conflict.
+Only the fields the schema declares are compared, so a loader that adds computed fields, such as a url or a read time, or that changes them on every read, causes no false conflict. A save still sends every field the entry has, so a field the loader changed meanwhile that the schema does not declare is written back as the editor opened it.
 
 Saves and deletes of one collection are checked and written one after the other in the server, but two servers behind one app do not wait for each other.
 

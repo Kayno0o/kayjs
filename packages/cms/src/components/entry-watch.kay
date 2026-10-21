@@ -1,12 +1,13 @@
 ---
-import type { Member } from '../room'
+import type { EntryRef } from '../kay/contract'
 import { memo, presence } from 'kay'
 import { wording } from 'kay/words'
-import { editorsOf } from '../room'
+import { editorsOf, entryRoom, watchRoom } from '../room'
 
-// Tells a list that an entry is being edited, by name when the editors have one. The list joins the entry's room as a tab that only watches, which no editor is told of.
-const { room, member } = props<{ room: string, member: Member }>()
-const here = presence(room, member)
+// Tells a list that an entry is being edited, by name when the editors have one. The list watches through a room of its own, so it is no editor to anyone.
+const { collection, entry } = props<{ collection: string, entry: EntryRef }>()
+const { room, member } = entryRoom(collection, entry, { name: '', watching: true })
+const here = presence(watchRoom(room), member)
 const editors = memo(() => editorsOf(here.others(), here.count(), member))
 const text = memo(() => {
   if (editors().names.length > 0)

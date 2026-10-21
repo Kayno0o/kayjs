@@ -33,6 +33,8 @@ export interface Recovery {
 export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const wait = durationMs(delay)
   const saved = new Map<string, DraftEntry>()
+  // What `open` was last given for each entry, so being given it again changes nothing.
+  const offered = new Map<string, string>()
   // The version of each entry's file its saved state was read from, which the next save names.
   const versions = new Map<string, string | undefined>()
   // The entries whose file the other side deleted and whose edits were kept: their next save creates the file, and is refused if one was made meanwhile.
@@ -158,16 +160,22 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     open(entry: DraftEntry, version?: string | undefined): void {
       const key = entryKey(entry)
 
+      const offer = `${version ?? ''}\n${JSON.stringify(entry)}`
+
       if (saved.has(key)) {
-        // An entry opened again with no edits shows the copy and version it has now; edits keep the version they were made from, so their save meets any conflict.
-        if (current().get(key) === saved.get(key) && (versions.get(key) !== version || JSON.stringify(saved.get(key)) !== JSON.stringify(entry))) {
+        // An entry offered again with a copy or version it was not offered before, as on returning to it, shows that copy with no edits; edits keep the version they were made from, so their save meets any conflict. The same offer again, as when an effect reruns, changes nothing, a save of this page's included.
+        if (offered.get(key) !== offer && current().get(key) === saved.get(key)) {
           saved.set(key, entry)
           versions.set(key, version)
           current.set(new Map(current()).set(key, entry))
         }
 
+        offered.set(key, offer)
+
         return
       }
+
+      offered.set(key, offer)
 
       const start = recover(key, entry, version)
 

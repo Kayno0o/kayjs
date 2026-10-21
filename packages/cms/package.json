@@ -33,10 +33,12 @@
     "./entry-notices.kay": "./src/components/entry-notices.kay",
     "./entry-presence.kay": "./src/components/entry-presence.kay",
     "./entry-table.kay": "./src/components/entry-table.kay",
+    "./entry-watch.kay": "./src/components/entry-watch.kay",
     "./field-input.kay": "./src/editor/field-input.kay",
     "./file-input.kay": "./src/editor/file-input.kay",
     "./form": "./src/form.ts",
-    "./presence": "./src/presence.ts"
+    "./presence": "./src/presence.ts",
+    "./room": "./src/room.ts"
   },
   "kay": {
     "messages": "./src/messages"

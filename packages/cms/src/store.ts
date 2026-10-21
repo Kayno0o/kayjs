@@ -1,5 +1,5 @@
 import type { Commit, FileChange, Identity } from './files'
-import type { CollectionInfo, DraftEntry, EntryRef, Issue, ScreenCollection, StoredEntry } from './kay/contract'
+import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
@@ -295,14 +295,14 @@ async function inTurn<T>(collection: string, run: () => Promise<T>): Promise<T> 
 }
 
 // What a loaded entry is at now, as its loader gives it: undefined once it holds none.
-async function currentLoaded(ref: EntryRef, schema: unknown): Promise<string | undefined> {
+async function currentLoaded(ref: EntryRef, schema: JsonSchema): Promise<string | undefined> {
   const found = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 
   return found === undefined ? undefined : contentVersion(found, schema)
 }
 
 // The version a save leaves a loaded entry at, for the editor's next save to name; none when the loader cannot be read again, which the save does not fail for.
-async function loadedVersion(ref: EntryRef, schema: unknown): Promise<string | undefined> {
+async function loadedVersion(ref: EntryRef, schema: JsonSchema): Promise<string | undefined> {
   try {
     return await currentLoaded(ref, schema)
   }
@@ -314,7 +314,7 @@ async function loadedVersion(ref: EntryRef, schema: unknown): Promise<string | u
 }
 
 // Refuses a save or a delete of a loaded entry made over a change of it since the editor opened it, by another editor or by the app: the loader keeps no version, so the editor names the hash of the entry it showed.
-async function staleLoaded(ref: EntryRef, schema: unknown, version: string | undefined, required: boolean, deleting = false): Promise<{ issues: Issue[], conflict?: { version: string | null } | undefined } | undefined> {
+async function staleLoaded(ref: EntryRef, schema: JsonSchema, version: string | undefined, required: boolean, deleting = false): Promise<{ issues: Issue[], conflict?: { version: string | null } | undefined } | undefined> {
   const current = await currentLoaded(ref, schema)
 
   if (version === undefined)

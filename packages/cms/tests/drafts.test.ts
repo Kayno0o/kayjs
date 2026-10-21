@@ -44,6 +44,35 @@ describe('opening an entry again', () => {
   })
 })
 
+describe('opening from an effect, as the page editor does', () => {
+  it('keeps a save and the edits typed after it when the effect runs again, and takes a copy it is offered anew', async () => {
+    const { effect, signal, flush } = await import('kay')
+    const drafts = createDrafts({ show: async () => ({}) })
+    const source = signal({ entry: post, version: 'v1' })
+
+    effect(() => {
+      const offer = source()
+
+      drafts.open(offer.entry, offer.version)
+    })
+    flush()
+
+    drafts.set(post, 'title', 'Saved')
+    drafts.markSaved(post, drafts.entry(post)!, 'v2')
+    flush()
+    expect([drafts.value(post, 'title'), drafts.version(post), drafts.changed(post)]).toEqual(['Saved', 'v2', false])
+
+    drafts.set(post, 'title', 'Typed after')
+    flush()
+    expect([drafts.value(post, 'title'), drafts.changed(post)]).toEqual(['Typed after', true])
+
+    drafts.reset(post)
+    source.set({ entry: { ...post, data: { title: 'Offered anew', tags: ['a'] } }, version: 'v3' })
+    flush()
+    expect([drafts.value(post, 'title'), drafts.version(post)]).toEqual(['Offered anew', 'v3'])
+  })
+})
+
 describe('createDrafts', () => {
   it('reads the delay as a duration, and refuses a bare number', async () => {
     const { drafts, calls } = setup(undefined, '5ms')

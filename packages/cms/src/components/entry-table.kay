@@ -16,7 +16,7 @@ import { shipWords } from '../editor/words'
 import { fieldsOf } from '../fields'
 import { listColumns, rowActions } from '../layout'
 import { deleteMessage, entryPath, onPagePath, problemId } from '../listing'
-import { entryRoom } from '../room'
+import { WATCHED_ROWS } from '../room'
 
 const { prefix, collection, rows, searched } = props<{ prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean }>()
 
@@ -42,9 +42,9 @@ const columns: Column<EntryRow>[] = [
 ]
 
 const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
-// The room of a row's entry, which the list watches without being an editor of it.
-const watched = (row: EntryRow) => entryRoom(collection.name, row, { name: '', watching: true })
 const keyOf = (row: EntryRow) => row.locale === undefined ? row.slug : `${row.slug}@${row.locale}`
+// Only the first rows of a page watch their entry.
+const watched = (row: EntryRow) => rows.slice(0, WATCHED_ROWS).some(first => keyOf(first) === keyOf(row))
 
 async function publish(row: EntryRow): Promise<void> {
   if (await publishSaved(ref(row)))
@@ -69,7 +69,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
       if row.problem as problem
         Badge(tone="danger" label={wording('cms.table.broken', 'Broken')})
         span.kcms-sr-only(id={problemId(collection.name, keyOf(row))}) {problem}
-      EntryWatch(room={watched(row).room} member={watched(row).member})
+      if watched(row)
+        EntryWatch(collection={collection.name} entry={ref(row)})
     else if column.key.startsWith('cell:')
       span {row.cells?.[column.key.slice(5)] ?? ''}
     else if column.key === 'draft'
