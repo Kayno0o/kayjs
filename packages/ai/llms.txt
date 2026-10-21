@@ -14,12 +14,12 @@
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
 - A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
 - A chat for a site is `Chat` from `@kaynooo/kayjs-ai/chat.kay`, given the streaming action by the page (`Chat(action={reply})`), styled by kayjs-ui's `theme.css`: see the chat topic. It shows a line that the visitor talks to an AI and that messages go to a provider (`disclosure`, the `ai.chat.disclosure` message); what the provider receives is in [personal data](llms/personal-data.md). `ChatLauncher` from `@kaynooo/kayjs-ai/chat-launcher.kay` is the same chat behind a button at the bottom right of every page, put once in the root layout, loading the chat on its first open.
-- `ai({ limit, budget })` in `kay.config.ts` sets asks and tokens per visitor (the user `visitor` names, else the one kayjs-auth names, else the address; a store sees a digest of it, never the address or id) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. In production, unset, a visitor gets 20 asks per 10 minutes and 100,000 tokens a day; `limit: false` / `budget: false` lifts one. Messages past `maxInputChars` (50,000) fail with `too-long` (413), a streamed tool name past 256 characters stops growing and names no tool, and `confirm` gates each tool call.
+- `ai({ rateLimit, budget })` in `kay.config.ts` sets asks and tokens per visitor (the user `key` names, else the one kayjs-auth names, else the address; a store sees a digest of it, never the address or id) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. In production, unset, a visitor gets 20 asks per 10 minutes and 100,000 tokens a day; `rateLimit: false` / `budget: false` lifts one. Messages past `maxInputChars` (50,000) fail with `too-long` (413), a streamed tool name past 256 characters stops growing and names no tool, and `confirm` gates each tool call.
 - `kay i18n translate <locale>` (added by `ai()`) writes a locale's missing messages and localized entries as drafts, a text kept only when it keeps every `{placeholder}`, a string field of a `customField` kind left as it is; `--dry-run` lists and estimates the tokens, [translating](llms/translating.md).
 
 ## Setup
 
-`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which lists the variables in `kay env`, applies `limit`/`budget`/`visitor` and adds `kay i18n translate`; without it `ask` is unlimited.
+`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which lists the variables in `kay env`, applies `rateLimit`/`budget`/`key` and adds `kay i18n translate`; without it `ask` is unlimited.
 
 ```ts
 // kay.config.ts
@@ -48,7 +48,7 @@ The rest is split by topic, each file read whole with one command:
 
 - [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, an object instead of text (`schema`), the reply, `await` blocks and streaming actions
 - [Chat island](llms/chat.md): `Chat(action={reply})`, its props, behaviour, markdown and the rules for passing it the action
-- [Limits and the token budget](llms/limits.md): `ai({ limit, budget, visitor })`, the stores, when tokens count, the `limited` error and a failing store
+- [Limits and the token budget](llms/limits.md): `ai({ rateLimit, budget, key })`, the stores, when tokens count, the `limited` error and a failing store
 - [Personal data and the AI notice](llms/personal-data.md): what goes to the provider (US transfers, DPA, the privacy notice), what kayjs-ai keeps, the disclosure line `Chat` shows and how to word it
 - [`kay i18n translate`](llms/translating.md): filling a locale's missing messages and localized entries as drafts, the checks on the model's reply, how an entry is marked, a run stopped half way
 - [Actions as tools](llms/tools.md): `tools`, `maxSteps`, what the model is told when a call goes wrong, `reply.progress()` and `reply.calls` for a chat to show the calls

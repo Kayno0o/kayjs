@@ -543,6 +543,15 @@ export const LINTS = {
     wrong: 'extensions: [authPages({ auth: () => import(\'./src/auth\') }), mailExtension(\'./src/mail\')]',
     right: 'extensions: [auth({ module: \'./src/auth\' }), mail({ module: \'./src/mail\' })]',
   },
+  'deprecated-rate-limit': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'A rate limit option under its old name: kayjs-ai\'s `limit` and `visitor` in `ai({ ... })` (and `visitor` in `ask(messages, { ... })`), which are `rateLimit` and `key` since 1.70, and kayjs-auth\'s `limits` in `createAuth({ ... })`, which is `rateLimit`. The old names still work for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
+    wrong: 'ai({ limit: { max: 10, window: \'1m\' }, visitor: request => request.headers.get(\'x-user\') ?? undefined })',
+    right: 'ai({ rateLimit: { max: 10, window: \'1m\' }, key: request => request.headers.get(\'x-user\') ?? undefined })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

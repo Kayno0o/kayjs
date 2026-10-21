@@ -210,7 +210,7 @@ describe('signing in with a passkey', () => {
 describe('a passkey as second factor and as proof', () => {
   test('guesses at the passkey second factor past the account\'s cap mail the holder once, as code guesses do', async () => {
     const box = mailbox()
-    const app = await setup(undefined, { limits: { twoFactorAccount: { max: 2, window: 900 } }, email: { mailer: box.mailer, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false } })
+    const app = await setup(undefined, { rateLimit: { twoFactorAccount: { max: 2, window: 900 } }, email: { mailer: box.mailer, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false } })
 
     await addPasskey(await registered(app))
 

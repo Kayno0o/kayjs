@@ -130,7 +130,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw new TypeError('kayjs-ai: maxInputChars is a number of characters of 1 or more')
 
-  const asker = { request: answering, visitor: options.visitor, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
+  const asker = { request: answering, visitor: options.key ?? options.visitor, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
 
   if (messageChars > maxInputChars)

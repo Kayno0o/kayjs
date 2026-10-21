@@ -12,7 +12,7 @@ const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-li
 // An account whose address is verified, so the mail about it is sent, and a mailbox for it.
 async function account(limits: Partial<Limits>, extra: Parameters<typeof testApp>[0] = {}) {
   const box = mailbox()
-  const app = testApp({ limits, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, ...extra })
+  const app = testApp({ rateLimit: limits, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, ...extra })
 
   await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 

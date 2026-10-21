@@ -84,13 +84,13 @@ async function inside<T>(request: Request, run: () => PromiseLike<T>): Promise<T
   return answeringRequest(request, async () => run())
 }
 
-describe('ai({ limit })', () => {
+describe('ai({ rateLimit })', () => {
   it('refuses the ask past max with a limited error that waits for the window, before the provider is called', async () => {
-    ai({ limit: { max: 2, window: '1m' } })
-    await ask('a', { visitor: 'v' })
-    await ask('b', { visitor: 'v' })
+    ai({ rateLimit: { max: 2, window: '1m' } })
+    await ask('a', { key: 'v' })
+    await ask('b', { key: 'v' })
 
-    const refused = await failure(ask('c', { visitor: 'v' }))
+    const refused = await failure(ask('c', { key: 'v' }))
 
     expect(refused.kind).toBe('limited')
     expect(refused.limit).toBe('asks')
@@ -100,15 +100,29 @@ describe('ai({ limit })', () => {
   })
 
   it('counts each visitor on its own', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
-    await ask('a', { visitor: 'one' })
-    await ask('a', { visitor: 'two' })
-    expect((await failure(ask('b', { visitor: 'one' }))).kind).toBe('limited')
-    expect((await failure(ask('b', { visitor: 'two' }))).kind).toBe('limited')
+    ai({ rateLimit: { max: 1, window: '1m' } })
+    await ask('a', { key: 'one' })
+    await ask('a', { key: 'two' })
+    expect((await failure(ask('b', { key: 'one' }))).kind).toBe('limited')
+    expect((await failure(ask('b', { key: 'two' }))).kind).toBe('limited')
+  })
+
+  it('still takes the old names limit, visitor and the ask\'s visitor, with the new ones winning', async () => {
+    ai({ limit: { max: 1, window: '1m' }, visitor: () => 'old' })
+    await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))
+    expect((await failure(inside(rewrittenRequest('203.0.113.2'), () => ask('b')))).limit).toBe('asks')
+    await ask('a', { visitor: 'named' })
+    expect((await failure(ask('b', { visitor: 'named' }))).limit).toBe('asks')
+
+    ai({ limit: { max: 1, window: '1m' }, rateLimit: { max: 3, window: '1m' } })
+    await ask('a', { key: 'v', visitor: 'ignored' })
+    await ask('b', { key: 'v' })
+    await ask('c', { key: 'v' })
+    expect((await failure(ask('d', { key: 'v' }))).limit).toBe('asks')
   })
 
   it('counts the signed-in user the visitor hook names, else the address, and lets neither stand for the other', async () => {
-    ai({ limit: { max: 1, window: '1m' }, visitor: request => request.headers.get('x-user') ?? undefined })
+    ai({ rateLimit: { max: 1, window: '1m' }, key: request => request.headers.get('x-user') ?? undefined })
 
     const asUser = (user: string, address: string) => rewrittenRequest(address, { 'x-user': user })
 
@@ -126,7 +140,7 @@ describe('ai({ limit })', () => {
   })
 
   it('counts the user a library names to kay with no visitor option, and lets the visitor option override it', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
+    ai({ rateLimit: { max: 1, window: '1m' } })
 
     const named = (user: string | undefined, address: string) => {
       const request = rewrittenRequest(address)
@@ -143,7 +157,7 @@ describe('ai({ limit })', () => {
     await inside(named(undefined, '203.0.113.5'), () => ask('a'))
     expect((await failure(inside(named(undefined, '203.0.113.5'), () => ask('b')))).limit).toBe('asks')
 
-    ai({ limit: { max: 1, window: '1m' }, visitor: () => 'mine' })
+    ai({ rateLimit: { max: 1, window: '1m' }, key: () => 'mine' })
     await inside(named('cat', '203.0.113.7'), () => ask('a'))
     expect((await failure(inside(named('dan', '203.0.113.8'), () => ask('b')))).limit).toBe('asks')
   })
@@ -158,7 +172,7 @@ describe('ai({ limit })', () => {
     }
 
     for (const answer of [null, '', undefined]) {
-      ai({ limit: { max: 1, window: '1m' }, visitor: () => answer as undefined })
+      ai({ rateLimit: { max: 1, window: '1m' }, key: () => answer as undefined })
       forgetCounts()
 
       await inside(named('203.0.113.1'), () => ask('a'))
@@ -167,29 +181,29 @@ describe('ai({ limit })', () => {
   })
 
   it('does not run the visitor hook for an ask that names its visitor', async () => {
-    ai({ limit: { max: 1, window: '1m' }, visitor: () => {
+    ai({ rateLimit: { max: 1, window: '1m' }, key: () => {
       throw new Error('hook ran')
     } })
-    await inside(rewrittenRequest('203.0.113.1'), () => ask('a', { visitor: 'named' }))
+    await inside(rewrittenRequest('203.0.113.1'), () => ask('a', { key: 'named' }))
   })
 
   it('lets a visitor hook answer later, and a call name the visitor over it', async () => {
-    ai({ limit: { max: 1, window: '1m' }, visitor: async () => 'late' })
+    ai({ rateLimit: { max: 1, window: '1m' }, key: async () => 'late' })
     await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))
     expect((await failure(inside(rewrittenRequest('203.0.113.2'), () => ask('b')))).limit).toBe('asks')
-    await inside(rewrittenRequest('203.0.113.2'), () => ask('b', { visitor: 'named' }))
+    await inside(rewrittenRequest('203.0.113.2'), () => ask('b', { key: 'named' }))
   })
 
   it('counts every address of one IPv6 /64 as one', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
+    ai({ rateLimit: { max: 1, window: '1m' } })
     await inside(rewrittenRequest('2001:db8:1:2::1'), () => ask('a'))
     expect((await failure(inside(rewrittenRequest('2001:db8:1:2:ffff::9'), () => ask('b')))).kind).toBe('limited')
   })
 
   it('counts the asks started together exactly', async () => {
-    ai({ limit: { max: 3, window: '1m' } })
+    ai({ rateLimit: { max: 3, window: '1m' } })
 
-    const results = await Promise.allSettled(Array.from({ length: 10 }, async (_, index) => ask(`q${index}`, { visitor: 'v' })))
+    const results = await Promise.allSettled(Array.from({ length: 10 }, async (_, index) => ask(`q${index}`, { key: 'v' })))
 
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(3)
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(7)
@@ -197,30 +211,30 @@ describe('ai({ limit })', () => {
   })
 
   it('counts nothing for a reply that is never read', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
-    ask('unread', { visitor: 'v' })
-    await ask('read', { visitor: 'v' })
+    ai({ rateLimit: { max: 1, window: '1m' } })
+    ask('unread', { key: 'v' })
+    await ask('read', { key: 'v' })
   })
 
   it('skips the visitor limit with no request and no visitor, as in a job', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
+    ai({ rateLimit: { max: 1, window: '1m' } })
     await ask('a')
     await ask('b')
     await ask('c')
   })
 
   it('opens a fresh window once the last closed', async () => {
-    ai({ limit: { max: 1, window: 1 } })
-    await ask('a', { visitor: 'v' })
-    expect((await failure(ask('b', { visitor: 'v' }))).kind).toBe('limited')
+    ai({ rateLimit: { max: 1, window: 1 } })
+    await ask('a', { key: 'v' })
+    expect((await failure(ask('b', { key: 'v' }))).kind).toBe('limited')
     await Bun.sleep(1100)
-    await ask('c', { visitor: 'v' })
+    await ask('c', { key: 'v' })
   })
 
   it('refuses a limit that is not a whole number of at least 1, or a window it cannot read', () => {
-    expect(() => ai({ limit: { max: 0, window: '1m' } })).toThrow('max')
-    expect(() => ai({ limit: { max: 1.5, window: '1m' } })).toThrow('max')
-    expect(() => ai({ limit: { max: 1, window: 'soon' as '1m' } })).toThrow('window')
+    expect(() => ai({ rateLimit: { max: 0, window: '1m' } })).toThrow('max')
+    expect(() => ai({ rateLimit: { max: 1.5, window: '1m' } })).toThrow('max')
+    expect(() => ai({ rateLimit: { max: 1, window: 'soon' as '1m' } })).toThrow('window')
   })
 })
 
@@ -229,31 +243,31 @@ describe('ai({ budget })', () => {
     ai({ budget: { tokens: 12, window: '1m' } })
     // Each reply is 1 input token and 10 output ones: 11 of 12, so one more ask goes through.
     fakeAi.reply(usedBy(10))
-    await ask('a', { visitor: 'v' })
+    await ask('a', { key: 'v' })
     fakeAi.reply(usedBy(10))
-    await ask('a', { visitor: 'v' })
+    await ask('a', { key: 'v' })
 
-    const refused = await failure(ask('a', { visitor: 'v' }))
+    const refused = await failure(ask('a', { key: 'v' }))
 
     expect(refused.kind).toBe('limited')
     expect(refused.limit).toBe('budget')
     expect(refused.retryAfter).toBeGreaterThan(0)
     expect(fakeAi.asked).toHaveLength(2)
-    await ask('a', { visitor: 'other' })
+    await ask('a', { key: 'other' })
   })
 
   it('lets the reply that overruns the budget mid-stream finish, and counts all of it', async () => {
     ai({ budget: { tokens: 5, window: '1m' } })
     fakeAi.reply(usedBy(40))
-    expect(await ask('a', { visitor: 'v' })).toBe(usedBy(40))
-    expect((await failure(ask('a', { visitor: 'v' }))).limit).toBe('budget')
+    expect(await ask('a', { key: 'v' })).toBe(usedBy(40))
+    expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
   })
 
   it('caps the tokens of all visitors with total, a job included', async () => {
     ai({ budget: { tokens: 1000, total: 20, window: '1m' } })
     fakeAi.reply(usedBy(25))
-    await ask('a', { visitor: 'one' })
-    expect((await failure(ask('a', { visitor: 'two' }))).limit).toBe('total')
+    await ask('a', { key: 'one' })
+    expect((await failure(ask('a', { key: 'two' }))).limit).toBe('total')
     expect((await failure(ask('a'))).limit).toBe('total')
   })
 
@@ -261,7 +275,7 @@ describe('ai({ budget })', () => {
     ai({ budget: { tokens: 5, total: 100, window: '1m' } })
     fakeAi.reply(usedBy(30))
     await ask('a')
-    await ask('b', { visitor: 'v' })
+    await ask('b', { key: 'v' })
   })
 
   it('holds what a running reply may use, so asks started together are refused past the budget rather than all passing', async () => {
@@ -273,7 +287,7 @@ describe('ai({ budget })', () => {
     for (let index = 0; index < count; index++)
       fakeAi.reply(usedBy(10))
 
-    const results = await Promise.allSettled(Array.from({ length: count }, async (_, index) => ask(`q${index}`, { visitor: 'v' })))
+    const results = await Promise.allSettled(Array.from({ length: count }, async (_, index) => ask(`q${index}`, { key: 'v' })))
 
     // The first holds its worst case (its input and maxTokens), so every other is refused while it runs.
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
@@ -289,38 +303,38 @@ describe('ai({ budget })', () => {
       await new Promise(resolve => signal.addEventListener('abort', resolve))
     } }
     // Each holds 4096 + 1 tokens of the 10,000: the third finds 8,194 held and passes, the fourth finds 12,291 and is refused.
-    const running = Array.from({ length: 3 }, () => ask('x', { visitor: 'v', provider: open }))
+    const running = Array.from({ length: 3 }, () => ask('x', { key: 'v', provider: open }))
     const readers = running.map(reply => reply[Symbol.asyncIterator]())
 
     await Promise.all(readers.map(async reader => reader.next()))
 
-    const refused = await failure(ask('x', { visitor: 'v' }))
+    const refused = await failure(ask('x', { key: 'v' }))
 
     expect(refused.limit).toBe('budget')
     // Another visitor holds nothing, and meets the total.
-    expect((await failure(ask('x', { visitor: 'w' }))).limit).toBe('total')
+    expect((await failure(ask('x', { key: 'w' }))).limit).toBe('total')
 
     for (const reply of running)
       reply.stop()
 
     await Promise.all(running)
-    await ask('x', { visitor: 'v' })
-    await ask('x', { visitor: 'w' })
+    await ask('x', { key: 'v' })
+    await ask('x', { key: 'w' })
   })
 
   it('lets a failing reply release what it held', async () => {
     ai({ budget: { tokens: 5000, window: '1m' } })
-    await failure(ask('x', { visitor: 'v', provider: saying([], new AiError('unavailable', 'down')) }))
-    await ask('x', { visitor: 'v' })
+    await failure(ask('x', { key: 'v', provider: saying([], new AiError('unavailable', 'down')) }))
+    await ask('x', { key: 'v' })
   })
 
   it('lets a burst through up to the limit when the budget has room for what they hold', async () => {
-    ai({ limit: { max: 3, window: '1m' }, budget: { tokens: 100_000, window: '1m' } })
+    ai({ rateLimit: { max: 3, window: '1m' }, budget: { tokens: 100_000, window: '1m' } })
 
     for (let index = 0; index < 10; index++)
       fakeAi.reply(usedBy(10))
 
-    const results = await Promise.allSettled(Array.from({ length: 10 }, async (_, index) => ask(`q${index}`, { visitor: 'v' })))
+    const results = await Promise.allSettled(Array.from({ length: 10 }, async (_, index) => ask(`q${index}`, { key: 'v' })))
 
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(3)
   })
@@ -328,9 +342,9 @@ describe('ai({ budget })', () => {
   it('keeps no address nor user id in a store, only a digest to count under', async () => {
     const store = tracking()
 
-    ai({ limit: { max: 5, window: '1m', store }, budget: { tokens: 10_000, window: '1m', store } })
+    ai({ rateLimit: { max: 5, window: '1m', store }, budget: { tokens: 10_000, window: '1m', store } })
     await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))
-    await ask('a', { visitor: 'ann@example.com' })
+    await ask('a', { key: 'ann@example.com' })
 
     expect(store.keys.size).toBeGreaterThan(1)
     expect([...store.keys].filter(key => key.includes('203.0.113') || key.includes('ann@example.com'))).toEqual([])
@@ -341,7 +355,7 @@ describe('ai({ budget })', () => {
     const store = tracking()
 
     ai({ budget: { tokens: 10_000, window: '1m', store } })
-    await ask('a', { visitor: 'v', provider: saying([{ usage: { inputTokens: 30, outputTokens: 12, cacheReadTokens: 800, cacheWriteTokens: 200 } }, { finish: 'stop' }]) })
+    await ask('a', { key: 'v', provider: saying([{ usage: { inputTokens: 30, outputTokens: 12, cacheReadTokens: 800, cacheWriteTokens: 200 } }, { finish: 'stop' }]) })
     expect(store.count()).toBe(1042)
   })
 
@@ -350,7 +364,7 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 10_000, window: '1m', store } })
     fakeAi.reply({ text: 'abcd', cache: { read: 500 } })
-    await ask('abcd', { visitor: 'v' })
+    await ask('abcd', { key: 'v' })
     expect(store.count()).toBe(1 + 500 + 1)
   })
 
@@ -358,7 +372,7 @@ describe('ai({ budget })', () => {
     const store = tracking()
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
-    await ask('a', { visitor: 'v', provider: saying([{ text: 'hi' }, { usage: { inputTokens: 30, outputTokens: 12 } }, { finish: 'stop' }]) })
+    await ask('a', { key: 'v', provider: saying([{ text: 'hi' }, { usage: { inputTokens: 30, outputTokens: 12 } }, { finish: 'stop' }]) })
     expect(store.count()).toBe(42)
   })
 
@@ -366,7 +380,7 @@ describe('ai({ budget })', () => {
     const store = tracking()
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
-    await failure(ask('abcd'.repeat(5), { visitor: 'v', provider: saying([{ text: usedBy(6) }], new AiError('cut', 'cut')) }))
+    await failure(ask('abcd'.repeat(5), { key: 'v', provider: saying([{ text: usedBy(6) }], new AiError('cut', 'cut')) }))
     // 5 tokens of prompt, 6 of reply.
     expect(store.count()).toBe(11)
   })
@@ -375,7 +389,7 @@ describe('ai({ budget })', () => {
     const store = tracking()
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
-    await failure(ask('a', { visitor: 'v', provider: saying([], new AiError('unavailable', 'down')) }))
+    await failure(ask('a', { key: 'v', provider: saying([], new AiError('unavailable', 'down')) }))
     expect(store.keys.size).toBe(0)
   })
 
@@ -384,7 +398,7 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
 
-    const reply = ask('abcd', { visitor: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
+    const reply = ask('abcd', { key: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
       yield { usage: { inputTokens: 7 } }
       yield { text: usedBy(3) }
       await new Promise(resolve => signal.addEventListener('abort', resolve))
@@ -403,7 +417,7 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
 
-    const reply = ask('abcd'.repeat(25), { visitor: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
+    const reply = ask('abcd'.repeat(25), { key: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
       await new Promise(resolve => signal.addEventListener('abort', resolve))
       yield* []
     } } })
@@ -424,7 +438,7 @@ describe('ai({ budget })', () => {
     const controller = new AbortController()
 
     controller.abort()
-    await ask('a', { visitor: 'v', signal: controller.signal })
+    await ask('a', { key: 'v', signal: controller.signal })
     expect(store.keys.size).toBe(0)
     expect(fakeAi.asked).toEqual([])
   })
@@ -432,10 +446,10 @@ describe('ai({ budget })', () => {
   it('opens a fresh window once the last closed', async () => {
     ai({ budget: { tokens: 3, window: 1 } })
     fakeAi.reply(usedBy(10))
-    await ask('a', { visitor: 'v' })
-    expect((await failure(ask('a', { visitor: 'v' }))).limit).toBe('budget')
+    await ask('a', { key: 'v' })
+    expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
     await Bun.sleep(1100)
-    await ask('a', { visitor: 'v' })
+    await ask('a', { key: 'v' })
   })
 
   it('counts a reply ending after its window rolled over in the new window', async () => {
@@ -443,7 +457,7 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 1000, window: 1, store } })
 
-    const reply = ask('a', { visitor: 'v', provider: { name: 's', model: 'm', async* stream() {
+    const reply = ask('a', { key: 'v', provider: { name: 's', model: 'm', async* stream() {
       yield { text: 'start' }
       await Bun.sleep(1100)
       yield { usage: { inputTokens: 4, outputTokens: 6 } }
@@ -474,9 +488,9 @@ describe('when the store fails', () => {
   }
 
   it('refuses the ask on a limit store that fails, rather than let a public chat run without it', async () => {
-    ai({ limit: { max: 5, window: '1m', store: broken } })
+    ai({ rateLimit: { max: 5, window: '1m', store: broken } })
 
-    const refused = await failure(ask('a', { visitor: 'v' }))
+    const refused = await failure(ask('a', { key: 'v' }))
 
     expect(refused.kind).toBe('unavailable')
     expect(refused.cause).toBeInstanceOf(Error)
@@ -485,7 +499,7 @@ describe('when the store fails', () => {
 
   it('refuses on a budget store that fails to read', async () => {
     ai({ budget: { tokens: 5, window: '1m', store: broken } })
-    expect((await failure(ask('a', { visitor: 'v' }))).kind).toBe('unavailable')
+    expect((await failure(ask('a', { key: 'v' }))).kind).toBe('unavailable')
     expect(fakeAi.asked).toEqual([])
   })
 
@@ -493,15 +507,15 @@ describe('when the store fails', () => {
     const hanging = { hit: async () => new Promise<never>(() => undefined), peek: async () => new Promise<never>(() => undefined) }
 
     storeTimeout(30)
-    ai({ limit: { max: 5, window: '1m', store: hanging } })
+    ai({ rateLimit: { max: 5, window: '1m', store: hanging } })
 
-    const refused = await failure(ask('a', { visitor: 'v' }))
+    const refused = await failure(ask('a', { key: 'v' }))
 
     expect(refused.kind).toBe('unavailable')
     expect(refused.message).toContain('did not answer')
 
     ai({ budget: { tokens: 5, window: '1m', store: hanging } })
-    expect((await failure(ask('a', { visitor: 'v' }))).kind).toBe('unavailable')
+    expect((await failure(ask('a', { key: 'v' }))).kind).toBe('unavailable')
   })
 
   it('ends the reply when the store hangs as the tokens are counted', async () => {
@@ -510,15 +524,15 @@ describe('when the store fails', () => {
     storeTimeout(30)
     ai({ budget: { tokens: 5000, window: '1m', store: hanging } })
     fakeAi.reply('fine')
-    expect(await ask('a', { visitor: 'v' })).toBe('fine')
+    expect(await ask('a', { key: 'v' })).toBe('fine')
   })
 
   it('shares one store between the limit and the budget without mixing their counts', async () => {
     const store = tracking()
 
-    ai({ limit: { max: 1, window: '1m', store }, budget: { tokens: 1000, window: '1m', store } })
-    await ask('a', { visitor: 'v' })
-    expect((await failure(ask('b', { visitor: 'v' }))).limit).toBe('asks')
+    ai({ rateLimit: { max: 1, window: '1m', store }, budget: { tokens: 1000, window: '1m', store } })
+    await ask('a', { key: 'v' })
+    expect((await failure(ask('b', { key: 'v' }))).limit).toBe('asks')
     expect(store.keys.size).toBe(2)
   })
 
@@ -527,7 +541,7 @@ describe('when the store fails', () => {
 
     ai({ budget: { tokens: 1000, window: '1m', store: ignoring } })
     fakeAi.reply(usedBy(10))
-    expect(await ask('a', { visitor: 'v' })).toBe(usedBy(10))
+    expect(await ask('a', { key: 'v' })).toBe(usedBy(10))
   })
 
   it('keeps the reply when the store fails only as the tokens are counted', async () => {
@@ -540,14 +554,14 @@ describe('when the store fails', () => {
 
     ai({ budget: { tokens: 50, window: '1m', store: flaky } })
     fakeAi.reply('fine')
-    expect(await ask('a', { visitor: 'v' })).toBe('fine')
+    expect(await ask('a', { key: 'v' })).toBe('fine')
   })
 
   it('refuses when the store answers something that is no window', async () => {
     const odd = { peek: () => ({ count: Number.NaN, resetAt: 0 }), hit: () => ({ count: 1, resetAt: 0 }) }
 
     ai({ budget: { tokens: 50, window: '1m', store: odd } })
-    expect((await failure(ask('a', { visitor: 'v' }))).kind).toBe('unavailable')
+    expect((await failure(ask('a', { key: 'v' }))).kind).toBe('unavailable')
   })
 })
 
@@ -559,7 +573,7 @@ describe('the store', () => {
       ai({ budget: { tokens: 5, window: '1m', store: sqliteRates(path) } })
       expect(existsSync(path)).toBe(false)
       fakeAi.reply('a')
-      await ask('a', { visitor: 'v' })
+      await ask('a', { key: 'v' })
       expect(existsSync(path)).toBe(true)
     }
     finally {
@@ -573,11 +587,11 @@ describe('the store', () => {
     try {
       ai({ budget: { tokens: 5, window: '1m', store: sqliteRates(path) } })
       fakeAi.reply(usedBy(20))
-      await ask('a', { visitor: 'v' })
+      await ask('a', { key: 'v' })
 
       // Another process opens the same file.
       ai({ budget: { tokens: 5, window: '1m', store: sqliteRates(path) } })
-      expect((await failure(ask('a', { visitor: 'v' }))).limit).toBe('budget')
+      expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
     }
     finally {
       rmSync(path, { force: true })
@@ -587,10 +601,10 @@ describe('the store', () => {
 
 describe('the error', () => {
   it('carries the kay refusal an action answers 429 with Retry-After from', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
-    await ask('a', { visitor: 'v' })
+    ai({ rateLimit: { max: 1, window: '1m' } })
+    await ask('a', { key: 'v' })
 
-    const refused = await failure(ask('b', { visitor: 'v' }))
+    const refused = await failure(ask('b', { key: 'v' }))
     const refusal = (refused as unknown as Record<symbol, { status: number, retryAfter: number, message: string }>)[REFUSED]
 
     expect(refusal?.status).toBe(429)
@@ -605,17 +619,17 @@ describe('the error', () => {
 
 describe('ai() with nothing set', () => {
   it('limits nothing, and drops a limit the config no longer names', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
+    ai({ rateLimit: { max: 1, window: '1m' } })
     ai()
-    await ask('a', { visitor: 'v' })
-    await ask('b', { visitor: 'v' })
+    await ask('a', { key: 'v' })
+    await ask('b', { key: 'v' })
   })
 })
 
 describe('the production defaults', () => {
   const was = process.env.NODE_ENV ?? 'test'
   // Production names no provider of its own, so these asks go to the fake.
-  const own = (options: { visitor: string }) => ask('a', { ...options, provider: fakeAi })
+  const own = (options: { key: string }) => ask('a', { ...options, provider: fakeAi })
 
   afterEach(() => {
     process.env.NODE_ENV = was
@@ -626,17 +640,17 @@ describe('the production defaults', () => {
     ai()
 
     for (let count = 0; count < 20; count++)
-      await own({ visitor: 'v' })
+      await own({ key: 'v' })
 
-    const refused = await failure(own({ visitor: 'v' }))
+    const refused = await failure(own({ key: 'v' }))
 
     expect(refused.limit).toBe('asks')
     expect(refused.retryAfter).toBeLessThanOrEqual(600)
 
     fakeAi.reply({ text: usedBy(100_000) })
-    await own({ visitor: 'big' })
+    await own({ key: 'big' })
 
-    expect((await failure(own({ visitor: 'big' }))).limit).toBe('budget')
+    expect((await failure(own({ key: 'big' }))).limit).toBe('budget')
   })
 
   it('limits an app that never called ai()', async () => {
@@ -644,21 +658,21 @@ describe('the production defaults', () => {
     delete (globalThis as Record<symbol, unknown>)[Symbol.for('kayjs-ai.limits')]
 
     for (let count = 0; count < 20; count++)
-      await own({ visitor: 'v' })
+      await own({ key: 'v' })
 
-    expect((await failure(own({ visitor: 'v' }))).limit).toBe('asks')
+    expect((await failure(own({ key: 'v' }))).limit).toBe('asks')
   })
 
   it('keeps what the app set, and false lifts one default', async () => {
     process.env.NODE_ENV = 'production'
-    ai({ limit: { max: 1, window: '1m' }, budget: false })
-    await own({ visitor: 'v' })
-    expect((await failure(own({ visitor: 'v' }))).limit).toBe('asks')
+    ai({ rateLimit: { max: 1, window: '1m' }, budget: false })
+    await own({ key: 'v' })
+    expect((await failure(own({ key: 'v' }))).limit).toBe('asks')
 
-    ai({ limit: false, budget: false })
+    ai({ rateLimit: false, budget: false })
 
     for (let count = 0; count < 25; count++)
-      await own({ visitor: 'free' })
+      await own({ key: 'free' })
   })
 
   it('leaves development and tests unlimited', async () => {
@@ -667,7 +681,7 @@ describe('the production defaults', () => {
       ai()
 
       for (let count = 0; count < 25; count++)
-        await own({ visitor: env })
+        await own({ key: env })
     }
   })
 })

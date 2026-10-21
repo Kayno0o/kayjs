@@ -651,18 +651,18 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 Attempts are counted in the store, so every process shares them. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
-`limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
+`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
 
 ```ts
 createAuth({
   // ...
-  limits: { register: { max: 3, window: '1h' } },
+  rateLimit: { register: { max: 3, window: '1h' } },
 })
 ```
 
 Wrong passwords are counted twice for an account. Six from one address stop that address, so a stranger who keeps guessing cannot lock the owner out from their own device. Sixty from all addresses together stop every sign-in to that account for the rest of the 15 minutes and mail its owner, when the address is verified, at most once a day.
 
-A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `limits.signInAccount` and `limits.signInAccountAll` to change them.
+A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `rateLimit.signInAccount` and `rateLimit.signInAccountAll` to change them.
 
 Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `createAuth` instead, or every client counts as the proxy.
 

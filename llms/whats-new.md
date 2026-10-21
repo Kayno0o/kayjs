@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.69.0
 
 - A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
+- Rate limits are named `rateLimit` and `key` across the libraries: kayjs-ai's `ai({ rateLimit, key })` and `ask({ key })`, kayjs-auth's `createAuth({ rateLimit })` ([Limits](../packages/ai/llms/limits.md)); `kay upgrade` renames the old names.
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
 - `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
 - `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).

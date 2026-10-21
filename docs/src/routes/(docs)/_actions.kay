@@ -4,7 +4,7 @@ import { s } from 'kay'
 import { logFrom } from 'kay'
 import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
 
-// The tools' own limits sit well above what one question needs, so the chat's `ai({ limit })` is what a visitor meets first.
+// The tools' own limits sit well above what one question needs, so the chat's `ai({ rateLimit })` is what a visitor meets first.
 const TOOL_LIMIT = { max: 20, window: '1m' } as const
 const log = logFrom('docs-chat')
 

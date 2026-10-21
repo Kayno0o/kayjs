@@ -2996,6 +2996,28 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
+    const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/rates.ts': config,
+      'src/routes/index.kay': '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nconst reply = ask(\'hi\', { visitor: \'page\' })\n---\np hi\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-rate-limit/g)).toHaveLength(6)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/rates.ts')).text()).toBe(config.replace('ai({ limit, visitor:', 'ai({ rateLimit: limit, key:').replace('limits: {', 'rateLimit: {').replace('{ visitor: \'job\' }', '{ key: \'job\' }'))
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('ask(\'hi\', { key: \'page\' })')
+      expect((await runCheck(root)).output).toContain('deprecated-rate-limit')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('--fix removes the reason of a sole identity-key kay-allow comment with it, and keeps the reason of one naming other lints', async () => {
     const root = await scratchProject({
       'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\n---\n// kay-allow-file identity-key - the whole file\nul\n  // kay-allow identity-key - rows are static\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key - rows are static\n  for row of posts()\n    li {row.slug}\nbutton(onClick={() => posts.set([])}) Clear\n',

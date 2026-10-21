@@ -62,19 +62,24 @@ export interface LimitOption {
   window: Duration
 }
 
-// The limits `limits` overrides, the rest keeping their defaults.
+// The limits `rateLimit` overrides, the rest keeping their defaults.
 export type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
 
-// The defaults over what the app set, every window in seconds; a bad window throws naming its limit.
-export function resolveLimits(given: LimitsOption | undefined): Limits {
+// The defaults over what the app set in `rateLimit` and its old name `limits`, every window in seconds; a bad window throws naming its limit.
+export function resolveLimits(old: LimitsOption | undefined, given: LimitsOption | undefined): Limits {
   const limits: Limits = { ...DEFAULT_LIMITS }
 
-  for (const [name, option] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
-    if (option)
-      limits[name] = { max: option.max, window: durationSeconds(option.window, `limits.${name}.window`, 'kayjs-auth') }
-  }
+  applyLimits(limits, old, 'limits')
+  applyLimits(limits, given, 'rateLimit')
 
   return limits
+}
+
+function applyLimits(limits: Limits, option: LimitsOption | undefined, from: string): void {
+  for (const [name, limit] of Object.entries(option ?? {}) as [keyof Limits, LimitOption | undefined][]) {
+    if (limit)
+      limits[name] = { max: limit.max, window: durationSeconds(limit.window, `${from}.${name}.window`, 'kayjs-auth') }
+  }
 }
 
 // Counts one attempt and answers whether it was over the limit.

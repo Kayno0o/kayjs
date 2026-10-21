@@ -257,7 +257,7 @@ You can also read `reply.progress()` yourself. It gives the text so far and ever
 
 ## Limit what visitors spend
 
-A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `limit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
+A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `rateLimit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
 
 ```ts
 import { ai } from '@kaynooo/kayjs-ai'
@@ -265,7 +265,7 @@ import { sqliteRates } from 'kay/server'
 
 export default defineConfig({
   extensions: [ai({
-    limit: { max: 10, window: '1m' },
+    rateLimit: { max: 10, window: '1m' },
     budget: { tokens: 50_000, total: 2_000_000, window: '1d', store: sqliteRates('data/ai.sqlite') },
   })],
 })
@@ -273,11 +273,11 @@ export default defineConfig({
 
 Those defaults count in memory and set no `total`, so give `budget` a `total` to cap what many accounts spend together. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and the defaults cap the whole site.
 
-`limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
+`rateLimit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
 A visitor is counted by address, or by user when kayjs-auth is in `extensions`: a signed-in user has their own quota wherever they connect from, with nothing to add. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and one quota.
 
-To count users from a session of your own instead, pass `visitor`, a function from the request to the user's id; it wins over kayjs-auth. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
+To count users from a session of your own instead, pass `key`, a function from the request to the user's id; it wins over kayjs-auth. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { key })`, or leave it out: only `total` counts then.
 
 The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model. Tokens the provider read from its prompt cache, or wrote to it, count like any other, so a cached chat cannot spend past its budget unseen, even though a cache read costs less.
 

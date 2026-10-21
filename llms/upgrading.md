@@ -13,6 +13,9 @@ With Tailwind, classes merged from the shorthand, `class`, a spread and a compon
 `authPages({ auth: () => import('./src/auth') })` is `auth({ module: './src/auth' })`, `authExtension(() => import('./src/auth'))` is `auth({ module: './src/auth', pages: false })` and `mailExtension('./src/mail')` is `mail({ module: './src/mail' })`; `authPages({ server })` is `auth({ server })` and `mailExtension(fn)` is `mail({ server: fn })`. The old names work for three minors, and `kay upgrade` rewrites them (the `deprecated-library-registration` lint) where the module is a literal path. `auth({ module })` reads the `auth` export alone, no longer the default one, so a `src/auth.ts` exporting `createAuth` as `default` gains `export const auth`. `kay.config.ts` still imports none of the module, which loads as the server starts.
 
 `cms({ guard: { load } })` is unchanged: a guard is the app's own call, so it stays a function the config bundles. The lint leaves a call alone whose module has no `export const auth`.
+### Rate limits are `rateLimit` and `key`
+
+kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `ask(messages, { visitor })` are `key`, and kayjs-auth's `createAuth({ limits })` is `rateLimit`, as kay's actions and API routes already name theirs. The old names still work for three minors (the `deprecated-rate-limit` lint), and `kay upgrade` renames them. A `limit` or `limits` object held in a variable is not found: rename the option where it is passed.
 
 ## 1.69.0
 

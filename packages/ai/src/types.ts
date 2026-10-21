@@ -107,7 +107,9 @@ export interface AskOptions {
   signal?: AbortSignal | undefined
   // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
-  // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `visitor` names or the address of the request being answered: a job or a test names one.
+  // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
+  key?: string | undefined
+  // The old name of `key`, taken until 1.73.
   visitor?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with tools called outside one throws.
   tools?: readonly ToolAction[] | undefined

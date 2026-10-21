@@ -16,7 +16,7 @@ export function walk(node: t.Node, visit: (node: t.Node) => void): void {
 }
 
 // The name an import specifier takes from its module.
-function importedName(specifier: t.ImportSpecifier): string {
+export function importedName(specifier: t.ImportSpecifier): string {
   return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
 }
 

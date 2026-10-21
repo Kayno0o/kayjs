@@ -488,11 +488,11 @@ describe('structured replies with tools', () => {
 
 describe('limits around a structured reply', () => {
   it('refuses the ask past the limit before the provider is called', async () => {
-    ai({ limit: { max: 1, window: '1m' } })
+    ai({ rateLimit: { max: 1, window: '1m' } })
     fakeAi.reply({ data: answer })
-    await ask('a', { schema: verdict, visitor: 'v' })
+    await ask('a', { schema: verdict, key: 'v' })
 
-    const error = await failure(ask('b', { schema: verdict, visitor: 'v' }))
+    const error = await failure(ask('b', { schema: verdict, key: 'v' }))
 
     expect(error.kind).toBe('limited')
     expect(fakeAi.asked).toHaveLength(1)
@@ -501,16 +501,16 @@ describe('limits around a structured reply', () => {
   it('counts the tokens of a structured reply against the budget', async () => {
     ai({ budget: { tokens: 5, window: '1m' } })
     fakeAi.reply({ data: answer })
-    await ask('a', { schema: verdict, visitor: 'v' })
+    await ask('a', { schema: verdict, key: 'v' })
 
-    expect((await failure(ask('b', { schema: verdict, visitor: 'v' }))).limit).toBe('budget')
+    expect((await failure(ask('b', { schema: verdict, key: 'v' }))).limit).toBe('budget')
   })
 
   it('counts the tokens of a reply whose answer the schema refuses', async () => {
     ai({ budget: { tokens: 5, window: '1m' } })
     fakeAi.reply({ data: { title: 'x' } })
-    expect((await failure(ask('a', { schema: verdict, visitor: 'v' }))).kind).toBe('schema')
-    expect((await failure(ask('b', { schema: verdict, visitor: 'v' }))).limit).toBe('budget')
+    expect((await failure(ask('a', { schema: verdict, key: 'v' }))).kind).toBe('schema')
+    expect((await failure(ask('b', { schema: verdict, key: 'v' }))).limit).toBe('budget')
   })
 
   it('refuses messages past maxInputChars with too-long, to await and for await alike, before the provider', async () => {

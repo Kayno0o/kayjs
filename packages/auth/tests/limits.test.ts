@@ -25,7 +25,7 @@ interface Row {
 }
 
 async function registered(limits: Partial<Limits>, extra: Parameters<typeof testApp>[0] = {}) {
-  const app = testApp({ limits, ...extra })
+  const app = testApp({ rateLimit: limits, ...extra })
   const ada = app.browser()
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -53,7 +53,7 @@ function mail(codes?: 'code') {
 }
 
 async function mailed(limits: Partial<Limits>) {
-  const app = testApp({ limits, ...mail() })
+  const app = testApp({ rateLimit: limits, ...mail() })
 
   await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
 

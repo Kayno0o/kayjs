@@ -186,7 +186,7 @@ function server(options: { documents?: Record<string, unknown>, limits?: Record<
     pages: authPages(),
     scopes: ['posts:read', 'posts:write'],
     admin: 'admin',
-    ...options.limits && { limits: options.limits },
+    ...options.limits && { rateLimit: options.limits },
     oauthServer: { fetch: async (url: string) => options.documents?.[url] === undefined ? new Response('missing', { status: 404 }) : Response.json(options.documents[url]) },
   } as never)
 }

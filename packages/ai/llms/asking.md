@@ -23,7 +23,7 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 
 `ask(prompt | messages, options?)` returns a `Reply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.
 
-Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `cache`, `signal`, `timeout`, `visitor` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
+Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `cache`, `signal`, `timeout`, `key` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
 
 ## An object instead of text
 

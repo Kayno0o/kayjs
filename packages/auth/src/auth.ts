@@ -186,7 +186,9 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
-  // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
+  // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`: `rateLimit: { signIn: { max: 10, window: '15m' } }`.
+  rateLimit?: LimitsOption | undefined
+  // The old name of `rateLimit`, taken until 1.73: where both name a limit, `rateLimit` wins.
   limits?: LimitsOption | undefined
   // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`site` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
   passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | undefined
@@ -1586,7 +1588,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
     pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
-    limits: resolveLimits(options.limits),
+    limits: resolveLimits(options.limits, options.rateLimit),
     rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
     rules: resolveRules(options.rules),
     sessionsPage: options.sessionsPage ?? paths?.sessions,

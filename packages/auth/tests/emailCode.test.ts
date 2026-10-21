@@ -14,7 +14,7 @@ async function setup(codes: CodeMode | Partial<Record<CodedLink, CodeMode>>, lim
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
-    limits,
+    rateLimit: limits,
     email: {
       mailer,
       links: LINKS,

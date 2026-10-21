@@ -94,7 +94,7 @@ describe('signInWithPassword', () => {
   })
 
   test('stops an account after its failed attempts, even with the right password, and a success clears them', async () => {
-    const { browser } = await registered({ limits: { signInAccount: { max: 2, window: 900 } } })
+    const { browser } = await registered({ rateLimit: { signInAccount: { max: 2, window: 900 } } })
     const visitor = browser()
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
@@ -107,7 +107,7 @@ describe('signInWithPassword', () => {
   })
 
   test('counts an account once however it is named, by its email or by its name in any case', async () => {
-    const { browser } = await registered({ limits: { signInAccount: { max: 3, window: 900 } } })
+    const { browser } = await registered({ rateLimit: { signInAccount: { max: 3, window: 900 } } })
 
     for (const identifier of ['ada@example.com', 'Ada', 'ADA'])
       expect(await browser().post('/password', { identifier, password: 'wrong password!' })).toEqual({ ok: false, error: 'invalid' })
@@ -116,14 +116,14 @@ describe('signInWithPassword', () => {
   })
 
   test('counts a burst of parallel guesses before any password is checked', async () => {
-    const { browser } = await registered({ limits: { signInAccount: { max: 2, window: 900 } } })
+    const { browser } = await registered({ rateLimit: { signInAccount: { max: 2, window: 900 } } })
     const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
     expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && answer.error === 'invalid')).toHaveLength(2)
   })
 
   test('counts each client apart, as kay reads its address', async () => {
-    const { browser } = await registered({ limits: { signIn: { max: 1, window: 900 } } })
+    const { browser } = await registered({ rateLimit: { signIn: { max: 1, window: 900 } } })
     const from = (address: string) => ({ method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify({ identifier: 'ada@example.com', password: PASSWORD }) })
 
     expect(await browser().json('/password', from('10.0.0.1'))).toMatchObject({ ok: true })

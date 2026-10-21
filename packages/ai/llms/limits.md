@@ -9,7 +9,7 @@ import { sqliteRates } from 'kay/server'
 
 export default defineConfig({
   extensions: [ai({
-    limit: { max: 10, window: '1m' },
+    rateLimit: { max: 10, window: '1m' },
     budget: { tokens: 50_000, total: 2_000_000, window: '1d', store: sqliteRates('data/ai.sqlite') },
   })],
 })
@@ -17,14 +17,14 @@ export default defineConfig({
 
 ## The options
 
-- In production, a `limit` or `budget` left out is not unlimited: a visitor gets `limit: { max: 20, window: '10m' }` and `budget: { tokens: 100_000, window: '1d' }` (no `total`), in this process's memory, also in an app that never calls `ai()`. `limit: false` or `budget: false` lifts that one, for an app counting elsewhere (an action's `rateLimit`, a gateway). Development and tests have no default. Set `total` to cap what many addresses or accounts spend together. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, so the defaults cap the whole site: set `proxy`.
+- In production, a `rateLimit` or `budget` left out is not unlimited: a visitor gets `rateLimit: { max: 20, window: '10m' }` and `budget: { tokens: 100_000, window: '1d' }` (no `total`), in this process's memory, also in an app that never calls `ai()`. `rateLimit: false` or `budget: false` lifts that one, for an app counting elsewhere (an action's `rateLimit`, a gateway). Development and tests have no default. Set `total` to cap what many addresses or accounts spend together. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, so the defaults cap the whole site: set `proxy`.
 
-- `limit: { max, window, store? }`: at most `max` asks per visitor every `window`. Counted when the reply is first read, so a reply never read counts nothing.
+- `rateLimit: { max, window, store? }`: at most `max` asks per visitor every `window`. Counted when the reply is first read, so a reply never read counts nothing.
 - `budget: { tokens, total?, window, store? }`: the tokens (input plus output) the replies to one visitor may use every `window`, and across all visitors with `total`. `tokens` and `total` are whole numbers of at least 1.
-- `visitor: (request) => string | undefined`: overrides who a signed-in visitor is, such as a user id from your own session lookup; sync or async. With kayjs-auth in `extensions` you leave it out: the signed-in user it names to kay is counted (a guest is not named, so it counts by address), and a store outage in kayjs-auth refuses asks like a failing `store`. It must return something the client cannot choose: a header or cookie the visitor sets gives them a fresh budget per request, or a victim's. Without a user, from `visitor` or a library, the address counts, one key per IPv6 /64 as `rateLimit` does. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, hence one quota. A user and an address never share a key. A free signup mints a budget per account, which only `total` caps.
+- `key: (request) => string | undefined`: overrides who a signed-in visitor is, such as a user id from your own session lookup; sync or async. With kayjs-auth in `extensions` you leave it out: the signed-in user it names to kay is counted (a guest is not named, so it counts by address), and a store outage in kayjs-auth refuses asks like a failing `store`. It must return something the client cannot choose: a header or cookie the visitor sets gives them a fresh budget per request, or a victim's. Without a user, from `key` or a library, the address counts, one key per IPv6 /64 as `rateLimit` does. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, hence one quota. A user and an address never share a key. A free signup mints a budget per account, which only `total` caps.
 - `store`: a `RateStore`, in this process's memory unless given. `sqliteRates(path)` or an app's own store keeps the count over a restart and shares it between processes; the file is created on the first ask, not when the config loads. The budget's store must have `peek(key)` (`memoryRates` and `sqliteRates` do), else `ai()` throws.
-- `ask(..., { visitor: 'id' })` names the visitor for one ask, in place of the hook: a job, a test.
-- With no request being answered and no `visitor`, the per-visitor `limit` and `budget` are skipped and `total` still counts, so a background job spends the shared budget but is never one visitor's.
+- `ask(..., { key: 'id' })` names who is counted for one ask, in place of the hook: a job, a test.
+- With no request being answered and no `key`, the per-visitor `rateLimit` and `budget` are skipped and `total` still counts, so a background job spends the shared budget but is never one visitor's.
 
 ## The size of the input
 
@@ -32,7 +32,7 @@ export default defineConfig({
 
 ## When it counts
 
-- Before the provider is called, `limit` is hit (a refused ask counts, as an action's `rateLimit` does) and the budget is read without counting.
+- Before the provider is called, `rateLimit` is hit (a refused ask counts, as an action's `rateLimit` does) and the budget is read without counting.
 - The budget is compared with the tokens already counted plus what the replies running in this process hold: each holds its worst case, its input plus `maxTokens`, until it ends. So asks started together are refused past the budget rather than all passing, at the price that a visitor near the budget cannot start a second reply while one runs. Holds are not seen by other processes sharing a `store`, which can each pass by their own running replies.
 - When the reply ends, finished, failed or stopped, its tokens are added with the provider's `usage` as the weight. Cache reads and writes count too, one token each like any other (`inputTokens` leaves them out, so the sum is the whole input), so a cached chat cannot spend past its budget unseen; the budget is a cap on tokens, not on price, which a cache read lowers. With no usage reported, the characters sent and received stand for it (4 per token, low for code and CJK text); a reply that failed before any text and any usage counts nothing, while one stopped before the provider said anything counts its input. One stopped before it began is not asked and counts nothing.
 - A reply that overruns the budget mid-stream finishes, bounded by its input and `maxTokens`, and all of it is counted; the next ask is refused. A reply ending after its window rolled over counts in the new window.

@@ -150,6 +150,7 @@ kay check --only seo
 | `redirect-chain` | warn | seo | A redirect in `redirects` or a prerendered redirect whose target redirects again, naming the target to send it to directly; `kay check` reads `redirects` (at the redirect's line in kay.config.ts), `kay build` the redirects it rendered. |
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, since 1.70: libraries register with `auth({ module })` and `mail({ module })`. `kay upgrade` rewrites the calls and the import where the module is a literal path. Found in `kay.config.ts`. |
 | `deprecated-identity-key` | warn | deprecated | A `// kay-allow identity-key` comment or an `identity-key` entry in `lints`, since 1.69: the lint is gone, as a `for` over objects with no `id` needs no key. `kay upgrade` removes it. Found in `.kay` files and `kay.config.ts`. |
+| `deprecated-rate-limit` | warn | deprecated | kayjs-ai's `limit` and `visitor` in `ai({ ... })`, `visitor` in `ask(messages, { ... })` and kayjs-auth's `limits` in `createAuth({ ... })`, since 1.70: they are `rateLimit` and `key`. The fix renames the key, unless the new name is given beside it. Found in TypeScript files and `.kay` fences. |
 
 ### SEO lints
 

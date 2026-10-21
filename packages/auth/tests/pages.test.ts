@@ -258,7 +258,7 @@ describe('exporting a user\'s data', () => {
   })
 
   test('counts each export, the download included, against the account\'s limit', async () => {
-    const { browser } = testApp({ limits: { export: { max: 2, window: 3600 } } })
+    const { browser } = testApp({ rateLimit: { export: { max: 2, window: 3600 } } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -271,7 +271,7 @@ describe('exporting a user\'s data', () => {
 
   describe('needs a sign-in or a proof under ten minutes old, so a stolen session downloads nothing', () => {
     test('a stale session is refused by the method and the route, neither counting against the limit', async () => {
-      const { browser } = testApp({ limits: { export: { max: 1, window: 3600 } } })
+      const { browser } = testApp({ rateLimit: { export: { max: 1, window: 3600 } } })
       const ada = browser()
 
       await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

@@ -56,7 +56,7 @@ test('an action refuses a system message before anything is asked', async () => 
 })
 
 test('a visitor over the limit gets 429 and words from the chat action, nothing asked of the model', async () => {
-  ai({ limit: { max: 1, window: '1m' } })
+  ai({ rateLimit: { max: 1, window: '1m' } })
 
   try {
     const input = { messages: [{ role: 'user' as const, content: 'Hi' }] }

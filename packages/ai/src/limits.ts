@@ -36,10 +36,14 @@ export interface BudgetOptions {
 
 export interface AiOptions {
   // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it.
-  limit?: LimitOptions | false | undefined
+  rateLimit?: LimitOptions | false | undefined
   // In production 100,000 tokens per visitor every day unless set, with no total; `false` lifts it.
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
+  key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
+  // The old name of `rateLimit`, taken until 1.73: where both are given, `rateLimit` wins.
+  limit?: LimitOptions | false | undefined
+  // The old name of `key`, taken until 1.73.
   visitor?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
 }
 
@@ -51,7 +55,7 @@ interface Counter {
 interface Settings {
   limit: (Counter & { max: number }) | undefined
   budget: (Counter & { tokens: number, total: number | undefined }) | undefined
-  visitor: AiOptions['visitor']
+  key: AiOptions['key']
 }
 
 // Who an ask is for, worked out when its reply is first read.
@@ -106,14 +110,15 @@ function wholeNumber(value: unknown, what: string): number {
 }
 
 // The settings an app's options give, the production defaults filling what it left out.
-function settingsOf({ limit, budget, visitor }: AiOptions, memories: Map<string, RateStore>): Settings {
-  const settings: Settings = { limit: undefined, budget: undefined, visitor }
+function settingsOf({ rateLimit, limit: oldLimit, budget, key, visitor }: AiOptions, memories: Map<string, RateStore>): Settings {
+  const settings: Settings = { limit: undefined, budget: undefined, key: key ?? visitor }
+  const limit = rateLimit ?? oldLimit
   const production = process.env.NODE_ENV === 'production'
   const chosenLimit = limit ?? (production ? DEFAULT_LIMIT : undefined)
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
   if (chosenLimit !== undefined && chosenLimit !== false)
-    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ limit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ limit }).window', 'kayjs-ai') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
+    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window', 'kayjs-ai') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
 
   if (chosenBudget !== undefined && chosenBudget !== false) {
     if (chosenBudget.store !== undefined && chosenBudget.store.peek === undefined)
@@ -163,11 +168,11 @@ async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
   }
 }
 
-async function visitorKey(visitor: Settings['visitor'], { request, visitor: named }: Asker): Promise<string | undefined> {
+async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: Asker): Promise<string | undefined> {
   let user = named
 
   if ((user === undefined || user === '') && request) {
-    const hooked = await visitor?.(request)
+    const hooked = await keyOf?.(request)
 
     user = typeof hooked === 'string' && hooked !== '' ? hooked : await userOf(request)
   }
@@ -213,7 +218,7 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
   const { held } = slot()
 
   try {
-    const key = await visitorKey(settings.visitor, asker)
+    const key = await visitorKey(settings.key, asker)
 
     if (limit && key !== undefined) {
       const window = checked(await bounded(async () => limit.store.hit(`ai:limit\n${key}`, limit.ms)))!
