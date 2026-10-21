@@ -110,8 +110,8 @@ export async function highlight(code: string, language: string | undefined): Pro
             properties: { 'class': 'code-bar', 'data-search': 'false' },
             children: [
               { type: 'element', tagName: 'span', properties: {}, children: [{ type: 'text', value: lang === 'text' ? '' : lang }] },
-              // The classes copy-button.kay draws CopyButton with; components/code-copy.kay answers the click.
-              { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'kui-btn kui-copy-btn', 'data-copy': '' }, children: [{ type: 'text', value: 'Copy' }] },
+              // The markup copy-button.kay draws CopyButton with, its label in a span sized by the hidden other one; components/code-copy.kay answers the click.
+              { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'kui-btn kui-copy-btn', 'data-copy': '' }, children: [{ type: 'element', tagName: 'span', properties: { 'class': 'kui-copy-btn-text', 'data-other': 'Copied!' }, children: [{ type: 'text', value: 'Copy' }] }] },
             ],
           },
           ...node.children.filter(child => child.type === 'element'),

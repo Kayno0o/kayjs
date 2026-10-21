@@ -11,17 +11,21 @@ const said = signal('')
 async function copy(event: MouseEvent) {
   const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-copy]') : null
   const code = button?.closest('.code')?.querySelector('code')
+  const label = button?.querySelector<HTMLElement>('.kui-copy-btn-text')
 
-  if (!button || !code)
+  if (!label || !code)
     return
 
   if (!await attempt(async () => navigator.clipboard.writeText(code.textContent ?? ''), 'Could not copy to the clipboard'))
     return
 
-  button.textContent = 'Copied!'
+  // The label not showing sits in data-other, so the button keeps the wider width.
+  label.textContent = 'Copied!'
+  label.dataset.other = 'Copy'
   said.set('Copied to the clipboard')
   setTimeout(() => {
-    button.textContent = 'Copy'
+    label.textContent = 'Copy'
+    label.dataset.other = 'Copied!'
     said.set('')
   }, COPIED_MS)
 }
