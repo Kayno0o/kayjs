@@ -1,3 +1,4 @@
+import type { TArray, TLiteral, TObject, TUnion } from '@sinclair/typebox'
 import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
@@ -34,7 +35,7 @@ const indexes = new Map<Collection<unknown>, { index: Promise<TranslationIndex>,
 let hearing = false
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says; `customField` names any other kind, which the app's own component edits.
-export type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name'
+export type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name' | 'blocks'
 
 // A value an entry's data holds, which an island takes as a prop.
 export type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
@@ -186,7 +187,7 @@ export interface EditSite {
 const MARKDOWN = /\.md$/
 const KIND_NAME = /^[\w-]+$/
 // The kinds an editor has a control for, which `customField` cannot name: the built-in control would win over the app's component.
-const BUILT_IN_KINDS = ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference']
+const BUILT_IN_KINDS = ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference', 'blocks']
 const YAML_FILE = /\.ya?ml$/
 const SLASHES = /[\\/]/
 const CRLF = /\r\n/g
@@ -343,6 +344,32 @@ function currencySymbol(currency: string): string {
 // A list of distinct, non-empty words, which a CMS edits as chips typed into one box.
 export function tagsField(options?: NonNullable<Parameters<typeof t.Array>[1]>): ReturnType<typeof t.Array<ReturnType<typeof t.String>>> {
   return t.Array(t.String({ minLength: 1 }), { ...options, 'uniqueItems': true, 'x-kay': { kind: 'tag-list' } })
+}
+
+// The schema of a list of blocks: an object per declared type, each carrying its `type` key.
+type BlockOf<Name extends string, Block extends TObject> = TObject<{ type: TLiteral<Name> } & Block['properties']>
+type BlockVariants<Types extends Record<string, TObject>> = { [Name in keyof Types & string]: BlockOf<Name, Types[Name]> }[keyof Types & string]
+
+// A list whose items are of several declared types, `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })`, each stored as an object with a `type` key naming its type: `{ type: 'hero', ... }`.
+// The typed read is the union of the blocks discriminated on `type`, and a CMS adds an item by choosing its type, each type showing its own fields. A block's `title` labels its type.
+export function blocks<const Types extends Record<string, TObject>>(types: Types, options?: Omit<NonNullable<Parameters<typeof t.Array>[1]>, 'x-kay'>): TArray<TUnion<BlockVariants<Types>[]>> {
+  const variants = Object.entries(types).map(([name, block]) => {
+    if (name === '')
+      throw new KayError('content-api-misuse', 'kay: blocks() names a block type with an empty string, which `type` would store as nothing')
+
+    if (block.type !== 'object' || block.properties === undefined)
+      throw new KayError('content-api-misuse', `kay: blocks({ ${name} }) is not an object schema; each block type takes an s.Object({ ... })`)
+
+    if (Object.hasOwn(block.properties, 'type'))
+      throw new KayError('content-api-misuse', `kay: the ${name} block declares a \`type\` field, which blocks() keeps for the block's type name: rename the field`)
+
+    return { ...block, properties: { type: t.Literal(name), ...block.properties }, required: ['type', ...block.required ?? []] }
+  })
+
+  if (variants.length === 0)
+    throw new KayError('content-api-misuse', 'kay: blocks() declares no block type')
+
+  return t.Array(t.Union(variants), { ...options, 'x-kay': { kind: 'blocks' } }) as unknown as TArray<TUnion<BlockVariants<Types>[]>>
 }
 
 // A call to action: the words of a link and where it goes, a path or an http(s) address.

@@ -24,7 +24,7 @@ export function compiledCheck(schema: TSchema): TypeCheck<TSchema> {
 export function refusals(check: TypeCheck<TSchema>, value: unknown, keyOf: (pointer: string) => string, messageOf: (issue: ValueError) => string = summaryOf, max = Infinity): Map<string, string> {
   const refused = new Map<string, string>()
 
-  for (const issue of check.Errors(value)) {
+  for (const issue of withoutBlockUnions(check.Errors(value))) {
     const key = keyOf(issue.path)
 
     if (refused.has(key))
@@ -37,6 +37,33 @@ export function refusals(check: TypeCheck<TSchema>, value: unknown, keyOf: (poin
   }
 
   return refused
+}
+
+// A block of a `blocks()` list that fails is reported by the fields of its own type, as the union of all the types would only say the item is not valid; a block naming no declared type keeps the union's error.
+function* withoutBlockUnions(issues: Iterable<ValueError>): Generator<ValueError> {
+  for (const issue of issues) {
+    const own = variantOf(issue)
+
+    if (own === undefined)
+      yield issue
+    else
+      yield* withoutBlockUnions(own)
+  }
+}
+
+interface Variant {
+  properties?: { type?: { const?: unknown } }
+}
+
+function variantOf(issue: ValueError): Iterable<ValueError> | undefined {
+  const kind = (issue.value as { type?: unknown } | null | undefined)?.type
+  const variants = issue.errors as Iterable<ValueError>[] | undefined
+  const schema = issue.schema as { anyOf?: Variant[] }
+
+  if (typeof kind !== 'string' || !Array.isArray(variants) || schema.anyOf === undefined)
+    return undefined
+
+  return variants[schema.anyOf.findIndex(variant => variant.properties?.type?.const === kind)]
 }
 
 // A JSON pointer segment as the key it names, `a~1b` as `a/b`.

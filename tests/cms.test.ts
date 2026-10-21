@@ -341,8 +341,8 @@ describe('the collections a CMS edits', () => {
   })
 
   it('refuses a custom field kind named like a built-in one, listing them', () => {
-    for (const kind of ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference'])
-      expect(() => customField(kind, t.String())).toThrow(`names a kind the editor has built in (text, textarea, markdown, number, integer, boolean, date, datetime, image, file, json, reference)`)
+    for (const kind of ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference', 'blocks'])
+      expect(() => customField(kind, t.String())).toThrow(`names a kind the editor has built in (text, textarea, markdown, number, integer, boolean, date, datetime, image, file, json, reference, blocks)`)
 
     expect(customField('select', t.String())['x-kay']).toEqual({ kind: 'select' })
   })
