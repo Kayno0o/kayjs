@@ -135,7 +135,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 
 **Options**
 - `site` is a public origin and defaults to kay's `site`; `name` is a display name. A library's other origin options (`origin`, `host`, `publicUrl`) are spelled `site` (#1680). A third-party service's API root is `baseUrl`, not `url` (#1696).
-- A duration is one `Duration` type: a number of seconds or a string with its unit (`'250ms'`, `'5m'`), in every option of kay and the libraries. A number elsewhere (a store's `set(id, data, maxAge)`, a test helper's timeout) either takes `Duration` or carries its unit in its name (`timeoutMs`) (#1639).
+- A duration is one `Duration` type: a string with its unit (`'250ms'`, `'30s'`, `'5m'`, `'7d'`), never a bare number, in every option, store argument (`set(id, data, maxAge)`) and test helper of kay and the libraries; no name carries a unit (`timeoutMs`) (#1639).
 - How long something stays valid is `maxAge`, how long to wait is `timeout`, an absolute date is `expires`; never `expiresIn` or `lifetime`, and a second lifetime is a nested `maxAge`, not `rememberMaxAge` (#1685).
 - A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`); `bodyLimit` and `maxBytes` go (#1686).
 - A rate limit is `rateLimit: { max, window, store?, key?, count? }`, `key` naming who is counted (not `visitor`), and a library with several limits nests them: `rateLimit: { signIn: { max, window } }` (#1683).
@@ -153,7 +153,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 **Prefixes**
 - Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api` (#1691).
 - CSS classes and ids are `k<library>-` (`kui-`, `kcms-`, `kai-`, `kauth-`, `kmail-`), kay's own `kay-`; a data attribute that names an element or marker is `data-k<library>-`, kay's `data-kay-`. A bare `data-tone` or `data-size` is the state of the component's own element (#1691).
-- Cookies are `kay_<name>` and tables `kay_<plural name>`, the default session cookie included (#1691).
+- Cookies are `kay_<name>` and tables `kay_<plural name>`; the default session cookie becomes `kay_session`, the old name no longer read (#1691).
 - An export name two libraries share is prefixed with its library (`authMemoryStore`), and a Postgres entry or helper is spelled `pg`, not `postgres` (#1692).
 
 **Texts**
@@ -168,5 +168,5 @@ How kay and its libraries name the same idea, written before the renames land: a
 - Results say `ok`, never `failed`, and `errors` hold messages the user can read (#1696).
 
 **CLI and environment**
-- A command that writes takes `--dry-run`; `--quiet` and `--format text|json` go to every command that prints; `-p` is `--project` alone; one spelling per flag, an alias kept three minors (#1696).
-- `lang` is the language of a document, `locale` a language an app serves or formats for. Environment variables are the option's name in capitals, prefixed by the library (`AI_`, `MAIL_`), with `SITE_URL` for the origin (#1696).
+- A command that writes takes `--dry-run`, except `fmt --check`, the verify-only form every formatter uses; `--quiet` and `--format text|json` go to every command that prints; `-p` is `--project` alone; one spelling per flag, an alias kept three minors (#1696).
+- `lang` is the language of a document, `locale` a language an app serves or formats for. Environment variables are the option's name in capitals, prefixed by the library (`AI_`, `MAIL_`), with `SITE_URL` for the origin; a renamed variable is still read under its old name, with a warning, until its deprecated lint goes (#1696).
