@@ -3,9 +3,10 @@ import { existsSync, readdirSync, readFileSync, readlinkSync, realpathSync, stat
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { expect, it } from 'bun:test'
+import { expect, it, spyOn } from 'bun:test'
 import { testWorker } from '../src/build/assets'
 import { ConfigRefused, dev } from '../src/dev'
+import * as fingerprint from '../src/dev/fingerprint'
 import { FINGERPRINT } from '../src/dev/fingerprint'
 
 const PARENT_PID = /\) \S+ (\d+)/
@@ -120,6 +121,44 @@ it('leaves the server alone for an edit of package.json that resolves nothing, a
     await rm(root, { recursive: true, force: true })
   }
 }, 120_000)
+
+it('answers a burst of inert package.json edits with one scan, and one more for the edits that came in during it', async () => {
+  const root = await project('dev-burst-', { ...PAGES, 'package.json': JSON.stringify({ name: 'burst', version: '1.0.0', imports: { '#label': './src/label-a.ts' } }) })
+  const lines: string[] = []
+  const edit = async (version: string) => Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'burst', version, imports: { '#label': './src/label-a.ts' } }))
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>()
+  const scans = spyOn(fingerprint, 'mentionsPackage').mockImplementation(async () => {
+    await gate
+
+    return false
+  })
+  const stop = await dev(root, { port: await freePort(), log: line => lines.push(line) })
+
+  try {
+    await until(() => lines.some(line => line.includes('ready in')))
+    await edit('1.0.1')
+    await until(() => scans.mock.calls.length === 1)
+
+    // The first scan is still running: these three are answered by one more.
+    await edit('1.0.2')
+    await edit('1.0.3')
+    await edit('1.0.4')
+    await Bun.sleep(1000)
+    expect(scans).toHaveBeenCalledTimes(1)
+
+    release()
+    await until(() => scans.mock.calls.length === 2)
+    await Bun.sleep(1000)
+    expect(scans).toHaveBeenCalledTimes(2)
+    expect(lines.filter(line => line.includes('package.json: restarted'))).toEqual([])
+  }
+  finally {
+    release()
+    scans.mockRestore()
+    await stop()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 60_000)
 
 it('starts the server on the entry it knows when kay.config.ts changes, without waiting for the types, and follows the entry the types then tell', async () => {
   const marker = join(await mkdtemp(join(process.cwd(), 'node_modules/.cache/dev-config-')), 'typed')

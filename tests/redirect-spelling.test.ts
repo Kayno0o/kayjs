@@ -186,6 +186,28 @@ describe('the dev tool\'s guard outcome', () => {
   })
 })
 
+describe('the dev tool\'s guard outcome in a render', () => {
+  // A redirect answers without a page, so no dev tool carries its outcome: a denial is the refusal a dev render shows.
+  const served = async (dev: boolean) => new Elysia().use(await pages({ routes: 'tests/fixtures/guard-outcome/src/routes', prebuilt: false, security: false, site: 'https://x.example', dev }))
+  const visit = async (dev: boolean) => (await served(dev)).handle(new Request('http://localhost/gated', { headers: { accept: 'text/html' } }))
+
+  it('names what the refusing guard did in a dev render', async () => {
+    const response = await visit(true)
+    const html = await response.text()
+    const request = JSON.parse((/id="kay-dev-request">([^<]*)</).exec(html)![1]!.replaceAll('\\u003c', '<')) as { guards: { file: string, outcome: string }[] }
+
+    expect(response.status).toBe(403)
+    expect(request.guards).toEqual([{ file: expect.stringContaining('gated/_guard.ts'), outcome: 'denied with 403: No entry' }])
+  })
+
+  it('shows no dev tool in production', async () => {
+    const response = await visit(false)
+
+    expect(response.status).toBe(403)
+    expect(await response.text()).not.toContain('kay-dev-request')
+  })
+})
+
 describe('a redirect on a site with locales by domain', () => {
   const settings: LocaleSettings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false, hosts: { fr: 'fr.example', en: 'en.example' }, paths: { '/about': { fr: '/a-propos', en: '/about-us' } }, pages: ['/', '/about'] }
   const at = (host: string, locale: string) => runInLocale({ settings, locale, host, path: '/', messages: {} } as unknown as LocaleState, () => new Redirect('/about', 302).location)

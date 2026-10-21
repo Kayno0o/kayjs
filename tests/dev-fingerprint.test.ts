@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } f
 import { mkdir, rm, symlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
 import { devBuilder } from '../src/dev/builder'
 import { FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
@@ -267,6 +267,22 @@ describe('mentionsPackage', () => {
     expect(await mentionsPackage(project)).toBe(false)
     await write({ 'src/version.ts': 'import { version } from \'../package.json\'\nexport default version\n' })
     expect(await mentionsPackage(project)).toBe(true)
+  })
+
+  it('stops reading at the first source that names it', async () => {
+    const naming = 'import { version } from \'../package.json\'\nexport default version\n'
+
+    await write({ ...FILES, 'src/a.ts': naming, 'src/b.ts': naming, 'src/c.ts': naming })
+
+    const read = spyOn(Bun, 'file')
+
+    try {
+      expect(await mentionsPackage(project)).toBe(true)
+      expect(read.mock.calls.filter(([file]) => String(file).endsWith('.ts'))).toHaveLength(1)
+    }
+    finally {
+      read.mockRestore()
+    }
   })
 
   it('counts a source it cannot read as naming it', async () => {

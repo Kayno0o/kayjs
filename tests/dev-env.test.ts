@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { environmentWithoutDotenv } from '../src/dev/sources'
 import { scratchDir } from './scratch'
 
@@ -253,6 +253,22 @@ describe('environmentWithoutDotenv', () => {
 
   it('keeps the shell\'s value of a key an expansion of the file names, the documented limit', async () => {
     expect(await leftOut('A=file\nB=${A}-b\n', { A: 'shell' })).toEqual([])
+  })
+
+  it('probes once when no .env file holds a $, and twice when one does', async () => {
+    const spawn = spyOn(Bun, 'spawn')
+
+    try {
+      expect(await leftOut('A=same\n', { A: 'same' })).toEqual(['A'])
+      expect(spawn).toHaveBeenCalledTimes(1)
+
+      spawn.mockClear()
+      expect(await leftOut('A=${HOME}/x\n', { A: `${process.env.HOME}/x` })).toEqual(['A'])
+      expect(spawn).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      spawn.mockRestore()
+    }
   })
 
   it('reads the .env of the project root, not of the directory it was called from', async () => {
