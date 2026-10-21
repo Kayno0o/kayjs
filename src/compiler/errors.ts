@@ -162,7 +162,7 @@ export const ERRORS = {
   'env-invalid': {
     group: 'build',
     summary: 'The environment does not match its schema.',
-    fix: { file: 'llms/server.md', heading: 'Environment' },
+    fix: { file: 'llms/environment.md', heading: 'Environment' },
   },
   'config-invalid': {
     group: 'build',
