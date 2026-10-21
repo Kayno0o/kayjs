@@ -27,17 +27,17 @@ s.Object({
 })
 ```
 
-It wraps any schema, an optional or nullable one too, keeps its kind and keywords and reports the options as `x-kay-input`.
+It wraps any schema, an optional or nullable one too, keeps its kind and keywords and reports the options as `x-kay-input`. A nullable field listed as required stores `null` when cleared, not a missing key.
 
 - `placeholder`: shown in the empty control.
 - `prefix`, `suffix`: a word before or after a text or number box, a currency or a unit; `600 €` is a number with `suffix: '€'`, stored as `600`.
 - `rows`: a string entered in a textarea of that many rows (2 or more), growing with its text.
 - `type`: `'text' | 'email' | 'url' | 'tel' | 'search'` for a one-line string.
 - `labels`: the label of each `enum` value or union literal by value, which wins over a literal's own `title` (`s.Literal('new', { title: 'Nouveau' })`); the stored value stays the raw one.
-- `lines`: a list of strings entered in one box, a line each, blank lines dropped.
+- `lines`: a list of strings entered in one box, a line each, blank lines dropped; emptied on an optional field it unsets the key.
 - `titleField`: the field of a list's object items whose text heads an item, before the first filled text field.
-- `when`: a sibling field (same object) this one is shown for only once the sibling holds a value (not empty, `false` or `[]`). The sibling must be a key of the same object. Use it on an optional field: a required one hidden cannot be filled and fails the save, and a hidden field keeps its stored value.
-- `placeholder`, `prefix` and `suffix` apply to text and number boxes only; `rows` auto-growing needs a browser with `field-sizing` and a page allowing inline styles, else the box stays at its `rows`.
+- `when`: a sibling field (same object) this one is shown for only once the sibling holds a value (not empty, `false` or `[]`). The sibling must be a key of the same object, or the server logs a warning at boot. Use it on an optional field: a required one hidden cannot be filled and fails the save, and a hidden field keeps its stored value. A hidden field the schema refuses is shown with its message.
+- `placeholder`, `prefix` and `suffix` apply to text and number boxes only; `rows` auto-growing needs a browser with `field-sizing`, else the box stays at its `rows`; it sets no style attribute, so a strict content security policy keeps it.
 
 A collection's `description` (`collection({ description })`) is shown to the editor under the title of its list and of its entries.
 

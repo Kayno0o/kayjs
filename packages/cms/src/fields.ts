@@ -28,6 +28,8 @@ interface FieldBase {
   rows?: number
   // The sibling this field waits for a value in.
   when?: string
+  // Listed as required but allowed to be null: emptied, it stores `null`, as leaving the key out would be refused.
+  nullable?: true
 }
 
 // `value` is what the select posts, `raw` what the entry holds, a number for a numeric enum.
@@ -124,6 +126,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     hint: inner.description ?? schema.description,
     default: inner.default ?? schema.default,
     ...limits && { limits },
+    ...required && nullable && { nullable: true as const },
   }
   const entering = enteringOf(inner, schema)
 

@@ -1,7 +1,7 @@
 import type { CollectionInfo, ScreenCollection } from '../src/kay/contract'
 import { describe, expect, test } from 'bun:test'
 import { fieldsOf } from '../src/fields'
-import { cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions } from '../src/layout'
+import { cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, whenProblems } from '../src/layout'
 import { rowsOf } from '../src/listing'
 import { configure, settings } from '../src/settings'
 
@@ -134,6 +134,37 @@ describe('layoutProblems', () => {
       'cms({ collections }) names ghosts, which is no collection of the site',
     ])
     expect(layoutProblems([products], checkLayouts({ products: { form: { fields: ['name', ['price']] } } }))).toEqual([])
+  })
+})
+
+describe('whenProblems', () => {
+  const when = (key: string) => ({ 'type': 'string', 'x-kay-input': { when: key } })
+  const page = (properties: Record<string, unknown>): CollectionInfo => ({ name: 'pages', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties } as CollectionInfo['schema'] })
+
+  test('names a field waiting for a key that is no sibling, at the top, in a group and in a list of groups', () => {
+    const lines = whenProblems([page({
+      url: { type: 'string' },
+      label: when('url'),
+      alt: when('nope'),
+      link: { type: 'object', properties: { href: { type: 'string' }, text: when('url') } },
+      links: { type: 'array', items: { type: 'object', properties: { href: { type: 'string' }, text: when('href'), extra: when('url') } } },
+    })])
+
+    expect(lines).toEqual([
+      'pages: alt waits for nope (fieldInput `when`), which is no field beside it, so it stays hidden',
+      'pages: link.text waits for url (fieldInput `when`), which is no field beside it, so it stays hidden',
+      'pages: links.extra waits for url (fieldInput `when`), which is no field beside it, so it stays hidden',
+    ])
+  })
+
+  test('counts the alt text an image takes as a sibling', () => {
+    const lines = whenProblems([page({
+      photo: { 'type': 'string', 'x-kay': { kind: 'image', alt: 'alt' } },
+      alt: { type: 'string' },
+      caption: when('alt'),
+    })])
+
+    expect(lines).toEqual([])
   })
 })
 

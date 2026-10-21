@@ -183,6 +183,33 @@ export function cellText(field: Field, value: unknown): string {
   return typeof value === 'object' ? '' : clipped(String(value))
 }
 
+// The fields a `when` waits for that are no sibling of theirs, a line each, for the boot's log: the field would stay hidden for good.
+export function whenProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]): string[] {
+  const lines: string[] = []
+
+  function walk(where: string, siblings: Field[]): void {
+    // An image takes the fields it names as its alt text and size, which are siblings still.
+    const keys = new Set(siblings.flatMap(field => [field, ...field.kind === 'image' ? [field.upload?.alt, field.upload?.width, field.upload?.height] : []]).flatMap(field => field === undefined ? [] : [String(field.key)]))
+
+    for (const field of siblings) {
+      const at = `${where}${String(field.key)}`
+
+      if (field.when !== undefined && !keys.has(field.when))
+        lines.push(`${at} waits for ${field.when} (fieldInput \`when\`), which is no field beside it, so it stays hidden`)
+
+      if (field.kind === 'group')
+        walk(`${at}.`, field.fields)
+      else if (field.kind === 'list' && field.item.kind === 'group')
+        walk(`${at}.`, field.item.fields)
+    }
+  }
+
+  for (const { name, schema } of listed)
+    walk(`${name}: `, fieldsOf(schema))
+
+  return lines
+}
+
 // What the layouts name that the collections lack, once they are loaded: a line each, for the boot's log.
 export function layoutProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[], layouts: ReadonlyMap<string, CollectionLayout>): string[] {
   const lines: string[] = []

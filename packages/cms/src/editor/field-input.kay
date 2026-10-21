@@ -55,6 +55,20 @@ const starred = () => field.required && typeof field.key === 'string'
 // The schema's refusal of the last save or render, else what the box holds that cannot be saved, else a limit it breaks, the last two once the editor has left the box.
 const issue = () => drafts.issues(entry, path)[0]?.message ?? (touched() ? drafts.blocked(entry, path)[0]?.message ?? checkField(field, value()) : undefined)
 const formatted = () => value() === undefined ? '' : JSON.stringify(value(), null, 2)
+// A select's option, or its emptied state.
+function pick(option: { raw: unknown } | undefined): void {
+  set(option === undefined ? cleared : option.raw)
+}
+
+// A text with rows starts at them and grows from there. The minimum is set on the element, as a style attribute would be dropped by a strict content security policy; until the island hydrates, the `rows` attribute sizes it.
+function grow(element: HTMLTextAreaElement, rows: number | undefined): void {
+  if (rows === undefined)
+    return
+
+  element.style.setProperty('--kcms-rows', String(rows))
+  element.setAttribute('data-kcms-grow', '')
+}
+
 // The text typed stands while it is being edited or does not parse; once the draft is dropped or the box is left, the box shows the draft.
 const jsonShown = () => jsonFocused() || drafts.blocked(entry, path).length > 0 ? jsonText() ?? formatted() : formatted()
 
@@ -71,15 +85,26 @@ function set(next: unknown, typing = false): void {
     touched = true
 }
 
+// What an emptied control stores: nothing, or `null` for a field the schema lists as required but allows to be null, which a missing key would break.
+const cleared = field.nullable === true ? null : undefined
+
 // Emptying an optional text unsets it, as emptying a number does, instead of storing an empty string.
 function typed(next: string): void {
-  set(next === '' && !field.required ? undefined : next, true)
+  set(next === '' && !field.required ? cleared : next, true)
+}
+
+// A list of lines emptied on an optional field is unset, as emptying a text is.
+function typedLines(next: string): void {
+  const lines = next.split('\n').map(line => line.trim()).filter(line => line !== '')
+
+  set(lines.length === 0 && !field.required ? cleared : lines, true)
 }
 
 // A field waiting for a sibling shows once that holds a value.
 const parent = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : ''
 const filled = (found: unknown) => found !== undefined && found !== null && found !== '' && found !== false && !(Array.isArray(found) && found.length === 0)
-const shown = () => field.when === undefined || filled(drafts.value(entry, joinPath(parent, field.when)))
+// A field the schema refused is shown whatever its sibling holds, as a save cannot be fixed through a field that stays hidden.
+const shown = () => field.when === undefined || filled(drafts.value(entry, joinPath(parent, field.when))) || drafts.issues(entry, path).length > 0
 
 // What a limited text says of its length.
 const counter = () => field.limits?.maxLength === undefined ? undefined : wording('cms.field.counter', '{count} / {max}', { count: text().length, max: field.limits.maxLength })
@@ -90,8 +115,16 @@ const noteId = `kcms-note-${uid()}`
 // An integer takes digits and a minus: the keys that would write a decimal or an exponent are refused, and a pasted decimal is cut to its whole part.
 const NOT_INTEGER = new Set(['.', ',', 'e', 'E', '+'])
 
+let numberBox: HTMLInputElement | undefined
+
 function entered(next: number | null): void {
-  set(next === null ? undefined : field.kind === 'integer' ? Math.trunc(next) : next, true)
+  const whole = next !== null && field.kind === 'integer' ? Math.trunc(next) : next
+
+  set(whole === null ? cleared : whole, true)
+
+  // A pasted decimal cut to the figure the draft already holds changes no signal, so the box is written to.
+  if (numberBox && whole !== next && whole !== null)
+    numberBox.value = String(whole)
 }
 
 // The wheel over a focused number box changes its figure unasked: it leaves the box instead.
@@ -253,7 +286,7 @@ function setJson(next: string): void {
 
   try {
     drafts.block(entry, path, undefined)
-    set(next.trim() === '' ? undefined : JSON.parse(next), true)
+    set(next.trim() === '' ? cleared : JSON.parse(next), true)
   }
   catch {
     drafts.block(entry, path, wording('cms.field.invalidJson', '{field} is not valid JSON', { field: field.label }))
@@ -320,25 +353,25 @@ function leaveJson(): void {
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'lines'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={next => set(next.split('\n').map(line => line.trim()).filter(line => line !== ''), true)} onBlur={() => touched = true})
+        Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={typedLines} onBlur={() => touched = true})
     when 'textarea'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
-        Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} data-kcms-grow={current.rows === undefined ? undefined : ''} style={current.rows === undefined ? undefined : `--kcms-rows: ${current.rows}`} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
+        Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
-          TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} inputmode={current.kind === 'integer' ? 'numeric' : 'decimal'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} placeholder={current.placeholder} value={text()} onInput={entered} onKeyDown={digits} onWheel={wheel} onBlur={() => touched = true})
+          TextInput(ref={element => numberBox = element} type="number" step={current.kind === 'integer' ? '1' : 'any'} inputmode={current.kind === 'integer' ? 'numeric' : 'decimal'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} placeholder={current.placeholder} value={text()} onInput={entered} onKeyDown={digits} onWheel={wheel} onBlur={() => touched = true})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        TextInput(type="date" required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? undefined : next)})
+        TextInput(type="date" required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? cleared : next)})
     when 'datetime'
-      DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={set})
+      DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={next => set(next ?? cleared)})
     when 'select'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
+        Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => pick(current.options.find(option => option.value === next))})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} onAlt={setAlt} onChange={setFile})

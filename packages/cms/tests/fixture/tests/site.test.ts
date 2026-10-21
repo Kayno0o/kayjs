@@ -60,7 +60,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
 })
 

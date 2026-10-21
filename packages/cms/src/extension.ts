@@ -4,7 +4,7 @@ import { serverRoot, underKayDev } from 'kay/library'
 import { api, editRequested } from 'kay/server'
 import { collections } from './kay/content'
 import { missingKindLines } from './kinds'
-import { layoutProblems } from './layout'
+import { layoutProblems, whenProblems } from './layout'
 import { log } from './log'
 import { pageLinkLoader } from './page-link'
 import { configure, settings } from './settings'
@@ -42,11 +42,11 @@ export function cms(options: CmsOptions = {}): KayExtension {
         try {
           const listed = await collections({ counts: false })
 
-          for (const line of [...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts)])
+          for (const line of [...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)])
             log.warn(line)
         }
         catch (error) {
-          log.warn('the collections could not be checked for field kinds with no component or a layout naming a field they lack', error)
+          log.warn('the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none', error)
         }
       })
 

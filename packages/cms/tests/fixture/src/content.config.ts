@@ -1,5 +1,5 @@
 import { s } from 'kay'
-import { collection, customField, imageField } from 'kay/content'
+import { collection, customField, fieldInput, imageField } from 'kay/content'
 import { sections as blocks, footerDown, partners as friends, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
@@ -76,4 +76,16 @@ export const sections = collection({
   load: () => blocks.map(({ slug, data }) => ({ slug, data })),
 }, {
   schema: s.Object({ heading: s.String({ minLength: 1 }) }),
+})
+
+// A loaded collection whose schema says how its fields are entered, which reaches the form through `collectionInfo`.
+export const profiles = collection({
+  name: 'profiles',
+  load: () => [],
+}, {
+  schema: s.Object({
+    name: s.String({ minLength: 1 }),
+    nickname: s.Optional(fieldInput(s.String(), { placeholder: 'Jo', when: 'name' })),
+  }),
+  description: 'Who edits the site',
 })
