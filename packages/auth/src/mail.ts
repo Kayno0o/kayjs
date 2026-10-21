@@ -1,6 +1,6 @@
 import type { EmailCore } from './email'
 import type { LinkType } from './store'
-import { durationWords, escapeHtml as escape } from 'kay/library'
+import { durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
 import { language, pickLocale } from './locale'
 import { log } from './log'
 
@@ -218,7 +218,7 @@ export function sendAside(email: EmailCore, build: () => Mail, what: string): vo
 
   dropping = false
   aside++
-  void (async () => {
+  trackDetached((async () => {
     let timer: ReturnType<typeof setTimeout> | undefined
 
     try {
@@ -235,7 +235,7 @@ export function sendAside(email: EmailCore, build: () => Mail, what: string): vo
       clearTimeout(timer)
       aside--
     }
-  })()
+  })())
 }
 
 // The language to write in for a reader wanting `wanted`, most wanted first, and its templates.

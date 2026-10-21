@@ -7,7 +7,7 @@ import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, trackDetached } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, banned, homeOf, withBack } from './core'
@@ -140,7 +140,7 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
   if (current)
     await issue(state, current, 'verify-email', email, back, nonce)
   else if (record)
-    void issueQuietly(state, record, 'verify-email', email, back, nonce)
+    trackDetached(issueQuietly(state, record, 'verify-email', email, back, nonce))
 
   return { ok: true }
 }
@@ -318,7 +318,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 // On registering: the verification mail, when the app sends mail.
 export async function welcome(state: RequestState, record: UserRecord, back: string | null): Promise<void> {
   if (state.core.email && record.email !== null && record.email !== '')
-    void issueQuietly(state, record, 'verify-email', record.email, back, await bindCode(state, 'verify-email', record.email))
+    trackDetached(issueQuietly(state, record, 'verify-email', record.email, back, await bindCode(state, 'verify-email', record.email)))
 }
 
 // A registration for an address an account holds already, where registering signs no one in: this session is left as a new account's would be, and the holder is told, off the response's path and at most a few times an hour.
@@ -448,7 +448,7 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   const record = emailProblem(address) ? undefined : await core.store.users.findByEmail(address)
 
   if (record)
-    void issueQuietly(state, record, type, address, redirect, nonce)
+    trackDetached(issueQuietly(state, record, type, address, redirect, nonce))
 
   return { ok: true }
 }

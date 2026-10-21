@@ -9,7 +9,7 @@ import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
-import { drainQueues, forgetQueue } from '../src/server/queue'
+import { drainQueues, forgetQueue, trackDetached } from '../src/server/queue'
 import { reportBackgroundError, useAppOnError } from '../src/server/report'
 
 const dirs: string[] = []
@@ -1045,6 +1045,25 @@ describe('queue', () => {
     finally {
       await shutdown(app)
       forgetQueue(later)
+      forgetQueue(work)
+    }
+  })
+
+  it('waits for work started off a response before it looks at the queues, however it ends', async () => {
+    const log: string[] = []
+    const work = queue('detached', (step: string) => void log.push(step), { store: memoryJobs() })
+
+    try {
+      trackDetached((async () => {
+        await Bun.sleep(30)
+        await work.enqueue('late')
+      })())
+      trackDetached(Promise.reject(new Error('failed off the response')))
+
+      expect(await drainQueues()).toBe(1)
+      expect(log).toEqual(['late'])
+    }
+    finally {
       forgetQueue(work)
     }
   })
