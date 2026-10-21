@@ -152,7 +152,7 @@ interface SaveOptions extends VersionRule {
   heldData?: Record<string, unknown> | undefined
 }
 
-async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined, heldData?: Record<string, unknown> | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: SaveOptions): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
