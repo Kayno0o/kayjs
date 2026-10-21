@@ -119,6 +119,7 @@ describe('pageRows of a localized collection', () => {
 
     expect([first.rows[0]!.missing, first.rows[1]!.missing, second.rows[0]!.missing]).toEqual([['de'], ['en'], ['en']])
     expect(asked).toEqual([{ offset: 0, limit: PAGE_SIZE }, { offset: PAGE_SIZE, limit: PAGE_SIZE }])
+    expect(reads.translations).toBe(2)
   })
 })
 

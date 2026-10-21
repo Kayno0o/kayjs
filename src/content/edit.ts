@@ -33,10 +33,6 @@ const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
 const indexes = new Map<Collection<unknown>, { index: Promise<TranslationIndex>, stamp?: string | undefined, until?: number | undefined }>()
 let hearing = false
 
-function forgetIndex(collection: Collection<unknown>): void {
-  indexes.delete(collection)
-}
-
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says; `customField` names any other kind, which the app's own component edits.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name'
 
@@ -528,7 +524,7 @@ export async function translations(name: string): Promise<TranslationIndex> {
     onKeysInvalidated((_, dropped) => {
       for (const kept of indexes.keys()) {
         if (dropped(contentKey(kept.name)))
-          forgetIndex(kept)
+          indexes.delete(kept)
       }
 
       return []
@@ -542,6 +538,8 @@ export async function translations(name: string): Promise<TranslationIndex> {
   if (kept && (kept.until === undefined || kept.until > Date.now()) && (dir === undefined || (stamp !== undefined && kept.stamp === stamp)))
     return kept.index
 
+  const ttl = collection.loader?.ttl
+  const until = ttl === undefined ? undefined : Date.now() + durationSeconds(ttl, `the collection ${name}'s ttl`) * 1000
   const index = (async () => {
     const groups = new Map<string, Map<string, string>>()
 
@@ -556,7 +554,6 @@ export async function translations(name: string): Promise<TranslationIndex> {
 
     return groups
   })()
-  const ttl = collection.loader?.ttl
 
   if (dir !== undefined && stamp === undefined) {
     indexes.delete(collection)
@@ -564,7 +561,7 @@ export async function translations(name: string): Promise<TranslationIndex> {
     return index
   }
 
-  indexes.set(collection, { index, stamp, ...ttl !== undefined && { until: Date.now() + durationSeconds(ttl, `the collection ${name}'s ttl`) * 1000 } })
+  indexes.set(collection, { index, stamp, until })
 
   try {
     return await index
@@ -770,7 +767,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 
     await save(options.create === true ? { ...filled, create: true } : filled)
     loading.delete(name)
-    forgetIndex(collection)
+    indexes.delete(collection)
     collection.invalidate()
 
     return {}
@@ -826,7 +823,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
     }
     finally {
       loading.delete(name)
-      forgetIndex(collection)
+      indexes.delete(collection)
       collection.invalidate()
     }
 
@@ -859,7 +856,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     loading.delete(name)
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
     loading.delete(name)
-    forgetIndex(collection)
+    indexes.delete(collection)
     collection.invalidate()
 
     return {}

@@ -73,11 +73,10 @@ export async function entryTranslations(collection: ScreenCollection, entry: Sto
     return locale === undefined || slug === undefined ? undefined : paired((await entries(collection.name, { slug, locale }))[0])
   }
 
-  return {
-    locales: locales.map(locale => ({ locale, slug: slugIn(locale) })),
-    source: base === undefined || base === entry.locale ? undefined : await read(base),
-    compare: compare === undefined || compare === entry.locale ? undefined : await read(compare),
-  }
+  // Read together, so a loader without `get` is loaded once for both.
+  const [source, other] = await Promise.all([base === undefined || base === entry.locale ? undefined : read(base), compare === undefined || compare === entry.locale ? undefined : read(compare)])
+
+  return { locales: locales.map(locale => ({ locale, slug: slugIn(locale) })), source, compare: other }
 }
 
 // The slug of a single collection's entry, or undefined while none is written.
@@ -105,10 +104,10 @@ export async function translationStart(collection: ScreenCollection, from: strin
   if (entry === undefined)
     return {}
 
-  const translations = await entryTranslations(collection, entry)
+  const pairs = await entryTranslations(collection, entry)
   const base = collection.defaultLocale ?? collection.locales?.[0]
 
-  return { copy: paired(entry), source: base === fromLocale ? paired(entry) : translations?.source }
+  return { copy: paired(entry), source: base === fromLocale ? paired(entry) : pairs?.source }
 }
 
 export interface TranslationsScreen {

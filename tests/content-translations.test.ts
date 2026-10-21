@@ -12,7 +12,7 @@ const schema = t.Object({ title: t.String(), translationKey: t.Optional(t.String
 interface Row { slug: string, data: { title: string, translationKey?: string } }
 
 // A loader over rows it keeps, counting its loads.
-function counted(name: string, rows: Row[], extra: { ttl?: '50ms' } = {}) {
+function counted(name: string, rows: Row[], extra: { ttl?: '300ms' } = {}) {
   const counts = { loads: 0 }
   const loader = {
     name,
@@ -109,14 +109,14 @@ describe('translations', () => {
   })
 
   it('is built again once the loader\'s ttl passed', async () => {
-    const { loader, counts } = counted('index-ttl', [{ slug: 'fr/a', data: { title: 'A' } }], { ttl: '50ms' })
+    const { loader, counts } = counted('index-ttl', [{ slug: 'fr/a', data: { title: 'A' } }], { ttl: '300ms' })
     const before = registerCollections([['pages', collection(loader, { schema, localized: true })]])
 
     try {
       await translations('pages')
       await translations('pages')
       expect(counts.loads).toBe(1)
-      await Bun.sleep(80)
+      await Bun.sleep(400)
       await translations('pages')
       expect(counts.loads).toBe(2)
     }
