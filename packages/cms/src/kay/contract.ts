@@ -1,5 +1,6 @@
 // The shapes kayjs-cms passes around: kay's own from kay/content, and the entry references and issues its forms and API share.
 import type { CollectionInfo, SourceEntry } from 'kay/content'
+import type { IconProps } from 'kay/icons'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, FieldHint, FieldInputOptions, JsonSchema, SourceEntry, TranslationIndex } from 'kay/content'
 
@@ -26,6 +27,9 @@ export interface CollectionLayout {
   form?: FormLayout | undefined
   list?: ListLayout | undefined
 }
+
+// What `cms({ collections })` gave a collection: its layout and the icon the content list draws before it, which stays on the server, as the editor's islands would otherwise carry it with each page.
+export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined }
 
 // A collection as the screens read it: kay's, with the layout `cms({ collections })` gave it.
 export type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined }

@@ -568,9 +568,11 @@ In the form, `fields` come first, in that order. A list inside it is a row of co
 
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `duplicate`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 
-To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts and a New entry button.
+To organise the content list, give a collection a `group` and an `order`: `shop: { group: 'Store', order: 1 }`. Collections with no group come first, and each row shows the collection's drafts, when it was last edited and a New entry button. `icon` takes an icon imported from `~icons/<prefix>/<name>`, drawn before the collection: `shop: { icon: cart }`.
 
-The list keeps its state in the URL, so you can send a link to a view. You can search without caring for accents, filter by status, sort any column across every page, tick entries to publish, unpublish or delete them together, and duplicate an entry into a draft. A copy goes last in an ordered collection. In a collection with a publish date and no draft field, the copy is dated 9999-12-31 until you pick a date, so it does not go live at once. When an action fails, the message says why.
+The list keeps its state in the URL, so you can send a link to a view. You can search without caring for accents, filter by status, sort any column across every page, including when an entry was last modified and by whom (read from git history), tick entries to publish, unpublish or delete them together, and duplicate an entry into a draft.
+
+A new entry has Cancel, and Create and add another, which opens an empty form for the next one. A copy goes last in an ordered collection. In a collection with a publish date and no draft field, the copy is dated 9999-12-31 until you pick a date, so it does not go live at once. When an action fails, the message says why.
 
 The editor on the page follows the form's layout too. A name twice, or an action that does not exist, throws when `kay.config.ts` loads. A field the schema lacks logs a warning at boot.
 

@@ -29,9 +29,10 @@ export class UnknownCollection extends Error {}
 // The collection as the screens read it, with the layout `cms({ collections })` gave it.
 export async function findCollection(name: string): Promise<ScreenCollection | undefined> {
   const found = await collectionInfo(name)
-  const layout = settings().layouts.get(name)
+  const given = settings().layouts.get(name)
 
-  return found && layout ? { ...found, layout } : found
+  // Without the icon, which the content list draws on the server and the editor's islands would otherwise carry with each page.
+  return found && given ? { ...found, layout: { group: given.group, order: given.order, form: given.form, list: given.list } } : found
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.

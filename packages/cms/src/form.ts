@@ -17,7 +17,7 @@ import { deleteSaved, refuseUnsaved, saveDraft, showRefusal } from './editor/sav
 import { saveShortcut } from './editor/shortcut'
 import { shipWords } from './editor/words'
 import { fieldsOf } from './fields'
-import { collectionPath, collectionTitle, entryPath, entryTitle, SINGLE_SLUG } from './listing'
+import { collectionPath, collectionTitle, entryPath, entryTitle, newEntryPath, SINGLE_SLUG } from './listing'
 import { checkSlug, slugify } from './slug'
 
 // What the parts of an entry's form read: the drafts, the entry they edit, its collection, and which fields the screen renders.
@@ -75,6 +75,8 @@ export interface EntryForm extends FormScope {
   // Whether a published entry's `unpublishAt` date passed: the site no longer shows it.
   ended: () => boolean
   save: () => Promise<void>
+  // Creates a new entry, then opens an empty form for the next one in the same locale; a saved entry only saves.
+  saveAndAdd: () => Promise<void>
   // Publish, Unpublish, Publish now, Clear schedule and Clear end change the entry alone: with edits not saved yet they refuse, saving nothing, and a refused save leaves the form as it was.
   publish: () => Promise<void>
   unpublish: () => Promise<void>
@@ -257,7 +259,10 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       referrers.set(found[slug] ?? [])
   }
 
-  async function attemptSave(): Promise<boolean> {
+  // A new entry in the locale of the one just made.
+  const anotherPath = (locale: string | undefined) => locale === undefined ? newEntryPath(prefix, collection.name) : `${newEntryPath(prefix, collection.name)}?locale=${encodeURIComponent(locale)}`
+
+  async function attemptSave(next: 'open' | 'another' = 'open'): Promise<boolean> {
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
     if (first && !drafts.changed(ref) && drafts.blocked(ref).length === 0)
       return true
@@ -273,7 +278,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       if (!await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true, onSaved }))
         return false
 
-      await navigate(entryPath(prefix, created), { replace: true })
+      await navigate(next === 'open' ? entryPath(prefix, created) : anotherPath(created.locale), { replace: true })
 
       return true
     }
@@ -282,8 +287,8 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     }
   }
 
-  async function saveNow(): Promise<boolean> {
-    const saved = await attemptSave()
+  async function saveNow(next: 'open' | 'another' = 'open'): Promise<boolean> {
+    const saved = await attemptSave(next)
 
     // The fields are unlocked by now, so the focus can land in one.
     if (!saved)
@@ -294,6 +299,10 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
 
   async function save(): Promise<void> {
     await saveNow()
+  }
+
+  async function saveAndAdd(): Promise<void> {
+    await saveNow('another')
   }
 
   // Saves one field's new value alone, and puts the field back when the save is refused, so the form never shows what is not stored.
@@ -348,6 +357,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     ends,
     ended,
     save,
+    saveAndAdd,
     publish: async () => change(collection.draftField, false),
     unpublish: async () => change(collection.draftField, true),
     publishNow: async () => change(collection.publishField, new Date().toISOString()),

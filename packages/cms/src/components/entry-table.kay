@@ -62,6 +62,7 @@ const columns: Column<EntryRow>[] = [
   ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
   ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), sortValue: (row: EntryRow) => ['draft', 'scheduled', 'published'].indexOf(statusOf(row)), cell: true } satisfies Column<EntryRow>]),
+  ...(collection.kind === 'folder' ? [{ key: 'modified', header: wording('cms.table.modified', 'Last modified'), sortValue: true, defaultDirection: 'desc', cell: true } satisfies Column<EntryRow>, { key: 'author', header: wording('cms.table.author', 'Author'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
 
@@ -119,6 +120,11 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         EntryWatch(collection={collection.name} entry={ref(row)})
     else if column.key.startsWith('cell:')
       span {row.cells?.[column.key.slice(5)] ?? ''}
+    else if column.key === 'modified'
+      if row.modifiedAt as at
+        time(datetime={new Date(at).toISOString()}) {new Date(at).toISOString().slice(0, 10)}
+    else if column.key === 'author'
+      span {row.author ?? ''}
     else if column.key === 'locale'
       span {row.locale}
       if row.missing as lacks

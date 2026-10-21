@@ -1,7 +1,7 @@
 import type { Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
-import type { CollectionLayout } from './kay/contract'
+import type { GivenLayout } from './kay/contract'
 import type { Action } from './roles'
 import { byteSize, lazily } from 'kay/library'
 import { workingTree } from './files'
@@ -49,7 +49,7 @@ export interface CmsOptions {
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
   // How the screens arrange a collection, by its name: `form` its entry form (`fields` shown first, a nested list being a row of columns, `hide` left out) and `list` its list (`columns` of field keys after the title, `actions` kept among 'move', 'publish', 'unpublish', 'editOnPage' and 'delete').
-  collections?: Record<string, CollectionLayout> | undefined
+  collections?: Record<string, GivenLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-cms-edit-page` and is shown in its place.
   pageLink?: false | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
@@ -79,7 +79,7 @@ export interface CmsSettings {
   pageLink: boolean
   // The actions each role may do, or undefined when every editor the guard admits may do all of them.
   roles: ReadonlyMap<string, ReadonlySet<Action>> | undefined
-  layouts: ReadonlyMap<string, CollectionLayout>
+  layouts: ReadonlyMap<string, GivenLayout>
 }
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']

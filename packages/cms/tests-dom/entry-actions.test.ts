@@ -44,8 +44,8 @@ function server(answer: object = { saved: true, version: 'v2' }, hold = false) {
 
 const sentData = (fetched: ReturnType<typeof server>['fetched'], at = 0) => JSON.parse(String((fetched.mock.calls[at]![1] as RequestInit).body)) as { data: Record<string, unknown>, locale?: string }
 
-async function open(entry: StoredEntry | undefined = stored({}), collection: ScreenCollection = POSTS) {
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection, entry })
+async function open(entry: StoredEntry | undefined = stored({}), collection: ScreenCollection = POSTS, fresh = false) {
+  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection, entry: fresh ? undefined : entry })
   await settle()
 
   return mounted.root
@@ -285,4 +285,43 @@ test('every button of publishing is disabled for a role that may not publish', a
     mounted.unmount()
     mounted = undefined
   }
+})
+
+// The slugs a new entry reads, and a save that goes through.
+function creating() {
+  return spyOn(globalThis, 'fetch').mockImplementation((async (_url: string | URL | Request, init?: RequestInit) => init?.method === 'POST' ? Response.json({ saved: true, version: 'v1' }) : Response.json([])) as unknown as typeof fetch)
+}
+
+test('a new entry offers Cancel back to its list and Create and add another, a saved one neither', async () => {
+  creating()
+
+  const root = await open(undefined, POSTS, true)
+
+  expect(buttons(root)).toContain('Create and add another')
+  expect(buttons(root)).toContain('Create')
+  expect([...root.querySelectorAll('a')].find(link => link.textContent?.trim() === 'Cancel')?.getAttribute('href')).toBe('/admin/collections/posts')
+
+  mounted?.unmount()
+
+  const saved = await open()
+
+  expect(buttons(saved)).not.toContain('Create and add another')
+  expect([...saved.querySelectorAll('a')].some(link => link.textContent?.trim() === 'Cancel')).toBe(false)
+})
+
+test('Create and add another creates the entry, then leaves for an empty form', async () => {
+  const fetched = creating()
+  const root = await open(undefined, POSTS, true)
+
+  // A page URL for the navigation after the save to resolve against.
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/new/posts')
+  await type(root, 'Next one')
+  ;(button(root, 'Create and add another') as HTMLButtonElement).click()
+  await pause()
+
+  const posts = fetched.mock.calls.filter(call => (call[1])?.method === 'POST')
+
+  expect(posts).toHaveLength(1)
+  expect(String(posts[0]![0])).toContain('next-one')
+  expect(JSON.parse(String((posts[0]![1] as RequestInit).body))).toMatchObject({ create: true })
 })

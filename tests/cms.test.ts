@@ -9,7 +9,7 @@ import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
+import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -311,6 +311,24 @@ describe('the collections a CMS edits', () => {
     expect(TypeCompiler.Compile(color).Check('green')).toBe(false)
     expect(() => customField('a/b', t.String())).toThrow('names a kind outside letters')
     expect(() => customField('', t.String())).toThrow('names a kind outside letters')
+  })
+
+  it('types a reference, an image and a file as the string they hold, a custom field as the schema it wraps, and a referenced entry through the collection\'s own get', async () => {
+    const authors = collection({ name: 'authors-typed', load: () => [{ slug: 'ada', data: { name: 'Ada' } }] }, { schema: t.Object({ name: t.String() }) })
+    const posts = collection({ name: 'posts-typed', load: () => [{ slug: 'hello', data: { author: 'ada', cover: '/a.png', brochure: '/a.pdf', rating: 4 } }] }, { schema: t.Object({ author: reference('authors-typed'), cover: imageField(), brochure: fileField(), rating: customField('rating', t.Number()) }) })
+
+    const post = (await posts.get('hello'))!
+
+    const author: string = post.data.author
+    const cover: string = post.data.cover
+    const brochure: string = post.data.brochure
+    const rating: number = post.data.rating
+    // @ts-expect-error a custom field keeps the schema it wraps, a number here
+    const wrong: string = post.data.rating
+    const referenced = (await authors.get(post.data.author))!
+    const name: string = referenced.data.name
+
+    expect([author, cover, brochure, rating, name, wrong]).toEqual(['ada', '/a.png', '/a.pdf', 4, 'Ada', 4])
   })
 
   it('reports how a field is entered as x-kay-input beside the schema it wraps, its kind and keywords kept', () => {

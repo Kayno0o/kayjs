@@ -5,7 +5,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
-import { deleteMessage, onPagePath } from '../listing'
+import { collectionPath, deleteMessage, onPagePath } from '../listing'
 import Refused from './refused.kay'
 import EntrySaveState from './entry-save-state.kay'
 import ResetButton from './reset-button.kay'
@@ -59,4 +59,7 @@ else if form.ends() as at
       ConfirmDelete(message={deleteMessage(form.name, entry.url, 'entry', form.referrers())} onOpen={form.askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
   if form.dirty()
     ResetButton(disabled={form.saving()} onReset={form.reset})
+  if !entry && !form.collection.single
+    Button(href={collectionPath(form.prefix, form.collection.name)} label={wording('cms.entry.cancel', 'Cancel')} variant="ghost")
+    Button(label={wording('cms.entry.createAndAdd', 'Create and add another')} disabled={!form.canSave()} onClick={form.saveAndAdd})
   Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})

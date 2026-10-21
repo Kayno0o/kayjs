@@ -1,5 +1,6 @@
+import type { IconProps } from 'kay/icons'
 import type { Field } from './fields'
-import type { CollectionInfo, CollectionLayout, FormLayout, ListLayout, RowAction } from './kay/contract'
+import type { CollectionInfo, FormLayout, GivenLayout, ListLayout, RowAction } from './kay/contract'
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from './fields'
 
@@ -88,15 +89,15 @@ function checkList(where: string, value: unknown): ListLayout {
 }
 
 // The layouts `cms({ collections })` gave, checked as kay.config.ts loads: the shape alone, as the schemas are read later.
-export function checkLayouts(collections: unknown): ReadonlyMap<string, CollectionLayout> {
-  const layouts = new Map<string, CollectionLayout>()
+export function checkLayouts(collections: unknown): ReadonlyMap<string, GivenLayout> {
+  const layouts = new Map<string, GivenLayout>()
 
   if (collections === undefined)
     return layouts
 
   for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
     const where = `cms({ collections: { ${JSON.stringify(name)} } })`
-    const { form, list, group, order } = plain(where, value, ['form', 'list', 'group', 'order'])
+    const { form, list, group, order, icon } = plain(where, value, ['form', 'list', 'group', 'order', 'icon'])
 
     if (group !== undefined && (typeof group !== 'string' || group.trim() === ''))
       throw new Error(`kayjs-cms: \`${where}.group\` takes a heading, got ${JSON.stringify(group)}`)
@@ -104,7 +105,10 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, Collecti
     if (order !== undefined && (typeof order !== 'number' || !Number.isFinite(order)))
       throw new Error(`kayjs-cms: \`${where}.order\` takes a number, got ${JSON.stringify(order)}`)
 
-    layouts.set(name, { group, order, form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
+    if (icon !== undefined && (typeof icon !== 'object' || icon === null || typeof (icon as { viewBox?: unknown }).viewBox !== 'string'))
+      throw new Error(`kayjs-cms: \`${where}.icon\` takes an icon imported from \`~icons/<prefix>/<name>\`, got ${JSON.stringify(icon)}`)
+
+    layouts.set(name, { group, order, icon: icon as IconProps | undefined, form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
   }
 
   return layouts
@@ -258,7 +262,7 @@ export function whenProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]):
 }
 
 // What the layouts name that the collections lack, once they are loaded: a line each, for the boot's log.
-export function layoutProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[], layouts: ReadonlyMap<string, CollectionLayout>): string[] {
+export function layoutProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[], layouts: ReadonlyMap<string, GivenLayout>): string[] {
   const lines: string[] = []
 
   for (const [name, layout] of layouts) {

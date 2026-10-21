@@ -3,6 +3,7 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import Refused from '../components/refused.kay'
@@ -35,6 +36,9 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
       h2.kcms-group-title {group.name}
     for row of group.collections key={row.collection.name}
       CardRow
+        @left
+          if row.layout?.icon as icon
+            Icon(icon={icon})
         @right
           if row.collection.problem as problem
             Badge(tone="danger" label={wording('cms.admin.unreadable', 'Cannot be read')})
@@ -51,5 +55,7 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
         a(href={row.href} data-tooltip={row.collection.problem} aria-describedby={row.collection.problem === undefined ? undefined : problemId(row.collection.name)}) {collectionTitle(row.collection)}
         if row.collection.description
           p.kcms-entry-subtitle {row.collection.description}
+        if row.edited as edit
+          p.kcms-entry-subtitle {edit.author ? wording('cms.admin.lastEditedBy', 'Last edited {date} by {author}', { date: new Date(edit.at).toISOString().slice(0, 10), author: edit.author }) : wording('cms.admin.lastEdited', 'Last edited {date}', { date: new Date(edit.at).toISOString().slice(0, 10) })}
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

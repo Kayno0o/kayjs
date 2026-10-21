@@ -1,3 +1,4 @@
+import type { Edit, EditReader } from './history'
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry, TranslationIndex } from './kay/contract'
 import { wording } from 'kay/words'
 import { referrersNote } from './bulk-message'
@@ -31,24 +32,29 @@ export interface EntryRow {
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
   move?: { up: boolean, down: boolean } | undefined
+  // For a folder entry, when its file was last edited in milliseconds and by whom, from the repository's history, else the file's modification time.
+  modifiedAt?: number | undefined
+  author?: string | undefined
 }
 
 // The page size when `cms({ pageSize })` says none.
 export const PAGE_SIZE = 50
 
 // A row per entry, titled by the entry's first one-line text field, else its slug.
-export function rowsOf(collection: ScreenCollection, entries: SourceEntry[], now = Date.now()): EntryRow[] {
+export function rowsOf(collection: ScreenCollection, entries: SourceEntry[], now = Date.now(), edits?: Map<string, Edit>): EntryRow[] {
   const fields = fieldsOf(collection.schema)
   const titleKey = fields.find(field => field.kind === 'text')?.key
   const columns = listColumns(fields, collection.layout?.list)
 
-  return entries.map(({ slug, locale, url, data, draft, problem }) => {
+  return entries.map(({ slug, locale, url, data, draft, problem, path }) => {
     const goesLiveAt = draft ? undefined : publishTime(collection, data)
     const comesDownAt = draft ? undefined : unpublishTime(collection, data)
     const title = titleKey === undefined ? undefined : data?.[titleKey]
     const cells = columns.length === 0 ? undefined : Object.fromEntries(columns.map(field => [field.key, cellText(field, data?.[field.key])]))
 
-    return { slug, locale, url, draft, problem, cells, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: goesLiveAt }, ...comesDownAt !== undefined && { endsAt: comesDownAt }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    const edit = path === undefined ? undefined : edits?.get(path)
+
+    return { slug, locale, url, draft, problem, cells, ...edit !== undefined && { modifiedAt: edit.at, author: edit.author }, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: goesLiveAt }, ...comesDownAt !== undefined && { endsAt: comesDownAt }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 
@@ -121,7 +127,7 @@ export function statusOf(row: Pick<EntryRow, 'draft' | 'scheduledAt'>): EntrySta
 export interface ListView {
   search?: string | undefined
   status?: EntryStatus | undefined
-  // A column's key as the table names it: `title`, `locale`, `draft` for the status, or `cell:<field>`.
+  // A column's key as the table names it: `title`, `locale`, `draft` for the status, `modified` or `author` of a folder collection, or `cell:<field>`.
   sort?: string | undefined
   direction?: 'asc' | 'desc' | undefined
 }
@@ -130,6 +136,7 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 const STATUS_RANK: Record<EntryStatus, number> = { draft: 0, scheduled: 1, published: 2 }
 const NUMBERS = new Set(['number', 'integer'])
 const CELL = 'cell:'
+const BUILT_IN = new Set(['title', 'locale', 'draft', 'modified', 'author'])
 
 // Whether a sort key names a column of the list.
 export function knownSort(collection: ScreenCollection, key: string | undefined): key is string {
@@ -138,6 +145,9 @@ export function knownSort(collection: ScreenCollection, key: string | undefined)
 
   if (key === 'title' || key === 'locale' || key === 'draft')
     return true
+
+  if (key === 'modified' || key === 'author')
+    return collection.kind === 'folder'
 
   return key.startsWith(CELL) && listColumns(fieldsOf(collection.schema), collection.layout?.list).some(field => field.key === key.slice(CELL.length))
 }
@@ -158,6 +168,12 @@ function sortRows(collection: ScreenCollection, rows: EntryRow[], key: string, d
     if (key === 'draft')
       return STATUS_RANK[statusOf(row)]
 
+    if (key === 'modified')
+      return row.modifiedAt
+
+    if (key === 'author')
+      return row.author === '' ? undefined : row.author
+
     const text = field === undefined ? undefined : row.cells?.[field.key]
 
     if (text === undefined || text === '')
@@ -166,7 +182,7 @@ function sortRows(collection: ScreenCollection, rows: EntryRow[], key: string, d
     return field !== undefined && NUMBERS.has(field.kind) ? Number(text) : text
   }
 
-  if (key !== 'title' && key !== 'locale' && key !== 'draft' && field === undefined)
+  if (!BUILT_IN.has(key) && field === undefined)
     return rows
 
   const keyed = rows.map(row => ({ row, key: value(row) }))
@@ -206,7 +222,7 @@ export interface RowsPage {
 
 // A page of the collection's rows: a search, a status filter or a sort reads every entry to match or order them, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone; a loaded entry's is taken from the entries `read` gave.
-export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort: asked, direction = 'asc', translations }: Omit<ListView, 'search'> & { translations?: (() => Promise<TranslationIndex>) | undefined } = {}): Promise<RowsPage> {
+export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort: asked, direction = 'asc', translations, edits: readEdits }: Omit<ListView, 'search'> & { translations?: (() => Promise<TranslationIndex>) | undefined, edits?: EditReader | undefined } = {}): Promise<RowsPage> {
   const sort = knownSort(collection, asked) ? asked : undefined
 
   if (collection.problem !== undefined)
@@ -241,6 +257,16 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     }) }
   }
 
+  // The last edit of each entry's file, read for the entries a sort by edit has to order or the page shown alone.
+  const editsOf = async (found: SourceEntry[]): Promise<Map<string, Edit> | undefined> => {
+    if (readEdits === undefined || collection.kind !== 'folder')
+      return undefined
+
+    return readEdits(found.flatMap(entry => entry.path === undefined ? [] : [entry.path]))
+  }
+
+  const stamped = async (found: SourceEntry[]) => sort === 'modified' || sort === 'author' ? editsOf(found) : undefined
+
   const versioned = async (found: Omit<RowsPage, 'total'>, total: number): Promise<RowsPage> => {
     const listed = await marked(found)
 
@@ -257,7 +283,14 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     if (collection.kind !== 'folder')
       return { ...listed, total }
 
-    const rows = await Promise.all(listed.rows.map(async row => ({ ...row, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) })))
+    const last = await editsOf(listed.rows.flatMap(row => seen.get(key(row.slug, row.locale)) ?? []))
+
+    const rows = await Promise.all(listed.rows.map(async (row) => {
+      const path = seen.get(key(row.slug, row.locale))?.path
+      const edit = path === undefined ? undefined : last?.get(path)
+
+      return { ...row, ...row.modifiedAt === undefined && edit !== undefined && { modifiedAt: edit.at, author: edit.author }, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) }
+    }))
 
     return { ...listed, rows, total }
   }
@@ -265,14 +298,15 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
   const narrowed = search.trim() !== '' || status !== undefined || sort !== undefined
 
   if (collection.orderField !== undefined) {
-    const rows = orderedRows(collection, collection.orderField, await list({}), { search, status, sort, direction })
+    const found = await list({})
+    const rows = orderedRows(collection, collection.orderField, found, { search, status, sort, direction }, await stamped(found))
 
     return versioned(pageOf(rows, page, size), rows.length)
   }
 
   if (narrowed) {
     const found = await list({})
-    const all = rowsOf(collection, found)
+    const all = rowsOf(collection, found, undefined, await stamped(found))
     const kept = narrow(collection, all, found, { search, status, sort, direction })
 
     return versioned(pageOf(kept, page, size), kept.length)
@@ -293,9 +327,9 @@ function narrow(collection: ScreenCollection, rows: EntryRow[], entries: SourceE
 }
 
 // The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search, a status or a sort narrows or reorders the rows.
-function orderedRows(collection: ScreenCollection, field: string, found: SourceEntry[], view: ListView): EntryRow[] {
+function orderedRows(collection: ScreenCollection, field: string, found: SourceEntry[], view: ListView, edits?: Map<string, Edit>): EntryRow[] {
   const sorted = sortOrdered(found, field)
-  const rows = rowsOf(collection, sorted)
+  const rows = rowsOf(collection, sorted, undefined, edits)
 
   if ((view.search ?? '').trim() !== '' || view.status !== undefined || view.sort !== undefined)
     return narrow(collection, rows, sorted, view)

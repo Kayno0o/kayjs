@@ -147,6 +147,14 @@ describe('checkLayouts', () => {
     expect(() => checkLayouts({ posts: { order: Number.NaN } })).toThrow('order')
   })
 
+  test('reads an icon for the content list and refuses what is not one', () => {
+    const icon = { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': '<path d="M0 0"/>' }
+
+    expect(checkLayouts({ posts: { icon } }).get('posts')?.icon).toBe(icon as never)
+    expect(() => checkLayouts({ posts: { icon: 'home' } })).toThrow('icon')
+    expect(() => checkLayouts({ posts: { icon: {} } })).toThrow('icon')
+  })
+
   test('reads a layout as given, none as none', () => {
     expect(checkLayouts(undefined).size).toBe(0)
     expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })

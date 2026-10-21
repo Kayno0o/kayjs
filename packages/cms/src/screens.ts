@@ -1,7 +1,9 @@
-import type { CollectionInfo, CollectionLayout, EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
+import type { Edit } from './history'
+import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
 import { countEntries } from './counts'
+import { readEdits, readLastEdit } from './history'
 import { collections, entries, translations } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
 import { log } from './log'
@@ -49,7 +51,7 @@ export async function listScreen({ collection: name, q = '', page = 1, status, s
 
   const { prefix, pageSize } = settings()
 
-  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name) })
+  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name), edits: readEdits })
 
   return { prefix, collection, ...listed }
 }
@@ -134,7 +136,7 @@ export async function translationsScreen(): Promise<TranslationsScreen> {
 
 export interface IndexRow {
   collection: CollectionInfo
-  layout: CollectionLayout | undefined
+  layout: GivenLayout | undefined
   // Where the collection opens, see `openPath`.
   href: string
   // Where a new entry is written; undefined for a collection that cannot be read or holds its one entry already.
@@ -142,6 +144,8 @@ export interface IndexRow {
   // The entries in draft and those scheduled ahead, for a collection with a draft or publish field; undefined for any other.
   drafts: number | undefined
   scheduled: number | undefined
+  // The last commit touching a folder collection's entries, when git knows one.
+  edited: Edit | undefined
 }
 
 // What the content list reads: each collection with where it opens, where a new entry goes and how many entries wait in draft or for their date. A count that fails to read is left out, as the list must open whatever one collection does.
@@ -161,6 +165,7 @@ export async function indexRows(): Promise<IndexRow[]> {
       newHref: collection.problem === undefined && !collection.single ? newEntryPath(prefix, collection.name) : undefined,
       drafts: found?.drafts,
       scheduled: collection.publishField === undefined ? undefined : found?.scheduled,
+      edited: collection.kind === 'folder' && collection.dir !== undefined && collection.problem === undefined ? await readLastEdit(collection.dir) : undefined,
     }
   }))
 }

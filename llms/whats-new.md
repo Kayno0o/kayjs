@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.63.0
 
+- kayjs-cms's entries list shows Last modified and Author columns that sort, the content list shows a collection's last edit and its `icon`, and a new entry has Cancel and Create and add another ([kayjs-cms](../packages/cms/llms/screens.md)).
 - A schedule's `boot: true` runs again on a restart minutes after the previous boot, replicas starting within the same minute still running it once ([Production](production.md)).
 - kayjs-auth's `auth.signInAs(site, { email, username })` signs a test site in as a member, making them when none exists, with no form round trip, and `auth.signOut(site)` signs it out; a second call switches member ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
 - kayjs-auth's `auth.signInAs(site, { email, username })` signs a test site in as a member, making them (with the app's user `data`) when none exists and refusing one whose fields differ, with no form round trip, and `auth.signOut(site)` signs it out; a second call switches member ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).

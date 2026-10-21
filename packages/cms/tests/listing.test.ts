@@ -280,6 +280,26 @@ describe('sort', () => {
     expect(second.rows.map(row => row.slug)).toEqual(['c', 'a'])
   })
 
+  it('orders by when and by whom an entry\'s file was last edited across pages, an unknown edit last, for a folder collection only', async () => {
+    const files = stock.map((entry, i) => ({ ...entry, path: `content/shop/${entry.slug}.md`, data: entry.data, index: i }))
+    const edits = async () => new Map([['content/shop/a.md', { at: 300, author: 'Zoe' }], ['content/shop/b.md', { at: 100, author: 'Ada' }], ['content/shop/c.md', { at: 200 }]])
+    const view = async (collection: typeof shop, sort: string, direction: 'asc' | 'desc', page = 1, size = 50) => (await pageRows(collection, '', page, async () => files, none, size, { sort, direction, edits })).rows.map(row => row.slug)
+
+    expect(await view(shop, 'modified', 'asc')).toEqual(['b', 'c', 'a', 'd'])
+    expect(await view(shop, 'modified', 'desc')).toEqual(['a', 'c', 'b', 'd'])
+    expect(await view(shop, 'modified', 'desc', 2, 2)).toEqual(['b', 'd'])
+    expect(await view(shop, 'author', 'asc')).toEqual(['b', 'a', 'c', 'd'])
+    expect((await pageRows(shop, '', 1, async () => files, none, 50, { sort: 'modified', direction: 'asc', edits })).rows[0]).toMatchObject({ modifiedAt: 100, author: 'Ada' })
+    expect(await view({ ...shop, kind: 'loaded' }, 'modified', 'asc')).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('names the last edit on the rows of a plain page too', async () => {
+    const files = stock.map(entry => ({ ...entry, path: `content/shop/${entry.slug}.md` }))
+    const page = await pageRows(shop, '', 1, async () => files, none, 50, { edits: async () => new Map([['content/shop/d.md', { at: 5, author: 'Ada' }]]) })
+
+    expect(page.rows.map(row => row.modifiedAt)).toEqual([undefined, undefined, undefined, 5])
+  })
+
   it('reads nothing more than the page for a key no column has', async () => {
     const { asked, read } = reader()
 
