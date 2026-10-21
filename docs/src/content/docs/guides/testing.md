@@ -263,7 +263,7 @@ The page clicks and types as a user does.
 
 | Call | Does |
 | --- | --- |
-| `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']`. Covered at the middle of the view, by a fixed bar for instance, it is scrolled to the other alignments and aimed at the first point of its box nothing covers, once it keeps still; covered everywhere, it fails naming what covers it |
+| `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']`. Covered at the middle of the view, by a fixed bar for instance, it is scrolled to the other alignments and aimed at the first point of its box nothing covers, once it keeps still (up to about a second); covered everywhere, it fails naming what covers it |
 | `hover(selector)` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays |
 | `fill(selector, text)` | Replaces a field's text, as typing does |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
