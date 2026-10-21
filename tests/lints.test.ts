@@ -174,6 +174,21 @@ describe('async-reply', () => {
     expect(fixed(source)).toEqual([])
   })
 
+  it('reads through a condition, a type assertion and a logical operand, and reports a function once', () => {
+    const found = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply').length
+
+    expect(found('export const a = async (m: never, x: boolean) => x ? ask(m) : ask(m)')).toBe(1)
+    expect(found('export const a = async (m: never) => ask(m) as never')).toBe(1)
+    expect(found('export const a = async (m: never, x?: never) => x ?? ask(m)')).toBe(1)
+    expect(found('export const a = async (m: never, x: boolean) => { if (x) return ask(m); return ask(m) }')).toBe(1)
+  })
+
+  it('fixes async(m) with no space, and gives no fix to a function with a return type', () => {
+    expect(fixed(server('export const a = async(m: never) => ask(m)'))).toEqual([server('export const a = (m: never) => ask(m)')])
+    expect(fixed(server('export const a = async (m: never): Promise<string> => ask(m)'))).toEqual([])
+    expect(lints(server('export const a = async (m: never): Promise<string> => ask(m)')).filter(d => d.code === 'async-reply')).toHaveLength(1)
+  })
+
   it('leaves alone what streams or awaits on purpose', () => {
     const found = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply')
 
@@ -182,6 +197,11 @@ describe('async-reply', () => {
     expect(found('export const a = async (m: never) => { const f = () => ask(m); return f }')).toEqual([])
     expect(found('export const a = async (m: never) => ask(m).stream()')).toEqual([])
     expect(found('export async function* a(m: never) { return ask(m) }')).toEqual([])
+    expect(found('export const o = { async *a(m: never) { return ask(m) } }')).toEqual([])
+    expect(found('export class A { private async *a(m: never) { return ask(m) } }')).toEqual([])
+    expect(found('export const a = async (m: never) => await ask(m)')).toEqual([])
+    expect(found('export const a = async (ask: (m: never) => never, m: never) => ask(m)')).toEqual([])
+    expect(lints(server(reply, 'import type { ask } from \'@kaynooo/kayjs-ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
     expect(lints(server(reply, 'import { ask } from \'./ask\'')).filter(d => d.code === 'async-reply')).toEqual([])
     expect(lints(server(`// kay-allow async-reply\n${reply}`)).filter(d => d.code === 'async-reply')).toEqual([])
   })

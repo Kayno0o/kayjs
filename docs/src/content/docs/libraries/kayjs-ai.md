@@ -152,6 +152,7 @@ To let a reload of the tab find the conversation again, give `remember` a name, 
 - `await reply` is the whole text.
 - `for await (const text of reply)` gives the text so far, again and again.
 - `reply.deltas()` gives only the new pieces.
+- `reply.stream()` gives the text so far like `for await`, in an object that is no thenable, which an `async` handler returns to keep the streaming.
 - `await reply.usage` gives the token counts when the reply is over, with `cacheReadTokens` and `cacheWriteTokens` when the provider reported a prompt cache.
 - `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, `filtered`, or `steps` when the model was still calling tools after `maxSteps`.
 - `reply.stop()` cancels the request. The reply then resolves to the text that came so far, not an error.

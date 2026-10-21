@@ -56,7 +56,7 @@ On by default, so a chat does not pay full price for its system prompt, tools an
 ## The reply
 
 - `await reply` is the full text; it throws the `AiError` the provider failed with.
-- `for await (const text of reply)` yields snapshots, each the text so far; `reply.deltas()` yields the pieces alone.
+- `for await (const text of reply)` yields snapshots, each the text so far; `reply.deltas()` yields the pieces alone; `reply.stream()` yields the snapshots in an object that is no thenable, for an `async` handler to return.
 - `await reply.usage` is `{ inputTokens, outputTokens }`, plus `cacheReadTokens` and `cacheWriteTokens` when the provider reported a cache, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
 - `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is), `filtered` (the provider's filter or refusal) or `steps` (the tool loop ran out of `maxSteps` with the model still calling tools); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`. A stop is not an error: `await` resolves to the partial text.

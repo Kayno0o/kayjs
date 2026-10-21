@@ -16,8 +16,7 @@ export const outcome = action(s.Object({ prompt: s.String({ maxLength: 200 }), m
 })
 
 // An async handler on purpose: it awaits the reply, which answers the checked value whole.
-// kay-allow async-reply
-export const whole = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), async ({ prompt }) => ask(prompt, { schema: verdict, provider: testing.provider }))
+export const whole = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), async ({ prompt }) => await ask(prompt, { schema: verdict, provider: testing.provider }))
 
 const review = ask('Review the film', { schema: verdict, provider: testing.provider })
 --- script

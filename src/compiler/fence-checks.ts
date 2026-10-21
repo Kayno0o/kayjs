@@ -288,12 +288,26 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
 }
 
 const AI_PACKAGE = '@kaynooo/kayjs-ai'
-const ASYNC_KEYWORD = /^(?:(?:static|public|private|protected|override)\s+)*(async\s+)/
+const ASYNC_KEYWORD = /^(?:(?:static|public|private|protected|override)\s+)*(async\s*)/
 
 type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration | t.ObjectMethod | t.ClassMethod | t.ClassPrivateMethod
 
 function isFunction(node: t.Node): node is FunctionNode {
   return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ObjectMethod' || node.type === 'ClassMethod' || node.type === 'ClassPrivateMethod'
+}
+
+// The values an expression may be: both branches of a condition, the operands of a logical expression, and what a type assertion or a non-null mark wraps.
+function candidates(node: t.Node): t.Node[] {
+  if (node.type === 'ConditionalExpression')
+    return [...candidates(node.consequent), ...candidates(node.alternate)]
+
+  if (node.type === 'LogicalExpression')
+    return [...candidates(node.left), ...candidates(node.right)]
+
+  if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression')
+    return candidates(node.expression)
+
+  return [node]
 }
 
 // What the function itself returns and whether it awaits, its inner functions left alone.
@@ -313,7 +327,14 @@ function returnsAndAwaits(fn: FunctionNode): { returned: t.Node[], awaits: boole
     return true
   })
 
-  return { returned, awaits }
+  return { returned: returned.flatMap(candidates), awaits }
+}
+
+// Whether a parameter of the function is named like the call's callee, so the call is not the import's.
+function shadowed(fn: FunctionNode, call: t.CallExpression): boolean {
+  const name = call.callee.type === 'Identifier' ? call.callee.name : undefined
+
+  return name !== undefined && fn.params.some(param => (param.type === 'Identifier' && param.name === name) || (param.type === 'AssignmentPattern' && param.left.type === 'Identifier' && param.left.name === name))
 }
 
 // An `async` function returning `ask()` from kayjs-ai: the async function awaits the reply, which is a thenable, so the answer arrives as its whole text and the action or `await` block reading it never streams. Without an `await` in it, `async` can go; with one, the reply is returned as `.stream()`.
@@ -345,20 +366,22 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
 
   eachNode(fence.ast.program, (node) => {
-    if (!isFunction(node) || !node.async || ((node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') && node.generator))
+    if (!isFunction(node) || !node.async || ('generator' in node && node.generator))
       return
 
     const { returned, awaits } = returnsAndAwaits(node)
     const keyword = ASYNC_KEYWORD.exec(fence.code.slice(node.start!))
+    const call = returned.find(isAsk)
 
-    for (const call of returned.filter(isAsk)) {
+    // A parameter named like the import is something else.
+    if (call && !shadowed(node, call)) {
       diagnostics.push({
         ...fence.shift(call),
         code: 'async-reply',
         message: 'This `ask()` is returned from an `async` function, which awaits it: the answer arrives as its whole text, with no streaming',
         note: 'the reply is a thenable async iterable, and an action or an `await` block streams it only when it is returned as it is',
-        help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is' : 'remove `async`',
-        fixes: !awaits && keyword ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
+        help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is; `return await ask(...)` says the whole text is meant' : 'remove `async`, or write `return await ask(...)` when the whole text is meant',
+        fixes: !awaits && keyword && !node.returnType ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
       })
     }
   })
