@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { trashOf } from '../../../src/trash'
 
 const site = await testSite({ root: join(import.meta.dir, '..') })
 const JSON_BODY = { 'content-type': 'application/json' }
@@ -50,4 +51,26 @@ test('a deleted entry is listed in the collection\'s trash, which restoring empt
   expect(trash.find('.kcms-revision')).toHaveLength(1)
   expect(trash.text('main')).toContain('Gone soon')
   expect((await site.fetch('/admin/trash/products')).status).toBe(404)
+})
+
+test('a deleted entry is restored through the trash API, which leaves the trash empty, and an entry no longer there is refused', async () => {
+  expect(await post('journal/back', { data: { title: 'Back soon' }, create: true })).toMatchObject({ saved: true })
+
+  const opened = await (await site.fetch('/api/cms/entries/journal/back')).json() as { entry: { version: string } }
+
+  await site.fetch(`/api/cms/entries/journal/back?version=${opened.entry.version}`, { method: 'DELETE' })
+
+  const [row] = (await site.visit('/admin/trash/journal')).find('.kcms-revision')
+
+  expect(row!.text).toContain('Back soon')
+
+  expect((await site.fetch('/api/cms/entries/journal/back')).status).toBe(404)
+
+  const id = (await trashOf('journal')).find(item => item.slug === 'back')!.id
+  const restored = await site.fetch(`/api/cms/trash/journal/${id}/restore`, { method: 'POST' })
+
+  expect(await restored.json()).toMatchObject({ saved: true })
+  expect(((await (await site.fetch('/api/cms/entries/journal/back')).json()) as { entry: { data: { title: string } } }).entry.data.title).toBe('Back soon')
+  expect((await site.visit('/admin/trash/journal')).find('.kcms-revision').filter(each => each.text.includes('Back soon'))).toHaveLength(0)
+  expect(await (await site.fetch(`/api/cms/trash/journal/${id}/restore`, { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'That entry is not in the trash any more' }] })
 })

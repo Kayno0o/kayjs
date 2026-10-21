@@ -3,18 +3,21 @@ import type { Denials } from '../src/access'
 import type { AddedRedirect, MissingRow } from '../src/missing'
 import type { ScreenCollection } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
+import type { TrashScreen } from '../src/screens'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import AddedRedirects from '../src/components/added-redirects.kay'
 import EntryBulk from '../src/components/entry-bulk.kay'
 import EntryTable from '../src/components/entry-table.kay'
+import EntryTrash from '../src/components/entry-trash.kay'
 import MissingPaths from '../src/components/missing-paths.kay'
 
 // A screen of the redirects or of an entries list with the toaster beside it, in one bundle, so the toasts a failure raises show where a test can read them.
-const { rows, redirects, bar, table } = props<{
+const { rows, redirects, bar, table, trash } = props<{
   rows?: MissingRow[]
   redirects?: AddedRedirect[]
   bar?: { collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void, denied?: Denials }
   table?: { collection: ScreenCollection, rows: EntryRow[], denied?: Denials }
+  trash?: { collection: ScreenCollection, rows: TrashScreen['rows'] }
 }>()
 ---
 Toaster
@@ -26,3 +29,5 @@ if bar
   EntryBulk(collection={bar.collection} rows={bar.rows} actions={bar.actions} clear={bar.clear} denied={bar.denied})
 if table
   EntryTable(prefix="/admin" collection={table.collection} rows={table.rows} searched={false} denied={table.denied})
+if trash
+  EntryTrash(collection={trash.collection} rows={trash.rows})

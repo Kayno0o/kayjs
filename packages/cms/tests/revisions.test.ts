@@ -1,3 +1,4 @@
+import type { ContentLoader } from 'kay/content'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, entries } from 'kay/content'
@@ -318,5 +319,58 @@ describe('the trash, details', () => {
 
     await restoreTrashed('notes', item!.id)
     expect((await entryOf(ref))?.data?.position).toBeUndefined()
+  })
+})
+
+// A hidden collection answering only load, save and remove, as a minimal loader of one's own would.
+function plainHidden(rows: Map<string, { slug: string, data: unknown, body?: string | undefined }>): ContentLoader {
+  return {
+    name: 'hidden',
+    load: () => [...rows.values()],
+    save: (entry) => {
+      rows.set(entry.slug, { slug: entry.slug, data: entry.data, body: entry.body })
+    },
+    remove: (entry) => {
+      rows.delete(entry.slug)
+    },
+  }
+}
+
+describe('history gaps', () => {
+  test('a delete the loader fails leaves nothing in the trash', async () => {
+    const table = `notes_${++count}`
+    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table })
+
+    restore = registerCollections([['notes', collection({ ...inner, remove: async () => {
+      throw new Error('disk full')
+    } }, { schema })]])
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await expect(deleteEntry(ref)).rejects.toThrow('disk full')
+    expect(await trashOf('notes')).toEqual([])
+    expect((await entryOf(ref))?.data).toEqual({ title: 'One' })
+  })
+
+  test('a loader with a sibling but no get and no saveMany keeps revisions and a trash, saving the rows in turn', async () => {
+    const history = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
+    const trash = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
+    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` })
+
+    restore = registerCollections([['notes', collection({ ...inner, sibling: kind => plainHidden(kind === 'history' ? history : trash) }, { schema })]])
+    configure({ history: { revisions: 2 } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    await saveEntry({ ...ref, data: { title: 'Three' } })
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Two', 'Three'])
+    // The index and one row per kept revision, the pruned one removed.
+    expect(history.size).toBe(3)
+
+    await deleteEntry(ref)
+
+    const [item] = await trashOf('notes')
+
+    expect(item).toMatchObject({ slug: 'first', data: { title: 'Three' } })
+    expect(await restoreTrashed('notes', item!.id)).toMatchObject({ saved: true })
+    expect(trash.size).toBe(0)
+    expect((await entryOf(ref))?.data).toEqual({ title: 'Three' })
   })
 })
