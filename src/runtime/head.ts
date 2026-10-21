@@ -1,3 +1,4 @@
+import { resolveClasses } from './class-table'
 import { escape, escapeAttribute } from './escape'
 import { LOCALE_ATTRIBUTES, ROOT_ATTRIBUTES } from './root'
 import { safeUrl } from './url'
@@ -239,13 +240,13 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
-// The tokens of both, each once where first set, or none when there is no token at all.
+// The tokens of both, each once where first set, a Tailwind class the later ones override left out, or none when there is no token at all.
 function joinClasses(before: string | undefined, added: string): string | undefined {
   const tokens = new Set([...(before ?? '').split(SPACES), ...added.split(SPACES)])
 
   tokens.delete('')
 
-  return tokens.size === 0 ? undefined : [...tokens].join(' ')
+  return tokens.size === 0 ? undefined : resolveClasses([...tokens].join(' '))
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.

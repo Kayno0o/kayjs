@@ -1,0 +1,10 @@
+---
+import Box from './box.kay'
+const open = signal(false)
+---
+section.panel
+  Box.p-3(class="p-5") pair
+  .literal.p-4(class="p-6") literal
+  button.open(onClick={() => open.set(true)}) open
+  if open()
+    p.opened.mt-2(class="mt-4") opened

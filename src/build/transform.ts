@@ -2,6 +2,7 @@ import type { Diagnostic, SourceMap } from '../compiler'
 import type { ErrorName } from '../compiler/errors'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
+import type { ClassTable } from '../runtime/class-table'
 import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -13,6 +14,7 @@ import { parseExpanded } from '../compiler/markdown-block'
 import { nativeManifestIfInstalled } from '../compiler/native-typescript'
 import { analyzeScript } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
+import { tableFingerprint } from '../runtime/class-table'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
@@ -33,6 +35,8 @@ export interface TransformOptions {
   clientOnly?: boolean | undefined
   // Development: every element carries its source position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
+  // The browser's build only: resolves literal classes written together while compiling, so a change of the table compiles again.
+  classTable?: ClassTable | undefined
 }
 
 interface Compiled {
@@ -92,7 +96,7 @@ export async function transformKayCached(source: string, filename: string, given
   // Read once: it is part of the cache key and, on a miss, what the compile reads too.
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -225,7 +229,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, importedSignals: signals })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

@@ -24,6 +24,8 @@ const PACKAGE_NAME = /^(?:@[^/]+\/)?[^/]+/
 interface Loaded {
   sorter: ClassSorter | undefined
   design: Design | undefined
+  // Why the design system did not load.
+  failure?: string | undefined
   files: Map<string, number>
 }
 
@@ -35,9 +37,9 @@ export async function tailwindSorter(root: string): Promise<ClassSorter | undefi
   return (await tailwindLoad(root, false))?.sorter
 }
 
-// The design system of the app's Tailwind, loaded as the sorter's is and kept while no stylesheet it read changes; undefined when the app does not use Tailwind or it does not load.
-export async function tailwindDesign(root: string): Promise<Design | undefined> {
-  return (await tailwindLoad(root, true))?.design
+// The design system of the app's Tailwind, loaded as the sorter's is and kept while no stylesheet it read changes; undefined when the app does not use Tailwind, and a `failure` instead of the design when it does not load.
+export async function tailwindDesign(root: string): Promise<{ design?: Design | undefined, failure?: string | undefined } | undefined> {
+  return tailwindLoad(root, true)
 }
 
 async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | undefined> {
@@ -112,18 +114,18 @@ function assertResolvable(id: string, from: string): void {
 
 async function loadDesign(entry: string): Promise<Loaded> {
   const files = new Map([[entry, Bun.file(entry).lastModified]])
-  const design = await loadDesignSystem(entry, files)
+  const { design, failure } = await loadDesignSystem(entry, files)
 
-  return { sorter: design && (classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)), design, files }
+  return { sorter: design && (classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)), design, failure, files }
 }
 
 // Runs the project's own Tailwind plugin and config modules, as its build does, so the order holds for the utilities they add; none that is not installed.
-async function loadDesignSystem(entry: string, files: Map<string, number>): Promise<Design | undefined> {
+async function loadDesignSystem(entry: string, files: Map<string, number>): Promise<{ design?: Design, failure?: string }> {
   try {
     const base = dirname(entry)
 
     if (!installed('tailwindcss', base))
-      return undefined
+      return { failure: 'tailwindcss is not installed' }
 
     const tailwind = await import(Bun.resolveSync('tailwindcss', base)) as { __unstable__loadDesignSystem?: LoadDesign }
     const design = await tailwind.__unstable__loadDesignSystem?.(await Bun.file(entry).text(), {
@@ -146,10 +148,10 @@ async function loadDesignSystem(entry: string, files: Map<string, number>): Prom
       },
     })
 
-    return design
+    return design === undefined ? { failure: 'this version of tailwindcss has no design system to load' } : { design }
   }
-  catch {
-    return undefined
+  catch (error) {
+    return { failure: error instanceof Error ? error.message : String(error) }
   }
 }
 

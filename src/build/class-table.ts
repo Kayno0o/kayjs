@@ -1,6 +1,7 @@
 import type { Design } from '../format/tailwind'
 import type { ClassTable } from '../runtime/class-table'
 import { tailwindDesign } from '../format/tailwind'
+import { kayLog } from '../runtime/log'
 
 // A class as the table sees it: the variants it applies under, and the CSS properties it sets.
 interface Parsed {
@@ -207,10 +208,26 @@ function parse(design: Design, words: string[]): Map<string, Parsed | null> {
   return known
 }
 
+// The message last logged for each project, so a rebuild with the same failure is quiet and one that follows a fix says it again.
+const warned = new Map<string, string>()
+
+function warnUnloaded(root: string, failure: string | undefined): void {
+  if (failure === undefined) {
+    warned.delete(root)
+  }
+  else if (warned.get(root) !== failure) {
+    warned.set(root, failure)
+    kayLog('warn', `Tailwind is imported but its design system did not load (${failure}), so a later class does not override an earlier one`)
+  }
+}
+
 // Which classes of `words` another of them overrides, from what the app's own Tailwind makes of each: the table the runtime merges with.
 // Left out are the classes that meet no other, so an app using few utilities ships a small table; undefined when the app has no Tailwind or none of its classes conflicts.
 export async function buildClassTable(root: string, words: Iterable<string>): Promise<ClassTable | undefined> {
-  const design = await tailwindDesign(root)
+  const loaded = await tailwindDesign(root)
+  const design = loaded?.design
+
+  warnUnloaded(root, loaded?.failure)
 
   if (design === undefined)
     return undefined

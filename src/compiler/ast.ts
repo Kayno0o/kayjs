@@ -725,7 +725,8 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
   if (element.attributes.some(attribute => attribute.kind === 'spread'))
     return element.classes.length > 0 || attribute !== undefined
 
-  return element.classes.length > 0 && attribute?.kind === 'expression'
+  // A shorthand beside a static `class` merges while rendering, as the browser's build resolves it while compiling.
+  return element.classes.length > 0 && attribute !== undefined
 }
 
 // The spans of a template written in JavaScript, which is all of it a linter can judge: attribute values and spreads, `{...}` in text, the heads of `if`, `match`, `for`, `await`, `const` and `slot`. Tags, classes, static values and text stay with kay.

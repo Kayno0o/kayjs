@@ -443,6 +443,11 @@ export class HtmlTemplate extends TemplateWriter {
       markup.dynamic(() => b.add(`${helperName('className')}([${JSON.stringify(text)}, (`).addSource(expression).add(')])'))
       markup.text('"')
     }
+    else if (plan.classes?.pieces) {
+      markup.text(' class="')
+      markup.dynamic(() => b.add(`${helperName('className')}(${JSON.stringify(plan.classes!.pieces)})`))
+      markup.text('"')
+    }
     else if (plan.classes) {
       markup.text(` class="${escapeStaticAttribute(plan.classes.text)}"`)
     }

@@ -1,5 +1,7 @@
+import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf } from './ast'
@@ -88,8 +90,8 @@ export type PlannedAttribute
 // What an element without spreads renders, decided once for the server's markup and the browser's template.
 export interface ElementPlan {
   id: string | undefined
-  // The class shorthand, merged with a static `class`, or beside an expression one.
-  classes: { text: string, expression?: Span | undefined, parts?: string[] } | undefined
+  // The class shorthand, merged with a static `class`, or beside an expression one; `pieces` are the shorthand and the static `class` apart, which the server merges while rendering where the browser merged them while compiling.
+  classes: { text: string, expression?: Span | undefined, parts?: string[], pieces?: string[] } | undefined
   attributes: PlannedAttribute[]
   // The `sizes` an image source caps, left out of the attributes.
   sizes: NamedAttribute | undefined
@@ -110,6 +112,9 @@ export interface ElementPlan {
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
   constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
+
+  // Set for the browser's build, which resolves the literal classes written together while compiling; the server resolves them while rendering, with the same table.
+  protected classTable: ClassTable | undefined = undefined
 
   // Whether a component's slots and children are handed over as a function building them: in the browser, so a slot read in an attribute, a test or a ternary builds nothing and claims no server markup while an island hydrates.
   // The server hands over the markup itself, which an island reads its static slots off, and so draws a slot's ids once per read where the browser draws them once per insert; the browser sets the ids it binds, so they agree.
@@ -151,7 +156,7 @@ export abstract class TemplateWriter {
     if (parts.length > 0)
       plan.classes = { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
     else if (element.classes.length > 0)
-      plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute) }
+      plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute), ...classAttribute?.kind === 'static' && this.classTable === undefined && { pieces: this.staticParts(element, classAttribute) } }
 
     const section = name === 'a' ? sectionOf(element, this.src) : undefined
 
@@ -443,10 +448,8 @@ export abstract class TemplateWriter {
     if (expression !== undefined)
       items.push(() => b.add('(').addSource(expression).add(')'))
 
-    for (const part of classes.parts ?? []) {
-      this.recipeItem(items, part)
-      items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
-    }
+    for (const part of classes.parts ?? [])
+      items.push(...this.recipeItem(part), () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
 
     b.add('[')
 
@@ -461,11 +464,10 @@ export abstract class TemplateWriter {
   }
 
   // The classes the component's recipe gives a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant and a variant to the caller.
-  private recipeItem(items: (() => void)[], part: string): void {
+  private recipeItem(part: string): (() => void)[] {
     const { recipe } = this.facts
 
-    if (recipe !== undefined)
-      items.push(() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`))
+    return recipe === undefined ? [] : [() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`)]
   }
 
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.
@@ -485,37 +487,53 @@ export abstract class TemplateWriter {
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
     const parts = partsOf(element, this.src, this.facts.parts)
 
-    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0) {
+    // A shorthand beside a static `class` is a merge too: the browser resolves it here, the server while rendering.
+    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0 && (classAttribute === undefined || shorthand === undefined || this.classTable !== undefined)) {
       b.add(JSON.stringify(this.staticClass(element, classAttribute)))
 
       return
     }
 
-    const items: (() => void)[] = []
+    // A literal is kept as text, so the ones side by side resolve together.
+    const items: ({ text: string } | { emit: () => void })[] = []
 
     if (shorthand !== undefined)
-      items.push(() => b.add(JSON.stringify(shorthand)))
+      items.push({ text: shorthand })
 
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread')
-        items.push(() => b.add('((').addSource(attribute.expression).add(') as unknown as { class?: string }).class'))
+        items.push({ emit: () => b.add('((').addSource(attribute.expression).add(') as unknown as { class?: string }).class') })
       else if (attribute === classAttribute && attribute.kind === 'static')
-        items.push(() => b.add(JSON.stringify(decodeEntities(attribute.text))))
+        items.push({ text: decodeEntities(attribute.text) })
       else if (attribute === classAttribute && attribute.kind === 'expression')
-        items.push(() => b.add('(').addSource(attribute.expression).add(')'))
+        items.push({ emit: () => b.add('(').addSource(attribute.expression).add(')') })
     }
 
-    for (const part of parts) {
-      this.recipeItem(items, part)
-      items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
-    }
+    for (const part of parts)
+      items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
+
+    const written = this.classTable === undefined
+      ? items
+      : items.reduce<typeof items>((merged, item) => {
+        const last = merged.at(-1)
+
+        if ('text' in item && last !== undefined && 'text' in last)
+          merged[merged.length - 1] = { text: this.joinLiterals([last.text, item.text]) }
+        else
+          merged.push(item)
+
+        return merged
+      }, [])
 
     b.add(element.component ? `${helperName(parts.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
-    for (const [index, item] of items.entries()) {
+    for (const [index, item] of written.entries()) {
       if (index > 0)
         b.add(', ')
 
-      item()
+      if ('text' in item)
+        b.add(JSON.stringify(item.text))
+      else
+        item.emit()
     }
     b.add(element.component ? '])' : ']')
   }
@@ -565,11 +583,19 @@ export abstract class TemplateWriter {
     return element.classes.map(span => this.source(span)).join(' ')
   }
 
-  // The shorthand merged with a static `class` into one string.
+  // The shorthand merged with a static `class` into one string, a later class dropping an earlier one it overrides when the table is known.
   protected staticClass(element: ElementNode, classAttribute: NamedAttribute | undefined): string {
-    const shorthand = this.shorthand(element)
+    return classAttribute?.kind === 'static' ? this.joinLiterals(this.staticParts(element, classAttribute)) : this.shorthand(element)
+  }
 
-    return classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand
+  protected staticParts(element: ElementNode, classAttribute: NamedAttribute & { kind: 'static' }): string[] {
+    return [this.shorthand(element), decodeEntities(classAttribute.text)]
+  }
+
+  protected joinLiterals(parts: string[]): string {
+    const text = parts.join(' ')
+
+    return this.classTable === undefined ? text : resolveClasses(text, this.classTable)
   }
 
   // The `sizes` of an `img` whose `src` goes through the image helper, which caps it for dense screens, so the loop leaves it out.

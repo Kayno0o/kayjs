@@ -1,8 +1,10 @@
 ---
 import Box from '../components/box.kay'
+import Panel from '../components/panel.kay'
 import Toggle from '../components/toggle.kay'
 ---
 Box(class="p-6 text-lg") override
 Box(class="hover:p-2") hover
 Box plain
 Toggle
+Panel

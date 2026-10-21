@@ -1,3 +1,4 @@
+import type { ClassTable } from '../runtime/class-table'
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
@@ -40,8 +41,9 @@ export class DomTemplate extends TemplateWriter {
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined, classTable?: ClassTable) {
     super(b, src, facts)
+    this.classTable = classTable
   }
 
   // A block: one element, or a fragment of its items, or `null` when empty.

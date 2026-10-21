@@ -8,15 +8,18 @@ export interface ClassTable {
 const TABLE = Symbol.for('kay.classTable')
 const WHITESPACE = /\s+/
 
+// What a compile that read the table depends on: none without a table.
+export function tableFingerprint(table: ClassTable | undefined): string {
+  return table === undefined ? '' : String(Bun.hash(JSON.stringify(table)))
+}
+
 export function installClassTable(table: ClassTable | undefined): void {
   (globalThis as { [TABLE]?: ClassTable | undefined })[TABLE] = table
 }
 
 // A class list with each class another overrides left out: one drops when a later class has the same variants and sets every property it sets.
-// Classes the table does not hold, written by hand or built at runtime from parts, are never dropped.
-export function resolveClasses(text: string): string {
-  const table = (globalThis as { [TABLE]?: ClassTable | undefined })[TABLE]
-
+// Classes the table does not hold, written by hand or built at runtime from parts, are never dropped; the compiler resolves literal classes with a table it is given, the runtime with the installed one.
+export function resolveClasses(text: string, table = (globalThis as { [TABLE]?: ClassTable | undefined })[TABLE]): string {
   if (table === undefined)
     return text
 

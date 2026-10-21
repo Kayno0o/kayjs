@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { ClassTable } from '../runtime/class-table'
 import type { RouteMount } from '../server/routes'
 import type { Target } from './transform'
 import type { WorkerBundle, WorkerResult } from './worker-bundle'
@@ -38,6 +39,8 @@ export interface KayPluginOptions {
   anchored?: ReadonlySet<string> | undefined
   // Development: every element carries its source position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
+  // The classes a later Tailwind class overrides, with which an island's literal classes resolve while compiling.
+  classTable?: ClassTable | undefined
   // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
   api?: RouteMount[] | undefined
   external?: string[] | undefined
@@ -212,7 +215,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const load = async (file: string, twin = false) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect })
+        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable })
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents

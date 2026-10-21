@@ -1,3 +1,4 @@
+import type { ClassTable } from '../runtime/class-table'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
@@ -20,6 +21,7 @@ import { headTagProblem, sharedImports } from './validate'
 
 export interface GenerateOptions {
   name: string
+  classTable?: ClassTable | undefined
   // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
   translates?: boolean | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -431,7 +433,7 @@ class ModuleShell {
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
-      const dom = new DomTemplate(b, src, this.facts, errors, located)
+      const dom = new DomTemplate(b, src, this.facts, errors, located, this.options.classTable)
 
       dom.block(visible)
       b.add('\n}\n')

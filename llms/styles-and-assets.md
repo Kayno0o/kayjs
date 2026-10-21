@@ -35,7 +35,8 @@ With Tailwind, `Button(class="px-2")` over the `px-4` a component sets renders `
 - Properties come from the app's own Tailwind, so `@utility`, theme tokens and plugins count: `text-sm` and `text-lg` meet, `text-sm` and `text-red-500` do not.
 - A class Tailwind does not know (`.card`), and one built at runtime from parts (`p-${n}`), is never dropped.
 - The build writes a table of the classes that can meet another into the manifest and the islands' entry, about 200 to 1,000 bytes gzipped; an app without Tailwind has none and keeps the plain join.
-- A lone string is one source, and literal classes written together in one template (`.p-4(class="p-6")`) join as written: only a merge made while rendering resolves.
+- A lone string is one source, but literal classes written together in one template (`.p-4(class="p-6")`) resolve too, in an island while compiling and on the server while rendering. The `class` of `<html>` from a layout and a page merges the same way.
+- Tailwind imported but its design system not loading (a missing import, an uninstalled plugin) logs why in `kay dev` and `kay build`, and merges nothing.
 
 ### Style a part of a component
 

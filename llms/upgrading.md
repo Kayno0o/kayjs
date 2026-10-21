@@ -10,7 +10,7 @@ A static `part="x"` on an element or a component call now renders `data-part="x"
 
 ### A later Tailwind class overrides an earlier one
 
-With Tailwind, classes merged from the shorthand, `class`, a spread and a component's `class` prop no longer both stay when they set the same property under the same variants: the later one wins, so a `twMerge` or `cn` around a component's class can go. Literal classes written together in one template stay as written; nothing for `kay upgrade` to rewrite, as an old pair that both stayed was a CSS-order accident ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
+With Tailwind, classes merged from the shorthand, `class`, a spread and a component's `class` prop no longer both stay when they set the same property under the same variants: the later one wins, so a `twMerge` or `cn` around a component's class can go. `.p-4(class="p-6")` now renders `p-6` alone; nothing for `kay upgrade` to rewrite, as an old pair that both stayed was a CSS-order accident ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 
 ### kayjs-auth and kayjs-mail register with `auth({ module })` and `mail({ module })`
 
