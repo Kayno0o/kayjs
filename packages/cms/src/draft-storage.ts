@@ -12,6 +12,8 @@ export interface DraftKeeper {
   read: (key: string) => KeptDraft | undefined
   write: (key: string, kept: KeptDraft) => void
   remove: (key: string) => void
+  // Forgets every draft this keeper wrote, of any entry, and nothing else the storage holds.
+  clear: () => void
   now: () => number
 }
 
@@ -84,5 +86,13 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
       attempt(storage => storage.setItem(PREFIX + key, JSON.stringify(kept)))
     },
     remove,
+    clear() {
+      attempt((storage) => {
+        for (const name of Array.from({ length: storage.length }, (_, at) => storage.key(at))) {
+          if (name?.startsWith(PREFIX))
+            storage.removeItem(name)
+        }
+      })
+    },
   }
 }

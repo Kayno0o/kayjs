@@ -142,6 +142,11 @@ describe('drafts kept in the browser', () => {
     expect(drafts.anyChanged()).toBe(false)
     expect(drafts.value(post, 'title')).toBe('Hello')
     expect(storage.length).toBe(1)
+
+    // A draft of an entry this page never opened goes too.
+    storage.setItem('kcms:draft:posts:elsewhere', '{}')
+    drafts.discardAll()
+    expect(storage.length).toBe(1)
   })
 
   it('works with no storage, or storage that throws', () => {
@@ -177,14 +182,17 @@ describe('taking the other save after a conflict', () => {
     expect([drafts.value(post, 'title'), drafts.version(post), drafts.changed(post), drafts.refusal(post), storage.length]).toEqual(['Theirs', 'v2', false, undefined, 0])
   })
 
-  it('lists the fields where the two copies differ', () => {
+  it('lists the fields both sides changed from the copy the edits were made from', () => {
     const drafts = pageOf(memoryStorage())
 
-    drafts.open({ ...post, data: { title: 'Hello', tags: ['a', 'b'], seo: { description: 'x' } } }, 'v1')
+    const base = { ...post, data: { title: 'Hello', tags: ['a', 'b'], seo: { description: 'x' }, intro: 'i' }, body: '# Hello' }
+
+    drafts.open(base, 'v1')
     drafts.set(post, 'tags.1', 'c')
     drafts.set(post, 'seo.description', 'y')
     drafts.set(post, BODY, '# Mine')
 
-    expect(drafts.differences(post, { ...post, data: { title: 'Hello', tags: ['a', 'b'], seo: { description: 'x' } }, body: '# Theirs' })).toEqual(['tags.1', 'seo.description', BODY])
+    // They changed the title, the description and the body; only the last two were changed here too.
+    expect(drafts.differences(post, { ...base, data: { ...base.data, title: 'Theirs', seo: { description: 'z' } }, body: '# Theirs' })).toEqual(['seo.description', BODY])
   })
 })

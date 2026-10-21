@@ -14,6 +14,7 @@ afterEach(() => {
   mounted?.unmount()
   mounted = undefined
   mock.restore()
+  localStorage.clear()
 })
 
 const COLLECTION = { name: 'posts', title: 'Posts', schema: { type: 'object', properties: { title: { type: 'string' } } } }
@@ -91,6 +92,7 @@ test('Drop them and stop leaves the edit mode', async () => {
   await Bun.sleep(50)
 
   expect(left(fetched)).toBe(true)
+  expect(kept()).toBe(0)
 })
 
 test('a leave that fails keeps the edits', async () => {
@@ -105,6 +107,21 @@ test('a leave that fails keeps the edits', async () => {
   await Bun.sleep(50)
 
   expect(root.querySelector<HTMLInputElement>('input')!.value).toBe('Mine')
+  expect(kept()).toBe(1)
+})
+
+test('Stop editing pressed again while the question shows asks again and leaves nothing', async () => {
+  const fetched = server()
+  const root = await typed()
+
+  stop(root).click()
+  await settle()
+  stop(root).click()
+  await settle()
+
+  expect(root.querySelector('.kcms-editor-confirm')).not.toBeNull()
+  expect(left(fetched)).toBe(false)
+  expect(kept()).toBe(1)
 })
 
 test('a reload brings the typed edits back, and Reset drops them for good', async () => {

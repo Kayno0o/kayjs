@@ -51,7 +51,9 @@ The editor never covers the page it edits. From 64rem wide it docks to the right
 
 Drag the editor's inner edge, or focus it and press the arrow keys, to resize it. The button in its head docks it to the other edge, and the hide button folds it into one button. It remembers the edge, the size and whether it is hidden in the browser.
 
-What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first. Where the browser gives no storage, edits are only kept until the page closes.
+What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first.
+
+Stop editing clears every kept draft of the browser, but a draft left by a visit that ended another way stays until the week passes, and the edit cookie names no user, so on a browser several people sign in to, they should leave with Stop editing. Where the browser gives no storage, edits are only kept until the page closes.
 
 When the dev tool is docked to the right or the bottom, the editor sits beside it instead of under it. Clicking an element of the page scrolls it above the sheet when the sheet would hide it.
 

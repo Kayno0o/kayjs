@@ -104,10 +104,11 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     if (!kept)
       return entry
 
-    keep?.remove(key)
-
     // Edits made from another version of the file would write over what was saved since.
     const restored = kept.version === version && JSON.stringify(kept.entry) !== JSON.stringify(entry)
+
+    if (!restored)
+      keep?.remove(key)
 
     if (kept.version !== version || restored)
       recoveries.set(new Map(recoveries()).set(key, { at: kept.at, restored }))
@@ -165,7 +166,6 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       saved.set(key, entry)
       versions.set(key, version)
       current.set(new Map(current()).set(key, start))
-      persist(key)
 
       if (start !== entry)
         schedule()
@@ -241,11 +241,18 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       refuse(ref, undefined)
       schedule()
     },
-    // The fields where the entry's edits differ from `other`, a data field by its path and the body as `BODY`.
+    // The fields both the entry's edits and `other` changed from the copy the edits were made from, a data field by its path and the body as `BODY`.
     differences(ref: EntryRef, other: DraftEntry): FieldPath[] {
-      const mine = current().get(entryKey(ref))
+      const key = entryKey(ref)
+      const mine = current().get(key)
+      const base = saved.get(key)
 
-      return mine ? differing(mine, other) : []
+      if (!mine || !base)
+        return []
+
+      const theirs = new Set(differing(base, other))
+
+      return differing(base, mine).filter(path => theirs.has(path))
     },
     // Whether any entry has edits not saved yet.
     anyChanged(): boolean {
@@ -261,7 +268,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       recreated.clear()
       refusals.set(new Map())
       recoveries.set(new Map())
-      schedule()
+      // A draft of an entry this page never opened, left by a visit that ended without Stop editing, goes too: the edit cookie names no user.
+      keep?.clear()
     },
     // What was found kept for the entry when it opened: restored edits, or edits left out for being older than the entry.
     recovery(ref: EntryRef): Recovery | undefined {

@@ -19,9 +19,22 @@ const taking = signal(false)
 const label = (path: string | typeof BODY) => path === BODY ? wording('cms.entry.body', 'Body') : path
 
 // The entry as the other save left it, with the version a save would name.
-async function fetchTheirs(): Promise<{ entry: DraftEntry, version: string | undefined } | undefined> {
+async function fetchTheirs(quiet = false): Promise<{ entry: DraftEntry, version: string | undefined } | undefined> {
   const { collection, slug, locale } = form.entry
-  const answer = await attempt(async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } }), wording('cms.entry.theirsFailure', 'Could not load their version'))
+  const read = async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } })
+  let answer: Awaited<ReturnType<typeof read>> | undefined
+
+  if (quiet) {
+    try {
+      answer = await read()
+    }
+    catch {
+      answer = undefined
+    }
+  }
+  else {
+    answer = await attempt(read, wording('cms.entry.theirsFailure', 'Could not load their version'))
+  }
 
   return answer && { entry: { collection, slug, locale, data: answer.entry.data ?? {}, body: answer.entry.body }, version: answer.entry.version }
 }
@@ -39,7 +52,7 @@ effect(() => {
 
   onCleanup(() => stale = true)
   void (async () => {
-    const found = await fetchTheirs()
+    const found = await fetchTheirs(true)
 
     if (!stale)
       theirs = found?.entry
@@ -75,7 +88,8 @@ if form.drafts.refusal(form.entry) as refusal
     p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
     if refusal.conflict
       if theirs() as other
-        p {wording('cms.entry.differs', 'Both sides changed: {fields}.', { fields: form.drafts.differences(form.entry, other).map(label).join(', ') })}
+        if form.drafts.differences(form.entry, other).length > 0
+          p {wording('cms.entry.differs', 'Both sides changed: {fields}.', { fields: form.drafts.differences(form.entry, other).map(label).join(', ') })}
       p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}
       .kcms-refusal-choice
         Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} disabled={taking()} onClick={() => form.drafts.keepEdits(form.entry)})
