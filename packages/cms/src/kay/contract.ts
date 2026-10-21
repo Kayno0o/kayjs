@@ -37,8 +37,8 @@ export interface CollectionLayout {
   list?: ListLayout | undefined
 }
 
-// What `cms({ collections })` gave a collection: its layout and the icon the content list draws before it, which stays on the server, as the editor's islands would otherwise carry it with each page.
-export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined }
+// What `cms({ collections })` gave a collection: its layout, the icon the content list draws before it, which stays on the server, as the editor's islands would otherwise carry it with each page, and `history: false` to keep neither its revisions nor its trash.
+export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, history?: false | undefined }
 
 // A collection as the screens read it: kay's, with the layout `cms({ collections })` gave it.
 // `history` is set for a collection that keeps its entries' revisions, and `trash` for one that keeps its deleted entries, which the screens then link to.

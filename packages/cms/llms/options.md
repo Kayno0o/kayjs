@@ -6,7 +6,7 @@ The options `cms()` takes, from `kay.config.ts`.
 
 `onSave({ collection, slug, locale, verb, author, commit })` runs after each save, publish, duplicate, move, restore and deletion that went through, a throw being logged and never undoing the save ([After a save](loaders.md#after-a-save)).
 
-`history` is `false` to keep no revisions nor deleted entries, or `{ revisions, trash }`: the saves kept per entry, 50 by default, and how long a deleted entry is kept, `'30d'` by default, `false` for none ([History and the trash](history.md)).
+`history` is `false` to keep no revisions nor deleted entries, or `{ revisions, trash }`: the saves kept per entry, 50 by default, and how long a deleted entry is kept, `'30d'` by default, `false` for none; `collections: { name: { history: false } }` leaves one collection out ([History and the trash](history.md)).
 
 ## Signing in and roles
 

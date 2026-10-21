@@ -1,6 +1,6 @@
 # History and the trash
 
-A collection read through a SQLite or Postgres loader keeps what an editor saved, the last 50 saves of each entry, which the editor lists, compares and restores, and what an editor deleted, for 30 days. It needs nothing declared, and `cms({ history: false })` turns it off.
+A collection read through a SQLite or Postgres loader keeps what an editor saved, the last 50 saves of each entry, which the editor lists, compares and restores, and what an editor deleted, for 30 days. It needs nothing declared, and `cms({ history: false })` turns it off, `cms({ collections: { notes: { history: false } } })` for one collection (no revisions, no trash, no buttons; what it kept stays in the store).
 
 ## Revisions
 

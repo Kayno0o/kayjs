@@ -133,7 +133,7 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, GivenLay
 
   for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
     const where = `cms({ collections: { ${JSON.stringify(name)} } })`
-    const { form, list, group, order, icon } = plain(where, value, ['form', 'list', 'group', 'order', 'icon'])
+    const { form, list, group, order, icon, history } = plain(where, value, ['form', 'list', 'group', 'order', 'icon', 'history'])
 
     if (group !== undefined && (typeof group !== 'string' || group.trim() === ''))
       throw new Error(`kayjs-cms: \`${where}.group\` takes a heading, got ${JSON.stringify(group)}`)
@@ -144,7 +144,10 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, GivenLay
     if (icon !== undefined && (typeof icon !== 'object' || icon === null || typeof (icon as { viewBox?: unknown }).viewBox !== 'string'))
       throw new Error(`kayjs-cms: \`${where}.icon\` takes an icon imported from \`~icons/<prefix>/<name>\`, got ${JSON.stringify(icon)}`)
 
-    layouts.set(name, { group, order, icon: icon as IconProps | undefined, form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
+    if (history !== undefined && history !== false)
+      throw new Error(`kayjs-cms: \`${where}.history\` takes \`false\` to keep no history for the collection, got ${JSON.stringify(history)}`)
+
+    layouts.set(name, { group, order, history, icon: icon as IconProps | undefined, form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
   }
 
   return layouts

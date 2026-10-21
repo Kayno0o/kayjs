@@ -5,9 +5,9 @@ import { settings } from './settings'
 // The hidden collections of each loader, made once as a loader opens its table and starts its watcher on first use.
 const kept = new WeakMap<ContentLoader, Map<string, ContentLoader>>()
 
-// The hidden collection of that kind (`history`, `trash`) beside a loaded collection's entries, written through its own loader; undefined when `cms({ history })` is off, the collection is a folder's or its loader has no `sibling`.
+// The hidden collection of that kind (`history`, `trash`) beside a loaded collection's entries, written through its own loader; undefined when `cms({ history })` or the collection's `history` is off, the collection is a folder's or its loader has no `sibling`.
 export function hiddenOf(collection: string, kind: 'history' | 'trash'): ContentLoader | undefined {
-  if (settings().history === undefined || (kind === 'trash' && settings().history?.trash === undefined))
+  if (settings().history === undefined || settings().layouts.get(collection)?.history === false || (kind === 'trash' && settings().history?.trash === undefined))
     return undefined
 
   const loader = collectionLoader(collection)

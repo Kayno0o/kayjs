@@ -86,6 +86,20 @@ describe('revisions', () => {
     expect((await findCollection('notes'))?.history).toBeUndefined()
   })
 
+  test('keeps nothing for a collection whose layout says history: false, and the others go on', async () => {
+    notes()
+    configure({ collections: { notes: { history: false } } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    await deleteEntry(ref)
+    expect(await revisionsOf(ref)).toEqual([])
+    expect(await trashOf('notes')).toEqual([])
+    const found = await findCollection('notes')
+
+    expect([found?.history, found?.trash]).toEqual([undefined, undefined])
+    expect(() => configure({ collections: { notes: { history: true } } } as never)).toThrow('takes `false`')
+  })
+
   test('marks the collections whose loader can keep it, and no other', async () => {
     notes()
     expect((await findCollection('notes'))?.history).toBe(true)
