@@ -103,7 +103,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .bar .pill { font-size: 12px; }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: calc(56px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px - var(--kay-panel-right, 0px))); height: min(28rem, 60vh); max-height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
+.drawer { position: fixed; bottom: calc(56px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px - var(--kay-panel-right, 0px))); height: min(28rem, 60vh); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
+.ui:not(.floating, .dock-bottom, .dock-right) .drawer { max-height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); }
 .right .drawer { left: auto; right: calc(12px + var(--kay-panel-right, 0px)); }
 .max .drawer { width: calc(100vw - 24px - var(--kay-panel-right, 0px)); height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); }
 .top .bar { bottom: auto; top: 12px; }
@@ -294,7 +295,8 @@ td .copy { margin-left: 4px; }
   .tabs button, .bar > button, .icon { transition: background-color .12s, color .12s; }
 }
 @media (max-width: 480px) {
-  .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; }
+  .drawer, .max .drawer { left: 8px; right: 8px; width: auto; }
+  .right .drawer { left: 8px; right: calc(8px + var(--kay-panel-right, 0px)); width: auto; }
   .max .drawer { height: calc(100vh - 68px - var(--kay-panel-bottom, 0px)); }
 }
 `

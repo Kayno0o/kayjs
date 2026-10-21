@@ -95,3 +95,29 @@ for (const [width, height, corner] of [[390, 800, 'bottom-left'], [800, 700, 'bo
     expect(drawer.height).toBeGreaterThan(120)
   })
 }
+
+test('a drawer docked at the right keeps the full window height beside the editor, and a drawer the user sized is left as sized', async () => {
+  const page = await open(1280, 800, 'bottom-left')
+
+  await page.evaluate(() => {
+    localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'right', corner: 'bottom-left', max: false, bottom: 320, right: 448 }))
+    sessionStorage.clear()
+  })
+  await page.reload()
+  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null)
+  const { drawer } = await drawerBeside(page)
+
+  expect(drawer.top).toBe(0)
+  expect(drawer.height).toBe(800)
+
+  await page.evaluate(() => {
+    localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner: 'bottom-left', max: false, bottom: 320, right: 448, box: { left: 20, top: 10, width: 500, height: 780 } }))
+    sessionStorage.clear()
+  })
+  await page.reload()
+  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null)
+
+  const sized = await drawerBeside(page)
+
+  expect(sized.drawer.height).toBe(780)
+})
