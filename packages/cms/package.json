@@ -40,7 +40,8 @@
     "./postgres": "./src/loaders/postgres.ts",
     "./presence": "./src/presence.ts",
     "./room": "./src/room.ts",
-    "./sqlite": "./src/loaders/sqlite.ts"
+    "./sqlite": "./src/loaders/sqlite.ts",
+    "./test": "./src/test.ts"
   },
   "kay": {
     "messages": "./src/messages"

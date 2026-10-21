@@ -62,6 +62,16 @@ Pass `{ secret }` with a secret of your own to tie the sign-in to your site, and
 
 Signing out deletes the cookie and ends it on the server, so a copy of it stops working too. That is kept in memory: another server process, or a restart, still accepts a copy until it expires or the password changes. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
 
+A test signs a site in without the form, with helpers from `@kaynooo/kayjs-cms/test`:
+
+```ts
+import { cmsSignInAs, cmsSignInWith, cmsSignOut } from '@kaynooo/kayjs-cms/test'
+
+await cmsSignInAs(site, 'admin') // the role may be left out when the guard holds one password
+cmsSignOut(site)
+expect((await cmsSignInWith(site, 'wrong')).status).toBe(401)
+```
+
 The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
 
 By default everyone the guard admits can do everything. `roles` limits what a role may do beyond editing:

@@ -62,6 +62,11 @@ export class Passwords {
     }
   }
 
+  // The roles the guard holds a password for.
+  roles(): string[] {
+    return [...this.digests.keys()]
+  }
+
   // The role this password opens, or undefined. Every password is compared, so the time taken tells nothing of which one was close.
   match(given: string): string | undefined {
     const hashed = digest(given)
