@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.69.0
 
+### `guards` and `layouts` held in a variable, and a spread in an endpoint or `api()`, are errors
+
+Write `guards: false` and `layouts: false` as the literal in a page, layout, endpoint `page` and `api({...})` options: the server read them from the source, so a variable or an expression kept the guards and layouts with no message, and `kay check` now reports it. An endpoint's `page` and `api({...})` options also take no spread or computed key, as a page never did: write the keys out.
+
 ### The `identity-key` lint is gone
 
 `kay upgrade` removes the `// kay-allow identity-key` comments and the `identity-key` entry in `lints` (the `deprecated-identity-key` lint, kept three minors), which would otherwise go unrecognised. A `for` over objects with no `id` needs no `key`, as the runtime keeps each row through immutable edits ([Templates](templates.md)).

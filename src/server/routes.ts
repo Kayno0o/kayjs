@@ -411,7 +411,7 @@ export interface UnreadSetting {
 }
 
 const SETTING_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*/iy
-const LITERAL_BOOLEAN = /(?:true|false)(?![\w$])/y
+const LITERAL_SETTING = /(?:[A-Za-z_$][\w$]*|'[^'\n]*'|"[^"\n]*")\s*:\s*(?:true|false)(?![\w$])/y
 const LITERAL_SETTINGS = new Set(['guards', 'layouts'])
 
 // The entries of the object literal `head` opens that kay does not read as written: a spread or a computed key, which may carry `guards` or `layouts`, and a `guards` or `layouts` set to anything but a literal `true` or `false`, which the server ignores.
@@ -432,13 +432,9 @@ export function unreadSettings(source: string, head = PAGE_EXPORT): UnreadSettin
     if (name === undefined || !LITERAL_SETTINGS.has(name))
       continue
 
-    const colon = codeAfter(source, SETTING_KEY.lastIndex)
-    let literal = false
-
-    if (source[colon] === ':') {
-      LITERAL_BOOLEAN.lastIndex = codeAfter(source, colon + 1)
-      literal = LITERAL_BOOLEAN.test(source) && [',', '}'].includes(source[codeAfter(source, LITERAL_BOOLEAN.lastIndex)]!)
-    }
+    // Written as the server reads it, key, colon and value with no comment or parenthesis between.
+    LITERAL_SETTING.lastIndex = index
+    const literal = LITERAL_SETTING.test(source) && [',', '}'].includes(source[codeAfter(source, LITERAL_SETTING.lastIndex)]!)
 
     if (!literal)
       found.push({ key: name, index })

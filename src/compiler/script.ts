@@ -15,6 +15,8 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?!\s*[.(])/
 const WHITESPACE = /\s/
 const FIRST_TOKEN = /^[\w$]*/
+// A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
+const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
@@ -407,7 +409,7 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
         }
 
         // The server reads these two from the source, so a value held in a variable would keep the guards and layouts with no message.
-        if ((key === 'guards' || key === 'layouts') && property.value.type !== 'BooleanLiteral')
+        if ((key === 'guards' || key === 'layouts') && !LITERAL_SETTING.test(text(property)))
           analysis.diagnostics.push({ ...shift(property.value), message: `kay reads \`${key}\` as a literal \`true\` or \`false\``, help: `write \`${key}: false\` itself: the server reads it from the source, so a variable or an expression is ignored` })
 
         settings.set(key, { key: shift(property.key), value: shift(property.value) })

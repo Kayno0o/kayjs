@@ -18,6 +18,8 @@ describe('unreadSettings', () => {
     ['a computed key', 'export const page = { [\'layouts\']: false }\n', undefined, ['...']],
     ['an expression starting with a literal', 'export const page = { layouts: false || open }\n', undefined, ['layouts']],
     ['a quoted key', 'export const page = { \'layouts\': flag }\n', undefined, ['layouts']],
+    ['a comment between the key and the literal, which the server does not read', 'export const page = { guards: /* open */ false }\n', undefined, ['guards']],
+    ['a parenthesised literal', 'export const page = { layouts: (false) }\n', undefined, ['layouts']],
     ['a method', 'export const page = { guards() { return false } }\n', undefined, ['guards']],
   ])('finds %s', (_name, source, head, keys) => {
     const found = unreadSettings(source, head)
@@ -28,7 +30,7 @@ describe('unreadSettings', () => {
 
   it.each([
     ['literals', 'export const page = { guards: false, layouts: true }\n', undefined],
-    ['a literal past a comment', 'export const page = { guards: /* open */ false, // why\n layouts: false }\n', undefined],
+    ['a literal followed by a comment', 'export const page = { guards: false, // why\n layouts: true /* x */ }\n', undefined],
     ['other keys holding anything', 'export const page = { noindex: flag, revalidate: compute() }\n', undefined],
     ['a nested key of the same name', 'export const page = { sitemap: { guards: flag } }\n', undefined],
     ['an object that is not the page', 'const other = { guards: flag }\n', undefined],
@@ -45,6 +47,8 @@ describe('a guards or layouts setting kay cannot read', () => {
     ['a negation', 'export const page = { guards: !protect }', 'guards'],
     ['a variable for layouts', 'const bare = true\nexport const page = { layouts: bare }', 'layouts'],
     ['a call', 'export const page = { layouts: pick() }', 'layouts'],
+    ['a comment before the literal', 'export const page = { guards: /* open */ false }', 'guards'],
+    ['a parenthesised literal', 'export const page = { guards: (false) }', 'guards'],
   ])('is reported in a page for %s', (_name, fence, key) => {
     expect(messages(`--- server\n${fence}\n---\np x`)).toEqual([SETTING(key)])
   })
