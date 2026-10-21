@@ -315,6 +315,39 @@ describe('moving a file', () => {
     expect((await failureOf<SaveConflict>(saver.move!({ ...move, from: at('gone.md'), to: at('free.md') }))).current).toBeNull()
   })
 
+  test('forgejo commits the files that named the moved one in the same commit, and writes nothing when one changed', async () => {
+    const also = { repoPath: 'content/books/engine.md', absolute: '/unused/engine', text: 'pointed', message: 'm', base: 'a1' }
+    const { sent, saver } = forge({ 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a1' })
+
+    await saver.move!({ ...move, also: [also] })
+    expect(sent.filter(each => each.method === 'POST')[0]?.body).toMatchObject({ files: [{ operation: 'delete' }, { operation: 'create' }, { operation: 'update', path: 'content/books/engine.md', sha: 'a1', content: Buffer.from('pointed').toString('base64') }] })
+
+    const stale = forge({ 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a2' })
+    const conflict = await failureOf<SaveConflict>(stale.saver.move!({ ...move, also: [also] }))
+
+    expect(conflict.at).toBe('content/books/engine.md')
+    expect(stale.sent.filter(each => each.method === 'POST')).toEqual([])
+  })
+
+  test('the working tree writes the files that named the moved one with it, or none when one changed', async () => {
+    const dir = await scratchDir('move-also')
+    const saver = workingTree()
+    const at = (name: string) => ({ repoPath: `posts/${name}`, absolute: join(dir, name) })
+
+    await Bun.write(join(dir, 'old.md'), 'before')
+    await Bun.write(join(dir, 'book.md'), 'book')
+
+    const stale = await failureOf<SaveConflict>(saver.move!({ ...move, from: at('old.md'), to: at('new.md'), also: [{ ...at('book.md'), text: 'pointed', message: 'm', base: fileVersion('else') }] }))
+
+    expect(stale.at).toBe('posts/book.md')
+    expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(true)
+    expect(await Bun.file(join(dir, 'new.md')).exists()).toBe(false)
+
+    await saver.move!({ ...move, from: at('old.md'), to: at('new.md'), also: [{ ...at('book.md'), text: 'pointed', message: 'm', base: fileVersion('book') }] })
+    expect(await Bun.file(join(dir, 'book.md')).text()).toBe('pointed')
+    expect(await Bun.file(join(dir, 'old.md')).exists()).toBe(false)
+  })
+
   test('the working tree runs a save and a move of one file one after the other', async () => {
     const dir = await scratchDir('move-race')
     const saver = workingTree()

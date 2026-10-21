@@ -304,6 +304,16 @@ describe('renaming an entry other entries refer to', () => {
     expect(await dataOf('books', 'loop')).toMatchObject({ book: 'machine' })
   })
 
+  test('points every entry naming it, even two of one title', async () => {
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'one', { title: 'Same', author: 'ada' })
+    await make('books', 'two', { title: 'Same', author: 'ada' })
+
+    await renameEntry(ADA, 'lovelace')
+    expect(await dataOf('books', 'one')).toMatchObject({ author: 'lovelace' })
+    expect(await dataOf('books', 'two')).toMatchObject({ author: 'lovelace' })
+  })
+
   test('tells onSave each entry it pointed, as an update', async () => {
     const events: { collection: string, slug: string, verb: string }[] = []
 
@@ -419,5 +429,15 @@ describe('renaming one locale of a translated entry', () => {
     await renameEntry({ collection: 'spots', slug: 'about', locale: 'fr' }, 'a-propos')
     expect(await dataOf('guides', 'g', 'fr')).toMatchObject({ spot: 'a-propos' })
     expect(await dataOf('visits', 'v')).toMatchObject({ spot: 'a-propos' })
+  })
+
+  test('keeps them paired when each locale is renamed in turn', async () => {
+    await make('spots', 'about', { title: 'About' }, 'en')
+    await make('spots', 'about', { title: 'A propos' }, 'fr')
+
+    await renameEntry({ collection: 'spots', slug: 'about', locale: 'en' }, 'about-us')
+    await renameEntry({ collection: 'spots', slug: 'about', locale: 'fr' }, 'a-propos')
+    expect(await dataOf('spots', 'a-propos', 'fr')).toMatchObject({ translationKey: 'about' })
+    expect(await dataOf('spots', 'about-us', 'en')).toMatchObject({ translationKey: 'about' })
   })
 })

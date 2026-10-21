@@ -49,7 +49,7 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
   const result = new Map<string, string[]>()
 
   for (const [slug, found] of await referrersWith(target, slugs))
-    result.set(slug, found.map(each => each.label))
+    result.set(slug, [...new Set(found.map(each => each.label))])
 
   return result
 }
@@ -108,7 +108,7 @@ function collect(collection: CollectionInfo, found: SourceEntry[], target: strin
       const label = `${collectionTitle(collection)}${entry.locale === undefined ? '' : ` (${entry.locale})`}: ${entryTitle(collection, entry)}`
       const listed = result.get(slug) ?? []
 
-      if (!listed.some(each => each.label === label))
+      if (!listed.some(each => each.collection.name === collection.name && each.entry.slug === entry.slug && each.entry.locale === entry.locale))
         result.set(slug, [...listed, { collection, entry, label }])
     }
   }

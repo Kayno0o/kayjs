@@ -103,7 +103,7 @@ export default defineMessages({
       rename: 'Renommer',
       renameDirty: 'Enregistrez ou réinitialisez d\'abord vos modifications',
       renameHint: 'L\'ancienne adresse de la page redirige vers la nouvelle.',
-      renameReferrers: 'Ces entrées pointent aussi vers le nouveau slug : {names}',
+      renameReferrers: 'Référencée par {names}, qui suivent le nouveau slug quand elles le peuvent',
       renameSlug: 'Nouveau slug',
       renameTitle: 'Renommer {slug}',
       body: 'Contenu',

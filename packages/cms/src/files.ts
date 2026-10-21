@@ -134,12 +134,12 @@ async function moveFile({ from, to, text, base, also = [] }: FileMove): Promise<
     checkBase(change.base, await file.exists() ? fileVersion(await file.bytes()) : undefined, change.repoPath)
   }
 
+  for (const change of also)
+    await Bun.write(change.absolute, change.text)
+
   await mkdir(dirname(to.absolute), { recursive: true })
   await Bun.write(to.absolute, text)
   await rm(from.absolute, { force: true })
-
-  for (const change of also)
-    await Bun.write(change.absolute, change.text)
 
   return undefined
 }

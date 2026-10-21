@@ -90,4 +90,4 @@ Dialog(open={open} title={wording('cms.entry.renameTitle', 'Rename {slug}', { sl
     FormField(label={wording('cms.entry.renameSlug', 'New slug')} hint={hint()} issue={reason() ?? refusal()})
       TextInput(autofocus value={typed()} onInput={type} size={32})
     if referrers.length > 0
-      p.kcms-rename-referrers {wording('cms.entry.renameReferrers', 'These entries are pointed at the new slug too: {names}', { names: referrers.join(', ') })}
+      p.kcms-rename-referrers {wording('cms.entry.renameReferrers', 'Referred to by {names}, which follow the new slug where they can', { names: referrers.join(', ') })}

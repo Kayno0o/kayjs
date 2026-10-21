@@ -627,7 +627,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     return refused(ref, wording('cms.store.sameSlug', '{slug} is the slug already', { slug }), 'slug')
 
   const target = { ...ref, slug }
-  const keepPairing = await pairedBySlug(collection, existing)
+  const keepPairing = await pairingKey(collection, existing)
   const data = renamedData(collection, existing.data, ref.slug, slug, keepPairing)
   const plan = await pointings(collection, ref, slug)
 
@@ -684,20 +684,22 @@ async function joinedFiles(plan: Pointing[]): Promise<{ pointing: Pointing, chan
   return files
 }
 
-// Whether the entry's translations pair with it by its slug, in a collection that gives entries a `translationKey` field to keep them paired once the slug changes.
-async function pairedBySlug(collection: CollectionInfo, existing: StoredEntry): Promise<boolean> {
+// The `translationKey` to write so the entry's translations stay paired once its slug changes: set when they pair with it by its slug and the collection gives entries a `translationKey` field.
+async function pairingKey(collection: CollectionInfo, existing: StoredEntry): Promise<string | undefined> {
   if (collection.localized !== true || collection.schema.properties?.translationKey === undefined || pairKey(existing) !== existing.slug)
-    return false
+    return undefined
 
-  return (await entries(collection.name, { slug: existing.slug })).some(each => each.locale !== existing.locale && pairKey(each) === existing.slug)
+  const paired = (await entries(collection.name, {})).some(each => each.locale !== existing.locale && pairKey(each) === existing.slug)
+
+  return paired ? existing.slug : undefined
 }
 
-// The entry's data under its new slug: the `slug` field of its own, if it has one, following, so do its references to itself, and the `translationKey` its translations pair it by when `keepPairing`.
-function renamedData(collection: CollectionInfo, data: Record<string, unknown>, from: string, slug: string, keepPairing: boolean): Record<string, unknown> {
+// The entry's data under its new slug: the `slug` field of its own, if it has one, following, so do its references to itself, and the `translationKey` its translations pair it by when `pairing` gives one.
+function renamedData(collection: CollectionInfo, data: Record<string, unknown>, from: string, slug: string, pairing: string | undefined): Record<string, unknown> {
   const own = typeof data.slug === 'string' ? { ...data, slug } : data
   const pointing = pointReferences(collection, own, collection.name, from, slug) ?? own
 
-  return keepPairing ? { ...pointing, translationKey: from } : pointing
+  return pairing === undefined ? pointing : { ...pointing, translationKey: pairing }
 }
 
 async function renameFile(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { author, version, required, also }: { author?: Identity | undefined, version?: string | undefined, also: (FileChange & { text: string })[] } & VersionRule): Promise<SaveOutcome> {
@@ -755,7 +757,7 @@ async function renameFile(collection: CollectionInfo, existing: StoredEntry, tar
   }
 }
 
-async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, { version, required = false, keepPairing }: { version?: string | undefined, keepPairing: boolean } & VersionRule): Promise<SaveOutcome> {
+async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, { version, required = false, keepPairing }: { version?: string | undefined, keepPairing: string | undefined } & VersionRule): Promise<SaveOutcome> {
   const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
 
   return inTurn(collection.name, async () => {

@@ -201,7 +201,7 @@ A folder entry's file is moved and keeps its format. With `forgejo()` it is one 
 
 Every entry that refers to this one in a `reference` field is pointed at the new slug, in lists, groups and blocks, in every language it is written in, in folder and loaded collections alike. The dialog lists them before you rename.
 
-With `forgejo()` and the working tree they are part of the same commit as the move, and a saver of your own saves them one by one afterwards. A loaded entry's save shows in its history. If one was saved meanwhile, the rename is refused and nothing is written. If one cannot be saved after the move, the editor names it so you can change it by hand.
+With `forgejo()` they are part of the same commit as the move, and the working tree writes them with it. A saver of your own saves them one by one afterwards, as it does loaded entries, whose save shows in their history. If a folder entry committed with the move was saved meanwhile, the rename is refused and nothing is written. If one saved afterwards cannot be saved, the editor names it so you can change it by hand.
 
 A rename is refused if the new slug is taken or names another place, or if an entry that refers to this one lives in a folder outside the repository.
 
