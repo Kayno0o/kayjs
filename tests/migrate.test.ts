@@ -456,4 +456,23 @@ import '@fontsource/open-sans/scss/mixins.scss'
     expect(code).toBe('// before\np a\nscript {`document.x = 1`}\n')
     expect(notes.map(note => lead(note.message))).toEqual(['define', 'a script attribute holding an expression'])
   })
+
+  it('reads icon names, subsets and every import.meta.env form without throwing or losing one', () => {
+    const { code, fonts, notes } = component(`---
+import { Icon } from 'astro-icon/components'
+import '@fontsource/roboto/cyrillic-700.css'
+const { A } = import.meta.env
+const b = import.meta.env?.B
+---
+<Icon name="mdi:sun-" />
+<Icon name="a-b:c" />
+<Icon name="a:b-c" />
+<script data-t="x y={z}" is:inline>1</script>
+`)
+
+    expect(fonts).toEqual([{ line: 2, fontsource: '@fontsource/roboto', subset: 'cyrillic', weight: 700, style: 'normal' }])
+    expect(code).toContain('import ABC from \'~icons/a-b/c\'\nimport ABC2 from \'~icons/a/b-c\'\n')
+    expect(code).toContain('script(data-t="x y={z}") {`1`}')
+    expect(notes.map(note => [note.line, lead(note.message)])).toEqual([[4, 'import.meta.env is Vite\'s'], [5, 'import.meta.env is Vite\'s'], [7, 'an astro-icon whose name is not a plain `set']])
+  })
 })

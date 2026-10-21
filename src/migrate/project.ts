@@ -94,25 +94,26 @@ async function pathsOf(root: string): Promise<{ paths: Record<string, string[]>,
 
 // The line of a package in a package.json, 1 when the file does not name it.
 function lineOfPackage(text: string, name: string | undefined): number {
-  const index = name === undefined ? -1 : text.indexOf(`"${name}"`)
+  const index = name === undefined ? -1 : text.indexOf(`"${name}":`)
 
   return index === -1 ? 1 : text.slice(0, index).split('\n').length
 }
 
 // One `fonts` entry per package and style, listing the weights imported; a variable font spans them all.
 function fontEntries(imported: FontImport[]): NonNullable<ConfigSettings['fonts']> {
-  const groups = new Map<string, { fontsource: string, style: string, weights: Set<number> }>()
+  const groups = new Map<string, { fontsource: string, style: string, subset: string | undefined, weights: Set<number> }>()
 
-  for (const { fontsource, style, weight } of imported) {
-    const group = groups.get(`${fontsource} ${style}`) ?? { fontsource, style, weights: new Set<number>() }
+  for (const { fontsource, style, subset, weight } of imported) {
+    const key = `${fontsource} ${style} ${subset}`
+    const group = groups.get(key) ?? { fontsource, style, subset, weights: new Set<number>() }
 
     if (weight !== undefined)
       group.weights.add(weight)
 
-    groups.set(`${fontsource} ${style}`, group)
+    groups.set(key, group)
   }
 
-  return [...groups.values()].map(({ fontsource, style, weights }) => ({ fontsource, ...weights.size > 0 && { weights: [...weights].toSorted((a, b) => a - b) }, ...style !== 'normal' && { styles: [style] } }))
+  return [...groups.values()].map(({ fontsource, style, subset, weights }) => ({ fontsource, ...weights.size > 0 && { weights: [...weights].toSorted((a, b) => a - b) }, ...style !== 'normal' && { styles: [style] }, ...subset !== undefined && { subsets: [subset] } }))
 }
 
 // The generated .gitignore followed by the lines the Astro project's has that it lacks, Astro's own folders left out.

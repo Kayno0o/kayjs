@@ -25,8 +25,9 @@ export interface MigratedFile {
 
 export interface FontImport {
   line: number
-  // The package, `@fontsource/montserrat`.
   fontsource: string
+  // The subset a file such as `cyrillic-700.css` is for.
+  subset?: string | undefined
   // Undefined for a variable font, whose one file spans every weight.
   weight: number | undefined
   style: 'normal' | 'italic'
@@ -43,8 +44,8 @@ const OTHER_FRAMEWORK = /\.(?:svelte|vue|jsx|tsx)$/
 const ASTRO_ICON = /^astro-icon(?:\/.*)?$/
 // `@fontsource/montserrat/400.css`, `@fontsource/montserrat/latin-400-italic.css`, `@fontsource-variable/inter/wght-italic.css` or the package alone.
 const FONTSOURCE = /^(@fontsource(?:-variable)?\/[^/]+)(?:\/(.+?)(?:\.css)?)?$/
-const FONT_WEIGHT = /^(?:[a-z][a-z-]*-)?(\d{3})(?:-(italic|normal))?$/
-const FONT_VARIABLE = /^(?:[a-z][a-z-]*-)?(?:index|variable|wght|opsz|wdth|slnt|full)(?:-(italic|normal))?$/
+const FONT_WEIGHT = /^(?:([a-z][a-z-]*)-)?(\d{3})(?:-(italic|normal))?$/
+const FONT_VARIABLE = /^(?:([a-z][a-z-]*)-)?(?:index|variable|wght|opsz|wdth|slnt|full)(?:-(italic|normal))?$/
 const RAW_QUERY = /\?raw$/
 
 interface Edit {
@@ -283,9 +284,11 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
   const at = (inner: t.Node, text: string) => edits.push({ start: inner.start! - offset, end: inner.end! - offset, text })
   const page = role === 'page'
 
-  eachNode(node, (inner) => {
-    if (inner.type === 'MemberExpression' && isMetaEnv(inner.object)) {
-      note(inner.loc!.start.line, `import.meta.env.${inner.property.type === 'Identifier' ? inner.property.name : '...'} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or in \`publicEnv\` for an island`)
+  eachNode(node, (inner, parent) => {
+    if (isMetaEnv(inner)) {
+      const read = parent?.type === 'MemberExpression' && parent.object === inner && !parent.computed && parent.property.type === 'Identifier' ? `.${parent.property.name}` : ''
+
+      note(inner.loc!.start.line, `import.meta.env${read} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or in \`publicEnv\` for an island`)
 
       return false
     }
@@ -349,12 +352,12 @@ function fontOf(specifier: string, line: number): FontImport | undefined {
   const weight = FONT_WEIGHT.exec(file)
 
   if (weight && !variable)
-    return { line, fontsource, weight: Number(weight[1]), style: weight[2] === 'italic' ? 'italic' : 'normal' }
+    return { line, fontsource, subset: weight[1], weight: Number(weight[2]), style: weight[3] === 'italic' ? 'italic' : 'normal' }
 
   const spans = FONT_VARIABLE.exec(file)
 
   if (spans && variable)
-    return { line, fontsource, weight: undefined, style: spans[1] === 'italic' ? 'italic' : 'normal' }
+    return { line, fontsource, subset: spans[1], weight: undefined, style: spans[2] === 'italic' ? 'italic' : 'normal' }
 
   return undefined
 }

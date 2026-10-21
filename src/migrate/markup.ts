@@ -19,14 +19,11 @@ const TRAILING_SPACE = /[ \t\n\r\f]*$/
 const INTERPOLATION = /#\[/g
 const EVENT_ATTRIBUTE = /^on[a-z]+$/
 
-const ICON_NAME = /^([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)$/
+const ICON_NAME = /^([a-z][a-z0-9-]*[a-z0-9]|[a-z]):([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)$/
 const ICON_SEPARATOR = /[^a-z0-9]+/i
 const EXTERNAL_URL = /^(?:https?:)?\/\/([^/\s"'?#]+)/i
-const EXPRESSION_START = /\s[\w:-]+=\{/
-const SET_HTML = /\sset:html\b/
-const SET_HTML_VALUE = /\sset:html=\{(?:[^{}]|\{[^{}]*\})*\}/
-const DEFINE_VARS = /\sdefine:vars=\{(?:[^{}]|\{[^{}]*\})*\}/
-const EXPRESSION_ATTRIBUTE = /\s[\w:-]+=\{(?:[^{}]|\{[^{}]*\})*\}/g
+// A quoted value, kept whole, or an attribute holding an expression.
+const EXPRESSION_ATTRIBUTE = /("[^"]*"|'[^']*')|\s([\w:-]+)=\{(?:[^{}]|\{[^{}]*\})*\}/g
 const RAW_TAG = /^kay-raw-(\d+)$/
 const WHITESPACE = /\s+/
 // HTML's own whitespace, which leaves a no-break space alone.
@@ -388,9 +385,15 @@ class Translator {
       return this.untranslated(element, 'an astro-icon whose name is not a plain `set:name` (a local icon, or a computed name): import the icon from `@iconify-json/<prefix>` as `~icons/<prefix>/<name>` and draw it as a tag, or import the svg file')
 
     const [, prefix, icon] = match as unknown as [string, string, string]
-    const local = [prefix, icon].flatMap(part => part.split(ICON_SEPARATOR)).map(part => `${part[0]!.toUpperCase()}${part.slice(1)}`).join('')
+    const specifier = `~icons/${prefix}/${icon}`
+    const base = [prefix, icon].flatMap(part => part.split(ICON_SEPARATOR)).map(part => `${part[0]!.toUpperCase()}${part.slice(1)}`).join('')
+    // Two names can fold to one (`a-b:c` and `a:b-c`), the second then taking a number.
+    let local = base
 
-    this.imports.icons.set(local, `~icons/${prefix}/${icon}`)
+    for (let count = 2; this.imports.icons.has(local) && this.imports.icons.get(local) !== specifier; count++)
+      local = `${base}${count}`
+
+    this.imports.icons.set(local, specifier)
 
     return [this.head(element, local, 'name')]
   }
@@ -598,15 +601,22 @@ class Translator {
   // A `<script>` or `<style>` taken out before parsing: an inline script and a stylesheet stay as their element, a bundled script cannot.
   private rawBlock(block: RawBlock, element: t.JSXElement): string[] {
     // An attribute holding an expression is listed below, not read as text.
-    const attributes = [...block.attributes.replace(EXPRESSION_ATTRIBUTE, '').matchAll(ATTRIBUTE_PART)].map(([, name, value]) => ({ name: name!, value }))
+    const expressions: string[] = []
+    const plain = block.attributes.replace(EXPRESSION_ATTRIBUTE, (_whole, quoted: string | undefined, name: string | undefined) => {
+      if (quoted === undefined)
+        expressions.push(name!)
+
+      return quoted ?? ''
+    })
+    const attributes = [...plain.matchAll(ATTRIBUTE_PART)].map(([, name, value]) => ({ name: name!, value }))
     const kept = attributes.filter(attribute => !DROPPED.has(attribute.name) && attribute.name !== 'set:html')
-    const html = SET_HTML.test(block.attributes)
+    const html = attributes.some(attribute => attribute.name === 'set:html') || expressions.includes('set:html')
     const head = `${block.tag}${kept.length > 0 ? `(${kept.map(attribute => attribute.value === undefined ? attribute.name : `${attribute.name}=${attribute.value.startsWith('\'') ? `"${attribute.value.slice(1, -1)}"` : attribute.value}`).join(' ')})` : ''}`
 
-    if (block.attributes.includes('define:vars'))
+    if (expressions.includes('define:vars'))
       this.note(this.line(element), `define:vars on a ${block.tag}: pass the values through an attribute or a prop instead; dropped`)
 
-    if (EXPRESSION_START.test(block.attributes.replace(DEFINE_VARS, '').replace(SET_HTML_VALUE, '')))
+    if (expressions.some(name => name !== 'define:vars' && name !== 'set:html'))
       this.note(this.line(element), `a ${block.tag} attribute holding an expression: kay migrate keeps only the attributes written as text, so write it by hand`)
 
     const host = block.tag === 'script' ? EXTERNAL_URL.exec(attributes.find(attribute => attribute.name === 'src')?.value?.slice(1, -1) ?? '')?.[1] : undefined
