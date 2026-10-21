@@ -15,3 +15,6 @@ export const partners: { slug: string, data: { name: string } }[] = [{ slug: 'ac
 
 // The sections collection's store: single entries a page reads by their slug.
 export const sections: { slug: string, data: { heading: string } }[] = [{ slug: 'hero', data: { heading: 'Welcome' } }, { slug: 'unused', data: { heading: 'Nobody shows this' } }]
+
+// The rows of the ledger collection, which keeps what a save hands it.
+export const ledgerRows: { slug: string, data: { name: string, note: string | null } }[] = []

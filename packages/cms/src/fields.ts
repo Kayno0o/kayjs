@@ -243,13 +243,17 @@ export function checkField(field: Field, value: unknown): string | undefined {
   return undefined
 }
 
-// The pattern for the control's `pattern` attribute, which HTML anchors itself and compiles with the `v` flag, while the schema's is unanchored: only a pattern already anchored at both ends in one alternative, which both read the same, becomes the attribute. Any other is left to the form's own check.
+// Escapes and characters the `u` and `v` flags read differently from no flag, which the form's own check compiles with.
+const FLAG_DEPENDENT = /\\[pPu]\{|[\u{10000}-\u{10FFFF}]/u
+
+// The pattern for the control's `pattern` attribute, which HTML anchors itself and compiles with the `v` flag, while the schema's is unanchored and the form's own check compiles it with no flag: only a pattern already anchored at both ends in one alternative, which all read the same, becomes the attribute. Any other is left to the form's own check.
 export function htmlPattern(pattern: string | undefined): string | undefined {
-  if (pattern === undefined || !pattern.startsWith('^') || !pattern.endsWith('$') || endsEscaped(pattern) || hasTopLevelAlternative(pattern))
+  if (pattern === undefined || !pattern.startsWith('^') || !pattern.endsWith('$') || endsEscaped(pattern) || hasTopLevelAlternative(pattern) || FLAG_DEPENDENT.test(pattern))
     return undefined
 
   try {
     void new RegExp(pattern, 'v')
+    void new RegExp(pattern)
 
     return pattern
   }

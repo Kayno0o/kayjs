@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, fieldInput, imageField } from 'kay/content'
-import { sections as blocks, footerDown, partners as friends, outage, shop as shelf, products as stock } from './products'
+import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
@@ -88,4 +88,15 @@ export const profiles = collection({
     nickname: s.Optional(fieldInput(s.String(), { placeholder: 'Jo', when: 'name' })),
   }),
   description: 'Who edits the site',
+})
+
+// A loaded collection whose `note` is required yet may be null, which emptied stores `null`.
+export const ledger = collection({
+  name: 'ledger',
+  load: () => ledgerRows,
+  save: (entry) => {
+    ledgerRows.splice(0, ledgerRows.length, ...ledgerRows.filter(row => row.slug !== entry.slug), { slug: entry.slug, data: entry.data as { name: string, note: string | null } })
+  },
+}, {
+  schema: s.Object({ name: s.String({ minLength: 1 }), note: s.Nullable(s.String()) }),
 })

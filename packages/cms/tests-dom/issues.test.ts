@@ -293,10 +293,15 @@ test('a save that fails on the network leaves the form as it was, with no notice
   const { root, submit, edit } = await openIn(NOTES, entry({ title: 'hello', count: 3 }))
 
   await edit()
+
+  const focused = root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!
+
+  focused.focus()
   spyOn(globalThis, 'fetch').mockImplementation((async () => {
     throw new TypeError('offline')
   }) as unknown as typeof fetch)
   await submit()
+  expect(document.activeElement).toBe(focused)
 
   expect(root.querySelector('.kcms-entry-failure')).toBeNull()
   expect(root.querySelector('.kcms-summary')).toBeNull()

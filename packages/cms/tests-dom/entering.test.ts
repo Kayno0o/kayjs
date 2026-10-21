@@ -35,7 +35,7 @@ afterEach(() => {
   mock.restore()
 })
 
-function server(issues?: { path: string, message: string }[]) {
+function server(issues?: { path: string, message: string, body?: true }[]) {
   return spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json(issues ? { issues } : { saved: true, version: 'v2' })) as unknown as typeof fetch)
 }
 
@@ -105,6 +105,31 @@ test('a field the schema refused shows although its `when` sibling is empty, so 
 
   await type('shade', 'light')
   expect(field('shade').hidden).toBe(false)
+})
+
+test('a surfaced field hides again once the refusal is fixed and the focus has left it, its sibling still empty', async () => {
+  const { field, submit, type } = await open({ note: 'x', shade: 'dark' })
+
+  await type('story', 'a')
+  server([{ path: 'shade', message: 'Shade is not valid' }])
+  await submit()
+  expect(field('shade').hidden).toBe(false)
+
+  field('shade').dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+  await type('shade', 'light')
+  expect(field('shade').hidden).toBe(false)
+  field('shade').dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+  await settle()
+  expect(field('shade').hidden).toBe(true)
+})
+
+test('a refusal of the body surfaces no field', async () => {
+  const { field, submit, type } = await open({ note: 'x', shade: 'dark' })
+
+  await type('story', 'a')
+  server([{ path: '', body: true, message: 'The body is not valid' }])
+  await submit()
+  expect(field('shade').hidden).toBe(true)
 })
 
 test('an integer refuses the keys of a decimal or an exponent, and a pasted decimal shows the figure kept at once', async () => {

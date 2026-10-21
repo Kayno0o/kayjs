@@ -98,14 +98,18 @@ function typedLines(next: string): void {
 // A field waiting for a sibling shows once that holds a value.
 const parent = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : ''
 const filled = (found: unknown) => found !== undefined && found !== null && found !== '' && found !== false && !(Array.isArray(found) && found.length === 0)
-// A field the schema refused, or one of its children, is shown whatever its sibling holds, and stays so: a save cannot be fixed through a field that stays hidden, and an edit drops the issue that surfaced it.
+// A field the schema refused, or one of its children, is shown whatever its sibling holds, and stays so while it is edited: a save cannot be fixed through a field that stays hidden, and an edit drops the issue that surfaced it.
+// Once the refusal is gone and the focus has left it, the field waits for its sibling again. A refusal of the body or of the slug names no field.
 const surfaced = signal(false)
-const refused = () => drafts.issues(entry).some(found => found.path === path || found.path.startsWith(`${path}.`))
+const inside = signal(false)
+const refused = () => drafts.issues(entry).some(found => found.body !== true && found.key === undefined && (found.path === path || found.path.startsWith(`${path}.`)))
 const shown = () => field.when === undefined || surfaced() || filled(drafts.value(entry, joinPath(parent, field.when)))
 
 effect(() => {
   if (refused())
     surfaced = true
+  else if (!inside())
+    surfaced = false
 })
 
 // What a limited text says of its length.
@@ -304,7 +308,7 @@ function leaveJson(): void {
 }
 
 ---
-.kcms-field(data-kcms-path={path} id={fieldId(entry, `f:${path}`)} hidden={!shown()})
+.kcms-field(data-kcms-path={path} id={fieldId(entry, `f:${path}`)} hidden={!shown()} onFocusIn={() => { inside = true }} onFocusOut={(event) => { if (!(event.currentTarget as Element).contains(event.relatedTarget as Node | null)) inside = false }})
   const current = field
   match current.kind
     when 'boolean'

@@ -75,6 +75,8 @@ test('a date, a date and time and a select take required, and a date or time emp
   expect(issueOf('moment')).toBe('Moment is required')
   await change('kind', 'b', 'change')
   expect(issueOf('kind')).toBeUndefined()
+  await change('kind', '', 'change')
+  expect(issueOf('kind')).toBe('Kind is required')
 })
 
 test('a pattern anchored at both ends is the attribute, any other is left to the form\'s own check', async () => {

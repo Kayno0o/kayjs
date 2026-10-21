@@ -377,6 +377,10 @@ describe('htmlPattern', () => {
     expect(htmlPattern('^[a-z-]$')).toBeUndefined()
     expect(htmlPattern('^[a|b]$')).toBeUndefined()
     expect(htmlPattern('^(a$')).toBeUndefined()
+    // Read as the literal `p{L}` with no flag, as a letter class with the u or v flag.
+    expect(htmlPattern('^\\p{L}+$')).toBeUndefined()
+    expect(htmlPattern('^\\u{1F600}$')).toBeUndefined()
+    expect(htmlPattern('^😀$')).toBeUndefined()
     expect(htmlPattern(undefined)).toBeUndefined()
   })
 })

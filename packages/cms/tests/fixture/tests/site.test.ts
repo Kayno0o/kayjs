@@ -2,12 +2,13 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, setSystemTime, test } from 'bun:test'
+import { saveEntry } from 'kay/content'
 import { files } from 'kay/server'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
 import { entryScreen, listScreen } from '../../../src/screens'
-import { footerDown, outage, products, shop } from '../src/products'
+import { footerDown, ledgerRows, outage, products, shop } from '../src/products'
 import { saved } from '../src/saved'
 
 const ROOT = join(import.meta.dir, '..')
@@ -60,7 +61,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Ledger', '/admin/collections/ledger'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -1142,3 +1143,10 @@ test('an editor who opened the screens finds the link on a page they read and la
   expect(await page.evaluate(selector => document.querySelector(selector), link)).toBeNull()
   expect(page.errors).toEqual([])
 }, 60_000)
+
+test('saveEntry stores a null for a required field that allows it, and refuses the field left out', async () => {
+  expect(await saveEntry('ledger', { slug: 'first', data: { name: 'First', note: null } })).toEqual({})
+  expect(ledgerRows).toEqual([{ slug: 'first', data: { name: 'First', note: null } }])
+  expect(await saveEntry('ledger', { slug: 'second', data: { name: 'Second' } })).toMatchObject({ issues: [{ collection: 'ledger', slug: 'second', path: 'note' }] })
+  expect(ledgerRows).toHaveLength(1)
+})
