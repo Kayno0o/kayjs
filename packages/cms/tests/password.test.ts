@@ -65,7 +65,7 @@ describe('the password guard\'s sign-in cookie', () => {
   })
 
   test('refuses a cookie past its date, and one signed for another password', async () => {
-    const short = new Passwords({ editor: 'pw-editor' }, 1)
+    const short = new Passwords({ editor: 'pw-editor' }, '1s')
     const cookie = short.issue('editor', false)
 
     expect(short.read(cookie.value)).toBe('editor')
@@ -88,7 +88,7 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(() => passwordGuard({ editor: 'ok', admin: '' })).toThrow('admin')
     expect(() => passwordGuard({})).toThrow('takes a password')
     expect(() => passwordGuard({ 'a.b': 'x' })).toThrow('letters, digits')
-    expect(() => passwordGuard('x', { maxAge: 'soon' })).toThrow()
+    expect(() => passwordGuard('x', { maxAge: 'soon' as never })).toThrow()
   })
 
   test('signing out ends the sign-in for a copy of the cookie too, and only that one', () => {

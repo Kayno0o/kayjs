@@ -84,7 +84,7 @@ describe('publicCache', () => {
   })
 
   it('keeps revalidating the files a glob gives 0, whatever their kind', async () => {
-    const app = await appWith({ publicCache: { '/fonts/**': 0, '**/*.png': 0 }, dev: false })
+    const app = await appWith({ publicCache: { '/fonts/**': '0s', '**/*.png': '0s' }, dev: false })
 
     expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     expect((await fetchFrom(app, '/img/logo.png')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
@@ -96,7 +96,7 @@ describe('publicCache', () => {
 
   it('refuses a duration that is none in development too', async () => {
     // A development server that fails to boot serves the reason instead.
-    const html = await (await fetchFrom(await appWith({ publicCache: { '/x': -1 }, dev: true }), '/')).text()
+    const html = await (await fetchFrom(await appWith({ publicCache: { '/x': -1 as never }, dev: true }), '/')).text()
 
     expect(html).toContain('Boot failed')
     expect(html).toContain('publicCache[')

@@ -334,7 +334,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
       routes: 'tests/fixtures/analytics-consent/src/routes',
       browser: { path },
       onError: () => undefined,
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { notice: false, maxAge: 1234 } })],
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { notice: false, maxAge: '1234s' } })],
     })
     opened = await own.open('/')
   }, 60_000)

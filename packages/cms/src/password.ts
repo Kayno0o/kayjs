@@ -1,4 +1,4 @@
-import type { Guard } from 'kay'
+import type { Duration, Guard } from 'kay'
 import type { LazyGuard } from 'kay/library'
 import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
 import { guard } from 'kay'
@@ -15,7 +15,7 @@ const KEY_SALT = 'kayjs-cms/password/v1:'
 
 export interface PasswordOptions {
   // How long a sign-in lasts, `'14d'` by default.
-  maxAge?: string | number | undefined
+  maxAge?: Duration | undefined
   // Mixed into the key the cookie is signed with, so the same password on another site signs in nowhere else; the app's own secret from the environment.
   secret?: string | undefined
 }
@@ -40,7 +40,7 @@ export class Passwords {
   private readonly seconds: number
   private lastIssued = 0
 
-  constructor(passwords: Record<string, string>, maxAge: string | number, secret = '') {
+  constructor(passwords: Record<string, string>, maxAge: Duration, secret = '') {
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
     const entries = Object.entries(passwords)

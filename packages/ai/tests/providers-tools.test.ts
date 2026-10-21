@@ -38,7 +38,7 @@ async function collect(source: AsyncIterable<Piece>): Promise<Piece[]> {
 }
 
 const SPEC = { name: 'add_note', description: 'Add note', inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] } }
-const BASE: ProviderRequest = { messages: [{ role: 'user', content: 'Add milk' }], system: 'Be brief', model: 'm', maxTokens: 50, temperature: undefined, timeouts: { connect: 5000, idle: 5000 }, tools: [SPEC] }
+const BASE: ProviderRequest = { messages: [{ role: 'user', content: 'Add milk' }], system: 'Be brief', model: 'm', maxTokens: 50, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' }, tools: [SPEC] }
 const AFTER: ProviderRequest = {
   ...BASE,
   messages: [

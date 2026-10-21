@@ -221,7 +221,7 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
     const key = await visitorKey(settings.key, asker)
 
     if (limit && key !== undefined) {
-      const window = checked(await bounded(async () => limit.store.hit(`ai:limit\n${key}`, limit.ms)))!
+      const window = checked(await bounded(async () => limit.store.hit(`ai:limit\n${key}`, `${limit.ms}ms`)))!
 
       if (window.count > limit.max)
         throw limited('asks', window.resetAt)
@@ -274,12 +274,12 @@ function hold(names: string[], tokens: number): () => void {
 async function record(budget: NonNullable<Settings['budget']>, key: string | undefined, used: number): Promise<void> {
   try {
     const windows = await bounded(async () => Promise.all([
-      key === undefined ? undefined : budget.store.hit(`ai:budget\n${key}`, budget.ms, used),
-      budget.total === undefined ? undefined : budget.store.hit(TOTAL, budget.ms, used),
+      key === undefined ? undefined : budget.store.hit(`ai:budget\n${key}`, `${budget.ms}ms`, used),
+      budget.total === undefined ? undefined : budget.store.hit(TOTAL, `${budget.ms}ms`, used),
     ]))
 
     if (windows.some(window => window !== undefined && window.count < used))
-      log.error(`the budget's store counted less than the ${used} tokens of a reply; its hit(key, windowMs, weight) must add weight to the count`)
+      log.error(`the budget's store counted less than the ${used} tokens of a reply; its hit(key, window, weight) must add weight to the count`)
   }
   catch (error) {
     log.error(`${used} tokens could not be counted against the budget`, error)

@@ -1,4 +1,4 @@
-import type { DurationText } from 'kay'
+import type { Duration } from 'kay'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { configError, optionMs } from 'kay/library'
@@ -179,7 +179,7 @@ interface ForgejoSettings {
   // A token allowed to write the repository's contents.
   token: string
   // How long a save may take, its requests to the forge together, before it fails: `'15s'` by default. The extra read naming the file's version after a conflict has its own.
-  timeout?: DurationText | undefined
+  timeout?: Duration | undefined
   fetch?: typeof fetch | undefined
 }
 

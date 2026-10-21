@@ -45,6 +45,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 #### Rate limits
 
+
 - `rateLimit` lets one client post `max` times every `window`, then answers 429 with `Retry-After`; counting, keys and stores are in [Rate limits](rate-limits.md#on-an-action).
 
 #### Honeypot

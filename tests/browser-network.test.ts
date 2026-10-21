@@ -103,7 +103,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     })
 
     expect(await page.waitForResponse('/stream', { complete: false })).toMatchObject({ status: 200, complete: false })
-    await expect(page.waitForResponse('/stream', { timeout: 100 })).rejects.toThrow('timed out')
+    await expect(page.waitForResponse('/stream', { timeout: '100ms' })).rejects.toThrow('timed out')
     await page.evaluate(() => (window as { events?: EventSource }).events!.close())
   })
 
@@ -124,7 +124,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     })
 
     expect((await waiting).status).toBe(200)
-    await expect(page.waitForResponse('/never', { timeout: 100 })).rejects.toThrow('timed out after 100ms waiting for a response matching /never')
+    await expect(page.waitForResponse('/never', { timeout: '100ms' })).rejects.toThrow('timed out after 100ms waiting for a response matching /never')
   })
 
   it('answers a request with a response of its own, by path, URL pattern, RegExp or function', async () => {
@@ -308,7 +308,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(await page.evaluate(() => document.querySelector('.box')!.matches(':hover'))).toBe(true)
     expect(await page.evaluate(() => (window as { entered?: number }).entered)).toBe(1)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.box')!).backgroundColor)).toBe('rgb(204, 0, 0)')
-    await expect(page.hover('.nothing', { timeout: 100 })).rejects.toThrow('timed out after 100ms waiting for .nothing')
+    await expect(page.hover('.nothing', { timeout: '100ms' })).rejects.toThrow('timed out after 100ms waiting for .nothing')
   })
 
   it('lets a request go that the page cancels while it is paused, and reports nothing', async () => {
@@ -443,7 +443,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
   })
 
   it('ends after its bound on a page that never finishes loading, inside the timeout', async () => {
-    const stalled = await browse(`${origin}/`, { timeout: 5000 })
+    const stalled = await browse(`${origin}/`, { timeout: '5000ms' })
 
     // A request that never answers keeps the next document loading.
     await stalled.route('/hang.png', async () => new Promise<void>(() => undefined))

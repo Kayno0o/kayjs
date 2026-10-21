@@ -297,7 +297,7 @@ if (result.ok)
   console.log(result.token)
 ```
 
-`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `expiresIn` is seconds or a string such as `'30d'`; a token expires after 90 days without it, and `expiresIn: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
+`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `expiresIn` is a string such as `'30d'`; a token expires after 90 days without it, and `expiresIn: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
 
 Control characters are removed from a token's label and from a passkey's name.
 

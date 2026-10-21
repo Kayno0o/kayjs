@@ -299,7 +299,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('clicks a page with JavaScript off only where a click would reach the element', async () => {
-    const plain = await site.open('/', { javaScript: false, timeout: 500 })
+    const plain = await site.open('/', { javaScript: false, timeout: '500ms' })
 
     try {
       await plain.evaluate(() => {
@@ -316,7 +316,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('clicks an element covered at the centre of the view or of its own box, and names what covers one it cannot reach', async () => {
     for (const javaScript of [true, false]) {
-      const own = await site.open('/', { javaScript, timeout: 1500 })
+      const own = await site.open('/', { javaScript, timeout: '1500ms' })
 
       try {
         await own.evaluate(() => {
@@ -353,7 +353,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('names an element no alignment brings into the view as out of view', async () => {
     for (const javaScript of [true, false]) {
-      const own = await site.open('/', { javaScript, timeout: 600 })
+      const own = await site.open('/', { javaScript, timeout: '600ms' })
 
       try {
         // Above the top of the page, where no scroll reaches.
@@ -370,7 +370,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('waits for an element to keep still before it clicks a point other than its middle', async () => {
-    const own = await site.open('/', { timeout: 3000 })
+    const own = await site.open('/', { timeout: '3000ms' })
 
     try {
       // A thin strip covers the middle of the link's box, so the click is aimed at another point of it while it slides.
@@ -406,7 +406,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('clicks an element of a page with JavaScript off that draws a declarative shadow root, and names what covers it', async () => {
-    const plain = await site.open('/', { javaScript: false, timeout: 500 })
+    const plain = await site.open('/', { javaScript: false, timeout: '500ms' })
 
     try {
       await plain.evaluate(() => {
@@ -468,7 +468,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
       uploading.close()
     }
 
-    const quick = await site.open('/posted', { timeout: 300 })
+    const quick = await site.open('/posted', { timeout: '300ms' })
 
     try {
       await expect(quick.upload('nothing-here', file)).rejects.toThrow('timed out')
@@ -489,12 +489,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(await page.evaluate((first: string, second?: string) => [first, second === undefined], 'a', undefined)).toEqual(['a', true])
 
     // A wait that times out names what it waited for.
-    await expect(page.waitFor('p.nothing', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for p.nothing')
-    await expect(page.waitFor('h1', { text: 'Nope', timeout: 100 })).rejects.toThrow('waiting for h1 with text "Nope"')
+    await expect(page.waitFor('p.nothing', { timeout: '100ms' })).rejects.toThrow('kay: timed out after 100ms waiting for p.nothing')
+    await expect(page.waitFor('h1', { text: 'Nope', timeout: '100ms' })).rejects.toThrow('waiting for h1 with text "Nope"')
 
     // A condition that keeps throwing is named as never held, as one calling a helper of the test does.
-    await expect(page.waitUntil(() => elsewhere(), { timeout: 100 })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
-    await expect(page.waitUntil(() => false, { timeout: 100 })).rejects.toThrow(/to hold$/)
+    await expect(page.waitUntil(() => elsewhere(), { timeout: '100ms' })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
+    await expect(page.waitUntil(() => false, { timeout: '100ms' })).rejects.toThrow(/to hold$/)
     // Thrown once, as by a page swap in flight, then only false: the error is over.
     await expect(page.waitUntil(() => {
       const counted = window as unknown as { polls?: number }
@@ -505,7 +505,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
         throw new Error('Swapping')
 
       return false
-    }, { timeout: 200 })).rejects.toThrow(/to hold$/)
+    }, { timeout: '200ms' })).rejects.toThrow(/to hold$/)
   })
 
   it('answers the next call once a wait timed out on a try the page was still running, as on a slow machine', async () => {
@@ -515,7 +515,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
       while (Date.now() < end);
 
       return false
-    }, { timeout: 50 })).rejects.toThrow(/to hold$/)
+    }, { timeout: '50ms' })).rejects.toThrow(/to hold$/)
     expect(await page.evaluate(() => 1)).toBe(1)
   })
 
@@ -535,7 +535,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     await page.click('a.far')
     await page.waitUntil(() => location.hash === '#far')
     expect(page.errors).toEqual([])
-    await expect(page.click('a.nowhere', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
+    await expect(page.click('a.nowhere', { timeout: '100ms' })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
   })
 
   it('replays a click on an island hydrating once visible after its onMount ran, again after a reload restoring the scroll to it', async () => {

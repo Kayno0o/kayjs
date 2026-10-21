@@ -1,8 +1,10 @@
 import type { KayExtension } from '../config'
+import type { Duration } from '../runtime/duration'
 import type { HeadTag } from '../runtime/head'
 import type { Words } from './analytics-words'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
+import { wholeSeconds } from '../runtime/duration'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 import { SHIPPED_WORDS } from './analytics-words'
 
@@ -22,8 +24,8 @@ export interface AnalyticsConsent {
   refuse?: AnalyticsText | undefined
   // The link to the privacy policy, `Privacy policy` by default.
   policy?: AnalyticsText | undefined
-  // How long the visitor's answer, a refusal as much as a yes, is remembered, in seconds: 180 days by default and 13 months at most, the CNIL's ceiling.
-  maxAge?: number | undefined
+  // How long the visitor's answer, a refusal as much as a yes, is remembered: 180 days by default and 13 months at most, the CNIL's ceiling.
+  maxAge?: Duration | undefined
   // `false` shows no notice and opens none from `data-analytics-consent`: the app asks in its own UI and answers with `consent.set('yes')` from `kay/analytics`, while the server still forwards nothing without the yes.
   notice?: boolean | undefined
 }
@@ -166,6 +168,16 @@ const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
 // The providers that wait for a yes unless the app wrote `consent: false`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
+// The seconds a consent lasts, NaN for what is no positive duration.
+function consentSeconds(age: unknown): number {
+  try {
+    return wholeSeconds(age, 'consent.maxAge')
+  }
+  catch {
+    return Number.NaN
+  }
+}
+
 // Whether a visit waits for the visitor's yes: the app's `consent`, else the provider's default.
 export function isGated(options: AnalyticsOptions): boolean {
   return options.consent === undefined ? ASKS_BY_DEFAULT.has(options.provider) : options.consent !== false
@@ -192,7 +204,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     ...asking ? { 'data-consent': '', ...given.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
     'data-texts': JSON.stringify(named),
     'data-provider': name,
-    'data-max-age': String(given.maxAge ?? CONSENT_MAX_AGE),
+    'data-max-age': String(given.maxAge === undefined ? CONSENT_MAX_AGE : wholeSeconds(given.maxAge, 'consent.maxAge')),
     ...options.policyUrl !== undefined && { 'data-policy': options.policyUrl },
   }
   const counting = options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'
@@ -304,8 +316,8 @@ function checked(options: AnalyticsOptions): void {
 
   const age = typeof options.consent === 'object' ? options.consent.maxAge : undefined
 
-  if (age !== undefined && !(Number.isInteger(age) && age > 0 && age <= MAX_CONSENT_AGE))
-    refuse(`consent.maxAge is a number of seconds up to 13 months (${MAX_CONSENT_AGE}); got ${JSON.stringify(age)}`)
+  if (age !== undefined && !(consentSeconds(age) <= MAX_CONSENT_AGE))
+    refuse(`consent.maxAge is a duration up to 13 months, such as '180d'; got ${JSON.stringify(age)}`)
 
   if (options.exclude !== undefined && (!Array.isArray(options.exclude) || options.exclude.some(path => typeof path !== 'string' || !path.startsWith('/') || path === '/')))
     refuse(`exclude is a list of paths starting with /, such as ['/account']; got ${JSON.stringify(options.exclude)}`)

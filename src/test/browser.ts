@@ -1,4 +1,5 @@
 import type { AxeResults } from '../runtime/dev-a11y'
+import type { Duration } from '../runtime/duration'
 import type { Network, PageResponse } from './network'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -7,6 +8,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
+import { legacyMs } from '../runtime/duration'
 import { ISLAND } from '../runtime/markers'
 import { createNetwork } from './network'
 
@@ -15,8 +17,8 @@ export interface BrowserOptions {
   path?: string | undefined
   width?: number | undefined
   height?: number | undefined
-  // How long a page waits for an element, a condition or a navigation, in milliseconds.
-  timeout?: number | undefined
+  // How long a page waits for an element, a condition or a navigation, 5 seconds by default.
+  timeout?: Duration | undefined
   // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
   strict?: boolean | undefined
   // A page that does not settle within the timeout, loaded and hydrated, is returned as it stands with the reason in `errors`, instead of failing the call.
@@ -50,7 +52,7 @@ export function cookiePairs(cookies: BrowserOptions['cookies']): { name: string,
 }
 
 export interface WaitOptions {
-  timeout?: number | undefined
+  timeout?: Duration | undefined
 }
 
 export interface ClickOptions extends WaitOptions {
@@ -248,7 +250,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     throw new Error(given !== undefined && given !== '' ? `kay: no browser at ${given}` : 'kay: browser tests need Chrome or Chromium, and none was found; install one, or give its path as the `path` option or `BUN_CHROME_PATH`')
   }
 
-  const timeout = options.timeout ?? TIMEOUT_MS
+  const timeout = options.timeout === undefined ? TIMEOUT_MS : legacyMs(options.timeout, 'the browser timeout')
   const strict = options.strict ?? true
   const errors: string[] = []
   const warnings: string[] = []
@@ -366,6 +368,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   // Polls the page, reading an error as not yet: the page may be between two documents.
+  // The milliseconds of a call's own `timeout`, undefined for the page's.
+  const waitMs = (value: Duration | undefined) => value === undefined ? undefined : legacyMs(value, 'timeout')
   const poll = async (expression: string, wanted: string, wait = timeout) => {
     const until = Date.now() + wait
     // Why the last try failed, if it threw: a page swap in flight throws once, a condition naming a test variable every time.
@@ -566,7 +570,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     hover: async (selector, wait = {}) => serial(async () => {
       await untilLoaded()
-      await poll(script(scrolledTo, [selector, true]), selector, wait.timeout)
+      await poll(script(scrolledTo, [selector, true]), selector, waitMs(wait.timeout))
 
       const [x, y] = await center(selector)
 
@@ -600,7 +604,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     click: async (selector, { modifiers, ...wait } = {}) => serial(async () => {
       await untilLoaded()
 
-      const budget = wait.timeout ?? timeout
+      const budget = waitMs(wait.timeout) ?? timeout
       const until = Date.now() + budget
       // Why the last try could not click, which a budget running out on the next scroll reports rather than the scroll's own wait.
       let refused: Error | undefined
@@ -694,7 +698,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     waitFor: async (selector, wait = {}) => serial(async () => {
       const found = script((css: string, text?: string) => [...document.querySelectorAll(css)].some(element => text === undefined || element.textContent?.includes(text)), [selector, wait.text])
 
-      await poll(wait.gone ? `!${found}` : found, `${selector}${wait.text === undefined ? '' : ` with text "${wait.text}"`}${wait.gone ? ' to be gone' : ''}`, wait.timeout)
+      await poll(wait.gone ? `!${found}` : found, `${selector}${wait.text === undefined ? '' : ` with text "${wait.text}"`}${wait.gone ? ' to be gone' : ''}`, waitMs(wait.timeout))
     }),
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
@@ -726,7 +730,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       return violations
     }),
-    waitUntil: async (condition, wait = {}, ...args) => serial(async () => poll(script(condition, args), 'the condition to hold', wait.timeout)),
+    waitUntil: async (condition, wait = {}, ...args) => serial(async () => poll(script(condition, args), 'the condition to hold', waitMs(wait.timeout))),
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {

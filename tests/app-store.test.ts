@@ -1,4 +1,4 @@
-import type { Action } from '../src/runtime'
+import type { Action, Duration } from '../src/runtime'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
@@ -13,10 +13,10 @@ function counting() {
   const store = memoryRates()
   const seen: string[] = []
 
-  return { seen, store: { hit: (key: string, ms: number, weight?: number) => {
+  return { seen, store: { hit: (key: string, window: Duration, weight?: number) => {
     seen.push(key)
 
-    return store.hit(key, ms, weight)
+    return store.hit(key, window, weight)
   }, peek: store.peek } }
 }
 

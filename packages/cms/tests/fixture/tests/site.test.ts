@@ -1237,7 +1237,7 @@ test('an entry\'s screen carries a presence proof for its entry\'s room and the 
 })
 
 // The phone-size tests close a tab on this entry's screen, which leaves its room after the grace and a heartbeat.
-const SETTLED = { timeout: 15_000 }
+const SETTLED = { timeout: '15s' } as const
 
 test('two tabs on one entry\'s screen name each other, and the one left is told when the other closes', async () => {
   const built = await browser()
@@ -1255,7 +1255,7 @@ test('two tabs on one entry\'s screen name each other, and the one left is told 
   await Bun.sleep(300)
   expect(await ann.evaluate(text)).toBe('Also open: Bob')
   bob.close()
-  await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '', { timeout: 15_000 })
+  await ann.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '', { timeout: '15s' })
 
   expect(await ann.evaluate(text)).toBe('')
   expect(ann.errors).toEqual([])

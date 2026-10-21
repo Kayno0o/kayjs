@@ -5,7 +5,7 @@ import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
-import { wholeSeconds } from '../runtime/duration'
+import { optionMs, wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
@@ -21,8 +21,8 @@ export type SessionData = Record<string, unknown>
 // Where sessions live when the cookie only carries their id; each method may answer synchronously or with a promise.
 export interface SessionStore {
   get: (id: string) => SessionData | undefined | Promise<SessionData | undefined>
-  // `maxAge` in seconds: past it the store may forget the session.
-  set: (id: string, data: SessionData, maxAge: number) => void | Promise<void>
+  // Past `maxAge`, such as `'90d'`, the store may forget the session.
+  set: (id: string, data: SessionData, maxAge: Duration) => void | Promise<void>
   delete: (id: string) => void | Promise<void>
   // Deletes every session whose data `match` returns true for, such as a person's once they asked to be erased or their password changed, resolving with how many went.
   deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
@@ -283,7 +283,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
     if (store) {
       this.id ??= nodeCrypto().randomBytes(32).toString('base64url')
-      await store.set(this.id, this.data, maxAge)
+      await store.set(this.id, this.data, `${maxAge}s`)
       sealed = { id: this.id, issued: now, started, ...this.own }
     }
 
@@ -385,7 +385,7 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 
       // Deleted first, so a session written again counts as the newest.
       sessions.delete(id)
-      sessions.set(id, { text: stringify(data), expires: now + maxAge * 1000 })
+      sessions.set(id, { text: stringify(data), expires: now + optionMs(maxAge, 'a session\x27s maxAge') })
 
       if (sessions.size > MOST_SESSIONS)
         sessions.delete(sessions.keys().next().value!)
@@ -530,7 +530,7 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
       if (++writes % SWEEP_EVERY === 0)
         sweep.run(Date.now())
 
-      upsert.run(id, stringify(data), Date.now() + maxAge * 1000)
+      upsert.run(id, stringify(data), Date.now() + optionMs(maxAge, 'a session\x27s maxAge'))
     },
     delete(id) {
       remove.run(id)

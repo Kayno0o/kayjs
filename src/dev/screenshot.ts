@@ -188,7 +188,7 @@ async function reach(url: URL): Promise<number> {
 }
 
 async function shoot(open: { page?: { close: () => void } }, root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean, cookies: { name: string, value: string }[]): Promise<{ shot: Shot, console: string[] }> {
-  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: shotLimits.settleMs, strict: false, lenient: true, colorScheme: scheme, cookies })
+  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: `${shotLimits.settleMs}ms`, strict: false, lenient: true, colorScheme: scheme, cookies })
 
   open.page = page
 

@@ -219,7 +219,7 @@ describe('the outbox helpers', () => {
 
     expect((await waiting).subject).toBe('This one')
     expect((await outbox.waitFor('bob@example.com')).subject).toBe('Not this one')
-    await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('no mail to carol@example.com reached the outbox within 50 ms')
+    await expect(outbox.waitFor('carol@example.com', { timeout: '50ms' })).rejects.toThrow('no mail to carol@example.com reached the outbox within 50 ms')
   })
 
   it('waits for a mail matching a predicate, running the site\'s queues until it is delivered, and lists what the outbox holds on failure', async () => {
@@ -239,8 +239,8 @@ describe('the outbox helpers', () => {
 
     expect((await outbox.waitFor('ada@example.com', { site, find: each => each.subject === 'Second' })).subject).toBe('Second')
     expect(runs).toBe(3)
-    await expect(outbox.waitFor('ada@example.com', { site, find: each => each.subject === 'Third', timeout: 0.05 })).rejects.toThrow('the outbox holds "First" to ada@example.com; "Second" to ada@example.com')
-    await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('"Second" to ada@example.com')
+    await expect(outbox.waitFor('ada@example.com', { site, find: each => each.subject === 'Third', timeout: '50ms' })).rejects.toThrow('the outbox holds "First" to ada@example.com; "Second" to ada@example.com')
+    await expect(outbox.waitFor('carol@example.com', { timeout: '50ms' })).rejects.toThrow('"Second" to ada@example.com')
   })
 
   it('runs the site\'s queues before taking a mail already there, so the one still queued is the newest', async () => {
@@ -264,7 +264,7 @@ describe('the outbox helpers', () => {
     await mail.send({ to: 'ada@example.com', subject: 'Wanted', text: 'Hi' })
 
     expect((await waiting).subject).toBe('Wanted')
-    await expect(outbox.waitFor('ada@example.com', { find: () => false, timeout: 0.05 })).rejects.toThrow('no mail to ada@example.com matching `find` reached')
+    await expect(outbox.waitFor('ada@example.com', { find: () => false, timeout: '50ms' })).rejects.toThrow('no mail to ada@example.com matching `find` reached')
   })
 
   it('reads a link and its token from a mail', async () => {
@@ -296,7 +296,7 @@ describe('the queue', () => {
         return { accepted: [], rejected: [] }
       },
     }
-    const queued = mailer({ from: 'q@example.com', transport: flaky, queue: { name: 'flaky-mail', backoff: 0.01 } })
+    const queued = mailer({ from: 'q@example.com', transport: flaky, queue: { name: 'flaky-mail', backoff: '10ms' } })
 
     await queued.enqueue({ to: 'ada@example.com', subject: 'Queued', view: Welcome, props: { name: 'Ada', url: URL } })
     expect(await queued.drain()).toBe(1)

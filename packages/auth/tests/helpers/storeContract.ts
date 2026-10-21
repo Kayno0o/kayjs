@@ -429,11 +429,11 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       for (const [id, version] of [['ended', 0], ['current', 1]] as const)
         await store.sessions.create({ id, userId: 'u2', version, userAgent: 'ua', ip: '127.0.0.1', createdAt: at(-1), lastSeenAt: at(-1), maxAge: null })
 
-      await store.attempts.hit('short', 60)
-      await store.attempts.hit('long', 7 * 24 * 3600)
+      await store.attempts.hit('short', '60s')
+      await store.attempts.hit('long', '604800s')
 
       setSystemTime(at(0))
-      await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })
+      await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: '2592000s', sessionAbsoluteMaxAge: '31536000s' })
 
       expect(await store.tokens.consume('old-link', 'verify-email')).toBeUndefined()
       expect(await store.tokens.consume('live-link', 'verify-email')).toBeDefined()
@@ -663,7 +663,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         await oauth.grants.upsert({ userId: 'u2', clientId: 'approved', clientName: 'Approved', scopes: null, createdAt: at(-30), lastUsedAt: null })
 
         setSystemTime(at(0))
-        await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })
+        await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: '2592000s', sessionAbsoluteMaxAge: '31536000s' })
 
         expect(await oauth.codes.use('old-code', at(0))).toBeUndefined()
         expect(await oauth.codes.use('live-code', at(0))).toBeDefined()
@@ -677,14 +677,14 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
     test('attempts count within their window, start over after it, and reset', async () => {
       expect(await store.attempts.count('k')).toBe(0)
-      expect(await store.attempts.hit('k', 60)).toBe(1)
-      expect(await Promise.all([store.attempts.hit('k', 60), store.attempts.hit('k', 60)])).toEqual(expect.arrayContaining([2, 3]))
+      expect(await store.attempts.hit('k', '60s')).toBe(1)
+      expect(await Promise.all([store.attempts.hit('k', '60s'), store.attempts.hit('k', '60s')])).toEqual(expect.arrayContaining([2, 3]))
       expect(await store.attempts.count('k')).toBe(3)
 
       setSystemTime(Date.now() + 61_000)
 
       expect(await store.attempts.count('k')).toBe(0)
-      expect(await store.attempts.hit('k', 60)).toBe(1)
+      expect(await store.attempts.hit('k', '60s')).toBe(1)
 
       await store.attempts.reset('k')
 

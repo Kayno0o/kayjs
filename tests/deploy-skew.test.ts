@@ -458,7 +458,7 @@ async function staticHost(): Promise<Deploy> {
 }
 
 // What a wait for the page after a reload allows: a loaded host takes seconds to serve and run the chunks the reload fetches.
-const LOADED_MS = 40_000
+const LOADED_MS = '40s'
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab opened before a deploy', () => {
   let host: Deploy

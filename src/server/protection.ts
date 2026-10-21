@@ -8,7 +8,7 @@ import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
-import { durationSeconds } from '../runtime/duration'
+import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
@@ -119,8 +119,13 @@ function windowMs(rateLimit: { window: Duration }): number {
   return ms
 }
 
+// The window as the stores read it.
+function windowText(rateLimit: { window: Duration }): `${number}ms` {
+  return `${windowMs(rateLimit)}ms`
+}
+
 // Fixed windows per key in this process: enough to slow a script hammering a form, which is what a contact or login form needs.
-export function memoryRates(): { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
+export function memoryRates(): { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
   // Ordered by when each window opened, so the oldest come first.
   const windows = new Map<string, RateWindow>()
 
@@ -130,7 +135,7 @@ export function memoryRates(): { hit: (key: string, windowMs: number, weight?: n
 
       return window && window.resetAt > Date.now() ? { ...window } : undefined
     },
-    hit(key, windowMs, weight = 1) {
+    hit(key, length, weight = 1) {
       const now = Date.now()
       let window = windows.get(key)
 
@@ -140,7 +145,7 @@ export function memoryRates(): { hit: (key: string, windowMs: number, weight?: n
 
         // Moved to the end, as the newest window.
         windows.delete(key)
-        windows.set(key, window = { count: 0, resetAt: now + windowMs })
+        windows.set(key, window = { count: 0, resetAt: now + optionMs(length, 'a rate window') })
       }
 
       window.count += weight
@@ -217,13 +222,13 @@ export function sqliteRates(path: string): SyncRates {
 
   // The file is opened by the first call, so loading a config that names it, to build or check, creates nothing.
   return {
-    hit: (key, windowMs, weight) => (opened ??= openRates(path)).hit(key, windowMs, weight),
+    hit: (key, window, weight) => (opened ??= openRates(path)).hit(key, window, weight),
     peek: key => (opened ??= openRates(path)).peek(key),
   }
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-interface SyncRates { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
+interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -247,7 +252,7 @@ function openRates(path: string): OpenRates {
 
   return {
     close: () => db.close(),
-    hit(key, windowMs, weight = 1) {
+    hit(key, window, weight = 1) {
       const now = Date.now()
 
       if (now - swept > SWEEP_MS) {
@@ -255,7 +260,7 @@ function openRates(path: string): OpenRates {
         sweep.run(now)
       }
 
-      const row = hit.get(hashed(key), now, windowMs, weight)!
+      const row = hit.get(hashed(key), now, optionMs(window, 'a rate window'), weight)!
 
       return { count: row.count, resetAt: row.reset_at }
     },
@@ -279,11 +284,11 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
       if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
-      const window = await (limit.store ?? sharedRates(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
+      const window = await (limit.store ?? sharedRates(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), `${ms}ms`, weight)
 
       // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
-        throw new KayError('config-invalid', `kay: rateLimit('${name}')'s store ignores the weight of a hit; its hit(key, windowMs, weight) adds weight to the count`)
+        throw new KayError('config-invalid', `kay: rateLimit('${name}')'s store ignores the weight of a hit; its hit(key, window, weight) adds weight to the count`)
 
       return waitFor(window, limit.max)
     },
@@ -318,7 +323,7 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
   let wait: number | undefined
 
   for (const { name, limit } of limits) {
-    const own = waitFor(await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
+    const own = waitFor(await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, context), windowText(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -338,7 +343,7 @@ export function checkApiLimit(name: string, limit: ApiRateLimit): void {
     throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a key that is not a function; it takes a function of the request returning the string to count under`)
 
   if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
-    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a store without a hit(key, windowMs) method; give it a RateStore`)
+    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a store without a hit(key, window) method; give it a RateStore`)
 }
 
 // Seconds until the next attempt may go through, or undefined while under the limit.
@@ -447,7 +452,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
-    const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
+    const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowText(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -471,7 +476,7 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
   const client = clientAddress(request, server)
 
   for (const { name, limit } of limits)
-    await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
+    await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, undefined), windowText(limit))
 }
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
@@ -538,7 +543,7 @@ function filledIn(value: unknown): boolean {
 
 // Seconds until the client may try again under `name`, in this process's memory, or undefined while it is under the limit: for kay's own routes.
 export function overLimit(name: string, client: string, max: number, windowMs: number): number | undefined {
-  return waitFor(memoryOf(name).hit(limitKey(name, client), windowMs), max)
+  return waitFor(memoryOf(name).hit(limitKey(name, client), `${windowMs}ms`), max)
 }
 
 // The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.

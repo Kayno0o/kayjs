@@ -1,5 +1,5 @@
 import type { Timeouts } from './types'
-import { parseEvents } from 'kay/library'
+import { optionMs, parseEvents } from 'kay/library'
 import { AiError } from './errors'
 
 const MESSAGE_LIMIT = 200
@@ -77,7 +77,8 @@ export async function refusal(name: string, response: Response, secret?: string)
 export async function* postEvents(name: string, url: string, headers: Record<string, string>, body: unknown, timeouts: Timeouts, signal: AbortSignal, secret?: string): AsyncGenerator<ServerEvent> {
   let response: Response
   const connecting = new AbortController()
-  const timer = setTimeout(() => connecting.abort(), timeouts.connect)
+  const connect = optionMs(timeouts.connect, 'the connect timeout', 'kayjs-ai')
+  const timer = setTimeout(() => connecting.abort(), connect)
 
   try {
     response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'text/event-stream', ...headers }, body: JSON.stringify(body), signal: AbortSignal.any([signal, connecting.signal]), redirect: 'error' })
@@ -86,7 +87,7 @@ export async function* postEvents(name: string, url: string, headers: Record<str
     signal.throwIfAborted()
 
     if (connecting.signal.aborted)
-      throw new AiError('timeout', `${name} did not answer within ${timeouts.connect} ms`, { cause: error })
+      throw new AiError('timeout', `${name} did not answer within ${connect} ms`, { cause: error })
 
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
   }
@@ -106,7 +107,7 @@ export async function* postEvents(name: string, url: string, headers: Record<str
   if (response.body === null)
     throw new AiError('protocol', `${name} answered with no body`)
 
-  yield* eventsOf(name, response.body, timeouts.idle, signal)
+  yield* eventsOf(name, response.body, optionMs(timeouts.idle, 'the idle timeout', 'kayjs-ai'), signal)
 }
 
 // The events of a body one by one; the body is cancelled as the generator ends, so a reply stopped early stops the provider.

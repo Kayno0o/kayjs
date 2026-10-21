@@ -49,15 +49,15 @@ describe('a value restored from a store keeps what it was built from', () => {
     const before = await restart('before')
 
     before.trackLoads(async load => ({ result: await load(), reads: ['collection:news'] }))
-    expect(await before.cached('latest', 600, () => 'one', { store })).toBe('one')
+    expect(await before.cached('latest', '600s', () => 'one', { store })).toBe('one')
 
     const after = await restart('after')
     let loads = 0
     const load = () => ++loads
 
-    expect(await after.cached('latest', 600, () => 'restored', { store })).toBe('one')
+    expect(await after.cached('latest', '600s', () => 'restored', { store })).toBe('one')
     after.invalidate('collection:news')
-    expect(await after.cached('latest', 600, load, { store })).toBe(1)
+    expect(await after.cached('latest', '600s', load, { store })).toBe(1)
     expect(store.get('latest')?.text).not.toContain('collection:news')
   })
 
@@ -66,14 +66,14 @@ describe('a value restored from a store keeps what it was built from', () => {
     const before = await restart('early-before')
 
     before.trackLoads(async load => ({ result: await load(), reads: ['collection:news'] }))
-    await before.cached('latest', 600, () => 'one', { store })
+    await before.cached('latest', '600s', () => 'one', { store })
 
     const after = await restart('early-after')
 
     after.trackStore(store)
     after.invalidate('collection:news')
     expect(store.keys()).toEqual([])
-    expect(await after.cached('latest', 600, () => 'two', { store })).toBe('two')
+    expect(await after.cached('latest', '600s', () => 'two', { store })).toBe('two')
   })
 
   it('is dropped by any invalidation when it read more than the server tracks', async () => {
@@ -81,7 +81,7 @@ describe('a value restored from a store keeps what it was built from', () => {
     const before = await restart('all-before')
 
     before.trackLoads(async load => ({ result: await load(), reads: [before.ALL_READS] }))
-    await before.cached('many', 600, () => 'one', { store })
+    await before.cached('many', '600s', () => 'one', { store })
 
     const after = await restart('all-after')
 
@@ -95,11 +95,11 @@ describe('a value restored from a store keeps what it was built from', () => {
     const old = await restart('old')
 
     old.trackLoads(async load => ({ result: await load(), reads: [] }))
-    await old.cached('plain', 600, () => ({ n: 1 }), { store })
+    await old.cached('plain', '600s', () => ({ n: 1 }), { store })
 
     const after = await restart('plain-after')
 
-    expect(await after.cached('plain', 600, () => ({ n: 2 }), { store })).toEqual({ n: 1 })
+    expect(await after.cached('plain', '600s', () => ({ n: 2 }), { store })).toEqual({ n: 1 })
   })
 
   it('hands the reads to the page that hits the restored value', async () => {
@@ -107,13 +107,13 @@ describe('a value restored from a store keeps what it was built from', () => {
     const before = await restart('hands-before')
 
     before.trackLoads(async load => ({ result: await load(), reads: ['collection:news'] }))
-    await before.cached('latest', 600, () => 'one', { store })
+    await before.cached('latest', '600s', () => 'one', { store })
 
     const after = await restart('hands-after')
     const seen: string[] = []
 
     after.onRead(key => seen.push(key))
-    await after.cached('latest', 600, () => 'two', { store })
+    await after.cached('latest', '600s', () => 'two', { store })
     expect(seen).toEqual(['latest', 'collection:news'])
   })
 })
@@ -127,7 +127,7 @@ describe('a key invalidated in another process', () => {
     const untouched = fakePage(['other'])
 
     trackPrerendered(new Map([['/a', page], ['/b', untouched]]))
-    await cached('k', 600, () => 1, { store: mine.store })
+    await cached('k', '600s', () => 1, { store: mine.store })
 
     const before = invalidationCount()
 
@@ -173,7 +173,7 @@ describe('a render that newly reads a key invalidated while it runs', () => {
 
     await revalidateStale(page, async () => {
       renders++
-      await cached('built', 600, async () => {
+      await cached('built', '600s', async () => {
         noteRead('collection:news')
 
         if (loads === 0)
@@ -186,7 +186,7 @@ describe('a render that newly reads a key invalidated while it runs', () => {
     }, () => undefined)
 
     expect(renders).toBe(2)
-    expect(await cached('built', 600, () => 99)).toBe(2)
+    expect(await cached('built', '600s', () => 99)).toBe(2)
   })
 
   it('names the invalidation in what readsOf gives back', async () => {

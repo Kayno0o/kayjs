@@ -67,5 +67,5 @@ export async function verifyWork(solution: string | null | undefined, scope: str
 export function freshFieldWork(mark: string): string {
   const [scope = '', difficulty = '', maxAge = ''] = mark.split(':')
 
-  return `data-kay-work="${workChallenge(decodeURIComponent(scope), { difficulty: Number(difficulty), maxAge: Number(maxAge) / 1000 })}"`
+  return `data-kay-work="${workChallenge(decodeURIComponent(scope), { difficulty: Number(difficulty), maxAge: `${Number(maxAge)}ms` })}"`
 }

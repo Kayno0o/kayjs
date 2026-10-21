@@ -875,14 +875,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
     expect((await posted).requestHeaders['x-kay-page']).toBe(await page.path())
     // On a loaded CI host the post and the swap showing its answer can outlast the default wait.
-    await page.waitFor('p.done', { text: 'Added abcd', timeout: 20_000 })
+    await page.waitFor('p.done', { text: 'Added abcd', timeout: '20000ms' })
 
     expect(await page.count('form[aria-busy]')).toBe(0)
     expect(await sameDocument()).toBe(true)
 
     await page.fill('input[name="title"]', 'taken')
     await page.click('form button')
-    await page.waitFor('p.error', { text: 'Already taken', timeout: 20_000 })
+    await page.waitFor('p.error', { text: 'Already taken', timeout: '20000ms' })
 
     expect(await page.value('input[name="title"]')).toBe('taken')
     expect(await sameDocument()).toBe(true)
@@ -2040,7 +2040,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     const own = await browse(worker.origin, VIEWPORT)
 
     try {
-      await own.waitUntil(async () => (await navigator.serviceWorker.ready).active?.state === 'activated' && navigator.serviceWorker.controller !== null, { timeout: 10_000 })
+      await own.waitUntil(async () => (await navigator.serviceWorker.ready).active?.state === 'activated' && navigator.serviceWorker.controller !== null, { timeout: '10000ms' })
       await own.goto('/second')
       await stopSuiteServer(worker.server)
 

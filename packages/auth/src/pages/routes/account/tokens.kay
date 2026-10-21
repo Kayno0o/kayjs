@@ -11,11 +11,10 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
-const DAY = 24 * 60 * 60
 const EXPIRIES = [30, 90, 365]
 
 // Left out is the default, 0 is the form's "Never".
-const expiry = (days: number | undefined) => days === undefined ? undefined : days === 0 ? null : days * DAY
+const expiry = (days: number | undefined) => days === undefined ? undefined : days === 0 ? null : `${days}d` as const
 
 // The plain token comes back once, for the page to show it this one time.
 export const create = action(schemas.createToken, async (input, ctx) => {

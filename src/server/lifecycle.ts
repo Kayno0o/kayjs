@@ -11,7 +11,7 @@ import { reportBackgroundError } from './report'
 import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
-const DEFAULT_SHUTDOWN_TIMEOUT = 10
+const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
 const HEALTH_CACHE_MS = 3000
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.

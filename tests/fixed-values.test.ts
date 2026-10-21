@@ -29,7 +29,7 @@ describe('health.timeout', () => {
 
     try {
       const tight = await pages({ routes: ROUTES, prebuilt: false, health: { check: slow(300), timeout: '100ms' } })
-      const loose = await pages({ routes: ROUTES, prebuilt: false, health: { check: slow(300), timeout: 2 } })
+      const loose = await pages({ routes: ROUTES, prebuilt: false, health: { check: slow(300), timeout: '2s' } })
 
       expect((await tight.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
       expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('the health check took longer than 0.1 s')])
@@ -72,7 +72,7 @@ describe('health.timeout', () => {
     for (const timeout of [0, -1, '5 s', Number.NaN, '30d'])
       await expect(pages({ routes: ROUTES, prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
 
-    expect(await probeHealth({ timeout: 0 })).toBe(1)
+    expect(await probeHealth({ timeout: '0s' })).toBe(1)
   })
 
   it('makes the build\'s --health wait follow it, 10 s at least', () => {
@@ -98,7 +98,7 @@ describe('health.timeout', () => {
   it('is read by kay check', async () => {
     const problems = await check('tests/fixtures/production', configCheckOptions({ health: { timeout: '5 s' as never } }))
 
-    expect(problems.map(problem => problem.message)).toContain('kay: health.timeout is \'5 s\'; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\'')
+    expect(problems.map(problem => problem.message)).toContain('kay: health.timeout is \'5 s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\'')
   })
 })
 
@@ -152,7 +152,7 @@ describe('images.remote caps', () => {
   it('refuses a size or a timeout that is not positive', () => {
     expect(() => remoteLimits({ remoteMaxSize: 0 })).toThrow('images.remoteMaxSize is 0')
     expect(() => remoteLimits({ remoteMaxSize: '20 mb' as never })).toThrow('images.remoteMaxSize is \'20 mb\'')
-    expect(() => remoteLimits({ remoteTimeout: -1 })).toThrow('images.remoteTimeout is -1')
+    expect(() => remoteLimits({ remoteTimeout: -1 as never })).toThrow('images.remoteTimeout is -1')
   })
 })
 

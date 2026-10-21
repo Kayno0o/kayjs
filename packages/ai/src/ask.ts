@@ -39,8 +39,8 @@ function timeoutsOf(timeout: AskOptions['timeout']): Timeouts {
   const { connect = DEFAULT_CONNECT_TIMEOUT, idle = DEFAULT_IDLE_TIMEOUT } = timeout ?? {}
 
   return {
-    connect: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(connect, 'ask({ timeout }).connect') * 1000)),
-    idle: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(idle, 'ask({ timeout }).idle') * 1000)),
+    connect: `${Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(connect, 'ask({ timeout }).connect') * 1000))}ms`,
+    idle: `${Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(idle, 'ask({ timeout }).idle') * 1000))}ms`,
   }
 }
 

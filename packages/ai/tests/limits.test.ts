@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -55,10 +56,10 @@ function tracking() {
 
   return {
     keys,
-    hit: (key: string, windowMs: number, weight?: number) => {
+    hit: (key: string, window: Duration, weight?: number) => {
       keys.add(key)
 
-      return base.hit(key, windowMs, weight)
+      return base.hit(key, window, weight)
     },
     peek: base.peek,
     count: () => base.peek([...keys][0]!)?.count,
@@ -224,7 +225,7 @@ describe('ai({ rateLimit })', () => {
   })
 
   it('opens a fresh window once the last closed', async () => {
-    ai({ rateLimit: { max: 1, window: 1 } })
+    ai({ rateLimit: { max: 1, window: '1s' } })
     await ask('a', { key: 'v' })
     expect((await failure(ask('b', { key: 'v' }))).kind).toBe('limited')
     await Bun.sleep(1100)
@@ -444,7 +445,7 @@ describe('ai({ budget })', () => {
   })
 
   it('opens a fresh window once the last closed', async () => {
-    ai({ budget: { tokens: 3, window: 1 } })
+    ai({ budget: { tokens: 3, window: '1s' } })
     fakeAi.reply(usedBy(10))
     await ask('a', { key: 'v' })
     expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
@@ -455,7 +456,7 @@ describe('ai({ budget })', () => {
   it('counts a reply ending after its window rolled over in the new window', async () => {
     const store = tracking()
 
-    ai({ budget: { tokens: 1000, window: 1, store } })
+    ai({ budget: { tokens: 1000, window: '1s', store } })
 
     const reply = ask('a', { key: 'v', provider: { name: 's', model: 'm', async* stream() {
       yield { text: 'start' }

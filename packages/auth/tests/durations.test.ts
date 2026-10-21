@@ -11,8 +11,8 @@ afterEach(() => {
 })
 
 describe('time options take a Duration', () => {
-  test('rememberMaxAge takes a string or seconds and a bad one fails at boot naming it', async () => {
-    for (const rememberMaxAge of ['45d', 45 * 24 * 60 * 60] as const) {
+  test('rememberMaxAge takes a string, the bare seconds of before 1.70 still work, and a bad one fails at boot naming it', async () => {
+    for (const rememberMaxAge of ['45d' as never, 45 * 24 * 60 * 60 as never]) {
       const { browser, store } = testApp({ rememberMaxAge })
       const ada = browser()
 
@@ -21,11 +21,11 @@ describe('time options take a Duration', () => {
     }
 
     expect(() => testApp({ rememberMaxAge: '3 weeks' as Duration })).toThrow('kay: rememberMaxAge is \'3 weeks\'')
-    expect(() => testApp({ rememberMaxAge: 0 })).toThrow('kay: rememberMaxAge is 0')
+    expect(() => testApp({ rememberMaxAge: '0s' })).toThrow('kay: rememberMaxAge is \'0s\'')
   })
 
   test('a sub-second rememberMaxAge is stored as whole seconds, rounded up', async () => {
-    const { browser, store } = testApp({ rememberMaxAge: 0.4 })
+    const { browser, store } = testApp({ rememberMaxAge: '0.4s' })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
@@ -40,7 +40,7 @@ describe('time options take a Duration', () => {
 
       return base.users.staleGuests!(createdBefore, limit)
     } } }
-    const { browser } = testApp({ store, guests: { maxAge: 0.4 } })
+    const { browser } = testApp({ store, guests: { maxAge: '0.4s' } })
     const now = Date.now()
 
     setSystemTime(now)
@@ -57,7 +57,7 @@ describe('time options take a Duration', () => {
       cutoffs.push(before)
       await base.audit!.prune(before)
     } } }
-    const { browser } = testApp({ store, audit: { maxAge: 0.4 } })
+    const { browser } = testApp({ store, audit: { maxAge: '0.4s' } })
     const now = Date.now()
 
     setSystemTime(now)
@@ -81,9 +81,9 @@ describe('time options take a Duration', () => {
   })
 
   test('a limit window takes a string, handed to the store in seconds, and a bad one names its limit', async () => {
-    const windows: number[] = []
+    const windows: Duration[] = []
     const base = memoryStore()
-    const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: number) => {
+    const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: Duration) => {
       windows.push(window)
 
       return base.attempts.hit(key, window)
@@ -91,7 +91,7 @@ describe('time options take a Duration', () => {
     const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '2h' } } })
 
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    expect(windows).toContain(2 * 60 * 60)
+    expect(windows).toContain('7200s')
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('rateLimit.signIn.window is \'-5m\'')
   })
 
@@ -123,6 +123,6 @@ describe('time options take a Duration', () => {
     expect(minted.id).toBe(stored!.id)
     expect(stored!.expiresAt!.getTime() - Date.now()).toBeGreaterThan(30 * DAY_MS - 60_000)
     expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { expiresIn: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { expiresIn: 3600 })).toMatchObject({ ok: true })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { expiresIn: '3600s' })).toMatchObject({ ok: true })
   })
 })

@@ -136,7 +136,7 @@ kay and its libraries name the same idea the same way. A new option, export or f
 ### Options
 
 - `site` is the public address of the site, and it defaults to kay's own `site`. `name` is a display name.
-- A duration is a string with its unit, such as `'30s'` or `'5m'`. Every option, store argument and test helper takes this form, never a bare number.
+- A duration is a string with its unit, such as `'5m'` or `'250ms'`. Every option, store argument and test helper takes the same type, and `kay check --fix` rewrites an old bare number.
 - `maxAge` is how long something stays valid. `timeout` is how long to wait. `expires` is a date.
 - `maxSize` is a size limit. It takes bytes or a string such as `'2mb'`.
 - `rateLimit` sets a rate limit with `max` and `window`. `key` says who is counted. A library with several limits nests them under `rateLimit`.
@@ -170,6 +170,6 @@ kay and its libraries name the same idea the same way. A new option, export or f
 
 - A library lists with `list<Things>`, reads one with `get<Thing>`, revokes a credential with `revoke<Thing>`, and deletes a record with `delete<Thing>`. A call that can be refused returns `{ ok }`.
 - A kayjs-ui prop that picks a style is an enum: `variant`, `tone` or `size`. A pending state is `busy`. Open state is `open` with `onOpenChange`.
-- A command that writes takes `--dry-run`. `kay fmt --check` keeps the form every formatter uses. A command that prints takes `--quiet` and `--format`.
+- A command that writes takes `--dry-run`. A command that prints takes `--quiet` and `--format`.
 
 <ReadMore href="/llms/component-libraries">Using a library, pruned stylesheets, extension checks, layouts, the dev tool's classes and every option.</ReadMore>

@@ -267,7 +267,7 @@ describe('the caps set in docs/kay.config.ts', () => {
 
   it('refuses a visitor who used the daily tokens and lets another visitor ask', async () => {
     await fresh(async (store) => {
-      await store.hit(`ai:budget\naddress:${hashed('203.0.113.20')}`, DAY, TOKENS)
+      await store.hit(`ai:budget\naddress:${hashed('203.0.113.20')}`, `${DAY}ms`, TOKENS)
 
       await expect(asks('203.0.113.20')).rejects.toMatchObject({ status: 429 })
       expect(fakeAi.asked).toEqual([])
@@ -278,7 +278,7 @@ describe('the caps set in docs/kay.config.ts', () => {
 
   it('lets a visitor ask until the tokens used reach the budget, the answer that crosses it finishing', async () => {
     await fresh(async (store) => {
-      await store.hit(`ai:budget\naddress:${hashed('203.0.113.22')}`, DAY, TOKENS - 1)
+      await store.hit(`ai:budget\naddress:${hashed('203.0.113.22')}`, `${DAY}ms`, TOKENS - 1)
       await asks('203.0.113.22')
       expect(fakeAi.asked).toHaveLength(1)
       await expect(asks('203.0.113.22')).rejects.toMatchObject({ status: 429 })
@@ -300,7 +300,7 @@ describe('the caps set in docs/kay.config.ts', () => {
 
   it('refuses every visitor once the day\'s total is used, whoever they are', async () => {
     await fresh(async (store) => {
-      await store.hit('ai:budget\ntotal', DAY, TOTAL)
+      await store.hit('ai:budget\ntotal', `${DAY}ms`, TOTAL)
 
       await expect(asks('203.0.113.25')).rejects.toMatchObject({ status: 429 })
       await expect(asks('203.0.113.26')).rejects.toMatchObject({ status: 429 })

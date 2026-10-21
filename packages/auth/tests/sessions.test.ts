@@ -111,7 +111,7 @@ describe('sessions', () => {
   })
 
   test('a session unseen for longer than its lifetime is over, and dropped from the list', async () => {
-    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: 3600 }) })
+    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: '3600s' }) })
     const laptop = await signedIn()
     const phone = await signedIn('10.0.0.2', IPHONE)
 
@@ -131,7 +131,7 @@ describe('sessions', () => {
   })
 
   test('a session signed in longer than the session plugin\'s absoluteMaxAge ago is over, however often it was seen', async () => {
-    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: 3600, absoluteMaxAge: 7200 }) })
+    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: '3600s', absoluteMaxAge: '7200s' }) })
     const laptop = await signedIn()
 
     try {

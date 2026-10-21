@@ -70,7 +70,7 @@ An API route or module sets its own with `api({ rateLimit })` or the route's `de
 - Counts live in the process unless `store` names a shared one, for at most 10,000 windows per limit, the expired ones dropped first and the oldest past that.
 - `store: sqliteData(path)` in kay.config.ts (or `store: { rates }`) is where every limit naming no `store` counts, kay's own login-less routes aside, so one line shares the counts of all of them between replicas.
 - `rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }`, `sqliteRates` from `kay/server`, counts every process of the machine opening that file together, which stores each key pseudonymised as an HMAC keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set, else by a random key in `<path>.key` beside the file.
-- `RateStore`, a `hit(key, windowMs, weight)` method adding `weight` (one unless given) to the count and giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
+- `RateStore`, a `hit(key, window, weight)` method, `window` a `Duration` string such as `'60000ms'` (`durationMs` from `kay` turns it into milliseconds), adding `weight` (one unless given) to the count and giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
 
 ### Outside an action
 

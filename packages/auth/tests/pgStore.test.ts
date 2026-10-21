@@ -74,7 +74,7 @@ if (reachable) {
       const store = pgStore(db)
 
       await store.oauth!.refresh.deleteForUser('u1')
-      await store.prune!({ now: new Date(), bearerExpiredBefore: new Date(), sessionMaxAge: 60, sessionAbsoluteMaxAge: 60 })
+      await store.prune!({ now: new Date(), bearerExpiredBefore: new Date(), sessionMaxAge: '60s', sessionAbsoluteMaxAge: '60s' })
     }
     finally {
       await db.sync({ allowDestructive: true })

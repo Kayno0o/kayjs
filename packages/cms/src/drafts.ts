@@ -1,4 +1,4 @@
-import type { DurationText } from 'kay'
+import type { Duration } from 'kay'
 import type { DraftKeeper } from './draft-storage'
 import type { DraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
 import type { FieldPath } from './markers'
@@ -11,7 +11,7 @@ export interface DraftsOptions {
   // Renders the page with these entries in place of the saved ones: kay's `showDraft`.
   show: (entries: DraftEntry[]) => Promise<DraftResult>
   // How long typing pauses before the page renders again, `'150ms'` by default.
-  delay?: DurationText | undefined
+  delay?: Duration | undefined
   // Where unsaved edits are kept across a reload, a crash and a second tab: `browserKeeper()`. None keeps them in memory only.
   keep?: DraftKeeper | undefined
 }

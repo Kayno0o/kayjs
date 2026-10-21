@@ -614,6 +614,15 @@ export const LINTS = {
     wrong: 'forgejo({ url: \'https://git.example.com\', repo: \'me/site\', token })',
     right: 'forgejo({ baseUrl: \'https://git.example.com\', repo: \'me/site\', token })',
   },
+  'deprecated-bare-duration': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    typed: true,
+    summary: 'A bare number where a duration goes, the form before 1.70: a number of seconds in a kay or library option (`cached`\'s `ttl`, a session\'s `maxAge`, a `rateLimit`\'s `window`), milliseconds in a `kay/test` wait or a toast. Every duration is now a string with its unit, `\'250ms\'`, `\'30s\'`, `\'5m\'` or `\'7d\'`, so seconds and milliseconds are never mistaken. The number still works until 1.73; the fix writes a literal with the unit it stood for.',
+    wrong: 'export const profile = await cached("profile", 300, loadProfile)',
+    right: 'export const profile = await cached("profile", "5m", loadProfile)',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

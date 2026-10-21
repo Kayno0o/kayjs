@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 // An account as kayjs-auth stores it. The app sees a `User`, which leaves the secrets out.
 export interface UserRecord {
   id: string
@@ -125,7 +126,7 @@ export interface SessionRecord {
   ip: string
   createdAt: Date
   lastSeenAt: Date
-  // Seconds it lives unseen, as chosen at sign-in; null for `sessionMaxAge`.
+  // Seconds it lives unseen, as chosen at sign-in; null for `sessionMaxAge`. Kept as the number of seconds a store saves.
   maxAge: number | null
 }
 
@@ -384,8 +385,8 @@ export interface AuthStore {
   // Attempt counts, shared by every process the store is: a window starts with its first attempt.
   attempts: {
     count: (key: string) => MaybePromise<number>
-    // Counts one more attempt against `key`, in a window of `window` seconds when none is open; the count once raised.
-    hit: (key: string, window: number) => MaybePromise<number>
+    // Counts one more attempt against `key`, in a window of `window`, such as `'15m'`, when none is open; the count once raised.
+    hit: (key: string, window: Duration) => MaybePromise<number>
     reset: (key: string) => MaybePromise<void>
   }
   // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
@@ -396,10 +397,10 @@ export interface PruneLimits {
   now: Date
   // Bearer tokens expired before this go: the list shows an expired one for a while, so its owner sees why a device stopped working.
   bearerExpiredBefore: Date
-  // Seconds a session may go unseen: the longest lifetime any session was given.
-  sessionMaxAge: number
-  // Seconds since a session's sign-in, whatever its use.
-  sessionAbsoluteMaxAge: number
+  // How long a session may go unseen: the longest lifetime any session was given.
+  sessionMaxAge: Duration
+  // How long since a session's sign-in, whatever its use.
+  sessionAbsoluteMaxAge: Duration
 }
 
 export type MaybePromise<T> = T | Promise<T>

@@ -653,7 +653,7 @@ describe('clients nobody approved', () => {
 
     await ada.post('/call/oauthDecide', [params(used.body.client_id!), true])
     setSystemTime(Date.now() + 25 * 60 * 60 * 1000)
-    await app.store.prune!({ now: new Date(), bearerExpiredBefore: new Date(0), sessionMaxAge: 10 ** 9, sessionAbsoluteMaxAge: 10 ** 9 })
+    await app.store.prune!({ now: new Date(), bearerExpiredBefore: new Date(0), sessionMaxAge: '1000000000s', sessionAbsoluteMaxAge: '1000000000s' })
 
     expect(await app.store.oauth!.clients.get(unused.body.client_id!)).toBeUndefined()
     expect(await app.store.oauth!.clients.get(used.body.client_id!)).toBeDefined()

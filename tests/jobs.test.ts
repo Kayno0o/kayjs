@@ -1,3 +1,4 @@
+import type { Duration } from '../src/runtime'
 import type { JobStore } from '../src/server'
 import { mkdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -662,7 +663,7 @@ describe('schedule', () => {
     })
 
     it('refuses a timeout that is not a duration at boot, and takes false for no limit', () => {
-      expect(() => schedule('@hourly', () => undefined, { timeout: 0 })).toThrow('the timeout of the schedule @hourly is 0')
+      expect(() => schedule('@hourly', () => undefined, { timeout: '0s' })).toThrow('the timeout of the schedule @hourly is \'0s\'')
       expect(() => schedule('@hourly', () => undefined, { timeout: false })).not.toThrow()
     })
   })
@@ -826,8 +827,8 @@ describe('schedule every so long', () => {
 
     const store = memoryJobs()
     const runs: string[] = []
-    const first = new Elysia().use(schedule(2, () => runs.push('first'), { lock: 'sync', store })).listen(0)
-    const second = new Elysia().use(schedule(2, () => runs.push('second'), { lock: 'sync', store })).listen(0)
+    const first = new Elysia().use(schedule('2s', () => runs.push('first'), { lock: 'sync', store })).listen(0)
+    const second = new Elysia().use(schedule('2s', () => runs.push('second'), { lock: 'sync', store })).listen(0)
 
     try {
       for (let tick = 0; tick < 3; tick++) {
@@ -848,9 +849,9 @@ describe('schedule every so long', () => {
     const typed = (_build: () => unknown) => true
     const computed = (every: number) => every
 
-    expect(() => schedule(computed(0), () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
+    expect(() => schedule(computed(0) as never, () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
     expect(() => schedule('30s', () => undefined, { tz: 'UTC' } as object)).toThrow('the schedule 30s takes no tz')
-    expect(typed(() => [schedule(30, () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
+    expect(typed(() => [schedule('30s', () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
     // @ts-expect-error -- not positive
     expect(typed(() => schedule('0s', () => undefined))).toBe(true)
     // @ts-expect-error -- a time zone means nothing to a schedule running from the epoch
@@ -1702,9 +1703,9 @@ describe('queue', () => {
     ['attempts that is no whole number of at least 1', { attempts: 0 }, 'attempts is 0'],
     ['a concurrency that is no whole number of at least 1', { concurrency: 1.5 }, 'concurrency is 1.5'],
     ['a backoff that is no positive duration', { backoff: '0s' as never }, 'backoff'],
-    ['an idlePoll of 0', { idlePoll: 0 }, 'idlePoll'],
+    ['an idlePoll of 0', { idlePoll: '0s' as never }, 'idlePoll'],
     ['an idlePoll in milliseconds', { idlePoll: '500ms' as never }, 'idlePoll'],
-    ['an idlePoll shorter than the 1 s poll', { idlePoll: 0.5 }, 'idlePoll is 0.5; it takes a duration of at least 1 second'],
+    ['an idlePoll shorter than the 1 s poll', { idlePoll: '0.5s' as never }, 'idlePoll is 0.5s; it takes a duration of at least 1 second'],
   ])('refuses %s', (_name, options, message) => {
     expect(() => queue('x', () => undefined, options)).toThrow(message)
   })
@@ -1721,7 +1722,7 @@ describe('queue', () => {
     }
 
     // Starts a worker over a store counting its claims, and returns how many looks each second of fake time brings.
-    const watch = async (options: { idlePoll?: number, concurrency?: number, backoff?: number, handler?: (payload: string) => unknown }) => {
+    const watch = async (options: { idlePoll?: Duration, concurrency?: number, backoff?: Duration, handler?: (payload: string) => unknown }) => {
       const store = memoryJobs()
       const claim = store.claim.bind(store)
       const claims: number[] = []
@@ -1761,7 +1762,7 @@ describe('queue', () => {
       jest.useFakeTimers({ now: 0 })
 
       const idle = await watch({})
-      const steady = await watch({ idlePoll: 1 })
+      const steady = await watch({ idlePoll: '1s' })
 
       try {
         // One clock runs both queues.
@@ -1930,7 +1931,7 @@ describe('queue', () => {
       jest.useFakeTimers({ now: 0 })
 
       let runs = 0
-      const idle = await watch({ backoff: 2, handler: () => {
+      const idle = await watch({ backoff: '2s', handler: () => {
         if (++runs === 1)
           throw new Error('once')
       } })
@@ -1952,7 +1953,7 @@ describe('queue', () => {
     it('doubles its wait up to idlePoll, and starts over once a job runs', async () => {
       jest.useFakeTimers({ now: 0 })
 
-      const idle = await watch({ idlePoll: 5 })
+      const idle = await watch({ idlePoll: '5s' })
 
       try {
         await idle.advance(20_000)
@@ -1972,7 +1973,7 @@ describe('queue', () => {
     it('runs a job enqueued in the process at once, however long the wait', async () => {
       jest.useFakeTimers({ now: 0 })
 
-      const idle = await watch({ idlePoll: 60 })
+      const idle = await watch({ idlePoll: '60s' })
 
       try {
         await idle.advance(30_000)
@@ -1989,11 +1990,11 @@ describe('queue', () => {
     it('still wakes for a delayed job when it is due', async () => {
       jest.useFakeTimers({ now: 0 })
 
-      const idle = await watch({ idlePoll: 60 })
+      const idle = await watch({ idlePoll: '60s' })
 
       try {
         await idle.advance(30_000)
-        await idle.work.enqueue('later', { delay: 10 })
+        await idle.work.enqueue('later', { delay: '10s' })
         await idle.advance(9900)
         expect(idle.ran).toEqual([])
         await idle.advance(200)

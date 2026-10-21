@@ -72,7 +72,7 @@ describe('guests', () => {
   })
 
   test('guests are counted as registering', async () => {
-    const { browser } = setup({ rateLimit: { register: { max: 1, window: 3600 } } })
+    const { browser } = setup({ rateLimit: { register: { max: 1, window: '3600s' } } })
 
     expect(await browser().call('signInAsGuest')).toMatchObject({ ok: true })
     expect(await browser().call('signInAsGuest')).toEqual({ ok: false, error: 'limited' })

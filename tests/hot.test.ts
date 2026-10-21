@@ -10,7 +10,7 @@ import { browse, browserPath } from '../src/test'
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
 const browserInstalled = browserPath() !== undefined
 // Edits reach the page after a rebuild, which takes longer than a page's usual wait.
-const SLOW = 30_000
+const SLOW = '30s'
 // Inside the repository, so the project resolves `kay` to it.
 const scratch = join(import.meta.dir, '../node_modules/.cache')
 const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(list => list.slice(1))}) ${label}\nul.todos\n  for item of items() key={item}\n    li {item}\n`
@@ -412,7 +412,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.goto(`${await origin()}/live`)
     await page.waitFor('p.online', { text: '0 online' })
     await bump()
-    await page.waitFor('p.online', { text: '1 online', timeout: 10_000 })
+    await page.waitFor('p.online', { text: '1 online', timeout: '10000ms' })
 
     await Bun.write(join(root, 'src/live.ts'), 'import { live } from \'kay\'\n\nexport const visitors = live(0)\nexport const rooms = live((id: string) => id)\n')
 
@@ -420,9 +420,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.waitUntil(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/live\.ts: reloaded in \d+ ms$/).test(text)))
 
     expect(await bump()).toBe(2)
-    await page.waitFor('p.online', { text: '2 online', timeout: 10_000 })
+    await page.waitFor('p.online', { text: '2 online', timeout: '10000ms' })
     // The page reloaded with the server module, and follows again on its own.
     expect(await bump()).toBe(3)
-    await page.waitFor('p.online', { text: '3 online', timeout: 10_000 })
+    await page.waitFor('p.online', { text: '3 online', timeout: '10000ms' })
   }, 90_000)
 })

@@ -5,7 +5,7 @@ import { news } from '../news'
 
 export const page = {
   prerender: true,
-  revalidate: 60,
+  revalidate: '1m',
 }
 
 export const publish = action(s.Object({ edition: s.Integer({ minimum: 1, maximum: 1000 }) }), ({ edition }) => {

@@ -145,6 +145,6 @@ describe('pruning guests', () => {
 
   test('maxAge is a duration, and a bad one is refused', () => {
     expect(() => testApp({ guests: { maxAge: 'soon' as never } })).toThrow('guests.maxAge')
-    expect(() => testApp({ guests: { maxAge: 0 } })).toThrow('guests.maxAge')
+    expect(() => testApp({ guests: { maxAge: '0s' } })).toThrow('guests.maxAge')
   })
 })

@@ -170,13 +170,14 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 ```ts
 import type { RateStore } from 'kay'
+import { durationMs } from 'kay'
 
 const store: RateStore = {
-  hit: async (key, windowMs, weight = 1) => {
+  hit: async (key, window, weight = 1) => {
     const count = await redis.incrby(key, weight)
 
     if (count === weight)
-      await redis.pexpire(key, windowMs)
+      await redis.pexpire(key, durationMs(window))
 
     return { count, resetAt: Date.now() + await redis.pttl(key) }
   },

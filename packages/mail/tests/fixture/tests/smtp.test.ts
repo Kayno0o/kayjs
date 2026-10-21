@@ -149,7 +149,7 @@ describe('smtp', () => {
 
   it('refuses a timeout that is no positive duration where the transport is made', () => {
     expect(() => smtp({ host: '127.0.0.1', timeout: 'soon' as '10s' })).toThrow('takes a positive duration')
-    expect(() => smtp({ host: '127.0.0.1', timeout: 0 })).toThrow('takes a positive duration')
+    expect(() => smtp({ host: '127.0.0.1', timeout: '0s' })).toThrow('takes a positive duration')
     expect(() => smtp({ host: '127.0.0.1', timeout: '1.5m' })).not.toThrow()
   })
 
@@ -297,8 +297,8 @@ describe('mailer({ smtp })', () => {
     expect(() => mailer({ smtp: { name: '' } })).toThrow('mailer({ smtp })\'s name is ""')
     expect(() => mailer({ smtp: { name: 'example.com\r\nMAIL FROM:<a@b.c>' } })).toThrow('mailer({ smtp })\'s name is')
     expect(() => mailer({ smtp: { name: 'two words' } })).toThrow('mailer({ smtp })\'s name is')
-    expect(() => mailer({ smtp: { timeout: 0 } })).toThrow('mailer({ smtp })\'s timeout is 0; it takes a positive duration')
-    expect(() => mailer({ smtp: { timeout: -5 } })).toThrow('takes a positive duration')
+    expect(() => mailer({ smtp: { timeout: '0s' } })).toThrow('mailer({ smtp })\'s timeout is \'0s\'; it takes a positive duration')
+    expect(() => mailer({ smtp: { timeout: '-5s' } })).toThrow('takes a positive duration')
     expect(() => mailer({ smtp: { timeout: '-1m' as '1m' } })).toThrow('takes a positive duration')
     expect(() => mailer({ smtp: { maxConnections: 0 } })).toThrow('mailer({ smtp })\'s maxConnections is 0')
     expect(() => mailer({ smtp: { rateLimit: -1 } })).toThrow('rateLimit is -1')

@@ -71,7 +71,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a live v
     await page.click('button.reveal')
     await page.waitUntil(() => document.querySelector('p.late')?.textContent === '60 late' && document.querySelector('p.revealed')?.textContent === '60 revealed')
     visitors.set(61)
-    await page.waitUntil(() => document.querySelector('p.late')?.textContent === '61 late' && document.querySelector('p.revealed')?.textContent === '61 revealed', { timeout: 10_000 })
+    await page.waitUntil(() => document.querySelector('p.late')?.textContent === '61 late' && document.querySelector('p.revealed')?.textContent === '61 revealed', { timeout: '10000ms' })
     expect(page.errors).toEqual([])
   })
 })

@@ -233,7 +233,7 @@ describe('the audit log', () => {
   })
 
   test('forgets what is older than its age, an hour at most after', async () => {
-    const { browser, store } = setup({ audit: { maxAge: 60 } })
+    const { browser, store } = setup({ audit: { maxAge: '60s' } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

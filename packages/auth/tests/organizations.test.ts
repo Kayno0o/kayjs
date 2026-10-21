@@ -187,8 +187,8 @@ describe('organizations', () => {
     expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
-  test('invitationMaxAge takes seconds or a duration string, and a bad one fails naming the option', async () => {
-    for (const maxAge of ['2d', 2 * 24 * 60 * 60] as const) {
+  test('invitationMaxAge takes a duration string, the bare seconds of before 1.70 still work, and a bad one fails naming the option', async () => {
+    for (const maxAge of ['2d' as never, 2 * 24 * 60 * 60 as never]) {
       const { ada, org } = await setup({ invitationMaxAge: maxAge })
       const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
 

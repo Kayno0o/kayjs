@@ -29,11 +29,11 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
   const pending = `sign-in-ceiling:${kind}:${account}`
   const failures = `sign-in-failures:${kind}:${account}`
 
-  if (await attempts.hit(hard, core.limits.signInAccount.window) > core.limits.signInAccount.max)
+  if (await attempts.hit(hard, `${core.limits.signInAccount.window}s`) > core.limits.signInAccount.max)
     return 'limited'
 
   // `pending` is every guess since the last right password, so a burst in parallel stops at the ceiling; `failures` is what the ceiling is spent on.
-  if (await attempts.hit(pending, window) > max || await attempts.count(failures) >= max) {
+  if (await attempts.hit(pending, `${window}s`) > max || await attempts.count(failures) >= max) {
     if (record)
       await mailLockout(state, record)
 
@@ -45,7 +45,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
 
 // Counts a wrong password against the account's ceiling, which no right password gives back.
 export async function failGuess(state: RequestState, guess: Guess): Promise<void> {
-  await state.core.store.attempts.hit(guess.failures, guess.window)
+  await state.core.store.attempts.hit(guess.failures, `${guess.window}s`)
 }
 
 // A right password costs this client and the burst in flight nothing: the guesses they hold are forgotten, but not the failures of other clients, so signing in does not hand an attacker a fresh ceiling.
@@ -56,7 +56,7 @@ export async function forgive(state: RequestState, guess: Guess): Promise<void> 
 
 // Mails the holder that signing in is paused, at most once a day however often the lockout comes back, so guessing cannot flood their inbox.
 export async function mailLockout(state: RequestState, record: UserRecord): Promise<void> {
-  if (await state.core.store.attempts.hit(`sign-in-locked-mail:${record.id}`, DAY) === 1)
+  if (await state.core.store.attempts.hit(`sign-in-locked-mail:${record.id}`, `${DAY}s`) === 1)
     await afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
 }
 

@@ -100,7 +100,7 @@ describe('pruning what expired', () => {
     await store.sessions.create(session('idle', now - 100 * 24 * HOUR_MS))
     await store.sessions.create(session('old', now - HOUR_MS, now - 1000 * 24 * HOUR_MS))
     await store.sessions.create(session('fresh', now - HOUR_MS))
-    await store.attempts.hit('closed', 1)
+    await store.attempts.hit('closed', '1s')
 
     const { browser } = testApp({ store, sessions: sessionPlugin({ secret: SECRET, absoluteMaxAge: '365d' }), rememberMaxAge: '30d' })
 

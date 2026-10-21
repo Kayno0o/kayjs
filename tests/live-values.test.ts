@@ -703,7 +703,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '20 online')
     live.visitors.set(21)
-    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '21 online', { timeout: 15_000 })
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '21 online', { timeout: '15000ms' })
     expect(server.posts.length).toBe(plan.length + 1)
     expect(page.errors).toEqual([])
   })
@@ -718,7 +718,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '40 online')
     live.visitors.set(41)
-    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '41 online', { timeout: 5000 })
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '41 online', { timeout: '5000ms' })
     expect(server.posts.length).toBe(2)
     expect(server.gets.filter(path => path === '/other').length).toBe(2)
     expect(await page.evaluate(() => document.querySelectorAll('script[data-kay-live]').length)).toBe(1)
@@ -761,7 +761,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
       document.dispatchEvent(new Event('visibilitychange'))
     })
     live.visitors.set(71)
-    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '71 online', { timeout: 5000 })
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '71 online', { timeout: '5000ms' })
     expect(server.posts.length).toBe(2)
   })
 
@@ -776,7 +776,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await page.click('a.other')
     await page.waitUntil(() => location.pathname === '/other')
     live.visitors.set(31)
-    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '31 online', { timeout: 15_000 })
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '31 online', { timeout: '15000ms' })
 
     const { liveSlot } = await import('../src/runtime/live-value')
 

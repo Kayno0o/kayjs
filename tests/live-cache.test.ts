@@ -297,7 +297,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
   let refuse = false
   let gate: Promise<void> | undefined
 
-  const shows = (count: number) => [(expected: number) => document.querySelector('p.orders')?.textContent === `${expected} orders`, { timeout: 5000 }, count] as const
+  const shows = (count: number) => [(expected: number) => document.querySelector('p.orders')?.textContent === `${expected} orders`, { timeout: '5s' }, count] as const
   const change = (orders: number) => {
     db.orders = orders
     invalidate('orders')

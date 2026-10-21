@@ -1,4 +1,5 @@
-import { ActionError, ApiError, signal, untrack } from 'kay'
+import type { Duration } from 'kay'
+import { ActionError, ApiError, durationMs, signal, untrack } from 'kay'
 
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
 export type ToastTone = 'danger' | 'success' | 'info'
@@ -16,8 +17,8 @@ export interface Toast {
 }
 
 export interface ToastOptions {
-  // How long it stays, in milliseconds: 6000 by default, 10000 for an error. `Infinity` keeps it until the reader dismisses it, or `dismissToast(id)` does.
-  duration?: number | undefined
+  // How long it stays, such as `'3s'`: 6 seconds by default, 10 for an error. `false` keeps it until the reader dismisses it, or `dismissToast(id)` does.
+  duration?: Duration | false | undefined
 }
 
 // Long enough to read a sentence, an error longer as the reader has something to do about it.
@@ -82,10 +83,19 @@ export function holdToasts(hold: ToastHold, on: boolean): void {
   }
 }
 
+// A bare number of milliseconds, `Infinity` included, still reads until 1.73.
+function askedMs(duration: Duration | false | undefined): number | undefined {
+  if (duration === false)
+    return Number.POSITIVE_INFINITY
+
+  return typeof duration === 'string' ? durationMs(duration) : duration
+}
+
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string, type: ToastType, duration: number | undefined): number {
+function push(message: string, type: ToastType, duration: Duration | false | undefined): number {
   const id = nextId++
-  const wanted = duration === undefined || Number.isNaN(duration) || duration < 0 ? undefined : duration
+  const asked = askedMs(duration)
+  const wanted = asked === undefined || Number.isNaN(asked) || asked < 0 ? undefined : asked
   const timer: Timer = { remaining: wanted ?? (type === 'error' ? ERROR_DURATION_MS : DURATION_MS), started: Date.now() }
 
   untrack(() => toasts.set(list => [...list, { id, message, tone: type === 'error' ? 'danger' : type, type }]))

@@ -398,7 +398,7 @@ describe('a page with presence', () => {
 
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 // A tab leaves its room once the grace and a heartbeat have passed.
-const LEFT = { timeout: 15_000 }
+const LEFT = { timeout: '15s' } as const
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence in a browser', () => {

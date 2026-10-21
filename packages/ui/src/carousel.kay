@@ -1,5 +1,5 @@
 ---
-import type { DurationText, JSX } from 'kay'
+import type { Duration, JSX } from 'kay'
 import { durationMs, effect, listen, onCleanup, onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
@@ -12,7 +12,7 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
   index?: number | undefined
   onIndexChange?: ((index: number) => void) | undefined
   // Moves to the next slide this often, `'5s'`, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion.
-  autoplay?: DurationText | undefined
+  autoplay?: Duration | undefined
   // The slides' aspect ratio, as CSS writes it.
   ratio?: string | undefined
   // Names the carousel for screen readers.

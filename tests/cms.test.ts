@@ -2059,10 +2059,10 @@ describe('preview mode', () => {
     let loads = 0
     const load = () => ++loads
 
-    expect(await cached('preview-bypass', 60, load)).toBe(1)
-    expect(await inPreview(async () => cached('preview-bypass', 60, load))).toBe(2)
-    expect(await inPreview(async () => cached('preview-bypass', 60, load))).toBe(3)
-    expect(await cached('preview-bypass', 60, load)).toBe(1)
+    expect(await cached('preview-bypass', '60s', load)).toBe(1)
+    expect(await inPreview(async () => cached('preview-bypass', '60s', load))).toBe(2)
+    expect(await inPreview(async () => cached('preview-bypass', '60s', load))).toBe(3)
+    expect(await cached('preview-bypass', '60s', load)).toBe(1)
   })
 
   it('renders a prerendered page afresh for a visitor in preview mode, the copy served to everyone else', async () => {

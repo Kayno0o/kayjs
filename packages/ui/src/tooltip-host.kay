@@ -1,5 +1,5 @@
 ---
-import type { DurationText } from 'kay'
+import type { Duration } from 'kay'
 import { durationMs, effect, onCleanup, signal } from 'kay'
 import { claim } from './claim'
 
@@ -13,9 +13,9 @@ const PANEL_ID = 'kui-tooltip'
 
 const { showDelay = '80ms', hideDelay = '150ms' } = props<{
   // How long the pointer or focus rests on an element before its tooltip shows.
-  showDelay?: DurationText | undefined
+  showDelay?: Duration | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
-  hideDelay?: DurationText | undefined
+  hideDelay?: Duration | undefined
 }>()
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)

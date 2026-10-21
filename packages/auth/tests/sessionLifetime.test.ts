@@ -97,7 +97,7 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
     const app = await setup({ maxAge: '7d', absoluteMaxAge: '20d', browserMaxAge: '1h' }, { store, rememberMaxAge: '15d' })
 
     await app.browser().json('/me')
-    expect(limits).toMatchObject([{ sessionMaxAge: 15 * DAY, sessionAbsoluteMaxAge: 20 * DAY }])
+    expect(limits).toMatchObject([{ sessionMaxAge: '1296000s', sessionAbsoluteMaxAge: '1728000s' }])
   })
 })
 

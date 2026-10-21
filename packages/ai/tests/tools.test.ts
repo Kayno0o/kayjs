@@ -330,7 +330,7 @@ describe('a visitor leaving mid-loop', () => {
   }
 
   function open(tools: Offered[], steps = 5) {
-    return createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }, tools, steps, request, signal), [])
+    return createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }, tools, steps, request, signal), [])
   }
 
   it('runs no further call and asks nothing more once stopped while a call ran', async () => {
@@ -361,7 +361,7 @@ describe('a visitor leaving mid-loop', () => {
   })
 
   it('asks nothing when it was stopped before the first read', async () => {
-    const reply = createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }, offered(async () => ({ content: [] })), 5, request, signal), [AbortSignal.abort()])
+    const reply = createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }, offered(async () => ({ content: [] })), 5, request, signal), [AbortSignal.abort()])
 
     expect(await reply).toBe('')
     expect(fakeAi.asked).toEqual([])
@@ -404,7 +404,7 @@ describe('a visitor leaving mid-loop', () => {
 
 describe('confirm', () => {
   const request = new Request('http://localhost/')
-  const base = { messages: [{ role: 'user' as const, content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }
+  const base = { messages: [{ role: 'user' as const, content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5s' as const, idle: '5s' as const } }
 
   function run(confirm: Parameters<typeof converse>[6], call: () => Promise<{ content: { type: 'text', text: string }[] }>) {
     const tool = { name: 'book', description: 'Books', inputSchema: {}, call }

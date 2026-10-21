@@ -211,7 +211,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     })
 
     it('refuses a wait that is no positive duration', () => {
-      expect(() => retryLater(0)).toThrow('positive duration')
+      expect(() => retryLater('0s')).toThrow('positive duration')
       expect(() => retryLater('soon' as never)).toThrow('positive duration')
     })
   })

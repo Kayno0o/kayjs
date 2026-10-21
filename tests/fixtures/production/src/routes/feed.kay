@@ -2,6 +2,6 @@
 import { cached } from 'kay/cache'
 import { feed } from '../news'
 
-const items = await cached('feed', 300, () => feed.items)
+const items = await cached('feed', '5m', () => feed.items)
 ---
 p.feed {items.join(', ')}

@@ -63,7 +63,7 @@ export async function challengeRefusal(use: string, boundTo: (difficulty: string
   if (!DIGITS.test(number) || hashOf(salt + number) !== hash)
     return 'wrong'
 
-  return (await store.hit(`${key}\n${salt}`, left)).count > 1 ? 'wrong' : undefined
+  return (await store.hit(`${key}\n${salt}`, `${left}ms`)).count > 1 ? 'wrong' : undefined
 }
 
 export async function workRefusal(url: string, solution: string | null, store: RateStore): Promise<ProofOfWorkRefusal | undefined> {

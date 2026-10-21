@@ -12,7 +12,7 @@ afterEach(() => {
 })
 
 async function useBoth(rates: ReturnType<typeof sqliteRates>, rooms: ReturnType<typeof sqliteRooms>): Promise<void> {
-  await rates.hit('a', 1000)
+  await rates.hit('a', '1000ms')
   rooms.add('r', 'c', '"m"')
 }
 
@@ -28,8 +28,8 @@ describe('a sqlite store given in a config', () => {
 
     expect(existsSync(join(dir, 'data'))).toBe(false)
 
-    expect((await ratesStore.hit('a', 1000)).count).toBe(1)
-    expect((await ratesStore.hit('a', 1000)).count).toBe(2)
+    expect((await ratesStore.hit('a', '1000ms')).count).toBe(1)
+    expect((await ratesStore.hit('a', '1000ms')).count).toBe(2)
     expect(existsSync(rates)).toBe(true)
     expect(existsSync(rooms)).toBe(false)
     expect(existsSync(sessions)).toBe(false)
@@ -39,7 +39,7 @@ describe('a sqlite store given in a config', () => {
     expect(existsSync(rooms)).toBe(true)
     expect(existsSync(sessions)).toBe(false)
 
-    await sessionStore.set('s', { a: 1 }, 60)
+    await sessionStore.set('s', { a: 1 }, '60s')
     expect(await sessionStore.get('s')).toEqual({ a: 1 })
     expect(existsSync(sessions)).toBe(true)
 
@@ -64,7 +64,7 @@ describe('a sqlite store given in a config', () => {
     // Used from another module than the one naming it: the stores only get their owner at construction.
     await useBoth(rates, rooms)
     await disposeOwned(new Set([import.meta.path]))
-    expect(async () => rates.hit('a', 1000)).toThrow()
+    expect(async () => rates.hit('a', '1000ms')).toThrow()
     expect(() => rooms.members('r')).toThrow()
   })
 })

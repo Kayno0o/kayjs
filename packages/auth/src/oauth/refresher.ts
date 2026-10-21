@@ -1,5 +1,7 @@
+import type { Duration } from 'kay'
 import type { OAuthTokens } from './types'
 import { MINUTE_MS } from '@kaynooo/utils'
+import { optionMs } from 'kay/library'
 import { OAuthExchangeError } from './client'
 
 // The answers by which a provider refuses the refresh token itself; anything else, an outage or a rate limit, may pass.
@@ -19,13 +21,14 @@ export interface TokenRefresherDeps<K, S> {
   load: (subject: S) => StoredCredential
   /** Performs the refresh + persistence; returns the new token, or `null` when refresh failed. */
   exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: number | undefined } | null>
-  /** How long before expiry to refresh (default 5 min). */
-  marginMs?: number | undefined
+  /** How long before expiry to refresh, `'5m'` by default. */
+  margin?: Duration | undefined
 }
 
 /** Wraps a token `exchange` with per-subject caching + in-flight dedup; non-expiring credentials pass through. Feeds `GrantStore.hasCredential` (non-null = live). */
 export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
-  const margin = deps.marginMs ?? 5 * MINUTE_MS
+  // `marginMs`, the number of milliseconds before 1.70, still reads until 1.73.
+  const margin = deps.margin === undefined ? (deps as { marginMs?: number }).marginMs ?? 5 * MINUTE_MS : optionMs(deps.margin, 'margin', 'kayjs-auth')
   const cache = new Map<K, { accessToken: string, expiresAt: number }>()
   const inFlight = new Map<K, Promise<string | null>>()
 
@@ -117,8 +120,8 @@ export interface OAuthTokenRefresherDeps<K, S> {
   save: (subject: S, tokens: OAuthTokens | null) => Promise<void>
   /** Notified when a step throws; the refresher itself never rejects. */
   onError?: ((error: unknown, stage: RefreshStage) => void) | undefined
-  /** How long before expiry to refresh (default 5 min). */
-  marginMs?: number | undefined
+  /** How long before expiry to refresh, `'5m'` by default. */
+  margin?: Duration | undefined
 }
 
 /**
@@ -131,7 +134,8 @@ export function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K,
   return createTokenRefresher<K, S>({
     key: deps.key,
     load: deps.load,
-    marginMs: deps.marginMs,
+    margin: deps.margin,
+    ...(deps as { marginMs?: number }).marginMs === undefined ? {} : { marginMs: (deps as { marginMs?: number }).marginMs },
     exchange: async (subject) => {
       const refreshToken = deps.load(subject).refreshToken
 

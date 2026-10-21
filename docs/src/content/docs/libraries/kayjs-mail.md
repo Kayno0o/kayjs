@@ -63,7 +63,7 @@ The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `S
 
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
-What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails in a window, `{ max: 5, window: '1s' }`, unlimited by default). An option left out keeps the default.
+What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails in a window, `{ max: 5, window: '1s' }`, unlimited by default). An option left out keeps the default.
 
 A name, a timeout or a count that cannot be used stops the boot. `smtp` cannot go with a `transport`, which replaces the SMTP: give them to `smtp()` instead.
 

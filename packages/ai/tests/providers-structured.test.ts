@@ -63,7 +63,7 @@ const SENT = {
   required: ['title', 'score', 'tags', 'author'],
   additionalProperties: false,
 }
-const BASE: ProviderRequest = { messages: [{ role: 'user', content: 'Review' }], system: undefined, model: 'm', maxTokens: 50, temperature: undefined, timeouts: { connect: 5000, idle: 5000 }, schema: SENT }
+const BASE: ProviderRequest = { messages: [{ role: 'user', content: 'Review' }], system: undefined, model: 'm', maxTokens: 50, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' }, schema: SENT }
 const SPEC = { name: 'add_note', description: 'Add note', inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] } }
 
 function openaiAnswer(chunks: string[], finish = 'stop'): Event[] {

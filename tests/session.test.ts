@@ -7,6 +7,7 @@ import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { durationSeconds } from '../src/runtime/duration'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memoryStore, session, sqliteStore } from '../src/server'
 import { readClient } from '../src/server/client'
@@ -67,7 +68,7 @@ function counter(options: Partial<Parameters<typeof session>[0]> = {}) {
       return 'rotated'
     })
     .get('/remember/:lifetime', async ({ session, params }) => {
-      await session.lifetime(params.lifetime === 'browser' ? 'browser' : Number(params.lifetime))
+      await session.lifetime(params.lifetime === 'browser' ? 'browser' : `${Number(params.lifetime)}s`)
 
       return 'remembered'
     })
@@ -157,13 +158,13 @@ describe('sessions', () => {
   it('caps the memory store, the oldest sessions going first and a session written again counting as new', async () => {
     const store = memoryStore()
 
-    await store.set('first', { n: 0 }, 60)
+    await store.set('first', { n: 0 }, '60s')
 
     for (let index = 0; index < 99_999; index++)
-      await store.set(`s${index}`, { n: index }, 60)
+      await store.set(`s${index}`, { n: index }, '60s')
 
-    await store.set('first', { n: 1 }, 60)
-    await store.set('overflow', { n: 2 }, 60)
+    await store.set('first', { n: 1 }, '60s')
+    await store.set('overflow', { n: 2 }, '60s')
 
     expect(await store.get('first')).toEqual({ n: 1 })
     expect(await store.get('s0')).toBeUndefined()
@@ -231,7 +232,7 @@ describe('sessions', () => {
   })
 
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {
-    const visit = browser(counter({ maxAge: 100 }))
+    const visit = browser(counter({ maxAge: '100s' }))
 
     await visit('/count')
     setSystemTime(Date.now() + 60_000)
@@ -243,7 +244,7 @@ describe('sessions', () => {
   })
 
   it('ends a session absoluteMaxAge after it started or was regenerated, however much it is used, its cookie living no longer', async () => {
-    const visit = browser(counter({ maxAge: 100, absoluteMaxAge: 250 }))
+    const visit = browser(counter({ maxAge: '100s', absoluteMaxAge: '250s' }))
 
     await visit('/count')
     setSystemTime(Date.now() + 60_000)
@@ -271,7 +272,7 @@ describe('sessions', () => {
     const lifetimes: number[] = []
     const memory = memoryStore()
     const visit = browser(counter({ store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge)
+      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
     } } }))
     const DAY = 24 * 60 * 60
@@ -378,7 +379,7 @@ describe('sessions', () => {
     const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
     const now = Math.floor(Date.now() / 1000)
     const legacy = (issued: number) => `session=${sealWith(key, stringify({ data: { count: 1 }, issued }), 'session')}`
-    const app = counter({ maxAge: 200, absoluteMaxAge: 150 })
+    const app = counter({ maxAge: '200s', absoluteMaxAge: '150s' })
     const peek = async (cookie: string) => (await app.handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()
 
     expect(await peek(legacy(now - 60))).toBe('1')
@@ -397,14 +398,14 @@ describe('sessions', () => {
     const DAY = 24 * 60 * 60
 
     expect(await read({})).toEqual({ maxAge: 30 * DAY, absoluteMaxAge: 90 * DAY, browserMaxAge: DAY })
-    expect(await read({ maxAge: '7d', absoluteMaxAge: 3600, browserMaxAge: '2h' })).toEqual({ maxAge: 7 * DAY, absoluteMaxAge: 3600, browserMaxAge: 7200 })
+    expect(await read({ maxAge: '7d', absoluteMaxAge: '3600s', browserMaxAge: '2h' })).toEqual({ maxAge: 7 * DAY, absoluteMaxAge: 3600, browserMaxAge: 7200 })
   })
 
   it('caps a browser session\'s lifetime in the store too', async () => {
     const lifetimes: number[] = []
     const memory = memoryStore()
-    const visit = browser(counter({ absoluteMaxAge: 30, browserMaxAge: 50, store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge)
+    const visit = browser(counter({ absoluteMaxAge: '30s', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
+      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -418,7 +419,7 @@ describe('sessions', () => {
   })
 
   it('keeps a lifetime a session chose through its extensions and a regenerate, until it is destroyed', async () => {
-    const visit = browser(counter({ maxAge: 100 }))
+    const visit = browser(counter({ maxAge: '100s' }))
 
     await visit('/count')
     expect((await visit('/remember/300')).set).toMatch(/Max-Age=300;/)
@@ -436,8 +437,8 @@ describe('sessions', () => {
   it('gives a browser session a cookie without Max-Age, kept browserMaxAge unused, a store told so', async () => {
     const lifetimes: number[] = []
     const memory = memoryStore()
-    const visit = browser(counter({ maxAge: '30d', browserMaxAge: 50, store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge)
+    const visit = browser(counter({ maxAge: '30d', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
+      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -465,7 +466,7 @@ describe('sessions', () => {
       }
     })
 
-    expect(await (await app.handle(new Request('http://localhost/'))).text()).toBe('kay: a session lifetime is \'forever\'; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\'')
+    expect(await (await app.handle(new Request('http://localhost/'))).text()).toBe('kay: a session lifetime is \'forever\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\'')
   })
 
   it('takes a maxAge with its unit', async () => {
@@ -497,9 +498,9 @@ describe('sessions', () => {
 
   for (const [name, store] of [['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
     it(`erases the sessions ${name} whose data matches, and only those`, async () => {
-      await store.set('a', { userId: 1 }, 60)
-      await store.set('b', { userId: 2 }, 60)
-      await store.set('c', { userId: 1, cart: [3] }, 60)
+      await store.set('a', { userId: 1 }, '60s')
+      await store.set('b', { userId: 2 }, '60s')
+      await store.set('c', { userId: 1, cart: [3] }, '60s')
 
       expect(await store.deleteWhere(data => data.userId === 1)).toBe(2)
       expect([await store.get('a'), await store.get('b'), await store.get('c')]).toEqual([undefined, { userId: 2 }, undefined])
@@ -512,8 +513,9 @@ describe('sessions', () => {
     const store = sqliteStoreAt(file)
     const db = new Database(file)
 
-    await store.set('a', { userId: 1 }, 60)
-    await store.set('old', { userId: 1 }, -60)
+    await store.set('a', { userId: 1 }, '60s')
+    await store.set('old', { userId: 1 }, '60s')
+    db.run('UPDATE kay_sessions SET expires = ? WHERE id = ?', [Date.now() - 1000, 'old'])
     db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
 
     const logged = await logsOf(async () => {
@@ -526,7 +528,8 @@ describe('sessions', () => {
 
     const memory = memoryStore()
 
-    await memory.set('old', { userId: 1 }, -60)
+    await memory.set('old', { userId: 1 }, '1s')
+    setSystemTime(Date.now() + 2000)
     expect(await memory.deleteWhere(() => true)).toBe(0)
   })
 
@@ -578,12 +581,12 @@ describe('sessions', () => {
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
     const store = sqliteStoreAt(file)
 
-    await store.set('a', { userId: 1 }, 60)
+    await store.set('a', { userId: 1 }, '60s')
     await deleteSqlite(file)
 
     expect(sqliteStoreAt(file)).toBe(store)
     expect(await store.get('a')).toBeUndefined()
-    await store.set('b', { userId: 2 }, 60)
+    await store.set('b', { userId: 2 }, '60s')
     expect(readSessionIds(file)).toEqual(['b'])
   })
 
@@ -594,13 +597,13 @@ describe('sessions', () => {
 
     try {
       setSystemTime(new Date())
-      await store.set('a', { userId: 1 }, 60)
+      await store.set('a', { userId: 1 }, '60s')
       await deleteSqlite(file)
       // Within the few seconds, the deleted file's handle still answers.
       expect(await store.get('a')).toEqual({ userId: 1 })
 
       setSystemTime(new Date(Date.now() + 10_000))
-      await store.set('b', { userId: 2 }, 60)
+      await store.set('b', { userId: 2 }, '60s')
       expect(readSessionIds(file)).toEqual(['b'])
 
       const replacement = new Database(join(dir, 'replacement.sqlite'))
@@ -762,7 +765,7 @@ describe('sqliteStore under bun test', () => {
     const file = join(dir, 'data', 'sessions.sqlite')
     const store = sqliteStore(file)
 
-    await store.set('a', { userId: 1 }, 60)
+    await store.set('a', { userId: 1 }, '60s')
 
     expect(await store.get('a')).toEqual({ userId: 1 })
     expect(await Bun.file(file).exists()).toBe(false)

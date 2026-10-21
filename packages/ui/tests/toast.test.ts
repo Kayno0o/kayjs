@@ -67,8 +67,8 @@ describe('a toast\'s time', () => {
   })
 
   test('runs for the duration it is given, whatever its tone', () => {
-    toast.info('Short', { duration: 1000 })
-    toast.error('Long', { duration: 20_000 })
+    toast.info('Short', { duration: '1000ms' })
+    toast.error('Long', { duration: '20000ms' })
     jest.advanceTimersByTime(999)
 
     expect(shown().map(item => item.message)).toEqual(['Short', 'Long'])
@@ -87,8 +87,8 @@ describe('a toast\'s time', () => {
   })
 
   test('falls back to the default time for a duration that is not a time', () => {
-    toast.info('NaN', { duration: Number.NaN })
-    toast.info('Negative', { duration: -5 })
+    toast.info('NaN', { duration: Number.NaN as never })
+    toast.info('Negative', { duration: -5 as never })
     toast.info('Unset', { duration: undefined })
     jest.advanceTimersByTime(6000)
 
@@ -96,7 +96,7 @@ describe('a toast\'s time', () => {
   })
 
   test('stays until dismissed with an infinite duration, holds and releases included, and answers its id', () => {
-    const sticky = toast.error('Stuck', { duration: Infinity })
+    const sticky = toast.error('Stuck', { duration: false })
 
     toast.info('Gone')
     jest.advanceTimersByTime(60_000)

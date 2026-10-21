@@ -55,13 +55,13 @@ export interface ProviderRequest {
   schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
   cache?: boolean | '1h' | undefined
-  // Milliseconds a provider may take to answer, and to send the next chunk once it did.
+  // How long a provider may take to answer, and to send the next chunk once it did.
   timeouts: Timeouts
 }
 
 export interface Timeouts {
-  connect: number
-  idle: number
+  connect: Duration
+  idle: Duration
 }
 
 // A part of the reply, or the token counts the provider reports as it goes (each field when it knows it).

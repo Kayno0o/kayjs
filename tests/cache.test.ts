@@ -28,21 +28,21 @@ describe('cached', () => {
       return loads
     }
 
-    expect(await Promise.all([cached('a', 60, load), cached('a', 60, load)])).toEqual([1, 1])
-    expect(await cached('a', 60, load)).toBe(1)
-    expect(await cached('b', 60, load)).toBe(2)
+    expect(await Promise.all([cached('a', '60s', load), cached('a', '60s', load)])).toEqual([1, 1])
+    expect(await cached('a', '60s', load)).toBe(1)
+    expect(await cached('b', '60s', load)).toBe(2)
   })
 
   it('gives the stale value past its ttl while refreshing it in the background', async () => {
     let edition = 1
     const load = () => edition
 
-    expect(await cached('news', 60, load)).toBe(1)
+    expect(await cached('news', '60s', load)).toBe(1)
     edition = 2
     setSystemTime(Date.now() + 61_000)
-    expect(await cached('news', 60, load)).toBe(1)
+    expect(await cached('news', '60s', load)).toBe(1)
     await Bun.sleep(0)
-    expect(await cached('news', 60, load)).toBe(2)
+    expect(await cached('news', '60s', load)).toBe(2)
   })
 
   it('keeps nothing from a first load that throws, and the stale value through a refresh that throws', async () => {
@@ -56,17 +56,17 @@ describe('cached', () => {
     }
 
     try {
-      await expect(cached('feed', 60, load)).rejects.toThrow('down')
+      await expect(cached('feed', '60s', load)).rejects.toThrow('down')
       failing = false
-      expect(await cached('feed', 60, load)).toBe('up')
+      expect(await cached('feed', '60s', load)).toBe('up')
 
       failing = true
       setSystemTime(Date.now() + 61_000)
-      expect(await cached('feed', 60, load)).toBe('up')
+      expect(await cached('feed', '60s', load)).toBe('up')
       await Bun.sleep(0)
       expect(logged).toHaveBeenCalledTimes(1)
       // A minute before the next attempt, whatever the ttl.
-      expect(await cached('feed', 60, load)).toBe('up')
+      expect(await cached('feed', '60s', load)).toBe('up')
       expect(logged).toHaveBeenCalledTimes(1)
     }
     finally {
@@ -78,13 +78,13 @@ describe('cached', () => {
     let value = 'old'
     const load = async () => value
 
-    await Promise.all([cached('post:1', 60, load), cached('post:2', 60, load), cached('tags', 60, load)])
+    await Promise.all([cached('post:1', '60s', load), cached('post:2', '60s', load), cached('tags', '60s', load)])
     value = 'new'
     invalidate(key => key.startsWith('post:'))
-    expect(await cached('post:1', 60, load)).toBe('new')
-    expect(await cached('tags', 60, load)).toBe('old')
+    expect(await cached('post:1', '60s', load)).toBe('new')
+    expect(await cached('tags', '60s', load)).toBe('old')
 
-    const running = cached('tags:slow', 60, async () => {
+    const running = cached('tags:slow', '60s', async () => {
       await Bun.sleep(5)
 
       return 'slow'
@@ -92,11 +92,11 @@ describe('cached', () => {
 
     invalidate('tags:slow')
     expect(await running).toBe('slow')
-    expect(await cached('tags:slow', 60, load)).toBe('new')
+    expect(await cached('tags:slow', '60s', load)).toBe('new')
   })
 
   it('refuses a computed ttl that is not a positive duration, which kay check cannot see', async () => {
-    await expect(cached('x', Number('0'), () => 1)).rejects.toThrow('cached(\'x\')\'s ttl is 0; it takes a positive duration')
+    await expect(cached('x', Number('0') as never, () => 1)).rejects.toThrow('cached(\'x\')\'s ttl is 0; it takes a positive duration')
     await expect(cached('y', `${Number('-1')}m`, () => 1)).rejects.toThrow('cached(\'y\')\'s ttl is \'-1m\'')
   })
 
@@ -184,25 +184,25 @@ describe('cached with a store', () => {
 
     invalidate('reviews')
     expect(store.keys()).toEqual([])
-    expect(await cached('reviews', 60, () => 'new', { store })).toBe('new')
+    expect(await cached('reviews', '60s', () => 'new', { store })).toBe('new')
   })
 
   it('drops a key another process sharing the store invalidated, within a second', async () => {
     const path = await storePath()
     const store = sqliteCache(path)
 
-    expect(await cached('shared', 60, () => 'old', { store })).toBe('old')
+    expect(await cached('shared', '60s', () => 'old', { store })).toBe('old')
 
     const child = Bun.spawn([process.execPath, '-e', `import { invalidate, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nsqliteCache(${JSON.stringify(path)})\ninvalidate(key => key === 'shared')\n`], { stderr: 'inherit' })
 
     expect(await child.exited).toBe(0)
 
     // Without the broadcast this process would keep its copy for its whole ttl.
-    let value = await cached('shared', 60, () => 'new', { store })
+    let value = await cached('shared', '60s', () => 'new', { store })
 
     for (let wait = 0; value === 'old' && wait < 40; wait++) {
       await Bun.sleep(50)
-      value = await cached('shared', 60, () => 'new', { store })
+      value = await cached('shared', '60s', () => 'new', { store })
     }
 
     expect(value).toBe('new')
@@ -249,10 +249,10 @@ describe('cached with a store', () => {
     let value: unknown = 'plain'
 
     try {
-      expect(await cached('feed', 60, () => value, { store })).toBe('plain')
+      expect(await cached('feed', '60s', () => value, { store })).toBe('plain')
       value = () => 1
       setSystemTime(Date.now() + 61_000)
-      expect(await cached('feed', 60, () => value, { store })).toBe('plain')
+      expect(await cached('feed', '60s', () => value, { store })).toBe('plain')
       await Bun.sleep(0)
       expect(logged.mock.calls[0]![0]).toContain('cannot keep its value in a store')
       expect(store.get('feed')!.text).toBe('["plain"]')
@@ -261,8 +261,8 @@ describe('cached with a store', () => {
         throw new Error('SQLITE_FULL')
       } }
 
-      expect(await cached('full', 60, () => 'kept', { store: failing })).toBe('kept')
-      expect(await cached('full', 60, () => 'again', { store: failing })).toBe('kept')
+      expect(await cached('full', '60s', () => 'kept', { store: failing })).toBe('kept')
+      expect(await cached('full', '60s', () => 'again', { store: failing })).toBe('kept')
       expect(logged).toHaveBeenCalledTimes(2)
     }
     finally {
@@ -286,14 +286,14 @@ describe('cached with a store', () => {
     let value = 'old'
     const load = () => value
 
-    expect(await cached('post:1', 60, load, { store })).toBe('old')
+    expect(await cached('post:1', '60s', load, { store })).toBe('old')
     value = 'new'
     invalidate(key => key.startsWith('post:'))
     expect(store.keys()).toEqual([])
-    expect(await cached('post:1', 60, load, { store })).toBe('new')
+    expect(await cached('post:1', '60s', load, { store })).toBe('new')
 
     store.set('broken', 'not devalue', Date.now() + 60_000)
-    expect(await cached('broken', 60, () => 'loaded', { store })).toBe('loaded')
+    expect(await cached('broken', '60s', () => 'loaded', { store })).toBe('loaded')
   })
 
   it('drops a stored value built from a key, found without reading any row of the store, for rows the process holds nowhere', async () => {
@@ -362,7 +362,7 @@ describe('cached with a store', () => {
     const store = { get: read, set: (key: string, text: string) => void rows.set(key, text), delete: (key: string) => void rows.delete(key), keys: () => [...rows.keys()] }
 
     // Naming the store makes invalidate empty it too.
-    expect(await cached('seed', 60, () => 'x', { store })).toBe('x')
+    expect(await cached('seed', '60s', () => 'x', { store })).toBe('x')
     invalidate('post:1')
     expect([...rows.keys()].sort()).toEqual(['plain', 'seed'])
     expect(read).toHaveBeenCalled()
@@ -373,7 +373,7 @@ describe('cached with a store', () => {
     const sent = mock((_: string) => undefined)
     const store = { get: (key: string) => rows.has(key) ? { text: rows.get(key)!, freshUntil: Date.now() + 60_000 } : undefined, set: (key: string, text: string) => void rows.set(key, text), delete: (key: string) => void rows.delete(key), keys: () => [...rows.keys()], publish: sent }
     let loads = 0
-    const post = async () => cached('post:1', 60, () => ++loads, { store })
+    const post = async () => cached('post:1', '60s', () => ++loads, { store })
     const heard: boolean[][] = []
     const stopHearing = onKeysInvalidated((matches, dropped) => {
       heard.push([matches('post:1'), dropped('post:1'), matches('page:1')])
@@ -401,8 +401,8 @@ describe('cached with a store', () => {
   it('refuses a value the store cannot hold, keeping nothing', async () => {
     const store = sqliteCache(await storePath())
 
-    await expect(cached('handler', 60, () => ({ run: () => 1 }), { store })).rejects.toThrow('kay: cached(\'handler\') cannot keep its value in a store')
+    await expect(cached('handler', '60s', () => ({ run: () => 1 }), { store })).rejects.toThrow('kay: cached(\'handler\') cannot keep its value in a store')
     expect(store.keys()).toEqual([])
-    expect(await cached('handler', 60, () => 'plain', { store })).toBe('plain')
+    expect(await cached('handler', '60s', () => 'plain', { store })).toBe('plain')
   })
 })

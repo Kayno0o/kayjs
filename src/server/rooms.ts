@@ -1,5 +1,5 @@
 import type { FSWatcher } from 'node:fs'
-import type { DurationText } from '../runtime/duration'
+import type { Duration } from '../runtime/duration'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { t } from 'elysia'
@@ -51,7 +51,7 @@ export interface RoomsOptions<Message = never, State = undefined> {
 
 export interface CoalesceOptions {
   // How long changes are gathered before the one snapshot goes, `'50ms'` by default.
-  wait?: DurationText | undefined
+  wait?: Duration | undefined
 }
 
 export interface Rooms<Message, Member = undefined, State = undefined> {
@@ -268,7 +268,7 @@ export function memoryRooms(): RoomStore {
 // Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched); a bare number throws.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
 // The file is opened by the first call that needs it, so loading a config that names it, to build or check, creates nothing.
-export function sqliteRooms(path: string, { poll }: { poll?: DurationText } = {}): RoomStore {
+export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): RoomStore {
   const askedMs = poll === undefined ? undefined : optionMs(poll, '`sqliteRooms` poll')
   let opened: RoomStore | undefined
   let closed = false

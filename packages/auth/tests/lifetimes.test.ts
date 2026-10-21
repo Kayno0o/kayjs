@@ -56,7 +56,7 @@ describe('email.expires', () => {
         requireVerified: false,
         locales: ['en', 'fr'],
         codes: 'both',
-        expires: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': 3 * 3600, 'verify-code': '20m', 'sign-in-code': '5m' },
+        expires: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': '3h', 'verify-code': '20m', 'sign-in-code': '5m' },
         templates: { 'reset-password': (data) => {
           seen.push(data.expires)
 
@@ -119,6 +119,6 @@ describe('email.expires', () => {
     expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.expires.verify-email is \'a week\'')
     expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kay: email.expires.verify is no link or code')
     expect(() => setup({ expires: { constructor: '1d' } as never })).toThrow('kay: email.expires.constructor is no link or code')
-    expect(() => setup({ expires: { 'magic-link': 0 } })).toThrow('kay: email.expires.magic-link is 0')
+    expect(() => setup({ expires: { 'magic-link': '0s' } })).toThrow('kay: email.expires.magic-link is \'0s\'')
   })
 })

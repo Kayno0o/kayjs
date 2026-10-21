@@ -1,4 +1,4 @@
-import type { DurationText, Guard, GuardContext } from 'kay'
+import type { Duration, Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout } from './kay/contract'
@@ -63,7 +63,7 @@ export interface CmsOptions {
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
   onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `false` turns both off, and `collections: { name: { history: false } }` for one collection.
-  history?: false | { revisions?: number | undefined, trash?: DurationText | false | undefined } | undefined
+  history?: false | { revisions?: number | undefined, trash?: Duration | false | undefined } | undefined
 }
 
 // What `cms({ history })` comes to: undefined when off.
@@ -95,7 +95,7 @@ export interface CmsSettings {
 }
 
 const DEFAULT_REVISIONS = 50
-const DEFAULT_TRASH: DurationText = '30d'
+const DEFAULT_TRASH: Duration = '30d'
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 

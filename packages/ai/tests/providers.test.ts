@@ -302,22 +302,22 @@ describe('timeouts', () => {
   it('takes durations and rejects a bad value', () => {
     const provider = openai({ baseUrl: 'http://localhost:1', model: 'm' })
 
-    expect(() => ask('Hi', { provider, timeout: { connect: 0 } })).toThrow('ask({ timeout }).connect')
-    expect(() => ask('Hi', { provider, timeout: { idle: Number.NaN } })).toThrow('ask({ timeout }).idle')
-    expect(() => ask('Hi', { provider, timeout: { idle: Number.POSITIVE_INFINITY } })).toThrow('ask({ timeout }).idle')
-    expect(() => ask('Hi', { provider, timeout: { idle: '2m', connect: 10 } })).not.toThrow()
+    expect(() => ask('Hi', { provider, timeout: { connect: '0s' } })).toThrow('ask({ timeout }).connect')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.NaN as never } })).toThrow('ask({ timeout }).idle')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.POSITIVE_INFINITY as never } })).toThrow('ask({ timeout }).idle')
+    expect(() => ask('Hi', { provider, timeout: { idle: '2m', connect: '10s' } })).not.toThrow()
   })
 
-  it('passes durations to a provider as milliseconds, capped to what a timer takes', async () => {
+  it('passes durations to a provider in milliseconds, capped to what a timer takes', async () => {
     const seen: unknown[] = []
     const spy = { name: 'spy', model: 'm', async* stream(request: ProviderRequest) {
       seen.push(request.timeouts)
       yield { text: 'ok' }
     } }
 
-    await ask('Hi', { provider: spy, timeout: { connect: 2, idle: '500ms' } })
+    await ask('Hi', { provider: spy, timeout: { connect: '2s', idle: '500ms' } })
     await ask('Hi', { provider: spy, timeout: { connect: '365d' } })
-    expect(seen).toEqual([{ connect: 2000, idle: 500 }, { connect: 2 ** 31 - 1, idle: 60_000 }])
+    expect(seen).toEqual([{ connect: '2000ms', idle: '500ms' }, { connect: `${2 ** 31 - 1}ms`, idle: '60000ms' }])
   })
 
   it('passes the defaults to a provider', async () => {
@@ -327,7 +327,7 @@ describe('timeouts', () => {
       seen = request.timeouts
       yield { text: 'ok' }
     } } })
-    expect(seen).toEqual({ connect: 30_000, idle: 60_000 })
+    expect(seen).toEqual({ connect: '30000ms', idle: '60000ms' })
   })
 })
 

@@ -5,7 +5,7 @@ import { testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 const built = await testSite({ root: ROOT, browser: true })
 // A tab that closed leaves its room after a grace and a heartbeat.
-const SETTLED = { timeout: 15_000 }
+const SETTLED = { timeout: '15s' } as const
 
 afterAll(async () => {
   await built.close()

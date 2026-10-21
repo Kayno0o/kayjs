@@ -89,7 +89,7 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
   if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
     return true
 
-  const guesses = await store.attempts.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)
+  const guesses = await store.attempts.hit(`two-factor:${record.id}`, `${limits.twoFactorAccount.window}s`)
 
   if (guesses <= limits.twoFactorAccount.max)
     return false

@@ -42,7 +42,7 @@ export const PUBLISH_TIMES = Symbol.for('kay.publishTimes')
 declare const FEED_PATH: unique symbol
 export { contentKey }
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
-const FOREVER = 1e9
+const FOREVER = '11574d'
 
 export interface Entry<Data> {
   // The file's path in the collection without its extension, `guides/intro` for `guides/intro.md`; an `index` file takes its folder's.
@@ -297,7 +297,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const published = async (): Promise<Entries<Data>> => {
-    const raw = await cachedPublished(key, loader!.ttl === undefined ? FOREVER : durationSeconds(loader!.ttl, `the collection ${name}'s ttl`), async () => fetchLoaded(contentMode().dev), { store: loader!.store })
+    const raw = await cachedPublished(key, loader!.ttl === undefined ? FOREVER : `${durationSeconds(loader!.ttl, `the collection ${name}'s ttl`)}s`, async () => fetchLoaded(contentMode().dev), { store: loader!.store })
     let entries = decoded.get(raw)
 
     if (!entries)

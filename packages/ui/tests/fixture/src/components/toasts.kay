@@ -5,5 +5,5 @@ import { toast } from '@kaynooo/kayjs-ui'
 button#saved(onClick={() => toast.success('Saved')}) Save
 button#refused(onClick={() => toast.error('Refused')}) Refuse
 button#copied(onClick={() => toast.info('Copied')}) Copy
-button#sticky(onClick={() => toast.info('Stuck', { duration: Infinity })}) Stick
+button#sticky(onClick={() => toast.info('Stuck', { duration: false })}) Stick
 Toaster

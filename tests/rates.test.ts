@@ -7,17 +7,17 @@ import { scratchDir } from './scratch'
 describe('a weighted hit', () => {
   it('counts its weight in memory and in SQLite, one when given none', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      expect((await store.hit('key', 60_000, 5)).count).toBe(5)
-      expect((await store.hit('key', 60_000)).count).toBe(6)
+      expect((await store.hit('key', '60000ms', 5)).count).toBe(5)
+      expect((await store.hit('key', '60000ms')).count).toBe(6)
       expect((await store.peek('key'))!.count).toBe(6)
     }
   })
 
   it('opens an expired window afresh with the weight, in SQLite as in memory', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      await store.hit('key', 1, 5)
+      await store.hit('key', '1ms', 5)
       await Bun.sleep(5)
-      expect((await store.hit('key', 60_000, 3)).count).toBe(3)
+      expect((await store.hit('key', '60000ms', 3)).count).toBe(3)
     }
   })
 

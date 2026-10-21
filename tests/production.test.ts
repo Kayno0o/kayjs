@@ -962,16 +962,16 @@ const inputs = ['203.0.113.7', 'ada@example.com', 'login\\nkey:ada@example.com',
 const sha = (...parts) => { const hasher = new Bun.CryptoHasher('sha256'); for (const part of parts) hasher.update(part); return hasher.digest('base64url') }
 const first = sqliteRates(path)
 const hits = []
-for (const input of inputs) hits.push(first.hit(input, 60_000).count)
+for (const input of inputs) hits.push(first.hit(input, '60000ms').count)
 // A restart within the window: a new store on the same file counts on.
 const second = sqliteRates(path)
-for (const input of inputs) hits.push(second.hit(input, 60_000).count)
+for (const input of inputs) hits.push(second.hit(input, '60000ms').count)
 const noSecret = new Set(new Database(path).query('SELECT key FROM kay_rates').all().map(row => row.key))
 const keyFile = readFileSync(path + '.key', 'utf8')
 const guesses = inputs.flatMap(input => [sha(input), sha(keyFile, input), sha(Buffer.from(keyFile, 'base64url'), input)])
 const plain = guesses.filter(guess => noSecret.has(guess)).length
 useStampSecret('a session secret, long enough too', 'session')
-second.hit('after', 60_000)
+second.hit('after', '60000ms')
 const withSecret = new Set(new Database(path).query('SELECT key FROM kay_rates').all().map(row => row.key))
 const hasSalt = new Database(path).query("SELECT name FROM sqlite_master WHERE name = 'kay_rates_salt'").all().length
 console.log(JSON.stringify({ hits, plain, size: noSecret.size, after: withSecret.size, plainAfter: withSecret.has(sha('after')), hasSalt }))
@@ -991,7 +991,7 @@ console.log(JSON.stringify({ hits, plain, size: noSecret.size, after: withSecret
     const path = join(dir, 'rates.sqlite')
     const script = `import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
 const store = sqliteRates(${JSON.stringify(path)})
-console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
+console.log(JSON.stringify(store.hit('203.0.113.7', '60000ms').count))
 `
 
     try {
@@ -1015,7 +1015,7 @@ console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
       await Bun.write(`${path}.key`, 'short')
       // In a process of its own, as a file run before in this one may have set the app's secret, which leaves the key file alone.
       expect(await isolated(`import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
-console.log(JSON.stringify(sqliteRates(${JSON.stringify(path)}).hit('a', 60_000).count))
+console.log(JSON.stringify(sqliteRates(${JSON.stringify(path)}).hit('a', '60000ms').count))
 `, `[kay] ${path}.key held no rate-limit key and was replaced\n`)).toBe(1)
       expect((await Bun.file(`${path}.key`).text()).length).toBe(43)
       expect((await readdir(dir)).filter(name => name.includes('.key'))).toEqual(['rates.sqlite.key'])
@@ -1031,8 +1031,8 @@ console.log(JSON.stringify(sqliteRates(${JSON.stringify(path)}).hit('a', 60_000)
 import { useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
 useStampSecret('a session secret, long enough too', 'session')
 const store = sqliteRates(${JSON.stringify(join(dir, 'rates.sqlite'))})
-store.hit('ada@example.com', 60_000)
-console.log(JSON.stringify(store.hit('ada@example.com', 60_000).count))
+store.hit('ada@example.com', '60000ms')
+console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
 `
 
     try {
@@ -1352,7 +1352,7 @@ describe('SQLite stores', () => {
 
     try {
       // The rates and session stores open their file on first use, so a config naming them creates nothing until then.
-      await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', 60_000)
+      await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', '60000ms')
       await sqliteStoreAt(join(dir, 'sessions/sessions.sqlite')).get('a')
       sqliteCache(join(dir, 'cache/cache.sqlite')).set('a', '["a"]', 0)
       // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.

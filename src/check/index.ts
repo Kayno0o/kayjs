@@ -17,6 +17,7 @@ import { inWalkScope } from '../build/files'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { bareDuration } from './bare-duration'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
@@ -170,9 +171,10 @@ async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagn
     if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
       continue
 
-    const remapped: CheckDiagnostic = shadow && diagnosed
+    const mapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
       : { ...diagnostic, ...helped(diagnostic) }
+    const remapped = await bareDuration(mapped, options.lints)
     const generated = generatedProblem(root, remapped, types, content)
 
     if (generated)

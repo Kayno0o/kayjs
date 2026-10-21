@@ -316,7 +316,7 @@ describe('page swap, checking a form in the browser', () => {
     try {
       persisted('year', 'a').set('b')
       persisted('month', 'a', { maxAge: '30d' }).set('b')
-      persisted('seconds', 'a', { maxAge: 90 }).set('b')
+      persisted('seconds', 'a', { maxAge: '90s' }).set('b')
 
       expect(writes.map(write => (/^(\w+)=.*max-age=(\d+)/).exec(write)!.slice(1))).toEqual([['year', '31536000'], ['month', '2592000'], ['seconds', '90']])
       expect(() => persisted('none', 'a', { maxAge: '0s' })).toThrow('kay: the maxAge of persisted("none") is \'0s\'')

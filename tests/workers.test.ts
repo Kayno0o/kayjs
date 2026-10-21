@@ -20,7 +20,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('wasm and w
 
       // A blocked wasm compile or worker shows as a page error, which says more than the timeout.
       try {
-        await shown.waitUntil(labDone, { timeout: 10_000 })
+        await shown.waitUntil(labDone, { timeout: '10000ms' })
       }
       finally {
         expect(shown.errors).toEqual([])

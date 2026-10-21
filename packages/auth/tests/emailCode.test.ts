@@ -1,5 +1,5 @@
 import type { CodedLink, CodeMode } from '../src/email'
-import type { Limits } from '../src/limits'
+import type { LimitsOption } from '../src/limits'
 import type { MailKind } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
@@ -9,7 +9,7 @@ const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
 const CODE = /\b(\d{6})\b/
 
-async function setup(codes: CodeMode | Partial<Record<CodedLink, CodeMode>>, limits: Partial<Limits> = {}) {
+async function setup(codes: CodeMode | Partial<Record<CodedLink, CodeMode>>, limits: LimitsOption = {}) {
   const { mails, mailer, take } = mailbox()
   const app = testApp({
     url: 'https://site.test',

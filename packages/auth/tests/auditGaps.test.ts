@@ -1,4 +1,4 @@
-import type { Limits } from '../src/limits'
+import type { LimitsOption } from '../src/limits'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { hcaptcha, turnstile } from '../src/captcha'
 import { createOAuthClient } from '../src/oauth/client'
@@ -46,7 +46,7 @@ describe('resetting a password', () => {
     const asked: string[] = []
     const { browser } = testApp({
       url: 'https://site.test',
-      rateLimit: { link: { max: 2, window: 900 } } satisfies Partial<Limits>,
+      rateLimit: { link: { max: 2, window: '900s' } } satisfies LimitsOption,
       email: { mailer: mailbox().mailer, links: LINKS },
       breachedPasswords: (password) => {
         asked.push(password)
@@ -81,7 +81,7 @@ describe('resetting a password', () => {
 describe('the second factor cap', () => {
   test('mails the holder once when the account has had too many guesses', async () => {
     const box = mailbox()
-    const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: 900 } }, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
+    const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: '900s' } }, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 

@@ -161,7 +161,7 @@ export type Redirect = <const Location extends string>(location: Location & Chec
 export type ErrorStatus<Status extends number> = number extends Status ? unknown : `${Status}` extends `${'4' | '5'}${Digit}${Digit}` ? unknown : { kayError: `ctx.fail takes an error status, from 400 to 599, not ${Status}` }
 
 // A literal duration is positive; a computed one is checked when it is used.
-export type PositiveDuration<Length extends Duration> = number extends Length ? unknown : string extends Length ? unknown : `${Length}` extends `-${string}` | '0' | `0${'ms' | 's' | 'm' | 'h' | 'd' | 'w'}` ? { kayError: `A duration is positive, seconds or a string such as '5m', not ${Length}` } : unknown
+export type PositiveDuration<Length extends Duration> = string extends Length ? unknown : `${Length}` extends `-${string}` | '0' | `0${'ms' | 's' | 'm' | 'h' | 'd' | 'w'}` ? { kayError: `A duration is positive, such as '5m', not ${Length}` } : unknown
 
 type CronNickname = 'yearly' | 'annually' | 'monthly' | 'weekly' | 'daily' | 'midnight' | 'hourly'
 // Fields may be apart by tabs as by spaces.

@@ -2,7 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
-import type { Duration, DurationText } from './duration'
+import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
@@ -43,7 +43,7 @@ export interface EveryOptions {
 // Runs `run` every `interval` while the island lives, and while `options.while` holds: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
 // Nothing runs while the server renders or the tab is hidden, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
 // An interval that is not a positive duration throws.
-export function every(interval: DurationText, run: () => unknown, options?: EveryOptions): void {
+export function every(interval: Duration, run: () => unknown, options?: EveryOptions): void {
   const ms = typeof interval === 'string' ? durationMs(interval) : Number.NaN
   let paused = false
 
@@ -120,7 +120,7 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
 
 // `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
 // The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
-export function debounced<T>(source: () => T, delay: DurationText): Memo<T> {
+export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
   const wait = durationMs(delay)
   const [settled, write] = createSignal(untrack(source))
 

@@ -1,4 +1,4 @@
-import type { DurationText } from 'kay'
+import type { Duration } from 'kay'
 import type { DraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { createDrafts } from '../src/drafts'
@@ -6,7 +6,7 @@ import { BODY } from '../src/markers'
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
 
-function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: DurationText = '5ms') {
+function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = '5ms') {
   const calls: DraftEntry[][] = []
   const drafts = createDrafts({
     delay,

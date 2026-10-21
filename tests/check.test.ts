@@ -1736,8 +1736,8 @@ describe.concurrent('kay check, edge cases', () => {
       '  ctx.redirect(\'javascript:alert(1)\')',
       '})',
       '',
-      'const kept = await cached(\'kept\', 60, () => 1)',
-      'const never = await cached(\'never\', 0, () => 1)',
+      'const kept = await cached(\'kept\', \'1m\', () => 1)',
+      'const never = await cached(\'never\', \'0s\', () => 1)',
       'const later = await cached(\'later\', \'5m\', () => 1)',
       'const none = await cached(\'none\', \'0m\', () => 1)',
       '---',
@@ -1751,8 +1751,8 @@ describe.concurrent('kay check, edge cases', () => {
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
         [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
-        [23, 'A duration is positive, seconds or a string such as \'5m\', not 0'],
-        [25, 'A duration is positive, seconds or a string such as \'5m\', not 0m'],
+        [23, 'A duration is positive, such as \'5m\', not 0s'],
+        [25, 'A duration is positive, such as \'5m\', not 0m'],
       ])
     }
     finally {
@@ -2259,9 +2259,9 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n' })
 
     try {
-      expect(await refusals(root, { base: 'docs', site: 'example.com', shutdownTimeout: 0, redirects: { '/old/:slug': '/:id' } })).toEqual([
+      expect(await refusals(root, { base: 'docs', site: 'example.com', shutdownTimeout: '0s', redirects: { '/old/:slug': '/:id' } })).toEqual([
         ['kay.config.ts', 'kay: base is docs, which is no path such as /docs'],
-        ['kay.config.ts', 'kay: shutdownTimeout is 0; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\''],
+        ['kay.config.ts', 'kay: shutdownTimeout is \'0s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\''],
         ['kay.config.ts', 'kay: site is the origin the site is public at, such as https://example.com, not "example.com"'],
         ['kay.config.ts', 'kay: the redirect from /old/:slug goes to /:id, whose :id its path has none of'],
       ])
@@ -3343,31 +3343,61 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
-    const root = await scratchProject({
-      'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
-      'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
-    })
+  it('reports a bare number where a duration goes, and --fix writes it with the unit it stood for', async () => {
+    const page = [
+      '--- server',
+      'import { cached } from "kay/cache"',
+      'const profile = await cached("user", 300, async () => "ada")',
+      'const slow = await cached("slow", 60 * 5, async () => "ada")',
+      '---',
+      'p {profile}',
+      'p {slow}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
-      expect(output).not.toContain('unknown-lint')
-      expect(output).not.toContain('no lint or group')
-      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
-      expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
-      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
+      expect(output.match(/deprecated-bare-duration/g)).toHaveLength(1)
+      expect(output).toContain('write \'300s\'')
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
-      expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+
+      const fixed = await Bun.file(join(root, 'src/routes/index.kay')).text()
+
+      expect(fixed).toContain('cached("user", \'300s\',')
+      expect(fixed).toContain('cached("slow", 60 * 5,')
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
+  const root = await scratchProject({
+    'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
+    'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+  })
+
+  try {
+    const { output } = await runCheck(root)
+
+    expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
+    expect(output).not.toContain('unknown-lint')
+    expect(output).not.toContain('no lint or group')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
+    expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
+    await runCheck(root, '--fix')
+    expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
+    expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
     const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { mailer, smtp } from \'@kaynooo/kayjs-mail\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const sent = smtp({ host: \'mail.test\', rateLimit: 5 })\nexport const nested = mailer({ smtp: { rateLimit: 2 } })\nexport const done = smtp({ host: \'mail.test\', rateLimit: { max: 5, window: \'1s\' } })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'

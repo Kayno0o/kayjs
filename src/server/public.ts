@@ -8,7 +8,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { wholeSeconds } from '../runtime/duration'
+import { isZeroDuration, wholeSeconds } from '../runtime/duration'
 import { COMPRESSIBLE_TYPE, readResponse } from './compress'
 import { pageRequested } from './not-found'
 
@@ -144,7 +144,7 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
 // The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out is kept by its kind, a font or an image, and else revalidates, as a manifest, `robots.txt`, a script or a page must.
 export function publicCacheRules(setting: Record<string, Duration> | undefined): ((url: string) => string) {
   // A zero keeps the files a glob names revalidating, for an app replacing a font or an image in place.
-  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: value === 0 ? REVALIDATE : `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
+  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: isZeroDuration(value) ? REVALIDATE : `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
 
   return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? defaultControl(url)
 }

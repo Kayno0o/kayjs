@@ -192,7 +192,7 @@ const chrome = browserPath()
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resource following a route, in a browser', () => {
   let site: TestSite
 
-  const shows = (count: number) => [(expected: number) => document.querySelector('p.answer')?.textContent === `${expected} via ready`, { timeout: 5000 }, count] as const
+  const shows = (count: number) => [(expected: number) => document.querySelector('p.answer')?.textContent === `${expected} via ready`, { timeout: '5s' }, count] as const
   const change = (orders: number) => {
     db.orders = orders
     invalidate('orders')
@@ -218,7 +218,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resour
     await page.waitUntil(...shows(20))
     db.news = ['first', 'fresh']
     invalidate('latest')
-    await page.waitUntil(() => document.querySelector('p.latest')?.textContent === 'fresh', { timeout: 8000 })
+    await page.waitUntil(() => document.querySelector('p.latest')?.textContent === 'fresh', { timeout: '8000ms' })
     change(21)
     await page.waitUntil(...shows(21))
     expect(page.errors).toEqual([])
@@ -251,7 +251,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resour
   it('opens no connection and loads no chunk for a resource whose route reads no live key', async () => {
     await using page = await site.open('/resource-plain')
 
-    await page.waitUntil(() => document.querySelector('p.answer')?.textContent?.endsWith('via ready') === true, { timeout: 5000 })
+    await page.waitUntil(() => document.querySelector('p.answer')?.textContent?.endsWith('via ready') === true, { timeout: '5000ms' })
     await Bun.sleep(300)
     expect(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('live-cache') || entry.name.includes('/_kay/live')))).toBe(false)
   })

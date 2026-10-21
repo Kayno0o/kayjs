@@ -27,7 +27,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('pages foll
 
     for (let n = 0; n < PAGES && failure === undefined; n++) {
       try {
-        pages.push(await site.open('/', { timeout: 5000 }))
+        pages.push(await site.open('/', { timeout: '5000ms' }))
       }
       catch (error) {
         failure = error
@@ -43,7 +43,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('pages foll
       page.close()
 
     for (let n = 0; n < PAGES; n++) {
-      await using page = await site.open('/', { timeout: 5000 })
+      await using page = await site.open('/', { timeout: '5000ms' })
 
       expect(await page.count('body')).toBe(1)
     }

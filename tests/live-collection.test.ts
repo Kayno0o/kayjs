@@ -147,7 +147,7 @@ const chrome = browserPath()
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a collection a page follows, in a browser', () => {
   let site: TestSite
 
-  const lists = (count: number) => [(expected: number) => document.querySelectorAll('ul.tales li').length === expected, { timeout: 5000 }, count] as const
+  const lists = (count: number) => [(expected: number) => document.querySelectorAll('ul.tales li').length === expected, { timeout: '5s' }, count] as const
 
   beforeAll(async () => {
     site = await testSite({ root: ROOT, browser: { path: chrome } })

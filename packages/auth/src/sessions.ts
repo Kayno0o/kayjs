@@ -109,12 +109,12 @@ export async function applyLifetime(state: RequestState, remember: boolean | und
   const { core, session } = state
 
   if (remember === undefined) {
-    await session.lifetime(session.settings.maxAge)
+    await session.lifetime(`${session.settings.maxAge}s`)
 
     return null
   }
 
-  await session.lifetime(remember ? core.rememberMaxAge : 'browser')
+  await session.lifetime(remember ? `${core.rememberMaxAge}s` : 'browser')
 
   return remember ? core.rememberMaxAge : session.settings.browserMaxAge
 }

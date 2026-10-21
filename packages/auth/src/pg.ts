@@ -1,6 +1,7 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
+import { optionMs } from 'kay/library'
 import { log } from './log'
 
 export const AuthUsers = defineTable('auth_user', t => ({
@@ -474,7 +475,7 @@ export function pgStore(db: Database): AuthStore {
 
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
         const [row] = await db.raw<{ count: number }>`
-          INSERT INTO "auth_attempt" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + window * 1000)})
+          INSERT INTO "auth_attempt" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + optionMs(window, 'an attempts window', 'kayjs-auth'))})
           ON CONFLICT ("key") DO UPDATE SET
             "count" = CASE WHEN "auth_attempt"."reset_at" > ${now} THEN "auth_attempt"."count" + 1 ELSE 1 END,
             "reset_at" = CASE WHEN "auth_attempt"."reset_at" > ${now} THEN "auth_attempt"."reset_at" ELSE EXCLUDED."reset_at" END
@@ -498,8 +499,8 @@ export function pgStore(db: Database): AuthStore {
         invitations.write.deleteMany({ expires_at: { lte: now } }),
         bearerTokens.write.deleteMany({ expires_at: { lt: bearerExpiredBefore } }),
         attempts.write.deleteMany({ reset_at: { lte: now } }),
-        sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - sessionMaxAge * 1000) } }),
-        sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - sessionAbsoluteMaxAge * 1000) } }),
+        sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - optionMs(sessionMaxAge, 'sessionMaxAge', 'kayjs-auth')) } }),
+        sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - optionMs(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge', 'kayjs-auth')) } }),
         // A session the user's version moved past is already refused, so its row goes too.
         db.raw`DELETE FROM "auth_session" WHERE "version" < (SELECT "session_version" FROM "auth_user" WHERE "auth_user"."id" = "auth_session"."user_id")`,
       ])

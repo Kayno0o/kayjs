@@ -50,7 +50,7 @@ async function failure(reply: PromiseLike<string>): Promise<unknown> {
   throw new Error('the reply did not fail')
 }
 
-const REQUEST: ProviderRequest = { messages: [{ role: 'user', content: 'Add milk' }], system: undefined, model: 'mistral-small-2603', maxTokens: 50, temperature: undefined, timeouts: { connect: 5000, idle: 5000 }, tools: [{ name: 'add_note', description: 'Add note', inputSchema: { type: 'object', properties: { title: { type: 'string' } } } }] }
+const REQUEST: ProviderRequest = { messages: [{ role: 'user', content: 'Add milk' }], system: undefined, model: 'mistral-small-2603', maxTokens: 50, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' }, tools: [{ name: 'add_note', description: 'Add note', inputSchema: { type: 'object', properties: { title: { type: 'string' } } } }] }
 
 describe('Mistral through the OpenAI-compatible provider', () => {
   it('streams after the server refuses stream_options, counting the usage on the last chunk', async () => {

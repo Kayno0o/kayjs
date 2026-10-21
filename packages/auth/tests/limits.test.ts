@@ -1,4 +1,5 @@
-import type { Limits } from '../src/limits'
+import type { Duration } from 'kay'
+import type { LimitsOption } from '../src/limits'
 import { describe, expect, test } from 'bun:test'
 import { DEFAULT_LIMITS } from '../src/limits'
 import { base32Encode, totpCode, totpStep } from '../src/totp'
@@ -17,14 +18,14 @@ interface Row {
   // What the limiter counts: the account or address typed, or the client address.
   per: 'account' | 'client'
   // Overrides the default window and maximum, for a limiter too loose to walk in a test.
-  limit?: { max: number, window: number }
+  limit?: { max: number, window: Duration }
   // What an attempt before the maximum is answered with, so the limit is not reached through some other refusal.
   answers: object
   // Sets the app up and answers an attempt that is not itself refused, the n-th of them.
-  prepare: (limits: Partial<Limits>) => Promise<(n: number) => Promise<unknown>>
+  prepare: (limits: LimitsOption) => Promise<(n: number) => Promise<unknown>>
 }
 
-async function registered(limits: Partial<Limits>, extra: Parameters<typeof testApp>[0] = {}) {
+async function registered(limits: LimitsOption, extra: Parameters<typeof testApp>[0] = {}) {
   const app = testApp({ rateLimit: limits, ...extra })
   const ada = app.browser()
 
@@ -34,7 +35,7 @@ async function registered(limits: Partial<Limits>, extra: Parameters<typeof test
 }
 
 // A visitor with the password of an account that asks for a code, enrolled straight in the store so no attempt is spent on the way.
-async function pendingSignIn(limits: Partial<Limits>) {
+async function pendingSignIn(limits: LimitsOption) {
   const app = await registered(limits)
   const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
   const [user] = (await app.store.users.list({ offset: 0, limit: 1 })).users
@@ -52,7 +53,7 @@ function mail(codes?: 'code') {
   return { url: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, codes, requireVerified: false } }
 }
 
-async function mailed(limits: Partial<Limits>) {
+async function mailed(limits: LimitsOption) {
   const app = testApp({ rateLimit: limits, ...mail() })
 
   await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -60,14 +61,14 @@ async function mailed(limits: Partial<Limits>) {
   return app
 }
 
-async function secondFactor(limits: Partial<Limits>) {
+async function secondFactor(limits: LimitsOption) {
   const app = await registered(limits)
   const { setup } = await app.ada.callOk('setUpTwoFactor', { password: PASSWORD })
 
   return { ...app, secret: setup.secret }
 }
 
-async function guessingCodes(limits: Partial<Limits>) {
+async function guessingCodes(limits: LimitsOption) {
   const { ada } = await registered(limits, mail('code'))
 
   await ada.call('requestMagicLink', 'ada@example.com')
@@ -81,7 +82,7 @@ const rows: Row[] = [
     key: 'register',
     answers: { ok: true },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { browser } = testApp({ limits })
 
@@ -92,7 +93,7 @@ const rows: Row[] = [
     key: 'signIn',
     answers: { ok: false, error: 'invalid' },
     per: 'client',
-    limit: { max: 2, window: 900 },
+    limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
       const { browser } = testApp({ limits })
 
@@ -124,7 +125,7 @@ const rows: Row[] = [
     action: 'signing in',
     answers: { ok: false, error: 'invalid' },
     per: 'client',
-    limit: { max: 2, window: 900 },
+    limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
       const { visitor } = await pendingSignIn(limits)
 
@@ -136,7 +137,7 @@ const rows: Row[] = [
     action: 'turning on',
     answers: { ok: false, error: 'invalid' },
     per: 'client',
-    limit: { max: 2, window: 900 },
+    limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
       const { ada } = await secondFactor(limits)
 
@@ -183,21 +184,21 @@ const rows: Row[] = [
     key: 'emailCode',
     answers: { ok: false, error: 'invalid' },
     per: 'client',
-    limit: { max: 2, window: 900 },
+    limit: { max: 2, window: '900s' },
     prepare: guessingCodes,
   },
   {
     key: 'emailCodeAccount',
     answers: { ok: false, error: 'invalid' },
     per: 'account',
-    limit: { max: 2, window: 900 },
+    limit: { max: 2, window: '900s' },
     prepare: guessingCodes,
   },
   {
     key: 'resend',
     answers: { ok: true },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
@@ -208,7 +209,7 @@ const rows: Row[] = [
     key: 'emailChange',
     answers: { ok: true },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
@@ -219,7 +220,7 @@ const rows: Row[] = [
     key: 'link',
     answers: { ok: false, error: 'invalid' },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
@@ -250,7 +251,7 @@ const rows: Row[] = [
     key: 'forgot',
     answers: { ok: true },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
@@ -271,7 +272,7 @@ const rows: Row[] = [
     key: 'magicLink',
     answers: { ok: true },
     per: 'client',
-    limit: { max: 2, window: 3600 },
+    limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 

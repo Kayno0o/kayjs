@@ -1,6 +1,6 @@
-import type { DurationText } from '../src/runtime/duration'
+import type { Duration } from '../src/runtime/duration'
 import { describe, expect, it } from 'bun:test'
-import { durationMs, durationSeconds, optionMs, wholeSeconds } from '../src/runtime/duration'
+import { durationMs, durationSeconds, isZeroDuration, legacyMs, optionMs, wholeSeconds } from '../src/runtime/duration'
 import { durationWords } from '../src/runtime/duration-words'
 
 describe('durations', () => {
@@ -14,19 +14,19 @@ describe('durations', () => {
   })
 
   it('gives milliseconds to an option that takes them, from a duration string', () => {
-    expect(['300ms', '3s', '1.5m', '2h'].map(value => durationMs(value as DurationText))).toEqual([300, 3000, 90_000, 7_200_000])
-    expect(['250ms', '2s'].map(value => optionMs(value as DurationText, 'wait'))).toEqual([250, 2000])
-    expect(Number.isNaN(durationMs('soon' as DurationText))).toBe(true)
+    expect(['300ms', '3s', '1.5m', '2h'].map(value => durationMs(value as Duration))).toEqual([300, 3000, 90_000, 7_200_000])
+    expect(['250ms', '2s'].map(value => optionMs(value as Duration, 'wait'))).toEqual([250, 2000])
+    expect(Number.isNaN(durationMs('soon' as Duration))).toBe(true)
   })
 
   it('refuses a string that is no duration for an option taking milliseconds, naming it', () => {
-    for (const value of ['soon', '0ms', '-5s', '5', '5 ms', ''] as DurationText[])
+    for (const value of ['soon', '0ms', '-5s', '5', '5 ms', ''] as Duration[])
       expect(() => optionMs(value, 'wait')).toThrow(/^kay: wait is '.*'; it takes a positive duration/)
   })
 
   it('keeps the seconds of a fractional minute, hour or day exact, as headers carry them', () => {
     expect(['8.7m', '17.1m', '2.3h', '34.3m'].map(value => durationSeconds(value, 'ttl'))).toEqual([522, 1026, 8280, 2058])
-    expect((['1001ms', '1.1s', '8.7m'] as DurationText[]).map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
+    expect((['1001ms', '1.1s', '8.7m'] as Duration[]).map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
   })
 
   it('rounds up to whole seconds for a header or a cookie, so a sub-second duration is never 0 nor fractional', () => {
@@ -36,7 +36,21 @@ describe('durations', () => {
 
   it('refuses what is no positive duration, naming the option', () => {
     for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
-      expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'$/)
+      expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration such as '250ms', '5m' or '30d'$/)
+  })
+})
+
+describe('legacy numbers', () => {
+  it('keeps a number as milliseconds in legacyMs and as seconds in durationSeconds, until 1.73', () => {
+    expect(legacyMs(1500, 'wait')).toBe(1500)
+    expect(legacyMs('1500ms', 'wait')).toBe(1500)
+    expect(durationSeconds(90, 'ttl')).toBe(90)
+  })
+
+  it('tells a zero duration', () => {
+    expect(isZeroDuration('0s')).toBe(true)
+    expect(isZeroDuration('0ms')).toBe(true)
+    expect(isZeroDuration('5s')).toBe(false)
   })
 })
 
