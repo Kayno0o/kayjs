@@ -14,7 +14,8 @@ const { form } = props<{ form: FormScope }>()
 // An image dropped or pasted into the body is an upload too.
 guardLeave(uploading)
 
-const uploadDenied = uploadRefusal()
+// The refusal the page loaded with when the form holds it, else asked.
+const uploadRefused = form.denied ? () => form.denied?.upload : uploadRefusal()
 
 effect(() => {
   onCleanup(form.shown.add('#body'))
@@ -23,4 +24,4 @@ effect(() => {
 if form.collection.body
   .kcms-field(data-kcms-body id={fieldId(form.entry, 'b')})
     FormField(label={wording('cms.entry.body', 'Body')} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
-      MarkdownEditor(value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadDenied() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})
+      MarkdownEditor(value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={uploadRefused() === undefined ? async file => (await uploadFile(form.entry.collection, file)).path : undefined})

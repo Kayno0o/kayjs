@@ -45,7 +45,7 @@ if (field.kind === 'markdown')
   guardLeave(uploading)
 
 // Whether the role may upload an image dropped or pasted into a Markdown box.
-const uploadDenied = field.kind === 'markdown' ? uploadRefusal() : () => undefined
+const uploadRefused = field.kind === 'markdown' ? uploadRefusal() : () => undefined
 
 const touched = signal(false)
 // The text of a JSON box while it is edited, which the draft's value is formatted from once the box is left.
@@ -462,7 +462,7 @@ function leaveJson(): void {
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
-        MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadDenied() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
+        MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Adorned(prefix={current.prefix} suffix={current.suffix})

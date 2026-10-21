@@ -18,7 +18,7 @@ async function endedSite(base: string, redirects?: Record<string, string>) {
   const scratch = await scratchBuild()
 
   setSystemTime(new Date('2026-10-19T12:00:00Z'))
-  schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: ENDING }, { slug: 'later', title: 'Later', at: '2999-01-01' }]
+  schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: ENDING }, { slug: 'later', title: 'Later', at: '2999-01-01' }, { slug: 'inverted', title: 'Inverted', at: '2999-01-01', ends: '2020-01-01' }]
   await scratch.prerender(optionsFor(base, redirects))
   setSystemTime(new Date('2026-10-19T14:00:00Z'))
 
@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 
 describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p', (base) => {
-  it('answers its page with 410 Gone, a missing or not yet published entry staying 404', async () => {
+  it('answers its page with 410 Gone, a missing entry, one not yet published and one whose window never opened staying 404', async () => {
     const { scratch, app } = await endedSite(base)
 
     try {
@@ -57,6 +57,7 @@ describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p',
       expect((await visit(app, `/talks/now`)).status).toBe(200)
       expect((await visit(app, `/talks/nobody`)).status).toBe(404)
       expect((await visit(app, `/talks/later`)).status).toBe(404)
+      expect((await visit(app, `/talks/inverted`)).status).toBe(404)
     }
     finally {
       await scratch.remove()

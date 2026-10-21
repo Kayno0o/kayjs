@@ -6,6 +6,7 @@ import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { resource } from 'kay'
 import { wording } from 'kay/words'
+import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
 import { collectionTitle } from '../listing'
 import { BODY } from '../markers'
@@ -38,11 +39,13 @@ const saving = signal(false)
 const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 onCleanup(onSaved.stop)
+// What the signed-in person's role may not do, which locks the fields it covers once the server has said.
+const can = resource(editorApi, '/can')
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
   const answer = source.value()
 
-  return answer && formScope(drafts, entry, answer.collection)
+  return answer && Object.defineProperty(formScope(drafts, entry, answer.collection), 'denied', { get: () => can.value()?.denied })
 })
 let box: HTMLElement | undefined
 
