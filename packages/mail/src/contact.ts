@@ -89,7 +89,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     name: s.String({ pattern: ONE_LINE, maxLength: 100, ...refusal('name') }),
     email: s.String({ format: 'email', maxLength: 254, ...refusal('email') }),
     ...fields,
-    ...consent ? { consent: s.Literal(true, refusal('consent')) } : {},
+    ...consent ? { consent: s.Literal(true, { ...refusal('consent'), 'x-kay-consent': true }) } : {},
     message: s.String({ pattern: '\\S', maxLength, ...refusal('message') }),
   }) as unknown as ContactSchema<Extra, Consent>
 

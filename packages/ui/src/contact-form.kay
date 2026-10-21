@@ -5,7 +5,7 @@ import Button from './button.kay'
 import FormField from './form-field.kay'
 import Notice from './notice.kay'
 
-const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consentLabel', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacyLabel', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, rows = 6, class: className } = props<{
+const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consentLabel', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacyLabel', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6, class: className } = props<{
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
   action: Action<never, unknown>
   // The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language, English and French, which these replace.
@@ -18,6 +18,8 @@ const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.co
   // The consent checkbox, drawn when the action asks for one (`consent: true` in `contactForm`), and the link after it to the privacy page, drawn when `privacy` is given.
   consentLabel?: string | undefined
   privacyLabel?: string | undefined
+  // Whether to draw the consent checkbox, which is read from the action when left out; an action inside an island is a stub that carries no schema, so say `consent` there.
+  consent?: boolean | undefined
   // Where the privacy page is, such as `/privacy`.
   privacy?: string | undefined
   // The message box's height, in lines.
@@ -25,8 +27,8 @@ const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.co
   class?: string | undefined
 }>()
 
-// Server actions carry their schema; the consent checkbox is drawn when it holds a `consent` field.
-const asksConsent = (action as { schema?: { properties?: Record<string, unknown> } }).schema?.properties?.consent !== undefined
+// Server actions carry their schema; the consent checkbox is drawn when `consent: true` marked the field.
+const asksConsent = consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
 ---
 // Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action. Fields beyond those three go in as children, between the email and the message.
 form.kui-contact-form(action={action} novalidate class={className})
@@ -43,7 +45,7 @@ form.kui-contact-form(action={action} novalidate class={className})
         input.kui-checkbox-input(field="consent" type="checkbox")
         span.kui-checkbox-label {consentLabel}
       if privacy
-        a(href={privacy}) {privacyLabel}
+        a(href={privacy} target="_blank" rel="noopener") {privacyLabel}
       span.kui-form-field-issues(aria-live="polite" data-field="consent")
         if action.error('consent') as issue
           span.kui-form-field-issue {issue}

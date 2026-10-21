@@ -202,6 +202,17 @@ describe('contactForm', () => {
     expect(outbox.last()).toBeDefined()
   })
 
+  it('answers a bot filling the renamed honeypot without consent as if it worked', async () => {
+    const { call } = await site()
+    const body = new FormData()
+
+    for (const [key, value] of Object.entries({ name: 'Ada', email: 'ada@example.com', message: 'Hello', nectar: 'spam' }))
+      body.set(key, value)
+
+    expect(await call(consented, body as never)).toBeUndefined()
+    expect(outbox.last()).toBeUndefined()
+  })
+
   it('keeps website as the honeypot by default', async () => {
     const { call } = await site()
     const body = new FormData()

@@ -597,7 +597,7 @@ describe('ContactForm', () => {
     expect(html).toContain('name="consent"')
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('I agree that my details are used to answer my message.')
-    expect(html).toContain('<a href="/privacy">Privacy policy</a>')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>')
     expect(html).toContain('name="nectar"')
     expect((await site.visit('/fr/contact-consent')).html).toContain('Politique de confidentialité')
     expect((await site.visit('/contact-words')).html).not.toContain('name="consent"')
@@ -605,6 +605,15 @@ describe('ContactForm', () => {
     const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
 
     expect(refused.html).toContain('class="kui-form-field-issue">Please tick the box to send your message.</span>')
+  })
+
+  test('draws no consent box for an app\'s own consent field, which only consent: true marks', async () => {
+    await import('../src/routes/contact-own-consent.kay')
+
+    const { html } = await site.visit('/contact-own-consent')
+
+    expect(html).not.toContain('I agree that my details')
+    expect(html).not.toContain('name="consent"')
   })
 
   test('shows each refused field\'s message under it and the thanks once a post goes through', async () => {
