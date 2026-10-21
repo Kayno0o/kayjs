@@ -17,6 +17,14 @@ let server: Fixture
 let page: TestPage
 let origin: string
 
+async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    for await (const chunk of stream)
+      void chunk
+  }
+  catch {}
+}
+
 async function listeningPort(child: Fixture): Promise<string> {
   const reader = child.stdout.getReader()
   let output = ''
@@ -31,6 +39,9 @@ async function listeningPort(child: Fixture): Promise<string> {
   }
 
   reader.releaseLock()
+  // The server logs each request, and a pipe nobody reads fills at 64 KB, after which the server blocks on its next write and every later page hangs.
+  void drain(child.stdout)
+  void drain(child.stderr)
 
   return LISTENING.exec(output)![1]!
 }
