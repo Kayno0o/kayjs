@@ -523,7 +523,7 @@ class ModuleShell {
         edits.push({ ...specifier, text: JSON.stringify(target) })
     }
 
-    let cursor = span.start
+    let cursor = this.indentStart(span.start)
 
     for (const edit of edits.sort((a, b) => a.start - b.start)) {
       this.b.addSource({ start: cursor, end: edit.start })
@@ -535,6 +535,16 @@ class ModuleShell {
     }
 
     this.b.addSource({ start: cursor, end: span.end }).add('\n')
+  }
+
+  // Where the line of a statement hoisted out of a fence starts when the type check is written, so its indentation is the file's: the linter judges it.
+  private indentStart(offset: number): number {
+    let start = offset
+
+    while (this.mode === 'check' && (this.src[start - 1] === ' ' || this.src[start - 1] === '\t'))
+      start--
+
+    return start === 0 || this.src[start - 1] === '\n' ? start : offset
   }
 
   // An import specifier with the comma that separates it from its neighbour.
@@ -557,10 +567,12 @@ class ModuleShell {
     const page = this.mode === 'check' ? server.page?.init : undefined
 
     for (const span of server.exports) {
+      const from = this.indentStart(span.start)
+
       if (page && page.start >= span.start && page.end <= span.end)
-        b.addSource({ start: span.start, end: page.end }).add(' satisfies KayPageSettings').addSource({ start: page.end, end: span.end }).add('\n')
+        b.addSource({ start: from, end: page.end }).add(' satisfies KayPageSettings').addSource({ start: page.end, end: span.end }).add('\n')
       else
-        b.addSource(span).add('\n')
+        b.addSource({ start: from, end: span.end }).add('\n')
 
       this.deferDeclared(server, span)
     }
@@ -581,7 +593,7 @@ class ModuleShell {
       if (this.leftOut(server, span))
         continue
 
-      b.addSource(span)
+      b.addBody(span)
 
       this.deferDeclared(server, span)
     }
@@ -626,7 +638,7 @@ class ModuleShell {
         propsDone = true
       }
 
-      this.b.addSource(span)
+      this.b.addBody(span)
     }
 
     if (!propsDone)

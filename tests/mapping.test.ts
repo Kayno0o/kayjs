@@ -17,6 +17,15 @@ describe('CodeBuilder', () => {
     expect(builder.code).toBe('aa BB cc()| <dd> ee!|!')
   })
 
+  it('notes the lines of a body, a blank one aside, and a line a span starts after its indentation', () => {
+    const source = 'a\n  b\n\n  c d\n'
+    const builder = new CodeBuilder(source)
+
+    builder.add('head {\n').addBody({ start: 0, end: 1 }).addBody({ start: 1, end: 5 }).addBody({ start: 5, end: 9 }).addBody({ start: 9, end: 12 }).add('tail {\n')
+
+    expect(builder.bodyLines.map(line => builder.code.slice(line, line + 3))).toEqual(['a\n ', '  b', '  c'])
+  })
+
   it('leaves out a rewrite only partly inside the span', () => {
     const builder = new CodeBuilder('abcdef', new Map([[2, { replace: 'X', end: 5 }]]))
 

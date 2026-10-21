@@ -298,7 +298,7 @@ snippet row(key: string, fallback = list['x'])
       at(tsx, fence, { fix: { range: [fence, fence + 3], text: 'const\n' } }),
     ]], FILE)
 
-    expect(messages.map(message => message.fix?.text)).toEqual([undefined, 'const\n'])
+    expect(messages.map(message => message.fix?.text)).toEqual(['const\n', undefined])
   })
 
   it('reports no rule on the generated parentheses and wrappers around an expression', async () => {
@@ -599,6 +599,162 @@ describe('kay/eslint messages over template expressions', () => {
     expect(message).toEqual(expect.objectContaining({ message: 'Use String(list.length)', fix: { range: [source.indexOf('list.length'), source.indexOf('list.length') + 4], text: 'String(list.length)' } }))
     expect(message!.suggestions![0]!.desc).toBe('Wrap list.length')
     expect(message!.suggestions![0]!.fix.text).toBe('String(list.length)')
+  })
+})
+
+describe('kay/eslint over the indentation of a fence', () => {
+  const tsParser = import('@typescript-eslint/parser')
+  const stylistic = import('@stylistic/eslint-plugin')
+  const INDENT = { 'style/indent': ['error', 2, { CallExpression: { arguments: 'first' } }] }
+
+  async function lint(text: string, rules: Record<string, unknown> = INDENT) {
+    const { default: parser } = await tsParser
+    const { default: plugin } = await stylistic
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: plugin }, rules },
+    ] as never
+    const run = async (fix: boolean) => (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: FILE }))[0]!
+    const fixed = await run(true)
+
+    return { messages: (await run(false)).messages.map(message => [message.ruleId, message.line, message.column]), fixed: fixed.output ?? text, left: fixed.messages.map(message => [message.ruleId, message.line]) }
+  }
+
+  const MISINDENTED = `---
+const a = 1
+  const b = 2
+function run() {
+const c = 3
+    const d = 4
+  if (c) {
+     go()
+  }
+}
+---
+--- server
+const e = 1
+ const f = 2
+---
+p {a}
+`
+
+  it('reports a line misindented by any amount, an over-indent of one level included, at its .kay line', async () => {
+    const { messages } = await lint(MISINDENTED)
+
+    expect(messages).toEqual([
+      ['style/indent', 3, 1],
+      ['style/indent', 5, 1],
+      ['style/indent', 6, 1],
+      ['style/indent', 8, 1],
+      ['style/indent', 14, 1],
+    ])
+  })
+
+  it('reindents them as in a .ts file', async () => {
+    const { fixed, left } = await lint(MISINDENTED)
+
+    expect(fixed).toBe(`---
+const a = 1
+const b = 2
+function run() {
+  const c = 3
+  const d = 4
+  if (c) {
+    go()
+  }
+}
+---
+--- server
+const e = 1
+const f = 2
+---
+p {a}
+`)
+    expect(left).toEqual([])
+  })
+
+  it('reports nothing on a fence indented as a .ts file would be', async () => {
+    const { messages } = await lint(`---
+import {
+  signal,
+} from 'kay'
+import { x } from './x'
+export const hoisted = {
+  a: 1,
+}
+const total = signal(0)
+function run(list: number[]) {
+  // note
+  /* block
+     more */
+  const text = \`first
+second\`
+
+  return list.map((n) => {
+    return n + 1
+  })
+}
+const tabbed = {
+\ta: 1,
+}
+---
+--- server
+const items = [
+  1,
+  2,
+]
+export const post = {
+  a: 1,
+}
+---
+p {total}
+`)
+
+    expect(messages).toEqual([['style/indent', 22, 1]])
+  })
+
+  it('reports a tab once, as the indent rule and not as mixed spaces and tabs', async () => {
+    const { messages } = await lint('---\nconst tabbed = {\n\ta: 1,\n}\n---\np hi\n', { ...INDENT, 'style/no-mixed-spaces-and-tabs': 'error', 'style/no-tabs': 'error' })
+
+    expect(messages).toEqual([['style/indent', 3, 1], ['style/no-tabs', 3, 1]])
+  })
+
+  it('leaves blank lines without trailing spaces', async () => {
+    const { messages } = await lint('---\nconst a = 1\n\nfunction run() {\n  const b = 2\n\n  return b\n}\n---\np {a}\n', { ...INDENT, 'style/no-trailing-spaces': 'error' })
+
+    expect(messages).toEqual([])
+  })
+
+  it('lays out the line a brace-style fix breaks, with the indent rule on', async () => {
+    const { fixed, left } = await lint('--- server\ntry {\n  await Promise.resolve()\n} catch (e) {\n  console.error(e)\n}\n---\np hi\n', { ...INDENT, 'style/brace-style': ['error', 'stroustrup'] })
+
+    expect(fixed).toBe('--- server\ntry {\n  await Promise.resolve()\n}\ncatch (e) {\n  console.error(e)\n}\n---\np hi\n')
+    expect(left).toEqual([])
+  })
+
+  it('writes a fix over several lines at the indentation of the file', async () => {
+    const text = '---\nfunction run() {\n  const total = 1 +\n    2\n\n  return total\n}\n---\np hi\n'
+    const { fixed } = await lint(text, { ...INDENT, 'style/operator-linebreak': ['error', 'before'] })
+
+    expect(fixed).toBe('---\nfunction run() {\n  const total = 1\n    + 2\n\n  return total\n}\n---\np hi\n')
+  })
+
+  it('judges the arguments of a call by the columns of the file, even when a name before them is rewritten', async () => {
+    const aligned = '---\nconst { price } = props<{ price: number }>()\nconst total = Math.max(price,\n                       1)\n---\np {total}\n'
+    const { messages } = await lint(aligned)
+
+    expect(messages).toEqual([])
+  })
+
+  it('reports an argument not aligned to the first one of its call', async () => {
+    const { messages } = await lint('---\nconst total = Math.max(1,\n                  2)\n---\np {total}\n')
+
+    expect(messages).toEqual([['style/indent', 3, 1]])
+  })
+
+  it('reports nothing in a file that has no fence', async () => {
+    expect((await lint('p hi\n')).messages).toEqual([])
   })
 })
 

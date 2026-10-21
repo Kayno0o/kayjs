@@ -243,6 +243,8 @@ ESLint lints the script and server fences of `.kay` files through `kay/eslint`. 
 
 It reports at the `.kay` line and column. `--fix` edits the file when the code it replaces was written there as is.
 
+The indentation rule judges a line of a fence as it would in a `.ts` file, one over-indented by a level included, and `--fix` reindents it. It leaves the template, a multi-line expression in it and the `props` declaration alone. `@kaynooo/eslint` turns the rule on for `.kay` files once kay is 1.70 or later.
+
 With `tailwind` on, the classes of a template reach the Tailwind rules of `@kaynooo/eslint`, a shorthand `.flex` and a static `class="..."` alike. A class is reported at its place in the file. Its fix is made only inside a `class="..."` of an element with no shorthand.
 
 Tags and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
