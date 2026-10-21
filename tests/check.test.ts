@@ -3195,15 +3195,17 @@ describe.concurrent('kay check, unused code', () => {
       'kay.config.ts': 'export default {\n  onError: (err, req) => report(err, req),\n}\n',
       'src/auth.ts': 'import { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({\n  onSignUp: async (user, profile) => seed(user, profile),\n  onDelete: user => drop(user),\n  onExport: (u) => ({ u }),\n  onProviderProfile: (user: User, profile) => ({}),\n  onAuthEvent: info => log(info),\n})\n',
       'src/other.ts': 'export const x = { onDelete: user => drop(user) }\n',
+      'src/jobs.ts': 'import { queue } from \'kay/server\'\n\nexport const a = queue(\'a\', run, { onFailed: (payload, error) => alert(payload, error) })\nexport const b = queue(\'b\', run, { \'onFailed\': ({ to }) => alert(to) })\nexport const c = queue(\'c\', run, { onFailed: ({ payload }) => alert(payload) })\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-hook-shape/g)).toHaveLength(5)
+      expect(output.match(/deprecated-hook-shape/g)).toHaveLength(7)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  onError: ({ error: err, request: req }) => report(err, req),\n}\n')
       expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe('import { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({\n  onSignUp: async ({ user, profile }) => seed(user, profile),\n  onDelete: ({ user }) => drop(user),\n  exportData: ({ user: u }) => ({ u }),\n  onProviderProfile: (user: User, profile) => ({}),\n  onAuthEvent: info => log(info),\n})\n')
+      expect(await Bun.file(join(root, 'src/jobs.ts')).text()).toBe('import { queue } from \'kay/server\'\n\nexport const a = queue(\'a\', run, { onFailed: ({ payload, error }) => alert(payload, error) })\nexport const b = queue(\'b\', run, { \'onFailed\': ({ to }) => alert(to) })\nexport const c = queue(\'c\', run, { onFailed: ({ payload }) => alert(payload) })\n')
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe('export const x = { onDelete: user => drop(user) }\n')
     }
     finally {

@@ -30,7 +30,7 @@ async function app(options: Parameters<typeof pages>[0] = {}) {
 }
 
 async function build(options: Parameters<typeof pages>[0]) {
-  return pages({ routes: join(root, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported), ...options })
+  return pages({ routes: join(root, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]), ...options })
 }
 
 async function read(served: Awaited<ReturnType<typeof app>>, path: string, host = 'localhost') {
@@ -166,7 +166,7 @@ describe('a lastmod that cannot be read', () => {
         await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], lastmod: ({ slug }) => { if (slug === 'b') throw new Error('Database down'); return slug === 'a' ? '2026-02-31' : '2026-05-06' } }\n---\nh1 Post\n`)
         errors.length = 0
 
-        const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', dev, onError: (...reported) => void errors.push(reported) })
+        const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', dev, onError: ({ error, request }) => void errors.push([error, request]) })
         const { status, text } = await read(served, '/sitemap.xml')
 
         expect(status).toBe(200)
@@ -193,7 +193,7 @@ describe('a sitemap built without a lastmod', () => {
     await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { if ((globalThis as { sitemapDatabaseDown?: boolean }).sitemapDatabaseDown) throw new Error(\'Database down\'); return \'2026-05-06\' } }\n---\nh1 Post\n')
 
     try {
-      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported) })
+      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
 
       down.sitemapDatabaseDown = true
@@ -228,7 +228,7 @@ describe('a sitemap with a lastmod that is no date', () => {
     errors.length = 0
 
     try {
-      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: (...reported) => void errors.push(reported) })
+      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
       const first = await fetched()
 

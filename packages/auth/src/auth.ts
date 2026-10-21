@@ -156,7 +156,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, and the provider's `profile` for a sign-up by a provider account.
   onSignUp?: ((event: { user: User, profile: Profile | undefined }) => void | Promise<void>) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
-  // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `onProviderProfile` fills it, and a store keeps it as JSON.
+  // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `profileFields` fills it, and a store keeps it as JSON.
   user?: (TSchema & { static: UserData }) | undefined
   // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.
   profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
@@ -942,7 +942,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return actor ? linkedUser(this.core, actor) : null
   }
 
-  // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `onExport`: for a download of their data.
+  // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
   async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }> {
     return exportData(this[STATE])
   }
@@ -1770,12 +1770,12 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
     onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
-    onProviderProfile: hooked(options.profileFields ?? options.onProviderProfile, (user, profile) => ({ user, profile })),
+    onProviderProfile: (options.profileFields ? hooked(options.profileFields, (user, profile) => ({ user, profile })) : options.onProviderProfile) as Core['onProviderProfile'],
     userData: options.user && userDataRules(options.user),
     onDelete: hooked(options.onDelete, user => ({ user })),
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
-    onExport: hooked(options.exportData ?? options.onExport, user => ({ user })),
+    onExport: options.exportData ? hooked(options.exportData, user => ({ user })) : options.onExport,
     onAuthEvent: options.onAuthEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },

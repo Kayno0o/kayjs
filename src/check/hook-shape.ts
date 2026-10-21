@@ -14,18 +14,22 @@ const OPEN_PAREN = /\(\s*$/
 const QUEUES = /^(?:kay\/server|@kaynooo\/kayjs-mail)(?:\/|$)/
 
 // The `on*` hooks that took positional arguments before 1.70: the name they take now, the event's fields in their old order, and where the call is looked for (the config file, or a file importing a module the pattern accepts).
-const HOOKS: Record<string, { now: string, fields: string[], from: RegExp | 'config' }> = {
+const HOOKS = new Map<string, { now: string, fields: string[], from: RegExp | 'config' }>(Object.entries({
   onSignUp: { now: 'onSignUp', fields: ['user', 'profile'], from: AUTH },
   onDelete: { now: 'onDelete', fields: ['user'], from: AUTH },
   onExport: { now: 'exportData', fields: ['user'], from: AUTH },
   onProviderProfile: { now: 'profileFields', fields: ['user', 'profile'], from: AUTH },
   onError: { now: 'onError', fields: ['error', 'request'], from: 'config' },
   onFailed: { now: 'onFailed', fields: ['payload', 'error'], from: QUEUES },
-}
+}))
+const HOOK_NAME = /on(?:SignUp|Delete|Export|ProviderProfile|Error|Failed)/
 
 function keyOf(key: t.Node, computed: boolean): string | undefined {
   if (computed)
     return undefined
+
+  if (key.type === 'StringLiteral')
+    return key.value
 
   return key.type === 'Identifier' ? key.name : undefined
 }
@@ -51,6 +55,11 @@ function destructured(params: t.Node[], fields: string[]): string | undefined {
   return `{ ${parts.join(', ')} }`
 }
 
+// Whether a destructuring pattern reads only fields the event has.
+function patternReads(pattern: t.ObjectPattern, fields: string[]): boolean {
+  return pattern.properties.every(property => property.type === 'ObjectProperty' ? !property.computed && property.key.type === 'Identifier' && fields.includes(property.key.name) : true)
+}
+
 // An `on*` hook (or `onExport` and `onProviderProfile`) still written with positional arguments, which keeps working until 1.73: the hook takes one event object, and a hook returning data is named for what it returns.
 export async function hookShapes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-hook-shape', options.lints)
@@ -68,15 +77,19 @@ export async function hookShapes(root: string, options: CheckOptions): Promise<C
 
     try {
       source = await Bun.file(file).text()
+
+      if (!HOOK_NAME.test(source))
+        continue
+
       ast = parse(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
     }
     catch {
       continue
     }
 
-    const wanted = Object.fromEntries(Object.entries(HOOKS).filter(([, hook]) => hook.from === 'config' ? file === config : importsFrom(ast, hook.from)))
+    const wanted = new Map([...HOOKS].filter(([, hook]) => hook.from === 'config' ? file === config : importsFrom(ast, hook.from)))
 
-    if (Object.keys(wanted).length === 0)
+    if (wanted.size === 0)
       continue
 
     walk(ast, (node) => {
@@ -98,15 +111,17 @@ export async function hookShapes(root: string, options: CheckOptions): Promise<C
         return
       }
 
-      const hook = name === undefined ? undefined : wanted[name]
+      const hook = name === undefined ? undefined : wanted.get(name)
 
       if (name === undefined || hook === undefined || (fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression' && fn.type !== 'ObjectMethod'))
         return
 
       const params = fn.params
 
-      // A hook with no parameter, or one destructuring its event, is the new shape.
-      if (params.length === 0 || params[0]!.type === 'ObjectPattern')
+      // A hook with no parameter is the new shape, and so is one destructuring only fields of its event under the name that takes one; the old names took positional arguments always.
+      const [head] = params
+
+      if (head === undefined || (head.type === 'ObjectPattern' && hook.now === name && patternReads(head, hook.fields)))
         return
 
       const text = destructured(params, hook.fields)

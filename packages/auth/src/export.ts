@@ -19,7 +19,7 @@ import { provedLately } from './twoFactor'
 // More than a person's year of sign-ins, so only a bot's account is cut short.
 const AUDIT_EXPORT_MAX = 100_000
 
-// Everything kayjs-auth keeps about a user, secrets left out, and what the app's `onExport` adds.
+// Everything kayjs-auth keeps about a user, secrets left out, and what the app's `exportData` adds.
 export interface DataExport {
   exportedAt: Date
   user: User & { createdAt: Date, emailVerifiedAt: Date | null, twoFactorEnabledAt: Date | null }
