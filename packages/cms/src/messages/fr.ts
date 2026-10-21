@@ -4,17 +4,21 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   cms: {
     admin: {
+      brand: 'Administration du contenu',
       collectionUnreadable: 'Cette collection ne peut pas être lue',
       content: 'Contenu',
       entryCount: { one: '{count} entrée', other: '{count} entrées' },
+      navigation: 'Administration du contenu',
       newEntry: 'Nouvelle entrée',
       newEntryTitle: 'Nouvelle entrée - {collection}',
       noCollections: 'Aucune collection',
       noCollectionsHint: 'Ce site ne déclare aucune collection de contenu.',
       search: 'Rechercher',
       searchLabel: 'Rechercher dans les entrées',
+      skip: 'Aller au contenu',
       unreadable: 'Illisible',
       uploads: 'Fichiers inutilisés',
+      viewSite: 'Voir le site',
     },
     editor: {
       dockBottom: 'Placer l\'éditeur en bas',
