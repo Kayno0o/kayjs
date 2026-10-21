@@ -590,3 +590,14 @@ test('clearing an image takes its alt text with it', async () => {
   await settle()
   expect(drafts.value(ENTRY, 'alt')).toBeUndefined()
 })
+
+test('an image field built without upload hints, as an app\'s own code may, works as it did', async () => {
+  const drafts = createDrafts({ show: async () => ({}) })
+
+  drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
+  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: { key: 'tags', label: 'Photo', hint: undefined, required: false, kind: 'image' } })
+  await settle()
+  mounted.root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
+  await settle()
+  expect(drafts.value(ENTRY, 'tags')).toBe('')
+})

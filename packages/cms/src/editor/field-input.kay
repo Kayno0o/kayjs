@@ -158,7 +158,7 @@ function itemKey(event: KeyboardEvent, from: number): void {
 
 // The alt text paired with an image field, read from the field beside it.
 function altOf(): { value: string, issue?: string | undefined, required: boolean } | undefined {
-  const alt = field.kind === 'image' ? field.upload.alt : undefined
+  const alt = field.kind === 'image' ? field.upload?.alt : undefined
 
   if (alt === undefined)
     return undefined
@@ -169,7 +169,7 @@ function altOf(): { value: string, issue?: string | undefined, required: boolean
 }
 
 function setAlt(text: string): void {
-  const alt = field.kind === 'image' ? field.upload.alt : undefined
+  const alt = field.kind === 'image' ? field.upload?.alt : undefined
 
   if (alt !== undefined)
     drafts.set(entry, siblingPath(path, alt.key), text === '' ? undefined : text)
@@ -185,13 +185,13 @@ function setFile(next: string, uploaded?: { width: number, height: number }): vo
     return
 
   // The alt text described the image that went.
-  if (next === '' && field.upload.alt !== undefined)
+  if (next === '' && field.upload?.alt !== undefined)
     drafts.set(entry, siblingPath(path, field.upload.alt.key), undefined)
 
-  if (field.upload.width !== undefined)
+  if (field.upload?.width !== undefined)
     drafts.set(entry, siblingPath(path, field.upload.width.key), size?.width)
 
-  if (field.upload.height !== undefined)
+  if (field.upload?.height !== undefined)
     drafts.set(entry, siblingPath(path, field.upload.height.key), size?.height)
 }
 

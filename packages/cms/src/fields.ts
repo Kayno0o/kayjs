@@ -30,7 +30,7 @@ export interface UploadHints {
 
 export type Field
   = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json' }
-    | FieldBase & { kind: 'image' | 'file', upload: UploadHints }
+    | FieldBase & { kind: 'image' | 'file', upload?: UploadHints | undefined }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
     | FieldBase & { kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined }
@@ -70,7 +70,7 @@ function pairUploads(fields: Field[]): Field[] {
     const upload = { ...field.upload }
 
     for (const name of ['alt', 'width', 'height'] as const) {
-      const key = field.upload[name]?.key
+      const key = field.upload?.[name]?.key
       const sibling = fields.find(other => other !== field && other.key === key)
 
       if (sibling === undefined) {
@@ -175,7 +175,7 @@ function unpaired(field: Field): Field {
   if (field.kind !== 'image' && field.kind !== 'file')
     return field
 
-  const { accept, maxSize, minWidth, minHeight } = field.upload
+  const { accept, maxSize, minWidth, minHeight } = field.upload ?? {}
 
   return { ...field, upload: { accept, maxSize, minWidth, minHeight } }
 }

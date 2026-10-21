@@ -249,7 +249,7 @@ describe('image fields', () => {
     const [lone] = fieldsOf({ properties: { photo: image({ alt: 'missing' }) } })
 
     expect(lone).toMatchObject({ kind: 'image', upload: {} })
-    expect((lone as Field & { kind: 'image' }).upload.alt).toBeUndefined()
+    expect((lone as Field & { kind: 'image' }).upload?.alt).toBeUndefined()
 
     const [group] = fieldsOf({ properties: { hero: { type: 'object', properties: { src: image({ alt: 'alt' }), alt: { type: 'string' } } } } })
 
