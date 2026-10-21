@@ -581,7 +581,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     return refused(ref, wording('cms.store.sameSlug', '{slug} is the slug already', { slug }), 'slug')
 
   const target = { ...ref, slug }
-  const data = typeof existing.data.slug === 'string' ? { ...existing.data, slug } : existing.data
+  const data = renamedData(existing.data, slug)
 
   // A reference names its entry by the slug, so every entry naming this one would point at nothing.
   const named = (await referrersOf(collection.name, [ref.slug])).get(ref.slug) ?? []
@@ -589,7 +589,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   if (named.length > 0)
     return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}: change them to name the new slug first', { slug: ref.slug, names: named.slice(0, REFERRERS_NAMED).join(', ') + (named.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')
 
-  const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, data, { version, required }) : await renameFile(collection, existing, target, data, { author, version, required })
+  const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, { version, required }) : await renameFile(collection, existing, target, data, { author, version, required })
 
   if (!('saved' in moved))
     return moved
@@ -597,6 +597,11 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   await pointRedirect(existing, target, data)
 
   return moved
+}
+
+// The entry's data under its new slug, the `slug` field of its own, if it has one, following.
+function renamedData(data: Record<string, unknown>, slug: string): Record<string, unknown> {
+  return typeof data.slug === 'string' ? { ...data, slug } : data
 }
 
 async function renameFile(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { author, version, required }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
@@ -649,7 +654,7 @@ async function renameFile(collection: CollectionInfo, existing: StoredEntry, tar
   }
 }
 
-async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
   const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
 
   return inTurn(collection.name, async () => {
@@ -658,7 +663,13 @@ async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, t
     if (stale)
       return stale
 
-    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data, body: existing.body }, { create: true, replacing: ref.slug })
+    // Read again in the turn, so a save made since the entry was first read is not written over.
+    const current = storedState((await entries(collection.name, { slug: ref.slug, locale: ref.locale }))[0])
+
+    if (current === undefined)
+      return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data: renamedData(current.data, target.slug), body: current.body }, { create: true, replacing: ref.slug })
 
     if (refusedNew !== undefined && refusedNew.length > 0)
       return { issues: refusedNew }

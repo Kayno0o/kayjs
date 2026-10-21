@@ -52,6 +52,8 @@ export interface RedirectSet {
   // Every redirect held in memory, read again only when the file changed, for the lookup a missing path makes.
   snapshot: () => { exact: ReadonlyMap<string, RuntimeRedirect>, patterns: readonly RuntimeRedirect[] }
   add: (from: string, to: string, status: RuntimeStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
+  // Adds the redirect of a page that moved, as one write: the redirects leading to `from` lead to `to`, and the one from `to`, which exists again, is removed.
+  move: (from: string, to: string, rules: RuntimeRules) => RuntimeRedirect
   remove: (from: string) => boolean
 }
 
@@ -70,7 +72,7 @@ const NON_ASCII = /\P{ASCII}/gu
 const PERCENT_ESCAPE = /%[\da-f]{2}/gi
 
 // Non-ASCII text percent-encoded as a browser sends it, since a header carries ASCII alone: `/café` is `/caf%C3%A9`, and the escapes already there get their hex in upper case (`%c3%a9` is `%C3%A9`).
-function encoded(text: string): string {
+export function encoded(text: string): string {
   try {
     return text.replace(NON_ASCII, character => encodeURIComponent(character)).replace(PERCENT_ESCAPE, escape => escape.toUpperCase())
   }
@@ -242,6 +244,26 @@ export function redirectSet(db: Database): RedirectSet {
         insert.run(key, to, status, isPattern(key) ? 1 : 0, addedAt)
 
         return { from: key, to, status, addedAt }
+      })
+
+      held = undefined
+
+      return write.immediate()
+    },
+    move(rawFrom, rawTo, rules) {
+      const write = db.transaction(() => {
+        const from = plainPath(encoded(rawFrom))
+        const to = plainPath(encoded(rawTo))
+
+        // Nothing answers the page that exists again, and a redirect from it would make the way back a loop.
+        removed.get(to)
+
+        for (const row of all.all().map(entry)) {
+          if (row.status !== 410 && row.to.startsWith('/') && plainPath(row.to) === from)
+            set.add(row.from, rawTo, row.status, rules)
+        }
+
+        return set.add(rawFrom, rawTo, undefined, rules)
       })
 
       held = undefined

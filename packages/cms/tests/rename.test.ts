@@ -151,6 +151,13 @@ describe('renaming a folder entry', () => {
     expect(redirects()).toEqual([])
   })
 
+  test('refuses a rename whose page no redirect can name, without losing the rename', async () => {
+    await make('posts', 'first')
+
+    expect(await renameEntry({ collection: 'posts', slug: 'first' }, '*')).toMatchObject({ saved: true })
+    expect(redirects()).toEqual([])
+  })
+
   test('refuses a saver that cannot move files', async () => {
     await make('posts', 'first')
     configure({ files: { save: workingTree().save } })
@@ -164,6 +171,16 @@ describe('renaming a folder entry', () => {
     await renameEntry({ collection: 'posts', slug: 'b' }, 'c')
 
     expect(redirects()).toEqual([['/rn-blog/a', '/rn-blog/c'], ['/rn-blog/b', '/rn-blog/c']])
+  })
+
+  test('an accented slug chains and goes back like any other', async () => {
+    await make('posts', 'café')
+    await renameEntry({ collection: 'posts', slug: 'café' }, 'thé')
+    await renameEntry({ collection: 'posts', slug: 'thé' }, 'lait')
+    expect(redirects()).toEqual([['/rn-blog/caf%C3%A9', '/rn-blog/lait'], ['/rn-blog/th%C3%A9', '/rn-blog/lait']])
+
+    expect(await renameEntry({ collection: 'posts', slug: 'lait' }, 'café')).toMatchObject({ saved: true })
+    expect(redirects()).toEqual([['/rn-blog/lait', '/rn-blog/caf%C3%A9'], ['/rn-blog/th%C3%A9', '/rn-blog/caf%C3%A9']])
   })
 
   test('a rename back to the old slug leaves no redirect loop', async () => {
@@ -191,6 +208,8 @@ describe('renaming a loaded entry', () => {
     await saveEntry({ collection: 'notes', slug: 'first', data: { title: 'Two' } }, {})
 
     const before = await revisionsOf({ collection: 'notes', slug: 'first' })
+
+    expect(before.length).toBeGreaterThan(1)
 
     expect(await renameEntry({ collection: 'notes', slug: 'first' }, 'second')).toMatchObject({ saved: true, slug: 'second' })
     expect(await entryOf({ collection: 'notes', slug: 'first' })).toBeUndefined()

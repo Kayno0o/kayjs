@@ -182,10 +182,6 @@ export async function moveRevisions(from: EntryRef, to: EntryRef): Promise<void>
 
   try {
     const ats = await indexOf(hidden, place)
-
-    if (ats.length === 0)
-      return
-
     const writes: { slug: string, data: unknown, body?: string | undefined }[] = []
     const kept: number[] = []
 
@@ -194,12 +190,15 @@ export async function moveRevisions(from: EntryRef, to: EntryRef): Promise<void>
 
       if (row) {
         kept.push(at)
-        writes.push({ slug: revisionPlace(target, at), data: row.data, body: row.body })
+        writes.push({ slug: revisionPlace(target, at), data: withSlug(row.data as Stored, to.slug), body: row.body })
       }
     }
 
     // What an earlier entry of that slug left is replaced, as a new entry starts its history over.
     await forgetRevisions(to)
+
+    if (kept.length === 0)
+      return
 
     writes.push({ slug: target, data: { ats: kept } satisfies Index })
 
@@ -216,4 +215,9 @@ export async function moveRevisions(from: EntryRef, to: EntryRef): Promise<void>
   catch (error) {
     log.error(`${from.collection}/${from.slug}'s revisions could not be moved to ${to.slug}`, error)
   }
+}
+
+// A revision as it was saved, its `slug` field, if the entry has one, naming the new slug so restoring it does not bring the old one back.
+function withSlug(stored: Stored, slug: string): Stored {
+  return typeof stored.data.slug === 'string' ? { ...stored, data: { ...stored.data, slug } } : stored
 }
