@@ -454,9 +454,9 @@ describe('the dev tool', () => {
   })
 
   it('publishes the bar\'s room only for the bottom corner it is in, and nothing for a top corner', async () => {
-    const published = () => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ').match(/--kay-dev-bar-[a-z-]+/g) ?? []
+    const published = (): string[] => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ').match(/--kay-dev-bar-[a-z-]+/g) ?? []
 
-    for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as const) {
+    for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as [string, string[]][]) {
       localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner }))
       tool = startDevTool()
       await Bun.sleep(0)
