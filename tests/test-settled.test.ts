@@ -16,7 +16,7 @@ describe('the settled view of a streamed page', () => {
     expect(page.html).toContain('data-kay-await')
     expect(page.html).toMatch(/data-kay-await="\w[\dA-Za-z]*_\w+"/)
     expect(page.text()).toContain('Scoring')
-    expect(page.settled.text()).toBe('Bill4242')
+    expect(page.settled.text()).toBe('Bill 42 42')
     expect(page.settled.html).not.toContain('Scoring')
     expect(page.settled.html).not.toContain('kay-await')
     expect(page.settled.html).not.toContain('$kayAwait')
