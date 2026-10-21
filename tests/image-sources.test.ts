@@ -138,6 +138,39 @@ describe('gif and avif sources', () => {
     expect((await get('/uploads/broken.png', 'w=320')).status).toBe(415)
   })
 
+  it('decodes a file kay cannot decode once per version, a conditional request and another width or the card included', async () => {
+    const decoder = Bun.Image
+    let decodes = 0
+
+    Bun.Image = class extends decoder {
+      constructor(...args: ConstructorParameters<typeof decoder>) {
+        decodes++
+        super(...args)
+      }
+    }
+
+    try {
+      for (const name of ['undecodable.gif', 'broken.png']) {
+        // The first request may learn it fails; every later one answers without a decode.
+        const first = await get(`/uploads/${name}`, 'w=2')
+        const etag = first.headers.get('etag')
+        const before = decodes
+
+        await get(`/uploads/${name}`, 'w=2')
+        await get(`/uploads/${name}`, 'w=3')
+        await get(`/uploads/${name}`, 'card')
+
+        if (etag !== null)
+          expect((await get(`/uploads/${name}`, 'w=2', { 'if-none-match': etag })).status).toBe(304)
+
+        expect(decodes).toBe(before)
+      }
+    }
+    finally {
+      Bun.Image = decoder
+    }
+  })
+
   it('passes an animated GIF through untouched at every width, revalidated, and still draws its card', async () => {
     const response = await get('/uploads/animated.gif')
     const etag = response.headers.get('etag')!

@@ -234,6 +234,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
+  // The versions of files whose decode failed, so a request for one, a conditional one included, does not run the failing decode again.
+  const undecodable = new Set<string>()
   // The color of a runtime image, by the version of its file.
   const colors = new Map<string, Promise<string | undefined>>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
@@ -391,13 +393,19 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const cached = join(options.cacheDir, name)
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
 
+    const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
+    // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
+    const refused = () => own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
+
+    if (file === cached && undecodable.has(version))
+      return refused()
+
     let writing = pending.get(cached)
 
     // Requests for a variant being written wait for that one write.
     if (file === cached && (writing || !await touched(cached))) {
       if (!writing) {
         // Counted before it waits its turn, so the variants a burst asks for share the decode.
-        const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
         const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
 
         if (decoding) {
@@ -431,8 +439,12 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         if (typeof (error as { syscall?: unknown }).syscall === 'string')
           throw error
 
-        // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
-        return own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
+        if (undecodable.size >= MOST_ANSWERED)
+          undecodable.delete(undecodable.values().next().value!)
+
+        undecodable.add(version)
+
+        return refused()
       }
 
       file = cached
