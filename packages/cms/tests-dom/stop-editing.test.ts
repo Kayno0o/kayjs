@@ -37,6 +37,8 @@ async function typed(): Promise<ParentNode> {
   title.value = 'Mine'
   title.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
+  // The edit is kept in the browser after the render's pause.
+  await Bun.sleep(200)
 
   return mounted.root
 }

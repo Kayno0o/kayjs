@@ -1,5 +1,5 @@
 import type { DraftEntry } from '../src/kay/contract'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { browserKeeper, KEEP_FOR } from '../src/draft-storage'
 import { createDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
@@ -30,6 +30,7 @@ describe('drafts kept in the browser', () => {
 
     before.open(post, 'v1')
     before.set(post, 'title', 'Hello there')
+    before.flush()
 
     const after = pageOf(storage)
 
@@ -47,6 +48,7 @@ describe('drafts kept in the browser', () => {
 
     first.open(post, 'v1')
     first.set(post, 'title', 'From the first tab')
+    first.flush()
     second.open(post, 'v1')
 
     expect(second.value(post, 'title')).toBe('From the first tab')
@@ -58,6 +60,7 @@ describe('drafts kept in the browser', () => {
 
     drafts.open(post, 'v1')
     drafts.set(post, 'title', 'Mine')
+    drafts.flush()
     expect(storage.length).toBe(1)
     drafts.markSaved(post, drafts.entry(post)!, 'v2')
     expect(storage.length).toBe(0)
@@ -67,6 +70,7 @@ describe('drafts kept in the browser', () => {
     expect(storage.length).toBe(0)
 
     drafts.set(post, 'title', 'Again')
+    drafts.flush()
     drafts.set(post, 'title', 'Mine')
     expect(storage.length).toBe(0)
   })
@@ -77,12 +81,14 @@ describe('drafts kept in the browser', () => {
 
     drafts.open(post, 'v1')
     drafts.set(post, 'title', 'Sent')
+    drafts.flush()
     drafts.refuse(post, { message: 'Forgejo did not answer' })
     expect(storage.length).toBe(1)
 
     const sent = drafts.entry(post)!
 
     drafts.set(post, 'title', 'Sent, then more')
+    drafts.flush()
     drafts.markSaved(post, sent, 'v2')
 
     const after = pageOf(storage)
@@ -97,6 +103,7 @@ describe('drafts kept in the browser', () => {
 
     before.open(post, 'v1')
     before.set(post, 'title', 'Stale')
+    before.flush()
 
     const after = pageOf(storage)
 
@@ -114,6 +121,7 @@ describe('drafts kept in the browser', () => {
 
     before.open(post, 'v1')
     before.set(post, 'title', 'Old')
+    before.flush()
     now += KEEP_FOR + 1
 
     const after = pageOf(storage, () => now)
@@ -137,6 +145,7 @@ describe('drafts kept in the browser', () => {
     drafts.open(other, 'v1')
     drafts.set(post, 'title', 'Mine')
     drafts.set(other, 'title', 'Mine too')
+    drafts.flush()
     drafts.discardAll()
 
     expect(drafts.anyChanged()).toBe(false)
@@ -169,6 +178,56 @@ describe('drafts kept in the browser', () => {
   })
 })
 
+describe('kept drafts of an entry with no version', () => {
+  it('restores the edits while the saved copy is the one they were made from, and drops them once it changed', () => {
+    const storage = memoryStorage()
+    const before = pageOf(storage)
+
+    before.open(post)
+    before.set(post, 'title', 'Mine')
+    before.flush()
+
+    const same = pageOf(storage)
+
+    same.open({ ...post, data: { title: 'Hello' } })
+    expect([same.value(post, 'title'), same.recovery(post)?.restored]).toEqual(['Mine', true])
+
+    const moved = pageOf(storage)
+
+    moved.open({ ...post, data: { title: 'Saved elsewhere' } })
+    expect([moved.value(post, 'title'), moved.changed(post), moved.recovery(post)?.restored, storage.length]).toEqual(['Saved elsewhere', false, false, 0])
+  })
+
+  it('drops a draft kept with no record of its saved copy', () => {
+    const storage = memoryStorage()
+
+    storage.setItem('kcms:draft:posts:hello', JSON.stringify({ entry: { ...post, data: { title: 'Old' } }, at: Date.now() }))
+
+    const after = pageOf(storage)
+
+    after.open(post)
+    expect([after.value(post, 'title'), after.recovery(post)?.restored, storage.length]).toEqual(['Hello', false, 0])
+  })
+})
+
+describe('writing the kept draft', () => {
+  it('writes once per pause rather than on every keystroke', async () => {
+    const storage = memoryStorage()
+    const writes = spyOn(storage, 'setItem')
+    const drafts = createDrafts({ show: async () => ({}), delay: '10ms', keep: browserKeeper(() => storage) })
+
+    drafts.open(post, 'v1')
+
+    for (const title of ['H', 'He', 'Hel'])
+      drafts.set(post, 'title', title)
+
+    expect(writes).not.toHaveBeenCalled()
+    await Bun.sleep(40)
+    expect(writes).toHaveBeenCalledTimes(1)
+    expect((JSON.parse(storage.getItem('kcms:draft:posts:hello')!) as { entry: DraftEntry }).entry.data.title).toBe('Hel')
+  })
+})
+
 describe('taking the other save after a conflict', () => {
   it('adopts the stored copy and version, dropping the edits and the refusal', () => {
     const storage = memoryStorage()
@@ -176,6 +235,7 @@ describe('taking the other save after a conflict', () => {
 
     drafts.open(post, 'v1')
     drafts.set(post, 'title', 'Mine')
+    drafts.flush()
     drafts.refuse(post, { message: 'saved since', conflict: { version: 'v2' } })
     drafts.adopt(post, { ...post, data: { title: 'Theirs' } }, 'v2')
 

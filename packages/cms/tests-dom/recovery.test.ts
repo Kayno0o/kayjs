@@ -40,6 +40,7 @@ test('tells the editor their unsaved changes came back, or were left out for an 
 
   before.open({ ...ENTRY, data: { title: 'Hello' } }, 'v1')
   before.set(ENTRY, 'title', 'Mine')
+  before.flush()
 
   const same = createDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
 

@@ -276,14 +276,14 @@ listen(() => document, 'click', (event) => {
 
 // What the head's button does: leaves at once, or with edits not saved shows the question, which only its own two buttons answer.
 async function askStop(): Promise<void> {
-  if (!drafts.anyChanged())
+  if (!drafts.anyChanged(entries))
     return stopEditing()
 
   confirming = true
 }
 
 // Asks before the page, a link or a reload drops edits not saved.
-guardLeave(() => drafts.anyChanged())
+guardLeave(() => drafts.anyChanged(entries))
 
 // Renders the page again as visitors see it, once kay forgot the edit mode.
 async function stopEditing(): Promise<void> {

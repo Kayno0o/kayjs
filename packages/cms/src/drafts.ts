@@ -49,6 +49,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const recoveries = signal<ReadonlyMap<string, Recovery>>(new Map())
   const failure = signal<string>()
   const rendering = signal(false)
+  // The entries whose edits are typed but not yet written to the keeper: writing waits for the render's pause, since each write stringifies the whole entry.
+  const unwritten = new Set<string>()
   let timer: ReturnType<typeof setTimeout> | undefined
   let latest = 0
   // Set by a save's refusal, so a render scheduled before it leaves those issues be; the next edit clears it.
@@ -66,7 +68,16 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   function schedule(): void {
     reported = false
     clearTimeout(timer)
-    timer = setTimeout(() => void render(), wait)
+    timer = setTimeout(() => {
+      flush()
+      void render()
+    }, wait)
+  }
+
+  // Writes the edits typed since the last write.
+  function flush(): void {
+    for (const key of unwritten)
+      persist(key)
   }
 
   async function render(): Promise<void> {
@@ -98,6 +109,8 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
   // Keeps the entry's edits where a reload finds them, or forgets them once it has none.
   function persist(key: string): void {
+    unwritten.delete(key)
+
     const entry = current().get(key)
     const base = saved.get(key)
 
@@ -105,7 +118,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return
 
     if (entry && entry !== base)
-      keep.write(key, { entry, version: versions.get(key), at: keep.now() })
+      keep.write(key, { entry, version: versions.get(key), at: keep.now(), ...versions.get(key) === undefined ? { base } : {} })
     else
       keep.remove(key)
   }
@@ -116,13 +129,14 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     if (!kept)
       return entry
 
-    // Edits made from another version of the file would write over what was saved since.
-    const restored = kept.version === version && JSON.stringify(kept.entry) !== JSON.stringify(entry)
+    // Edits made from another version of the file would write over what was saved since. An entry with no version, a folder entry outside the repository, is told by the copy the edits were made from.
+    const stale = kept.version !== version || (version === undefined && (!kept.base || differing(kept.base, entry).length > 0))
+    const restored = !stale && JSON.stringify(kept.entry) !== JSON.stringify(entry)
 
     if (!restored)
       keep?.remove(key)
 
-    if (kept.version !== version || restored)
+    if (stale || restored)
       recoveries.set(new Map(recoveries()).set(key, { at: kept.at, restored }))
 
     return restored ? kept.entry : entry
@@ -199,7 +213,13 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     const same = next === undefined || JSON.stringify(next) === savedText.get(key)
 
     current.set(new Map(current()).set(key, same ? original : next))
-    persist(key)
+
+    // Dropping a draft is cheap and goes at once; keeping one waits for the pause.
+    if (same)
+      persist(key)
+    else
+      unwritten.add(key)
+
     schedule()
   }
 
@@ -332,10 +352,14 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
       return differing(base, mine).filter(path => theirs.has(path))
     },
-    // Whether any entry has edits not saved yet.
-    anyChanged(): boolean {
-      return [...current().keys()].some(key => current().get(key) !== saved.get(key))
+    // Whether any entry has edits not saved yet, among `shown` when given: the entries the editor shows, as edits of one the page left behind no longer ask a confirmation.
+    anyChanged(shown?: readonly EntryRef[]): boolean {
+      const keys = shown ? shown.map(entryKey) : [...current().keys()]
+
+      return keys.some(key => current().has(key) && current().get(key) !== saved.get(key))
     },
+    // Writes the edits not yet kept, as when the page is about to go.
+    flush,
     // Drops the edits of every entry, rendering the page without them, and forgets what the browser kept.
     discardAll(): void {
       for (const [key, entry] of saved) {
@@ -344,6 +368,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       }
 
       recreated.clear()
+      unwritten.clear()
       unparsed.set(new Map())
       refusals.set(new Map())
       recoveries.set(new Map())

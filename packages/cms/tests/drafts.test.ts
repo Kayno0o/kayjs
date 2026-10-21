@@ -417,3 +417,18 @@ describe('the issues of a refused save', () => {
     expect(drafts.changed(post)).toBe(false)
   })
 })
+
+describe('the entries the editor shows', () => {
+  it('counts only their edits as unsaved when asked for them', () => {
+    const { drafts } = setup()
+    const other = { collection: 'posts', slug: 'left-behind' }
+
+    drafts.open({ ...other, data: { title: 'Other' } })
+    drafts.set(other, 'title', 'Edited, then left')
+
+    expect([drafts.anyChanged(), drafts.anyChanged([post]), drafts.anyChanged([post, other])]).toEqual([true, false, true])
+
+    drafts.set(post, 'title', 'Here')
+    expect(drafts.anyChanged([post])).toBe(true)
+  })
+})
