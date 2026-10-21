@@ -149,6 +149,12 @@ const atMax = () => list?.maxItems !== undefined && count() >= list.maxItems
 const atMin = () => list?.minItems !== undefined && count() <= list.minItems
 const foldedAt = (at: number) => folded()[at] === true
 const addButton = () => box?.querySelector('[data-kcms-add]')
+// A list this long gets a menu to jump to an item.
+const JUMP_FROM = 8
+const titles = () => list ? items().map((item, at) => ({ value: at, label: `${at + 1}. ${itemTitle(list, item, at)}` })) : []
+
+// The refusals inside an item, its own and its fields', which a folded item has no field showing.
+const itemIssues = (at: number) => drafts.issues(entry).filter(found => found.body !== true && found.key === undefined && (found.path === joinPath(path, at) || found.path.startsWith(`${joinPath(path, at)}.`)))
 
 // What a list says of its size: how many items it holds, and the bounds its schema sets.
 function countText(): string {
@@ -184,6 +190,22 @@ function append(value: unknown): void {
   removed.set(undefined)
   set([...items(), value])
   focusItem(rows, count() - 1)
+}
+
+function prepend(): void {
+  if (atMax() || !list)
+    return
+
+  removed.set(undefined)
+  mirror(states => [false, ...states])
+  set([emptyValue(list.item), ...items()])
+  focusItem(rows, 0)
+}
+
+// The item picked in the menu takes the focus, which unfolds nothing but reaches the fold button of a folded one.
+function jump(at: number): void {
+  focusItem(rows, at)
+  rows?.querySelectorAll(':scope > [data-kcms-row]')[at]?.scrollIntoView({ block: 'nearest' })
 }
 
 function duplicate(at: number): void {
@@ -248,7 +270,7 @@ function itemKey(event: KeyboardEvent, from: number): void {
 }
 
 // The alt text paired with an image field, read from the field beside it.
-function altOf(): { value: string, issue?: string | undefined, required: boolean } | undefined {
+function altOf(): { id: string, value: string, issue?: string | undefined, required: boolean } | undefined {
   const alt = field.kind === 'image' ? field.upload?.alt : undefined
 
   if (alt === undefined)
@@ -256,7 +278,20 @@ function altOf(): { value: string, issue?: string | undefined, required: boolean
 
   const at = siblingPath(path, alt.key)
 
-  return { value: String(drafts.value(entry, at) ?? ''), issue: drafts.issues(entry, at)[0]?.message, required: alt.required }
+  return { id: fieldId(entry, `f:${at}`), value: String(drafts.value(entry, at) ?? ''), issue: drafts.issues(entry, at)[0]?.message, required: alt.required }
+}
+
+// The refusals of the image's width and height, which the form draws no field for.
+function sizeIssues(): { id: string, message: string }[] {
+  if (field.kind !== 'image')
+    return []
+
+  return [field.upload?.width, field.upload?.height].flatMap((part) => {
+    const at = part === undefined ? undefined : siblingPath(path, part.key)
+    const issue = at === undefined ? undefined : drafts.issues(entry, at)[0]
+
+    return at === undefined || issue === undefined ? [] : [{ id: fieldId(entry, `f:${at}`), message: issue.message }]
+  })
 }
 
 function setAlt(text: string): void {
@@ -321,6 +356,12 @@ function leaveJson(): void {
     when 'list'
       FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
         .kcms-list(ref={element => box = element})
+          if count() > 0
+            .kcms-list-tools
+              if !atMax()
+                Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" onClick={prepend})
+              if count() >= JUMP_FROM
+                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} aria-label={wording('cms.list.jumpLabel', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
           .kcms-list-items(ref={element => rows = element})
             for item, i of items() key={i}
               .kcms-list-item(data-kcms-row data-compact={isCompact(current) ? '' : undefined} onKeyDown={event => itemKey(event, i)})
@@ -335,12 +376,16 @@ function leaveJson(): void {
                   .kcms-item-head
                     IconButton.kcms-fold(icon="chevron" data-kcms-fold label={foldedAt(i) ? wording('cms.list.expand', 'Expand {item}', { item: title }) : wording('cms.list.collapse', 'Collapse {item}', { item: title })} variant="ghost" size="sm" aria-expanded={foldedAt(i) ? 'false' : 'true'} data-kcms-item-control onClick={() => fold(i)})
                     span.kcms-item-title {title}
+                    if foldedAt(i) && itemIssues(i).length > 0
+                      span.kcms-item-issues {wording('cms.list.itemIssues', itemIssues(i).length === 1 ? '1 issue' : '{count} issues', { count: itemIssues(i).length })}
                     .kcms-item-controls
                       Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
                       IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
                       IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
                   .kcms-item-body(role="group" aria-label={title} hidden={foldedAt(i)})
                     if current.item.kind === 'group'
+                      if drafts.issues(entry, joinPath(path, i))[0] as own
+                        p.kcms-item-error(role="alert") {own.message}
                       for child of current.item.fields key={child.key}
                         FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(joinPath(path, i), child.key)})
                     else
@@ -380,7 +425,7 @@ function leaveJson(): void {
         Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
-        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} onAlt={setAlt} onChange={setFile})
+        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} sizeIssues={sizeIssues()} onAlt={setAlt} onChange={setFile})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind

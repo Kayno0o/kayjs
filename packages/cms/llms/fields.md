@@ -36,6 +36,7 @@ It wraps any schema, an optional or nullable one too, keeps its kind and keyword
 - `labels`: the label of each `enum` value or union literal by value, which wins over a literal's own `title` (`s.Literal('new', { title: 'Nouveau' })`); the stored value stays the raw one.
 - `lines`: a list of strings entered in one box, a line each, blank lines dropped; emptied on an optional field it unsets the key.
 - `titleField`: the field of a list's object items whose text heads an item, before the first filled text field.
+- A list has Add at the top, a jump menu from 8 items, an issue count on a folded item's head, and the entry's Reset asks to confirm (`cms.list.*`, `cms.entry.resetMessage`).
 - `when`: a sibling field (same object) this one is shown for only once the sibling holds a value (not empty, `false` or `[]`). The sibling must be a key of the same object, or the server logs a warning at boot. Use it on an optional field: a required one hidden cannot be filled and fails the save, and a hidden field keeps its stored value. A hidden field the schema refuses is shown with its message.
 - `placeholder`, `prefix` and `suffix` apply to text and number boxes only; `rows` auto-growing needs a browser with `field-sizing`, else the box stays at its `rows`; it sets no style attribute, so a strict content security policy keeps it.
 

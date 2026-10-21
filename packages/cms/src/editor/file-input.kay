@@ -4,8 +4,9 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { guardLeave } from 'kay'
 import { sizeText, wording } from 'kay/words'
-import { atLeast } from '../upload-text'
+import { atLeast, typeName } from '../upload-text'
 import { listUploads, uploadFile, uploadRules } from './upload'
 
 type Size = { width: number, height: number } | undefined
@@ -13,7 +14,7 @@ type Size = { width: number, height: number } | undefined
 // An image or file field: the path of an upload dropped or picked, or one typed.
 // With `many`, the zone of a list of them: it takes several files, calls `onChange` with the path of each in order as it lands, and shows no path, clear button or alt text of its own.
 // `upload` is what the field asks of a file beyond the server's rules, `onChange` hears the size of an image the upload answered, and `alt` is the text paired with the image: its value, the issue it has and whether it is required.
-const { value, image, collection, many = false, upload = {}, alt, onAlt, onChange } = props<{ value: string, image: boolean, collection: string, many?: boolean, upload?: UploadHints, alt?: { value: string, issue?: string | undefined, required: boolean } | undefined, onAlt?: (text: string) => void, onChange: (path: string, size?: Size) => void }>()
+const { value, image, collection, many = false, upload = {}, alt, sizeIssues = [], onAlt, onChange } = props<{ value: string, image: boolean, collection: string, many?: boolean, upload?: UploadHints, alt?: { id: string, value: string, issue?: string | undefined, required: boolean } | undefined, sizeIssues?: { id: string, message: string }[], onAlt?: (text: string) => void, onChange: (path: string, size?: Size) => void }>()
 
 // The share of the upload sent, from 0 to 1, while one is under way.
 const sent = signal<number>()
@@ -35,6 +36,9 @@ const stored = signal<{ path: string, name: string }[]>()
 
 let cancel: AbortController | undefined
 
+// Leaving the page, by a link or the browser, asks first while a file is on its way.
+guardLeave(() => sent() !== undefined)
+
 async function offer(): Promise<void> {
   const rules = await uploadRules()
 
@@ -55,16 +59,6 @@ function fileName(): string {
   catch {
     return value.split('/').at(-1) || value
   }
-}
-
-const SUBTYPE_SUFFIX = /\+.*$/
-
-// A name for a type the field takes: `image/png` is PNG, `image/*` is images.
-function typeName(type: string): string {
-  if (type.endsWith('/*'))
-    return type.startsWith('image/') ? wording('cms.file.images', 'images') : type
-
-  return type.slice(type.indexOf('/') + 1).replace(SUBTYPE_SUFFIX, '').toUpperCase()
 }
 
 // What the field takes, said once for the editor: the types, the most it may weigh and the pixels an image needs.
@@ -106,6 +100,8 @@ async function send(files: File[]): Promise<void> {
   cancel = new AbortController()
   problem = leftOut
 
+  const failures = leftOut === undefined ? [] : [leftOut]
+
   try {
     for (const file of many ? files : files.slice(0, 1)) {
       sent = 0
@@ -119,7 +115,9 @@ async function send(files: File[]): Promise<void> {
         if (cancel.signal.aborted)
           return
 
-        problem = error instanceof Error && error.message !== '' ? error.message : wording('cms.file.failure', 'Could not upload')
+        // A list's zone takes several files and keeps what each refused one said.
+        failures.push(error instanceof Error && error.message !== '' ? error.message : wording('cms.file.failure', 'Could not upload'))
+        problem = failures.join(' ')
       }
     }
   }
@@ -146,7 +144,8 @@ async function opened(event: Event): Promise<void> {
     stored = await listUploads(collection, image)
   }
   catch {
-    stored = []
+    // Nothing listed is not nothing uploaded, so the empty line stays out and the next opening asks again.
+    stored = undefined
     problem = wording('cms.file.pickFailure', 'Could not list the uploads')
   }
 }
@@ -169,9 +168,15 @@ function pick(path: string, event: Event): void {
       a.kcms-file-link(href={value} target="_blank" rel="noopener" data-tooltip={wording('cms.file.open', 'Open {name} in a new tab', { name: fileName() })}) {fileName()}
       IconButton(icon="close" label={wording('cms.file.clear', 'Clear')} variant="ghost" size="sm" disabled={sent() !== undefined} onClick={clear})
   if image && alt && value !== '' && !many
-    TextInput(value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-label={alt.required ? `${wording('cms.file.altLabel', 'Alt text')} *` : wording('cms.file.altLabel', 'Alt text')} aria-invalid={alt.issue === undefined ? undefined : 'true'} onInput={text => onAlt?.(text)})
+    label.kcms-file-alt
+      span.kcms-file-alt-label {wording('cms.file.altLabel', 'Alt text')}
+      TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} onInput={text => onAlt?.(text)})
     if alt.issue
       p.kcms-file-error(role="alert") {alt.issue}
+  // The width and height of the image are not fields of the form, so their refusal shows here, where the path that left them blank was set.
+  if image && !many
+    for issue of sizeIssues key={issue.id}
+      p.kcms-file-error(id={issue.id} role="alert") {issue.message}
   FileDrop.kcms-file-drop(compact accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined} onFiles={send} onReject={reject})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} onClick={zone.open})

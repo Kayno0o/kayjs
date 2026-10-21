@@ -61,6 +61,20 @@
   white-space: nowrap;
 }
 
+.kcms-list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kcms-item-issues,
+.kcms-item-error {
+  margin: 0;
+  color: var(--color-kui-error);
+  font-size: 0.85rem;
+}
+
 .kcms-item-head {
   display: flex;
   flex-wrap: wrap;
@@ -159,6 +173,17 @@
 .kcms-file-hint,
 .kcms-file-rules {
   margin: 0;
+  color: var(--color-kui-subtext0);
+  font-size: 0.85rem;
+}
+
+.kcms-file-alt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kcms-file-alt-label {
   color: var(--color-kui-subtext0);
   font-size: 0.85rem;
 }

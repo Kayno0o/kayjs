@@ -28,27 +28,15 @@ export interface UploadOptions {
   limits?: UploadLimits | undefined
 }
 
-// The uploads on their way, which a save waits for and the browser asks before leaving over.
+// The uploads on their way, which a save waits for; the field asks before the page is left over one.
 let running = 0
 
 export function uploading(): boolean {
   return running > 0
 }
 
-function warnBeforeLeaving(event: BeforeUnloadEvent): void {
-  event.preventDefault()
-}
-
 function track(change: 1 | -1): void {
   running += change
-
-  if (typeof window === 'undefined')
-    return
-
-  if (running === 1 && change === 1)
-    window.addEventListener('beforeunload', warnBeforeLeaving)
-  else if (running === 0)
-    window.removeEventListener('beforeunload', warnBeforeLeaving)
 }
 
 let rules: Promise<UploadRules | undefined> | undefined
@@ -92,7 +80,8 @@ async function pixelsOf(file: File): Promise<{ width: number, height: number } |
     return undefined
 
   try {
-    const bitmap = await createImageBitmap(file)
+    // As the browser shows it, a rotated photo included, which is the size the upload answers.
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
     const { width, height } = bitmap
 
     bitmap.close()

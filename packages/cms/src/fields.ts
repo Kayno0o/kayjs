@@ -79,6 +79,9 @@ export function humanize(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+// The roles an image gives the fields beside it.
+const PAIRED = ['alt', 'width', 'height'] as const
+
 // The form fields for an entry's data, one per property of its schema, in the schema's order.
 export function fieldsOf(schema: JsonSchema): Field[] {
   const required = new Set(schema.required)
@@ -89,6 +92,9 @@ export function fieldsOf(schema: JsonSchema): Field[] {
 // The fields an image names as its `alt`, `width` and `height` move into it, so the form shows them with the image and not beside it.
 function pairUploads(fields: Field[]): Field[] {
   const claimed = new Set<string | number>()
+  const named = new Set(fields.flatMap(field => field.kind === 'image' ? PAIRED.map(name => field.upload?.[name]?.key) : []))
+  // A text field called `alt` is the alt text of the first image that names none, with no hint to write.
+  let plain = !named.has('alt') && fields.some(field => field.key === 'alt' && (field.kind === 'text' || field.kind === 'textarea'))
 
   const paired = fields.map((field) => {
     if (field.kind !== 'image')
@@ -96,9 +102,13 @@ function pairUploads(fields: Field[]): Field[] {
 
     const upload = { ...field.upload }
 
-    for (const name of ['alt', 'width', 'height'] as const) {
-      const key = field.upload?.[name]?.key
+    for (const name of PAIRED) {
+      const unnamed = name === 'alt' && plain && field.upload?.alt === undefined
+      const key = unnamed ? 'alt' : field.upload?.[name]?.key
       const sibling = fields.find(other => other !== field && other.key === key)
+
+      if (unnamed && sibling !== undefined)
+        plain = false
 
       if (sibling === undefined) {
         delete upload[name]
@@ -113,6 +123,25 @@ function pairUploads(fields: Field[]): Field[] {
   })
 
   return paired.filter(field => !claimed.has(field.key))
+}
+
+// The fields the images among `fields` pair with themselves, by key: what the form shows with the image and not as a field of its own.
+export function pairedFields(fields: Field[]): Map<string, { image: string, role: typeof PAIRED[number], field: Field }> {
+  const paired = new Map<string, { image: string, role: typeof PAIRED[number], field: Field }>()
+
+  for (const field of fields) {
+    if (field.kind !== 'image')
+      continue
+
+    for (const role of PAIRED) {
+      const sibling = field.upload?.[role]
+
+      if (sibling !== undefined)
+        paired.set(String(sibling.key), { image: String(field.key), role, field: sibling })
+    }
+  }
+
+  return paired
 }
 
 export function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field {
@@ -394,7 +423,7 @@ function uploadHints(hint: FieldHint): UploadHints {
       Object.assign(upload, { [name]: hint[name] })
   }
 
-  for (const name of ['alt', 'width', 'height'] as const) {
+  for (const name of PAIRED) {
     if (hint[name] !== undefined)
       upload[name] = { key: hint[name], label: '', required: false, kind: 'text' }
   }

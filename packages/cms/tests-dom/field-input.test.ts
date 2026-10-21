@@ -3,7 +3,7 @@ import type { Field, UploadHints } from '../src/fields'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
 import process from 'node:process'
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { inputValue } from '../src/datetime'
 import { createDrafts } from '../src/drafts'
@@ -60,8 +60,8 @@ test('Alt and Shift with an arrow in a field of an item moves it, and a move pas
 
 const PEOPLE: Field = { key: 'tags', label: 'People', hint: undefined, required: false, kind: 'list', numbered: true, minItems: 1, maxItems: 3, item: { key: 0, label: 'Person', hint: undefined, required: true, kind: 'group', fields: [{ key: 'name', label: 'Name', hint: undefined, required: false, kind: 'text', default: 'Anon' }, { key: 'role', label: 'Role', hint: undefined, required: true, kind: 'select', options: [{ value: 'a', label: 'A', raw: 'a' }, { value: 'b', label: 'B', raw: 'b' }] }] } }
 
-async function openField(field: Field, data: unknown) {
-  mounted = await mountComponent('src/components/list-state.kay', { data, field })
+async function openField(field: Field, data: unknown, issues: { path: string, message: string }[] = []) {
+  mounted = await mountComponent('src/components/list-state.kay', { data, field, issues })
   await settle()
 
   const root = mounted.root
@@ -353,7 +353,7 @@ async function openImage(data: Record<string, unknown>, hints: Parameters<typeof
   return { drafts, root: mounted.root }
 }
 
-async function openFile(initial: string, options: { image?: boolean, upload?: UploadHints, alt?: { value: string, issue?: string, required: boolean } } = {}) {
+async function openFile(initial: string, options: { image?: boolean, many?: boolean, upload?: UploadHints, alt?: { id: string, value: string, issue?: string, required: boolean }, sizeIssues?: { id: string, message: string }[] } = {}) {
   mounted = await mountComponent('src/components/file-field.kay', { initial, ...options })
   await settle()
 
@@ -404,20 +404,30 @@ test('an image that cannot be shown says so in place of a broken preview', async
 })
 
 test('an image previews with its alt text, which is edited in place, shown only for a set image and a field with an alt', async () => {
-  const withAlt = await openFile(UPLOADED, { alt: { value: 'A cat', required: true } })
+  const withAlt = await openFile(UPLOADED, { alt: { id: 'alt-id', value: 'A cat', required: true } })
+  const box = withAlt.querySelector<HTMLInputElement>('label.kcms-file-alt input')!
 
   expect(withAlt.querySelector('img.kcms-file-preview')?.getAttribute('alt')).toBe('A cat')
-  expect(withAlt.querySelector<HTMLInputElement>('input[aria-label="Alt text *"]')?.value).toBe('A cat')
+  expect(box.value).toBe('A cat')
+  // A visible label names the box, and the requirement is said to assistive tech rather than in the label.
+  expect(withAlt.querySelector('label.kcms-file-alt')?.textContent).toContain('Alt text')
+  expect(box.getAttribute('aria-required')).toBe('true')
+  expect(box.id).toBe('alt-id')
   mounted?.unmount()
 
-  const refused = await openFile(UPLOADED, { alt: { value: '', issue: 'Required', required: true } })
+  const refused = await openFile(UPLOADED, { alt: { id: 'alt-id', value: '', issue: 'Required', required: true } })
 
-  expect(refused.querySelector('input[aria-label="Alt text *"]')?.getAttribute('aria-invalid')).toBe('true')
+  expect(refused.querySelector('label.kcms-file-alt input')?.getAttribute('aria-invalid')).toBe('true')
   expect(refused.querySelector('.kcms-file-error')?.textContent).toBe('Required')
   mounted?.unmount()
-  expect((await openFile(UPLOADED)).querySelector('input[aria-label="Alt text"]')).toBeNull()
+  expect((await openFile(UPLOADED)).querySelector('label.kcms-file-alt')).toBeNull()
   mounted?.unmount()
-  expect((await openFile('', { alt: { value: '', required: false } })).querySelector('input[aria-label="Alt text"]')).toBeNull()
+  expect((await openFile('', { alt: { id: 'alt-id', value: '', required: false } })).querySelector('label.kcms-file-alt')).toBeNull()
+  mounted?.unmount()
+
+  const optional = await openFile(UPLOADED, { alt: { id: 'alt-id', value: '', required: false } })
+
+  expect(optional.querySelector('label.kcms-file-alt input')?.hasAttribute('aria-required')).toBe(false)
 })
 
 test('the field says what it takes: the types, the most it weighs and the pixels an image needs', async () => {
@@ -430,7 +440,7 @@ test('the field says what it takes: the types, the most it weighs and the pixels
 test('the alt text of a paired field is written to the field beside the image, and a path sets or drops the size beside it', async () => {
   const hints = { alt: sibling('alt'), width: sibling('width'), height: sibling('height') }
   const { drafts, root } = await openImage({ tags: UPLOADED, alt: 'A cat', width: 1, height: 1 }, hints)
-  const alt = root.querySelector<HTMLInputElement>('input[aria-label="Alt text"]')!
+  const alt = root.querySelector<HTMLInputElement>('label.kcms-file-alt input')!
 
   expect(alt.value).toBe('A cat')
   alt.value = 'A black cat'
@@ -489,6 +499,18 @@ class SlowRequest {
 
   abort() {
     this.onabort?.()
+  }
+}
+
+// A request the server refuses at once, naming the file it was sent.
+class RefusingRequest extends SlowRequest {
+  private file = ''
+
+  override send = (body?: unknown): undefined => {
+    this.file = body instanceof FormData ? (body.get('file') as File).name : ''
+    this.status = 415
+    this.response = new Blob([`${this.file} is refused`])
+    queueMicrotask(() => this.onload?.())
   }
 }
 
@@ -602,6 +624,81 @@ test('an image field built without upload hints, as an app\'s own code may, work
   expect(drafts.value(ENTRY, 'tags')).toBe('')
 })
 
+test('the refusal of an image\'s hidden width or height shows beside the image, since no field of the form carries it', async () => {
+  const root = await openFile(UPLOADED, { sizeIssues: [{ id: 'w', message: 'Width is required' }, { id: 'h', message: 'Height is required' }] })
+
+  expect([...root.querySelectorAll('.kcms-file-error')].map(item => item.textContent)).toEqual(['Width is required', 'Height is required'])
+  expect(root.querySelector('#w')).not.toBeNull()
+})
+
+test('a picker that could not list the uploads says so and not that nothing was uploaded, and asks again when opened again', async () => {
+  const listing = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('down', { status: 500 })) as unknown as typeof fetch)
+
+  try {
+    const root = await openFile('')
+    const pick = root.querySelector<HTMLDetailsElement>('details.kcms-file-pick')!
+
+    pick.open = true
+    pick.dispatchEvent(new Event('toggle'))
+    await settle()
+    expect(root.textContent).toContain('Could not list the uploads')
+    expect(root.textContent).not.toContain('Nothing uploaded yet')
+  }
+  finally {
+    listing.mockRestore()
+  }
+})
+
+test('the zone of a list keeps what each refused file was told', async () => {
+  const request = globalThis.XMLHttpRequest
+
+  Object.assign(globalThis, { XMLHttpRequest: RefusingRequest })
+
+  try {
+    const root = await openFile('', { many: true })
+
+    root.querySelector('.kcms-file-drop')!.dispatchEvent(Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer: { files: [new File([new Uint8Array(10)], 'a.png', { type: 'image/png' }), new File([new Uint8Array(10)], 'b.png', { type: 'image/png' })] } }))
+    await settle()
+    await settle()
+
+    const told = root.querySelector('.kcms-file-error')?.textContent ?? ''
+
+    expect(told).toContain('a.png is refused')
+    expect(told).toContain('b.png is refused')
+  }
+  finally {
+    Object.assign(globalThis, { XMLHttpRequest: request })
+  }
+})
+
+test('the page asks before it is left while an upload is on its way, and not after', async () => {
+  const request = globalThis.XMLHttpRequest
+
+  Object.assign(globalThis, { XMLHttpRequest: SlowRequest })
+  SlowRequest.instances = []
+
+  try {
+    const { root } = await openImage({ tags: '' })
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+
+      window.dispatchEvent(event)
+
+      return event.defaultPrevented
+    }
+
+    expect(leave()).toBe(false)
+    await drop(root, new File([new Uint8Array(10)], 'a.png', { type: 'image/png' }))
+    expect(leave()).toBe(true)
+    SlowRequest.instances[0]!.onload?.()
+    await settle()
+    expect(leave()).toBe(false)
+  }
+  finally {
+    Object.assign(globalThis, { XMLHttpRequest: request })
+  }
+})
+
 const base = { hint: undefined, required: false }
 
 test('a text shows its placeholder, takes its prefix and suffix beside it and counts its length against maxLength', async () => {
@@ -700,4 +797,47 @@ test('a toggle keeps its hint and its issue', async () => {
   expect(root.textContent).toContain('Shown on the home page')
   expect(root.querySelector('input')!.getAttribute('aria-describedby')).toStartWith('kcms-note-')
   expect(root.querySelector('[aria-live]')?.id).toBe(root.querySelector('input')!.getAttribute('aria-describedby') ?? '')
+})
+
+test('a folded item counts its issues in its head, and an unfolded one does not', async () => {
+  const { root, click, rows } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }, { name: 'Bob', role: '' }], [{ path: 'tags.1.role', message: 'Required' }, { path: 'tags.1.name', message: 'Too short' }])
+
+  expect(root.querySelectorAll('.kcms-item-issues').length).toBe(0)
+  await click('.kcms-fold', 1)
+  expect(rows()[1]!.querySelector('.kcms-item-issues')?.textContent).toBe('2 issues')
+  expect(rows()[0]!.querySelector('.kcms-item-issues')).toBeNull()
+})
+
+test('Add at the top puts a new item first, and stops at maxItems', async () => {
+  const { drafted, root, click } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }])
+
+  await click('.kcms-list-tools button')
+  expect(drafted()).toEqual([{ name: 'Anon' }, { name: 'Ada', role: 'a' }])
+  await click('.kcms-list-tools button')
+  expect((drafted() as unknown[]).length).toBe(3)
+  expect(root.querySelector('.kcms-list-tools button')).toBeNull()
+})
+
+test('a list of eight items or more offers a menu to jump to an item', async () => {
+  const seven = await openField(TAGS, Array.from({ length: 7 }, (_, i) => `t${i}`))
+
+  expect(seven.root.querySelector('.kcms-list-tools select')).toBeNull()
+  mounted?.unmount()
+
+  const { root } = await openField(TAGS, Array.from({ length: 8 }, (_, i) => `t${i}`))
+  const menu = root.querySelector<HTMLSelectElement>('.kcms-list-tools select')!
+
+  expect(menu.options.length).toBe(9)
+  menu.value = '5'
+  menu.dispatchEvent(new Event('change', { bubbles: true }))
+  await settle()
+  expect(root.contains(document.activeElement)).toBe(true)
+})
+
+test('a new list item under a minLength is not flagged before it is touched', async () => {
+  const field: Field = { ...TAGS, item: { ...TAGS.item, limits: { minLength: 3 } } as Field }
+  const { root, click } = await openField(field, ['abcd'])
+
+  await click('[data-kcms-add]')
+  expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(0)
 })

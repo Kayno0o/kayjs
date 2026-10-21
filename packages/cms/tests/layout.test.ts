@@ -137,6 +137,24 @@ describe('layoutProblems', () => {
   })
 })
 
+describe('an image\'s paired fields', () => {
+  const shop: CollectionInfo = { name: 'shop', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { photo: { 'type': 'string', 'x-kay': { kind: 'image', alt: 'caption', width: 'w' } }, caption: { type: 'string' }, w: { type: 'integer' }, name: { type: 'string' } } } }
+
+  test('are told apart from fields the schema lacks when a form names them', () => {
+    expect(layoutProblems([shop], checkLayouts({ shop: { form: { fields: ['caption', 'nope'] } } }))).toEqual([
+      'shop\'s form names caption, which is the alt of its image photo: the form shows it there',
+      'shop\'s form names nope, which its schema lacks',
+    ])
+  })
+
+  test('can still be columns of a list', () => {
+    const fields = fieldsOf(shop.schema)
+
+    expect(listColumns(fields, { columns: ['name', 'caption', 'w'] }).map(field => field.key)).toEqual(['name', 'caption', 'w'])
+    expect(layoutProblems([shop], checkLayouts({ shop: { list: { columns: ['caption', 'w'] } } }))).toEqual([])
+  })
+})
+
 describe('whenProblems', () => {
   const when = (key: string) => ({ 'type': 'string', 'x-kay-input': { when: key } })
   const page = (properties: Record<string, unknown>): CollectionInfo => ({ name: 'pages', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties } as CollectionInfo['schema'] })

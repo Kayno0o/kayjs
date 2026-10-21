@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
 import { setupStorage } from '../../../src/server/storage'
 import { configure } from '../src/settings'
-import { emptyFile, sizeOfPath, tooLarge } from '../src/upload-text'
+import { emptyFile, sizeOfPath, tooLarge, typeName } from '../src/upload-text'
 import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
 
 const PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1]
@@ -183,4 +183,11 @@ test('reads the size off a stored key, with or without the placeholder colour ka
   expect(sizeOfPath('/_kay/files/products/a1.1600x1200-c86432.jpg')).toEqual({ width: 1600, height: 1200 })
   expect(sizeOfPath('/_kay/files/products/a1.1600x1200.png?v=2')).toEqual({ width: 1600, height: 1200 })
   expect(sizeOfPath('/_kay/files/products/a1.pdf')).toBeUndefined()
+})
+
+test('a type reads as the extension an editor knows, a vendor\'s long ones included', () => {
+  expect(['image/png', 'image/svg+xml', 'application/pdf', 'image/*'].map(typeName)).toEqual(['PNG', 'SVG', 'PDF', 'images'])
+  expect(['application/vnd.ms-excel', 'application/msword', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].map(typeName)).toEqual(['XLS', 'DOC', 'XLSX'])
+  expect(typeName('application/vnd.acme.report')).toBe('ACME.REPORT')
+  expect(typeName('application/x-tar')).toBe('TAR')
 })

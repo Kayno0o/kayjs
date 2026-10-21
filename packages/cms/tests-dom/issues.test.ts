@@ -164,6 +164,8 @@ test('Reset puts a JSON box that does not parse back to the draft, and it blocks
   expect(issueOf('meta')).toBe('Meta is not valid JSON')
   ;[...root.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Reset')!.click()
   await settle()
+  ;[...document.querySelectorAll<HTMLButtonElement>('button')].filter(button => button.textContent?.trim() === 'Reset').at(-1)!.click()
+  await settle()
 
   expect(box('meta').value).toContain('"a": 1')
   expect(issueOf('meta')).toBeUndefined()

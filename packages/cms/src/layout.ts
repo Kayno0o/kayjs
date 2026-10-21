@@ -1,7 +1,7 @@
 import type { Field } from './fields'
 import type { CollectionInfo, CollectionLayout, FormLayout, ListLayout, RowAction } from './kay/contract'
 import { wording } from 'kay/words'
-import { fieldsOf } from './fields'
+import { fieldsOf, pairedFields } from './fields'
 
 export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
@@ -139,7 +139,8 @@ export function formRows(fields: Field[], hasBody: boolean, layout?: FormLayout)
 
 // The columns of a list: the named fields the schema has, once each, of a kind a cell can show.
 export function listColumns(fields: Field[], layout?: ListLayout): Field[] {
-  const byName = new Map(fields.map(field => [String(field.key), field]))
+  // A field an image pairs with itself is no field of the form, but its value is a row's like any other.
+  const byName = new Map([...[...pairedFields(fields).values()].map(({ field }) => field), ...fields].map(field => [String(field.key), field]))
   const shown = new Set<Field>()
 
   for (const name of layout?.columns ?? []) {
@@ -227,13 +228,19 @@ export function layoutProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]
     const keys = new Set(fields.map(field => String(field.key)))
     const named = [...(layout.form?.fields ?? []).flat(), ...layout.form?.hide ?? []].filter(field => field !== 'body' && field !== BODY_ID)
 
+    const paired = pairedFields(fields)
+
     for (const field of named) {
-      if (!keys.has(field))
-        lines.push(`${name}'s form names ${field}, which its schema lacks`)
+      if (keys.has(field))
+        continue
+
+      const image = paired.get(field)
+
+      lines.push(image ? `${name}'s form names ${field}, which is the ${image.role} of its image ${image.image}: the form shows it there` : `${name}'s form names ${field}, which its schema lacks`)
     }
 
     for (const field of layout.list?.columns ?? []) {
-      const kind = fields.find(candidate => String(candidate.key) === field)?.kind
+      const kind = [...fields, ...[...paired.values()].map(({ field: sibling }) => sibling)].find(candidate => String(candidate.key) === field)?.kind
 
       if (kind === undefined)
         lines.push(`${name}'s list names the column ${field}, which its schema lacks`)

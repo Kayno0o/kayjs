@@ -1,7 +1,7 @@
 ---
 import type { FormScope } from '../form'
 import FieldInput from '../editor/field-input.kay'
-import { fieldsOf } from '../fields'
+import { fieldsOf, pairedFields } from '../fields'
 
 // One field of an entry's form by its key in the schema, a group or a list with the fields inside it. Unknown names throw, naming the schema's.
 const { form, name } = props<{ form: FormScope, name: string }>()
@@ -9,6 +9,11 @@ const { form, name } = props<{ form: FormScope, name: string }>()
 const field = memo(() => {
   const fields = fieldsOf(form.collection.schema)
   const found = fields.find(candidate => String(candidate.key) === name)
+
+  const paired = pairedFields(fields).get(name)
+
+  if (!found && paired)
+    throw new Error(`kayjs-cms: ${form.collection.name}'s ${JSON.stringify(name)} is the ${paired.role} of its image ${JSON.stringify(paired.image)}, which shows it: render ${JSON.stringify(paired.image)}`)
 
   if (!found)
     throw new Error(`kayjs-cms: ${form.collection.name} has no field ${JSON.stringify(name)} to render; its fields are ${fields.map(candidate => candidate.key).join(', ')}`)

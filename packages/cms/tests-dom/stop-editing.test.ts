@@ -144,6 +144,14 @@ test('Stop editing pressed again while the question shows asks again and leaves 
   expect(kept()).toBe(1)
 })
 
+// Reset asks first: the trigger opens a dialog whose own Reset button drops the edits.
+async function reset(root: ParentNode): Promise<void> {
+  ;[...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Reset')!.click()
+  await settle()
+  ;[...document.querySelectorAll('button')].filter(button => button.textContent?.trim() === 'Reset').at(-1)!.click()
+  await settle()
+}
+
 test('a reload brings the typed edits back, and Reset drops them for good', async () => {
   server()
   localStorage.clear()
@@ -162,10 +170,7 @@ test('a reload brings the typed edits back, and Reset drops them for good', asyn
   expect(mounted.root.textContent).toContain('Your unsaved changes from')
   expect(root).not.toBe(mounted.root)
 
-  const reset = [...mounted.root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Reset')!
-
-  reset.click()
-  await settle()
+  await reset(mounted.root)
 
   expect(kept()).toBe(0)
 })
@@ -183,8 +188,7 @@ test('closing or reloading the tab with edits not saved gets the browser prompt,
   }
 
   expect(unload()).toBe(true)
-  ;[...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Reset')!.click()
-  await settle()
+  await reset(root)
 
   expect(unload()).toBe(false)
 })

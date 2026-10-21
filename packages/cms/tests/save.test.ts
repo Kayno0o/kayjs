@@ -33,7 +33,7 @@ function server(answer: (body: Sent['body'], count: number) => unknown, wait = 2
     await Bun.sleep(wait)
 
     return Response.json(answer(body, sent.length))
-  }) as typeof fetch)
+  }) as unknown as typeof fetch)
 
   return sent
 }
@@ -260,5 +260,21 @@ describe('an upload on its way', () => {
     await expect(uploadFile('posts', PNG(), { limits: { maxSize: 2 } })).rejects.toThrow('a.png is 3 bytes, over the 2 bytes an upload may be')
     expect(files.posts).toBe(0)
     expect(uploading()).toBe(false)
+  })
+
+  it('measures an image as the browser shows it, a photo\'s orientation applied, before checking its least size', async () => {
+    const original = globalThis.createImageBitmap
+    const decoded = mock(async (..._args: unknown[]) => ({ width: 3000, height: 4000, close: () => undefined }))
+
+    Object.assign(globalThis, { createImageBitmap: decoded })
+
+    try {
+      spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ accept: 'image/png', images: 'image/png', maxBytes: 1000 })) as unknown as typeof fetch)
+      await expect(uploadFile('posts', PNG(), { limits: { minWidth: 4000 } })).rejects.toThrow('3000 by 4000')
+      expect(decoded.mock.calls[0]![1]).toEqual({ imageOrientation: 'from-image' })
+    }
+    finally {
+      Object.assign(globalThis, { createImageBitmap: original })
+    }
   })
 })

@@ -165,6 +165,8 @@ A new item starts from the `default` of the item's schema, and a select with no 
 
 Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields, a multi-line text excepted. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
 
+A list also has Add at the top, and a menu to jump to an item once it holds eight or more. A folded item shows how many issues it hides, such as `2 issues`. Reset asks before it drops your unsaved changes.
+
 ## How a field is entered
 
 The schema already shapes each control. A string with `format: 'email'` or `'uri'` gets an input of that type and stays on one line, whatever its `maxLength`. A `maxLength` limits the box and shows a counter such as `12 / 254`. `minimum` and `maximum` set the limits of a number. An `integer` takes no decimal point, and the mouse wheel over a number box leaves it instead of changing the figure. Emptying an optional text unsets the field, and a toggle shows its description and its issue.
@@ -233,7 +235,7 @@ photoHeight: s.Optional(s.Integer()),
 
 `accept`, `maxSize`, `minWidth` and `minHeight` narrow what `uploads` takes for that field alone; the editor checks them before it sends the file. `fileField` takes `accept` and `maxSize`.
 
-The fields named by `alt`, `width` and `height` leave the form. The editor asks for the alt text under the image, previews the image with it, and fills in the width and height of every image uploaded or picked, so a page can give them to `image()`.
+The fields named by `alt`, `width` and `height` leave the form. The editor asks for the alt text under the image, previews the image with it, and fills in the width and height of every image uploaded or picked, so a page can give them to `image()`. A text field called `alt` needs no hint: it is the alt text of the first image beside it.
 
 These pairs work for a field of an object, not for the items of a list. An object field is drawn as one block with a rule down its left side.
 

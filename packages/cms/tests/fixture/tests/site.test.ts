@@ -1012,6 +1012,31 @@ test.each(SCREENS)('%s fits a 375 px phone: no sideways page scroll, every contr
   expect(await phoneProblems(path)).toEqual([])
 }, 60_000)
 
+test('a list with the tools row keeps it inside a 375 px phone, wrapped and not spilling', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/new/posts', PHONE)
+
+  try {
+    await page.waitUntil(() => document.querySelector('[data-kcms-add]') !== null)
+    await page.evaluate(() => {
+      for (let i = 0; i < 8; i++)
+        document.querySelector<HTMLElement>('[data-kcms-add]')!.click()
+    })
+    await page.waitUntil(() => document.querySelector('.kcms-list-tools select') !== null)
+
+    const spill = await page.evaluate(() => {
+      const tools = document.querySelector('.kcms-list-tools')!.getBoundingClientRect()
+
+      return [...document.querySelectorAll('.kcms-list-tools > *')].map(child => child.getBoundingClientRect()).filter(box => box.left < tools.left - 1 || box.right > tools.right + 1 || box.right > innerWidth).length
+    })
+
+    expect(spill).toBe(0)
+  }
+  finally {
+    page.close()
+  }
+}, 60_000)
+
 test('the unused-uploads screen fits a 375 px phone with an upload to delete', async () => {
   const form = new FormData()
 

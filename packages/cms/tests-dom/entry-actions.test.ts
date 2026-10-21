@@ -122,6 +122,10 @@ test('Reset appears once edited, and puts the title back', async () => {
   expect(button(root, 'Reset')).toBeDefined()
   button(root, 'Reset')!.click()
   await settle()
+  // Asked first: the title stays until the dialog's Reset is pressed.
+  expect(title(root).value).toBe('Other')
+  ;[...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Reset').at(-1)!.click()
+  await settle()
   expect(title(root).value).toBe('Hello')
   expect(button(root, 'Reset')).toBeUndefined()
 })

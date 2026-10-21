@@ -4,6 +4,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-cms lists get Add at the top, a jump menu from eight items and an issue count on a folded item, and Reset asks before dropping edits ([fields](../packages/cms/llms/fields.md)).
+- kayjs-cms pairs a text field called `alt` with the image beside it with no hint, and asks before the page is left over a running upload ([uploads](../packages/cms/llms/uploads.md)).
 - The CMS tab of the dev tool speaks the page's language, from new `cms.dev.*` words (French shipped; see [the words](../packages/cms/llms/words.md)).
 - The dev tool's bar publishes its measured room as `--kay-dev-bar-bottom-left` or `-right` for a bottom corner (see [the dev tool](dev-tool.md)), and kayjs-cms's collapsed editor button is a panel the bar keeps off.
 - A page showing one content entry (`prerender` or `sitemap` of a collection on a one-param route) takes the entry's `title`, `description` and date for its head, with `og:type` `article`; its own `head` tags win ([A page per entry](head.md#site-defaults-and-social-cards)).

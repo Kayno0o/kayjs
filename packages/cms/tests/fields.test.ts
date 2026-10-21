@@ -2,7 +2,7 @@ import type { Field } from '../src/fields'
 import type { JsonSchema } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { checkField, emptyValue, fieldsOf, htmlPattern, humanize, isCompact, itemAt, itemTitle } from '../src/fields'
+import { checkField, emptyValue, fieldsOf, htmlPattern, humanize, isCompact, itemAt, itemTitle, pairedFields } from '../src/fields'
 
 describe('how a field is entered', () => {
   const one = (property: Record<string, unknown>, required = false) => fieldsOf({ type: 'object', required: required ? ['field'] : [], properties: { field: property as JsonSchema } })[0]!
@@ -299,6 +299,22 @@ describe('image fields', () => {
 
     expect(fields.map(field => field.key)).toEqual(['title', 'photo', 'caption'])
     expect(fields[1]).toMatchObject({ kind: 'image', upload: { alt: { key: 'photoAlt', required: true }, width: { key: 'photoWidth', kind: 'integer' }, height: { key: 'photoHeight' } } })
+  })
+
+  it('take a text field called alt with no hint, the first image only, and leave one a hint names or of another kind', () => {
+    const [first, second] = fieldsOf({ properties: { photo: image({}), banner: image({}), alt: { type: 'string' } } })
+
+    expect(first).toMatchObject({ key: 'photo', upload: { alt: { key: 'alt' } } })
+    expect((second as Field & { kind: 'image' }).upload?.alt).toBeUndefined()
+    expect(fieldsOf({ properties: { photo: image({}), alt: { type: 'string' } } }).map(field => field.key)).toEqual(['photo'])
+    expect(fieldsOf({ properties: { photo: image({ alt: 'caption' }), caption: { type: 'string' }, alt: { type: 'string' } } }).map(field => field.key)).toEqual(['photo', 'alt'])
+    expect(fieldsOf({ properties: { photo: image({}), alt: { type: 'integer' } } }).map(field => field.key)).toEqual(['photo', 'alt'])
+  })
+
+  it('are listed by pairedFields with the image and the role they play', () => {
+    const paired = pairedFields(fieldsOf({ properties: { photo: image({ alt: 'caption', width: 'w' }), caption: { type: 'string' }, w: { type: 'integer' } } }))
+
+    expect([...paired].map(([key, { image: owner, role }]) => [key, owner, role])).toEqual([['caption', 'photo', 'alt'], ['w', 'photo', 'width']])
   })
 
   it('ignore a name that is no field beside them, and pair inside a group', () => {

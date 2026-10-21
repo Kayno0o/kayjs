@@ -14,6 +14,7 @@ import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
 import EntrySaveState from '../components/entry-save-state.kay'
+import ResetButton from '../components/reset-button.kay'
 import { entryRoom } from '../room'
 import { saveDraft, showRefusal } from './save'
 import { saveShortcut } from './shortcut'
@@ -100,7 +101,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()})
-      Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving() || !unsaved()} onClick={() => drafts.reset(entry)})
+      ResetButton(disabled={saving() || !unsaved()} onReset={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !unsaved()} onClick={save})
   EntryPresence(room={room.room} member={room.member})
   if source.status() === 'failed'

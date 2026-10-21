@@ -4,8 +4,8 @@ import FileInput from '@kaynooo/kayjs-cms/file-input.kay'
 type Input = Parameters<typeof FileInput>[0]
 
 // The editor's file input on a value this component keeps, mounted with `mountComponent`.
-const { initial, image = true, upload = {}, alt, onChange } = props<{ initial: string, image?: boolean, upload?: Input['upload'], alt?: Input['alt'], onChange?: Input['onChange'] }>()
+const { initial, image = true, many = false, upload = {}, alt, sizeIssues, onChange } = props<{ initial: string, image?: boolean, many?: boolean, upload?: Input['upload'], alt?: Input['alt'], sizeIssues?: Input['sizeIssues'], onChange?: Input['onChange'] }>()
 
 const value = signal(initial)
 ---
-FileInput(value={value()} image={image} collection="posts" upload={upload} alt={alt} onChange={(path, size) => { value = path; onChange?.(path, size) }})
+FileInput(value={value()} image={image} collection="posts" many={many} upload={upload} alt={alt} sizeIssues={sizeIssues} onChange={(path, size) => { value = path; onChange?.(path, size) }})

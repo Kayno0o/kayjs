@@ -39,3 +39,27 @@ export function sizeOfPath(path: string): { width: number, height: number } | un
 
   return match === null ? undefined : { width: Number(match[1]), height: Number(match[2]) }
 }
+
+const VENDOR_TYPES: Record<string, string> = {
+  'application/msword': 'DOC',
+  'application/vnd.ms-excel': 'XLS',
+  'application/vnd.ms-powerpoint': 'PPT',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+}
+const SUBTYPE_SUFFIX = /\+.*$/
+const VENDOR_PREFIX = /^(?:vnd|x)[.-]/i
+
+// A name for a type a field takes: `image/png` is PNG, `image/*` is images, and a vendor's long type such as a spreadsheet's is its usual extension.
+export function typeName(type: string): string {
+  if (type.endsWith('/*'))
+    return type.startsWith('image/') ? wording('cms.file.images', 'images') : type
+
+  const known = VENDOR_TYPES[type.toLowerCase()]
+
+  if (known !== undefined)
+    return known
+
+  return type.slice(type.indexOf('/') + 1).replace(SUBTYPE_SUFFIX, '').replace(VENDOR_PREFIX, '').toUpperCase()
+}
