@@ -208,3 +208,108 @@ test('a slug taken marks the slug field, which the summary links to, and typing 
   expect(root.querySelector('.kcms-field[id$="-s"] .kui-form-field-issue')).toBeNull()
   expect(root.querySelector('.kcms-summary')).toBeNull()
 })
+
+const BOXES: ScreenCollection = { ...NOTES, schema: { type: 'object', properties: { items: { type: 'array', items: { 'type': 'object', 'x-kay': { kind: 'json' } } } } } }
+const LOCALIZED: ScreenCollection = { ...NOTES, localized: true, locales: ['en', 'fr'], schema: { type: 'object', properties: { title: { type: 'string' } } } }
+
+async function openIn(collection: ScreenCollection, stored: StoredEntry | undefined) {
+  mounted = await mountComponent('src/components/entry-screen.kay', { collection, entry: stored })
+  await settle()
+
+  const root = mounted.root
+  const submit = async () => {
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+
+    for (let wait = 0; wait < 30; wait++) {
+      await Bun.sleep(10)
+      await settle()
+    }
+  }
+
+  // The form saves only once something changed.
+  const edit = async () => {
+    const title = root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!
+
+    title.value = 'edited'
+    title.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+  }
+
+  return { root, submit, edit }
+}
+
+test('removing a list item holding a JSON box that does not parse stops blocking Save', async () => {
+  const { root, submit } = await openIn(BOXES, entry({ items: [{ a: 1 }] }))
+  const fetched = server(undefined)
+  const area = root.querySelector<HTMLTextAreaElement>('[data-kcms-path="items.0"] textarea')!
+
+  area.value = '{ "a": '
+  area.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  await submit()
+  expect(fetched).not.toHaveBeenCalled()
+
+  ;[...root.querySelectorAll<HTMLButtonElement>('button')].find(button => button.getAttribute('aria-label') === 'Remove Item 1')!.click()
+  await settle()
+  await submit()
+
+  expect(fetched).toHaveBeenCalledTimes(1)
+  expect(sent(fetched).data.items).toEqual([])
+})
+
+test('a refused locale marks the locale field on its own and takes the focus', async () => {
+  const { root, submit } = await openIn(LOCALIZED, undefined)
+  const slug = root.querySelector<HTMLInputElement>('.kcms-field[id$="-s"] input')!
+
+  slug.value = 'hello'
+  slug.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  server([{ path: '', key: 'locale', message: 'This locale is not offered' }])
+  await submit()
+
+  const locale = root.querySelector<HTMLSelectElement>('.kcms-field[id$="-l"] select')!
+
+  expect(root.querySelector('.kcms-field[id$="-l"] .kui-form-field-issue')?.textContent).toBe('This locale is not offered')
+  expect(root.querySelector('.kcms-field[id$="-s"] .kui-form-field-issue')).toBeNull()
+  expect(locale.getAttribute('aria-invalid')).toBe('true')
+  expect(document.activeElement).toBe(locale)
+  expect(root.querySelector('.kcms-summary a')?.getAttribute('href')).toBe(`#${locale.closest('.kcms-field')!.id}`)
+})
+
+test('a refusal naming a field the form does not draw is a notice of its own, which takes the focus', async () => {
+  const { root, submit, edit } = await openIn(NOTES, entry({ title: 'hello', count: 3 }))
+
+  await edit()
+  server([{ path: 'hidden', message: 'Hidden is not valid' }])
+  await submit()
+
+  const notice = root.querySelector<HTMLElement>('p.kcms-entry-failure')!
+
+  expect(notice.textContent).toBe('Hidden is not valid')
+  expect(document.activeElement).toBe(notice)
+})
+
+test('a save that fails on the network leaves the form as it was, with no notice to move to', async () => {
+  const { root, submit, edit } = await openIn(NOTES, entry({ title: 'hello', count: 3 }))
+
+  await edit()
+  spyOn(globalThis, 'fetch').mockImplementation((async () => {
+    throw new TypeError('offline')
+  }) as unknown as typeof fetch)
+  await submit()
+
+  expect(root.querySelector('.kcms-entry-failure')).toBeNull()
+  expect(root.querySelector('.kcms-summary')).toBeNull()
+  expect(document.activeElement?.closest('.kcms-entry-failure')).toBeNull()
+})
+
+test('the summary does not announce what each field\'s own message already does', async () => {
+  const { root, submit, edit } = await openIn(NOTES, entry({ title: 'hello', count: 3 }))
+
+  await edit()
+  server([{ path: 'title', message: 'Title is not valid' }, { path: 'count', message: 'Count is not valid' }])
+  await submit()
+
+  expect(root.querySelector('.kcms-summary')?.hasAttribute('role')).toBe(false)
+  expect(root.querySelectorAll('[data-kcms-path] .kui-form-field-issues[aria-live="polite"] .kui-form-field-issue').length).toBe(2)
+})

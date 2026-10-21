@@ -133,8 +133,9 @@ if form.drafts.refusal(form.entry) as refusal
         Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} disabled={taking()} onClick={() => form.drafts.keepEdits(form.entry)})
         if refusal.conflict.version !== null
           Button(label={wording('cms.entry.takeTheirs', 'Take their version')} busy={taking()} onClick={takeTheirs})
+// The summary is no alert of its own: each field's message is a live region that says it, so a screen reader hears a refusal once.
 if listed().length > 0
-  .kcms-entry-failure.kcms-summary(role="alert" tabindex="-1")
+  .kcms-entry-failure.kcms-summary(tabindex="-1")
     p {wording('cms.entry.summary', listed().length === 1 ? 'One field needs fixing:' : '{count} fields need fixing:', { count: listed().length })}
     ul
       for issue of listed() key={`${issue.key ?? ''}:${issue.path}:${issue.message}`}
