@@ -14,7 +14,7 @@ import { parseExpanded } from '../compiler/markdown-block'
 import { nativeManifestIfInstalled } from '../compiler/native-typescript'
 import { analyzeScript } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
-import { tableFingerprint } from '../runtime/class-table'
+import { usesTailwind } from '../format/tailwind'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
@@ -22,6 +22,21 @@ import { importedSignals, keepImportedSignals } from './signals'
 import { embeddedMap, registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
+
+const fingerprinted = new WeakMap<ClassTable, string>()
+
+// What a compile that read the table depends on: none without a table.
+function tableFingerprint(table: ClassTable | undefined): string {
+  if (table === undefined)
+    return ''
+
+  let fingerprint = fingerprinted.get(table)
+
+  if (fingerprint === undefined)
+    fingerprinted.set(table, fingerprint = String(Bun.hash(JSON.stringify(table))))
+
+  return fingerprint
+}
 
 export interface TransformOptions {
   target: Target
@@ -37,6 +52,8 @@ export interface TransformOptions {
   inspect?: boolean | undefined
   // The browser's build only: resolves literal classes written together while compiling, so a change of the table compiles again.
   classTable?: ClassTable | undefined
+  // The server's build of an app with Tailwind, which merges a shorthand beside a static `class` while rendering; set by `transformKayCached` from the app's stylesheets.
+  classMerge?: boolean | undefined
 }
 
 interface Compiled {
@@ -88,7 +105,9 @@ export function transformKay(source: string, filename: string, options: Transfor
 
 // `transformKay` through the cache: one entry per file and target, replaced when the source or the compiler changes.
 export async function transformKayCached(source: string, filename: string, given: TransformOptions): Promise<string> {
-  const options = await clientOnlyIsland(source, filename, given.cacheDir) ? { ...given, clientOnly: true } : given
+  const clientOnly = await clientOnlyIsland(source, filename, given.cacheDir)
+  const classMerge = given.target === 'ssr' ? await usesTailwind(given.root ?? process.cwd()) : undefined
+  const options = { ...given, ...clientOnly && { clientOnly }, classMerge }
 
   if (options.cacheDir === undefined)
     return transformKay(source, filename, options)
@@ -96,7 +115,7 @@ export async function transformKayCached(source: string, filename: string, given
   // Read once: it is part of the cache key and, on a miss, what the compile reads too.
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -229,7 +248,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

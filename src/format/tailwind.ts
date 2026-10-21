@@ -65,6 +65,22 @@ async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | unde
   return loaded
 }
 
+const tailwindApps = new Map<string, Promise<boolean>>()
+
+// Whether the app imports Tailwind in a stylesheet, read once per project and process: adding it needs a restart of `kay dev`.
+export async function usesTailwind(root: string): Promise<boolean> {
+  let known = tailwindApps.get(root)
+
+  if (known === undefined)
+    tailwindApps.set(root, known = hasTailwindEntry(root))
+
+  return known
+}
+
+async function hasTailwindEntry(root: string): Promise<boolean> {
+  return await tailwindEntry(root, true) !== undefined
+}
+
 async function tailwindEntry(root: string, parts: boolean): Promise<string | undefined> {
   const preferred = join(root, ENTRY)
 

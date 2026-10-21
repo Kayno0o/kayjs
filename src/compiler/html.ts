@@ -20,6 +20,8 @@ export function htmlHelperImport(): string {
 }
 
 export interface HtmlOptions {
+  // The app has Tailwind, so a class table may merge classes while rendering.
+  classMerge?: boolean | undefined
   // An island or a twin: dynamic parts carry markers for hydration.
   hydratable?: boolean | undefined
   // Loop rows read their item, and a keyed row its index, through functions, as the island build of the same template does.
@@ -73,6 +75,7 @@ class Markup {
 export class HtmlTemplate extends TemplateWriter {
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
     super(b, src, facts)
+    this.mergesAtRuntime = options.classMerge === true
   }
 
   // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
@@ -444,8 +447,10 @@ export class HtmlTemplate extends TemplateWriter {
       markup.text('"')
     }
     else if (plan.classes?.pieces) {
+      const { pieces } = plan.classes
+
       markup.text(' class="')
-      markup.dynamic(() => b.add(`${helperName('className')}(${JSON.stringify(plan.classes!.pieces)})`))
+      markup.dynamic(() => b.add(`${helperName('className')}(${JSON.stringify(pieces)})`))
       markup.text('"')
     }
     else if (plan.classes) {

@@ -116,6 +116,9 @@ export abstract class TemplateWriter {
   // Set for the browser's build, which resolves the literal classes written together while compiling; the server resolves them while rendering, with the same table.
   protected classTable: ClassTable | undefined = undefined
 
+  // Set for the server of an app with Tailwind, which merges a shorthand beside a static `class` while rendering; without either, the two are joined as written.
+  protected mergesAtRuntime = false
+
   // Whether a component's slots and children are handed over as a function building them: in the browser, so a slot read in an attribute, a test or a ternary builds nothing and claims no server markup while an island hydrates.
   // The server hands over the markup itself, which an island reads its static slots off, and so draws a slot's ids once per read where the browser draws them once per insert; the browser sets the ids it binds, so they agree.
   protected readonly lazySlots: boolean = false
@@ -155,8 +158,14 @@ export abstract class TemplateWriter {
 
     if (parts.length > 0)
       plan.classes = { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
-    else if (element.classes.length > 0)
-      plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute), ...classAttribute?.kind === 'static' && this.classTable === undefined && { pieces: this.staticParts(element, classAttribute) } }
+    else if (element.classes.length > 0) {
+      if (classAttribute?.kind === 'expression')
+        plan.classes = { text: this.shorthand(element), expression: classAttribute.expression }
+      else if (classAttribute?.kind === 'static' && this.mergesAtRuntime)
+        plan.classes = { text: this.staticClass(element, classAttribute), pieces: this.staticParts(element, classAttribute) }
+      else
+        plan.classes = { text: this.staticClass(element, classAttribute) }
+    }
 
     const section = name === 'a' ? sectionOf(element, this.src) : undefined
 
@@ -488,7 +497,7 @@ export abstract class TemplateWriter {
     const parts = partsOf(element, this.src, this.facts.parts)
 
     // A shorthand beside a static `class` is a merge too: the browser resolves it here, the server while rendering.
-    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0 && (classAttribute === undefined || shorthand === undefined || this.classTable !== undefined)) {
+    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0 && (classAttribute === undefined || shorthand === undefined || !this.mergesAtRuntime)) {
       b.add(JSON.stringify(this.staticClass(element, classAttribute)))
 
       return
@@ -592,8 +601,9 @@ export abstract class TemplateWriter {
     return [this.shorthand(element), decodeEntities(classAttribute.text)]
   }
 
+  // The text `classText` makes of the same parts: a part written twice stays once, then the classes a later one overrides go.
   protected joinLiterals(parts: string[]): string {
-    const text = parts.join(' ')
+    const text = [...new Set(parts.filter(part => part !== ''))].join(' ')
 
     return this.classTable === undefined ? text : resolveClasses(text, this.classTable)
   }

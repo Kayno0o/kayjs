@@ -12,6 +12,7 @@ import { devBuilder } from '../src/dev/builder'
 import { modeOf, resolveProject } from '../src/project'
 import { installClassTable } from '../src/runtime/class-table'
 import { collectHead, head } from '../src/runtime/head'
+import { classText } from '../src/runtime/values'
 import { servePages } from '../src/server/app'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -100,11 +101,44 @@ describe('literal classes written together in one template', () => {
     }
   })
 
-  it('stay as written with no table', () => {
-    const compile = (output: 'dom' | 'html') => compileKay('.p-4(class="p-6") x\nBox.p-4(class="p-6") y\n', join(root, 'src/components/plain.kay'), { root, output }).tsx
+  it('stay as written, with no merge call, in an app without Tailwind', async () => {
+    const plain = await scratchDir('class-merge-plain-')
+    const source = '.p-4(class="p-6") x\nBox.p-4(class="p-6") y\n'
 
-    expect(compile('dom')).toContain('p-4 p-6')
-    expect(compile('html')).toContain('KayClassName(["p-4","p-6"])')
+    try {
+      await Bun.write(join(plain, 'src/app.css'), 'body { margin: 0 }\n')
+      const server = await transformKayCached(source, join(plain, 'src/components/plain.kay'), { target: 'ssr', root: plain })
+      const browser = compileKay(source, join(plain, 'src/components/plain.kay'), { root: plain, output: 'dom' }).tsx
+
+      expect(server).not.toContain('KayClassName(')
+      expect(server).not.toContain('KayComponentClass(')
+      expect(server).toContain('p-4 p-6')
+      expect(browser).not.toContain('KayComponentClass(')
+      expect(browser).toContain('p-4 p-6')
+    }
+    finally {
+      await rm(plain, { recursive: true, force: true })
+    }
+  })
+
+  it('leave the island no merge call to run, and the server one only when the app has Tailwind', async () => {
+    const source = '.p-4(class="p-6") x\nBox.p-4(class="p-6") y\n'
+    const file = join(root, 'src/components/pairs.kay')
+    const browser = compileKay(source, file, { root, output: 'dom', classTable: client.classTable }).tsx
+    const server = await transformKayCached(source, file, { target: 'ssr', root })
+
+    expect(browser).not.toContain('KayComponentClass(')
+    expect(browser).not.toContain('KayClassName(')
+    expect(server).toContain('KayClassName(["p-4","p-6"])')
+    expect(server).toContain('KayComponentClass(["p-4", "p-6"])')
+  })
+
+  it('give a class written twice the one the server gives', () => {
+    const { tsx } = compileKay('.card(class="card") x\n', join(root, 'src/components/twice.kay'), { root, output: 'dom', classTable: client.classTable })
+
+    expect(tsx).toContain('class=\\"card\\"')
+    expect(tsx).not.toContain('card card')
+    expect(classText(['card', 'card'])).toBe('card')
   })
 
   it('merge in a dynamic merge the literals on their own side', () => {

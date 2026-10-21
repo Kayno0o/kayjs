@@ -8,11 +8,6 @@ export interface ClassTable {
 const TABLE = Symbol.for('kay.classTable')
 const WHITESPACE = /\s+/
 
-// What a compile that read the table depends on: none without a table.
-export function tableFingerprint(table: ClassTable | undefined): string {
-  return table === undefined ? '' : String(Bun.hash(JSON.stringify(table)))
-}
-
 export function installClassTable(table: ClassTable | undefined): void {
   (globalThis as { [TABLE]?: ClassTable | undefined })[TABLE] = table
 }

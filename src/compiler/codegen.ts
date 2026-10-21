@@ -22,6 +22,7 @@ import { headTagProblem, sharedImports } from './validate'
 export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
+  classMerge?: boolean | undefined
   // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
   translates?: boolean | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -429,7 +430,7 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      new HtmlTemplate(b, src, this.facts, { hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
+      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
