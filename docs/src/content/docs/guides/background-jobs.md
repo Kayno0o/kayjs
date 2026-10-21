@@ -155,7 +155,7 @@ Once the job completes, or is kept as failed, the key is free again. `await sync
 
 A job enqueued while the one with its key runs is dropped, even if its data is newer than what that run read. To run again after it, enqueue without a key, or once it completed.
 
-Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them.
+Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them. It also waits for a job a worker already started, so the test sees what that job did.
 
 An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`.
 

@@ -136,7 +136,7 @@ export type Queue<Payload, Progress = unknown> = Elysia & {
   enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string>
   // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state()`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
   job: (job: string | { id: string }) => Promise<JobState<Progress> | undefined>
-  // Runs every job whose time has come, here and now, until none is left: for a test, or a script with no server.
+  // Runs every job whose time has come, here and now, until none is left and none a worker took is still running: for a test, or a script with no server.
   drain: () => Promise<number>
   failed: () => Promise<FailedJob<Payload>[]>
   // Removes the job of that id, or every job, waiting or failed, whose payload `match` returns true for, such as a person's mails once they asked to be erased; resolves with how many went.
@@ -602,7 +602,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   }
 
   // Runs one job it claimed, then marks how it went; false when none was due.
-  const runNext = async (): Promise<boolean> => {
+  const runOne = async (): Promise<boolean> => {
     const now = Date.now()
     const claimedAt = performance.now()
     const job = await store().claim(name, now, now + lostAfter)
@@ -700,6 +700,22 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
 
     return true
+  }
+
+  // Every run in flight, a worker's included: a drain cannot claim a job a worker holds, so it waits for these instead.
+  const running = new Set<Promise<boolean>>()
+
+  const runNext = async (): Promise<boolean> => {
+    const run = runOne()
+
+    running.add(run)
+
+    try {
+      return await run
+    }
+    finally {
+      running.delete(run)
+    }
   }
 
   let purged = 0
@@ -862,10 +878,16 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
       await purgeFailed()
 
-      while (await runNext())
-        ran++
+      for (;;) {
+        while (await runNext())
+          ran++
 
-      return ran
+        if (running.size === 0)
+          return ran
+
+        // A job a worker holds may enqueue another, so the queue is looked at again once it ends.
+        await Promise.allSettled(running)
+      }
     },
     failed: async () => {
       await tidy()

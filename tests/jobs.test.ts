@@ -948,6 +948,30 @@ describe('queue', () => {
     expect(steps).toEqual(['a started', 'a done'])
   })
 
+  it('drains only once the job a worker took has ended, and the jobs it enqueued with it', async () => {
+    const steps: string[] = []
+    const work = queue('work', async (step: string) => {
+      steps.push(`${step} started`)
+      await Bun.sleep(50)
+
+      if (step === 'a')
+        await work.enqueue('b')
+
+      steps.push(`${step} done`)
+    }, { store: memoryJobs() })
+    const app = new Elysia().use(work).listen(0)
+
+    try {
+      await work.enqueue('a')
+      await until(() => steps.length > 0, 200)
+      await work.drain()
+      expect(steps.at(-1)).toBe('b done')
+    }
+    finally {
+      await shutdown(app)
+    }
+  })
+
   it('runs each job in one of the processes sharing the store', async () => {
     const path = await jobsPath()
     const ran: number[] = []
