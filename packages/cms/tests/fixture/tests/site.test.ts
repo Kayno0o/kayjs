@@ -462,8 +462,16 @@ test('a duplicate is a draft copy under a free slug, and a collection\'s entries
   expect(saved[0]?.text).toContain('draft: true')
   expect((await send('POST', 'posts/nope/duplicate')).answer).toHaveProperty('issues.0.key', 'slug')
   expect((await send('POST', 'welcome/index/duplicate')).answer).toHaveProperty('issues.0.message', expect.stringContaining('cannot be duplicated'))
-  expect((await send('GET', 'posts')).answer).toEqual([{ slug: 'hello', title: 'Hello world' }, { slug: 'notes/garden', title: 'Spring garden' }])
+  expect((await send('GET', 'posts')).answer).toEqual({ choices: [{ slug: 'hello', title: 'Hello world' }, { slug: 'notes/garden', title: 'Spring garden' }], complete: true })
   expect((await site.fetch('/api/cms/entries/nothing')).status).toBe(404)
+})
+
+test('the content list shows each collection\'s drafts and a New entry, and an empty collection offers one', async () => {
+  const index = await site.visit('/admin')
+
+  expect(index.find('.kui-badge').map(badge => badge.text)).toContain('1 draft')
+  expect(index.find('.kui-card-row a').map(link => link.attributes.href)).toContain('/admin/new/posts')
+  expect((await site.visit('/admin/collections/profiles')).find('.kui-empty-state a').map(link => link.attributes.href)).toEqual(['/admin/new/profiles'])
 })
 
 test('a list sorts, filters and searches across its entries from the URL, and counts what it keeps', async () => {

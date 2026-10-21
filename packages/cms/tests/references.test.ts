@@ -18,11 +18,11 @@ const held: Record<string, { slug: string, data: Record<string, unknown> }[]> = 
 
 void mock.module('../src/kay/content', () => ({
   collections: async () => [people, posts, friends, broken],
-  entries: async (name: string) => {
+  entries: async (name: string, filter?: { slug?: string }) => {
     if (name === 'broken')
       throw new Error('database down')
 
-    return held[name] ?? []
+    return (held[name] ?? []).filter(entry => filter?.slug === undefined || entry.slug === filter.slug)
   },
 }))
 

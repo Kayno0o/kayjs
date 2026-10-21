@@ -126,7 +126,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
           ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', row.referencedBy)} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
-      EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry holds every word searched.')})
+      EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry matches the search and the filter.')})
     else
       EmptyState(title={wording('cms.table.empty', 'No entries yet')})
         @actions

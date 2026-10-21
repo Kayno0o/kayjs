@@ -132,7 +132,7 @@ async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Pro
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
-export async function saveEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } & VersionRule = {}): Promise<SaveOutcome> {
+export async function saveEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined, heldData?: Record<string, unknown> | undefined } & VersionRule = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
@@ -142,7 +142,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
       return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')
   }
 
-  const dangling = await missingReferences(collection, entry, async () => (await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]?.data)
+  const dangling = await missingReferences(collection, entry, async () => heldData ?? (await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]?.data)
 
   if (dangling.length > 0)
     return { issues: dangling }
@@ -267,7 +267,7 @@ export async function unpublishEntry(ref: EntryRef, author?: Identity): Promise<
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: true }, body: existing.body }, { version: existing.version, verb: 'unpublish', author, bodyKept: true })
 }
 
-// The most entries a reference picker lists; a collection past it keeps the typed slug, which a save still checks.
+// The most entries a reference picker lists; a collection past it is typed as a slug, which a save still checks.
 export const REFERENCE_CHOICES = 1000
 
 export interface ReferenceChoice {
@@ -276,7 +276,7 @@ export interface ReferenceChoice {
 }
 
 // The entries of a collection a reference can name, by title, one per slug whatever its locales; the entries that do not parse are left out.
-export async function referenceChoices(name: string): Promise<ReferenceChoice[]> {
+export async function referenceChoices(name: string): Promise<{ choices: ReferenceChoice[], complete: boolean }> {
   const collection = await collectionNamed(name)
   const found = (await entries(name, {})).filter(entry => entry.data !== undefined)
   const seen = new Set<string>()
@@ -290,7 +290,7 @@ export async function referenceChoices(name: string): Promise<ReferenceChoice[]>
     choices.push({ slug: row.slug, title: row.title })
   }
 
-  return choices.slice(0, REFERENCE_CHOICES)
+  return choices.length > REFERENCE_CHOICES ? { choices: [], complete: false } : { choices, complete: true }
 }
 
 // The slug a copy of `slug` is written under: `<slug>-copy`, then `-copy-2`, `-copy-3`, the first that is free.
@@ -321,7 +321,7 @@ export async function duplicateEntry(ref: EntryRef, author?: Identity): Promise<
   const taken = new Set((await entries(collection.name, { locale: ref.locale })).map(entry => entry.slug))
   const slug = copySlug(ref.slug, taken)
   const data = collection.draftField === undefined ? existing.data : { ...existing.data, [collection.draftField]: true }
-  const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data, body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true })
+  const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data, body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true, heldData: existing.data })
 
   return 'issues' in outcome ? outcome : { ...outcome, slug }
 }

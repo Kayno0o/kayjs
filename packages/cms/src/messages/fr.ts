@@ -341,7 +341,7 @@ export default defineMessages({
       moveUpLabel: 'Monter {title}',
       no: 'Non',
       noMatch: 'Aucun résultat',
-      noMatchHint: 'Aucune entrée ne contient tous les mots cherchés.',
+      noMatchHint: 'Aucune entrée ne correspond à la recherche et au filtre.',
       publishLabel: 'Publier {title}',
       published: 'Publié',
       scheduled: 'Programmé pour {at}',

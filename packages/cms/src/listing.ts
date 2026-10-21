@@ -133,6 +133,17 @@ const STATUS_RANK: Record<EntryStatus, number> = { draft: 0, scheduled: 1, publi
 const NUMBERS = new Set(['number', 'integer'])
 const CELL = 'cell:'
 
+// Whether a sort key names a column of the list.
+export function knownSort(collection: ScreenCollection, key: string | undefined): key is string {
+  if (key === undefined)
+    return false
+
+  if (key === 'title' || key === 'locale' || key === 'draft')
+    return true
+
+  return key.startsWith(CELL) && listColumns(fieldsOf(collection.schema), collection.layout?.list).some(field => field.key === key.slice(CELL.length))
+}
+
 // The rows ordered by a column, an empty cell last whichever way; as they were for a key no column has.
 function sortRows(collection: ScreenCollection, rows: EntryRow[], key: string, direction: 'asc' | 'desc'): EntryRow[] {
   const fields = listColumns(fieldsOf(collection.schema), collection.layout?.list)
@@ -197,7 +208,9 @@ export interface RowsPage {
 
 // A page of the collection's rows: a search, a status filter or a sort reads every entry to match or order them, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone; a loaded entry's is taken from the entries `read` gave.
-export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort, direction = 'asc' }: Omit<ListView, 'search'> = {}): Promise<RowsPage> {
+export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE, { status, sort: asked, direction = 'asc' }: Omit<ListView, 'search'> = {}): Promise<RowsPage> {
+  const sort = knownSort(collection, asked) ? asked : undefined
+
   if (collection.problem !== undefined)
     return { ...pageOf([], 1, size), total: 0 }
 

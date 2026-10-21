@@ -19,7 +19,7 @@ cms({ collections: { shop: {
 - A hidden field that a save refuses (a required one, say) still shows its issue above the form, so the editor is never told nothing. See [Fixing a refused save](#fixing-a-refused-save) for what the form does with the others.
 - `list.columns` are field keys shown after the title, each headed by the field's label and sortable. A text, number, boolean (Yes or No), select (its label), date, image or file (its file name) or reference field can be a column; a list, group, JSON or custom field cannot.
 - `list.actions` keeps some of a row's actions, `'move'`, `'publish'`, `'unpublish'`, `'duplicate'`, `'editOnPage'`, `'delete'`; all by default. `actions: []` removes the Actions column.
-- `group: 'Blog'` puts the collection under that heading in the content list (those with none come first) and `order: 1` places it, the lowest first, then the site's order. The list names each collection's `description`, its drafts and scheduled entries, and has a New entry button.
+- `group: 'Blog'` puts the collection under that heading in the content list (those with none come first) and `order: 1` places it (a number here, not the content config's `order` field name), the lowest first, then the site's order. The list names each collection's `description`, its drafts and scheduled entries, and has a New entry button.
 - A shape that means nothing, a name twice, a name both shown and hidden or an unknown action throws as `kay.config.ts` loads. A name the schema lacks logs a warning at boot, and the screens skip it.
 
 ## The list

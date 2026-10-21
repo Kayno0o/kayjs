@@ -135,7 +135,7 @@ function valueAt(data: Record<string, unknown> | undefined, path: string): unkno
   return at
 }
 
-// The references of an entry about to be saved that name an entry the target collection lacks, as the issues a save is refused for. A reference the stored entry already held is left alone, so publishing, unpublishing or moving an entry never stops on an old one; a collection that cannot be read tells nothing, and its references pass.
+// The references of an entry about to be saved that name an entry the target collection lacks, as the issues a save is refused for. A reference the stored entry already held is left alone without reading its target, so publishing, unpublishing or moving an entry never stops on an old one; a collection that cannot be read tells nothing, and its references pass.
 export async function missingReferences(collection: CollectionInfo, entry: DraftEntry, stored: () => Promise<Record<string, unknown> | undefined>): Promise<Issue[]> {
   const found: Named[] = []
 
@@ -145,24 +145,29 @@ export async function missingReferences(collection: CollectionInfo, entry: Draft
   if (found.length === 0)
     return []
 
-  const slugs = new Map<string, Set<string> | undefined>()
+  // References the stored entry holds already are left alone, so publishing, unpublishing or moving reads nothing of the targets.
+  const before = await stored()
+  const fresh = found.filter(each => valueAt(before, each.path) !== each.slug && !(each.target === collection.name && each.slug === entry.slug))
 
-  for (const target of new Set(found.map(each => each.target))) {
+  if (fresh.length === 0)
+    return []
+
+  const exists = new Map<string, boolean | undefined>()
+
+  for (const { target, slug } of fresh) {
+    const key = JSON.stringify([target, slug])
+
+    if (exists.has(key))
+      continue
+
     try {
-      slugs.set(target, new Set((await entries(target, {})).map(each => each.slug)))
+      exists.set(key, (await entries(target, { slug })).length > 0)
     }
     catch (error) {
       log.error(`${target}'s entries failed to read for the references of ${collection.name}/${entry.slug}`, error)
-      slugs.set(target, undefined)
+      exists.set(key, undefined)
     }
   }
 
-  const gone = found.filter(each => slugs.get(each.target)?.has(each.slug) === false && !(each.target === collection.name && each.slug === entry.slug))
-
-  if (gone.length === 0)
-    return []
-
-  const before = await stored()
-
-  return gone.filter(each => valueAt(before, each.path) !== each.slug).map(each => ({ collection: entry.collection, slug: entry.slug, locale: entry.locale, path: each.path, message: wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: each.slug, collection: each.target }) }))
+  return fresh.filter(each => exists.get(JSON.stringify([each.target, each.slug])) === false).map(each => ({ collection: entry.collection, slug: entry.slug, locale: entry.locale, path: each.path, message: wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: each.slug, collection: each.target }) }))
 }

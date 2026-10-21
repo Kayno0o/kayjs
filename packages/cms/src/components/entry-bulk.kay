@@ -13,11 +13,13 @@ import type { BulkAction } from '../editor/bulk'
 // The actions on the rows ticked in the list, each saved one after another and told in one toast.
 const { collection, rows, actions, clear } = props<{ collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }>()
 
-const targets = () => rows.map(row => ({ ref: { collection: collection.name, slug: row.slug, locale: row.locale }, version: row.version }))
+// Only the rows an action fits: a draft is published and a published entry unpublished, as the row buttons offer, and a broken entry is neither.
+const fitting = (action: BulkAction) => rows.filter(row => action === 'delete' || (row.problem === undefined && row.draft === (action === 'publish')))
+const targets = (action: BulkAction) => fitting(action).map(row => ({ ref: { collection: collection.name, slug: row.slug, locale: row.locale }, version: row.version }))
 const drafts = () => collection.draftField !== undefined
 
 async function run(action: BulkAction): Promise<void> {
-  const { done, failed } = await bulk(action, targets())
+  const { done, failed } = await bulk(action, targets(action))
 
   if (done > 0) {
     if (action === 'publish')
@@ -35,9 +37,9 @@ async function run(action: BulkAction): Promise<void> {
   await refresh()
 }
 ---
-if actions.has('publish') && drafts()
+if actions.has('publish') && drafts() && fitting('publish').length > 0
   Button(label={wording('cms.entry.publish', 'Publish')} onClick={() => run('publish')})
-if actions.has('unpublish') && drafts()
-  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', rows.length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: rows.length })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
+if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
+  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
 if actions.has('delete')
   ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows)} failure={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})

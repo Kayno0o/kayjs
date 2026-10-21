@@ -222,6 +222,15 @@ describe('sort', () => {
   ]
   const none = async () => undefined
   const read = async () => stock
+  const reader = () => {
+    const asked: EntryFilter[] = []
+
+    return { asked, read: async (filter: EntryFilter) => {
+      asked.push(filter)
+
+      return stock.slice(filter.offset ?? 0, filter.limit === undefined ? undefined : (filter.offset ?? 0) + filter.limit)
+    } }
+  }
   const order = async (sort: string, direction: 'asc' | 'desc') => (await pageRows(shop, '', 1, read, none, 50, { sort, direction })).rows.map(row => row.slug)
 
   it('orders every entry, not the page, by title regardless of accents and case', async () => {
@@ -240,6 +249,13 @@ describe('sort', () => {
     const second = await pageRows(shop, '', 2, read, none, 2, { sort: 'title', direction: 'asc' })
 
     expect(second.rows.map(row => row.slug)).toEqual(['c', 'a'])
+  })
+
+  it('reads nothing more than the page for a key no column has', async () => {
+    const { asked, read } = reader()
+
+    await pageRows({ ...shop, count: 4 }, '', 1, read, none, 2, { sort: 'nope', direction: 'asc' })
+    expect(asked).toEqual([{ offset: 0, limit: 2 }])
   })
 
   it('keeps the order of a key no column has', async () => {
