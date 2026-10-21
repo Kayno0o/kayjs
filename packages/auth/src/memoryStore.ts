@@ -1,5 +1,5 @@
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
-import { optionMs } from 'kay/library'
+import { durationSeconds } from 'kay/library'
 
 const SWEEP_EVERY = 1000
 // A client that registered itself and was never approved by anyone is dropped after this long.
@@ -495,7 +495,7 @@ export function memoryStore(): AuthStore {
       hit(key, window) {
         const now = Date.now()
         const entry = attempts.get(key)
-        const next = entry && entry.resetAt > now ? { ...entry, count: entry.count + 1 } : { count: 1, resetAt: now + optionMs(window, 'an attempts window') }
+        const next = entry && entry.resetAt > now ? { ...entry, count: entry.count + 1 } : { count: 1, resetAt: now +  durationSeconds(window, 'an attempts window') * 1000 }
 
         // Swept every so many hits, so memory follows the clients that keep trying.
         if (++hits % SWEEP_EVERY === 0) {
@@ -551,7 +551,7 @@ export function memoryStore(): AuthStore {
       }
 
       for (const [key, session] of sessions) {
-        if (session.lastSeenAt.getTime() < at - optionMs(sessionMaxAge, 'sessionMaxAge') || session.createdAt.getTime() < at - optionMs(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge') || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
+        if (session.lastSeenAt.getTime() < at -  durationSeconds(sessionMaxAge, 'sessionMaxAge') * 1000 || session.createdAt.getTime() < at -  durationSeconds(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge') * 1000 || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
           sessions.delete(key)
       }
     },

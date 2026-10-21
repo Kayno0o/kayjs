@@ -116,7 +116,7 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 
 Google Analytics, Fathom, Cloudflare and `custom` ask by default, as if you wrote `consent: true`; for Plausible, Umami, Simple Analytics and Matomo you add it. Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
 
-`consent: { maxAge }` sets another time in seconds, up to 13 months, the longest the CNIL accepts.
+`consent: { maxAge }` sets another time, a string such as `'180d'`, up to 13 months, the longest the CNIL accepts.
 
 ```ts
 analytics({

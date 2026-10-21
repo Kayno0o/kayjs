@@ -172,7 +172,7 @@ export default defineConfig({ requireGuards: true })
 - `regenerate()` also restarts the `absoluteMaxAge` clock, so it belongs at a sign-in or a change of privileges, never on every request.
 - All of them return promises.
 - `lifetime(maxAge)` gives this session its own lifetime in place of `maxAge`, for "remember me" at sign-in, right after `regenerate()`.
-- It takes seconds or a string such as `'90d'`, or `'browser'` for a cookie without `Max-Age`, which the browser drops on closing, lasting `browserMaxAge` unused on the server, `'1d'` by default.
+- It takes a string such as `'90d'`, or `'browser'` for a cookie without `Max-Age`, which the browser drops on closing, lasting `browserMaxAge` unused on the server, `'1d'` by default.
 - The session keeps it through its extensions and `regenerate()`, a store getting it as `set`'s `maxAge`, until `destroy()`, never past `absoluteMaxAge`.
 - A lifetime that is no positive duration throws.
 - `settings` is `{ maxAge, absoluteMaxAge, browserMaxAge }` as the plugin resolved them, in seconds and defaults included, for a library that follows the app's session instead of asking for the lifetimes again.
@@ -185,7 +185,7 @@ export default defineConfig({ requireGuards: true })
 - With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself.
 - `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart, the oldest going past 100,000.
 - `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; under `NODE_ENV=test`, which `bun test` sets, it keeps them in memory and writes no file; it opens its file on first use, so a process only loading the module naming it writes nothing; called again with the same file, it gives the store already open. A file deleted or replaced under a running server is noticed within seconds and opened afresh; a file put in its place takes its `-wal` and `-shm` along, or none, as SQLite would otherwise replay the old ones over it.
-- Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
+- Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, `maxAge` a `Duration` string such as `'2592000s'` (`durationMs` from `kay` gives its milliseconds), is a store too, such as one over Redis.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteStore` also drops expired sessions every hour.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.
 - The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and over https `Secure` and named `__Host-session`, so no other host of the site can set it; code reading kay's session cookie by hand looks for that name over https.

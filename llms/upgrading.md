@@ -79,7 +79,7 @@ No lint can fix it safely, as its fields move to another file, so kay warns at b
 Drop `url` from `createAuth` when it repeats `site` or `SITE_URL`. OAuth sign-in and mailed links with no `url` and no site stop the server as it starts.
 ### A duration is a string with its unit
 
-Every option, store argument and test helper of kay and its libraries takes a `Duration` (`'250ms'`, `'30s'`, `'5m'`, `'7d'`), so a bare number is a type error. `kay check --fix` (or `kay upgrade`) rewrites a literal as `'<n>s'`, or `'<n>ms'` where the option took milliseconds (`kay/test`'s `timeout`, a toast's `duration`). A `RateStore.hit`, a kayjs-auth `attempts`/`prune` store and a kayjs-ai provider now receive a `Duration` string where they got a number: `durationMs` from `kay` turns it into milliseconds. The runtime reads the old numbers until 1.73.
+Every option, store argument and test helper of kay and its libraries takes a `Duration` (`'250ms'`, `'30s'`, `'5m'`, `'7d'`), so a bare number is a type error. `kay check --fix` (or `kay upgrade`) rewrites a literal as `'<n>s'`, or `'<n>ms'` where the option took milliseconds (`kay/test`'s `timeout`, a toast's `duration`). A `SessionStore.set` (its `maxAge`), a `RateStore.hit`, a kayjs-auth `attempts`/`prune` store and a kayjs-ai provider now receive a `Duration` string where they got a number: `durationMs` from `kay` turns it into milliseconds. The runtime reads the old numbers until 1.73.
 
 ## 1.69.0
 

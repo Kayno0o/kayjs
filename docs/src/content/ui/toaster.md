@@ -14,7 +14,7 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 ## How long it stays
 
-`toast.info('Copied', { duration: 3000 })` sets how long a toast stays, in milliseconds. `Infinity` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, `danger`, `success` or `info`; the info toast takes `--color-kui-info`. `type` is the deprecated name of the tone, with `error` for `danger`.
+`toast.info('Copied', { duration: '3s' })` sets how long a toast stays. `false` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, `danger`, `success` or `info`; the info toast takes `--color-kui-info`. `type` is the deprecated name of the tone, with `error` for `danger`.
 
 ## After an action
 

@@ -367,9 +367,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
-  // Polls the page, reading an error as not yet: the page may be between two documents.
   // The milliseconds of a call's own `timeout`, undefined for the page's.
   const waitMs = (value: Duration | undefined) => value === undefined ? undefined : legacyMs(value, 'timeout')
+
+  // Polls the page, reading an error as not yet: the page may be between two documents.
   const poll = async (expression: string, wanted: string, wait = timeout) => {
     const until = Date.now() + wait
     // Why the last try failed, if it threw: a page swap in flight throws once, a condition naming a test variable every time.

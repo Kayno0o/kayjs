@@ -18,7 +18,7 @@ They combine. A streamed value can come from `cached`, and a prerendered page ca
 
 ## Caching a load
 
-`cached(key, ttl, load)` from `kay/cache` keeps what a load fetched for `ttl`, shared by every request in the process. `ttl` is in seconds or a string such as `'5m'`.
+`cached(key, ttl, load)` from `kay/cache` keeps what a load fetched for `ttl`, shared by every request in the process. `ttl` is a string such as `'5m'`.
 
 ```kay
 --- server

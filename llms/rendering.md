@@ -4,7 +4,7 @@
 
 ### Cache what a load fetches
 
-`cached(key, ttl, load)` from `kay/cache` keeps the result for `ttl`, seconds or a string such as `'5m'`, shared by every request in the process:
+`cached(key, ttl, load)` from `kay/cache` keeps the result for `ttl`, a string such as `'5m'`, shared by every request in the process:
 
 ```kay
 --- server
@@ -101,7 +101,7 @@ const html = await renderToString(Mail, { order }, { locale: 'fr' })
 
 ### Caching
 
-`cached(key, ttl, load)` from `kay/cache` keeps what a load fetches for `ttl`, seconds or a string such as `'5m'`, shared by every request in the process:
+`cached(key, ttl, load)` from `kay/cache` keeps what a load fetches for `ttl`, a string such as `'5m'`, shared by every request in the process:
 
 ```kay
 --- server

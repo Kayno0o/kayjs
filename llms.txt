@@ -11,7 +11,7 @@
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`), in every option, store call and test helper of kay and its libraries; a bare number is a type error that `kay check` fixes (`deprecated-bare-duration`), and a session store's `set` still gets seconds.
+- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`), in every option, store call and test helper of kay and its libraries; a bare number is a type error that `kay check` fixes (`deprecated-bare-duration`), and a session store's `set` gets its `maxAge` as a `Duration` string (`durationMs` gives its milliseconds).
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile errors, requests that threw, islands' browser errors) at their `.kay` lines: read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.

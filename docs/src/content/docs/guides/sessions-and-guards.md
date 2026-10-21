@@ -67,15 +67,16 @@ await store.deleteWhere(data => data.userId === id)
 
 ### Your own store
 
-A store is an object with three methods, each sync or async. `set` is given `maxAge` in seconds, past which the store may forget the session.
+A store is an object with three methods, each sync or async. `set` is given `maxAge` as a duration string such as `'2592000s'`, past which the store may forget the session. `durationMs` from `kay` turns it into milliseconds.
 
 ```ts
 import type { SessionStore } from 'kay/server'
+import { durationMs } from 'kay'
 
 const store: SessionStore = {
   get: async id => JSON.parse(await redis.get(`session:${id}`) ?? 'null') ?? undefined,
   set: async (id, data, maxAge) => {
-    await redis.set(`session:${id}`, JSON.stringify(data), 'EX', maxAge)
+    await redis.set(`session:${id}`, JSON.stringify(data), 'EX', Math.ceil(durationMs(maxAge) / 1000))
   },
   delete: async (id) => {
     await redis.del(`session:${id}`)
@@ -93,7 +94,7 @@ So call `regenerate()` at sign-in, not on every request.
 
 ### Remember me
 
-`lifetime()` gives one session its own lifetime in place of `maxAge`. Call it right after `regenerate()`. It takes seconds or a string such as `'90d'`, and never goes past `absoluteMaxAge`.
+`lifetime()` gives one session its own lifetime in place of `maxAge`. Call it right after `regenerate()`. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`.
 
 ```ts
 await ctx.locals.session.regenerate()

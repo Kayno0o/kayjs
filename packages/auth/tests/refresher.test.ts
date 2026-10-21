@@ -49,6 +49,16 @@ describe('createTokenRefresher', () => {
     expect(calls()).toBe(1)
   })
 
+  test('margin is a duration, and the marginMs of before 1.70 still reads', async () => {
+    const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 10 * MIN }
+
+    for (const margin of [{ margin: '15m' as const }, { marginMs: 15 * MIN }]) {
+      const refresher = createTokenRefresher<string, Subject>({ key: s => s.id, load: () => stored, exchange: async () => ({ accessToken: 'fresh', expiresAt: Date.now() + 60 * MIN }), ...margin })
+
+      expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
+    }
+  })
+
   test('a failed refresh yields null and does not cache', async () => {
     const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 }
     const { refresher, calls } = setup(stored, async () => null)

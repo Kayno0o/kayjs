@@ -109,7 +109,7 @@ h1 {post.title}
 
 #### Revalidating
 
-- `revalidate: '1h'` beside `prerender` in `page` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does.
+- `revalidate: '1h'` beside `prerender` in `page` keeps a prerendered page fresh: once it is older than that, a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does.
 - Every request after that render lands gets the new page, with a new ETag and compressed copies.
 - One render runs at a time per path.
 - A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most.

@@ -5,7 +5,7 @@ import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
-import { optionMs, wholeSeconds } from '../runtime/duration'
+import { durationSeconds, wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
@@ -385,7 +385,7 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 
       // Deleted first, so a session written again counts as the newest.
       sessions.delete(id)
-      sessions.set(id, { text: stringify(data), expires: now + optionMs(maxAge, 'a session\x27s maxAge') })
+      sessions.set(id, { text: stringify(data), expires: now + durationSeconds(maxAge, 'a session\x27s maxAge') * 1000 })
 
       if (sessions.size > MOST_SESSIONS)
         sessions.delete(sessions.keys().next().value!)
@@ -530,7 +530,7 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
       if (++writes % SWEEP_EVERY === 0)
         sweep.run(Date.now())
 
-      upsert.run(id, stringify(data), Date.now() + optionMs(maxAge, 'a session\x27s maxAge'))
+      upsert.run(id, stringify(data), Date.now() + durationSeconds(maxAge, 'a session\x27s maxAge') * 1000)
     },
     delete(id) {
       remove.run(id)

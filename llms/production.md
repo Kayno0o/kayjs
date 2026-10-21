@@ -204,7 +204,7 @@ new Elysia()
 - A literal one with another number of fields, an unknown nickname or a day its month never has, `0 0 30 2 *`, is a type error; a computed one it cannot read, or that never comes, fails the boot.
 - Runs never overlap: the next is planned once the last settles.
 - A run that throws is logged and the next one comes as planned.
-- `schedule('30s', job)`, or `schedule(30, job)` in seconds, runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `tz`; a run outlasting its length skips the runs it overlaps.
+- `schedule('30s', job)` runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `tz`; a run outlasting its length skips the runs it overlaps.
 - A length that is not positive is a type error, or fails the boot when computed.
 - `lock`, `store`, the overlap and the shutdown work as for a cron.
 - `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time.

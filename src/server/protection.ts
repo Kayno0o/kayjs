@@ -8,7 +8,7 @@ import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
-import { durationSeconds, optionMs } from '../runtime/duration'
+import { durationSeconds, legacyMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
@@ -145,7 +145,7 @@ export function memoryRates(): { hit: (key: string, window: Duration, weight?: n
 
         // Moved to the end, as the newest window.
         windows.delete(key)
-        windows.set(key, window = { count: 0, resetAt: now + optionMs(length, 'a rate window') })
+        windows.set(key, window = { count: 0, resetAt: now + legacyMs(length, 'a rate window') })
       }
 
       window.count += weight
@@ -260,7 +260,7 @@ function openRates(path: string): OpenRates {
         sweep.run(now)
       }
 
-      const row = hit.get(hashed(key), now, optionMs(window, 'a rate window'), weight)!
+      const row = hit.get(hashed(key), now, legacyMs(window, 'a rate window'), weight)!
 
       return { count: row.count, resetAt: row.reset_at }
     },

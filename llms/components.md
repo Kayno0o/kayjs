@@ -245,7 +245,7 @@ ul
 - An event handler runs under the owner it was bound in, the enclosing block or component, so an `onCleanup` it registers runs when that goes.
 - `root(fn)` runs `fn(dispose)` under an owner of its own, not attached to the one it was called under: the effects and `onCleanup`s created inside live until `dispose()` is called, and `root` returns what `fn` returns. It is for code with no component to stop it, such as a module-level subscription.
 - A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
-- `durationMs('3s')` from `kay` is the milliseconds a duration written with its unit stands for, `'250ms'` 250 and `'2m'` 120000, for a timer of your own: a bare number throws, as it would read as seconds elsewhere, and a text that is no duration gives `NaN`.
+- `durationMs('3s')` from `kay` is the milliseconds a duration written with its unit stands for, `'250ms'` 250 and `'2m'` 120000, for a timer of your own: a bare number throws, and a text that is no duration gives `NaN`.
 - `every(interval, run, { while })` from `kay` runs `run` every `interval`, a duration such as `'3s'` or `'250ms'`, while the island lives, and while `while`, read as an effect reads, holds: the timer starts and stops as it turns, never on the server.
 - `every` skips a tick while the promise the last run returned is pending.
 - `every(interval, run, { immediate: true })` runs it as the timer starts too, rather than one interval later.

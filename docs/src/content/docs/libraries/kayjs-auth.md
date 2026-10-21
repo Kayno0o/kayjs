@@ -416,7 +416,7 @@ It gets one object: `event`, `user`, `context` and the fields of that event, suc
 
 A failed sign-in is reported after the response is sent. Your `onAuthEvent` and the audit log can be slow without telling anyone which addresses have an account.
 
-With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it.
+With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }` to change it.
 
 Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address.
 
@@ -651,7 +651,7 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 Attempts are counted in the store, so every process shares them. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
-`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
+`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` a string such as `'1h'`.
 
 ```ts
 createAuth({

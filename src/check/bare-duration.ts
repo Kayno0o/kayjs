@@ -14,8 +14,9 @@ const VALUE_START = /^(?:[\w$]+\s*[:=]\s*\{?\s*)?/
 // A whole literal: one followed by an operator is the start of an expression, which only a person can rewrite.
 const NUMBER = /^\d[\d_]*(?:\.\d+)?(?=\s*(?:[,)}\]\n;]|$|\/\/))/
 // What the calls that took milliseconds before 1.70 are named, and a `toast` method: a number inside one of these is milliseconds.
-const MS_CALLS = new Set(['click', 'hover', 'waitFor', 'waitUntil', 'waitForResponse', 'open', 'testSite', 'browse'])
-// `outbox.waitFor` of kayjs-mail took seconds, where the test helpers of the same name took milliseconds.
+const MS_CALLS = new Set(['click', 'hover', 'waitFor', 'waitUntil', 'waitForResponse', 'hit', 'open', 'testSite', 'browse'])
+// `outbox.waitFor` of kayjs-mail and kayjs-auth's `attempts.hit` took seconds, where the helpers of the same names took milliseconds.
+const SECONDS_OWNER = /outbox|attempts/i
 const TOAST_CALLS = new Set(['error', 'success', 'info'])
 const CALLEE = /([\w$]+)(?:\s*\.\s*([\w$]+))?$/
 // How far back the enclosing calls are looked for.
@@ -53,7 +54,7 @@ function contextAt(source: string, offset: number): { toast: boolean, unit: 'ms'
   const calls = enclosingCalls(source, offset)
   const toast = calls.some(([owner, name]) => TOAST_CALLS.has(name) && owner === 'toast')
 
-  return { toast, unit: toast || calls.some(([owner, name]) => MS_CALLS.has(name) && owner !== 'outbox') ? 'ms' : 's' }
+  return { toast, unit: toast || calls.some(([owner, name]) => MS_CALLS.has(name) && !SECONDS_OWNER.test(owner ?? '')) ? 'ms' : 's' }
 }
 
 // A type error on a bare number where a `Duration` goes, as the deprecation of the form before 1.70, with the fix that writes the number with its unit.

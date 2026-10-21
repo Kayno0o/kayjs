@@ -3347,11 +3347,13 @@ describe.concurrent('kay check, unused code', () => {
     const page = [
       '--- server',
       'import { cached } from "kay/cache"',
+      'import { memoryRates } from "kay/server"',
       'const profile = await cached("user", 300, async () => "ada")',
       'const slow = await cached("slow", 60 * 5, async () => "ada")',
+      'const hit = await memoryRates().hit("k", 60_000)',
       '---',
       'p {profile}',
-      'p {slow}',
+      'p {slow} {hit.count}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page })
@@ -3359,14 +3361,16 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-bare-duration/g)).toHaveLength(1)
+      expect(output.match(/deprecated-bare-duration/g)).toHaveLength(2)
       expect(output).toContain('write \'300s\'')
+      expect(output).toContain('write \'60000ms\'')
       await runCheck(root, '--fix')
 
       const fixed = await Bun.file(join(root, 'src/routes/index.kay')).text()
 
       expect(fixed).toContain('cached("user", \'300s\',')
       expect(fixed).toContain('cached("slow", 60 * 5,')
+      expect(fixed).toContain('.hit("k", \'60000ms\')')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -23,12 +23,13 @@ export interface TokenRefresherDeps<K, S> {
   exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: number | undefined } | null>
   /** How long before expiry to refresh, `'5m'` by default. */
   margin?: Duration | undefined
+  /** @deprecated The milliseconds before 1.70, read until 1.73: `margin` wins when both are set. */
+  marginMs?: number | undefined
 }
 
 /** Wraps a token `exchange` with per-subject caching + in-flight dedup; non-expiring credentials pass through. Feeds `GrantStore.hasCredential` (non-null = live). */
 export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
-  // `marginMs`, the number of milliseconds before 1.70, still reads until 1.73.
-  const margin = deps.margin === undefined ? (deps as { marginMs?: number }).marginMs ?? 5 * MINUTE_MS : optionMs(deps.margin, 'margin')
+  const margin = deps.margin === undefined ? deps.marginMs ?? 5 * MINUTE_MS : optionMs(deps.margin, 'margin')
   const cache = new Map<K, { accessToken: string, expiresAt: number }>()
   const inFlight = new Map<K, Promise<string | null>>()
 
@@ -122,6 +123,8 @@ export interface OAuthTokenRefresherDeps<K, S> {
   onError?: ((error: unknown, stage: RefreshStage) => void) | undefined
   /** How long before expiry to refresh, `'5m'` by default. */
   margin?: Duration | undefined
+  /** @deprecated The milliseconds before 1.70, read until 1.73: `margin` wins when both are set. */
+  marginMs?: number | undefined
 }
 
 /**
@@ -135,7 +138,7 @@ export function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K,
     key: deps.key,
     load: deps.load,
     margin: deps.margin,
-    ...(deps as { marginMs?: number }).marginMs === undefined ? {} : { marginMs: (deps as { marginMs?: number }).marginMs },
+    ...deps.marginMs === undefined ? {} : { marginMs: deps.marginMs },
     exchange: async (subject) => {
       const refreshToken = deps.load(subject).refreshToken
 
