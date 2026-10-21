@@ -133,6 +133,7 @@ export async function translationsScreen(): Promise<TranslationsScreen> {
   }
 
   return { prefix: settings().prefix, collections: found }
+}
 
 export interface IndexRow {
   collection: CollectionInfo
