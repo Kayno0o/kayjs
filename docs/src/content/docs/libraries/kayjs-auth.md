@@ -547,7 +547,7 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails. `authMailer` comes from kayjs-mail and needs its `mail({ module })` in `kay.config.ts`.
 
-Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.maxAge` changes any of them, such as a week for invited users: `email: { maxAge: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `expires.link` and `expires.code`, and `lifetime(seconds, locale)` words them.
+Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.maxAge` changes any of them, such as a week for invited users: `email: { maxAge: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `maxAge.link` and `maxAge.code`, and `lifetime(seconds, locale)` words them.
 
 The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `auth`, `mail` and `authMailer`, and no sign-in page of its own.
 

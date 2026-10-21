@@ -199,6 +199,16 @@ describe('organizations', () => {
     await expect(setup({ invitations: { maxAge: 'soon' as Duration } })).rejects.toThrow('kay: organizations.invitations.maxAge is \'soon\'')
   })
 
+  test('invitationMaxAge, its name before 1.70, still sets the lifetime, and invitations.maxAge wins beside it', async () => {
+    for (const [options, days] of [[{ invitationMaxAge: '2d' }, 2], [{ invitationMaxAge: '2d', invitations: { maxAge: '4d' } }, 4]] as const) {
+      const { ada, org } = await setup(options as never)
+      const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
+
+      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeGreaterThan(days * 24 * 60 * 60 * 1000 - 60_000)
+      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(days * 24 * 60 * 60 * 1000)
+    }
+  })
+
   test('invitations are listed for managers, replaced when sent again, revoked, declined and expire', async () => {
     const { ada, org, person } = await setup()
     const grace = await person('grace@example.com')

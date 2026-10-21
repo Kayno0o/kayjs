@@ -30,6 +30,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay lint` reports a line misindented in a `.kay` fence, by any amount, and `--fix` reindents it as in a `.ts` file; the preset turns `style/indent` on under kay 1.70 ([Linting](checks.md#linting)).
 - `src/ui.ts` with `defineUi` sets the parts and variants of any component, the app's or a library's, merged at compile time ([Restyle a component from src/ui.ts](styles-and-assets.md#restyle-a-component-from-srcuits)).
 - A lifetime is `maxAge` across kay and kayjs-auth: `files.url(key, { maxAge })`, `session.maxAge()`, a token's `maxAge`, `email.maxAge`, `remember: { maxAge }` and `invitations: { maxAge }`; `kay upgrade` renames the old names ([Upgrading](upgrading.md)).
+- A lifetime is `maxAge` across kay and kayjs-auth: `files.url(key, { maxAge })`, `session.maxAge()`, a token's `maxAge`, `email.maxAge`, the `maxAge` a mail hands its template, `remember: { maxAge }` and `invitations: { maxAge }`; `kay upgrade` renames the old names ([Upgrading](upgrading.md)).
 - kayjs-cms: `forgejo({ baseUrl })` names the forge's address as the other service options do; `kay upgrade` renames `url` ([kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-mail: `mailer({ locale })` and a message's `locale` replace `lang`, as kayjs-auth names the language of a mail; `kay upgrade` renames the mailer's ([kayjs-mail](../packages/mail/llms.txt)).
 

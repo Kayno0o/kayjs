@@ -33,6 +33,32 @@ describe('lifetimes under their names before 1.70', () => {
     expect(mails.find(mail => mail.kind === 'reset-password')!.expires).toEqual({ link: 2 * 3600 })
   })
 
+  test('email.expires and email.maxAge are merged key by key, the new one winning', async () => {
+    const { mailer, mails } = mailbox()
+    const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false, expires: { 'reset-password': '2h', 'verify-email': '3d' }, maxAge: { 'reset-password': '1h' } } })
+    const ada = app.browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('requestPasswordReset', 'ada@example.com')
+    expect(mails.find(mail => mail.kind === 'reset-password')!.maxAge).toEqual({ link: 3600 })
+    expect(mails.find(mail => mail.kind === 'verify-email')!.maxAge).toEqual({ link: 3 * DAY })
+  })
+
+  test('a token\'s maxAge wins over expiresIn, and null never expires', async () => {
+    const { browser, store } = testApp({ scopes: ['posts:read'] })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.callOk('createToken', { password: PASSWORD }, 'Phone', { maxAge: '1d', expiresIn: '30d' })
+    await ada.callOk('createToken', { password: PASSWORD }, 'Forever', { maxAge: null, expiresIn: '30d' })
+
+    const tokens = await store.bearerTokens.listByUser((await ada.json('/me') as { id: string }).id)
+    const phone = tokens.find(token => token.label === 'Phone')!
+
+    expect(phone.expiresAt!.getTime() - Date.now()).toBeLessThanOrEqual(DAY * 1000)
+    expect(tokens.find(token => token.label === 'Forever')!.expiresAt).toBeNull()
+  })
+
   test('a token\'s expiresIn is maxAge', async () => {
     const { browser, store } = testApp({ scopes: ['posts:read'] })
     const ada = browser()
