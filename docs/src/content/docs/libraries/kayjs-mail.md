@@ -285,7 +285,9 @@ Set `honeypot: 'nectar'` to name the honeypot field yourself, under a name no br
 
 ### Consent
 
-A form collecting personal data often needs a consent checkbox. Set `consent: true` and the action requires a ticked `consent` field: an unticked one is refused with the `mail.contact.errors.consent` message, and the field is checked but never put in the mail. [ContactForm](/ui/contact-form) draws the checkbox when the action asks for one, and links your privacy page when you give it `privacy="/privacy"`. A form of your own writes `input(field="consent" type="checkbox")`.
+A form collecting personal data often needs a consent checkbox. Set `consent: true` and the action requires a ticked `consent` field: an unticked one is refused with the `mail.contact.errors.consent` message, and the field is checked but never put in the mail.
+
+[ContactForm](/ui/contact-form) draws the checkbox for this field only, not for an extra field of your own named `consent`, and links your privacy page when you give it `privacy="/privacy"`. A form of your own writes `input(field="consent" type="checkbox")`.
 
 ### Refusals and wording
 
