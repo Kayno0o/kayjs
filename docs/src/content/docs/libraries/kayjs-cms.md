@@ -631,6 +631,6 @@ An island marked `persist` keeps its state when the page refreshes in place and 
 
 ## In the dev tool
 
-Under `kay dev`, the dev tool has a CMS tab with nothing to set up. It says whether you are in edit mode. One button takes you into edit mode on the page you are viewing, as long as the guard lets you in, and another leaves it.
+Under `kay dev`, the dev tool has a CMS tab with nothing to set up. It says whether you are in edit mode. One button takes you into edit mode on the page you are viewing, as long as the guard lets you in, and another leaves it. The tab speaks the page's language, from the `cms.dev.*` words. You can reword them like the other `cms` words.
 
 <ReadMore href="/llms/kayjs-cms">Every option, the CMS API and the rules that are easy to get wrong are in the full kayjs-cms reference.</ReadMore>

@@ -152,7 +152,7 @@ A `persisted` signal kept in a cookie stores its value in kay's own encoding, so
 
 ## Waiting for a mail
 
-An action that sends a mail through a queue has not sent it when the call answers. `outbox.waitFor(address, { site })` from kayjs-mail runs the site's queues until the mail is there, and fails after 5 seconds, naming the mails the outbox holds. `outbox.token(mail, path)` reads the token of the link that opens `path`.
+An action that sends a mail through a queue has not sent it when the call answers. `outbox.waitFor(address, { site })` from kayjs-mail runs the site's queues until the mail is there, and fails after 5 seconds, naming the mails the outbox holds. `outbox.token(mail, path)` reads the token of the link that opens `path`. `outbox.link(mail, path)` gives the link itself, for a page you visit next.
 
 ```ts
 await site.submit(request, { email }, { from: '/auth/reset-password' })
@@ -219,6 +219,8 @@ export default async function seed(db: Database): Promise<void> {
 ```
 
 Each file gets a copy of the database the migrations build, with what `seed` adds. Run `bun test --isolate` so each file reads its own copy. Without it, every file shares one.
+
+An app that wrote its own `tests/database.ts` with `testDatabase()` deletes that file and its line in `bunfig.toml`, and moves its seed to `tests/seed.ts`.
 
 Keep `pg-orm.config.ts` to the tables and the config, and read the url from `DATABASE_URL`, so no module that connects loads before the copy is made.
 

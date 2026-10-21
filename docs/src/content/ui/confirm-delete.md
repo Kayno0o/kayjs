@@ -40,6 +40,10 @@ A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure 
 
 A deletion made with `call()` throws an `ApiError` when the route refuses. It is read like a refusal of a handler: the dialog stays open and the words the route answered with are toasted for a 4xx when they read as a message (a proxy's HTML page or a bare code does not), or `refused` reads its JSON `answer`. A call that got no answer at all (status 0) and a 5xx toast `failure`.
 
+## A message read when it opens
+
+`onOpen` runs when the trigger is pressed. Use it when `message` depends on something you must ask for first, such as a request. Set a signal in `onOpen` and pass that signal as `message`.
+
 ## Look and cancel label
 
 `size` is `xs`, `sm`, `md` or `lg` for the icon trigger, and sizes the cancel button too when asking inline. `variant` is `solid`, `ghost` or `inline`. `cancelLabel` words the cancel button, `Cancel` by default.

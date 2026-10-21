@@ -8,6 +8,8 @@ Under `kay dev`, every page carries a small bar, at the bottom left by default, 
 
 Drag the drawer by its head to move it, and by an edge or a corner to resize it. With the keyboard, focus its bottom right corner and use the arrow keys. Three buttons in its head let it float or dock it to the bottom or the right of the window. Docked, it pads the page so nothing hides under it. Drag the bar to move it to another corner. A new tab places the tool where you left it. On a window 480 pixels wide or less, the drawer spans the window instead.
 
+The bar sets `--kay-dev-bar-bottom-left` or `--kay-dev-bar-bottom-right` on the page, for the bottom corner it is in. The value is the room the bar takes. A fixed element of your page in that corner can read it to keep clear of the bar. Nothing is set for a top corner.
+
 ```sh
 kay dev --open
 ```

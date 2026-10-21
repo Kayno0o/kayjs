@@ -8,6 +8,14 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 `auth.guard()` and `requireUser()` redirect an anonymous GET or HEAD to the sign-in page unless it clearly is not a page opening: a browser fetch (a `Sec-Fetch-Mode` other than `navigate` or `nested-navigate`) or a client whose `Accept` names neither `text/html` nor `*/*`, such as `application/json`, now gets the 401 where the prebuilt `pages` redirected it. Everything else, a test's or curl's request with no headers included, redirects as before. An app that sets `signInPage` in `createAuth` without `pages` now has such a request redirected there with `?redirect=`, where it got a 401; a GET route returning JSON under that guard keeps its 401 when the client sends `Accept: application/json`. No lint can recognise it.
 
+### kayjs-cms and kayjs-auth bring a visitor back
+
+An anonymous visitor opening a cms screen goes to its sign-in screen or kayjs-auth's page and back, where the guard showed a bare refusal; a post still gets it. kayjs-auth keeps `?redirect=` through reset and verification mails, a failed OAuth sign-in and the second factor, and a guard on `/fr/page` sends to `/fr/auth/sign-in`, not `/auth/sign-in`. A test expecting the old address changes.
+
+### The test helpers need less
+
+`sqliteStore` keeps sessions in memory under `bun test`: a test reading the sessions file finds none, and the `NODE_ENV === 'test'` switch in `src/session.ts` goes. An app deletes its `tests/database.ts` and its `bunfig.toml` line for it, moving its seed to `tests/seed.ts`: left after `kay/test/preload` the line only copies the copy again, but before it the seed is lost. `afterAll(() => site.close())` can go, as `testSite()` closes itself; a second close does nothing ([Test databases and setup](testing-setup.md#databases-and-setup)).
+
 ### An entry's page takes its head from the entry
 
 A page with `prerender` or `sitemap` of a collection on a one-param route now writes the entry's `title` and `description` fields over its layout's, and a `Date` field named `publishAt`, `date`, `publishedAt` or `published` makes `og:type` an `article`. A collection whose `title` or `date` means something else (an event date) sets the tags in the page's `head` block, which replaces them ([Head](head.md#site-defaults-and-social-cards)).
