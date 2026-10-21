@@ -20,7 +20,9 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
 // A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
 // A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
 export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & { storage: 'query' }): Signal<T>
-export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local' }): Signal<T>
+// `values` types the signal as their union, and the default must be one of them.
+export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedOptions<T> & { storage?: 'cookie' | undefined, values: readonly T[] } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local', values: readonly T[] }): Signal<T>
+export function persisted<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedOptions<T>, 'values'> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge' | 'values'> & { storage: 'local' }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
   const storage = options?.storage ?? 'cookie'
