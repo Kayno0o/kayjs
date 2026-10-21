@@ -13,13 +13,13 @@ import { checkSize, MAX_DIFF_PIXELS, MAX_HEIGHT, MAX_WIDTH, ShotRefused } from '
 export const SCREENSHOTS_DIR = join(KAY_DIR, 'screenshots')
 export const DEFAULT_WIDTHS = [375, 1280]
 const DEFAULT_HEIGHT = 800
-// A page gets this long to load and hydrate, then is shot as it stands.
-const SETTLE_MS = 10_000
+
+// A page gets this long to load and hydrate, then is shot as it stands, and this long to load its fonts and images once it is shown. Tests of a page that never settles shorten both.
+export const shotLimits = { settleMs: 10_000, imageMs: 3000 }
 // The whole shot, a page that hangs the browser included.
 const SHOT_MS = 45_000
 const REACH_MS = 10_000
-// How long the page gets to load its fonts and images once it is shown, and the whole preparation.
-const IMAGE_MS = 3000
+// The whole preparation of a shot.
 const PREPARE_MS = 8000
 
 // Beyond this many files the oldest shots go, a shot being three.
@@ -188,7 +188,7 @@ async function reach(url: URL): Promise<number> {
 }
 
 async function shoot(open: { page?: { close: () => void } }, root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean, cookies: { name: string, value: string }[]): Promise<{ shot: Shot, console: string[] }> {
-  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: SETTLE_MS, strict: false, lenient: true, colorScheme: scheme, cookies })
+  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: shotLimits.settleMs, strict: false, lenient: true, colorScheme: scheme, cookies })
 
   open.page = page
 
@@ -220,9 +220,9 @@ async function prepare(view: Bun.WebView, fullPage: boolean): Promise<number | u
     const loading = [...document.images].filter(image => !image.complete).map(image => new Promise(resolve => {
       image.addEventListener('load', resolve)
       image.addEventListener('error', resolve)
-      setTimeout(resolve, ${IMAGE_MS})
+      setTimeout(resolve, ${shotLimits.imageMs})
     }))
-    await Promise.race([Promise.all([document.fonts.ready, ...loading]), new Promise(resolve => setTimeout(resolve, ${IMAGE_MS}))])
+    await Promise.race([Promise.all([document.fonts.ready, ...loading]), new Promise(resolve => setTimeout(resolve, ${shotLimits.imageMs}))])
     return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)
   })()`
 

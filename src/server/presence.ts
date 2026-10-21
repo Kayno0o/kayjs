@@ -6,8 +6,9 @@ import { memoryRooms } from './rooms'
 
 // What a presence room is called in the store, apart from the rooms an app's own `rooms()` keep there.
 const PREFIX = 'kay:presence:'
-// How long a tab that left is kept in its room, so a reconnect or a page swap does not show it leaving and coming back.
-const GRACE_MS = 3000
+
+// How long a tab that left is kept in its room, so a reconnect or a page swap does not show it leaving and coming back. Tests of the grace shorten it.
+export const presenceGrace = { ms: 3000 }
 // How often a room's members are read again, which picks up a process that crashed without leaving.
 const RECHECK_MS = 5000
 // What tells this process's rows from another process's for one tab, which a reconnect may land on.
@@ -157,7 +158,7 @@ function leave(room: string, tab: string): void {
     catch (error) {
       kayLog('error', 'taking a tab out of a presence room failed', error)
     }
-  }, GRACE_MS)
+  }, presenceGrace.ms)
   seat.leaving.unref()
 }
 

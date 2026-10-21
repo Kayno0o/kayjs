@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
 import { mountedAt } from '../src/dev/base-proxy'
-import { keep, locked, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName, takeOverStale } from '../src/dev/screenshot'
+import { keep, locked, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotLimits, shotName, takeOverStale } from '../src/dev/screenshot'
 import { diffPngs } from '../src/dev/screenshot-diff'
 import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
@@ -658,9 +658,21 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
 
   it('shoots a page that never settles as it stands, saying why', async () => {
     const started = performance.now()
-    const report = await shot('/hang', { widths: [375] })
+    const limits = { ...shotLimits }
 
-    expect(performance.now() - started).toBeLessThan(40_000)
+    // The image never comes, so the page settles on neither limit.
+    Object.assign(shotLimits, { settleMs: 2000, imageMs: 1000 })
+
+    let report: Awaited<ReturnType<typeof shot>>
+
+    try {
+      report = await shot('/hang', { widths: [375] })
+    }
+    finally {
+      Object.assign(shotLimits, limits)
+    }
+
+    expect(performance.now() - started).toBeLessThan(20_000)
     expect(report.console.some(line => line.includes('timed out'))).toBe(true)
     expect(existsSync(join(root, report.shots[0]!.file))).toBe(true)
   }, 60_000)
@@ -671,8 +683,6 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
   })
 
   it('answers through the command line, as JSON', async () => {
-    await Bun.sleep(1500)
-
     const { code, stdout } = await run(root, ['screenshot', '/about', '--width', '375', '--format', 'json'])
     const report = JSON.parse(stdout) as Awaited<ReturnType<typeof screenshot>>
 
@@ -683,8 +693,6 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
   }, 60_000)
 
   it('returns the images through the MCP tool, the diff only when asked', async () => {
-    await Bun.sleep(1500)
-
     const { tools, resources } = await projectCapabilities(root)
     const server = new McpServer(tools, resources, () => undefined)
     const call = async (args: object) => {

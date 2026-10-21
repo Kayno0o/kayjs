@@ -7,12 +7,17 @@ import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:te
 import { chromium } from 'playwright-core'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../src/runtime/presence'
+import { presenceGrace } from '../src/server/presence'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { browserPath, testSite } from '../src/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const ROOT = 'tests/fixtures/live-presence'
+// The grace a tab that left is kept in its room for, shortened from 3 s; the tests wait twice that to see a tab kept or taken out.
+const GRACE_MS = 600
+
+presenceGrace.ms = GRACE_MS
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const ROOM = 'kay:presence:entry:1'
 const ANN = '{"name":"Ann"}'
@@ -189,7 +194,7 @@ describe('presence on the server', () => {
     const again = await enter(site, 'Ann', 'ann-tab')
 
     await again.next()
-    await Bun.sleep(3300)
+    await Bun.sleep(GRACE_MS * 2)
     expect(held(rooms, ROOM)).toEqual([BOB, ANN])
 
     const quiet = Symbol('quiet')
@@ -203,7 +208,7 @@ describe('presence on the server', () => {
     expect(await Promise.race([told, wait()])).toBe(quiet)
     await again.close()
     await leaves(rooms, ROOM, 1)
-    expect(Date.now() - left).toBeGreaterThanOrEqual(3300)
+    expect(Date.now() - left).toBeGreaterThanOrEqual(GRACE_MS * 2)
     expect(await told).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), []]])
     await watching.close()
     await leaves(rooms, ROOM, 0)
@@ -225,7 +230,7 @@ describe('presence on the server', () => {
 
     await second.next()
     expect(held(rooms, ROOM)).toEqual([BOB, ANN])
-    await Bun.sleep(3300)
+    await Bun.sleep(GRACE_MS * 2)
     expect(held(rooms, ROOM)).toEqual([BOB, ANN])
     await second.close()
     await watching.close()
@@ -338,7 +343,7 @@ describe('a tab reconnecting to another process', () => {
       other.add(ROOM, 'ann-tab@elsewhere', `ann-tab:${ANN}`)
       other.publish(ROOM, '', {})
       await ann.close()
-      await Bun.sleep(3300)
+      await Bun.sleep(GRACE_MS * 2)
       expect(await bob.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), [ANN]]])
       expect(rooms.members(ROOM).filter(text => text.startsWith('ann-tab:'))).toHaveLength(1)
       await bob.close()
@@ -422,7 +427,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await Bun.sleep(4500)
+    await Bun.sleep(GRACE_MS * 2)
     expect(await watching.text('p.names')).toBe('Ann')
   }, 30_000)
 
@@ -439,7 +444,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
     })
     await leaving.click('a.same')
     await leaving.waitUntil(() => location.search === '?as=Ann&n=2')
-    await Bun.sleep(4500)
+    await Bun.sleep(GRACE_MS * 2)
     expect(await watching.evaluate(() => (Reflect.get(window, 'seen') as string[]).filter(text => text !== 'Ann'))).toEqual([])
     expect(await watching.text('p.names')).toBe('Ann')
     await leaving.click('a.plain')

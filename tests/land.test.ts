@@ -134,9 +134,18 @@ async function landings(...names: string[]) {
   const land = (name: string, env: Record<string, string> = {}) => {
     const child = Bun.spawn(['bun', LAND], { cwd: clones[name]!, env: { ...process.env, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
 
+    let out = ''
+
+    // Stdout is read as it comes, for a test waiting on a line of it.
+    const reading = (async () => {
+      for await (const chunk of child.stdout)
+        out += new TextDecoder().decode(chunk)
+    })()
+
     return {
+      saying: async (text: string) => until(async () => out.includes(text)),
       done: async () => {
-        const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+        const [err] = await Promise.all([new Response(child.stderr).text(), reading, child.exited])
 
         return { code: child.exitCode, out, err }
       },
@@ -217,7 +226,9 @@ describe('landing', () => {
     const holder = Bun.spawn(['flock', join(clones.a!, '.git/kay-land.lock'), 'sh', '-c', 'echo held; cat >/dev/null'], { stdin: 'pipe', stdout: 'pipe' })
     const running = land('a')
 
-    await Bun.sleep(1500)
+    await running.saying('waiting for another landing to finish')
+    // Pushing without the lock would take no longer than this.
+    await Bun.sleep(300)
     expect(await tree()).not.toContain('a.txt')
     await holder.stdin.end()
 
@@ -254,9 +265,9 @@ describe('landing', () => {
     const started = Date.now()
 
     try {
-      const { code } = await land('a', { LAND_LEAK: '1' }).done()
+      const { code } = await land('a', { LAND_LEAK: '1', KAY_LAND_DRAIN_MS: '300' }).done()
 
-      expect({ code, fast: Date.now() - started < 25_000 }).toEqual({ code: 0, fast: true })
+      expect({ code, fast: Date.now() - started < 15_000 }).toEqual({ code: 0, fast: true })
       expect(await tree()).toContain('a.txt')
     }
     finally {
