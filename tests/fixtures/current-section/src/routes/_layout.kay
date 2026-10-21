@@ -1,9 +1,0 @@
-nav
-  a.home(href="/") Home
-  a.docs(href="/docs") Docs
-  a.guide(href="/docs/guide") Guide
-  a.other(href="/docs/guide?x=1") Query
-  a.old(href="/docs-old") Old
-  a.self(href="/docs" aria-current={undefined}) Own
-main
-  slot

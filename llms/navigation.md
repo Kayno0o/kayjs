@@ -91,7 +91,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A page streaming `await` blocks is swapped in once they all arrived.
 - `aria-busy="true"` sits on `html` while a page loads.
 - A link to the page being rendered gets `aria-current="page"`, which screen readers announce and a stylesheet can light up, `aria-[current=page]:font-bold` with Tailwind: an `a` whose `href` is a path of the site, a trailing slash or not, and holds no query or fragment.
-- A link to a section of the site gets `aria-current="true"` on the pages below it (`/docs` on `/docs/guide`, not on `/docs-old`), which a stylesheet lights up with `aria-[current=true]:font-bold`; the site's home, `/` or a locale's own, is never marked that way, and it holds under `base`, `trailingSlash` and a locale prefix. A link writing its own `aria-current` keeps it, and one an island renders is left to it.
+- A link writing its own `aria-current` keeps it, and one an island renders is left to it. A section's link lit on the pages below it is still the template's to write.
 
 ### Islands kept across pages
 

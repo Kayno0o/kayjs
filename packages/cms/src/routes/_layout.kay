@@ -13,14 +13,14 @@ const SCREENS_OF_CONTENT = /\/(?:collections|new)\//
 export const page = { layouts: false, noindex: true }
 
 const { prefix } = settings()
-// The admin's root is the parent of every screen, so its links write their own mark: Content is current on the collection, entry and new-entry screens only, and the brand never.
+// kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
 const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 // The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
 ---
 .kcms-admin
   a.kcms-skip(href="#kcms-main") {wording('cms.admin.skip', 'Skip to the content')}
   header.kcms-admin-head
-    a.kcms-admin-home(href={screenPath(prefix)} aria-current={undefined}) {wording('cms.admin.brand', 'Content admin')}
+    a.kcms-admin-home(href={screenPath(prefix)}) {wording('cms.admin.brand', 'Content admin')}
     nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}
       a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}

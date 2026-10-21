@@ -86,8 +86,6 @@ main
 
 Layouts nest, so `blog/_layout.kay` renders inside the root one. A folder in parentheses groups pages under a layout without changing their URL: `(marketing)/pricing.kay` is `/pricing`.
 
-A link to the page being shown gets `aria-current="page"`. A link to a section, such as `/blog`, gets `aria-current="true"` on the pages below it, `/blog/hello` included, so a header can light it with no path passed down. The home link is never marked that way. Style them with `aria-[current=page]:font-bold` and `aria-[current=true]:font-bold` in Tailwind, or `[aria-current]` in CSS.
-
 ## Page settings
 
 A page's settings are the keys of one object that its server fence exports.

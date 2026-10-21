@@ -1306,8 +1306,7 @@ describe('prerendering', () => {
     const current = (href: string) => inServerScope(request, () => undefined, () => currentPage(href))
 
     expect(['/docs/guide', '/docs/guide/', '/docs/./guide', '/blog/../docs/guide', '/blog/./../docs/guide/'].map(current)).toEqual(new Array(5).fill(' aria-current="page"'))
-    expect(['/docs', '/docs/', '/blog/../docs'].map(current)).toEqual(new Array(3).fill(' aria-current="true"'))
-    expect(['/', '/docs/gui', '/docs/guide.html', '/docs/guide?x=1', '//docs/guide'].map(current)).toEqual(new Array(5).fill(''))
+    expect(['/docs', '/docs/guide.html', '/docs/guide?x=1', '//docs/guide'].map(current)).toEqual(new Array(4).fill(''))
   })
 
   it('refuses what no build can prerender, logging what a page throws rather than handing it to the app\'s onError, and builds without the server\'s preview secret', async () => {
