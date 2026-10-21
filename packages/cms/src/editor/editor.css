@@ -8,7 +8,7 @@ html.kcms-editing {
   position: fixed;
   z-index: 2147483000;
   right: calc(1rem + var(--kay-dev-inset-right, 0px));
-  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + var(--kay-dev-bar-bottom, 0px) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + env(safe-area-inset-bottom, 0px));
   color: var(--color-kui-text);
   background: var(--color-kui-mantle);
   border: 1px solid var(--color-kui-surface2);

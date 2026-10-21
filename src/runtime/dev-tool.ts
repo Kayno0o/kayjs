@@ -83,7 +83,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 .mono { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.bar { position: fixed; bottom: calc(12px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); max-width: calc(100vw - 24px); }
+.bar { position: fixed; bottom: calc(12px + var(--kay-panel-bottom, 0px)); left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); max-width: calc(100vw - 24px - var(--kay-panel-right, 0px)); }
 .right .bar { left: auto; right: calc(12px + var(--kay-panel-right, 0px)); }
 .bar > button { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
 .bar > button:hover { background: var(--mantle); }
@@ -638,8 +638,8 @@ const PAGE_LEFT = 80
 // How near an edge a moved drawer snaps to it, and how far from it it lands.
 const SNAP = 24
 const MARGIN = 12
-// What the bar takes of the window's top or bottom edge, its margin and height, published as `--kay-dev-bar-<edge>` for a panel of the page to keep clear of it.
-const BAR_ROOM = MARGIN + 36
+// The bar's height where nothing is laid out to measure, which its room at the bottom edge is then taken from.
+const BAR_HEIGHT = 36
 // How far the bar's mark moves before a press becomes a drag.
 const DRAG_START = 5
 const KEY_STEP = 16
@@ -831,8 +831,9 @@ export function startDevTool(doc: Document = document): DevTool {
     const free = floating && !layout.max && win.innerWidth > NARROW
     const box = free && layout.box !== undefined ? fitBox(layout.box, room()) : undefined
     const keyGrip = KEY_GRIPS[current]
-    const edge = layout.corner.startsWith('top') ? 'top' : 'bottom'
-    const sheet = `html { --kay-dev-bar-${edge}: ${BAR_ROOM}px;${state.open && !floating ? ` padding-${current}: ${docked}px !important; --kay-dev-inset-${current}: ${docked}px;` : ''} }`
+    // What the bar takes of a bottom corner, its margin and measured height, published as `--kay-dev-bar-bottom-<side>` for the page's own fixed elements at that corner to keep clear of it; nothing is published for a top corner, nor for a corner the bar is not in.
+    const corner = layout.corner.startsWith('bottom') ? ` --kay-dev-bar-${layout.corner}: ${MARGIN + (bar.getBoundingClientRect().height || BAR_HEIGHT)}px;` : ''
+    const sheet = `html {${corner}${state.open && !floating ? ` padding-${current}: ${docked}px !important; --kay-dev-inset-${current}: ${docked}px;` : ''} }`
 
     ui.classList.toggle('right', layout.corner.endsWith('right'))
     ui.classList.toggle('top', layout.corner.startsWith('top'))

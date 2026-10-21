@@ -63,6 +63,8 @@ To place the link yourself, write an `a(data-cms-edit-page hidden)` in your layo
 
 The editor never covers the page it edits. From 64rem wide it docks to the right and moves the page's body aside by its width. On a narrower window, and always below 40rem, it is a sheet at the bottom and pads the page by its height, so the page keeps its width and a fixed header at the top stays in view. At the side, the editor starts under a header fixed or sticky across the top of the window, so the header stays visible, and the dev tool's bar and floating drawer sit outside it.
 
+The header it looks for touches the top and is at most 240px tall. One the page adds later is found on the next scroll or resize.
+
 While the page updates, the editor says so in a line screen readers announce. If an entry you edited does not pass its checks, the page shows its saved text until it does, the editor names it, and the other entries keep their preview. Your unsaved edits show again on the next page you open in the site. After a save to a forge, the editor reminds you for five minutes that the live site may still show the old content, also after you leave edit mode and come back.
 
 Drag the editor's inner edge, or focus it and press the arrow keys, to resize it. The button in its head docks it to the other edge, and the hide button folds it into one button. It remembers the edge, the size and whether it is hidden in the browser.

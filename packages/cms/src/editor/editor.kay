@@ -24,6 +24,8 @@ import './editor.css'
 // Where across the window the top is probed for a header, and the positions that hold one there.
 const PROBES = [0.25, 0.5, 0.75]
 const PINNED = new Set(['fixed', 'sticky'])
+// The collapsed button's distance from the window's right edge, which what keeps off it counts too.
+const COLLAPSED_GAP = 16
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
 const { entries, unclickable } = props<EditorProps>()
@@ -49,7 +51,7 @@ const clear = signal(0)
 let shownPath = ''
 let panel: HTMLElement | undefined
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
-let dragging = false
+let dragging = 0
 let frame = 0
 
 const layout = (): Layout => ({ open: open(), dock: chosen(), side: side(), bottom: bottom() })
@@ -159,7 +161,7 @@ listen(() => window, 'scroll', measureSoon, { passive: true })
 effect(() => {
   const value = layout()
 
-  if (ready() && !dragging)
+  if (ready() && dragging === 0)
     writeLayout(browserStorage(), value)
 })
 
@@ -190,16 +192,18 @@ function startResize(event: PointerEvent): void {
   const move = (next: PointerEvent) => resizeTo(from.size + from.point - (at === 'side' ? next.clientX : next.clientY))
 
   event.preventDefault()
-  dragging = true
+  dragging++
   handle.setPointerCapture(event.pointerId)
   handle.addEventListener('pointermove', move)
 
   // A cancelled drag, as when the browser takes a touch over, ends it too, keeping the size it reached.
+  let ended = false
   const end = () => {
-    if (!dragging)
+    if (ended)
       return
 
-    dragging = false
+    ended = true
+    dragging--
     writeLayout(browserStorage(), layout())
     handle.removeEventListener('lostpointercapture', end)
     handle.removeEventListener('pointermove', move)
@@ -305,6 +309,20 @@ async function stopEditing(): Promise<void> {
 effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
   onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
+})
+
+// The collapsed button is a panel too, so the dev tool's bar and a floating drawer at the bottom right keep off it.
+effect(() => {
+  if (!ready() || open() || !panel)
+    return
+
+  const root = document.documentElement
+  const width = panel.offsetWidth
+
+  if (width > 0)
+    root.style.setProperty('--kay-panel-right', `${width + COLLAPSED_GAP}px`)
+
+  onCleanup(() => root.style.removeProperty('--kay-panel-right'))
 })
 
 // The page's own styles read the dock and the sizes from its root, where the editor's room is made.

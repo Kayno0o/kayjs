@@ -97,7 +97,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
 
     if (!button) {
       button = document.createElement('a')
-      button.style.cssText = 'position:fixed;left:1rem;bottom:calc(1rem + var(--kay-dev-inset-bottom,0px) + var(--kay-dev-bar-bottom,0px));z-index:2147482000;padding:.5rem .875rem;border-radius:.5rem;background:#111;color:#fff;font:500 14px/1.2 system-ui,sans-serif;text-decoration:none;box-shadow:0 .25rem 1rem rgb(0 0 0/.3)'
+      button.style.cssText = 'position:fixed;left:1rem;bottom:calc(1rem + var(--kay-dev-inset-bottom,0px) + var(--kay-dev-bar-bottom-left,0px));z-index:2147482000;padding:.5rem .875rem;border-radius:.5rem;background:#111;color:#fff;font:500 14px/1.2 system-ui,sans-serif;text-decoration:none;box-shadow:0 .25rem 1rem rgb(0 0 0/.3)'
       button.textContent = found.label
       // Outside the body, which a page swap morphs into the next page's.
       document.documentElement.append(button)

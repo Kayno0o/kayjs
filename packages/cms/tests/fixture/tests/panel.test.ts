@@ -175,6 +175,21 @@ test('an editor left collapsed never shows open while the page loads', async () 
   expect(await page.evaluate(() => (window as unknown as { flashed?: boolean }).flashed)).toBeUndefined()
 })
 
+test('the collapsed button is published as a panel at the right, so the dev tool keeps off it, and the open editor takes the variable back', async () => {
+  const page = await open(1280, 800)
+  const held = () => page.evaluate(() => document.documentElement.style.getPropertyValue('--kay-panel-right'))
+
+  expect(await held()).toBe('')
+  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null && document.documentElement.style.getPropertyValue('--kay-panel-right') !== '')
+
+  const button = await page.evaluate(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().width)
+
+  expect(Number.parseFloat(await held())).toBe(button + 16)
+  await page.click('.kcms-editor-head button[aria-label="Edit this page"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.documentElement.style.getPropertyValue('--kay-panel-right') === '')
+})
+
 test('a click that lies under a fixed header at the top scrolls the element clear of it', async () => {
   const page = await open(390, 800)
 

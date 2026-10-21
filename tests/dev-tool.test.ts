@@ -453,6 +453,32 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.icon[aria-label="Dock to the right"]')!.getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('publishes the bar\'s room only for the bottom corner it is in, and nothing for a top corner', async () => {
+    const published = () => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ').match(/--kay-dev-bar-[a-z-]+/g) ?? []
+
+    for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as const) {
+      localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner }))
+      tool = startDevTool()
+      await Bun.sleep(0)
+      expect(published()).toEqual(expected)
+      tool.stop()
+      tool = undefined
+    }
+  })
+
+  it('measures the bar\'s room rather than assuming its height', async () => {
+    const measured = spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ height: 40 } as DOMRect)
+
+    try {
+      tool = startDevTool()
+      await Bun.sleep(0)
+      expect([...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ')).toContain('--kay-dev-bar-bottom-left: 52px')
+    }
+    finally {
+      measured.mockRestore()
+    }
+  })
+
   it('docks to the bottom or the right padding the page while open, resizes from the grip the keyboard reaches, and reads a broken layout as the default', async () => {
     const padding = () => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ')
     const reached = () => [...shadow().querySelectorAll<HTMLElement>('.grip')].filter(grip => grip.tabIndex === 0).map(grip => grip.dataset.edge)
@@ -489,7 +515,7 @@ describe('the dev tool', () => {
 
     shadow().querySelector<HTMLButtonElement>('.mark')!.click()
     expect(padding()).not.toContain('padding')
-    expect(padding()).toContain('--kay-dev-bar-bottom: 48px')
+    expect(padding()).toContain('--kay-dev-bar-bottom-left: 48px')
 
     tool.stop()
     tool = undefined
