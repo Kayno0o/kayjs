@@ -1032,7 +1032,7 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
 
   if (typed) {
     to.value = value
-    to.dispatchEvent(new Event('input', { bubbles: true }))
+    to.dispatchEvent(new InputEvent('input', { bubbles: true }))
   }
 
   const length = to.value.length

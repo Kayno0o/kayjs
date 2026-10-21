@@ -6,7 +6,7 @@ export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
 const q = ctx.query.q ?? ''
 
 // The round trip outlasts the visitor's next keys.
-await Bun.sleep(q === '' ? 0 : 300)
+await Bun.sleep(q === '' ? 0 : 600)
 --- script
 import SearchField from '../components/search-field.kay'
 ---

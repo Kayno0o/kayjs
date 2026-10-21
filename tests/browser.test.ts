@@ -2102,8 +2102,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
 
       await page.click('.field')
       await page.type('el')
-      // The debounce sends `el` after 400ms and the server answers 300ms later: `ys` lands between the two, and its own navigate is still to come.
-      await Bun.sleep(550)
+      // The debounce sends `el` after 400ms and the server answers 600ms later: `ys` lands between the two, and its own navigate is still to come.
+      await Bun.sleep(800)
+
+      expect(await page.text('p.searched')).toBe('')
+
       await page.type('ys')
       await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'el')
 
