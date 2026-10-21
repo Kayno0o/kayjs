@@ -2,7 +2,7 @@ import type { Drafts } from '../drafts'
 import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { MarkedField } from '../markers'
-import { fieldsOf, itemAt } from '../fields'
+import { checkField, fieldsOf, itemAt } from '../fields'
 import { BODY, entryKey } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
 
@@ -105,38 +105,121 @@ export function inlineValue(field: Field, text: string): unknown {
 }
 
 let active: { element: HTMLElement, end: () => void } | undefined
+let issueCount = 0
+
+// Safari ends a composition with an Enter whose keyCode is 229 and whose isComposing is already false.
+const COMPOSING_KEY = 229
+// The attributes the edit puts on the element, all removed when it ends.
+const EDIT_ATTRIBUTES = ['contenteditable', 'data-kay-typing', 'role', 'aria-label', 'aria-invalid', 'aria-describedby']
+
+// A line under the text being typed in that says why its schema would refuse it, read out as it appears.
+function createIssueNote(element: HTMLElement): { show: (message: string | undefined) => void, remove: () => void } {
+  const note = document.createElement('p')
+
+  note.id = `kcms-inline-issue-${++issueCount}`
+  note.className = 'kcms-inline-issue'
+  note.setAttribute('role', 'alert')
+  note.hidden = true
+
+  const place = () => {
+    const box = element.getBoundingClientRect()
+
+    note.style.left = `${Math.max(0, box.left)}px`
+    note.style.top = `${box.bottom + 4}px`
+  }
+
+  document.body.append(note)
+
+  return {
+    show(message) {
+      if (message === undefined) {
+        note.hidden = true
+        element.removeAttribute('aria-invalid')
+        element.removeAttribute('aria-describedby')
+
+        return
+      }
+
+      // Only a changed message is written, so a screen reader hears each new problem once.
+      if (note.textContent !== message)
+        note.textContent = message
+
+      note.hidden = false
+      place()
+      element.setAttribute('aria-invalid', 'true')
+      element.setAttribute('aria-describedby', note.id)
+    },
+    remove: () => note.remove(),
+  }
+}
+
+// Gives each marked element a tab stop while the editor is open, so a keyboard reaches a field the page shows as plain text; the page renders again and may drop it.
+export function reachMarked(): () => void {
+  const mark = () => {
+    for (const element of document.querySelectorAll<HTMLElement>(`[data-kay-field]:not([tabindex], ${CONTROLS}, a[href])`))
+      element.tabIndex = 0
+  }
+  const observer = new MutationObserver(mark)
+
+  mark()
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'data-kay-field'] })
+
+  return () => {
+    observer.disconnect()
+    for (const element of document.querySelectorAll<HTMLElement>('[data-kay-field][tabindex="0"]'))
+      element.removeAttribute('tabindex')
+  }
+}
 
 // Whether the node is in the element being typed in, whose clicks place the caret instead of starting an edit.
 export function isTypingInline(node: Node): boolean {
   return active?.element.contains(node) === true
 }
 
-// Makes the element a plain-text box until the focus leaves it, writing each keystroke to the draft as text: what is typed or pasted never becomes markup, and a line break is not kept. The page renders the draft again meanwhile, which leaves this element alone.
+// Makes the element a plain-text box until the focus leaves it, writing each keystroke to the draft as text: what is typed or pasted never becomes markup, and a line break is not kept. Enter keeps the text, Escape puts back the text from before the edit. The page renders the draft again meanwhile, which leaves this element alone.
 export function startInline({ entry, path, field, element, busy }: InlineTarget, drafts: Drafts, at?: { x: number, y: number }): void {
   active?.end()
 
   const caret = at ? document.caretPositionFromPoint(at.x, at.y) : null
   const controller = new AbortController()
   const { signal } = controller
+  const before = valueAt(drafts.entry(entry)?.data, path)
+  const beforeText = element.textContent
+  const note = createIssueNote(element)
+  let gone: MutationObserver | undefined
   let emptied = false
+  let cancelled = false
   // Read as rendered, as the browser makes a line of its own for a pasted line break (a `div` or `br`) that `textContent` would glue to the text around it.
   // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText is the rendered text, with the line breaks textContent lacks
   const typed = () => element.innerText.replace(EDGE_BREAKS, '')
   const commit = () => drafts.set(entry, path, inlineValue(field, typed()))
   const end = () => {
     controller.abort()
-    for (const name of ['contenteditable', 'data-kay-typing', 'role', 'aria-label'])
+    gone?.disconnect()
+    note.remove()
+    for (const name of EDIT_ATTRIBUTES)
       element.removeAttribute(name)
 
+    if (cancelled) {
+      element.textContent = beforeText
+      drafts.set(entry, path, before)
+    }
     // An emptied optional text is unset once the edit ends: the page renders nothing for it, which would take the element being typed in away.
-    if (emptied)
+    else if (emptied) {
       commit()
+    }
 
     if (active?.element === element)
       active = undefined
   }
 
   active = { element, end }
+  // An element the page took away can no longer be blurred, so the edit ends with it.
+  gone = new MutationObserver(() => {
+    if (!element.isConnected)
+      end()
+  })
+  gone.observe(document.documentElement, { childList: true, subtree: true })
   element.setAttribute('contenteditable', 'plaintext-only')
   element.setAttribute('data-kay-typing', '')
   element.setAttribute('role', 'textbox')
@@ -147,20 +230,42 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
   }, { signal })
   element.addEventListener('input', () => {
     emptied = !field.required && typed() === ''
+    note.show(checkField(field, inlineValue(field, typed())))
 
     if (!emptied)
       commit()
   }, { signal })
   element.addEventListener('keydown', (event) => {
-    if (event.isComposing || (event.key !== 'Enter' && event.key !== 'Escape'))
+    if (event.isComposing || event.keyCode === COMPOSING_KEY || (event.key !== 'Enter' && event.key !== 'Escape'))
       return
 
     event.preventDefault()
+    cancelled = event.key === 'Escape'
     element.blur()
   }, { signal })
-  element.addEventListener('blur', end, { signal })
+  // The window losing the focus (alt-tab) blurs the element while it stays the focused one: the edit goes on, and the browser gives the focus back with the window.
+  element.addEventListener('blur', () => {
+    if (document.activeElement === element && !document.hasFocus())
+      return
+
+    end()
+  }, { signal })
   element.focus({ preventScroll: true })
 
-  if (caret && element.contains(caret.offsetNode))
-    document.getSelection()?.collapse(caret.offsetNode, caret.offset)
+  // A focus that did not land leaves nothing editable behind.
+  if (document.activeElement !== element) {
+    end()
+
+    return
+  }
+
+  const selection = document.getSelection()
+
+  if (caret && element.contains(caret.offsetNode)) {
+    selection?.collapse(caret.offsetNode, caret.offset)
+  }
+  else if (!at) {
+    selection?.selectAllChildren(element)
+    selection?.collapseToEnd()
+  }
 }

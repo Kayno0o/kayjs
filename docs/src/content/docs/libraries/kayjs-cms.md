@@ -97,9 +97,11 @@ In edit mode, kay renders the editor at the end of every page, with the entries 
 
 ### Typing on the page
 
-Click a one-line text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and a line break becomes a space. Enter or Escape, or a click elsewhere, ends the edit. The form beside the page shows each keystroke, and the page keeps the text you are typing while it renders the draft again.
+Click a one-line text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.
 
-This works for a text that is the whole content of its element, in an entry, a group, a block or a list of texts, in any locale. A field the page shows inside a longer text, in an attribute, with other formatting around it or as a Markdown body is still brought up in the form by a click, as is any other kind of field. The text is not limited as you type: its length and pattern are checked when you save. The editor's code is only sent in edit mode.
+Tab reaches a marked text and Enter starts the edit. The form beside the page shows each keystroke, and the page keeps the text you are typing while it renders the draft again.
+
+This works for a text that is the whole content of its element, in an entry, a group, a block or a list of texts, in any locale. A field the page shows inside a longer text, in an attribute, with other formatting around it or as a Markdown body is still brought up in the form by a click, as is any other kind of field. The schema's length and pattern show their message under the text as you type, and a screen reader reads it out. The editor's code is only sent in edit mode.
 
 An entry has such a link when a page shows it. That is the page listing its collection in `prerender` or `sitemap`. For an entry read by its slug, such as a section of the home page, it is the first page without params that reads it. The cms finds that page by rendering those pages once in edit mode, the first time it needs one, and keeps the answer for a few minutes. An entry no page shows has no link.
 

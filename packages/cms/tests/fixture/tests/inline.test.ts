@@ -69,3 +69,110 @@ test('text with a line break and HTML lands as one line of text', async () => {
   await page.waitUntil((selector: string) => document.querySelector(selector)!.children.length === 0 && document.querySelector(selector)!.textContent === 'one two <b>bold</b>', undefined, TITLE)
   expect(await page.value(FORM_TITLE)).toBe('one two <b>bold</b>')
 }, 60_000)
+
+test('the caret lands where the title was clicked', async () => {
+  const page = await open()
+
+  // The point between the fifth and sixth letter, where the h1's own box is wider than its text.
+  const [x, y] = await page.evaluate((selector: string) => {
+    const text = document.querySelector(selector)!.firstChild!
+    const range = document.createRange()
+
+    range.setStart(text, 5)
+    range.setEnd(text, 6)
+
+    const box = range.getBoundingClientRect()
+
+    return [box.left + 1, box.top + box.height / 2]
+  }, TITLE)
+
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
+
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)
+  await page.type('X')
+
+  const text = await page.evaluate(selector => document.querySelector(selector)!.textContent!, TITLE)
+
+  expect(text.replace('X', '')).toBe('Hello world')
+  expect(text).toBe('HelloX world')
+}, 60_000)
+
+test('a window blur keeps the edit going, and the focus coming back leaves with Enter', async () => {
+  const page = await open()
+
+  await edit(page)
+  await page.evaluate((selector: string) => {
+    // A window losing the focus blurs the element while it stays the document's active one.
+    document.hasFocus = () => false
+    document.querySelector(selector)!.dispatchEvent(new FocusEvent('blur'))
+  }, TITLE)
+  expect(await page.evaluate(selector => document.querySelector(selector)!.getAttribute('contenteditable'), TITLE)).toBe('plaintext-only')
+
+  await page.evaluate(() => {
+    delete (document as { hasFocus?: unknown }).hasFocus
+  })
+  await page.press('Enter')
+  await page.waitUntil((selector: string) => !document.querySelector(selector)!.hasAttribute('contenteditable'), undefined, TITLE)
+}, 60_000)
+
+test('an element the page removes mid-edit leaves no note or editable mark behind', async () => {
+  const page = await open()
+
+  await edit(page)
+  await page.type('x'.repeat(50))
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue:not([hidden])') !== null)
+  await page.evaluate((selector: string) => document.querySelector(selector)!.remove(), TITLE)
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue') === null)
+}, 60_000)
+
+test('the schema limit shows as the title is typed, announced as an alert tied to the text', async () => {
+  const page = await open()
+
+  await edit(page)
+  await page.type('x'.repeat(50))
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue:not([hidden])') !== null)
+
+  expect(await page.evaluate((selector: string) => {
+    const element = document.querySelector(selector)!
+    const note = document.querySelector('.kcms-inline-issue')!
+
+    return [note.getAttribute('role'), note.textContent, element.getAttribute('aria-invalid'), element.getAttribute('aria-describedby') === note.id]
+  }, TITLE)).toEqual(['alert', 'Title takes 40 characters at most', 'true', true])
+
+  await page.press('Backspace')
+  await page.evaluate(() => {
+    for (let n = 0; n < 9; n++) document.execCommand('delete')
+  })
+  await page.waitUntil((selector: string) => document.querySelector('.kcms-inline-issue')!.hasAttribute('hidden') && !document.querySelector(selector)!.hasAttribute('aria-invalid'), undefined, TITLE)
+
+  await page.press('Enter')
+  await page.waitUntil(() => document.querySelector('.kcms-inline-issue') === null)
+}, 60_000)
+
+test('Escape puts back the text from before the edit, in the page and the form', async () => {
+  const page = await open()
+  const before = (await page.text(TITLE)) ?? ''
+
+  await edit(page)
+  await page.type('Changed')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLInputElement).value === 'Changed', undefined, FORM_TITLE)
+  await page.press('Escape')
+  await page.waitUntil((selector: string) => !document.querySelector(selector)!.hasAttribute('contenteditable'), undefined, TITLE)
+  await page.waitUntil((selector: string, wanted: string) => (document.querySelector(selector) as HTMLInputElement).value === wanted, undefined, FORM_TITLE, before)
+  await page.waitUntil(() => document.querySelector('.kcms-editor-status p') === null)
+
+  expect(await page.text(TITLE)).toBe(before)
+}, 60_000)
+
+test('the title takes a tab stop, and Enter on it starts the edit', async () => {
+  const page = await open()
+
+  expect(await page.evaluate(selector => document.querySelector(selector)!.getAttribute('tabindex'), TITLE)).toBe('0')
+
+  await page.evaluate((selector: string) => (document.querySelector(selector) as HTMLElement).focus(), TITLE)
+  await page.press('Enter')
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)
+  await page.type('!')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLInputElement).value.endsWith('!'), undefined, FORM_TITLE)
+}, 60_000)

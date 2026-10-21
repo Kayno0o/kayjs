@@ -4,7 +4,7 @@ import { sqliteLoader } from '../../../src/loaders/sqlite'
 import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
+  schema: s.Object({ title: s.String({ maxLength: 40 }), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
   draft: 'draft',
 })
 
