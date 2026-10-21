@@ -1,4 +1,5 @@
 import type { MessageValue } from '../runtime/i18n'
+import { NUMERIC_FORMATS } from '../runtime/form'
 import { wording } from '../runtime/words.server'
 
 // The texts kay itself shows a visitor, by the `kay.*` key an app's `src/messages/<locale>.ts` words them under; a site without the key reads this English. Placeholders are filled from the params the caller gives.
@@ -8,6 +9,18 @@ export const KAY_ENGLISH = {
   'kay.action.bodyLimit': 'Too large to send; {size} at most',
   'kay.offline.title': 'Offline',
   'kay.offline.text': 'This page needs a connection, and none is open.',
+  'kay.entry.required': '{field} is required',
+  'kay.entry.tooShort': '{field} needs at least {min} characters',
+  'kay.entry.tooLong': '{field} takes {max} characters at most',
+  'kay.entry.pattern': '{field} is not in the expected form',
+  'kay.entry.format': '{field} is not a valid {format}',
+  'kay.entry.tooFewItems': '{field} needs at least {min} items',
+  'kay.entry.tooManyItems': '{field} takes {max} items at most',
+  'kay.entry.tooSmall': '{field} must be at least {min}',
+  'kay.entry.tooBig': '{field} must be at most {max}',
+  'kay.entry.type': '{field} is not valid',
+  'kay.entry.data': 'The data',
+  'kay.entry.item': '{field}, item {n}',
   'kay.protection.honeypot': 'Leave this field empty',
   'kay.protection.minTime.early': 'Sent too fast; take a moment, then send it again',
   'kay.protection.minTime.expired': 'This form has expired; send it again',
@@ -43,4 +56,73 @@ export const INVALID_PARAMS: Readonly<Record<InvalidWord, readonly string[]>> = 
   'kay.invalid.tooSmall': ['min'],
   'kay.invalid.tooBig': ['max'],
   'kay.invalid.type': [],
+}
+
+// The formats Elysia gives its own string types, which a visitor does not name: a number, a boolean, an object or array in text, a file.
+const INTERNAL_FORMATS = new Set(['boolean', 'ObjectString', 'ArrayString', 'binary'])
+
+// Whether the pattern holds for the text; one a plain RegExp cannot compile is taken as failed, as the schema refused it.
+function matches(pattern: string, text: string): boolean {
+  try {
+    return new RegExp(pattern).test(text)
+  }
+  catch {
+    return false
+  }
+}
+
+export interface Refusal {
+  kind: InvalidWord
+  params?: Record<string, string | number> | undefined
+}
+
+// What a schema error refused, as the keyword it fails and the limit it names: a missing value, a string out of its length, pattern or format, an array out of its item count, a number out of its bounds, else its type.
+export function schemaRefusal(issue: { schema?: unknown, value?: unknown }): Refusal {
+  const schema = (typeof issue.schema === 'object' && issue.schema !== null ? issue.schema : {}) as { minLength?: number, maxLength?: number, pattern?: string, format?: string, minimum?: number, maximum?: number, minItems?: number, maxItems?: number }
+  const { value } = issue
+
+  if (value === undefined)
+    return { kind: 'kay.invalid.required' }
+
+  if (typeof value === 'string') {
+    if (value === '' && schema.minLength === 1)
+      return { kind: 'kay.invalid.required' }
+
+    if (schema.minLength !== undefined && value.length < schema.minLength)
+      return { kind: 'kay.invalid.tooShort', params: { min: schema.minLength } }
+
+    if (schema.maxLength !== undefined && value.length > schema.maxLength)
+      return { kind: 'kay.invalid.tooLong', params: { max: schema.maxLength } }
+
+    if (schema.pattern !== undefined && !matches(schema.pattern, value))
+      return { kind: 'kay.invalid.pattern' }
+
+    if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format) && !INTERNAL_FORMATS.has(schema.format))
+      return { kind: 'kay.invalid.format', params: { format: schema.format } }
+  }
+
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems)
+      return { kind: 'kay.invalid.tooFewItems', params: { min: schema.minItems } }
+
+    if (schema.maxItems !== undefined && value.length > schema.maxItems)
+      return { kind: 'kay.invalid.tooManyItems', params: { max: schema.maxItems } }
+  }
+
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum)
+      return { kind: 'kay.invalid.tooSmall', params: { min: schema.minimum } }
+
+    if (schema.maximum !== undefined && value > schema.maximum)
+      return { kind: 'kay.invalid.tooBig', params: { max: schema.maximum } }
+  }
+
+  return { kind: 'kay.invalid.type' }
+}
+
+// The sentence for a refused field of an entry: the `kay.entry.*` text of the keyword it fails in the request's locale, naming the field by its label, its own English when the site words none.
+export function entryRefusal(label: string, issue: { schema?: unknown, value?: unknown }): string {
+  const { kind, params } = schemaRefusal(issue)
+
+  return kayWord(`kay.entry.${kind.slice('kay.invalid.'.length)}` as KayWord, { field: label, ...params })
 }

@@ -288,7 +288,7 @@ test('a field the layout hides still says why a save was refused', async () => {
   await page.waitUntil(() => document.querySelector('.kcms-entry-failure[role=alert]') !== null)
 
   expect(shop.map(item => item.slug)).toEqual(['lamp', 'vase'])
-  expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-failure[role=alert], p.kcms-entry-failure')].map(node => node.textContent))).toContain('Property \'sku\' is missing')
+  expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-failure[role=alert], p.kcms-entry-failure')].map(node => node.textContent))).toContain('Sku is required')
   expect(page.errors).toEqual([])
 }, 60_000)
 
@@ -565,6 +565,17 @@ test('an upload exactly at uploads.maxSize is stored, one byte over refused by t
 
   expect(empty.status).toBe(400)
   expect(await empty.text()).toBe('big.pdf is empty')
+})
+
+test('a save the schema refuses names each field by its label, nested ones on their own path', async () => {
+  const save = async (headers: Record<string, string>, data: object) => {
+    const response = await site.fetch('/api/cms/entries/products/lamp', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ data }) })
+
+    return ((await response.json()) as { issues: { path: string, message: string }[] }).issues.map(({ path, message }) => [path, message])
+  }
+
+  expect(await save({ referer: 'http://localhost/products' }, { name: '', gallery: [3] })).toEqual([['name', 'Name is required'], ['gallery.0', 'Gallery, item 1 is not valid']])
+  expect(await save({ referer: 'http://localhost/products' }, { name: 'Lamp', color: 'red' })).toEqual([['color', 'Color is not in the expected form']])
 })
 
 test('the API refusals come back in the locale of the page that called, English from any other', async () => {

@@ -1,7 +1,8 @@
 import type { TSchema } from 'elysia'
 import type { RawEntry } from './load'
 import type { ComponentSegment, Segment } from './markdown'
-import { compiledCheck, dottedPath, fieldOf, refusals } from '../server/schema-check'
+import { compiledCheck, dottedPath, refusals } from '../server/schema-check'
+import { entryRefusal, kayWord } from '../server/words'
 
 export interface ContentProblem {
   // Relative to the project root.
@@ -52,14 +53,21 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
       continue
     }
 
-    for (const [field, message] of refusals(check, data, fieldOf))
-      problems.push({ file: entry.file, line: entry.lines[field] ?? 1, message: `${field === '' ? 'the data' : field}: ${message}` })
+    // Each refused field by its own dotted path, on the line its top-level field starts at.
+    for (const [path, message] of refusals(check, data, dottedPath, issue => refusalSentence(schema, issue)))
+      problems.push({ file: entry.file, line: entry.lines[topField(path)] ?? 1, message: path === '' ? message : `${path}: ${message}` })
   }
 
   if (problems.length > 0)
     throw new ContentError(problems)
 
   return decoded
+}
+
+function topField(path: string): string {
+  const dot = path.indexOf('.')
+
+  return dot === -1 ? path : path.slice(0, dot)
 }
 
 // A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder.
@@ -91,7 +99,63 @@ export function dataIssues(schema: TSchema, data: unknown): { path: string, mess
   if (check.Check(filled))
     return []
 
-  return [...refusals(check, filled, dottedPath)].map(([path, message]) => ({ path, message }))
+  return [...refusals(check, filled, dottedPath, issue => refusalSentence(schema, issue))].map(([path, message]) => ({ path, message }))
+}
+
+const INDEX = /^\d+$/
+
+interface Node {
+  title?: unknown
+  properties?: Record<string, Node>
+  items?: Node
+  anyOf?: Node[]
+}
+
+// The node of a field one step down: a property by its name, an array's item by its index, looking through the branches of a union such as a nullable field.
+function stepInto(node: Node | undefined, segment: string): Node | undefined {
+  for (const candidate of [node, ...node?.anyOf ?? []]) {
+    const found = candidate?.properties?.[segment] ?? (INDEX.test(segment) ? candidate?.items : undefined)
+
+    if (found)
+      return found
+  }
+
+  return undefined
+}
+
+// A field's `title`, else a branch's of its union, such as the inner type of a nullable one.
+function titleOf(node: Node | undefined): string | undefined {
+  return [node, ...node?.anyOf ?? []].map(candidate => candidate?.title).find((title): title is string => typeof title === 'string')
+}
+
+// How an entry names a field: its schema `title`, else its key worded (`publishedAt` gives `Published at`), an item of a list as `Tags, item 2`.
+export function labelOf(schema: TSchema, pointer: string): string {
+  const segments = pointer.split('/').slice(1).map(segment => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+  let node: Node | undefined = schema
+  let label = ''
+
+  for (const segment of segments) {
+    node = stepInto(node, segment)
+
+    label = INDEX.test(segment) ? kayWord('kay.entry.item', { field: label, n: Number(segment) + 1 }) : titleOf(node) ?? humanize(segment)
+  }
+
+  return label === '' ? kayWord('kay.entry.data') : label
+}
+
+// The words of a key: `publishedAt` gives `Published at`, `seoURL` gives `Seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
+const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
+
+// The same words the CMS labels a field with, `packages/cms/src/fields.ts`, which runs in the browser and cannot import this.
+function humanize(key: string): string {
+  const words = (key.match(WORD) ?? [key]).map(word => word === word.toUpperCase() && word.length > 1 ? word : word.toLowerCase()).join(' ')
+
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+// The sentence for a refused field: its label, then the keyword it fails, in the request's locale.
+function refusalSentence(schema: TSchema, issue: { path: string, schema?: unknown, value?: unknown }): string {
+  return entryRefusal(labelOf(schema, issue.path), issue)
 }
 
 function withDefaults(data: unknown, schema: TSchema): unknown {

@@ -1,0 +1,128 @@
+import type { LocaleState } from '../src/runtime/locale-state'
+import { describe, expect, it } from 'bun:test'
+import { t } from 'elysia'
+import { ContentError, dataIssues, decodeEntries } from '../src/content/validate'
+import { runInLocale } from '../src/runtime/locale-state'
+
+const schema = t.Object({
+  title: t.String({ minLength: 1 }),
+  summary: t.String({ minLength: 3, maxLength: 5 }),
+  slug: t.String({ pattern: '^[a-z]+$' }),
+  publishedAt: t.String({ title: 'Date de parution', format: 'date-time' }),
+  rating: t.Number({ minimum: 1, maximum: 5 }),
+  tags: t.Array(t.String({ minLength: 2 }), { minItems: 1, maxItems: 2 }),
+  flag: t.Boolean(),
+  networks: t.Object({
+    youtube: t.String({ format: 'uri' }),
+    handle: t.Optional(t.Union([t.String({ minLength: 2 }), t.Null()], { title: 'Pseudo' })),
+  }),
+  seoURL: t.Optional(t.String({ minLength: 4 })),
+})
+
+const VALID = { title: 'T', summary: 'abcd', slug: 'ok', publishedAt: '2026-01-01T00:00:00Z', rating: 3, tags: ['aa'], flag: true, networks: { youtube: 'https://youtu.be/x' } }
+
+const messagesOf = (data: unknown): Record<string, string> => Object.fromEntries(dataIssues(schema, data).map(({ path, message }) => [path, message]))
+
+const FRENCH: LocaleState = {
+  locale: 'fr',
+  settings: { locales: ['fr'], defaultLocale: 'fr', prefixDefault: false, pages: [] },
+  path: '/',
+  messages: new Map<string, string>([
+    ['kay.entry.required', '{field} est obligatoire'],
+    ['kay.entry.format', '{field} n\'est pas une adresse {format} valide'],
+    ['kay.entry.tooShort', '{field} demande au moins {min} caractères'],
+    ['kay.entry.item', '{field}, élément {n}'],
+  ]),
+}
+
+describe('an entry the schema refuses', () => {
+  it('reads as a sentence naming the field by its label, for each keyword', () => {
+    const found = messagesOf({ ...VALID, title: '', summary: 'ab', slug: 'No1', publishedAt: 'x', rating: 9, tags: ['aa', 'bb', 'cc'], flag: 'yes', seoURL: 'abc' })
+
+    expect(found).toEqual({
+      title: 'Title is required',
+      summary: 'Summary needs at least 3 characters',
+      slug: 'Slug is not in the expected form',
+      publishedAt: 'Date de parution is not a valid date-time',
+      rating: 'Rating must be at most 5',
+      tags: 'Tags takes 2 items at most',
+      flag: 'Flag is not valid',
+      seoURL: 'Seo URL needs at least 4 characters',
+    })
+  })
+
+  it('words a number under its lower bound, a long text and too few items', () => {
+    expect(messagesOf({ ...VALID, rating: 0, summary: 'abcdefg', tags: [] })).toEqual({
+      rating: 'Rating must be at least 1',
+      summary: 'Summary takes 5 characters at most',
+      tags: 'Tags needs at least 1 items',
+    })
+  })
+
+  it('words a field the entry leaves out as required', () => {
+    const without: Record<string, unknown> = { ...VALID }
+
+    delete without.title
+
+    expect(messagesOf(without)).toEqual({ title: 'Title is required' })
+  })
+
+  it('attaches the issue to the nested field, with the nested field\'s label', () => {
+    expect(messagesOf({ ...VALID, networks: { youtube: 'nope', handle: 'xy' } })).toEqual({
+      'networks.youtube': 'Youtube is not a valid uri',
+    })
+    // A nullable field wears the title of its inner type.
+    expect(messagesOf({ ...VALID, networks: { youtube: 'https://a.b', handle: 3 } })).toEqual({ 'networks.handle': 'Pseudo is not valid' })
+  })
+
+  it('names an item of a list by its position', () => {
+    expect(messagesOf({ ...VALID, tags: ['aa', 'b'] })).toEqual({ 'tags.1': 'Tags, item 2 needs at least 2 characters' })
+  })
+
+  it('reads in the request\'s locale, a key without a text keeping its English', () => {
+    const found = runInLocale(FRENCH, () => messagesOf({ ...VALID, title: '', networks: { youtube: 'nope' }, tags: ['aa', 'b'], rating: 9 }))
+
+    expect(found).toEqual({
+      'title': 'Title est obligatoire',
+      'networks.youtube': 'Youtube n\'est pas une adresse uri valide',
+      'tags.1': 'Tags, élément 2 demande au moins 2 caractères',
+      'rating': 'Rating must be at most 5',
+    })
+  })
+
+  it('names the data itself when it is not an object, and a key with a slash or a tilde by its words', () => {
+    expect(messagesOf('text')).toEqual({ '': 'The data is not valid' })
+
+    const odd = t.Object({ 'a/b~c': t.String({ minLength: 1 }), '__proto__x': t.String() })
+
+    expect(dataIssues(odd, { 'a/b~c': '', '__proto__x': 1 }).map(issue => issue.message)).toEqual(['A b c is required', 'Proto x is not valid'])
+  })
+})
+
+describe('the entries a build reads', () => {
+  const entry = (data: unknown, lines: Record<string, number>): never => ({ file: 'content/a.md', slug: 'a', data, lines, body: '' }) as never
+
+  it('reports each nested field apart, on the line its top-level field starts at', () => {
+    try {
+      decodeEntries([entry({ ...VALID, title: '', networks: { youtube: 'nope' } }, { title: 2, networks: 7 })], schema, {})
+      expect.unreachable()
+    }
+    catch (error) {
+      expect(error).toBeInstanceOf(ContentError)
+      expect((error as ContentError).problems.map(({ line, message }) => ({ line, message }))).toEqual([
+        { line: 2, message: 'title: Title is required' },
+        { line: 7, message: 'networks.youtube: Youtube is not a valid uri' },
+      ])
+    }
+  })
+
+  it('reports an entry that is not an object as the data', () => {
+    try {
+      decodeEntries([entry('text', {})], schema, {})
+      expect.unreachable()
+    }
+    catch (error) {
+      expect((error as ContentError).problems[0]?.message).toBe('The data is not valid')
+    }
+  })
+})

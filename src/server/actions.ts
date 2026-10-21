@@ -16,7 +16,7 @@ import type { DocumentedAction } from './openapi'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
-import { formInput, NUMERIC_FORMATS } from '../runtime/form'
+import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
@@ -45,7 +45,7 @@ import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
-import { invalidWord, kayWord } from './words'
+import { invalidWord, kayWord, schemaRefusal } from './words'
 
 export interface GuardedRequest {
   jar: CookieJar
@@ -953,61 +953,11 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// The formats Elysia gives its own string types, which a visitor does not name: a number, a boolean, an object or array in text, a file.
-const INTERNAL_FORMATS = new Set(['boolean', 'ObjectString', 'ArrayString', 'binary'])
-
-// Whether the pattern holds for the text; one a plain RegExp cannot compile is taken as failed, as the schema refused it.
-function matches(pattern: string, text: string): boolean {
-  try {
-    return new RegExp(pattern).test(text)
-  }
-  catch {
-    return false
-  }
-}
-
 // The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`, a format as `{format}`.
 function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
-  const schema = (typeof issue.schema === 'object' && issue.schema !== null ? issue.schema : {}) as { minLength?: number, maxLength?: number, pattern?: string, format?: string, minimum?: number, maximum?: number, minItems?: number, maxItems?: number }
-  const { value } = issue
+  const { kind, params } = schemaRefusal(issue)
 
-  if (value === undefined)
-    return invalidWord('kay.invalid.required', issue.summary)
-
-  if (typeof value === 'string') {
-    if (value === '' && schema.minLength === 1)
-      return invalidWord('kay.invalid.required', issue.summary)
-
-    if (schema.minLength !== undefined && value.length < schema.minLength)
-      return invalidWord('kay.invalid.tooShort', issue.summary, { min: schema.minLength })
-
-    if (schema.maxLength !== undefined && value.length > schema.maxLength)
-      return invalidWord('kay.invalid.tooLong', issue.summary, { max: schema.maxLength })
-
-    if (schema.pattern !== undefined && !matches(schema.pattern, value))
-      return invalidWord('kay.invalid.pattern', issue.summary)
-
-    if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format) && !INTERNAL_FORMATS.has(schema.format))
-      return invalidWord('kay.invalid.format', issue.summary, { format: schema.format })
-  }
-
-  if (Array.isArray(value)) {
-    if (schema.minItems !== undefined && value.length < schema.minItems)
-      return invalidWord('kay.invalid.tooFewItems', issue.summary, { min: schema.minItems })
-
-    if (schema.maxItems !== undefined && value.length > schema.maxItems)
-      return invalidWord('kay.invalid.tooManyItems', issue.summary, { max: schema.maxItems })
-  }
-
-  if (typeof value === 'number') {
-    if (schema.minimum !== undefined && value < schema.minimum)
-      return invalidWord('kay.invalid.tooSmall', issue.summary, { min: schema.minimum })
-
-    if (schema.maximum !== undefined && value > schema.maximum)
-      return invalidWord('kay.invalid.tooBig', issue.summary, { max: schema.maximum })
-  }
-
-  return invalidWord('kay.invalid.type', issue.summary)
+  return invalidWord(kind, issue.summary, params)
 }
 
 // Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.
