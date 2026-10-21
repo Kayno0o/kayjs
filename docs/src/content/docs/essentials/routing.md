@@ -227,6 +227,8 @@ Reviews(server="defer")
 
 `server` renders the island into the page before it is sent. `server="defer"` sends the page as prerendered, and the browser fetches the island as it nears the screen.
 
+When a form posts back to the same page, or a link leads to a page with the same island, the island stays on screen while its new copy is fetched, so the page does not jump.
+
 A deferred island shows nothing useful without JavaScript. Add `noscript` with the text of a link, and a visitor without JavaScript gets a link to the page with every island in place.
 
 ```kay

@@ -1,0 +1,26 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const stay = action(t.Object({}), (_, ctx) => ctx.redirect(ctx.url.pathname))
+export const refuse = action(t.Object({}), (_, ctx) => ctx.fail(409, 'Refused'))
+export const over = action(t.Object({}), (_, ctx) => ctx.redirect('/deferred-two'))
+
+const refused = ctx.failed(refuse)
+const label = ctx.url.searchParams.get('label') ?? 'one'
+--- script
+import Remote from '../components/remote.kay'
+---
+head
+  title Deferred
+h1 Deferred
+div.tall(style="height: 1500px")
+Remote(server="defer" label={label} to={stay})
+Remote(server="defer" label="two" to={over})
+a.pair(href="/deferred-two") Pair
+a.labeled(href="/deferred?label=changed") Labeled
+a.self(href="/deferred") Self
+form.refuse(action={refuse})
+  button Refuse
+if refused
+  p.refused Refused

@@ -1,0 +1,8 @@
+---
+import type { Action } from 'kay'
+
+const { label, to } = props<{ label: string, to: Action<{}, unknown> }>()
+---
+form(action={to})
+  p.remote {label}
+  button.send Send

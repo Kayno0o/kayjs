@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const stay = action(t.Object({}), (_, ctx) => ctx.redirect('/deferred-two'))
+--- script
+import Remote from '../components/remote.kay'
+---
+head
+  title Deferred two
+h1 Deferred two
+Remote(server="defer" label="one" to={stay})
+Remote(server="defer" label="other" to={stay})
+a.back(href="/deferred") Back
