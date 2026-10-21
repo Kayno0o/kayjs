@@ -1,10 +1,12 @@
-import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
+import type { EntryRef, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow } from './listing'
-import { entries } from './kay/content'
+import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
+import { collections, entries } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
 import { referrersOf } from './references'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
+import { groupEntries, pairKey, translationReport } from './translations'
 
 export interface EntryScreen {
   prefix: string
@@ -56,6 +58,28 @@ export async function listScreen({ collection: name, q = '', page = 1 }: { colle
   return { prefix, collection, ...listed, rows: listed.rows.map(row => ({ ...row, ...referrers.has(row.slug) && { referencedBy: referrers.get(row.slug) } })) }
 }
 
+function paired(entry: Pick<SourceEntry, 'locale' | 'slug' | 'data' | 'body'> | undefined): PairedEntry | undefined {
+  return entry?.locale === undefined ? undefined : { locale: entry.locale, slug: entry.slug, data: entry.data, body: entry.body }
+}
+
+// The translations of a localized entry, undefined for an entry that is not one or a site with a single locale: which locales have it, the default locale's entry it is marked against, and the locale asked to be shown beside it. Reads every entry of the collection, as a translation may carry another slug.
+export async function entryTranslations(collection: ScreenCollection, entry: StoredEntry, compare?: string): Promise<EntryTranslations | undefined> {
+  const locales = collection.locales ?? []
+
+  if (!collection.localized || locales.length < 2 || entry.locale === undefined)
+    return undefined
+
+  const group = groupEntries(await entries(collection.name, {})).get(pairKey(entry)) ?? new Map<string, SourceEntry>()
+  const base = collection.defaultLocale ?? locales[0]
+  const other = compare === undefined || compare === entry.locale ? undefined : group.get(compare)
+
+  return {
+    locales: locales.map(locale => ({ locale, slug: locale === entry.locale ? entry.slug : group.get(locale)?.slug })),
+    source: base === undefined || base === entry.locale ? undefined : paired(group.get(base)),
+    compare: paired(other),
+  }
+}
+
 // The slug of a single collection's entry, or undefined while none is written.
 export async function writtenSlug(name: string): Promise<string | undefined> {
   return (await entries(name, { limit: 1 }))[0]?.slug
@@ -71,4 +95,39 @@ export async function openPath(collection: Pick<ScreenCollection, 'name' | 'sing
   const slug = await writtenSlug(collection.name)
 
   return slug === undefined ? newEntryPath(prefix, collection.name) : entryPath(prefix, { collection: collection.name, slug })
+}
+
+// A new translation of an entry: the entry it starts as a copy of and the default locale's entry the form marks untranslated fields against.
+export async function translationStart(collection: ScreenCollection, from: string, fromLocale: string): Promise<{ copy?: PairedEntry | undefined, source?: PairedEntry | undefined }> {
+  const found = await readEntry({ collection: collection.name, slug: from, locale: fromLocale })
+  const entry = found?.entry
+
+  if (entry === undefined)
+    return {}
+
+  const translations = await entryTranslations(collection, entry)
+  const base = collection.defaultLocale ?? collection.locales?.[0]
+
+  return { copy: paired(entry), source: base === fromLocale ? paired(entry) : translations?.source }
+}
+
+export interface TranslationsScreen {
+  prefix: string
+  collections: { collection: ScreenCollection, rows: TranslationRow[] }[]
+}
+
+// What the translations report reads: per localized collection of two locales or more, the entries missing a locale or holding a text still as the default locale's.
+export async function translationsScreen(): Promise<TranslationsScreen> {
+  const found: TranslationsScreen['collections'] = []
+
+  for (const info of await collections()) {
+    const collection = await findCollection(info.name)
+
+    if (!collection?.localized || (collection.locales?.length ?? 0) < 2 || collection.problem !== undefined)
+      continue
+
+    found.push({ collection, rows: translationReport(collection, await entries(collection.name, {})) })
+  }
+
+  return { prefix: settings().prefix, collections: found }
 }

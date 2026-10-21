@@ -5,6 +5,7 @@ import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
 import { screenPath } from './paths'
+import { groupEntries, missingLocales } from './translations'
 import { contentVersion } from './version'
 
 // The most referencing entries a delete confirmation names; the rest is told as a trailing ellipsis.
@@ -28,6 +29,8 @@ export interface EntryRow {
   referencedBy?: string[] | undefined
   // The text of each column the collection's list names, by field key.
   cells?: Record<string, string> | undefined
+  // In a localized collection, the site's locales this entry has no translation in, none when it has every one.
+  missing?: string[] | undefined
   // The version of an entry as the list read it, a folder entry's file or a loaded entry's content, which a delete from the list names, so it never removes an entry saved since.
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
@@ -107,7 +110,33 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     return found
   }
 
-  const versioned = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
+  // The locales each row's entry lacks, read from every entry of the collection, as a translation may carry another slug.
+  const marked = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
+    const locales = collection.locales ?? []
+
+    if (!collection.localized || locales.length < 2 || listed.rows.length === 0)
+      return listed
+
+    const groups = groupEntries(await list({}))
+    const lacks = new Map<string, string[]>()
+
+    for (const group of groups.values()) {
+      const missing = missingLocales(locales, group)
+
+      for (const entry of group.values())
+        lacks.set(key(entry.slug, entry.locale), missing)
+    }
+
+    return { ...listed, rows: listed.rows.map((row) => {
+      const missing = lacks.get(key(row.slug, row.locale))
+
+      return missing === undefined || missing.length === 0 ? row : { ...row, missing }
+    }) }
+  }
+
+  const versioned = async <T extends { rows: EntryRow[] }>(found: T): Promise<T> => {
+    const listed = await marked(found)
+
     if (collection.kind === 'loaded') {
       const rows = listed.rows.map((row) => {
         const entry = seen.get(key(row.slug, row.locale))
@@ -184,6 +213,11 @@ export function problemId(collection: string, key?: string): string {
 
 export function newEntryPath(prefix: string, collection: string): string {
   return screenPath(prefix, `/new/${encodeURIComponent(collection)}`)
+}
+
+// A new entry in `locale` that starts as a copy of `from`, the entry in another locale.
+export function translatePath(prefix: string, from: EntryRef, locale: string): string {
+  return `${newEntryPath(prefix, from.collection)}?locale=${encodeURIComponent(locale)}&from=${encodeURIComponent(from.slug)}&fromLocale=${encodeURIComponent(from.locale ?? '')}`
 }
 
 // Opens the page in edit mode, through the screens' guard.

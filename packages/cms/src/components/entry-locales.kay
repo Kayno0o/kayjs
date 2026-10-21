@@ -1,0 +1,28 @@
+---
+import type { EntryRef } from '../kay/contract'
+import type { EntryTranslations } from '../translations'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import { wording } from 'kay/words'
+import { entryPath, translatePath } from '../listing'
+
+// The locales of a localized entry: the one on screen, the others as links to their entry, a missing one as a link that starts it as a copy, and the one shown beside the form.
+const { prefix, entry, translations, compared } = props<{ prefix: string, entry: EntryRef, translations: EntryTranslations, compared?: string | undefined }>()
+
+const here = (locale: string) => locale === entry.locale
+const comparePath = (locale: string) => `${entryPath(prefix, entry)}&compare=${encodeURIComponent(locale)}`
+---
+nav.kcms-locales(aria-label={wording('cms.locales.label', 'Translations')})
+  for item of translations.locales key={item.locale}
+    if here(item.locale)
+      span.kcms-locale(aria-current="true") {item.locale}
+    else if item.slug as slug
+      span.kcms-locale
+        a(href={entryPath(prefix, { collection: entry.collection, slug, locale: item.locale })}) {item.locale}
+        if compared === item.locale
+          a(href={entryPath(prefix, entry)}) {wording('cms.locales.stopCompare', 'Hide')}
+        else
+          a(href={comparePath(item.locale)}) {wording('cms.locales.compare', 'Compare')}
+    else
+      span.kcms-locale
+        Badge(tone="warning" label={wording('cms.locales.missing', 'Missing')})
+        a(href={translatePath(prefix, entry, item.locale)}) {wording('cms.locales.translate', 'Translate to {locale}', { locale: item.locale })}

@@ -1,0 +1,21 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { wording } from 'kay/words'
+import TranslationReport from '../components/translation-report.kay'
+import { adminTitle } from '../listing'
+import { screenPath } from '../paths'
+import { translationsScreen } from '../screens'
+
+const { prefix, collections } = await translationsScreen()
+---
+head
+  title {adminTitle(wording('cms.locales.title', 'Translations'))}
+PageSection(title={wording('cms.locales.title', 'Translations')} level={1})
+  @actions
+    Button(href={screenPath(prefix)} label={wording('cms.admin.content', 'Content')})
+  for item of collections key={item.collection.name}
+    TranslationReport(prefix={prefix} collection={item.collection} rows={item.rows})
+  else
+    EmptyState(title={wording('cms.locales.none', 'No localized collection')} description={wording('cms.locales.noneHint', 'A collection kept in two locales or more is checked here for missing translations.')})

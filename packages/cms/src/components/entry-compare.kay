@@ -1,0 +1,20 @@
+---
+import type { CollectionInfo } from '../kay/contract'
+import type { PairedEntry } from '../translations'
+import { wording } from 'kay/words'
+import { BODY_FIELD, translatable } from '../translations'
+
+// The text of a translation read-only beside the form, to translate against.
+const { collection, other } = props<{ collection: CollectionInfo, other: PairedEntry }>()
+
+const texts = translatable(collection).map(field => ({ key: String(field.key), label: field.label, text: other.data?.[field.key] })).filter(item => typeof item.text === 'string' && item.text !== '')
+---
+aside.kcms-compare(aria-label={wording('cms.locales.comparing', 'Text in {locale}', { locale: other.locale })})
+  h2.kcms-compare-title {wording('cms.locales.comparing', 'Text in {locale}', { locale: other.locale })}
+  dl
+    for item of texts key={item.key}
+      dt {item.label}
+      dd {String(item.text)}
+    if collection.body !== undefined && other.body
+      dt {BODY_FIELD}
+      dd.kcms-compare-body {other.body}

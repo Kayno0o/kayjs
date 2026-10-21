@@ -275,6 +275,12 @@ The upload route takes `maxSize` whatever the app's `bodyLimit` is, so nothing e
 
 `pageSize` sets how many entries a collection's list shows on a page, 50 by default.
 
+### Translations
+
+In a site with two locales or more, an entry's screen lists its locales. A locale it has links to that entry, with a Compare link that shows its text beside the form. A locale it lacks links to a new entry that starts as a draft copy of this one, so you translate over the text instead of retyping it.
+
+Under a text still equal to the default locale's, or empty while the default has one, the field says so. The Translations screen at `<prefix>/translations` lists, per collection, the entries missing a locale and the texts not translated yet. A field with a `format`, or wrapped in `untranslated()`, is never asked for.
+
 Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
 
 Check each upload before you confirm. A URL written by hand in a page, or a file outside the collections, is not seen as a use.

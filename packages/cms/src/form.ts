@@ -3,6 +3,7 @@ import type { Drafts } from './drafts'
 import type { SavedState } from './editor/live'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
 import type { SlugReport } from './slug'
+import type { PairedEntry } from './translations'
 import { call, effect, guardLeave, navigate, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import slugsApi from './api/slugs'
@@ -24,6 +25,8 @@ export interface FormScope {
   collection: ScreenCollection
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
+  // In a locale other than the default's, the default locale's entry, which a field still saying the same is marked against.
+  source?: PairedEntry | undefined
   shown: Shown
 }
 
@@ -101,8 +104,8 @@ export function createShown(): Shown {
   }
 }
 
-export function formScope(drafts: Drafts, entry: EntryRef, collection: ScreenCollection, problem?: string): FormScope {
-  return { drafts, entry, collection, problem, shown: createShown() }
+export function formScope(drafts: Drafts, entry: EntryRef, collection: ScreenCollection, problem?: string, source?: PairedEntry): FormScope {
+  return { drafts, entry, collection, problem, source, shown: createShown() }
 }
 
 function slugLine(entry: StoredEntry): string {
@@ -111,7 +114,8 @@ function slugLine(entry: StoredEntry): string {
 
 // An entry's form on its own screen, or a new entry's when `entry` is left out: the drafts, the save, publish and delete, and the guard against leaving with edits. Called in a component's script, it is what the default screen runs.
 // `entry` may be a function returning it, read each time the form needs it: for a screen that stays when the page refreshes in place (a `persist` island) and takes new props, `entry: () => all.entry`, so `stored`, `name` and `subtitle` follow the refreshed entry.
-export function createEntryForm({ prefix, collection, entry, locale }: { prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined }): EntryForm {
+// `copy` starts a new entry as a copy of a translation, `source` is the default locale's entry the form marks untranslated fields against.
+export function createEntryForm({ prefix, collection, entry, locale, copy, source }: { prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
   const read = typeof entry === 'function' ? entry : () => entry
   const first = read()
 
@@ -122,13 +126,13 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   const drafts = createDrafts({ show: async () => Promise.resolve({}) })
   // A new entry's draft is kept under no slug until it is saved under the one typed.
   const ref: EntryRef = { collection: collection.name, slug: first?.slug ?? '', locale: first?.locale ?? locale }
-  const slug = signal(first?.slug ?? (collection.single ? SINGLE_SLUG : ''))
+  const slug = signal(first?.slug ?? copy?.slug ?? (collection.single ? SINGLE_SLUG : ''))
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
   // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
   const cleans = collection.kind === 'folder'
-  const suggestsSlug = signal(!first && !collection.single && cleans)
+  const suggestsSlug = signal(!first && !copy && !collection.single && cleans)
   const known = signal<{ slug: string, locale?: string | undefined }[]>()
   const titleKey = fieldsOf(collection.schema).find(field => field.kind === 'text')?.key.toString()
 
@@ -183,7 +187,10 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
     return checkSlug(slug(), list.filter(entry => entry.locale === locale).map(entry => entry.slug))
   }
 
-  drafts.open({ ...ref, data: first?.data ?? collection.seed ?? {}, body: first?.body }, first?.version)
+  // A copy is held back as a draft, so the untranslated text is not published as it is.
+  const copied = copy?.data && { ...copy.data, ...collection.draftField !== undefined && { [collection.draftField]: true } }
+
+  drafts.open({ ...ref, data: first?.data ?? copied ?? collection.seed ?? {}, body: first?.body ?? copy?.body }, first?.version)
   guardLeave(() => !saving() && drafts.changed(ref))
 
   // The entry as it is now, the one the form opened with once it is gone.
@@ -282,7 +289,7 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   })
 
   return {
-    ...formScope(drafts, ref, collection),
+    ...formScope(drafts, ref, collection, undefined, source),
     prefix,
     get problem() {
       return stored()?.problem

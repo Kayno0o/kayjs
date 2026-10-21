@@ -196,3 +196,28 @@ body {
 .kcms-admin .kui-page-section-head {
   flex-wrap: wrap;
 }
+
+.kcms-locales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-block: 0.5rem;
+}
+
+.kcms-locale {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kcms-compare {
+  margin-block-start: 1rem;
+  padding: 1rem;
+  border: 1px solid currentcolor;
+  border-radius: 0.5rem;
+}
+
+.kcms-compare dd {
+  margin: 0 0 0.75rem;
+  white-space: pre-wrap;
+}

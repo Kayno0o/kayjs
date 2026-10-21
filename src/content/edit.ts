@@ -109,6 +109,8 @@ export interface CollectionInfo {
   localized: boolean
   // The locales the site serves, which a localized collection's entries are written in.
   locales?: string[] | undefined
+  // The site's default locale, which the other locales' entries are compared with.
+  defaultLocale?: string | undefined
   // A folder collection's folder, relative to the repository root; absent when it lies outside it, where a CMS commits nothing.
   dir?: string | undefined
   // The boolean field `draft: 'field'` names, true for a draft: publishing writes false to it.
@@ -172,6 +174,7 @@ export interface EntryFile extends EntryPath {
 export interface EditSite {
   urls: (collection: Collection<unknown>, entry: { slug: string, locale?: string | undefined }) => Promise<string | undefined>
   locales?: readonly string[] | undefined
+  defaultLocale?: string | undefined
 }
 
 const MARKDOWN = /\.md$/
@@ -451,6 +454,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     components: Object.keys(collection.components),
     localized,
     ...localized && site?.locales && { locales: [...site.locales] },
+    ...localized && site?.defaultLocale !== undefined && { defaultLocale: site.defaultLocale },
     ...inRepo !== undefined && { dir: inRepo },
     ...typeof draft === 'string' && { draftField: draft },
     ...publishAt !== undefined && { publishField: publishAt },

@@ -36,7 +36,7 @@ const sortKey = (kind: string, text = ''): string | number => kind === 'number' 
 const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
   ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
-  ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true } satisfies Column<EntryRow>] : []),
+  ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
   ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
@@ -78,6 +78,10 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
         EntryWatch(collection={collection.name} entry={ref(row)})
     else if column.key.startsWith('cell:')
       span {row.cells?.[column.key.slice(5)] ?? ''}
+    else if column.key === 'locale'
+      span {row.locale}
+      if row.missing as lacks
+        Badge(tone="warning" label={wording('cms.table.missingLocales', 'No {locales}', { locales: lacks.join(', ') })})
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})

@@ -29,7 +29,8 @@ import { announceMove, focusItem, followFocus, reordered, reorderKey } from './r
 import { uploadFile, uploading } from './upload'
 import './fields.css'
 
-const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
+// `note` is said under a text field with its hint, such as that it still reads as its source.
+const { drafts, entry, field, path, note } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string, note?: string | undefined }>()
 
 // The components the app gives its own field kinds, `src/cms/fields/<kind>.kay` each, bundled with the editor.
 const kinds = import.meta.glob<Component<CustomFieldProps>>('/src/cms/fields/*.kay', { eager: true, import: 'default' })
@@ -52,6 +53,7 @@ const removed = signal<{ at: number, title: string, value: unknown }>()
 let rows: HTMLElement | undefined
 let box: HTMLElement | undefined
 
+const hinted = () => [field.hint, note].filter(Boolean).join(' ') || undefined
 const value = () => drafts.value(entry, path)
 const text = () => value() === undefined || value() === null ? '' : String(value())
 const items = () => Array.isArray(value()) ? value() as unknown[] : []
@@ -425,10 +427,10 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={typedLines} onBlur={() => touched = true})
     when 'textarea'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
         MarkdownEditor(value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={async file => (await uploadFile(entry.collection, file)).path})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
@@ -467,6 +469,6 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
         Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     else
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
           TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={htmlPattern(current.limits?.pattern)})

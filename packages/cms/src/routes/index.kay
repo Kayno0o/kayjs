@@ -12,12 +12,15 @@ import { openPath } from '../screens'
 import { settings } from '../settings'
 
 const { prefix } = settings()
+const localized = (await collections()).some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
 const listed = await Promise.all((await collections()).map(async collection => ({ collection, href: await openPath(collection) })))
 ---
 head
   title {adminTitle(wording('cms.admin.content', 'Content'))}
 PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
+    if localized
+      Button(href={screenPath(prefix, '/translations')} label={wording('cms.locales.title', 'Translations')})
     Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for row of listed key={row.collection.name}

@@ -92,6 +92,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.list.jumpLabel',
   'cms.list.removed',
   'cms.list.undo',
+  'cms.locales.empty',
+  'cms.locales.same',
   'cms.missing.dismissFailure',
   'cms.missing.dismissed',
   'cms.redirects.addFailure',
