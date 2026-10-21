@@ -379,7 +379,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const route of app.routes)
     earlier.add(`${route.method} ${route.path}`)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: spell, requireGuards: options.requireGuards, cors: options.cors }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: (location: string) => spell(location), requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0

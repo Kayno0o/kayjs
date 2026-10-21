@@ -136,8 +136,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let typesAgain = false
   // The code files edited while a write ran, whose module the process may have loaded by then.
   const editedWhileWriting: string[] = []
-  // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
   const env = await environmentWithoutDotenv(root)
+  // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
   const typesProcess = new TypesProcess(root, options.entry, env)
   let typesFresh = true
   let startedTypes = false
