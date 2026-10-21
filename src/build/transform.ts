@@ -9,8 +9,8 @@ import process from 'node:process'
 import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
 import { isErrorCode } from '../compiler/errors'
+import { parseExpanded } from '../compiler/markdown-block'
 import { nativeManifestIfInstalled } from '../compiler/native-typescript'
-import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
@@ -254,12 +254,12 @@ async function clientOnlyIsland(source: string, filename: string, cacheDir: stri
 
 // The packages to probe: none for a page or layout, which never switches, nor for a component that is not an island.
 function probedPackages(source: string): string[] {
-  const file = parseKay(source)
+  const { file } = parseExpanded(source)
 
   if (file.client || !file.script || file.server)
     return []
 
-  const script = analyzeScript(source, file.script, [], templateReads(file))
+  const script = analyzeScript(file.source, file.script, [], templateReads(file))
 
   return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }

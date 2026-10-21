@@ -975,11 +975,16 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/cookie.kay': '---\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/server.kay': '--- server\nconst origin = publicEnv.SITE\n---\np {origin}\n',
       'src/routes/declared.kay': '---\nconst live = 1\n---\np {live}\n',
+      'src/routes/template.kay': 'p {publicEnv.SITE}\n',
+      'src/routes/markdown.kay': 'markdown\n  Hello {publicEnv.SITE}\n',
     })
 
     roots.push(root)
 
     const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    expect(await at('src/routes/template.kay')).toMatchObject({ why: expect.stringContaining('`publicEnv`') })
+    expect(await at('src/routes/markdown.kay')).toMatchObject({ why: expect.stringContaining('`publicEnv`') })
 
     expect(await at('src/routes/free.kay')).toBeUndefined()
     expect(await at('src/routes/local.kay')).toBeUndefined()

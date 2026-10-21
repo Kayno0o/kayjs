@@ -69,8 +69,23 @@ function parameters(code: string): Set<string> | undefined {
   return names
 }
 
-// The values of `kay` the template's expressions read, bar the names the template binds itself and the ones a function in an expression takes as parameters: the script declares the rest or leaves them to the compiler to import.
+const reads = new WeakMap<KayFile, string[]>()
+
+// The values of `kay` the template's expressions read, bar the names the template binds itself and the ones a function in an expression takes as parameters: the script declares the rest or leaves them to the compiler to import. A binder or a parameter hides its name file-wide, not only where it is in scope, so a file mixing both uses of one name imports it from the script.
 export function templateReads(file: KayFile): string[] {
+  const known = reads.get(file)
+
+  if (known)
+    return known
+
+  const found = readsOf(file)
+
+  reads.set(file, found)
+
+  return found
+}
+
+function readsOf(file: KayFile): string[] {
   const bound = new Set<string>()
   const read = new Set<string>()
   const text = (span: Span) => file.source.slice(span.start, span.end)

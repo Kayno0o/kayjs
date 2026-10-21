@@ -3,6 +3,7 @@ import type { Unchanged } from './module-state'
 import { relative } from 'node:path'
 import { findProjectFiles, resolveFrom } from '../build/files'
 import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
+import { parseExpanded } from '../compiler/markdown-block'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -776,9 +777,9 @@ async function scanned(file: string, root: string | undefined, scans: object): P
 
   // What a `.kay` file reads of `kay` with no import is judged as if it imported it.
   if (file.endsWith('.kay')) {
-    const parts = parseKay(source)
-    const server = analyzeServer(source, parts.server)
-    const implicit = [...new Set([...analyzeScript(source, parts.script, server?.data.map(({ name }) => name), templateReads(parts)).implicit, ...server?.implicit ?? []])]
+    const { file: parts } = parseExpanded(source)
+    const server = analyzeServer(parts.source, parts.server)
+    const implicit = [...new Set([...analyzeScript(parts.source, parts.script, server?.data.map(({ name }) => name), templateReads(parts)).implicit, ...server?.implicit ?? []])]
 
     if (implicit.length > 0)
       imports.push({ clause: `{ ${implicit.join(', ')} }`, specifier: 'kay', index: 0, length: 0 })
