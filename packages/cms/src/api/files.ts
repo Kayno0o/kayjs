@@ -2,15 +2,20 @@ import { s } from 'kay'
 import { api, files, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
-import { renameUpload, storeUpload } from '../media'
+import { collections } from '../kay/content'
+import { MEDIA_FOLDER, mediaIndex, renameUpload, storeUpload } from '../media'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
 import { emptyFile, sizeOfPath, tooLarge } from '../upload-text'
-import { uploadBodyLimit, uploadFolders, uploadRefusal, uploadRules } from '../uploads'
+import { uploadBodyLimit, uploadFolder, uploadFolders, uploadRefusal, uploadRules } from '../uploads'
 
 // The most uploads a picker lists, the newest first.
 const PICKABLE = 200
+
+async function ownFolders(): Promise<Set<string>> {
+  return new Set([MEDIA_FOLDER, ...(await collections({ counts: false })).map(collection => uploadFolder(collection.name))])
+}
 
 // Stores an upload public, in the folder every collection shares and named by its hash, and answers the path a page renders it from, which the field keeps, and the size of an image.
 // Read when kay mounts the route, as `cms()` has run by then and an import before it does not throw.
@@ -23,8 +28,9 @@ export default api({ bodyLimit: uploadBodyLimit })
     const collection = await collectionNamed(params.collection)
     const stored = (await Promise.all(uploadFolders(collection.name).map(async folder => files.list({ folder })))).flat()
     const wanted = stored.filter(file => query.images !== 'true' || typeOfName(file.key).startsWith('image/'))
+    const index = await mediaIndex()
 
-    return wanted.toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: file.key.split('/').at(-1) ?? file.key }))
+    return wanted.toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: index[file.key]?.name ?? file.key.split('/').at(-1) ?? file.key }))
   }, { query: s.Object({ images: s.Optional(s.String()) }) })
   .post('/:collection', async ({ params, body, status, request }) => {
     await collectionNamed(params.collection)
@@ -51,6 +57,11 @@ export default api({ bodyLimit: uploadBodyLimit })
   // Changes the name the library shows for an upload; the key, and so every reference to it, stays.
   .post('/media/rename', async ({ body, status }) => {
     const name = body.name.trim()
+    const folder = body.key.slice(0, body.key.lastIndexOf('/'))
+
+    // Only the files of the CMS's own folders have a name to change.
+    if (!(await ownFolders()).has(folder))
+      return status(404, wording('cms.media.notFound', '{key} is not an upload', { key: body.key }))
 
     if (name === '')
       return status(400, wording('cms.media.nameEmpty', 'The name is empty'))

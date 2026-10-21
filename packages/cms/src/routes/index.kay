@@ -32,6 +32,7 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
     else
       Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/media')} label={wording('cms.admin.media', 'Media')})
+    Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for group of groups key={group.name ?? ''}
     if group.name
       h2.kcms-group-title {group.name}

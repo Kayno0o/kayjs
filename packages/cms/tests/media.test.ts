@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
 import { setupStorage } from '../../../src/server/storage'
-import { forgetUploads, isUploadKey, MEDIA_FOLDER, mediaIndex, renameUpload, storeUpload } from '../src/media'
+import { forgetUploads, isUploadKey, MEDIA_FOLDER, mediaIndex, NAME_LENGTH, renameUpload, storeUpload } from '../src/media'
 import { uploadFolders } from '../src/uploads'
 
 const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
@@ -46,6 +46,40 @@ test('a rename changes the name shown, a legacy upload with no record included, 
 
 test('a collection looks in the shared folder first, then its own', () => {
   expect(uploadFolders('blog-posts')).toEqual([MEDIA_FOLDER, 'blog-posts'])
+})
+
+test('a failed read of the index never wipes the records on the next write', async () => {
+  setupStorage(memoryFiles(), '.kay/cache')
+
+  const key = await storeUpload(png('a.png'), 'Ada')
+  const real = files.get.bind(files)
+
+  files.get = async () => {
+    throw new Error('storage is down')
+  }
+
+  try {
+    expect(await mediaIndex()).toEqual({})
+    await expect(renameUpload(key, 'b.png')).rejects.toThrow('storage is down')
+  }
+  finally {
+    files.get = real
+  }
+
+  expect((await mediaIndex())[key]).toMatchObject({ name: 'a.png', by: 'Ada' })
+
+  await files.put(new Blob(['not json'], { type: 'application/json' }), { private: true, id: 'cms-media-index' })
+  await expect(storeUpload(png('c.png'))).resolves.toMatch(/^cms-media\//)
+  expect(await (await files.get('private/cms-media-index.json'))?.text()).toBe('not json')
+})
+
+test('a long name is cut, and a collection named like the shared folder lists it once', async () => {
+  setupStorage(memoryFiles(), '.kay/cache')
+
+  const key = await storeUpload(png(`${'n'.repeat(500)}.png`))
+
+  expect((await mediaIndex())[key]!.name).toHaveLength(NAME_LENGTH)
+  expect(uploadFolders(MEDIA_FOLDER)).toEqual([MEDIA_FOLDER])
 })
 
 test('a missing or unreadable index reads as empty', async () => {

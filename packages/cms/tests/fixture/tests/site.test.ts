@@ -639,7 +639,7 @@ test('an image upload answers its size, a file that is no image none, and the up
 
     return await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string, width?: number, height?: number }
   }
-  const image = await send(new File([PIXEL], 'size.png', { type: 'image/png' }))
+  const image = await send(new File([PIXEL, new Uint8Array([5])], 'size.png', { type: 'image/png' }))
   const pdf = await send(new File(['%PDF-1.4\n%%EOF'], 'doc.pdf', { type: 'application/pdf' }))
 
   expect(image).toMatchObject({ width: 1, height: 1 })
@@ -653,7 +653,7 @@ test('an image upload answers its size, a file that is no image none, and the up
   expect(everything).toEqual(expect.arrayContaining([image.path, pdf.path]))
   expect(images).toContain(image.path)
   expect(images).not.toContain(pdf.path)
-  expect((await listed()).find(upload => upload.path === image.path)?.name).toMatch(/\.1x1-[\da-f]{6}\.png$/)
+  expect((await listed()).find(upload => upload.path === image.path)?.name).toBe('size.png')
   expect((await site.fetch('/api/cms/files/nope')).status).toBe(404)
 })
 
@@ -1049,7 +1049,7 @@ test('a file over the size limit is refused before it is sent, with its size tol
 test('an upload stored before can be picked again from the field, and fills it', async () => {
   const form = new FormData()
 
-  form.append('file', new File([PIXEL], 'again.png', { type: 'image/png' }))
+  form.append('file', new File([PIXEL, new Uint8Array([6])], 'again.png', { type: 'image/png' }))
 
   const built = await browser()
   const { path } = await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
@@ -1063,7 +1063,7 @@ test('an upload stored before can be picked again from the field, and fills it',
     const choice = [...document.querySelectorAll<HTMLElement>('[data-kcms-path="photo"] .kcms-file-choice')].find(each => each.getAttribute('aria-label') === `Use ${name}`)
 
     choice!.click()
-  }, path.split('/').at(-1)!)
+  }, 'again.png')
   await page.waitUntil(() => document.querySelector('[data-kcms-path="photo"] a.kcms-file-link') !== null)
 
   expect(await page.evaluate(() => document.querySelector('[data-kcms-path="photo"] a.kcms-file-link')?.getAttribute('href'))).toBe(path)

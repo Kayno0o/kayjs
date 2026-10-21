@@ -20,7 +20,7 @@ export function uploadFolder(collection: string): string {
 
 // The folders a collection's uploads are looked for in: the shared one new uploads go to, then the collection's own, where an older release stored them.
 export function uploadFolders(collection: string): string[] {
-  return [MEDIA_FOLDER, uploadFolder(collection)]
+  return [...new Set([MEDIA_FOLDER, uploadFolder(collection)])]
 }
 
 // Why the CMS refuses the upload, or undefined when `uploads` takes its type and its bytes are that type: the type is the one kay's storage serves it as, its name's extension's in any case, else the type it was sent with.

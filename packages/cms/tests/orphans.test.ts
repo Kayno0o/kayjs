@@ -39,7 +39,7 @@ const content: Partial<typeof Content> = {
 void mock.module('../src/kay/content', () => content)
 
 const { deleteUnusedUploads, libraryUploads, unusedUploads } = await import('../src/orphans')
-const { storeUpload } = await import('../src/media')
+const { mediaIndex, storeUpload } = await import('../src/media')
 
 const PIXEL = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
 const upload = async (folder: string) => files.put(new File([PIXEL], 'pixel.png', { type: 'image/png' }), { folder })
@@ -223,7 +223,7 @@ test('the library lists every upload with the entries using it, its record and w
     throw new Error(fresh.blocked.join('; '))
 
   expect(fresh.uploads.map(found => found.key).toSorted()).toEqual([shared, legacy].toSorted())
-  expect(fresh.uploads.find(found => found.key === shared)).toMatchObject({ name: 'team.png', by: 'Ada', size: PIXEL.length, width: 1, height: 1, usedIn: ['posts/a', 'posts/b'], deletable: false })
+  expect(fresh.uploads.find(found => found.key === shared)).toMatchObject({ name: 'team.png', by: 'Ada', size: PIXEL.length, width: 1, height: 1, usedIn: [{ collection: 'posts', slug: 'a' }, { collection: 'posts', slug: 'b' }], deletable: false })
   expect(fresh.uploads.find(found => found.key === legacy)).toMatchObject({ name: legacy.split('/').at(-1), usedIn: [], deletable: false })
 
   aged()
@@ -234,4 +234,15 @@ test('the library lists every upload with the entries using it, its record and w
 
   stored = { posts: [] }
   expect(await libraryUploads()).toEqual({ blocked: ['products cannot be read'] })
+})
+
+test('the shared folder\'s uploads are listed when unused, kept when an entry mentions them, and deleting one drops its record', async () => {
+  const kept = await storeUpload(new File([PIXEL], 'kept.png', { type: 'image/png' }))
+  const stray = await storeUpload(new File([PIXEL, new Uint8Array([9])], 'stray.png', { type: 'image/png' }))
+
+  stored = { posts: [entry('a', { photo: files.url(kept) })], products: [] }
+  aged()
+  expect(await unusedKeys()).toEqual([stray])
+  expect(await deleteUnusedUploads([kept, stray])).toEqual({ deleted: [stray], kept: [kept] })
+  expect(Object.keys(await mediaIndex())).toEqual([kept])
 })

@@ -1,3 +1,4 @@
+import type { EntryRef } from './kay/contract'
 import { files } from 'kay/server'
 import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
@@ -33,8 +34,8 @@ interface Stored {
 
 interface Read {
   stored: Stored[]
-  // The entries mentioning each upload's id, as `collection/slug`.
-  usedBy: Map<string, Set<string>>
+  // The entries mentioning each upload's id.
+  usedBy: Map<string, Map<string, EntryRef>>
 }
 
 const idOf = (key: string) => KEY_ID.exec(key)?.[1]
@@ -57,7 +58,7 @@ async function readUploads(): Promise<Read | { blocked: string[] }> {
     return { blocked: [wording('cms.uploads.listFailure', 'The files cannot be listed: {reason}', { reason: error instanceof Error ? error.message : String(error) })] }
   }
 
-  const usedBy = new Map<string, Set<string>>()
+  const usedBy = new Map<string, Map<string, EntryRef>>()
 
   for (const collection of listed) {
     try {
@@ -70,9 +71,9 @@ async function readUploads(): Promise<Read | { blocked: string[] }> {
 
         for (const text of [JSON.stringify(entry.data, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value), entry.body ?? '']) {
           for (const match of text.toLowerCase().matchAll(IDS)) {
-            const users = usedBy.get(match[1]!) ?? new Set<string>()
+            const users = usedBy.get(match[1]!) ?? new Map<string, EntryRef>()
 
-            users.add(`${collection.name}/${entry.slug}`)
+            users.set(`${collection.name}/${entry.slug}/${entry.locale ?? ''}`, { collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } })
             usedBy.set(match[1]!, users)
           }
         }
@@ -119,12 +120,10 @@ export interface LibraryUpload {
   by: string | undefined
   // When it was last written, in ms, when the store knows.
   at: number | undefined
-  // The entries mentioning it, as `collection/slug`.
-  usedIn: string[]
+  // The entries mentioning it.
+  usedIn: EntryRef[]
   // Whether the unused-uploads rules let it be deleted: no entry mentions it and it is over a day old.
   deletable: boolean
-  // The files the image route made of it, deleted with it; read for the deletable ones only.
-  variants: string[]
 }
 
 const DIMENSIONS = /\.(\d+)x(\d+)(?:-[\da-f]{6})?\.[a-z\d]{1,10}$/
@@ -139,10 +138,8 @@ export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | {
   const index = await mediaIndex()
   const now = Date.now()
   const found = read.stored.filter(file => idOf(file.key) !== undefined).toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0))
-  const unusedKeys = found.filter(file => !read.usedBy.has(idOf(file.key)!)).map(file => file.key)
-  const variants = await files.variants(unusedKeys)
   const uploads = found.map((file): LibraryUpload => {
-    const usedIn = [...read.usedBy.get(idOf(file.key)!) ?? []].toSorted()
+    const usedIn = [...read.usedBy.get(idOf(file.key)!)?.values() ?? []]
     const record = index[file.key]
     const [, width, height] = DIMENSIONS.exec(file.key) ?? []
 
@@ -154,10 +151,9 @@ export async function libraryUploads(): Promise<{ uploads: LibraryUpload[] } | {
       width: width === undefined ? undefined : Number(width),
       height: height === undefined ? undefined : Number(height),
       by: record?.by,
-      at: file.modified?.getTime(),
+      at: record?.at ?? file.modified?.getTime(),
       usedIn,
       deletable: usedIn.length === 0 && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
-      variants: variants.get(file.key) ?? [],
     }
   })
 
@@ -186,8 +182,15 @@ export async function deleteUnusedUploads(keys: string[]): Promise<{ deleted: st
     deleted.push(key)
   }
 
-  if (deleted.length > 0)
-    await forgetUploads(deleted)
+  if (deleted.length > 0) {
+    try {
+      await forgetUploads(deleted)
+    }
+    catch (error) {
+      // The files are gone; a record left behind is dropped with the next write that finds none of its files.
+      log.error('dropping the deleted uploads from the media index failed', error)
+    }
+  }
 
   return { deleted, kept }
 }

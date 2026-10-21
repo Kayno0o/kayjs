@@ -28,6 +28,7 @@ const EDITOR_CAN = /\/api\/cms\/editor\/can$/
 const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
 const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
 const UPLOAD = /\/api\/cms\/files\/[^/]+$/
+const MEDIA_RENAME = /\/api\/cms\/files\/media\/rename$/
 const UNUSED_UPLOADS = /\/api\/cms\/files\/unused\/delete$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
@@ -41,7 +42,7 @@ function actionOf(method: string, path: string): Action | undefined {
   if (method === 'POST' && PUBLISH.test(path))
     return 'publish'
 
-  return method === 'POST' && UPLOAD.test(path) ? 'upload' : undefined
+  return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
 }
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.

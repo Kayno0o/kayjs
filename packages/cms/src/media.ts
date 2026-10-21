@@ -6,7 +6,8 @@ export interface MediaRecord {
   name: string
   size: number
   by?: string | undefined
-  at: number
+  // Absent for an upload sent before the library, which the file's own date stands in for.
+  at?: number | undefined
 }
 
 // Where every new upload goes, whatever the collection, named by the hash of its bytes so a file sent twice is stored once.
@@ -18,14 +19,23 @@ const INDEX_ID = 'cms-media-index'
 const INDEX_KEY = `private/${INDEX_ID}.json`
 const HASH_CHARS = 20
 
+// The most characters of a name kept, as the index is read and written whole.
+export const NAME_LENGTH = 200
+
 // One write at a time per process: the index is read, changed and written back, and two uploads landing together would lose one. Another replica's write can still race; a record lost that way only leaves the upload shown by its key.
 let writing: Promise<void> = Promise.resolve()
 
+// The index as stored, `{}` when there is none yet; a read that fails or finds something unreadable throws, so a write never replaces records it could not read.
+async function readIndex(): Promise<Record<string, MediaRecord>> {
+  const stored = await files.get(INDEX_KEY)
+
+  return stored === undefined ? {} : await stored.json() as Record<string, MediaRecord>
+}
+
+// What the library shows beside the files; an index that cannot be read leaves each upload shown by its key.
 export async function mediaIndex(): Promise<Record<string, MediaRecord>> {
   try {
-    const stored = await files.get(INDEX_KEY)
-
-    return stored === undefined ? {} : await stored.json() as Record<string, MediaRecord>
+    return await readIndex()
   }
   catch (error) {
     log.error('reading the media index failed', error)
@@ -46,7 +56,7 @@ async function change(update: (index: Record<string, MediaRecord>) => boolean): 
   await before
 
   try {
-    const index = await mediaIndex()
+    const index = await readIndex()
 
     if (update(index))
       await files.put(new Blob([JSON.stringify(index)], { type: 'application/json' }), { private: true, id: INDEX_ID })
@@ -56,7 +66,7 @@ async function change(update: (index: Record<string, MediaRecord>) => boolean): 
   }
 }
 
-// The hash of the bytes sent, which names the file: the same bytes always give the same key.
+// The hash of the bytes sent, not of what is stored once kay strips their metadata, which names the file: the same bytes always give the same key.
 export async function contentId(file: Blob): Promise<string> {
   const hasher = new Bun.CryptoHasher('sha256')
 
@@ -74,7 +84,7 @@ export async function storeUpload(file: File, by?: string): Promise<string> {
       if (key in index)
         return false
 
-      index[key] = { name: file.name || key.split('/').at(-1)!, size: file.size, ...by !== undefined && { by }, at: Date.now() }
+      index[key] = { name: (file.name || key.split('/').at(-1)!).slice(0, NAME_LENGTH), size: file.size, ...by !== undefined && { by }, at: Date.now() }
 
       return true
     })
@@ -102,7 +112,7 @@ export async function renameUpload(key: string, name: string): Promise<boolean> 
     return false
 
   await change((index) => {
-    index[key] = { size: stored.size, at: 0, ...index[key], name }
+    index[key] = { size: stored.size, ...index[key], name }
 
     return true
   })

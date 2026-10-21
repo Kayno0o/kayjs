@@ -16,7 +16,7 @@ import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { setupStampSecret, signedText, signText } from './stamp'
 
-// Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
+// Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, unless `files.put` is given an `id` for bytes it names (a hash), so a store needs no locking.
 export interface FileStore {
   write: (key: string, data: Blob) => Promise<void>
   // The file, or undefined when none is stored under the key.

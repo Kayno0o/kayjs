@@ -35,7 +35,7 @@ A JPEG, PNG, WebP, AVIF or HEIC is stored without the metadata a camera or phone
 
 ### Replacing and deleting
 
-Keys are never reused, so a new avatar is a new file. `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored. `files.put(file, { id })` makes the key from an id you give, such as a hash of the bytes, so the same file sent twice is stored once. `files.delete(key)` deletes a file with every resized variant and social card of it.
+Keys are never reused, so a new avatar is a new file. `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored. `files.put(file, { id })` makes the key from an id you give, such as a hash of the bytes, so the same file sent twice is stored once. An id must stand for one content, since a key is cached for good. `files.delete(key)` deletes a file with every resized variant and social card of it.
 
 ### Finding unused files
 

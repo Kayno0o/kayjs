@@ -233,6 +233,7 @@ export default defineMessages({
       preview: 'Aperçu',
       rename: 'Renommer',
       renameFailure: 'Impossible de renommer',
+      renameAction: 'Renommer {name}',
       renameLabel: 'Nouveau nom de {name}',
       renamed: 'Renommé',
       sent: 'Envoyé',
