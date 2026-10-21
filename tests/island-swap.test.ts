@@ -171,6 +171,21 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         expect(await page.evaluate(() => window.scrollY)).toBe(top)
       })
 
+      it('gives back the inert copy of a held island whose fetch fails', async () => {
+        await ready()
+
+        const failing = /kay_island=1/
+        const done = page.waitForResponse(`${path('/deferred')}?kay_island=1`)
+
+        await page.route(failing, async request => request.fulfill({ status: 500, headers: { 'content-type': 'text/html' }, body: '' }))
+        await page.click('slot[data-kay-server="0"] button.send')
+        await done
+        await settled(page)
+        await page.unroute(failing)
+
+        expect(await page.evaluate(() => [...document.querySelectorAll('slot[data-kay-server]')].map(slot => [slot.hasAttribute('inert'), slot.querySelector('form[action]') !== null]))).toEqual([[false, true], [true, false]])
+      })
+
       it('fetches again an island whose first fetch failed, the next page\'s copy standing in its place', async () => {
         const failing = /kay_island=0/
         let refused = false

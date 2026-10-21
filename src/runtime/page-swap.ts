@@ -1,3 +1,4 @@
+import type { FetchedIsland } from './fetch-island'
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { ISLAND } from './markers'
 import { moves, place } from './move'
@@ -80,11 +81,6 @@ interface KeptIsland extends HTMLElement {
   _$p?: (props: object) => void
   // Set by an island with static slots as it hydrates: its server markup, which a refresh compares.
   _$h?: string
-}
-
-interface FetchedIsland extends HTMLElement {
-  // Set as a deferred server island is fetched: the inert copy it replaced, which the next page's copy of it is compared with.
-  _$b?: string
 }
 
 // Fetches a link's page ahead of the click, kept a few seconds for it.
@@ -715,10 +711,11 @@ function swapBody(next: Document, policy: Policy): void {
 
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
-  holdFetched(old, body)
 
   // A browser without popovers throws on the selector. One open in an island kept closes too, as it did when moving the island hid it.
   const opened = 'popover' in HTMLElement.prototype ? [old, ...kept].flatMap(root => [...root.querySelectorAll(':popover-open')]) : []
+
+  holdFetched(old, body)
 
   // What ran already, the hydration script for one, runs once.
   const ran = new Set([...document.scripts].map(scriptMarkup))
@@ -841,15 +838,28 @@ function typedKept(live: Element, other: Element): boolean {
 
 // A deferred server island already fetched shows its render while the next page's copy of it is fetched, rather than the inert copy standing in for it: a post back to the same page keeps the island on screen, and the scroll with it. It stays inert until the fetch answers, and one the next page renders another copy of is replaced by it at once.
 function holdFetched(old: Element, body: Element): void {
-  for (const placeholder of body.querySelectorAll<FetchedIsland>(SERVER_ISLAND)) {
-    const live = old.querySelector<FetchedIsland>(`${SERVER_ISLAND}[data-kay-server="${CSS.escape(placeholder.dataset.kayServer ?? '')}"]`)
+  const fetched = new Map<string | undefined, FetchedIsland>()
+
+  for (const live of old.querySelectorAll<FetchedIsland>(SERVER_ISLAND)) {
+    if (live._$b !== undefined && !live.hasAttribute('inert'))
+      fetched.set(live.dataset.kayServer, live)
+  }
+
+  for (const placeholder of fetched.size === 0 ? [] : body.querySelectorAll<FetchedIsland>(SERVER_ISLAND)) {
+    const live = fetched.get(placeholder.dataset.kayServer)
     const markup = placeholder.innerHTML
 
-    if (live?._$b !== markup || live.hasAttribute('inert'))
+    if (live === undefined || live._$b !== markup)
       continue
 
     placeholder.replaceChildren(...live.childNodes)
     placeholder._$b = markup
+
+    // An island of the held render still waiting to hydrate never does: the next render replaces it.
+    for (const island of placeholder.querySelectorAll<HTMLElement>(ISLAND)) {
+      delete island.dataset.component
+      delete island.dataset.chunk
+    }
   }
 }
 
