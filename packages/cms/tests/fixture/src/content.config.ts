@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, imageField } from 'kay/content'
-import { footerDown, outage, shop as shelf, products as stock } from './products'
+import { footerDown, sections as blocks, partners as friends, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
@@ -60,4 +60,20 @@ export const footer = collection({ name: 'footer', load: () => {
   title: 'Footer',
   single: true,
   seed: { legal: 'All rights reserved' },
+})
+
+// A loaded collection `partners/[slug]` serves through `sitemap`, with no `prerender`.
+export const partners = collection({
+  name: 'partners',
+  load: () => friends.map(({ slug, data }) => ({ slug, data })),
+}, {
+  schema: s.Object({ name: s.String({ minLength: 1 }) }),
+})
+
+// Single entries: `about` reads `hero`, no page reads `unused`.
+export const sections = collection({
+  name: 'sections',
+  load: () => blocks.map(({ slug, data }) => ({ slug, data })),
+}, {
+  schema: s.Object({ heading: s.String({ minLength: 1 }) }),
 })

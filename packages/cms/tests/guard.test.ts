@@ -179,10 +179,23 @@ describe('the screens\' guard', () => {
   const screen = (path: string, headers: Record<string, string> = {}): GuardContext => {
     const url = new URL(`http://site.test${path}`)
 
-    return { request: new Request(url, { headers }), url, deny: (_code?: number, message?: string) => {
+    return { request: new Request(url, { headers }), url, cookies: new Bun.CookieMap(), deny: (_code?: number, message?: string) => {
       throw new Refused(message)
     } } as unknown as GuardContext
   }
+
+  test('marks the editor it lets in with the hint the pages look for, and no other', async () => {
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+
+    const refused = screen('/admin')
+    const admitted = screen('/admin', { 'x-editor': '1' })
+
+    await expect(screenGuard(refused)).rejects.toThrow('Editors only')
+    expect(refused.cookies.has('kay_editor')).toBe(false)
+    await screenGuard(admitted)
+    expect(admitted.cookies.get('kay_editor')).toBe('1')
+    expect(admitted.cookies.toSetCookieHeaders()[0]).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
+  })
 
   test('keeps every screen closed, the missing pages included, while the app gives no guard', async () => {
     configure({})

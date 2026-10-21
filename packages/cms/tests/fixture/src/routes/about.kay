@@ -1,0 +1,6 @@
+--- server
+import { sections } from '../content.config'
+
+const hero = await sections.get('hero') ?? ctx.notFound()
+---
+h1 {hero.data.heading}

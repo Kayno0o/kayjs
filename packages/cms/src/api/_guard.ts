@@ -12,6 +12,8 @@ const LEAVING = /\/api\/cms\/preview\/exit$/
 // What the editor reads: an entry of a collection, and the rules for an upload.
 const ENTRY = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
 const UPLOAD_RULES = /\/api\/cms\/files\/rules$/
+// The module an editor's browser loads on each page, which holds nothing private.
+const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext): boolean {
@@ -42,6 +44,10 @@ function refusal(editing: boolean, reading: boolean): string {
 export default guard(async (ctx) => {
   const { guard: admits, author } = settings()
   const { method } = ctx.request
+
+  if (method === 'GET' && PAGE_LINK_MODULE.test(ctx.url.pathname))
+    return
+
   const editing = editRequested(ctx.request)
 
   if (editing) {

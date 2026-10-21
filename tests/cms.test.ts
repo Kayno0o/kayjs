@@ -25,10 +25,11 @@ import { html as renderedHtml } from '../src/runtime/rendered'
 import { merge } from '../src/runtime/values'
 import { editedEntry, editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { entryUrls } from '../src/server/entry-urls'
-import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
+import { inPreview, noteProbedEntries, previewRequested, requestDrafts } from '../src/server/preview'
 import { extensionEditor } from '../src/server/routes'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
+import { partners } from './fixtures/cms/src/partners'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 
@@ -618,6 +619,50 @@ describe('the collections a CMS edits', () => {
     expect(await urls(news, { slug: 'launch', locale: 'fr' })).toBe('/site/fr/news/launch/')
     expect(await urls(articles, { slug: 'hello', locale: 'fr' })).toBeUndefined()
     expect(await entryUrls([route], '', undefined, { ...settings, hosts: { en: 'news.example', fr: 'nouvelles.example' } })(news, { slug: 'launch', locale: 'fr' })).toBe('https://nouvelles.example/news/launch')
+  })
+
+  it('finds the first page without params that shows an entry no collection page does, under the base, the trailing slash, the locale and the domain', async () => {
+    const plain = (pattern: string) => ({ pattern, file: resolve(`${FIXTURE}/src/routes/news/[slug].kay`), params: [], layouts: [], special: {}, guards: [] }) as unknown as ServedRoute
+    const settings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }
+    const asked: string[] = []
+
+    // The page reads `intro` everywhere, and `team` on `/about/team` alone; a page shows nothing when it is guarded.
+    const handle = async (request: Request) => {
+      const { pathname, host } = new URL(request.url)
+
+      asked.push(`${host}${pathname}`)
+
+      if (pathname.endsWith('/private/'))
+        return new Response(null, { status: 302 })
+
+      noteProbedEntries(request, [{ collection: 'sections', slug: 'intro' }, ...pathname.includes('/about/team') ? [{ collection: 'sections', slug: 'team' }] : []])
+
+      return new Response('page')
+    }
+
+    const routes = [plain('/about/team'), plain('/private'), plain('/'), plain('/about')]
+    const sections = collection({ name: 'sections', load: () => [] }, { schema: t.Object({ title: t.String() }) })
+
+    // The server takes the base off a request, so the probes carry none.
+    const urls = entryUrls(routes, '/site', 'always', settings, handle)
+
+    expect(await urls(sections, { slug: 'intro' })).toBe('/site/')
+    expect(await urls(sections, { slug: 'team' })).toBe('/site/about/team/')
+    expect(await urls(sections, { slug: 'team', locale: 'fr' })).toBe('/site/fr/about/team/')
+    expect(await urls(sections, { slug: 'nobody' })).toBeUndefined()
+    expect(new Set(asked)).toEqual(new Set(['localhost/', 'localhost/fr/', 'localhost/about/', 'localhost/fr/about/', 'localhost/about/team/', 'localhost/fr/about/team/', 'localhost/private/', 'localhost/fr/private/']))
+    expect(asked).toHaveLength(8)
+
+    const domains = entryUrls([plain('/')], '', undefined, { ...settings, hosts: { en: 'news.example', fr: 'nouvelles.example' } }, handle)
+
+    expect(await domains(sections, { slug: 'intro', locale: 'fr' })).toBe('https://nouvelles.example/')
+    expect(await entryUrls(routes, '', undefined, settings)(sections, { slug: 'intro' })).toBeUndefined()
+  })
+
+  it('lists a collection in a sitemap setting as its entries\' page', async () => {
+    const route = { pattern: '/partners/:slug', file: resolve(`${FIXTURE}/src/routes/partners/[slug].kay`), params: ['slug'], layouts: [], special: {}, guards: [] } as unknown as ServedRoute
+
+    expect(await entryUrls([route], '', undefined)(partners, { slug: 'acme' })).toBe('/partners/acme')
   })
 
   it('gives a folder entry\'s file as the editor wrote it, keeping its format and body, for the CMS to commit', async () => {

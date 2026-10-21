@@ -54,7 +54,7 @@ import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
 import { pageToken } from './prerendered'
-import { noteEditedEntries } from './preview'
+import { noteEditedEntries, noteProbedEntries } from './preview'
 import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
@@ -976,6 +976,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: markup, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
+
+  if (marks)
+    noteProbedEntries(rendering.ctx.request, marks.entries.values())
+
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0

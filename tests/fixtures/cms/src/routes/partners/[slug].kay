@@ -1,0 +1,6 @@
+--- server
+import { partners } from '../../partners'
+
+export const page = { sitemap: partners }
+---
+p {ctx.params.slug}

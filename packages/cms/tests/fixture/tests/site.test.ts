@@ -60,7 +60,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -1068,4 +1068,73 @@ test('two tabs on one entry\'s screen name each other, and the one left is told 
 
   expect(await ann.evaluate(text)).toBe('')
   expect(ann.errors).toEqual([])
+}, 60_000)
+
+test('an entry of a loaded collection a [slug] page lists in its sitemap opens on that page', async () => {
+  expect((await listScreen({ collection: 'partners' }))!.rows.map(row => [row.slug, row.url])).toEqual([['acme', '/partners/acme']])
+  expect((await site.visit('/admin/collections/partners')).find('.kcms-row-actions a').map(link => link.attributes.href)).toEqual(['/admin/page?path=%2Fpartners%2Facme'])
+})
+
+test('an entry a page without params reads opens on that page, and one no page shows has no link', async () => {
+  expect((await listScreen({ collection: 'sections' }))!.rows.map(row => [row.slug, row.url])).toEqual([['hero', '/about'], ['unused', undefined]])
+  expect((await site.visit('/admin/collections/sections')).find('.kcms-row-actions a')).toHaveLength(1)
+  expect((await (await entryScreen({ collection: 'sections', slug: 'hero' }))!.entry)?.url).toBe('/about')
+})
+
+test('every page carries one line looking for the editor hint, and the screens set it when the guard lets an editor in', async () => {
+  const loader = (await site.visit('/about')).find('script').filter(script => script.html.includes('kay_editor='))
+
+  expect(loader).toHaveLength(1)
+  expect(loader[0]!.html.length).toBeLessThan(250)
+  expect((await site.visit('/blog/hello')).find('script').filter(script => script.html.includes('kay_editor='))).toHaveLength(1)
+  expect((await site.fetch('/admin')).headers.get('set-cookie')).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
+  expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()
+})
+
+test('the check answers an editor the guard admits with the link\'s words in the page\'s language, refreshing the hint, and a signed-out browser with a refusal', async () => {
+  const signedIn = await site.fetch('/api/cms/editor')
+
+  expect(await signedIn.json()).toEqual({ label: 'Edit this page', href: '/admin/page' })
+  expect(signedIn.headers.get('set-cookie')).toContain('kay_editor=1')
+  expect(signedIn.headers.get('cache-control')).toBe('no-store')
+  expect(((await (await site.fetch('/api/cms/editor', { headers: { referer: 'http://localhost/fr/about' } })).json()) as { label: string }).label).toBe('Modifier cette page')
+
+  const refused = await site.fetch('/api/cms/editor', { headers: { 'x-deny': '1' } })
+
+  expect(refused.status).toBe(403)
+  expect(refused.headers.get('set-cookie')).toBeNull()
+})
+
+test('the module an editor\'s browser loads is open to every request, holding nothing private', async () => {
+  const module = await site.fetch('/api/cms/editor/module.js', { headers: { 'x-deny': '1' } })
+  const text = await module.text()
+
+  expect(module.status).toBe(200)
+  expect(module.headers.get('content-type')).toContain('text/javascript')
+  expect(text).toContain('kay_editor')
+  expect(text).not.toContain('Fixture editor')
+})
+
+test('an editor who opened the screens finds the link on a page they read and lands in edit mode on it, and a browser with no hint loads nothing more', async () => {
+  const built = await browser()
+  const link = 'html > a[href^="/admin/page"]'
+
+  {
+    await using plain = await built.open('/about')
+
+    expect(await plain.evaluate(selector => document.querySelector(selector), link)).toBeNull()
+    expect(plain.errors).toEqual([])
+  }
+
+  await using page = await built.open('/admin')
+
+  expect(page.errors).toEqual([])
+  await page.goto('/about')
+  await page.waitUntil(() => document.querySelector('html > a[href^="/admin/page"]') !== null)
+  expect(await page.evaluate(selector => document.querySelector(selector)?.textContent, link)).toBe('Edit this page')
+  await page.click(link)
+  await page.waitUntil(() => document.querySelector('aside.kcms-editor') !== null)
+  expect(await page.evaluate(() => location.pathname)).toBe('/about')
+  expect(await page.evaluate(selector => document.querySelector(selector), link)).toBeNull()
+  expect(page.errors).toEqual([])
 }, 60_000)

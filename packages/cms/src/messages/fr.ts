@@ -157,6 +157,9 @@ export default defineMessages({
       truncated: 'Les {shown} adresses les plus visitées sur {total}.',
       unreadable: 'Les pages introuvables ne peuvent pas être listées',
     },
+    page: {
+      edit: 'Modifier cette page',
+    },
     redirects: {
       addFailure: 'Impossible d\'ajouter la redirection',
       added: 'Redirection ajoutée',

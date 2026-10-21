@@ -6,6 +6,7 @@ import { collections } from './kay/content'
 import { missingKindLines } from './kinds'
 import { layoutProblems } from './layout'
 import { log } from './log'
+import { pageLinkLoader } from './page-link'
 import { configure, settings } from './settings'
 
 // The API path the editor and the screens call, under `/api`.
@@ -23,6 +24,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
     routes: { dir: `${import.meta.dir}/routes`, prefix },
     api: { dir: `${import.meta.dir}/api`, prefix: API_PREFIX },
     editor: `${import.meta.dir}/editor/editor.kay`,
+    // An editor's browser, marked once the guard let it into the screens, finds an "Edit this page" link on the pages it reads; any other browser loads nothing more than this line.
+    ...options.pageLink !== false && { config: { head: [{ tag: 'script', props: { children: pageLinkLoader() } }] } },
     devTool: { module: `${import.meta.dir}/devTool.ts` },
     // Run as the server boots, never by `kay build` or `kay check`.
     server: () => {

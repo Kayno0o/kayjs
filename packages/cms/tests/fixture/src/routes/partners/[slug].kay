@@ -1,0 +1,8 @@
+--- server
+import { partners } from '../../content.config'
+
+export const page = { sitemap: partners }
+
+const partner = await partners.get(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {partner.data.name}

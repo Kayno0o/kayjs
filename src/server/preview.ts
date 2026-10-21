@@ -33,6 +33,10 @@ const SITE_PATH = /^\/(?![/\\])\S*$/
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Names the drafts `/_kay/draft` renders a page with, by an id no request from outside can guess.
 const DRAFT_HEADER = 'x-kay-draft'
+// Names the probe a request belongs to, by an id no request from outside can guess, so a page rendered for it reports what it read.
+const PROBE_HEADER = 'x-kay-probe'
+// A probe's cookie only has to outlive its own render.
+const PROBE_MAX_AGE = 60
 const POSTED_HEADERS = ['content-type', 'content-length']
 
 // `/_kay/draft` takes no more than the app's `bodyLimit`, as an action does.
@@ -56,6 +60,9 @@ let settings: PreviewSettings | undefined
 // The entries the pages rendered in edit mode read, by the edit cookie they were rendered for.
 const editSessions = new Map<string, EditSession>()
 const store = new AsyncLocalStorage<PreviewState>()
+const probes = new Map<string, EntryRef[]>()
+// Set while a page renders for a probe, where a CMS screen asking for pages must not start another.
+const probing = new AsyncLocalStorage<true>()
 const pendingDrafts = new Map<string, Map<string, EntryDraft[]>>()
 
 setPreviewScope(() => store.getStore())
@@ -187,7 +194,8 @@ function editCookie(request: Request): string | undefined {
 export function noteEditedEntries(request: Request, entries: Iterable<EntryRef>): void {
   const cookie = editCookie(request)
 
-  if (cookie === undefined)
+  // A probe's cookie is the server's own, opening nothing for an editor.
+  if (cookie === undefined || request.headers.has(PROBE_HEADER))
     return
 
   let session = editSessions.get(cookie)
@@ -240,6 +248,49 @@ export function enterPreview(ctx: { cookies: CookieMap, request: Request }, opti
   const edit = options.edit === true
 
   ctx.cookies.set(PREVIEW_COOKIE, [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.'), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
+}
+
+// Renders the page at `url` through `handle` in edit mode, as an editor's request would, and gives the entries it read; undefined when the app has no preview, or the page answered nothing.
+// The request carries an edit cookie only this process signs for, and the answer is dropped: it is how the CMS learns which page shows an entry no collection page does.
+export async function entriesReadAt(handle: (request: Request) => Promise<Response>, url: string): Promise<EntryRef[] | undefined> {
+  if (!settings)
+    return undefined
+
+  const until = String(Math.floor(Date.now() / 1000) + PROBE_MAX_AGE)
+  const id = crypto.randomUUID()
+  const reads: EntryRef[] = []
+
+  probes.set(id, reads)
+
+  try {
+    const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${PREVIEW_COOKIE}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
+
+    const response = await probing.run(true, async () => handle(new Request(url, { headers })))
+
+    await response.body?.cancel()
+
+    return reads
+  }
+  catch {
+    return undefined
+  }
+  finally {
+    probes.delete(id)
+  }
+}
+
+// Whether the code running renders a page for `entriesReadAt`.
+export function inProbe(): boolean {
+  return probing.getStore() === true
+}
+
+// Called with the entries a page rendered in edit mode read, for the probe that asked for it.
+export function noteProbedEntries(request: Request, entries: Iterable<EntryRef>): void {
+  const id = request.headers.get(PROBE_HEADER)
+  const reads = id === null ? undefined : probes.get(id)
+
+  if (reads)
+    reads.push(...entries)
 }
 
 export function exitPreview(ctx: { cookies: CookieMap }): void {
