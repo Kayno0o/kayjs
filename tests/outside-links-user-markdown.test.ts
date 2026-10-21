@@ -56,7 +56,7 @@ describe('markdownHtml links', () => {
     expectSplit(markdownHtml(SOURCE))
   })
 
-  it('does the same under trailingSlash always and a base path in the site', () => {
+  it('does the same under trailingSlash always', () => {
     setSite('https://x.example', 'always')
     expectSplit(markdownHtml(SOURCE))
     setSite('https://x.example')

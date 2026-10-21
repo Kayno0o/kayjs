@@ -177,7 +177,7 @@ describe('markdownHtml', () => {
       expect(marked(counter!.modules)).toBe(false)
       expect(marked(report!.entry!.modules)).toBe(false)
       // marked and the renderer matching Bun.markdown's HTML, minified and gzipped, plus the runtime modules only the note uses, which its own chunk carries.
-      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_300)
+      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_150)
     }
     finally {
       await rm(root, { recursive: true, force: true })

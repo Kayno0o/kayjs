@@ -18,7 +18,7 @@ const LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 const AMPERSAND = /&amp;/g
 
 // A link leaving the site opens in a new tab: `target="_blank"` and `noopener` besides the sanitizer's `rel`. `leaves` is told the link's `href` as written.
-function outsideLinks(html: string, leaves: (href: string) => boolean): string {
+function openLeavingLinks(html: string, leaves: (href: string) => boolean): string {
   return html.replace(LINK, (link, href: string) => leaves(href.replace(AMPERSAND, '&')) ? `<a href="${href}" target="_blank" rel="nofollow ugc noopener">` : link)
 }
 
@@ -26,5 +26,5 @@ function outsideLinks(html: string, leaves: (href: string) => boolean): string {
 export function sanitizedMarkdown(html: string, leaves: (href: string) => boolean): SafeHtml {
   const held = html.replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
 
-  return vouch(outsideLinks(sanitizeHtml(held, KEPT), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`))
+  return vouch(openLeavingLinks(sanitizeHtml(held, KEPT), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`))
 }
