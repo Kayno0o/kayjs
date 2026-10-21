@@ -33,11 +33,18 @@ export default api()
     }
   }, { body: s.Object({ markdown: s.String(), collection: s.Optional(s.String()), slug: s.Optional(s.String()), locale: s.Optional(s.String()) }) })
   // An image the preview's text names by a path in the entry's folder, read from there: only a PNG, JPEG, WebP, GIF or AVIF inside the collection's folder.
-  .get('/image', async ({ query, status }) => {
+  // The browser keeps it but asks again each time (`no-cache`), and an unchanged file answers 304: a re-rendered preview refetches nothing, an edited image shows at once.
+  .get('/image', async ({ query, request, status }) => {
     const found = await folderImage({ collection: query.collection, slug: query.slug, locale: query.locale }, query.path)
 
     if (found === undefined)
       return status(404, 'No such image')
 
-    return new Response(Bun.file(found.file), { headers: { 'content-type': found.type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    const file = Bun.file(found.file)
+    const headers = { 'content-type': found.type, 'cache-control': 'private, no-cache', 'etag': `W/"${file.lastModified.toString(36)}-${file.size.toString(36)}"`, 'x-content-type-options': 'nosniff' }
+
+    if (request.headers.get('if-none-match') === headers.etag)
+      return new Response(null, { status: 304, headers })
+
+    return new Response(file, { headers })
   }, { query: s.Object({ collection: s.String(), slug: s.String(), path: s.String(), locale: s.Optional(s.String()) }) })

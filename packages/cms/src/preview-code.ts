@@ -1,35 +1,13 @@
 import type { Highlighter } from 'kay/library'
-import { sanitizeHtml } from 'kay'
-import { configuredHighlighter } from 'kay/library'
+import { configuredHighlighter, safeCode } from 'kay/library'
 import { log } from './log'
 
 // The block `bodyHtml` writes for a fence, its language in a class when the fence names one.
 const CODE_BLOCK = /<pre><code(?: class="language-([\w+#.-]{1,30})")?>([\s\S]*?)<\/code><\/pre>/g
 const ENTITY = /&(amp|lt|gt|quot|#39);/g
 const ENTITIES: Record<string, string> = { 'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', '#39': '\'' }
-const BUTTONS = /<button\b[\s\S]*?<\/button\s*>/gi
-const STYLE = /(<[a-z][^<>]*?)\sstyle="/gi
-const KEPT_STYLE = /(<[a-z][^<>]*?)\sdata-style="([^"]*)"/gi
-// Colours, font style and weight, text decoration and custom properties (the variables of a Shiki theme), in a value holding no URL, escape or quote: all a highlighter's spans need.
-const DECLARATION = /^\s*(?:color|background-color|font-style|font-weight|text-decoration|--[\w-]+)\s*:[\w#%.,\s()-]+$/i
-const UNSAFE_VALUE = /url|expression|image|\bimport/i
-const SANITIZE = {
-  tags: ['div', 'span'],
-  attributes: { div: ['class', 'data-style'], span: ['class', 'data-style'], pre: ['class', 'data-style', 'tabindex'], code: ['class'] },
-}
 
 const unescaped = (text: string) => text.replace(ENTITY, (_, name: string) => ENTITIES[name]!)
-
-// A highlighter's HTML kept to what code needs: its tags sanitized, and the `style` attributes `sanitizeHtml` never keeps only when they hold colours.
-function safeCode(markup: string): string {
-  const kept = sanitizeHtml(markup.replace(BUTTONS, '').replace(STYLE, '$1 data-style="'), SANITIZE)
-
-  return String(kept).replace(KEPT_STYLE, (_, tag: string, value: string) => {
-    const declarations = value.split(';').filter(declaration => !UNSAFE_VALUE.test(declaration) && DECLARATION.test(declaration))
-
-    return declarations.length === 0 ? tag : `${tag} style="${declarations.join(';')}"`
-  })
-}
 
 let highlighter: Promise<Highlighter | undefined> | undefined
 

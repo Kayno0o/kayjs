@@ -1,7 +1,7 @@
 import type { Highlighter } from 'kay/library'
 import type { CodeBlock } from './types'
-import { logFrom, sanitizeHtml } from 'kay'
-import { configuredHighlighter } from 'kay/library'
+import { logFrom } from 'kay'
+import { configuredHighlighter, safeCode } from 'kay/library'
 import { markdownHtml } from 'kay/markdown'
 
 const log = logFrom('kayjs-ai')
@@ -11,22 +11,12 @@ const LIST_ITEM = /^(?: {0,3}> ?)*([ \t]*)([-*+]|\d{1,9}[.)])( {1,4})\S/
 const INDENT = /^(?: {0,3}> ?)*([ \t]*)\S/
 // The class naming a block's language does not survive the sanitizing of a reply, so the language is read from the fence.
 const RENDERED_BLOCK = /<pre><code>([\s\S]*?)<\/code><\/pre>/
-const BUTTONS = /<button\b[\s\S]*?<\/button\s*>/gi
 const FIRST_WORD = /^\S+/
 const ENTITY = /&(amp|lt|gt|quot);/g
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"' }
-const STYLE = /(<[a-z][^<>]*?)\sstyle="/gi
-const KEPT_STYLE = /(<[a-z][^<>]*?)\sdata-style="([^"]*)"/gi
-// Colours, font style and weight, text decoration and custom properties (the variables of a Shiki theme), in a value that holds no URL, escape or quote: all a highlighter's spans need, and nothing that loads or covers the page.
-const DECLARATION = /^\s*(?:color|background-color|font-style|font-weight|text-decoration|--[\w-]+)\s*:[\w#%.,\s()-]+$/i
 // What the info string may name, which a highlighter may write into a class.
 const LANGUAGE = /^[\w+#.-]{1,30}$/
-const UNSAFE_VALUE = /url|expression|image|\bimport/i
 const MAX_BLOCKS = 40
-const SANITIZE = {
-  tags: ['div', 'span'],
-  attributes: { div: ['class', 'data-style', 'data-search'], span: ['class', 'data-style'], pre: ['class', 'data-style', 'tabindex'], code: ['class'] },
-}
 
 const unescaped = (text: string) => text.replace(ENTITY, (_, name: string) => ENTITIES[name]!)
 
@@ -87,19 +77,6 @@ export function scanFences(text: string, from: number, indent = 0): { blocks: Fe
 // The fenced blocks of a Markdown text that have their closing fence, as the lines they span with the language of their info string.
 export function closedFences(text: string): Fence[] {
   return scanFences(text, 0).blocks
-}
-
-function styled(markup: string): string {
-  return markup.replace(KEPT_STYLE, (_, tag: string, value: string) => {
-    const kept = value.split(';').filter(declaration => !UNSAFE_VALUE.test(declaration) && DECLARATION.test(declaration))
-
-    return kept.length === 0 ? tag : `${tag} style="${kept.join(';')}"`
-  })
-}
-
-// A highlighter's HTML kept to what code needs, without the copy button of a docs-style frame, which the page's listener would have to answer: its tags are sanitized as the rest of a reply is, and its `style` attributes, which `sanitizeHtml` never keeps, only when they hold colours.
-export function safeCode(markup: string): string {
-  return styled(sanitizeHtml(markup.replace(BUTTONS, '').replace(STYLE, '$1 data-style="'), SANITIZE))
 }
 
 async function render(source: string, language: string | undefined, highlight: Highlighter): Promise<CodeBlock | undefined> {

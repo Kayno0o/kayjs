@@ -165,6 +165,7 @@ async function until(ready: () => boolean): Promise<void> {
     await Bun.sleep(5)
 }
 
+const TOOLBAR_COUNT = 7
 const buttons = (root: Element) => [...root.querySelectorAll<HTMLButtonElement>('.kui-markdown-bar button')]
 const named = (root: Element, label: string) => buttons(root).find(button => button.getAttribute('aria-label') === label)!
 
@@ -198,6 +199,17 @@ describe('MarkdownEditor toolbar', () => {
     const some = await editor('x', undefined, { toolbar: ['link', 'bold'] })
 
     expect(buttons(some.root).map(button => button.getAttribute('aria-label'))).toEqual(['Link', 'Bold'])
+  })
+
+  test('loads its buttons when the toolbar prop turns on after mount', async () => {
+    const state = await editor('x', undefined, { toolbar: false, late: true })
+
+    expect(state.root.querySelector('.kui-markdown-bar')).toBeNull()
+
+    state.root.querySelector<HTMLButtonElement>('#enable-toolbar')!.click()
+    await until(() => buttons(state.root).length > 0)
+
+    expect(buttons(state.root).length).toBe(TOOLBAR_COUNT)
   })
 
   test('is one tab stop, and the arrows, Home and End move it between the buttons', async () => {

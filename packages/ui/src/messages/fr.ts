@@ -72,6 +72,7 @@ export default defineMessages({
       preview: 'Aperçu',
       previewFailure: 'Impossible d\'afficher l\'aperçu',
       previewLabel: 'Aperçu',
+      toolbarFailure: 'La barre d\'outils n\'a pas pu être chargée',
       toolbarLabel: 'Mise en forme',
       uploadFailure: 'Impossible d\'envoyer l\'image',
     },

@@ -91,18 +91,22 @@ effect(() => {
 const toolbarView = signal<(typeof import('./internal/markdown-toolbar.kay'))['default'][]>([])
 const previewView = signal<(typeof import('./internal/markdown-preview.kay'))['default'][]>([])
 
-async function loadView<View>(load: () => Promise<{ default: View }>, keep: (view: View) => void): Promise<void> {
+const toolbarFailed = signal(false)
+
+async function loadView<View>(load: () => Promise<{ default: View }>, keep: (view: View) => void, fail?: () => void): Promise<void> {
   try {
     keep((await load()).default)
   }
   catch (error) {
     console.error('kayjs-ui: a MarkdownEditor part could not be loaded', error)
+    fail?.()
   }
 }
 
-onMount(() => {
-  if (actions().length > 0 || preview)
-    void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView.set([view]))
+// Follows `toolbar` and `preview`, which a parent may change after mount; a chunk that failed is not tried again on each change.
+effect(() => {
+  if ((actions().length > 0 || preview) && untrack(toolbarView).length === 0 && !untrack(toolbarFailed))
+    void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView.set([view]), () => toolbarFailed.set(true))
 })
 
 effect(() => {
@@ -322,6 +326,8 @@ function drop(event: DragEvent) {
     textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview
       .kui-markdown-bar(role="toolbar" aria-label={wording('ui.markdownEditor.toolbarLabel', 'Formatting')})
+        if toolbarFailed()
+          span.kui-markdown-bar-failed(role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}
           View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
     if previewing() && preview

@@ -100,3 +100,16 @@ test('reads no file outside the collection\'s folder, no other type than an imag
 
   expect((await image('escape.png')).status).toBe(404)
 })
+
+test('lets the browser keep a preview image but ask again, an unchanged file answering 304', async () => {
+  const first = await image('./pic.png')
+  const etag = first.headers.get('etag')!
+
+  expect(first.headers.get('cache-control')).toBe('private, no-cache')
+  expect(etag).toStartWith('W/"')
+
+  const again = await site.fetch(`/api/cms/markdown/image?${new URLSearchParams({ collection: 'posts', slug: 'hello', path: './pic.png' })}`, { headers: { 'if-none-match': etag } })
+
+  expect(again.status).toBe(304)
+  expect(await again.text()).toBe('')
+})

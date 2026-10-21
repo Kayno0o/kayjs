@@ -147,4 +147,19 @@ describe('component contract', () => {
       expect(unnamed).toEqual([])
     })
   }
+
+  // The bar's buttons come from a chunk loaded after mount, so the comparison above leaves them out: they must appear, and be named.
+  test('markdown-editor hydrates its toolbar buttons', async () => {
+    const browser = await mountComponent(wrapper, { name: 'markdown-editor' })
+
+    mounted.push(browser)
+
+    for (let tries = 0; tries < 400 && browser.root.querySelector('.kui-markdown-bar button') === null; tries++)
+      await Bun.sleep(5)
+
+    const buttons = [...browser.root.querySelectorAll('.kui-markdown-bar button')]
+
+    expect(buttons.length).toBeGreaterThan(0)
+    expect(buttons.filter(button => nameOf(button) === '')).toEqual([])
+  })
 })

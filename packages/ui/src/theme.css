@@ -1093,7 +1093,8 @@
     grid-area: view;
   }
 
-  .kui-markdown-preview-failed {
+  .kui-markdown-preview-failed,
+  .kui-markdown-bar-failed {
     @apply text-kui-error;
   }
 
