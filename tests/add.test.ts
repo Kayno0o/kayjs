@@ -206,6 +206,11 @@ it('puts an extension first in an existing list, and refuses a config without de
 
   expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
   expect(addExtension('export default { lang: \'en\' }\n', extension)).toBeUndefined()
+  const mail = { import: 'import { mail } from \'@kaynooo/kayjs-mail\'', expression: 'mail({ module: \'./src/mail\' })' }
+  const former = 'import { mailExtension } from \'@kaynooo/kayjs-mail\'\nexport default defineConfig({ extensions: [mailExtension(\'./src/mail\')] })\n'
+
+  expect(addExtension(former, mail)).toBe(former)
+  expect(addExtension('import { defineConfig } from \'kay/server\'\nexport default defineConfig({ extensions: [] })\n', mail)).toContain('import { mail } from \'@kaynooo/kayjs-mail\'')
 })
 
 it('leaves the project as it was when a library refuses, package.json included', async () => {

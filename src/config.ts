@@ -148,7 +148,7 @@ export interface KayConfig {
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
-  // What libraries add to the app, each listed once: `extensions: [authPages()]`.
+  // What libraries add to the app, each listed once: `extensions: [auth()]`.
   extensions?: KayExtension[] | undefined
 }
 

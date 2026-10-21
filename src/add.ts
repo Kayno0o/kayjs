@@ -171,6 +171,9 @@ function withLines(current: string, wanted: string): string {
   return `${current === '' || current.endsWith('\n') ? current : `${current}\n`}${missing.join('\n')}\n`
 }
 
+// What a library's extension was called before it was renamed, so a config on the old name is not given the new one beside it.
+const FORMER_NAMES: Record<string, string[]> = { auth: ['authPages', 'authExtension'], mail: ['mailExtension'] }
+
 // kay.config.ts with an import and an `extensions` entry added, or undefined when it is not a plain `defineConfig({ ... })` with no `extensions` or a literal list; an extension the config already calls is left as it is.
 export function addExtension(config: string, extension: { import: string, expression: string }): string | undefined {
   const define = DEFINE_CONFIG.exec(config)
@@ -180,7 +183,7 @@ export function addExtension(config: string, extension: { import: string, expres
 
   const callee = (CALLEE).exec(extension.expression)?.[1]
 
-  if (callee !== undefined && new RegExp(`\\b${callee}\\(`).test(config))
+  if (callee !== undefined && [callee, ...FORMER_NAMES[callee] ?? []].some(name => new RegExp(`\\b${name}\\(`).test(config)))
     return config
 
   const hasKey = KEY.test(config)
@@ -194,7 +197,7 @@ export function addExtension(config: string, extension: { import: string, expres
   const entry = list === null ? `${define[0].endsWith('\n') ? '' : '\n'}  extensions: [${extension.expression}],\n` : `${extension.expression}${empty ? '' : ', '}`
   const next = `${config.slice(0, at)}${entry}${config.slice(at)}`
 
-  if (extension.import === '' || (callee !== undefined && new RegExp(`import[^;]*\\b${callee}\\b[^;]*from`).test(next)))
+  if (extension.import === '' || (callee !== undefined && new RegExp(`import\\s*\\{[^}]*\\b${callee}\\b[^}]*\\}\\s*from`).test(next)))
     return next
 
   return insertImport(next, extension.import)

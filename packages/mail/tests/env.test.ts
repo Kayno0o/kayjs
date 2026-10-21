@@ -20,7 +20,7 @@ describe('mail()', () => {
 
   it('takes a module or a server, one of them', () => {
     expect(() => mail({})).toThrow('takes the path of the module')
-    expect(() => mail({ module: './src/mail', server: async () => ({}) as never })).toThrow('takes the path of the module')
+    expect(() => mail({ module: './src/mail', server: async () => ({}) as never })).toThrow('not both')
   })
 
   it('is what mailExtension gives for a path or a function', () => {

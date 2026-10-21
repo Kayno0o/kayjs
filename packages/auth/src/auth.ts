@@ -141,7 +141,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   failurePage?: string | undefined
   // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
   twoFactorPage?: string | undefined
-  // The prebuilt pages, `authPages()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
+  // The prebuilt pages, `auth()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
   pages?: boolean | AuthPagesConfig | undefined
   // Mail for email verification, password resets, magic links and email changes.
   email?: EmailOptions | undefined
@@ -1520,7 +1520,7 @@ function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated
   return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
 }
 
-// Lets `authPages` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
+// Lets `auth()` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
 function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
   const own = typeof options.pages === 'object' ? options.pages : {}
 

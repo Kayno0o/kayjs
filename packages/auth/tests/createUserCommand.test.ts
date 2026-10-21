@@ -63,7 +63,7 @@ describe('the command is reached from the extension', () => {
     const lone = authPages({ server: () => ({}) as never })
     const [symbol] = Object.getOwnPropertySymbols(lone)
 
-    await expect((lone as unknown as Record<symbol, () => Promise<unknown>>)[symbol!]!()).rejects.toThrow('the `server` of authPages is not the `plugin`')
+    await expect((lone as unknown as Record<symbol, () => Promise<unknown>>)[symbol!]!()).rejects.toThrow('the `server` of auth() is not the `plugin`')
   })
 })
 

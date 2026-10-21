@@ -298,8 +298,11 @@ export interface MailExtensionOptions {
 export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
   const { module, server } = options
 
-  if (module === undefined === (server === undefined))
-    throw new Error('kayjs-mail: mail() takes the path of the module exporting the mailer as `mail`, such as mail({ module: \'./src/mail\' })')
+  if (module === undefined && server === undefined)
+    throw new Error('kayjs-mail: mail() takes the path of the module exporting the mailer as `mail`, such as mail({ module: \'./src/mail\' }), or a `server` loading it')
+
+  if (module !== undefined && server !== undefined)
+    throw new Error('kayjs-mail: mail() takes the path of the module or a `server`, not both')
 
   const messages = `${import.meta.dir}/messages`
 
@@ -310,7 +313,7 @@ export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
   return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, messages, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, messages, devTool, env }
 }
 
-// Superseded by `mail({ module })`, which `kay check` rewrites it to.
+/** @deprecated Use `mail({ module })`, which `kay check --fix` rewrites it to. */
 export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {
   return typeof from === 'string' ? mail({ module: from }) : mail({ server: from })
 }

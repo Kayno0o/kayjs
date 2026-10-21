@@ -58,12 +58,25 @@ function importedPath(node: t.Node | null | undefined): string | undefined {
   return specifier?.type === 'StringLiteral' ? specifier.value : undefined
 }
 
-const NAMED_AUTH = /export\s+(?:const|let|var)\s+auth\b|export\s*\{[^}]*\bauth\b/
-
-// Whether the module at `path` exports `auth` by name, which `auth({ module })` reads and the old forms read beside a default export.
+// Whether the module at `path` exports `auth` by name, which `auth({ module })` reads; a module it cannot read or whose exports it cannot tell (`export *`) counts as not.
 function exportsAuth(root: string, path: string): boolean {
   try {
-    return NAMED_AUTH.test(readFileSync(Bun.resolveSync(resolve(root, path), root), 'utf8'))
+    const ast = parse(readFileSync(Bun.resolveSync(resolve(root, path), root), 'utf8'), { sourceType: 'module', plugins: ['typescript', 'jsx'] })
+
+    return ast.program.body.some((statement) => {
+      if (statement.type !== 'ExportNamedDeclaration')
+        return false
+
+      const declared = statement.declaration
+
+      if (declared?.type === 'VariableDeclaration')
+        return declared.declarations.some(declaration => declaration.id.type === 'Identifier' && declaration.id.name === 'auth')
+
+      if (declared?.type === 'FunctionDeclaration' || declared?.type === 'ClassDeclaration')
+        return declared.id?.name === 'auth'
+
+      return statement.specifiers.some(specifier => specifier.exported.type === 'Identifier' ? specifier.exported.name === 'auth' : specifier.exported.value === 'auth')
+    })
   }
   catch {
     return false
@@ -100,21 +113,24 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
   const members: string[] = []
 
   for (const property of first.properties) {
-    if (property.type === 'SpreadElement') {
-      members.push(text(property))
-
-      continue
-    }
-
     if (property.type !== 'ObjectProperty') {
+      // A method named `auth` is not a loader this reads, and `auth({ module, ...rest })` takes the rest as it was.
+      if (property.type === 'ObjectMethod' && !property.computed && property.key.type === 'Identifier' && property.key.name === 'auth')
+        return undefined
+
       members.push(text(property))
 
       continue
     }
 
-    const path = keyOf(property) === 'auth' ? importedPath(property.value) : undefined
+    const key = keyOf(property)
+    const path = key === 'auth' ? importedPath(property.value) : undefined
 
-    if (keyOf(property) === 'auth' && (path === undefined || !exportsAuth(root, path)))
+    // The old form took both and `auth` won; the new takes one.
+    if (key === 'server' && first.properties.some(other => other.type === 'ObjectProperty' && keyOf(other) === 'auth'))
+      return undefined
+
+    if (key === 'auth' && (path === undefined || !exportsAuth(root, path)))
       return undefined
 
     members.push(path === undefined ? text(property) : `module: ${literal(path)}`)
@@ -200,8 +216,12 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
     return []
 
   const severity = level === 'warn' ? 'warning' : 'error'
-  // An old name is fixed only where its import and every use go together.
-  const fixable = new Set(OLD_FORMS.map(form => form.old).filter(name => names.has(name) && found.filter(({ form }) => form.old === name).every(({ rewrite, form }) => rewrite !== undefined && !taken.has(form.now)) && uses.get(name) === found.filter(({ form }) => form.old === name).length + IMPORT_NODES))
+  // An old name is fixed only where its import and every use go together, and `authPages` with `authExtension` would give two `auth` extensions, so those stay as written.
+  const fixable = new Set(OLD_FORMS.map(form => form.old).filter((name) => {
+    const calls = found.filter(({ form }) => form.old === name)
+
+    return names.has(name) && calls.every(({ rewrite, form }) => rewrite !== undefined && !taken.has(form.now) && found.filter(other => other.form.now === form.now).length === calls.length) && uses.get(name) === calls.length + IMPORT_NODES
+  }))
   // One fix holds every edit of the file, so applying one problem's fix leaves no import without the name a call still uses.
   const edits: Edit[] = [...found.filter(({ form }) => fixable.has(form.old)).map(({ call, rewrite }) => ({ start: call.start!, end: call.end!, text: rewrite! })), ...importRewrites(source, imports.filter(({ form }) => fixable.has(form.old)))]
   const diagnostics: CheckDiagnostic[] = []
@@ -214,7 +234,7 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
       ...positionAt(source, callee.start!),
       end: callee.end!,
       message: `\`${form.old}\` is the old way to register ${form.library}, which every library now registers with \`x({ module })\``,
-      help: `use \`${form.now}({ module: './src/${form.now}'${form.old === 'authExtension' ? ', pages: false' : ''} })\``,
+      help: `use \`${form.now}({ module: './src/${form.now}'${form.old === 'authExtension' ? ', pages: false' : ''} })\`, or \`${form.now}({ server })\` for a plugin built in code`,
       code: 'deprecated-library-registration',
       severity,
       ...fixable.has(form.old) && { fixes: [{ title: `Use ${form.now}({ module })`, edits, safe: true }] },

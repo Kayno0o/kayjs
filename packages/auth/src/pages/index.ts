@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 import { pickLocale } from '../locale'
 
 export interface AuthPagesOptions {
-  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `authPages` loads it with `auth`.
+  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
   prefix?: string | undefined
   // Where a sign-in goes when nothing asked for another page, and a sign-out always: `/` by default.
   home?: string | undefined
@@ -51,7 +51,7 @@ export interface ProfileOptions<Field extends string = string> {
   save: (user: BareUser, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>> } | Promise<void | { errors: Partial<Record<Field, string>> }>
 }
 
-// What `createAuth`'s `pages` option takes: `authPages`' own options and the profile data of the app.
+// What `createAuth`'s `pages` option takes: `auth()`'s own options and the profile data of the app.
 export interface AuthPagesConfig extends AuthPagesOptions {
   // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `rememberMaxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
   remember?: RememberMode | undefined
@@ -123,7 +123,7 @@ export function featuresOf(core: Core): AuthFeatures {
   }
 }
 
-// The pages `authPages()` serves for `createAuth({ pages })` to send users to, each under the prefix.
+// The pages `auth()` serves for `createAuth({ pages })` to send users to, each under the prefix.
 export function pagePaths(prefix: string) {
   return {
     signIn: `${prefix}/sign-in`,
@@ -145,11 +145,11 @@ export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: 
 // The plugin of an `AuthModule`, for `kay check` to type `ctx.locals.auth` off.
 export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
 
-// What `createAuth` hands `authPages` to settle the prefix and home between them, whichever of the two was made first.
+// What `createAuth` hands `auth()` to settle the prefix and home between them, whichever of the two was made first.
 export const PAGES_OF = Symbol('kayjs-auth.pages')
 
 export interface PagesHandle {
-  // Takes the prefix and home `authPages` was given where `createAuth({ pages })` set none of its own, and throws when both name another prefix.
+  // Takes the prefix and home `auth()` was given where `createAuth({ pages })` set none of its own, and throws when both name another prefix.
   adopt: (given: { prefix?: string | undefined, home?: string | undefined }) => void
 }
 
@@ -177,7 +177,7 @@ function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyEl
   const auth = module.auth ?? module.default
 
   if (!auth)
-    throw new Error('kayjs-auth: the module `authPages` or `authExtension` loads exports no `auth`, nor a default `createAuth` result')
+    throw new Error('kayjs-auth: the auth module exports no `auth`, the `createAuth` result')
 
   return auth
 }
@@ -188,7 +188,7 @@ async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | und
   const auth = plugin?.[AUTH_OF]
 
   if (!auth)
-    throw new Error('kayjs-auth: the `server` of authPages is not the `plugin` of a `createAuth` result, so its commands cannot reach the app\'s auth; give `auth: () => import(\'./src/auth\')` instead')
+    throw new Error('kayjs-auth: the `server` of auth() is not the `plugin` of a `createAuth` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
 
   return auth
 }
@@ -202,7 +202,7 @@ async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>, 
   return auth.plugin as PluginOf<Module>
 }
 
-// Superseded by `auth({ module, pages: false })`, which `kay check` rewrites it to.
+/** @deprecated Use `auth({ module, pages: false })`, which `kay check --fix` rewrites it to. */
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
 export function authExtension<Module extends AuthModule>(load: () => Promise<Module>): KayExtension<PluginOf<Module>> {
   const extension: KayExtension<PluginOf<Module>> = { name: 'auth', server: async () => pluginIn(load), devTool: DEV_TOOL, commands: COMMANDS }
@@ -210,7 +210,7 @@ export function authExtension<Module extends AuthModule>(load: () => Promise<Mod
   return Object.assign(extension, { [LOAD_AUTH]: async () => authOfModule(await load()) as unknown as UserMaker })
 }
 
-// Superseded by `auth({ module })`, which `kay check` rewrites it to.
+/** @deprecated Use `auth({ module })`, which `kay check --fix` rewrites it to. */
 // The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. With `auth`, `createAuth({ pages: true })` takes this `prefix` and `home`; one given in both places must match for the prefix.
 // `auth` loads the app's `auth` as `authExtension` does, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes; `server` hands `pages()` any other plugin carrying it.
 export function authPages<Module extends AuthModule>(options: AuthPagesOptions & { auth: () => Promise<Module> }): AuthPages<PluginOf<Module>>
@@ -266,7 +266,7 @@ export function auth(options: AuthExtensionOptions = {}): AuthPages {
     home: home ?? '/',
   }
 
-  const load = async (root: string): Promise<UserMaker> => module === undefined ? authOfServer(server) : authOfModule(await import(resolve(root, module)) as Parameters<typeof authOfModule>[0]) as unknown as UserMaker
+  const load = async (root: string): Promise<UserMaker> => module === undefined ? authOfServer(server) : authOfModule({ auth: ((await import(resolve(root, module))) as { auth: { plugin: AnyElysia } }).auth }) as unknown as UserMaker
 
   return Object.assign(extension, { [LOAD_AUTH]: load })
 }
