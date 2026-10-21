@@ -83,7 +83,7 @@ async function running(env: Record<string, string>, shell: Record<string, string
 }
 
 describe.concurrent('kay dev .env values', () => {
-  it('follows a plain value edited, a value added and a value removed', async () => {
+  it('follows a plain value edited, a value added and a value removed, and restarts nothing for one written again with the same content', async () => {
     const project = await running({ A: 'one' })
 
     try {
@@ -96,6 +96,21 @@ describe.concurrent('kay dev .env values', () => {
       await project.write('.env', 'B=added\n')
       await until(() => project.starts().at(-1)!.A === undefined)
       expect(project.starts().at(-1)!.B).toBe('added')
+
+      // The same content written again restarts nothing.
+      await project.write('.env', 'A=two\n')
+      await until(() => project.starts().at(-1)!.A === 'two')
+      await until(() => project.configSaw('types.ts')?.A === 'two')
+      await Bun.sleep(1000)
+
+      const starts = project.starts().length
+      const loads = project.configLoads()
+
+      await project.write('.env', 'A=two\n')
+      await Bun.sleep(1500)
+
+      expect(project.starts()).toHaveLength(starts)
+      expect(project.configLoads()).toBe(loads)
     }
     finally {
       await project.cleanup()
@@ -152,59 +167,24 @@ describe.concurrent('kay dev .env values', () => {
     }
   }, 60_000)
 
-  it('shows the process writing the types, which loads the config, the new value', async () => {
-    const project = await running({ C: 'c1' })
+  it('shows the process writing the types, which loads the config, and the browser through /_kay/env.js, the new value', async () => {
+    const project = await running({ C: 'c1', KAY_ENV_PUB: 'p1' })
 
     try {
       await until(() => project.configSaw('types.ts')?.C === 'c1')
-
-      await project.write('.env', 'C=c2\n')
-      await until(() => project.starts().at(-1)!.C === 'c2')
-      await until(() => project.configSaw('types.ts')?.C === 'c2')
-
-      await project.write('.env', 'C=c3\n')
-      await until(() => project.configSaw('types.ts')?.C === 'c3')
-
-      await project.write('.env', 'C=\n')
-      await until(() => project.configSaw('types.ts')?.C === '')
-    }
-    finally {
-      await project.cleanup()
-    }
-  }, 60_000)
-
-  it('shows the browser the new value through /_kay/env.js', async () => {
-    const project = await running({ KAY_ENV_PUB: 'p1' })
-
-    try {
       await until(async () => (await project.envJs()).includes('p1'))
 
-      await project.write('.env', 'KAY_ENV_PUB=p2\n')
+      await project.write('.env', 'C=c2\nKAY_ENV_PUB=p2\n')
+      await until(() => project.starts().at(-1)!.C === 'c2')
+      await until(() => project.configSaw('types.ts')?.C === 'c2')
       await until(async () => (await project.envJs()).includes('p2'))
       expect(await project.envJs()).not.toContain('p1')
-    }
-    finally {
-      await project.cleanup()
-    }
-  }, 60_000)
 
-  it('restarts nothing for a .env written again with the same content', async () => {
-    const project = await running({ A: 'one' })
+      await project.write('.env', 'C=c3\nKAY_ENV_PUB=p2\n')
+      await until(() => project.configSaw('types.ts')?.C === 'c3')
 
-    try {
-      await project.write('.env', 'A=two\n')
-      await until(() => project.starts().at(-1)!.A === 'two')
-      await until(() => project.configSaw('types.ts')?.A === 'two')
-      await Bun.sleep(1000)
-
-      const starts = project.starts().length
-      const loads = project.configLoads()
-
-      await project.write('.env', 'A=two\n')
-      await Bun.sleep(1500)
-
-      expect(project.starts()).toHaveLength(starts)
-      expect(project.configLoads()).toBe(loads)
+      await project.write('.env', 'C=\nKAY_ENV_PUB=p2\n')
+      await until(() => project.configSaw('types.ts')?.C === '')
     }
     finally {
       await project.cleanup()
