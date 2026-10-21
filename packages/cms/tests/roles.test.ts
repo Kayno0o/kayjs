@@ -162,6 +162,22 @@ describe('roles', () => {
     expect(await statusOf(ask({ method: 'DELETE', path: '/entries/posts/hello', cookie: `admin.${expires}.${signature}` }))).toBe(401)
   })
 
+  test('a save that is not a JSON object with a data object is refused to a role that may not publish, whatever its content type', async () => {
+    auth()
+
+    const form = new FormData()
+
+    form.append('data', JSON.stringify({ title: 'Hello', draft: false }))
+
+    for (const [body, type] of [[form, undefined], ['data={"draft":false}', 'text/plain'], ['not json', 'application/json'], ['{"data":"x"}', 'application/json'], ['null', 'application/json']] as const) {
+      const ctx = ask({ path: '/entries/posts/hello', user: { roles: ['editor'] } })
+      const url = new URL('http://site.test/api/cms/entries/posts/hello')
+
+      Object.assign(ctx, { request: new Request(url, { method: 'POST', body, ...type === undefined ? {} : { headers: { 'content-type': type } } }) })
+      expect(await statusOf(ctx), String(type)).toBe(403)
+    }
+  })
+
   test('a save is held to the publishing rights too: it may not flip the draft flag or the publish date', async () => {
     auth()
 

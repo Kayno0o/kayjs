@@ -129,3 +129,21 @@ test('a site without a password guard and without kayjs-auth sends the sign-in s
   expect(response.headers.get('location')).toBe('/admin')
   expect((await plain.fetch('/admin')).status).toBe(401)
 })
+
+test('under a base, the sign-in leads back to the page asked for under that base', async () => {
+  const options = { guard: passwordGuard('pw-editor') }
+  const based = await testSite({ root: ROOT, base: '/site', extensions: [cms(options)] })
+
+  cms(options)
+
+  const response = await based.fetch('/site/admin/collections/posts?q=a')
+  const location = new URL(response.headers.get('location') ?? '', 'http://site.test')
+
+  expect(response.status).toBe(302)
+  expect(location.pathname).toBe('/site/admin/sign-in')
+  expect(location.searchParams.get('redirect')).toBe('/admin/collections/posts?q=a')
+
+  const done = await based.submit(signIn, { password: 'pw-editor', redirect: location.searchParams.get('redirect') ?? '' }, { from: '/site/admin/sign-in' })
+
+  expect(done.url).toBe('/site/admin/collections/posts?q=a')
+})

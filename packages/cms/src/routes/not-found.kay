@@ -8,10 +8,15 @@ import { wording } from 'kay/words'
 import AddedRedirects from '../components/added-redirects.kay'
 import ConfigRedirects from '../components/config-redirects.kay'
 import MissingPaths from '../components/missing-paths.kay'
+import { forbidden, may } from '../access'
 import { adminTitle } from '../listing'
 import { readMissing } from '../missing'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
+
+// The missing pages are where redirects are made.
+if (!await may(ctx, 'redirects'))
+  forbidden(ctx, 'redirects')
 
 const { prefix } = settings()
 const screen = readMissing()

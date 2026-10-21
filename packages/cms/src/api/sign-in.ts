@@ -11,5 +11,5 @@ export default api({ guards: false })
     const base = new URL(request.url).pathname.replace(PATH, '')
     const back = localPath(query.redirect, settings().prefix)
 
-    return new Response(null, { status: 302, headers: { location: `${base}${screenPath(settings().prefix, '/sign-in')}?redirect=${encodeURIComponent(back)}` } })
+    return new Response(null, { status: 302, headers: { location: localPath(`${base}${screenPath(settings().prefix, '/sign-in')}?redirect=${encodeURIComponent(back)}`, '/') } })
   }, { query: s.Object({ redirect: s.Optional(s.String({ maxLength: 2000 })) }) })

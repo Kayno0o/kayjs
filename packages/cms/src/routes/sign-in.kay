@@ -13,7 +13,7 @@ import { settings } from '../settings'
 export const page = { guards: false, noindex: true, sitemap: false }
 
 export const signIn = action(s.Object({
-  password: s.String({ minLength: 1, maxLength: 500, error: 'Type the password.' }),
+  password: s.String({ maxLength: 500 }),
   redirect: s.Optional(s.String({ maxLength: 2000 })),
 }), async ({ password, redirect }, ctx) => {
   const { passwords } = await probe(ctx)
@@ -23,7 +23,10 @@ export const signIn = action(s.Object({
     return ctx.fail(401, { message: wording('cms.signIn.wrong', 'That is not the right password.') })
 
   ctx.cookies.set(passwords.issue(role, overHttps(ctx.request)))
-  ctx.cookies.set(hintCookie(overHttps(ctx.request)))
+
+  if (settings().pageLink)
+    ctx.cookies.set(hintCookie(overHttps(ctx.request)))
+
   ctx.redirect(localPath(redirect, settings().prefix))
 }, {
   // Ten tries per visitor every quarter of an hour: plenty for a typo, far too few to guess a password.

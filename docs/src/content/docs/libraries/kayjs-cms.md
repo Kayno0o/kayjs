@@ -56,7 +56,11 @@ cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
 cms({ guard: passwordGuard({ editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSWORD }, { maxAge: '30d' }) })
 ```
 
-A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` says otherwise, and it is a signed cookie, so changing a password signs out everyone who used it. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
+A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` says otherwise, and it is a signed cookie, so changing a password signs out everyone who used it. 
+
+Pass `{ secret }` with a secret of your own to tie the sign-in to your site, and set kay's `proxy` option behind a proxy, as the ten tries are counted per client address.
+
+Signing out deletes the cookie, but a copy of it stays valid until it expires or the password changes. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
 
 The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
 

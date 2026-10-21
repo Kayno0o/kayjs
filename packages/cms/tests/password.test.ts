@@ -97,3 +97,28 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(lone.match('only')).toBe('editor')
   })
 })
+
+describe('the secret and the lazily loaded guard', () => {
+  test('a cookie signed with one secret opens nothing signed with another', () => {
+    const one = new Passwords({ editor: 'pw' }, '1h', 'secret-one')
+    const other = new Passwords({ editor: 'pw' }, '1h', 'secret-two')
+    const cookie = one.issue('editor', false).value
+
+    expect(one.read(cookie)).toBe('editor')
+    expect(other.read(cookie)).toBeUndefined()
+    expect(new Passwords({ editor: 'pw' }, '1h').read(cookie)).toBeUndefined()
+  })
+
+  test('the sign-in screen knows a lazily loaded password guard once it has loaded', async () => {
+    const { configure, settings } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+
+    configure({ guard: { load: async () => passwordGuard('lazy-pw') } })
+    expect(activePasswords()).toBeUndefined()
+    expect(await statusOf(context(), settings().guard)).toBe(401)
+    expect(activePasswords()?.match('lazy-pw')).toBe('editor')
+
+    configure({ guard: () => undefined })
+    expect(activePasswords()).toBeUndefined()
+  })
+})

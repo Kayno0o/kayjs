@@ -1,6 +1,6 @@
 import type { Guard } from 'kay'
 import type { LazyGuard } from 'kay/library'
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
 import { guard } from 'kay'
 import { durationSeconds } from 'kay/library'
 import { wording } from 'kay/words'
@@ -16,6 +16,8 @@ const KEY_SALT = 'kayjs-cms/password/v1:'
 export interface PasswordOptions {
   // How long a sign-in lasts, `'14d'` by default.
   maxAge?: string | number | undefined
+  // Mixed into the key the cookie is signed with, so the same password on another site signs in nowhere else; the app's own secret from the environment.
+  secret?: string | undefined
 }
 
 // Who a password guard let a request in as, for the screens to name and the roles to read.
@@ -35,7 +37,7 @@ export class Passwords {
   private readonly keys = new Map<string, Buffer>()
   private readonly seconds: number
 
-  constructor(passwords: Record<string, string>, maxAge: string | number) {
+  constructor(passwords: Record<string, string>, maxAge: string | number, secret = '') {
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`', 'kayjs-cms')
 
     const entries = Object.entries(passwords)
@@ -52,7 +54,8 @@ export class Passwords {
         throw new Error(`kayjs-cms: \`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
 
       this.digests.set(role, digest(password))
-      this.keys.set(role, digest(KEY_SALT + password))
+      // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed.
+      this.keys.set(role, scryptSync(password, KEY_SALT + secret, 32))
     }
   }
 
@@ -122,8 +125,8 @@ export function trackPasswords(given: Guard | LazyGuard | undefined): Guard | La
 }
 
 // A guard for a site with no users: one password, or one per role, and a sign-in screen at the admin's `/sign-in`. `cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })`; a lone password signs in as `editor`.
-export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE }: PasswordOptions = {}): Guard {
-  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge)
+export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE, secret }: PasswordOptions = {}): Guard {
+  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret)
 
   const checked = guard((ctx) => {
     const role = known.read(ctx.cookies.get(SESSION_COOKIE))

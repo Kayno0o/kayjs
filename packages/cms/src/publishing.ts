@@ -7,7 +7,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 // Whether the save a request carries leaves what the site shows alone: the draft flag and the publish and unpublish dates of an existing entry as they are, a new entry a draft with neither date set. A save is a way to publish as much as `/publish` is, so a role that may not publish is held to it.
-// A body or collection it cannot read passes, as the route refuses those itself.
+// A body that is not a JSON object holding an object `data` is refused: the route would take a multipart form too, and the guard cannot read the publishing fields of one.
 export async function leavesPublication(request: Request, path: string): Promise<boolean> {
   const [, collectionName, slug] = SAVE.exec(path) ?? []
 
@@ -20,14 +20,14 @@ export async function leavesPublication(request: Request, path: string): Promise
     sent = await request.clone().json() as typeof sent
   }
   catch {
-    return true
+    return false
   }
 
   if (typeof sent !== 'object' || sent === null || typeof sent.data !== 'object' || sent.data === null)
-    return true
+    return false
 
   try {
-    const name = decodeURIComponent(collectionName)
+    const name = collectionName
     const collection = await collectionNamed(name)
     const fields = [collection.draftField, collection.publishField, collection.unpublishField].filter(field => field !== undefined)
 
@@ -35,7 +35,7 @@ export async function leavesPublication(request: Request, path: string): Promise
       return true
 
     const data = sent.data as Record<string, unknown>
-    const screen = await entryScreen({ collection: name, slug: decodeURIComponent(slug), locale: typeof sent.locale === 'string' ? sent.locale : undefined })
+    const screen = await entryScreen({ collection: name, slug, locale: typeof sent.locale === 'string' ? sent.locale : undefined })
     const saved = screen?.entry?.data
 
     // A new entry starts as a draft, with nothing scheduled.

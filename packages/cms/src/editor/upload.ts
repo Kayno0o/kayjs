@@ -1,6 +1,8 @@
 import { ActionError, ApiError, call } from 'kay'
+import { wording } from 'kay/words'
 import filesApi from '../api/files'
 import { emptyFile, tooLarge, tooLargeForServer, tooSmall } from '../upload-text'
+import { isSignedOut, setSessionEnded } from './session'
 
 export interface UploadRules {
   accept: string
@@ -68,7 +70,13 @@ export function uploadFailure(error: unknown, file: File, limits: UploadRules | 
   if (error instanceof ApiError && error.status === 413 && limits)
     return refused(413, tooLargeForServer(file.name, file.size))
 
-  if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))
+  if (isSignedOut(error)) {
+    setSessionEnded(true)
+
+    return refused(401, wording('cms.session.toast', 'Your session has ended. Sign in again to save.'))
+  }
+
+  if (error instanceof ApiError && (error.status === 403 || error.status === 413 || error.status === 415 || error.status === 400))
     return refused(error.status, error.message)
 
   return error
