@@ -4,7 +4,7 @@ import { localize, t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import PasskeyTwoFactor from '../components/passkey-two-factor.kay'
-import { failure, localized, schemas } from '../forms'
+import { failure, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -17,7 +17,7 @@ export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localized(result.redirect))
+  return ctx.redirect(localize(result.redirect))
 })
 
 export const passkeyOptions = action(async (ctx) => {
@@ -32,7 +32,7 @@ export const passkey = action(schemas.passkey, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(localized(result.redirect))
+  return ctx.redirect(localize(result.redirect))
 })
 
 const auth = ctx.locals.auth

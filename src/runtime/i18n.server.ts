@@ -1,7 +1,7 @@
 import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 import { PART_END, PART_START } from './markers'
@@ -51,7 +51,7 @@ export function locale(): Locale {
 export const localize = ((href: string, target?: string) => {
   const state = current('localize()')
 
-  return state.implicit ? href : localePath(state.settings, href, target ?? state.locale, state.host)
+  return state.implicit || leadsWithLocale(state.settings, href) ? href : localePath(state.settings, href, target ?? state.locale, state.host)
 }) as Localize
 
 // The page being rendered in another locale, for a language switcher.

@@ -1,7 +1,7 @@
 import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localeName as localeNameIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup } from './reactive'
 import { tabVisible } from './visibility'
@@ -89,7 +89,7 @@ export function locale(): Locale {
 export const localize = ((href: string, target?: string) => {
   const { locale: current } = translations()
 
-  return withBase(settings ? localePath(settings, href, target ?? current, location.host) : href)
+  return withBase(settings && !leadsWithLocale(settings, href) ? localePath(settings, href, target ?? current, location.host) : href)
 }) as Localize
 
 export function alternate(target: Locale): string {

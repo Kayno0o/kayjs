@@ -90,6 +90,7 @@ const localeNames = new Map<string, string>()
 const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
 // Where a link's path ends and its query or fragment starts.
 const PATH_END = /[?#]/
+const SEGMENT_END = /[/?#]/
 const OPTIONAL_MARK = /\?$/
 // Each unit with its length in seconds, a relative time taking the largest one the span reaches.
 const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
@@ -297,6 +298,13 @@ let matcher: LinkMatcher | undefined
 
 export function matchLinksWith(next: LinkMatcher | undefined): void {
   matcher = next
+}
+
+// Whether a path of the site already leads with a locale's prefix, such as `/fr/note`, `/fr/?a=1` or `/fr#top`, which `localize` leaves as it is.
+export function leadsWithLocale(settings: LocaleSettings, href: string): boolean {
+  const first = href.split(SEGMENT_END)[1]
+
+  return !settings.hosts && first !== undefined && prefixed(settings, first)
 }
 
 // A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.

@@ -5,7 +5,7 @@ import type { Proof } from '../twoFactor'
 import type { AuthFeatures, ProfileProblem } from './index'
 import type en from './messages/en'
 import { t } from 'elysia'
-import { locales, localize, t as message } from 'kay/i18n'
+import { t as message } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
 import { PROFILE_MAX_LENGTH } from '../rules'
@@ -24,7 +24,6 @@ export function scopeLabel(scope: string): string {
 
 // Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
 const MIN_TIME = 'kayjs-auth-min-time:'
-const PATH_END = /[/?#]/
 const PASSWORD_PROBLEMS: ReadonlySet<string> = new Set<Problem<'password'>>(['too-short', 'too-long', 'breached'])
 const OAUTH_FAILURES: ReadonlySet<string> = new Set<OAuthFailureCode>(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
 
@@ -120,15 +119,6 @@ export async function captchaFor(auth: Pick<Auth, 'captchaRequired' | 'captchaCh
 
 export function proofOf(input: { password?: string | undefined, code?: string | undefined }): Proof {
   return { ...input.password !== undefined && { password: input.password }, ...input.code !== undefined && { code: input.code } }
-}
-
-// A path of the site in the request's language, unless a language's prefix leads it already, as the `?redirect=` of a guard on a localized page does.
-export function localized(path: string): string {
-  const [, first] = path.split(PATH_END)
-  // Widened, as an app's registered locales narrow `locales()` to its own.
-  const known: readonly string[] = locales()
-
-  return first !== undefined && known.includes(first) ? path : localize(path)
 }
 
 // What a page shows for a failure code, in the request's language.

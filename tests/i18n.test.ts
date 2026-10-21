@@ -12,7 +12,7 @@ import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { flattenMessages, localeName, localePath, localizedLink, matchLinksWith, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
-import { relativeTime } from '../src/runtime/i18n.server'
+import { localize, relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { pages } from '../src/server'
@@ -706,6 +706,41 @@ describe('kay check', () => {
   })
 })
 
+describe('localize() on a path under a locale', () => {
+  const localized = (settings: LocaleSettings, locale: string, href: string, target?: string) => runInLocale({ locale, messages: new Map(), settings, path: '/' }, () => localize(href, target))
+  const PREFIXED = ['/en/note', '/en/note/', '/en', '/en/', '/en?a=1', '/en/?a=1#top', '/en/note/?a=1']
+
+  it('leaves it as written under each locale, a trailing slash, query and hash included', () => {
+    for (const prefixDefault of [false, true]) {
+      const settings = { ...localeSettings({ ...i18n, prefixDefault }), pages: ['/note'] }
+      const paths = prefixDefault ? [...PREFIXED, ...PREFIXED.map(path => path.replace('/en', '/fr'))] : PREFIXED
+
+      for (const locale of ['fr', 'en']) {
+        for (const path of paths) {
+          expect(localized(settings, locale, path), `${prefixDefault} ${locale} ${path}`).toBe(path)
+          expect(localized(settings, locale, path, 'en'), `${prefixDefault} ${locale} ${path} to en`).toBe(path)
+          expect(localized(settings, locale, path, 'fr'), `${prefixDefault} ${locale} ${path} to fr`).toBe(path)
+        }
+      }
+    }
+  })
+
+  it('still localizes a path no locale leads, the unprefixed default\'s name included', () => {
+    const settings = { ...localeSettings(i18n), pages: ['/note', '/:slug/note'] }
+
+    expect(localized(settings, 'en', '/note')).toBe('/en/note')
+    expect(localized(settings, 'en', '/note/')).toBe('/en/note/')
+    expect(localized(settings, 'fr', '/note')).toBe('/note')
+    expect(localized(settings, 'en', '/fr/note')).toBe('/en/fr/note')
+  })
+
+  it('leaves a site by domain as before, where no locale has a prefix', () => {
+    const settings = { ...localeSettings(i18n), hosts: { fr: 'x.fr', en: 'x.com' }, pages: ['/:slug/note'] }
+
+    expect(localized(settings, 'en', '/en/note')).toBe('//x.com/en/note')
+  })
+})
+
 describe('relativeTime', () => {
   it('reads the page as rendered at one moment on the server, which the page sends its islands once', () => {
     const state = { locale: 'en', messages: new Map(), settings: localeSettings(i18n), path: '/', implicit: true as const }
@@ -752,6 +787,9 @@ describe('in the browser', () => {
       expect(t('counter.label')).toBe('Counter')
       expect(localize('/about')).toBe('/en/about-us')
       expect(localize('/')).toBe('/en')
+      expect(localize('/en/about-us')).toBe('/en/about-us')
+      expect(localize('/en/about-us/', 'fr')).toBe('/en/about-us/')
+      expect(localize('/en')).toBe('/en')
       expect(alternate('fr')).toBe('/a-propos')
       expect(formatNumber(1234)).toBe('1,234')
       expect(locales()).toEqual(['fr', 'en'])
