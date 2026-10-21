@@ -502,11 +502,15 @@ export abstract class TemplateWriter {
     b.add(']')
   }
 
-  // The classes the component's recipe gives a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant and a variant to the caller.
+  // The classes the component's recipe, then `src/ui.ts`, give a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant, a variant to the app's `src/ui.ts` and that to the caller.
   private recipeItem(part: string): (() => void)[] {
     const { recipe } = this.facts
+    const items: (() => void)[] = recipe === undefined ? [] : [() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`)]
 
-    return recipe === undefined ? [] : [() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`)]
+    if (this.facts.ui === true)
+      items.push(() => this.b.add(`${helperName('ui')}(${PROPS}, ${JSON.stringify(part)})`))
+
+    return items
   }
 
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.

@@ -477,6 +477,8 @@ export interface TemplateFacts {
   parts: PartFacts | undefined
   // The recipe the script declares, whose classes every part of the component takes before its `class`.
   recipe?: string | undefined
+  // `src/ui.ts` sets classes for the parts of this component, after its recipe's.
+  ui?: boolean | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.

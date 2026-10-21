@@ -28,6 +28,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `Snippet` from `kay` types a prop taking markup, `Snippet<[Item, number]>` for markup the component calls with values, and `kay upgrade` rewrites `JSX.Element` props to it ([Slots](templates.md#slots), [Islands](islands.md#props-to-an-island)).
 - With Tailwind, a class passed to a component or merged with another, literal pairs and `<html>`'s included, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - `kay lint` reports a line misindented in a `.kay` fence, by any amount, and `--fix` reindents it as in a `.ts` file; the preset turns `style/indent` on under kay 1.70 ([Linting](checks.md#linting)).
+- `src/ui.ts` with `defineUi` sets the parts and variants of any component, the app's or a library's, merged at compile time ([Restyle a component from src/ui.ts](styles-and-assets.md#restyle-a-component-from-srcuits)).
 
 ## 1.69.0
 

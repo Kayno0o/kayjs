@@ -1,7 +1,7 @@
 // The classes of a variant value: a string for the root, or one string per part.
 type VariantClasses = string | Readonly<Record<string, string>>
 
-type VariantTable = Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>
+export type VariantTable = Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>
 
 // The names of a variant's values, a numeric key such as `2` included.
 type ValueNames<Values> = `${keyof Values & (string | number)}`
@@ -21,6 +21,7 @@ export interface Recipe<Variants extends VariantTable> {
   // The classes of a part, `root` unless named: its base, then the variant of each value given, in the order the variants are declared.
   (values?: VariantValues<Variants>, part?: string): string
   readonly variants: readonly (keyof Variants & string)[]
+  readonly defaults: VariantValues<Variants>
 }
 
 export interface RecipeConfig<Variants extends VariantTable> {
@@ -48,7 +49,12 @@ export function recipe<const Variants extends VariantTable = Record<never, never
     }
 
     return classes.filter(text => text !== undefined && text !== '').join(' ')
-  }, { variants: variants.map(([name]) => name) })
+  }, { variants: variants.map(([name]) => name), defaults: defaults as VariantValues<Variants> })
+}
+
+// What `src/ui.ts` gives a component: a recipe of its own, which reads the variant values as the component's recipe does, defaults included.
+export function uiRecipe(config: RecipeConfig<VariantTable>, base?: Pick<Recipe<VariantTable>, 'defaults'>): Recipe<VariantTable> {
+  return recipe(base === undefined ? config : { ...config, defaults: base.defaults })
 }
 
 // What a variant value gives a part: a string is the root's, an object holds an entry per part.

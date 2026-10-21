@@ -93,6 +93,8 @@ export interface ScriptAnalysis {
   recipeSpan?: Span | undefined
   // Whether the recipe's literal config gives the root classes, which a template with no root part leaves nowhere to go.
   recipeRoot?: boolean | undefined
+  // The variants and values of the recipe's literal config, which `src/ui.ts` is checked against; none when the config is not a literal.
+  recipeVariants?: Record<string, string[]> | undefined
   // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
   functions: string[]
   diagnostics: Diagnostic[]
@@ -159,6 +161,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   analysis.recipe = split.recipes[0]?.name
   analysis.recipeSpan = split.recipes[0]?.span
   analysis.recipeRoot = split.recipes[0]?.root
+  analysis.recipeVariants = split.recipes[0]?.variants
 
   for (const extra of split.recipes.slice(1))
     analysis.diagnostics.push({ ...extra.span, message: 'A component has one recipe', help: 'put its variants in the first `recipe({ ... })`' })
@@ -204,7 +207,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
 
 // Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = [], withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span, root: boolean }[] }) | undefined {
+function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = [], withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -216,7 +219,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
   const statements: FenceStatement[] = []
-  const recipes: { name: string, span: Span, root: boolean }[] = []
+  const recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] = []
   const recipeStatements = new Set<t.Statement>()
   const recipeCalls = recipeNames(ast.program.body)
 
@@ -1116,7 +1119,7 @@ function recipeNames(body: t.Statement[]): Set<string> {
 
 // The recipe a statement declares, `const card = recipe({ ... })`, optionally cast with `as` or checked with `satisfies`: a recipe is configuration, so it moves to module level, built once, where the component's props type can name its type.
 // Any other way to declare one keeps it in the body, where no props type can read it, and says so.
-function recipeDeclaration(statement: t.Statement, calls: ReadonlySet<string>, shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): { name: string, root: boolean } | undefined {
+function recipeDeclaration(statement: t.Statement, calls: ReadonlySet<string>, shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): { name: string, root: boolean, variants: Record<string, string[]> | undefined } | undefined {
   if (statement.type !== 'VariableDeclaration')
     return undefined
 
@@ -1128,7 +1131,7 @@ function recipeDeclaration(statement: t.Statement, calls: ReadonlySet<string>, s
   const { id, init } = statement.declarations[0]!
 
   if (statement.kind === 'const' && statement.declarations.length === 1 && id.type === 'Identifier')
-    return { name: id.name, root: stylesRoot(recipeCall(init, calls)!) }
+    return { name: id.name, root: stylesRoot(recipeCall(init, calls)!), variants: variantNames(recipeCall(init, calls)!) }
 
   diagnostics.push({ ...shift(statement), message: 'A recipe is a `const` of its own', note: 'the compiler reads `const card = recipe({ ... })` to type the component\'s variant props, and leaves any other form in the body, where the props stay untyped', help: 'write the recipe as a `const` statement with nothing else declared beside it' })
 
@@ -1160,6 +1163,43 @@ function propertyValue(object: t.ObjectExpression, key: string): t.Node | undefi
 
 function isClasses(node: t.Node | undefined): boolean {
   return node?.type === 'StringLiteral' ? node.value !== '' : node?.type === 'TemplateLiteral'
+}
+
+// A variant value's name: a key written as a name, a string or a number.
+function valueName(key: t.Node): string | undefined {
+  return key.type === 'NumericLiteral' ? String(key.value) : keyName(key)
+}
+
+// The variants of the recipe's literal config with the values each takes, when it is written in place.
+function variantNames(call: t.CallExpression): Record<string, string[]> | undefined {
+  const config = call.arguments[0]
+
+  if (config?.type !== 'ObjectExpression')
+    return undefined
+
+  const variants = propertyValue(config, 'variants')
+
+  if (variants === undefined)
+    return {}
+
+  if (variants.type !== 'ObjectExpression')
+    return undefined
+
+  const found: Record<string, string[]> = {}
+
+  for (const variant of variants.properties) {
+    if (variant.type !== 'ObjectProperty' || variant.computed || variant.value.type !== 'ObjectExpression')
+      return undefined
+
+    const name = keyName(variant.key)
+
+    if (name === undefined)
+      return undefined
+
+    found[name] = variant.value.properties.flatMap(value => value.type === 'ObjectProperty' && !value.computed ? valueName(value.key) ?? [] : [])
+  }
+
+  return found
 }
 
 // Whether the literal config of a recipe gives the root classes: a string for `parts` or a variant value, or a `root` entry. A config it cannot read is taken not to.

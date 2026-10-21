@@ -33,6 +33,10 @@ li(class={size})
 
 `const card = recipe({ parts, variants, defaults })` from `kay` holds the classes by part and variant, and the variants become typed props with no declaration: see [Give a component variants](styles-and-assets.md#give-a-component-variants).
 
+### Restyle any component from the app
+
+`src/ui.ts` with `defineUi` sets the parts and variants of any component, a library's included, without touching it: see [Restyle a component from src/ui.ts](styles-and-assets.md#restyle-a-component-from-srcuits).
+
 ### Keep state that changes
 
 A signal holds it, read by calling it and written by assigning it, in the template as in the script; a memo derives a value from it:

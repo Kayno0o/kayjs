@@ -20,6 +20,7 @@ import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
 import { embeddedMap, registerSourceMap } from './sourcemap'
+import { uiEntryOf, uiKeyOf } from './ui'
 
 export type Target = 'dom' | 'ssr'
 
@@ -115,7 +116,8 @@ export async function transformKayCached(source: string, filename: string, given
   // Read once: it is part of the cache key and, on a miss, what the compile reads too.
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
+  const root = options.root ?? process.cwd()
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -248,7 +250,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, ui: uiEntryOf(options.root ?? process.cwd(), file) })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

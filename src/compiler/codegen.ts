@@ -1,4 +1,5 @@
 import type { ClassTable } from '../runtime/class-table'
+import type { UiEntry } from '../runtime/ui'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { WRITE_HELPERS } from './names'
@@ -71,6 +72,8 @@ export interface GenerateOptions {
   hydratable?: boolean | undefined
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: ((specifier: string) => string | undefined) | undefined
+  // What `src/ui.ts` sets for the component, which its parts take after its recipe and before the caller's `class`.
+  ui?: UiEntry | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }> | undefined
   // Type checking's final pass: the value of each signal the template reads, declared under `VALUES`.
@@ -175,6 +178,8 @@ class ModuleShell {
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
   private jsxTemplate: JsxTemplate | undefined
+  // Whether `src/ui.ts` styles the parts of this component.
+  private readonly styled: boolean
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
@@ -186,6 +191,8 @@ class ModuleShell {
     const facts = { ...templateFacts(file, script.recipe), bindables: bindableNames(file.source, script.props) }
 
     this.facts = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
+    this.styled = options.ui !== undefined && this.facts.parts?.merges === true
+    this.facts.ui = this.styled
     this.deferred = deferredData(this.facts, this.fence)
   }
 
@@ -298,6 +305,9 @@ class ModuleShell {
     if (takesActions)
       kayHelpers.push('reviveActions')
 
+    if (this.styled)
+      kayHelpers.push('uiRecipe')
+
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
 
@@ -333,6 +343,9 @@ class ModuleShell {
 
     if (this.kind === 'twin' || this.kind === 'promotable twin')
       b.add(`import { ${this.kind === 'twin' ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
+
+    if (this.styled)
+      b.add(`const ${helperName('ui')} = ${helperName('uiRecipe')}(${JSON.stringify(this.options.ui)}${facts.recipe === undefined ? '' : `, ${facts.recipe}`})\n`)
 
     if (this.partsType().helper)
       b.add('import type { PartClass as KayPartOf } from \'kay\'\n')
@@ -965,7 +978,7 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

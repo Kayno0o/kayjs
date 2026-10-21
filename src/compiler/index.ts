@@ -1,4 +1,5 @@
 import type { ClassTable } from '../runtime/class-table'
+import type { UiEntry } from '../runtime/ui'
 import type { Attribute, Diagnostic, Node, Span } from './ast'
 import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
@@ -41,6 +42,8 @@ export interface CompileOptions {
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean | undefined
   relocateImport?: ((specifier: string) => string | undefined) | undefined
+  // What `src/ui.ts` sets for this component, merged into the classes of its parts: server and browser output only.
+  ui?: UiEntry | undefined
   // Code to run: `html` builds server markup as strings, `dom` builds the browser's DOM; type-checking output when unset.
   output?: 'html' | 'dom' | undefined
   // Server output of a build that hydrates: islands carry markers, and a static component renders through its hydratable `?island` twin inside one.
@@ -184,7 +187,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
   const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
-  const generateOptions = { classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, ui: options.output === undefined ? undefined : options.ui, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {

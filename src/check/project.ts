@@ -25,6 +25,7 @@ import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { fromCompile } from './shadow-types'
 import { redirectChainLints } from './site-seo'
+import { uiProblems } from './ui'
 
 // The project's own scripts, which `kay check` reads for what only it reports in them; a declaration file holds no code.
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
@@ -93,7 +94,7 @@ export async function projectProblems(root: string, options: CheckOptions, conte
   return inWalkScope(async () => {
     const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds, scanned), moduleLints(root, options)])
 
-    return [...content.problems, ...messages, ...boot, ...modules]
+    return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root)]
   })
 }
 

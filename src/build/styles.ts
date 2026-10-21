@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
 import { readFileSync, statSync } from 'node:fs'
-import { dirname, sep } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { projectPaths } from '../project'
@@ -10,6 +10,7 @@ import { collectionComponents, importedNames, rendersContent } from './collectio
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
 import { importsOf, libraryOf } from './libraries'
+import { UI_FILE, uiEntryOf } from './ui'
 
 const ABSOLUTE_URL = /^\//
 const FONT_FILE = /\.(?:woff2?|ttf|otf)(?:[?#].*)?$/i
@@ -153,7 +154,10 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
           server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
 
-        return { contents: classes + contents + styles + content, loader: 'js' }
+        // A component `src/ui.ts` restyles has the classes written there, which the page using it keeps the rules of.
+        const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, [join(root, UI_FILE)]))
+
+        return { contents: classes + contents + styles + content + restyled, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
         loaded?.add(path)

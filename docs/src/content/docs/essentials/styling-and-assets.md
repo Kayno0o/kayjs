@@ -164,6 +164,26 @@ Classes merge in the order the part's own classes, the recipe's base, its varian
 
 A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props, signals or any name the script declares. `kay check` reports one that does, a recipe that shares its `const` or sits in a `--- server` fence, and root classes in a template with no `part="root"`.
 
+### Restyle a component from src/ui.ts
+
+`src/ui.ts` sets the parts and variants of any component, the app's own or a library's, with no change to the component. Key each by the specifier `src/ui.ts` would import it with, and write what a recipe takes, without its `defaults`:
+
+```ts
+import { defineUi } from 'kay'
+
+export default defineUi({
+  '@kaynooo/kayjs-ui/card.kay': {
+    parts: { root: 'rounded-xl', head: 'p-6' },
+    variants: { tone: { danger: { head: 'bg-red-100' } } },
+  },
+  './components/panel.kay': { parts: 'shadow-lg' },
+})
+```
+
+- Classes merge in the order the part's own, the component's recipe base, its variants, `src/ui.ts`'s parts and variants, then the caller's `class`, so `Card(class={{ head: 'p-8' }})` still wins.
+- The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and an island runs no merge for it. It holds string literals and object literals only, and a variant reads the component's props and the defaults of its recipe.
+- The component must have parts or a recipe, and with a recipe a `src/ui.ts` variant must be one it declares. `kay check` reports an unknown component, part, variant or value, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
+
 ## Public files
 
 A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL.
