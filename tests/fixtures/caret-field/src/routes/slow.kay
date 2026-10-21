@@ -1,0 +1,17 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const q = ctx.query.q ?? ''
+
+// The round trip outlasts the visitor's next keys.
+await Bun.sleep(q === '' ? 0 : 300)
+--- script
+import SearchField from '../components/search-field.kay'
+---
+head
+  title Caret slow
+h1 Caret
+p.searched {q}
+SearchField(value={q} area={false} delay={400})

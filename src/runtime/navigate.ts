@@ -1,6 +1,6 @@
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
 import { withoutBase } from './base'
-import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
+import { busyForms, dirtyGuard, dropScrollSave, heldField, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -194,7 +194,7 @@ function onPopState(event: PopStateEvent): void {
 
   // Entries of one path that only their query tells apart are one page to the visitor, as following a query param is.
   if (navigation.shown !== '' && new URL(navigation.shown).pathname === url.pathname)
-    swap.focused = document.activeElement
+    Object.assign(swap, heldField())
 
   void follow(url, swap)
 }

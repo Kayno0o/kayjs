@@ -37,6 +37,8 @@ export interface Swap {
   saved?: [number, number] | undefined
   // The element focused before, found again by id or name once swapped: a traversal sets it between entries of one path, which keep the focus.
   focused?: Element | null
+  // What the focused text field held when the swap began, so the keys typed in it while the page was fetched are told from the text the server rendered.
+  held?: string | undefined
   // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.
   refused?: { form: number, control: number }
 }
@@ -244,4 +246,11 @@ export function takeFormCheck(form: HTMLFormElement): void {
 
   form.noValidate = true
   checkedForms.add(form)
+}
+
+// The focused element and the text it holds, for a swap that keeps the focus.
+export function heldField(): Pick<Swap, 'focused' | 'held'> {
+  const focused = document.activeElement
+
+  return { focused, held: focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement ? focused.value : undefined }
 }

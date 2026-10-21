@@ -2094,6 +2094,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     }
   }, 60_000)
 
+  it('keeps what was typed while the navigate was in flight, and asks for it next', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/caret-field/src/routes', browser: { path } })
+
+    try {
+      const page = await site.open('/slow')
+
+      await page.click('.field')
+      await page.type('el')
+      // The debounce sends `el` after 400ms and the server answers 300ms later: `ys` lands between the two, and its own navigate is still to come.
+      await Bun.sleep(550)
+      await page.type('ys')
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'el')
+
+      expect(await page.evaluate(() => {
+        const f = document.querySelector<HTMLInputElement>('.field')!
+
+        return [document.activeElement === f, f.value, f.selectionStart]
+      })).toEqual([true, 'elys', 4])
+
+      // The kept keys were searched for without another key.
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'elys')
+      await page.type('ia')
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'elysia' && document.querySelector<HTMLInputElement>('.field')!.value === 'elysia')
+
+      expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('.field')!.selectionStart)).toBe(6)
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   it('keeps it under a trailing slash', async () => {
     const site = await testSite({ routes: 'tests/fixtures/caret-field/src/routes', trailingSlash: 'always', browser: { path } })
 

@@ -1,7 +1,7 @@
 ---
 import { navigate } from 'kay'
 
-const { value, area } = props<{ value: string, area?: boolean }>()
+const { value, area, delay = 150 } = props<{ value: string, area?: boolean, delay?: number }>()
 let timer: ReturnType<typeof setTimeout> | undefined
 
 // Searches as you type, the way a live search page does: the value comes back from the URL, so each swap hydrates the field afresh.
@@ -9,7 +9,7 @@ const search = (event: Event) => {
   const { value: q } = event.currentTarget as HTMLInputElement
 
   clearTimeout(timer)
-  timer = setTimeout(() => void navigate({ query: { q } }, { replace: true }), 150)
+  timer = setTimeout(() => void navigate({ query: { q } }, { replace: true }), delay)
 }
 ---
 if area

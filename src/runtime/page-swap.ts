@@ -995,7 +995,7 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
 
     if (again instanceof HTMLElement) {
       again.focus({ preventScroll: true })
-      carryCaret(before, again)
+      carryCaret(before, again, swap.held)
     }
 
     return
@@ -1018,7 +1018,7 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
 }
 
 // A text field the swap replaced, such as an island hydrated afresh for a new value, takes the caret and selection the old one had: a fresh field focused would otherwise start at 0, and the next keys land before what was typed. When the new text differs, a caret that was at the end stays at the end and any other is kept within it. A caret (not a selection) at the end scrolls the field to its end, which the browser does not do for a field just hydrated.
-function carryCaret(from: Element | null, to: HTMLElement): void {
+function carryCaret(from: Element | null, to: HTMLElement, held: string | undefined): void {
   if (!(from instanceof HTMLInputElement || from instanceof HTMLTextAreaElement) || !(to instanceof HTMLInputElement || to instanceof HTMLTextAreaElement))
     return
 
@@ -1026,6 +1026,14 @@ function carryCaret(from: Element | null, to: HTMLElement): void {
 
   if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
     return
+
+  // Keys typed while the page was fetched are kept, and the island is told so it asks for them next.
+  const typed = held !== undefined && value !== held && value !== to.value
+
+  if (typed) {
+    to.value = value
+    to.dispatchEvent(new Event('input', { bubbles: true }))
+  }
 
   const length = to.value.length
   const place = (offset: number) => {
