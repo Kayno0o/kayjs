@@ -100,6 +100,16 @@
   margin: 0;
 }
 
+.kcms-refusal-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.kcms-entry-notice {
+  margin: 0 0 1rem;
+}
+
 .kcms-reorder {
   display: flex;
   flex-direction: column;

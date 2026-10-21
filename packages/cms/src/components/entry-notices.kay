@@ -1,21 +1,85 @@
 ---
 import type { FormScope } from '../form'
+import type { DraftEntry } from '../kay/contract'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { call } from 'kay'
 import { wording } from 'kay/words'
+import entriesApi from '../api/entries'
+import { sinceText } from '../datetime'
+import { BODY } from '../markers'
 import { topKey } from '../paths'
 
-// What went wrong with the entry as a whole: its file not parsing, a save refused (with Keep my edits after a conflict), issues on the entry, and issues on a field or the body that nothing renders.
+// What went wrong with the entry as a whole: edits brought back from an earlier visit, its file not parsing, a save refused (after a conflict, the fields both sides changed, with Keep my edits and Take their version), issues on the entry, and issues on a field or the body that nothing renders.
 const { form } = props<{ form: FormScope }>()
+
+const theirs = signal<DraftEntry>()
+const taking = signal(false)
+
+const label = (path: string | typeof BODY) => path === BODY ? wording('cms.entry.body', 'Body') : path
+
+// The entry as the other save left it, with the version a save would name.
+async function fetchTheirs(): Promise<{ entry: DraftEntry, version: string | undefined } | undefined> {
+  const { collection, slug, locale } = form.entry
+  const answer = await attempt(async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } }), wording('cms.entry.theirsFailure', 'Could not load their version'))
+
+  return answer && { entry: { collection, slug, locale, data: answer.entry.data ?? {}, body: answer.entry.body }, version: answer.entry.version }
+}
+
+// Which fields the other save changed, best effort: the choice below does not wait for it.
+effect(() => {
+  const conflict = form.drafts.refusal(form.entry)?.conflict
+
+  theirs = undefined
+
+  if (!conflict || conflict.version === null)
+    return
+
+  let stale = false
+
+  onCleanup(() => stale = true)
+  void (async () => {
+    const found = await fetchTheirs()
+
+    if (!stale)
+      theirs = found?.entry
+  })()
+})
+
+async function takeTheirs(): Promise<void> {
+  taking = true
+
+  try {
+    const found = await fetchTheirs()
+
+    if (found)
+      form.drafts.adopt(form.entry, found.entry, found.version)
+  }
+  finally {
+    taking = false
+  }
+}
 
 const unseen = () => form.drafts.issues(form.entry).filter(issue => issue.body === true ? !form.shown.has('#body') : issue.path === '' || !form.shown.has(topKey(issue.path)))
 ---
+if form.drafts.recovery(form.entry) as recovery
+  p.kcms-entry-notice(role="status")
+    if recovery.restored
+      {wording('cms.entry.restored', 'Your unsaved changes from {time} are back. Reset drops them.', { time: sinceText(recovery.at) })}
+    else
+      {wording('cms.entry.notRestored', 'Unsaved changes from {time} were left out: this entry was saved since.', { time: sinceText(recovery.at) })}
 if form.problem as problem
   p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
 if form.drafts.refusal(form.entry) as refusal
   .kcms-entry-failure.kcms-refusal(role="alert")
     p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
     if refusal.conflict
+      if theirs() as other
+        p {wording('cms.entry.differs', 'Both sides changed: {fields}.', { fields: form.drafts.differences(form.entry, other).map(label).join(', ') })}
       p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}
-      Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} onClick={() => form.drafts.keepEdits(form.entry)})
+      .kcms-refusal-choice
+        Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} disabled={taking()} onClick={() => form.drafts.keepEdits(form.entry)})
+        if refusal.conflict.version !== null
+          Button(label={wording('cms.entry.takeTheirs', 'Take their version')} busy={taking()} onClick={takeTheirs})
 for issue of unseen() key={`${issue.path}:${issue.message}`}
   p.kcms-entry-failure(role="alert") {issue.message}

@@ -1,0 +1,15 @@
+--- client
+import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
+
+// The entry notices on drafts a test opens, mounted with `mountComponent`.
+type Notices = Parameters<typeof EntryNotices>[0]
+
+const { drafts } = props<{ drafts: Notices['form']['drafts'] }>()
+const form = {
+  drafts,
+  entry: { collection: 'posts', slug: 'hello' },
+  collection: { name: 'posts', schema: { type: 'object', properties: { title: { type: 'string' } } } } as unknown as Notices['form']['collection'],
+  shown: { add: () => () => undefined, has: () => false },
+}
+---
+EntryNotices(form={form})

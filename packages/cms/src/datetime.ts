@@ -143,3 +143,10 @@ export function useGoesLive(at: () => number | undefined): () => string | undefi
     return time === undefined ? undefined : goesLive(time, Date.now(), zone())
   }
 }
+
+// When something was typed, as the browser writes a short date and time: for what only exists once the browser holds a draft, so the server never renders it.
+export function sinceText(at: number): string {
+  const date = new Date(at)
+
+  return `${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+}

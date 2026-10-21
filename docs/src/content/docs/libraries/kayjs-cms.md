@@ -45,11 +45,13 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 ## Edit mode
 
-In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
+In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
 
 The editor never covers the page it edits. From 64rem wide it docks to the right and moves the page's body aside by its width. On a narrower window, and always below 40rem, it is a sheet at the bottom and pads the page by its height, so the page keeps its width and a fixed header at the top stays in view. At the side, the editor starts under a header fixed or sticky across the top of the window, so the header stays visible, and the dev tool's bar and floating drawer sit outside it.
 
 Drag the editor's inner edge, or focus it and press the arrow keys, to resize it. The button in its head docks it to the other edge, and the hide button folds it into one button. It remembers the edge, the size and whether it is hidden in the browser.
+
+What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first. Where the browser gives no storage, edits are only kept until the page closes.
 
 When the dev tool is docked to the right or the bottom, the editor sits beside it instead of under it. Clicking an element of the page scrolls it above the sheet when the sheet would hide it.
 
@@ -267,7 +269,7 @@ Publish, Unpublish, Publish now and Clear schedule each change one field and sav
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
 
-A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, and its Keep my edits button lets the next save write your edits over that save.
+A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, names the fields both sides changed, and offers Take their version, which drops your edits for the saved copy. Its Keep my edits button lets the next save write your edits over that save.
 
 A loaded entry is protected the same way, and your loader does not have to give a version: kayjs-cms compares what the loader returns for the entry now with what the editor opened. If another editor or your app changed it meanwhile, the save or the delete is refused and the form offers Keep my edits. A save that leaves the content as it was does not count as a change.
 

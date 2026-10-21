@@ -51,6 +51,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A keyed row that moves, and an island kept by `persist` across a page swap, keep their loaded iframe, playing video and focus in a browser with `Element.moveBefore` (Chrome 133, Firefox 144). An island kept across a page swap keeps the scroll of its scrolled panels in every browser ([Templates](templates.md), [Navigation](navigation.md)).
 - A server build sends each page after the first as its difference from the build's 404 page to a browser holding it (Compression Dictionary Transport, `Content-Encoding: dcz`): no setup, off in development and in a static export, and a browser without the feature gets what it did before; on kay's docs a 41 KB page goes in 4.4 KB instead of 9.2 KB with brotli ([Production](proxy-and-security.md#compression)).
 - `kay check` no longer asks an app's locale for the `ui.*` or `mail.*` keys of kayjs-ui or kayjs-mail when the library ships no catalog for it, `de` for one: the locale reads the default locale's texts ([Locales](locales.md)).
+- kayjs-cms keeps the on-page editor's unsaved edits in the browser and brings them back after a reload, a crash or in a second tab (a draft older than the saved entry is left out with a note), asks before a reload, a link or Stop editing drops them, and a save conflict names the fields both sides changed and offers Take their version beside Keep my edits ([kayjs-cms](../packages/cms/llms.txt))
 
 ## 1.60.1
 

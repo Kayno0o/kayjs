@@ -10,7 +10,7 @@ import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
 import layoutBottom from '~icons/tabler/layout-bottombar'
 import layoutSide from '~icons/tabler/layout-sidebar-right'
-import { call, listen, refresh } from 'kay'
+import { call, guardLeave, listen, refresh } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
@@ -33,6 +33,8 @@ shipWords()
 const open = signal(true)
 const focused = signal<FieldMarker>()
 const leaving = signal(false)
+// Set once Stop editing was asked with edits not saved, until the editor chooses between keeping them and dropping them.
+const confirming = signal(false)
 // Where the editor was left, read once mounted since the server has no storage: the page renders with the window's choice, then takes the kept one.
 const chosen = signal<Dock>()
 const side = signal<number>()
@@ -250,8 +252,18 @@ listen(() => document, 'click', (event) => {
   reveal(field.element, event.clientY)
 }, { capture: true })
 
-// Renders the page again as visitors see it, once kay forgot the edit mode.
+// Asks before the page, a link or a reload drops edits not saved.
+guardLeave(() => drafts.anyChanged())
+
+// Renders the page again as visitors see it, once kay forgot the edit mode; with edits not saved, asks first.
 async function stopEditing(): Promise<void> {
+  if (drafts.anyChanged() && !confirming()) {
+    confirming = true
+
+    return
+  }
+
+  confirming = false
   leaving = true
 
   if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), wording('cms.editor.leaveFailure', 'Could not leave edit mode'))) {
@@ -260,6 +272,8 @@ async function stopEditing(): Promise<void> {
     return
   }
 
+  // The edits go with the edit mode, so nobody signing in on this browser next finds them.
+  drafts.discardAll()
   await refresh()
 }
 
@@ -301,6 +315,12 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
     IconButton(icon={open() ? 'close' : 'menu'} label={open() ? wording('cms.editor.hide', 'Hide the editor') : wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = !open()})
   if open() && dock() as at
     .kcms-editor-grip(role="separator" tabindex="0" aria-label={wording('cms.editor.resize', 'Resize the editor')} aria-orientation={at === 'side' ? 'vertical' : 'horizontal'} aria-valuenow={size(at)} aria-valuemin={at === 'side' ? SIDE.min : BOTTOM.min} aria-valuemax={clampSize(at, Number.MAX_SAFE_INTEGER, room(), taken(at))} onPointerDown={startResize} onKeyDown={resizeByKey})
+  if open() && confirming()
+    .kcms-editor-confirm(role="alert")
+      p {wording('cms.editor.discardAsk', 'You have changes that are not saved. Stopping drops them.')}
+      .kcms-editor-choice
+        Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})
+        Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
   if open()
     .kcms-editor-body
       if drafts.failure() as failure

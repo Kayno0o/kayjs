@@ -71,6 +71,23 @@ html.kcms-dock-side .kcms-editor-open {
   color: var(--color-kui-error);
 }
 
+.kcms-editor-confirm {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  margin: 1rem;
+}
+
+.kcms-editor-confirm p {
+  margin: 0;
+}
+
+.kcms-editor-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .kcms-editor-empty,
 .kcms-entry-loading {
   margin: 1rem;

@@ -1,3 +1,6 @@
+import type { DraftEntry } from './kay/contract'
+import type { FieldPath } from './markers'
+import { BODY } from './markers'
 // Field paths as kay's markers write them: dotted keys, list indexes as numbers, `sections.1.heading`.
 
 const INDEX = /^\d+$/
@@ -61,4 +64,35 @@ export function topKey(path: string): string {
   const dot = path.indexOf('.')
 
   return dot < 0 ? path : path.slice(0, dot)
+}
+
+// The paths where two entries' data differ, down to the leaves, then `BODY` when their Markdown bodies do.
+export function differing(a: DraftEntry, b: DraftEntry): FieldPath[] {
+  const paths: FieldPath[] = []
+
+  function walk(path: string, left: unknown, right: unknown): void {
+    if (JSON.stringify(left) === JSON.stringify(right))
+      return
+
+    const plain = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+    const lists = Array.isArray(left) && Array.isArray(right)
+
+    if ((plain(left) && plain(right)) || lists) {
+      const keys = new Set([...Object.keys(left as object), ...Object.keys(right as object)])
+
+      for (const key of keys)
+        walk(joinPath(path, key), (left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key])
+
+      return
+    }
+
+    paths.push(path)
+  }
+
+  walk('', a.data, b.data)
+
+  if ((a.body ?? '') !== (b.body ?? ''))
+    paths.push(BODY)
+
+  return paths
 }
