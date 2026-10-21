@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.63.0
 
 - A schedule's `boot: true` runs again on a restart minutes after the previous boot, replicas starting within the same minute still running it once ([Production](production.md)).
 - kayjs-auth's `auth.signInAs(site, { email, username })` signs a test site in as a member, making them when none exists, with no form round trip, and `auth.signOut(site)` signs it out; a second call switches member ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
