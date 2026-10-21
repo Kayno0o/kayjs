@@ -36,7 +36,7 @@ describe('authMailer', () => {
     expect(html).toStartWith('<!doctype html><html lang="fr"')
     expect(html).toContain('>Confirmez votre adresse pour Site</h1>')
     expect(html).toContain('Confirmez ada@example.com comme adresse de votre compte Site.')
-    expect(html).toContain('<a class="km-button" href="https://site.test/verify?token=a&amp;b" style="display:inline-block;padding:0.75em 1.25em;font-size:16px;font-weight:600;background:#0047ff')
+    expect(html).toContain('<a class="km-button" href="https://site.test/verify?token=a&amp;b" target="_blank" rel="noopener" style="display:inline-block;padding:0.75em 1.25em;font-size:16px;font-weight:600;background:#0047ff')
     expect(html).toContain('Confirmer mon adresse')
     expect(html).toContain('Ou collez ceci dans votre navigateur : <a class="km-link" href="https://site.test/verify?token=a&amp;b"')
     expect(html).toContain('Ou saisissez ce code là où vous l\'avez demandé :')
