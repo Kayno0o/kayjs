@@ -327,25 +327,26 @@ export default {
 
 ## Testing
 
-Under `bun test`, mails go to the `outbox`. An enqueued mail reaches it once `site.runJobs()` ran, including one the action enqueued or sent without awaiting.
+Under `bun test`, mails go to the outbox. `mailTest(site)` reads the ones a test site sent, from an outbox that is empty at the start of every test, so you clear nothing by hand. An enqueued mail reaches it once `site.runJobs()` ran, including one the action enqueued or sent without awaiting.
 
 ```ts
-import { outbox } from '@kaynooo/kayjs-mail'
+import { mailTest } from '@kaynooo/kayjs-mail/test'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'
 
 const site = await testSite()
+const mail = mailTest(site)
 
 it('welcomes a new account', async () => {
   await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
   await site.runJobs()
 
-  expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
+  expect(mail.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
 })
 ```
 
-`outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next. `outbox.waitFor(address, { site, find })` runs the test site's queues until the mail is delivered, for a mail an action enqueues, and `outbox.token(mail, path)` reads the token of the link that opens `path`. `outbox.link(mail, path)` gives the link itself. See [Waiting for a mail](/guides/testing#waiting-for-a-mail).
+`mail.waitFor(address, { find })` runs the site's queues until the mail is delivered, for a mail an action enqueues. `mail.links(mail)` gives the links a mail carries, `mail.token(mail, path)` reads the token of the link that opens `path`, and `mail.link(mail, path)` gives the link itself. The process's own `outbox` has the same methods, with `watch` and `clear()`. See [Waiting for a mail](/guides/testing#waiting-for-a-mail).
 
 ## With kayjs-auth
 

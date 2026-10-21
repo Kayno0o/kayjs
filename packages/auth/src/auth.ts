@@ -1422,7 +1422,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     }).join('; ')
   }
 
-  return withPluginOwner({
+  const instance = withPluginOwner({
     [PAGES_OF]: core.pages && pagesHandle(core, options),
     // What `kay auth create-user` asks before the password: what `createUser` would refuse the login for.
     [CHECK_USER]: async (input: CreateUserInput) => userProblems(core, input),
@@ -1572,6 +1572,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
           ctx.deny(403)
       }
     },
+  })
+
+  return Object.assign(instance, {
+    // The test calls on one test site, so a test names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })` and `as.signOut()`.
+    test: (site: { cookies: Bun.CookieMap }) => ({
+      signInAs: async (who: Parameters<typeof instance.signInAs>[1]) => instance.signInAs(site, who),
+      signOut: () => instance.signOut(site),
+      sessionCookie: async (userId: string, cookieOptions?: { secure?: boolean }) => instance.sessionCookie(userId, cookieOptions),
+    }),
   })
 }
 

@@ -26,22 +26,23 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 Under `bun test` mails go to the outbox, with no SMTP server to stub:
 
 ```ts
-import { outbox } from '@kaynooo/kayjs-mail'
-import { beforeEach, expect, it } from 'bun:test'
+import { mailTest } from '@kaynooo/kayjs-mail/test'
+import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'
 
 const site = await testSite()
-
-beforeEach(() => outbox.clear())
+const mail = mailTest(site)
 
 it('welcomes a new account', async () => {
   await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
   await site.runJobs()
 
-  expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
+  expect(mail.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
 })
 ```
+
+`mailTest(site)` reads the mails the site sent, from an outbox that is empty at the start of every test, so no test clears it by hand; call it at the top of a file, as `testSite()`. It has `mails`, `last()`, `to(address)`, `find(id)`, `links(mail)`, `link(mail, match)`, `token(mail, match)` and `waitFor(address, { find, timeout })`, which runs the site's queues until the mail is there. The bullets below name the same methods on `outbox`, the process's own, which a test of the dev tool, `watch` or `clear()` reaches for.
 
 - `outbox.mails` lists the mails sent, oldest first, each a `Mail` with `id` and `sentAt`; `last()`, `to(address)` (among `to`, `cc` and `bcc`, any case), `find(id)` and `clear()` read it. It keeps the last 500.
 - `outbox.links(mail)` gives the addresses a mail links to, in order, each once, as a confirmation test needs: its html's links, or the URLs its text holds. `await outbox.waitFor(address, { timeout })` resolves with the newest mail to that address once one is there, failing after `timeout`, 5 seconds by default, for a mail a server sends on its own time. `outbox.watch(listener)` calls `listener` with each mail sent from then on, until the function it returns is called.

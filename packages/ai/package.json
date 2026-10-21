@@ -20,6 +20,7 @@
     "./add": "./src/add.ts",
     "./chat.kay": "./src/chat.kay",
     "./chat-launcher.kay": "./src/chat-launcher.kay",
+    "./test": "./src/test.ts",
     ".": {
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"

@@ -61,6 +61,26 @@ describe('createAuth', () => {
     await expect(auth.signInAs(site, { email: 'not an address' })).rejects.toThrow('could not make the member')
   })
 
+  test('test(site) names the site once for signInAs, signOut and sessionCookie', async () => {
+    const { auth, app, store } = testApp()
+    const site = cookieJar()
+    const as = auth.test(site)
+    const who = async () => ((await site.send(app.handle, new Request('http://localhost/me'))).text())
+
+    const ada = await as.signInAs({ email: 'ada@example.com', roles: ['editor'] })
+
+    expect(JSON.parse(await who())).toMatchObject({ id: ada.id, roles: ['editor'] })
+
+    as.signOut()
+    expect(await who()).toBe('anonymous')
+
+    await store.users.create(userRecord({ id: 'u9', email: 'grace@example.com' }))
+
+    const cookie = await as.sessionCookie('u9')
+
+    expect(JSON.parse(await (await app.handle(new Request('http://localhost/me', { headers: { cookie } }))).text())).toMatchObject({ id: 'u9' })
+  })
+
   test('signOut signs out a site signed in by a cookie it did not set, and a refused sign-in keeps the current member', async () => {
     const { auth, app, store } = testApp()
     const site = cookieJar()

@@ -354,17 +354,22 @@ A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailabl
 Under `bun test`, `ask` always answers from `fakeAi`, even when a key is set. A test says what the model answers and reads what was asked.
 
 ```ts
-import { ask, fakeAi } from '@kaynooo/kayjs-ai'
+import { ask } from '@kaynooo/kayjs-ai'
+import { aiTest } from '@kaynooo/kayjs-ai/test'
 
-fakeAi.reply(['It ', 'works'])
+const model = aiTest()
+
+model.reply(['It ', 'works'])
 
 expect(await ask('Hi')).toBe('It works')
-expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
+expect(model.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
-`fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
+`aiTest()` forgets what was scripted and asked at the start of every test, so you clear nothing by hand. Call it at the top of a test file.
 
-A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+`model.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
+
+A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. `model.fail(error)` makes the next ask fail. `fakeAi` is exported too. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
 

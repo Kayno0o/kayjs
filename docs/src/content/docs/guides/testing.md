@@ -152,14 +152,20 @@ A `persisted` signal kept in a cookie stores its value in kay's own encoding, so
 
 ## Waiting for a mail
 
-An action that sends a mail through a queue has not sent it when the call answers. `outbox.waitFor(address, { site })` from kayjs-mail runs the site's queues until the mail is there, and fails after 5 seconds, naming the mails the outbox holds. `outbox.token(mail, path)` reads the token of the link that opens `path`. `outbox.link(mail, path)` gives the link itself, for a page you visit next.
+An action that sends a mail through a queue has not sent it when the call answers. `mailTest(site)` from kayjs-mail reads the site's mails, and its `waitFor(address)` runs the site's queues until the mail is there, and fails after 5 seconds, naming the mails the outbox holds. `token(mail, path)` reads the token of the link that opens `path`. `link(mail, path)` gives the link itself, for a page you visit next.
 
 ```ts
+const mail = mailTest(site)
+
 await site.submit(request, { email }, { from: '/auth/reset-password' })
 
-const mail = await outbox.waitFor(email, { site, find: each => each.subject.includes('Reset') })
-const token = outbox.token(mail, '/auth/reset-password')
+const sent = await mail.waitFor(email, { find: each => each.subject.includes('Reset') })
+const token = mail.token(sent, '/auth/reset-password')
 ```
+
+## Testing a library
+
+Each library has one helper. Call it at the top of a test file, and it clears itself before every test, so no test cleans up by hand. `mailTest(site)` reads the mails, `aiTest()` scripts the fake model, `auth.test(site)` signs the site in and out, and `cmsTest(site)` signs in as an editor, saves an entry and reads it back. Each library's page shows its helper.
 
 ## Calling an API route
 

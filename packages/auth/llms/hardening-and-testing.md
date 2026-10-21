@@ -69,6 +69,8 @@ auth.signOut(site)
 expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
 ```
 
+`auth.test(site)` names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })`, `as.signOut()` and `await as.sessionCookie(userId)`, the same calls as above without the `site` argument.
+
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
 
 ## Dev tool

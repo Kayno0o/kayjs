@@ -5,19 +5,22 @@
 Under `bun test`, and in development until a provider is configured, `ask()` answers from `fakeAi`, as kayjs-mail answers into its `outbox`. A key in the test environment is never used.
 
 ```ts
-import { ask, fakeAi } from '@kaynooo/kayjs-ai'
-import { afterEach, expect, it } from 'bun:test'
+import { ask } from '@kaynooo/kayjs-ai'
+import { aiTest } from '@kaynooo/kayjs-ai/test'
+import { expect, it } from 'bun:test'
 
-afterEach(() => fakeAi.clear())
+const model = aiTest()
 
 it('asks for the summary', async () => {
-  fakeAi.reply(['It ', 'works'])
-  fakeAi.reply(asked => `You sent ${asked.messages.length} messages`)
+  model.reply(['It ', 'works'])
+  model.reply(asked => `You sent ${asked.messages.length} messages`)
 
   expect(await ask('Hi')).toBe('It works')
-  expect(fakeAi.last()).toMatchObject({ messages: [{ role: 'user', content: 'Hi' }], model: 'fake' })
+  expect(model.last()).toMatchObject({ messages: [{ role: 'user', content: 'Hi' }], model: 'fake' })
 })
 ```
+
+`aiTest()` scripts and reads `fakeAi`, which forgets its scripts and asks at the start of every test, so no test clears it by hand; call it at the top of a file. It has `reply`, `fail`, `asked` and `last()`, which the bullets below describe on `fakeAi`, the process's own, whose `clear()` stays for a test outside `bun test`'s hooks.
 
 - `fakeAi.reply(script)`: the next ask answers with a text (streamed word by word), an array of pieces, `{ text?, data?, calls: [{ name, input, id? }], cache?, finish? }`: `data` is the object answering an ask with a `schema`, sent as its JSON text in pieces, and any value, so `data: { title: 'x' }` plays a model giving a field short; `calls` call tools (`id` is the call's id, `fake_1`, `fake_2` and so on by default), `cache: { read?, written? }` reports input tokens read from and written to the provider's prompt cache, and `finish` says why the step ended, `stop` by default, `length` for a reply cut by the token cap (also `filtered` and `steps`). A script can also be a function of what was asked returning any of them. A tool loop reads one script per step; a string `input` is sent as the raw arguments, so `'{"title": '` plays a model garbling its JSON. Scripts are used in order; with none left the reply is `Fake reply to: <the last user message>`, or for an ask with a `schema` an object that fits it (`fake` for a string, the minimum for a number, the first choice of an enum, the fields it requires), so `kay dev` needs no key.
 - `fakeAi.fail(error)`: the next ask throws it, an `AiError` say.

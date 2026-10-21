@@ -72,6 +72,10 @@ expect((await asAdmin.visit('/admin')).status).toBe(200)
 
 kayjs-auth's `await auth.signInAs(site, { email, username })` signs a test site in as a member, made when none exists, with no form round trip; `auth.signOut(site)` signs it out, and a second `signInAs` switches member (see [kayjs-auth](../packages/auth/llms/hardening-and-testing.md)).
 
+### Test a library's part
+
+Each library has one helper, called at the top of a file, that clears itself before every test: `const mail = mailTest(site)` from `@kaynooo/kayjs-mail/test` (the site's mails, `waitFor` running its queues), `const model = aiTest()` from `@kaynooo/kayjs-ai/test` (`reply`, `fail`, `asked`), `const as = auth.test(site)` (`signInAs`, `signOut`, `sessionCookie`) and `const editor = cmsTest(site)` from `@kaynooo/kayjs-cms/test` (`signInAs`, `save`, `entry`); each library's llms.txt has the rest.
+
 ### Check a page's metadata
 
 A visit reads the title, meta tags, canonical link, JSON-LD and links without a regex:

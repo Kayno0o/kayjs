@@ -23,6 +23,7 @@
   "exports": {
     "./*.kay": "./src/*.kay",
     "./add": "./src/add.ts",
+    "./test": "./src/test.ts",
     ".": {
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"
