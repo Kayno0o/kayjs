@@ -11,17 +11,24 @@ export interface EntryRef {
   locale?: string
 }
 
-// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the numbers read since anything unrelated to a field rendered, and every entry read.
+// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the numbers read since anything unrelated to a field rendered, how many fields rendered so far (what tells a read made before a render from one made after it), and every entry read.
 export interface FieldMarks {
   refs: string[]
   indexes: Map<string, number>
-  unrendered: Map<string, number[]>
-  numbers: { value: number, ref: number }[]
+  unrendered: Map<string, Read[]>
+  numbers: (Read & { value: number })[]
+  renders: number
   entries: Map<string, EntryRef>
   wrapped: WeakMap<object, object>
   // Set apart from any text an entry holds, which may use these private-use characters too, an icon font's glyphs say.
   nonce: string
   fence: RegExp
+}
+
+// A field's read, with the renders there were when it was read.
+interface Read {
+  ref: number
+  epoch: number
 }
 
 type Kind = 'field' | 'body' | 'list'
@@ -72,7 +79,7 @@ export function editMarks(): FieldMarks | undefined {
   if (!state.marks) {
     const nonce = crypto.randomUUID().slice(0, 8)
 
-    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
+    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
   }
 
   return state.marks
@@ -127,8 +134,9 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
 }
 
 // A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or a number read since nothing unrelated to a field rendered.
-export function markedText(value: string | number, markup: string): string {
-  const ref = fieldOf(value)
+// A part of a child that no field gave, a literal text between two numbers say, comes between them without forgetting the numbers read.
+export function markedText(value: string | number, markup: string, part = false): string {
+  const ref = fieldOf(value, part)
 
   return ref === undefined ? markup : fenced(fieldMarks.marking!, 'field', ref, markup)
 }
@@ -204,21 +212,44 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
   return `${OPEN}${marks.nonce}${KIND_CODE[kind]}${ref}${END}${markup}${CLOSE}${marks.nonce}${END}`
 }
 
-function fieldOf(value: string | number): number | undefined {
+function fieldOf(value: string | number, part = false): number | undefined {
   const marks = fieldMarks.marking!
-  const ref = typeof value === 'string' ? marks.unrendered.get(value)?.shift() : claimNumber(marks, value)
+  const ref = typeof value === 'string' ? claim(marks.unrendered.get(value)) : claim(marks.numbers, read => read.value === value)
+
+  marks.renders++
 
   // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field.
-  if (ref === undefined)
+  if (ref === undefined && !(part && typeof value === 'string'))
     marks.numbers.length = 0
 
   return ref
 }
 
-function claimNumber(marks: FieldMarks, value: number): number | undefined {
-  const index = marks.numbers.findIndex(read => read.value === value)
+// The field whose read a render is, taken off `reads`: of the reads of that value, the latest rendered before them, the first of those when several were read together.
+// A read made before a render this one follows is one nothing rendered, a condition's say, and an equal value read after it is the one rendered, so the earlier reads of that value are forgotten with it.
+function claim<T extends Read>(reads: T[] | undefined, same: (read: T) => boolean = () => true): number | undefined {
+  if (reads === undefined)
+    return undefined
 
-  return index < 0 ? undefined : marks.numbers.splice(index, 1)[0]!.ref
+  let latest = -1
+
+  for (const read of reads) {
+    if (same(read) && read.epoch > latest)
+      latest = read.epoch
+  }
+
+  const first = reads.findIndex(read => same(read) && read.epoch === latest)
+
+  if (first < 0)
+    return undefined
+
+  const { ref } = reads[first]!
+  const kept = reads.filter((read, index) => index !== first && (!same(read) || read.epoch === latest))
+
+  reads.length = 0
+  reads.push(...kept)
+
+  return ref
 }
 
 function refIndex(marks: FieldMarks, ref: string): number {
@@ -262,7 +293,7 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         const field = refIndex(marks, fieldPath(name, [...path, key]))
 
         marks.numbers = marks.numbers.filter(each => each.ref !== field)
-        marks.numbers.push({ value: read, ref: field })
+        marks.numbers.push({ value: read, ref: field, epoch: marks.renders })
       }
 
       // A blank text tells nothing apart: `''` is what any empty branch renders.
@@ -271,9 +302,9 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         const waiting = marks.unrendered.get(read)
 
         if (!waiting)
-          marks.unrendered.set(read, [field])
-        else if (!waiting.includes(field))
-          waiting.push(field)
+          marks.unrendered.set(read, [{ ref: field, epoch: marks.renders }])
+        else if (!waiting.some(each => each.ref === field))
+          waiting.push({ ref: field, epoch: marks.renders })
       }
 
       return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])

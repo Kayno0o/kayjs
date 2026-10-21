@@ -1109,6 +1109,63 @@ describe('preview mode', () => {
     }, true)
   })
 
+  it('opens the field rendered when an equal text was read in a condition before it, and marks no later equal text with the one read', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { status: 'draft', title: 'T', label: 'draft' }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => {
+        const draft = entry.data.status === 'draft'
+        const first = `<h1>${child(entry.data.title)}</h1>`
+        const label = `<h2>${child(entry.data.label)}</h2>`
+        const literal = `<p>${child('draft')}</p>`
+
+        return `${draft ? first : ''}${label}${literal}`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">T</h1><h2 data-kay-field="news:a:label">draft</h2><p>draft</p>')
+    }, true)
+  })
+
+  it('opens the field rendered when an equal number was read in a condition before it, and marks no later equal number with the one read', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'T', count: 3, rating: 3 }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => {
+        const high = entry.data.rating >= 3
+        const first = `<h1>${child(entry.data.title)}</h1>`
+        const count = `<p>${child(entry.data.count)}</p>`
+
+        return `${high ? first : ''}${count}<p>${child(3)}</p>`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">T</h1><p data-kay-field="news:a:count">3</p><p>3</p>')
+    }, true)
+  })
+
+  it('pairs fields of the same text with their renders one by one, read together or one after the other', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same', subtitle: 'Same', note: 'Same' }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => {
+        const { title, subtitle } = entry.data
+
+        return `<h1>${child(title)}</h1><h2>${child(subtitle)}</h2><p>${child(entry.data.note)}</p><p>${child('Same')}</p>`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">Same</h1><h2 data-kay-field="news:a:subtitle">Same</h2><p data-kay-field="news:a:note">Same</p><p>Same</p>')
+    }, true)
+  })
+
+  it('keeps a number\'s mark across a literal text between two numbers of one child', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { from: 3, to: 5 }, Content: () => renderedHtml('') })
+      const html = withFieldMarks(marks, () => `<p>${child([entry.data.from, ' to ', entry.data.to])}</p>`)
+
+      expect(placeFieldMarks(html, marks)).toBe('<p><!--kay-field crew:a:from-->3<!--/kay-field--> to <!--kay-field crew:a:to-->5<!--/kay-field--></p>')
+    }, true)
+  })
+
   it('marks the fields a component renders from an entry its page handed down, whatever its fence read', async () => {
     const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const preview = await previewCookie(previewUrl('/news'))

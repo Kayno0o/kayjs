@@ -73,7 +73,7 @@ export function child(value: unknown): string {
     else if (fieldMarks.marking === undefined)
       markup += escape(part)
     else
-      markup += markedText(typeof original === 'number' ? original : part, escape(part))
+      markup += markedText(typeof original === 'number' ? original : part, escape(part), true)
   })
 
   return markup
