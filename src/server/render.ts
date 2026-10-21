@@ -272,7 +272,7 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
   if (options.dev) {
-    rendering.guards = guardRuns(route.guards, refusal)
+    rendering.guards = guardRuns(route.guards, refusal, options.redirectSpelling)
 
     if (refusal?.error instanceof Redirect)
       noteRedirect(options.dev, rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
@@ -282,7 +282,7 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
 }
 
 // What each guard did, for the dev tool: those before a refusal passed, the one refusing says how, the rest did not run.
-function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined): NonNullable<Rendering['guards']> {
+function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined, spelling?: RenderOptions['redirectSpelling']): NonNullable<Rendering['guards']> {
   const refused = refusal ? guards.indexOf(refusal.guard) : -1
 
   return guards.map((guard, index) => {
@@ -291,7 +291,7 @@ function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined):
     if (index < refused || refused === -1)
       return { file, outcome: 'passed' }
 
-    return { file, outcome: index > refused ? 'did not run' : refusalOutcome(refusal!.error) }
+    return { file, outcome: index > refused ? 'did not run' : refusalOutcome(refusal!.error, spelling) }
   })
 }
 
@@ -342,9 +342,10 @@ async function reachesIsland(file: string): Promise<boolean> {
   }
 }
 
-function refusalOutcome(error: unknown): string {
+// The redirect names the `Location` that goes out, spelled as the response spells it.
+export function refusalOutcome(error: unknown, spelling?: RenderOptions['redirectSpelling']): string {
   if (error instanceof Redirect)
-    return `redirected to ${error.location} (${error.status})`
+    return `redirected to ${spelling?.(error.location) ?? error.location} (${error.status})`
 
   if (error instanceof Denied)
     return `denied with ${error.status}${error.message === '' ? '' : `: ${error.message}`}`

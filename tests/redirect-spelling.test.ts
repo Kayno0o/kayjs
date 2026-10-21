@@ -5,6 +5,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
+import { refusalOutcome } from '../src/server/render'
 import { Redirect } from '../src/server/signals'
 
 const routes = 'tests/fixtures/redirect-spelling/src/routes'
@@ -151,7 +152,7 @@ describe('a redirect to a path that is hostile or odd', () => {
 describe('a redirect on a site whose root catch-all page could take any path', () => {
   const shadowed = 'tests/fixtures/redirect-shadow/src/routes'
   const api = 'tests/fixtures/redirect-shadow/src/api'
-  const extension = { name: 'kay-test-auth', server: new Elysia({ name: 'kay-test-auth' }).get('/auth/:provider', () => 'auth') }
+  const extension = { name: 'kay-test-auth', server: new Elysia({ name: 'kay-test-auth' }).get('/auth/:provider', () => 'auth').get('/contact', () => 'contact') }
 
   for (const dev of [false, true]) {
     it(`spells a page and leaves what else serves the path as written, ${dev ? 'dev' : 'production'}`, async () => {
@@ -169,10 +170,20 @@ describe('a redirect on a site whose root catch-all page could take any path', (
       expect(await where('/')).toBe('/')
 
       // An API module's route, an extension's, a public file with no extension and kay's own.
-      for (const to of ['/api/ping/hello', '/auth/github', '/plain', '/_kay/x', '/x.json'])
+      // An extension's route at the very pattern of a page is reached first, so it is no page's.
+      for (const to of ['/api/ping/hello', '/auth/github', '/contact', '/plain', '/_kay/x', '/x.json'])
         expect(await where(to), to).toBe(to)
     })
   }
+})
+
+describe('the dev tool\'s guard outcome', () => {
+  it('names the Location that goes out, spelled, and the plain one without a spelling', () => {
+    const spelled = (location: string) => `${location}/`
+
+    expect(refusalOutcome(new Redirect('/deferred', 302), spelled)).toBe('redirected to /deferred/ (302)')
+    expect(refusalOutcome(new Redirect('/deferred', 302))).toBe('redirected to /deferred (302)')
+  })
 })
 
 describe('a redirect on a site with locales by domain', () => {

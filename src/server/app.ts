@@ -256,7 +256,9 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
 export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
-  const setup = await setupPages(project, loadClient)
+  // The one spelling every redirect goes through, handed to the setup's render options and the actions alike; it reads the routes, so it is set once they are known.
+  let spell = (location: string) => location
+  const setup = await setupPages(project, loadClient, false, location => spell(location))
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints, appManifest, extensions, api: apiImport } = setup
   const routes = await servedRoutes(setup, options.requireGuards)
   const served = new ServedPaths()
@@ -269,11 +271,12 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // A redirect to a page goes out as a visit to it is answered, with the trailing slash its page has; a route something else registered, such as an extension's or an API module's, is not one.
   const pagePaths = new Set(table.paths.keys())
+  // What was registered before the pages, an extension's routes among them: one at a page's own pattern is reached first, so it wins.
+  const earlier = new Set<string>()
   // Held weakly: the setup's render options keep the spelling, and through it the app would outlive its last request.
   const appRef = new WeakRef(app)
-  const spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...(appRef.deref()?.routes ?? []).filter(route => (route.method === 'GET' || route.method === 'ALL') && !pagePaths.has(route.path) && !served.suffixed().has(route.path)).map(route => route.path)])
 
-  renderOptions.redirectSpelling = spell
+  spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...(appRef.deref()?.routes ?? []).filter(route => (route.method === 'GET' || route.method === 'ALL') && (earlier.has(`${route.method} ${route.path}`) || !pagePaths.has(route.path)) && !served.suffixed().has(route.path)).map(route => route.path)])
 
   setSiteFacts(app, {
     pageRoute: path => bySpecificity.find(({ route }) => pageMatch.posted(route, path))?.label,
@@ -372,6 +375,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security, base }))
     filePaths.add(path)
+
+  for (const route of app.routes)
+    earlier.add(`${route.method} ${route.path}`)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: spell, requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
