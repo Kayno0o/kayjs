@@ -3351,17 +3351,19 @@ describe.concurrent('kay check, unused code', () => {
       'const profile = await cached("user", 300, async () => "ada")',
       'const slow = await cached("slow", 60 * 5, async () => "ada")',
       'const hit = await memoryRates().hit("k", 60_000)',
+      'const held = await store.hit("k", 60)',
+      'const counted = await attempts.hit("k", 60)',
       '---',
       'p {profile}',
       'p {slow} {hit.count}',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/routes/index.kay': page.replace('---\np {profile}', 'declare const store: { hit(key: string, window: Duration): Promise<{ count: number }> }\ndeclare const attempts: typeof store\n---\np {profile}').replace('import { cached }', 'import type { Duration } from "kay"\nimport { cached }') })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-bare-duration/g)).toHaveLength(2)
+      expect(output.match(/deprecated-bare-duration/g)).toHaveLength(4)
       expect(output).toContain('write \'300s\'')
       expect(output).toContain('write \'60000ms\'')
       await runCheck(root, '--fix')
@@ -3371,6 +3373,9 @@ describe.concurrent('kay check, unused code', () => {
       expect(fixed).toContain('cached("user", \'300s\',')
       expect(fixed).toContain('cached("slow", 60 * 5,')
       expect(fixed).toContain('.hit("k", \'60000ms\')')
+      // A receiver not known to be a rate store has a guessed unit, so its fix stays unsafe; an attempts store reads seconds.
+      expect(fixed).toContain('store.hit("k", 60)')
+      expect(fixed).toContain('attempts.hit("k", \'60s\')')
     }
     finally {
       await rm(root, { recursive: true, force: true })
