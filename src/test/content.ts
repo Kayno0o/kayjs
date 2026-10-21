@@ -14,6 +14,8 @@ export interface SeedEntry {
   locale?: string | undefined
   data: Record<string, unknown>
   body?: string | undefined
+  // HTML rendered as it is, as a loaded entry's: a folder collection's entry has none.
+  html?: string | undefined
 }
 
 export type ContentSeed = Record<string, SeedEntry[]>
@@ -38,7 +40,22 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   const copies = new Map<string, string>()
   const originals = new Map<Collection<unknown>, Partial<Methods>>()
   let scratch: Promise<string> | undefined
-  const baseDir = async () => scratch ??= scratchDir('content-', root)
+  const baseDir = async () => {
+    scratch ??= scratchDir('content-', root)
+
+    try {
+      return await scratch
+    }
+    catch (error) {
+      // A failed directory is made again by the next use.
+      scratch = undefined
+
+      throw error
+    }
+  }
+  // Moves on each reset, so a copy that was under way when it came does not land in the next test's content.
+  let epoch = 0
+  let started: Promise<void> | undefined
   let released = false
 
   const indexOf = (real: string) => folders.findIndex(([, collection]) => resolve(contentPlace().base, collection.dir) === real)
@@ -53,6 +70,7 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
       return
 
     const pending = isolating.get(real) ?? (async () => {
+      const mine = epoch
       const target = join(await baseDir(), String(index))
 
       await rm(target, { recursive: true, force: true })
@@ -61,6 +79,9 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
         await cp(real, target, { recursive: true })
       else
         await mkdir(target, { recursive: true })
+
+      if (mine !== epoch)
+        return
 
       copies.set(real, target)
       folders[index]![1].invalidate()
@@ -102,7 +123,7 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
       if (localized && entry.locale === undefined)
         throw new KayError('content-api-misuse', `kay: the seed of ${name} gives ${entry.slug} no locale, which each entry of a localized collection has`)
 
-      return { slug: localized ? `${entry.locale}/${entry.slug}` : entry.slug, data: entry.data, ...entry.body !== undefined && { body: entry.body } }
+      return { slug: localized ? `${entry.locale}/${entry.slug}` : entry.slug, data: entry.data, ...entry.body !== undefined && { body: entry.body }, ...entry.html !== undefined && { html: entry.html } }
     })
   }
 
@@ -162,7 +183,25 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
     }
   }
 
+  // The first use of the content moves every folder collection to its copy, so a file written straight into the project's folder is ignored from then on as a saved one is, and not only once a save reaches its folder.
+  const isolateAll = async () => {
+    started ??= (async () => {
+      await Promise.all(folders.map(async ([, collection]) => isolate(resolve(contentPlace().base, collection.dir))))
+    })()
+
+    try {
+      await started
+    }
+    catch (error) {
+      started = undefined
+
+      throw error
+    }
+  }
+
   const seed = async (name: string, entries: SeedEntry[]) => {
+    await isolateAll()
+
     const found = named.find(([exported]) => exported === name)
 
     if (found === undefined)
@@ -179,6 +218,8 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const write = async (name: string, file: string, text: string) => {
+    await isolateAll()
+
     const folder = folders.find(([exported]) => exported === name)
 
     if (folder === undefined)
@@ -198,11 +239,16 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const reset = async (given: ContentSeed = {}) => {
+    // A copy under way ends first, and its epoch is over, so it lands nowhere.
+    epoch++
+    await Promise.allSettled(isolating.values())
+
     for (const [, collection] of named)
       restoreLoader(collection)
 
     copies.clear()
     isolating.clear()
+    started = undefined
 
     if (scratch !== undefined)
       await rm(await scratch, { recursive: true, force: true })

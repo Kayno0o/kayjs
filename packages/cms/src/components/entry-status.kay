@@ -3,12 +3,18 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import { wording } from 'kay/words'
 import { useGoesLive } from '../datetime'
 
-// The Status of a published entry in the list: Scheduled for its date while that is ahead, in the editor's zone once the browser says it (UTC before), and Published once it passes, with no reload.
-const { at } = props<{ at: number | undefined }>()
+// The Status of a published entry in the list: Scheduled for its `publishAt` date while that is ahead, in the editor's zone once the browser says it (UTC before), else Ended once its `unpublishAt` date passed, else Published with an Ends badge while that date is ahead; each follows the clock with no reload.
+const { at, end } = props<{ at: number | undefined, end?: number | undefined }>()
 
 const scheduled = useGoesLive(() => at)
+const ends = useGoesLive(() => end)
+const ended = () => end !== undefined && ends() === undefined
 ---
 if scheduled() as when
   Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at: when })})
+else if ended()
+  Badge(tone="warning" label={wording('cms.entry.ended', 'Ended')})
 else
   Badge(tone="success" label={wording('cms.table.published', 'Published')})
+  if ends() as when
+    Badge(tone="info" label={wording('cms.entry.endsAt', 'Ends {at}', { at: when })})

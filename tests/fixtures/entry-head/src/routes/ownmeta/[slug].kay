@@ -1,0 +1,11 @@
+--- server
+import { notes } from '../../content.config'
+
+export const page = { prerender: notes }
+
+const note = await notes.get(ctx.params.slug) ?? ctx.notFound()
+---
+head
+  meta(name="description" content="Mine")
+  meta(property="article:published_time" content="2001-01-01T00:00:00.000Z")
+h1 {note.slug}

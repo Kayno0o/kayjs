@@ -407,6 +407,17 @@ describe('localized content', () => {
     expect((await get('/en/news', served)).html).toContain('<ul class="news"><li>English only (en)</li><li>Hello (en)</li><li>Lancement (fr)</li></ul>')
   })
 
+  it('writes the head of an entry page from the request\'s locale\'s entry', async () => {
+    const served = await contentSite()
+    const french = (await get('/news/hello', served)).html
+    const english = (await get('/en/news/hello', served)).html
+
+    expect(french).toContain('<title>Bonjour</title>')
+    expect(french).toContain('<meta property="article:published_time" content="2026-10-01T00:00:00.000Z">')
+    expect(english).toContain('<title>Hello</title>')
+    expect(english).not.toContain('<title>Bonjour</title>')
+  })
+
   it('serve a feed per locale of the entries written in it, and list every locale\'s copy in the sitemap', async () => {
     const served = await contentSite()
     const english = (await get('/en/news/rss.xml', served)).html

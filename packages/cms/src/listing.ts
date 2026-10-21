@@ -1,6 +1,6 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
 import { wording } from 'kay/words'
-import { publishTime } from './datetime'
+import { publishTime, unpublishTime } from './datetime'
 import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
@@ -19,6 +19,8 @@ export interface EntryRow {
   draft: boolean
   // For a published entry whose `publishAt` date is ahead, when it goes live in milliseconds, which the table names in the editor's zone and drops once it passes.
   scheduledAt?: number | undefined
+  // For a published entry with an `unpublishAt` date, when it comes down in milliseconds, which the table names while ahead and marks Ended once it passes.
+  endsAt?: number | undefined
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
@@ -43,10 +45,11 @@ export function rowsOf(collection: ScreenCollection, entries: SourceEntry[], now
 
   return entries.map(({ slug, locale, url, data, draft, problem }) => {
     const goesLiveAt = draft ? undefined : publishTime(collection, data)
+    const comesDownAt = draft ? undefined : unpublishTime(collection, data)
     const title = titleKey === undefined ? undefined : data?.[titleKey]
     const cells = columns.length === 0 ? undefined : Object.fromEntries(columns.map(field => [field.key, cellText(field, data?.[field.key])]))
 
-    return { slug, locale, url, draft, problem, cells, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: goesLiveAt }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    return { slug, locale, url, draft, problem, cells, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: goesLiveAt }, ...comesDownAt !== undefined && { endsAt: comesDownAt }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 

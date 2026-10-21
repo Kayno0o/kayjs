@@ -37,7 +37,7 @@ const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
   ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true } satisfies Column<EntryRow>] : []),
-  ...(collection.draftField === undefined && collection.publishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
+  ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
 
@@ -82,7 +82,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
       if row.draft
         Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
       else
-        EntryStatus(at={row.scheduledAt})
+        EntryStatus(at={row.scheduledAt} end={row.endsAt})
     else
       .kcms-row-actions
         if actions.has('move')

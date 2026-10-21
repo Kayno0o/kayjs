@@ -1,9 +1,10 @@
-import { readdir } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { entrySource, removeEntry, saveEntry } from '../src/content'
 import { testSite } from '../src/test'
 import { cms } from './fixtures/cms/src/cms'
+import { notes } from './fixtures/cms/src/content.config'
 
 const FIXTURE = 'tests/fixtures/cms/src'
 const site = await testSite({ routes: `${FIXTURE}/routes`, content: `${FIXTURE}/content.config.ts`, islands: false })
@@ -83,6 +84,42 @@ describe('the content of a test site', () => {
     expect((await removeEntry('news', 'seeded')).issues).toBeUndefined()
     expect((await site.visit('/news')).text('ul.news')).toBe('Other')
     expect(cms.entries).toEqual(source)
+  })
+
+  it('ignores a file written straight into the project\'s folder once the content is used, saved to or not', async () => {
+    const direct = join(REAL, 'fr/direct.md')
+
+    await site.content.seed('news', [{ slug: 'seeded', data: { title: 'Seeded', published: true, tags: [] } }])
+
+    try {
+      await Bun.write(direct, '---\ntitle: Direct\n---\n')
+      expect((await site.visit('/articles/direct')).status).toBe(404)
+    }
+    finally {
+      await rm(direct, { force: true })
+    }
+  })
+
+  it('seeds the html of a loaded entry', async () => {
+    await site.content.seed('notes', [{ slug: 'hello', locale: 'en', data: { title: 'Hello' }, html: '<p>Seeded html</p>' }])
+    expect(await notes.loader?.load({ preview: false })).toEqual([{ slug: 'en/hello', data: { title: 'Hello' }, html: '<p>Seeded html</p>' }])
+  })
+
+  it('lets a reset end a copy under way without the copy landing in the next test', async () => {
+    const direct = join(REAL, 'fr/raced.md')
+
+    await Bun.write(direct, '---\ntitle: Raced\n---\n')
+
+    try {
+      const writing = site.content.write('pages', 'raw.json', '{}')
+
+      await site.content.reset()
+      await Promise.allSettled([writing])
+      expect((await site.visit('/articles/raced')).status).toBe(200)
+    }
+    finally {
+      await rm(direct, { force: true })
+    }
   })
 
   it('gives a loaded collection back its own loader on reset', async () => {

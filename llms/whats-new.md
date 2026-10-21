@@ -15,6 +15,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The kayjs-cms on-page editor names, above an entry's form, the fields the page cannot let it click (a transformed value, an island's props, a frozen object), from the new `unclickable` of `EditorProps` ([Edit mode](content-edit.md#the-editor)).
 - kayjs-cms's admin takes `cms({ logo })`, shows crumbs on entry screens and keeps its chrome and guard at `prefix: '/'` under an app root layout; a new folder entry's slug is written from its title, cleaned as typed and checked against the collection, and its missing pages screen dismisses and clears paths, names the linking pages, edits and bulk-removes redirects, answers 410 and lists the config's ([Screens](../packages/cms/llms/screens.md)).
 - kayjs-cms's list has an `unpublish` row action, a save shown only after a rebuild turns to `Live now` once the public page serves it, and a delete confirmation lists the entries that reference the one deleted ([Screens](../packages/cms/llms/screens.md)).
+- kayjs-cms's list Status column shows `Ends` and `Ended` for an `unpublishAt` date, also for a collection with that date alone ([Screens](../packages/cms/llms/screens.md)).
 
 ## 1.62.0
 

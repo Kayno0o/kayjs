@@ -125,7 +125,7 @@ article
   Content
 ```
 
-The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`) makes `og:type` an `article` with an `article:published_time`. Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
+The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`, which must be a `Date` field: a text date gets nothing) makes `og:type` an `article` with an `article:published_time`. Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
 
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
 

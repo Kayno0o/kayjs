@@ -67,6 +67,19 @@ describe('rowsOf', () => {
   })
 })
 
+describe('rowsOf with unpublishAt', () => {
+  it('carries the end date of a published entry, ahead or past, and none for a draft', () => {
+    const offers: CollectionInfo = { ...talks, publishField: undefined, unpublishField: 'ends' }
+    const rows = rowsOf(offers, [
+      { slug: 'soon', data: { title: 'Soon', ends: '2026-10-20T08:00:00Z' }, draft: false },
+      { slug: 'over', data: { title: 'Over', ends: '2026-10-01' }, draft: false },
+      { slug: 'drafted', data: { title: 'Drafted', ends: '2026-10-20T08:00:00Z', draft: true }, draft: true },
+    ], NOW)
+
+    expect(rows.map(row => [row.slug, row.endsAt])).toEqual([['soon', Date.parse('2026-10-20T08:00:00Z')], ['over', Date.parse('2026-10-01')], ['drafted', undefined]])
+  })
+})
+
 describe('the datetime field', () => {
   it('shows a stored date as the minute it falls at in UTC, nothing for none or an unreadable one', () => {
     expect(inputValue('2026-10-20T08:00:00+02:00')).toBe('2026-10-20T06:00')

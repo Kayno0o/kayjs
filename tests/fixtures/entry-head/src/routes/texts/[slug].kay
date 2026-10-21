@@ -1,0 +1,8 @@
+--- server
+import { texts } from '../../content.config'
+
+export const page = { prerender: texts }
+
+const text = await texts.get(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {text.slug}

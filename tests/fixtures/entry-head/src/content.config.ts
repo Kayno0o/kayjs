@@ -19,3 +19,8 @@ export const events = collection({ name: 'events', load: () => [{ slug: 'launch'
   schema: t.Object({ name: t.String(), start: t.Date() }),
   publishAt: 'start',
 })
+
+// A date written as text is no Date, so its page stays a website.
+export const texts = collection({ name: 'texts', load: () => [{ slug: 'one', data: { title: 'Text one', date: '2026-03-04' } }] }, {
+  schema: t.Object({ title: t.String(), date: t.String() }),
+})

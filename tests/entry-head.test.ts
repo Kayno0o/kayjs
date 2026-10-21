@@ -45,6 +45,21 @@ describe('the head of a page showing one entry', () => {
     expect(page.meta('article:published_time')).toBe('2026-03-04T10:00:00.000Z')
   })
 
+  it('lets the page replace the description and the published time too', async () => {
+    const page = await site.visit('/ownmeta/full')
+
+    expect(page.meta('description')).toBe('Mine')
+    expect(page.meta('article:published_time')).toBe('2001-01-01T00:00:00.000Z')
+  })
+
+  it('reads only a Date field, so a date written as text leaves a website', async () => {
+    const page = await site.visit('/texts/one')
+
+    expect(page.title()).toBe('Text one | Notes')
+    expect(page.meta('og:type')).toBe('website')
+    expect(page.meta('article:published_time')).toBeUndefined()
+  })
+
   it('reads a nested entry through a catch-all param, for a page the sitemap lists', async () => {
     expect((await site.visit('/deep/nested/one')).title()).toBe('Nested one | Notes')
   })
