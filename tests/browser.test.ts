@@ -1340,7 +1340,7 @@ import { tmpdir } from 'node:os'
 import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
-${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-') && name !== ${JSON.stringify(LOCKED)}).map(name => readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock')))
+${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-') && name !== ${JSON.stringify(LOCKED)}).flatMap(name => { try { return [readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock'))] } catch { return [] } })
 const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
 const pages = [await open(), await open()]
 const listed = () => console.log(JSON.stringify(readdirSync(tmpdir())))

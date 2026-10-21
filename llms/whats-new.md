@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `kay/test` starts Chrome once per test process, however long a file pauses between pages, instead of closing it a second after the last page ([Browser tests](testing-browser.md)).
+- `kay/test` keeps Chrome open five minutes after the last page closes instead of one second, so a file pausing between pages launches it once ([Browser tests](testing-browser.md)).
 
 ## 1.68.0
 
