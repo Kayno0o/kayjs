@@ -16,18 +16,24 @@ interface Section {
   heading?: string | undefined
   anchor?: string | undefined
   text: string
+  // The `code` opening the rows of a table, an option's name in a reference.
+  names: string
 }
 
 // A page as the index reads it: its language, and its sections with what their words are worth.
 interface ReadPage {
   lang: string
   sections: SearchSection[]
+  // Each section's names, apart from its text.
+  names: string[]
   weight: number
 }
 
 // What each word is worth where it is found: the page's title in the text above its first heading, a heading, the page's title under one, the text.
 const TITLE_WEIGHT = 12
 const HEADING_WEIGHT = 10
+// A name opening a table row, such as an option of a reference: above the text, below a heading.
+const NAME_WEIGHT = 6
 const PAGE_WEIGHT = 6
 const TEXT_WEIGHT = 2
 // A word of a title or heading counts up to this much more as it makes up more of it: `kay mcp` before `An API route is an MCP tool only when...`, a heading staying below a title.
@@ -109,8 +115,8 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
     const words = new Map<string, number[]>()
     const all: SearchSection[] = []
 
-    for (const { sections, weight } of read) {
-      const scored = sections.map(section => sectionScores(section, sections[0]!.page, section === sections[0]))
+    for (const { sections, names, weight } of read) {
+      const scored = sections.map((section, at) => sectionScores(section, names[at]!, sections[0]!.page, section === sections[0]))
       const holding = new Map<string, number>()
       const filled = scored.filter(({ own }) => own.size > 0).length
 
@@ -190,7 +196,7 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
 }
 
 // Each word of a section with what it is worth there, the best place it is found deciding, and the words of its own heading and text, its page's title aside.
-function sectionScores(section: SearchSection, page: string, top: boolean): { scores: Map<string, number>, own: Set<string> } {
+function sectionScores(section: SearchSection, names: string, page: string, top: boolean): { scores: Map<string, number>, own: Set<string> } {
   const scores = new Map<string, number>()
   const own = new Set<string>()
   const add = (text: string | undefined, worth: (count: number, share: number) => number) => {
@@ -206,6 +212,7 @@ function sectionScores(section: SearchSection, page: string, top: boolean): { sc
 
   add(page, (_, share) => (top ? TITLE_WEIGHT : PAGE_WEIGHT) + FOCUS_WEIGHT * share)
   add(section.heading, (_, share) => HEADING_WEIGHT + FOCUS_WEIGHT * share)
+  add(names, () => NAME_WEIGHT)
   add(section.text, count => TEXT_WEIGHT + REPEAT_WEIGHT * (Math.min(count, REPEATS) - 1))
 
   for (const word of searchWords(`${section.heading ?? ''} ${section.text}`)) {
@@ -219,12 +226,13 @@ function sectionScores(section: SearchSection, page: string, top: boolean): { sc
 // The page's language, its title and its sections: the text above its first `h2` to `h4`, then each of those with the text under it, read from its `main`, or its `body` without one.
 function readPage(page: SearchPage): ReadPage {
   const scoped = MAIN.test(page.html)
-  const sections: Section[] = [{ text: '' }]
+  const sections: Section[] = [{ text: '', names: '' }]
   let lang = ''
   let title = ''
   let h1 = ''
   let inMain = 0
   let skipped = 0
+  let inName = 0
   let target: 'title' | 'h1' | 'heading' | 'anchor' | 'text' = 'text'
   let anchor = ''
   const toText = () => {
@@ -267,6 +275,14 @@ function readPage(page: SearchPage): ReadPage {
         })
       },
     })
+    .on('tr > :first-child code', {
+      element: (element) => {
+        inName++
+        atEnd(element, () => {
+          inName--
+        })
+      },
+    })
     .on(BLOCKS, { element: () => { sections.at(-1)!.text += ' ' } })
     .on('h1', {
       element: (element) => {
@@ -280,7 +296,7 @@ function readPage(page: SearchPage): ReadPage {
         if (skipped > 0 || (scoped && inMain === 0))
           return
 
-        sections.push({ heading: '', anchor: element.getAttribute('id') ?? undefined, text: '' })
+        sections.push({ heading: '', anchor: element.getAttribute('id') ?? undefined, text: '', names: '' })
         target = 'heading'
         atEnd(element, toText)
       },
@@ -311,14 +327,21 @@ function readPage(page: SearchPage): ReadPage {
         if (skipped > 0 || (scoped && inMain === 0))
           return
 
-        if (target === 'h1')
+        if (target === 'h1') {
           h1 += chunk.text
-        else if (target === 'heading')
+        }
+        else if (target === 'heading') {
           sections.at(-1)!.heading += chunk.text
-        else if (target === 'anchor')
+        }
+        else if (target === 'anchor') {
           anchor += chunk.text
-        else
+        }
+        else {
           sections.at(-1)!.text += chunk.text
+
+          if (inName > 0)
+            sections.at(-1)!.names += ` ${chunk.text}`
+        }
       },
     })
 
@@ -331,11 +354,9 @@ function readPage(page: SearchPage): ReadPage {
 
   const name = plain(h1) || plain(title)
 
-  return {
-    lang,
-    weight: page.weight,
-    sections: sections.map(section => ({ page: name, ...section.heading !== undefined && { heading: plain(section.heading) }, href: section.anchor === undefined ? page.path : `${page.path}#${encodeURIComponent(section.anchor)}`, text: plain(section.text) })).filter((section, index) => index === 0 || section.heading !== '' || section.text !== ''),
-  }
+  const kept = sections.map(section => ({ section: { page: name, ...section.heading !== undefined && { heading: plain(section.heading) }, href: section.anchor === undefined ? page.path : `${page.path}#${encodeURIComponent(section.anchor)}`, text: plain(section.text) }, names: plain(section.names) })).filter(({ section }, index) => index === 0 || section.heading !== '' || section.text !== '')
+
+  return { lang, weight: page.weight, sections: kept.map(({ section }) => section), names: kept.map(({ names }) => names) }
 }
 
 // Runs `run` once the element ends: at once for one with no end tag, a void element such as `img` or a self-closing one such as `<svg/>`.

@@ -231,6 +231,7 @@ ul
 - `{ limit }` returns at most that many hits, 20 by default.
 - `searchSite(query, options)` from `kay` is the same search as a promise, for a script of its own.
 - With `i18n`, each locale gets its own index, and the search reads the one matching the page's `lang`; `{ lang }` picks another.
+- A `code` opening a table row (an option's name) counts between a heading and the text.
 - The index is split by the first letters of its words, so a query loads only the files of the words it starts, then the texts of its best hits.
 - It is written under `/_kay/search/`, in a directory named by its content, and `/_kay/search.json`, which names it, is revalidated on every load.
 - Both return no hits on the server, and fail when the index cannot load, as under `kay dev`, which writes none: `kay build` then `kay start` serves it.

@@ -481,6 +481,18 @@ describe('the search index', () => {
     expect(await found('lens')).toEqual([])
   })
 
+  it('ranks an option named in the first cell of a table row above the text mentioning it', async () => {
+    const dir = await index([{
+      path: '/config',
+      html: '<main><h1>Config</h1><h2 id="site">Site</h2><p>The origin, for canonical links.</p><h2 id="routing">Routing</h2><table><tr><td><code>trailingSlash</code></td><td>Whether a path ends in a slash.</td></tr><tr><td><code>links</code></td><td>Keeps a link to another site in the same tab.</td></tr></table></main>',
+    }, {
+      path: '/guide',
+      html: '<main><h1>Guide</h1><p>Links open in a tab, and links are checked. Links everywhere.</p></main>',
+    }])
+
+    expect((await search(dir, 'links')).hits.map(hit => bare(hit.href))).toEqual(['/config#routing', '/config#site', '/guide'])
+  })
+
   it('drops the hits of the last query when the search of the next one fails', async () => {
     const dir = await index([{ path: '/x', html: '<main><h1>X</h1><h2 id="a">Alpha</h2><p>Beta.</p></main>' }])
     const { result } = await inBrowser(dir, 'en', async () => {
