@@ -48,7 +48,7 @@ A value read back from the element (`el.className = el.className`), a name that 
 
 A value read back from `this.el`, a call result such as `document.querySelector('a')`, an indexed element such as `els[i]`, or any longer chain counts too, as long as both sides write the element the same way, and so does an object inside an array given to `cn(...)`. A name that gets another value somewhere else in the file, or is also imported, is judged by all of them, and a parameter of a function, method or `catch`, or a loop's variable, is not read at all.
 
-Rules you write in a stylesheet are never cut by class. A page keeps every rule of a stylesheet it reaches, so `.maze td.t { @apply border-t-2 }` stays whatever builds `t`, with no `@source inline`. A value then gives no warning once a script its file reaches (`cls.push('t')`) names a class such a stylesheet declares.
+Rules you write in a stylesheet are never cut by class. A page keeps every rule of a stylesheet it reaches, so `.maze td.t { @apply border-t-2 }` stays whatever builds `t`, with no `@source inline`. A value then gives no warning once a script of yours its file reaches writes out a class (`cls.push('t')`) such a stylesheet declares.
 
 A static export has no server to render pages, so it gives no warning for a class a server template builds.
 

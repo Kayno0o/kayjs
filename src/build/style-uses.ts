@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { styledClassNames } from './class-rules'
 import { classModules, runtimeClasses } from './dynamic-classes'
-import { CSS_FILE, readSource } from './files'
+import { CSS_FILE, readSource, SCRIPT_FILE } from './files'
 import { parse } from './supports'
 
 // Which of an app's styled classes each page and layout names, so a page's head carries the rules of the classes its own components write.
@@ -53,6 +53,22 @@ function tokensOf(file: string): { text: string, words: Set<string>, fragments: 
     found = { text, words: new Set(), fragments: new Set() }
     readWords(text, found.words, found.fragments)
     tokens.set(read, found)
+  }
+
+  return found
+}
+
+// The class-like words of the string literals of a script, which are what it writes out as names, unlike an identifier or a comment.
+const STRING_LITERAL = /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g
+
+function literalWords(file: string): string[] {
+  const found: string[] = []
+
+  for (const literal of readSource(file).text.matchAll(STRING_LITERAL)) {
+    for (const word of literal[0].slice(1, -1).split(COARSE)) {
+      if (word !== '')
+        found.push(word)
+    }
   }
 
   return found
@@ -311,19 +327,29 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     return found
   }
-  // Whether a file reaches a stylesheet of the app and a script naming one of the classes it declares: the script is the vocabulary the value is read from, and the stylesheet keeps the rule of each class whatever builds it.
-  const sheetVouched = (file: string): boolean => {
-    const reach = closure([file], reached)
-    const declared = new Set<string>()
+  // Whether a file reaches a stylesheet of the app and a script of the app writing out, as a string, a class that stylesheet declares: that script is the vocabulary the value is read from, and the stylesheet keeps the rule of each class whatever builds it.
+  const vouchedByFile = new Map<string, boolean>()
+  const sheetVouched = (file: string, own: StyleUsesOptions['own']): boolean => {
+    let found = vouchedByFile.get(file)
 
-    for (const module of reach) {
-      if (CSS_FILE.test(module)) {
-        for (const name of named(module))
-          declared.add(name)
+    if (found === undefined) {
+      // The modules a value is read from count as reached, as in `named`, though server code importing them is not followed.
+      const roots = [file, ...IMPORTS_MODULE.test(tokensOf(file).text) ? classModules(tokensOf(file).text, file) : []]
+      const reach = [...closure(roots, reached)].filter(module => own?.(module) === true)
+      const declared = new Set<string>()
+
+      for (const module of reach) {
+        if (CSS_FILE.test(module)) {
+          for (const name of named(module))
+            declared.add(name)
+        }
       }
+
+      found = declared.size > 0 && reach.some(module => SCRIPT_FILE.test(module) && existsSync(module) && literalWords(module).some(word => declared.has(word)))
+      vouchedByFile.set(file, found)
     }
 
-    return declared.size > 0 && [...reach].some(module => SCRIPT_OR_KAY.test(module) && existsSync(module) && [...tokensOf(module).words].some(word => declared.has(word)))
+    return found
   }
   let written: Set<string> | undefined
   // The runtime classes of the app's scripts and components that nothing makes the build keep the rules of.
@@ -357,7 +383,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
       for (const runtime of runtimeClasses(readSource(file).text, judge, file)) {
         // A value with no part to match is the app's to vouch for with an `@source inline` of its own, or with a stylesheet its file reaches whose classes a script it reaches names.
-        if (runtime.part === '' && (vouched.length > 0 || sheetVouched(file)))
+        if (runtime.part === '' && (vouched.length > 0 || sheetVouched(file, own)))
           continue
 
         found.push({ file, ...runtime, client: client.has(file), by: [...reachedBy.get(file) ?? []] })

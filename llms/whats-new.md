@@ -25,6 +25,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.69.0
 
 - A class set from a value the build cannot read no longer warns when a script its file reaches names a class of a stylesheet the file reaches, whose rules every page reaching it keeps ([Link or inline the stylesheets](styles-and-assets.md#link-or-inline-the-stylesheets)).
+- A class set from a value the build cannot read no longer warns when a script its file reaches writes out a class of a stylesheet the file reaches, whose rules every page reaching it keeps ([Link or inline the stylesheets](styles-and-assets.md#link-or-inline-the-stylesheets)).
 - A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
 - With Tailwind, a class passed to a component or merged with another, literal pairs and `<html>`'s included, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
