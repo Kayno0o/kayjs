@@ -1576,7 +1576,7 @@ describe('preview mode', () => {
         const marks = editMarks()!
         const entry = editableEntry(marks, 'crew', { slug: 'a', data: { ratings: data }, Content: () => renderedHtml('') }) as { data: { ratings: Rating[] } }
 
-        html = placeFieldMarks(withFieldMarks(marks, () => render(merge(entry.data.ratings[0]!) as Rating)), marks)
+        html = placeFieldMarks(withFieldMarks(marks, () => render(merge(entry.data.ratings[0]!) as unknown as Rating)), marks)
       }, true)
 
       return html
@@ -1597,7 +1597,7 @@ describe('preview mode', () => {
 
     it('keeps its mark through one and two components, each copying its props', () => {
       expect(placed(rating => bar(rating, attribute('role', 'meter')))).toContain(marked(VALUE))
-      expect(placed(rating => bar(merge(merge(rating)) as Rating, attribute('role', 'meter')))).toContain(marked(VALUE))
+      expect(placed(rating => bar(merge(merge(rating)) as unknown as Rating, attribute('role', 'meter')))).toContain(marked(VALUE))
     })
 
     it('keeps its mark when it is read for logic too, before and after it renders', () => {
