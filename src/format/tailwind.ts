@@ -8,6 +8,8 @@ export interface Design {
   getClassOrder: (classes: string[]) => [string, bigint | null][]
   // The CSS each class compiles to, or null for one Tailwind does not know.
   candidatesToCss: (classes: string[]) => (string | null)[]
+  // How Tailwind reads a class, empty for a word that names no utility.
+  parseCandidate?: (candidate: string) => readonly unknown[]
 }
 
 type LoadDesign = (css: string, options: object) => Promise<Design>

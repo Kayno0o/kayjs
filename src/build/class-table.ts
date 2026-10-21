@@ -149,13 +149,33 @@ export function contextOf(name: string): string {
 
 const parsed = new WeakMap<Design, Map<string, Parsed | null>>()
 
+function isCandidate(design: Design, word: string): boolean {
+  try {
+    return design.parseCandidate!(word).length > 0
+  }
+  catch {
+    return true
+  }
+}
+
 function parse(design: Design, words: string[]): Map<string, Parsed | null> {
   let known = parsed.get(design)
 
   if (known === undefined)
     parsed.set(design, known = new Map<string, Parsed | null>())
 
-  const fresh = words.filter(word => !known.has(word))
+  const fresh: string[] = []
+
+  // Most words of a file are not classes: only those Tailwind reads as one are compiled, as compiling costs per word.
+  for (const word of words) {
+    if (known.has(word))
+      continue
+
+    if (design.parseCandidate === undefined || isCandidate(design, word))
+      fresh.push(word)
+    else
+      known.set(word, null)
+  }
 
   for (let at = 0; at < fresh.length; at += 500) {
     const chunk = fresh.slice(at, at + 500)
