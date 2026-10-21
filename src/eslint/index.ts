@@ -1,5 +1,5 @@
-import type { ShadowFile } from '../check/shadow'
 // `kay/eslint`: lints the JavaScript of .kay files, the script and server fences and the template's expressions, through the TSX `kay check` type-checks them as, reporting at the .kay line.
+import type { ShadowFile } from '../check/shadow'
 import type { Span } from '../compiler/ast'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -51,6 +51,8 @@ interface Linted {
   text: string
   indented: number[]
   lines: Set<number>
+  // The lines of the statements at the module level, which the code keeps as the file writes them.
+  module: Set<number>
 }
 
 // Lint runs each file through preprocess then postprocess before the next, so this only ever holds the one being linted.
@@ -71,7 +73,7 @@ export const processor = {
 
     const shifted = indentLines(shadow.tsx, indented)
 
-    compiled.set(filename, { shadow, text: shifted, indented, lines: new Set(indented) })
+    compiled.set(filename, { shadow, text: shifted, indented, lines: new Set(indented), module: new Set(shadow.moduleLines) })
 
     return [{ text: shifted, filename: BLOCK }]
   },
@@ -159,6 +161,8 @@ const INDENTATION = /^[ \t]*$/
 const LINE_COMMENT = /\/\/.*$/
 // A line starting with a character that opens a statement rather than closes one.
 const STATEMENT_START = /[^\s)\]}]/
+const EXPECTED_SPACES = /of (\d+) spaces?/
+const FOUND_SPACES = /found (\d+)\./
 const PLAIN_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A slot's one plain parameter, `@about(text)`: kay writes it bare in the shadow, so a rule about the parentheses around it would report, and fix, text the .kay file holds as the slot's own syntax.
@@ -208,9 +212,10 @@ function unindentedFix(linted: Linted, fix: LintFix): LintFix {
   const lines = fix.text.split('\n')
   // The line the text ends on goes on as the line of the code that follows it.
   const following = text.slice(fix.range[1], lineEnd(text, fix.range[1]))
+  const endsInBody = linted.lines.has(lineStart(tsx, unindented(indented, fix.range[1])))
   const opens = fix.range[0] < line + (indented.indexOf(line) + 1) * LEVEL.length
 
-  return { range, text: lines.map((written, index) => (index === 0 ? opens : NON_BLANK.test(written) || (index === lines.length - 1 && NON_BLANK.test(following))) && written.startsWith(LEVEL) ? written.slice(LEVEL.length) : written).join('\n') }
+  return { range, text: lines.map((written, index) => (index === 0 ? opens : NON_BLANK.test(written) || (index === lines.length - 1 && (endsInBody || NON_BLANK.test(following)))) && written.startsWith(LEVEL) ? written.slice(LEVEL.length) : written).join('\n') }
 }
 
 function lineStart(text: string, offset: number): number {
@@ -329,14 +334,26 @@ function alignedAfterRewrite(linted: Linted, line: number): boolean {
   return brackets.some(bracket => bracket.call && bracket.locked && rewritten(linted.shadow, bracket.line))
 }
 
-// The findings that would be false: the indentation rules outside a fence, whose lines the generated code lays out as it likes, and after a rewrite; and a tab the added indentation now follows.
+// The findings that would be false: the indentation rules outside a fence, or on a line of the code that is not the author's own layout (the default of a prop, copied into a generated line), and after a rewrite; and a tab the added indentation now follows.
 function misjudged(linted: Linted, ruleId: string | null, offset: number, span: Span): boolean {
   const line = lineStart(linted.shadow.tsx, offset)
 
   if (INDENT_RULE.test(ruleId ?? ''))
-    return !inFences(linted.shadow, span.start, span.start) || alignedAfterRewrite(linted, line)
+    return !inFences(linted.shadow, span.start, span.start) || !(linted.lines.has(line) || linted.module.has(line)) || alignedAfterRewrite(linted, line)
 
   return MIXED_RULE.test(ruleId ?? '') && linted.lines.has(line) && linted.shadow.tsx[line] === '\t'
+}
+
+// The counts an indentation message gives, as the file has them: the shadow reads a fence's lines one level deeper.
+function levelled(linted: Linted, message: LintMessage, offset: number | undefined): string {
+  if (offset === undefined || !INDENT_RULE.test(message.ruleId ?? '') || !linted.lines.has(lineStart(linted.shadow.tsx, offset)))
+    return message.message
+
+  const shallower = (count: string) => Math.max(0, Number(count) - LEVEL.length)
+
+  return message.message
+    .replace(EXPECTED_SPACES, (_, count: string) => `of ${shallower(count)} space${shallower(count) === 1 ? '' : 's'}`)
+    .replace(FOUND_SPACES, (_, count: string) => `found ${shallower(count)}.`)
 }
 
 function mapMessage(linted: Linted, message: LintMessage): LintMessage | undefined {
@@ -368,7 +385,7 @@ function mapMessage(linted: Linted, message: LintMessage): LintMessage | undefin
     return mappedFix ? [{ ...suggestion, desc: named(suggestion.desc), fix: { ...mappedFix, text: named(mappedFix.text) } }] : []
   })
 
-  return { ...message, message: named(message.message), ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix: fix && { ...fix, text: named(fix.text) }, suggestions }
+  return { ...message, message: named(levelled(linted, message, start)), ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix: fix && { ...fix, text: named(fix.text) }, suggestions }
 }
 
 // A fix stands only when the code it replaces was copied verbatim from the .kay file, or is a class the template writes as the string joins it, and a line break it adds only in a fence: a template expression is one line of the file.

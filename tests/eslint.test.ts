@@ -617,8 +617,9 @@ describe('kay/eslint over the indentation of a fence', () => {
     ] as never
     const run = async (fix: boolean) => (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: FILE }))[0]!
     const fixed = await run(true)
+    const found = (await run(false)).messages
 
-    return { messages: (await run(false)).messages.map(message => [message.ruleId, message.line, message.column]), fixed: fixed.output ?? text, left: fixed.messages.map(message => [message.ruleId, message.line]) }
+    return { messages: found.map(message => [message.ruleId, message.line, message.column]), texts: found.map(message => message.message), fixed: fixed.output ?? text, left: fixed.messages.map(message => [message.ruleId, message.line]) }
   }
 
   const MISINDENTED = `---
@@ -674,7 +675,7 @@ p {a}
     expect(left).toEqual([])
   })
 
-  it('reports nothing on a fence indented as a .ts file would be', async () => {
+  it('reports only the tab on a fence otherwise indented as a .ts file would be', async () => {
     const { messages } = await lint(`---
 import {
   signal,
@@ -751,6 +752,32 @@ p {total}
     const { messages } = await lint('---\nconst total = Math.max(1,\n                  2)\n---\np {total}\n')
 
     expect(messages).toEqual([['style/indent', 3, 1]])
+  })
+
+  it('names the indentation as the file has it', async () => {
+    const { texts } = await lint('---\nconst a = 1\nfunction run() {\n    return a\n}\n---\np hi\n')
+
+    expect(texts).toEqual(['Expected indentation of 2 spaces but found 4.'])
+  })
+
+  it('judges a line of a file with CRLF line ends as it does one with LF', async () => {
+    const { fixed } = await lint('---\r\nconst a = 1\r\nfunction run() {\r\n    return a\r\n}\r\n---\r\np hi\r\n')
+
+    expect(fixed).toBe('---\r\nconst a = 1\r\nfunction run() {\r\n  return a\r\n}\r\n---\r\np hi\r\n')
+  })
+
+  it('leaves a multi-line default of a prop alone, which the generated code copies into a line of its own', async () => {
+    const text = '---\nconst { a, onSave = () => {\n  console.log(a)\n}, size = Math.max(1,\n                 2) } = props<{ a: number, onSave?: () => void, size?: number }>()\n---\np {a}\n'
+    const { messages, fixed } = await lint(text)
+
+    expect(messages).toEqual([])
+    expect(fixed).toBe(text)
+  })
+
+  it('leaves no whitespace behind a fix that ends a line the added level started', async () => {
+    const { fixed } = await lint('--- server\nconst q = (\n  1\n)\nconst z = 2\n---\np {q}\n', { 'style/no-extra-parens': ['error', 'all'] })
+
+    expect(fixed.split('\n').filter(line => line !== '' && line.trim() === '')).toEqual([])
   })
 
   it('reports nothing in a file that has no fence', async () => {

@@ -523,6 +523,7 @@ class ModuleShell {
         edits.push({ ...specifier, text: JSON.stringify(target) })
     }
 
+    const generated = this.b.code.length
     let cursor = this.indentStart(span.start)
 
     for (const edit of edits.sort((a, b) => a.start - b.start)) {
@@ -534,7 +535,7 @@ class ModuleShell {
       cursor = edit.end
     }
 
-    this.b.addSource({ start: cursor, end: span.end }).add('\n')
+    this.b.addSource({ start: cursor, end: span.end }).add('\n').markModule(generated)
   }
 
   // Where the line of a statement hoisted out of a fence starts when the type check is written, so its indentation is the file's: the linter judges it.
@@ -568,11 +569,14 @@ class ModuleShell {
 
     for (const span of server.exports) {
       const from = this.indentStart(span.start)
+      const generated = b.code.length
 
       if (page && page.start >= span.start && page.end <= span.end)
         b.addSource({ start: from, end: page.end }).add(' satisfies KayPageSettings').addSource({ start: page.end, end: span.end }).add('\n')
       else
         b.addSource({ start: from, end: span.end }).add('\n')
+
+      b.markModule(generated)
 
       this.deferDeclared(server, span)
     }

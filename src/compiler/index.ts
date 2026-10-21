@@ -71,6 +71,8 @@ export interface CompileResult {
   map: SourceMap
   // The generated offsets where a line of a fence's body starts, which sits one level deeper in the code than in the file.
   bodyLines: number[]
+  // Those of the statements copied to the module level.
+  moduleLines: number[]
   // Set when the component is interactive and renders as an island.
   island?: string | undefined
   // Set when the static component renders as an island should it pass one what only an island sends.
@@ -221,13 +223,14 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], island, why, classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, diagnostics: reported }
   }
 
   return {
     tsx: final.builder.code,
     map: expansion ? final.builder.map().expanded(expansion) : final.builder.map(),
     bodyLines: final.builder.bodyLines,
+    moduleLines: final.builder.moduleLines,
     island,
     promote,
     why,

@@ -32,6 +32,7 @@ export class CodeBuilder {
   readonly mappings: Mapping[] = []
   readonly ranges: RangeMapping[] = []
   private readonly bodyStarts: number[] = []
+  private readonly moduleStarts: number[] = []
 
   // The rewrites by where they start, so a span finds the ones inside it by bisection rather than scanning them all.
   private readonly sorted: [number, Rewrite & { end: number }][]
@@ -96,27 +97,45 @@ export class CodeBuilder {
     const start = this.code.length
 
     this.addSource(span)
+    this.noteLines(start, this.bodyStarts)
 
-    const first = this.code.lastIndexOf('\n', start - 1) + 1
+    return this
+  }
 
-    // A span that starts after the indentation of its line is the line's.
-    if (BLANK.test(this.code.slice(first, start)))
-      this.noteBodyLine(first)
-
-    for (let at = this.code.indexOf('\n', start); at !== -1 && at + 1 < this.code.length; at = this.code.indexOf('\n', at + 1))
-      this.noteBodyLine(at + 1)
+  // Marks what was generated since `start` as a statement copied to the module level, whose lines are written as the file has them.
+  markModule(start: number): this {
+    this.noteLines(start, this.moduleStarts)
 
     return this
   }
 
   // The generated offsets where a line copied from a fence's body starts, a blank one aside: a linter reads them one level deeper than the file writes them, as the fence sits in the body of a function the generated code wraps it in.
   get bodyLines(): number[] {
-    return this.bodyStarts.filter(line => !BLANK.test(this.code.slice(line, (this.code.indexOf('\n', line) + 1 || this.code.length + 1) - 1)))
+    return this.withCode(this.bodyStarts)
   }
 
-  private noteBodyLine(line: number) {
-    if (this.bodyStarts.at(-1) !== line)
-      this.bodyStarts.push(line)
+  // The same for the lines of the statements copied to the module level.
+  get moduleLines(): number[] {
+    return this.withCode(this.moduleStarts)
+  }
+
+  private withCode(starts: number[]): number[] {
+    return starts.filter(line => !BLANK.test(this.code.slice(line, (this.code.indexOf('\n', line) + 1 || this.code.length + 1) - 1)))
+  }
+
+  private noteLines(start: number, into: number[]) {
+    const note = (line: number) => {
+      if (into.at(-1) !== line)
+        into.push(line)
+    }
+    const first = this.code.lastIndexOf('\n', start - 1) + 1
+
+    // A span that starts after the indentation of its line is the line's.
+    if (BLANK.test(this.code.slice(first, start)))
+      note(first)
+
+    for (let at = this.code.indexOf('\n', start); at !== -1 && at + 1 < this.code.length; at = this.code.indexOf('\n', at + 1))
+      note(at + 1)
   }
 
   // A component tag's name, which `KayDynamic` takes as a value when it is read through a call or a default; returns whether it did, so the closing tag matches.
