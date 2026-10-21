@@ -772,7 +772,7 @@ inBrowser('a CopyButton on a served page', () => {
 
     expect(await widths()).toEqual(before)
     expect(await names()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'])
-    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 0, { timeout: 5000 })
+    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 0, { timeout: 10_000 })
 
     expect(await widths()).toEqual(before)
     expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])

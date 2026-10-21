@@ -2,8 +2,8 @@
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 ---
 main
-  CopyButton#short(text="x" label="Copy")
-  CopyButton#longer(text="x" label="Copy" copiedLabel="Copied to the clipboard")
-  CopyButton#shorter(text="x" label="Copy the install command" copiedLabel="Done")
-  CopyButton#ghost-xs(text="x" label="Copy" variant="ghost" size="xs")
-  CopyButton#inline-lg(text="x" label="Copy" variant="inline" tone="accent" size="lg")
+  CopyButton#short(text="x" copiedFor="6s" label="Copy")
+  CopyButton#longer(text="x" copiedFor="6s" label="Copy" copiedLabel="Copied to the clipboard")
+  CopyButton#shorter(text="x" copiedFor="6s" label="Copy the install command" copiedLabel="Done")
+  CopyButton#ghost-xs(text="x" copiedFor="6s" label="Copy" variant="ghost" size="xs")
+  CopyButton#inline-lg(text="x" copiedFor="6s" label="Copy" variant="inline" tone="accent" size="lg")
