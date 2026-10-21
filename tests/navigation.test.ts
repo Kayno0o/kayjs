@@ -185,9 +185,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     page = await open('/')
   }, 60_000)
 
+  // SIGTERM would have the server finish the requests the tests leave open first, which outlasts the hook.
   afterAll(async () => {
     page?.close()
-    server?.kill()
+    server?.kill('SIGKILL')
     await server?.exited
   })
 
