@@ -113,7 +113,7 @@ export default api({ rateLimit: { max: 60, window: '1m' } })
 
 A route sets its own limit and its own `bodyLimit` in its `detail`. The module's limit applies to it as well.
 
-`key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance.
+`key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance. Stores and the other options are in [Rate limits](/guides/security#rate-limits).
 
 <ReadMore href="/llms/api-routes#limits">Lists of limits, shared stores, params and the order they count in.</ReadMore>
 

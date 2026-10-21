@@ -219,6 +219,8 @@ Input an action or an API route refuses meets its guards first. A caller they re
 
 Only what the app derives is in `ctx.locals` at that point. Read the user from what the app derives, such as the session `session()` derives. A guard that throws there answers 500, as it does on valid input.
 
+To slow a client down inside a guard, count its attempts with `rateLimit`, see [Rate limit a guard or an API route](/guides/security#rate-limit-a-guard-or-an-api-route).
+
 <ReadMore href="/llms/server#guards">Which refusals answer before any guard runs, trailing slashes, translated paths and API module params are in the full server reference.</ReadMore>
 
 ### Public routes

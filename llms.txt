@@ -42,7 +42,8 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Actions](llms/actions.md): form posts that work without JavaScript, typed by a schema: validation errors, files, redirects
 - [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming answers, optimistic changes, actions as props
 - [Schemas](llms/schemas.md): one schema for the server, its type read by islands
-- [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, guards on actions, rate limits, body limit
+- [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, honeypot, minimum time, proof of work, body limit
+- [Rate limits](llms/rate-limits.md): `rateLimit` on actions, in guards and API routes, keys, stores, and the libraries' limits
 - [Stored files](llms/files.md): uploads on disk or in S3, links from pages, resizing, private links, upload progress
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions and stores, `_guard.ts` route guards
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands

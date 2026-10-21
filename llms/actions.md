@@ -1,6 +1,8 @@
 # Actions
 
-An island calls an action it imports, with `pending()`, streams and optimistic changes, see [Calling actions from islands](actions-from-islands.md).
+- [Actions](actions.md): declaring an action and posting a form to it.
+- [Calling actions from islands](actions-from-islands.md): `pending()`, `track()`, optimistic changes and streaming answers.
+- [Protecting actions](action-protection.md): cross-site posts, honeypot, minimum time and proof of work; [Rate limits](rate-limits.md) holds every rate limit.
 
 ## Common tasks
 

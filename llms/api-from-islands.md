@@ -60,25 +60,7 @@ A source blocked on a quiet feed is freed by a signal: pass a function, `eventSt
 
 ### Stream an action's answer
 
-An action whose handler is an `async function*`, or returns any async iterable, answers a call with each value as it comes; a model's reply is the main use, and kayjs-ai's `ask(messages)` returned from the handler is one:
-
-```kay
---- server
-import { s } from 'kay'
-import { complete } from '../data'
-
-export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
-  let text = ''
-
-  for await (const piece of complete(prompt))
-    yield text += piece
-})
----
-```
-
-A handler returns the iterable as it is, from a plain arrow function: an `async` handler returning one that is also a thenable, such as kayjs-ai's `ask()` reply, awaits it, and the call gets its text alone (`async-reply` reports it; return the reply's `.stream()` after an `await`).
-
-A handler that throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message }` answers that status with `Retry-After` and the message, which the action's `messages.rateLimit` replaces, instead of a 500: how kayjs-ai refuses a visitor over its `limit` or `budget`.
+An action whose handler is an `async function*` streams its answer to the island calling it: [Stream an answer to an island](actions-from-islands.md#stream-an-answer-to-an-island).
 
 ## Reference
 
@@ -146,16 +128,3 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - The source is read once the browser reads the response and stopped when it goes away.
 - A source that throws ends the stream as failed, the error logged and handed to `onError`.
 - A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
-
-### Streaming actions
-
-- A handler returning an async iterable answers a call from an island with server-sent events: `await reply({ prompt })` resolves once the first value is there with an `ActionStream<T>` from `kay`, typed from what it yields, whose `last()`, `status()`, `on()` and `close()` read as `stream()`'s do; it never reconnects. `Answer<Output>` from `kay` is what a call resolves with for a given output, an `ActionStream` for an iterable, for a library typing a callback that receives it.
-- Guards, the schema, `rateLimit`, the cross-site check and the bot protections run before the handler, and what the iterable throws before its first value, a `ctx.redirect`, a `ctx.deny` or an error, answers as the handler's would, the call throwing `ActionError` or redirecting; the cookies it set by then go out with the stream.
-- A throw past the first value is logged, `onError` included, and ends the stream `failed`.
-- `pending()` stays true until the stream ends; once it ran to its end the page refreshes, unless `refresh: false`, and `succeeded()` reads its last value.
-- `close()` stops the handler's iterable, its `finally` running, as does the visitor going away; a stream called from an island's setup, an element's event handler or a `listen` callback closes with the enclosing block or component (the nearest still alive for a row playing its leave phase, or for a block the call's own result removes, as `reply = await ask()` flipping the `if` its button sits in, as long as the block goes in the task the answer arrived in), so a `persist` island's stays open across pages, and an effect running again closes the one it called; a stream called under no owner (after an `await` in a handler, or from a timer, or from a handler of an element whose whole owner chain is already disposed) closes once the visitor goes to another path, not at once. An `effect()` or `onCleanup()` called in a `listen` callback attaches to the island's owner and builds up per event, as in an element's handler, so keep them out of it; the callback is called with no `this`, so a `function` callback reads the target as `event.currentTarget`.
-- `rateLimit` with `count: 'succeeded'` counts a stream once its first value is there, and a drained post once its iterable ended.
-- A `pretend` bot protection answering an island's `FormData` call resolves `undefined`, not an `ActionStream`, as the handler never ran.
-- `on()` added right after the call resolves gets every value, `last()` only the latest: a reply yields the text so far rather than the piece added, so `last()` is all an island reads.
-- A plain form post, a page swap's post and an MCP tool call read the iterable to its end and get its last value, as from a handler returning it: `ctx.succeeded(reply)?.data`.
-

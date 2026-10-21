@@ -150,6 +150,8 @@ rateLimit: { max: 20, window: '1m', key: async ctx => ctx.locals.session.get('us
 
 It takes `request`, `locale`, `cookies`, `locals` and `client`, and gives a text or a promise of one. The limit counts before the guards run, so `locals` holds what the app's `derive` adds, such as `session`, and not what a guard sets. When the key gives `undefined`, an empty text or something else than a text, or throws, the client's address counts instead, so a failing key never lifts the limit.
 
+kayjs-ai and kayjs-auth name their limits the same way, `rateLimit` with `max`, `window`, `key` and `store`.
+
 The refusal carries `Retry-After`, and the form shows when to try again. Several limits can apply at once, as a list, and the longest wait is the one told.
 
 Counts live in the process. For several processes on one machine, share a file store.
@@ -183,7 +185,7 @@ const store: RateStore = {
 
 `peek(key)` is optional. It reads the open window without counting, which a limit set to `count: 'succeeded'` needs.
 
-<ReadMore href="/llms/action-protection#rate-limits">Several limits at once and the exact counting rules.</ReadMore>
+<ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route
 
