@@ -539,7 +539,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.70',
     site: true,
-    summary: 'A library registered the old way in `kay.config.ts`: `authPages({ auth: () => import(\'./src/auth\') })` and `authExtension(...)` for kayjs-auth, `mailExtension(\'./src/mail\')` for kayjs-mail. Every library now registers with `x({ module })`: `auth({ module: \'./src/auth\' })` (`pages: false` where `authExtension` served no pages) and `mail({ module: \'./src/mail\' })`. The fix rewrites the calls and the import; a function other than `() => import(\'path\')` is left to you.',
+    summary: 'A library registered the old way in `kay.config.ts`: `authPages({ auth: () => import(\'./src/auth\') })` and `authExtension(...)` for kayjs-auth, `mailExtension(\'./src/mail\')` for kayjs-mail. Every library now registers with `x({ module })`: `auth({ module: \'./src/auth\' })` (`pages: false` where `authExtension` served no pages) and `mail({ module: \'./src/mail\' })`. The fix rewrites the calls and the import; a call it cannot rewrite safely is left to you: a function other than `() => import(\'path\')`, a module with no `export const auth`, `authPages` beside `authExtension` (merge them into one `auth({ module })`), or `auth` and `server` together.',
     wrong: 'extensions: [authPages({ auth: () => import(\'./src/auth\') }), mailExtension(\'./src/mail\')]',
     right: 'extensions: [auth({ module: \'./src/auth\' }), mail({ module: \'./src/mail\' })]',
   },
