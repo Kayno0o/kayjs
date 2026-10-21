@@ -15,17 +15,18 @@ const HINT_AGE = 90 * 24 * 60 * 60
 export function pageLink(hint: string, attribute: string, endpoint: string, signedIn: string): void {
   const base = document.querySelector<HTMLMetaElement>('meta[name=kay-base]')?.content ?? ''
   let verified: Promise<{ label: string, href: string } | undefined> | undefined
+  let verifiedFor: string | undefined
   let button: HTMLAnchorElement | undefined
 
   // The sign-in this browser holds, which the guard refused once already: the answer is kept for the tab, so a signed-in visitor who is no editor costs one request, not one per page.
-  const signIn = new RegExp(`(?:^|; )${signedIn}=([^;]*)`).exec(document.cookie)?.[1]
+  const cookie = (name: string) => new RegExp(`(?:^|; )${name}=([^;]*)`).exec(document.cookie)?.[1]
   const refusedKey = `${hint}-refused`
 
   // The guard answers: the hint outlives the session or dies before it, so the session decides, both ways.
-  const verify = async () => {
+  const verify = async (signIn: string | undefined) => {
     try {
       // A hint back after a refusal means the guard let the user in since, so the answer kept no longer holds.
-      if (signIn !== undefined && !document.cookie.includes(`${hint}=`) && sessionStorage.getItem(refusedKey) === signIn)
+      if (signIn !== undefined && cookie(hint) === undefined && sessionStorage.getItem(refusedKey) === signIn)
         return undefined
     }
     catch {
@@ -57,7 +58,14 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
     // The admin's own screens and edit mode have no use for the link.
     const links = [...document.querySelectorAll<HTMLAnchorElement>(`[${attribute}]`)]
     const away = document.querySelector('.kcms-admin, .kcms-editor') !== null
-    const found = away ? undefined : await (verified ??= verify())
+    // Read again at each swap: one signing in as another user must not get the old verdict.
+    const signIn = cookie(signedIn)
+
+    if (verified && verifiedFor !== signIn)
+      verified = undefined
+
+    verifiedFor = signIn
+    const found = away ? undefined : await (verified ??= verify(signIn))
 
     if (!found) {
       button?.remove()
@@ -111,7 +119,7 @@ export function pageLinkModule(): string {
 // What the head of every page carries: one line that loads the module for a browser holding the hint or signed in, and costs any other nothing.
 // It waits for the document, as the meta naming the base comes after the head's scripts, and looks again after a page swap, as a sign-in ending in one leaves this script in place.
 export function pageLinkLoader(): string {
-  return `(()=>{let l;const go=()=>{!l&&/${HINT_COOKIE}=|${SIGNED_IN_COOKIE}=/.test(document.cookie)&&(l=1,import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
+  return `(()=>{let l;const go=()=>{!l&&/(?:^|; )(?:${HINT_COOKIE}|${SIGNED_IN_COOKIE})=/.test(document.cookie)&&(l=1,import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
 }
 
 // The cookie that marks the browser as an editor's, slid forward each time the guard lets the editor through.

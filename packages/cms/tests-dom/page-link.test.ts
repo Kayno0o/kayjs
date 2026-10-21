@@ -9,6 +9,15 @@ function answering(status: number, body: unknown = ANSWER) {
   return spyOn(globalThis, 'fetch').mockImplementation((async () => status === 200 ? Response.json(body) : new Response(null, { status })) as unknown as typeof fetch)
 }
 
+// The listeners a run leaves on the document, so a later page swap reaches only its own.
+const listeners: [string, EventListener][] = []
+const addListener = document.addEventListener.bind(document)
+
+document.addEventListener = ((type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
+  listeners.push([type, listener])
+  addListener(type, listener, options)
+}) as typeof document.addEventListener
+
 async function run(): Promise<void> {
   pageLink(HINT_COOKIE, PAGE_LINK_ATTRIBUTE, CHECK_PATH, SIGNED_IN_COOKIE)
   await settle()
@@ -31,9 +40,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  for (const [type, listener] of listeners.splice(0))
+    document.removeEventListener(type, listener)
+
   document.querySelector(BUTTON)?.remove()
-  document.cookie = `${HINT_COOKIE}=; path=/; max-age=0`
-  document.cookie = `${SIGNED_IN_COOKIE}=; path=/; max-age=0`
+  document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  document.cookie = `${SIGNED_IN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   sessionStorage.clear()
   mock.restore()
 })
@@ -201,4 +213,55 @@ test('a refusal kept for the tab does not hold once the hint is back, as the gua
   await run()
   expect(fetched).toHaveBeenCalledTimes(1)
   expect(document.querySelector(BUTTON)?.textContent).toBe('Edit this page')
+})
+
+test('the loader imports the module once, on the page swap that brings the cookie', () => {
+  const imported: string[] = []
+
+  document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  document.cookie = `${SIGNED_IN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+
+  Object.assign(globalThis, { loaded: (url: string) => imported.push(url) })
+  // `import()` is syntax, so the loader's call is swapped for a function that records the address.
+  new Function(pageLinkLoader().replace('import(', 'globalThis.loaded('))()
+  document.dispatchEvent(new Event('kay:navigate'))
+  expect(imported).toEqual([])
+  document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  document.cookie = `x_${HINT_COOKIE}=1; path=/`
+  document.dispatchEvent(new Event('kay:navigate'))
+  expect(imported).toEqual([])
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+  document.dispatchEvent(new Event('kay:navigate'))
+  document.dispatchEvent(new Event('kay:navigate'))
+  expect(imported).toHaveLength(1)
+  document.cookie = `x_${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+})
+
+test('a page swap signing in as another user is asked again, not answered with the old verdict', async () => {
+  document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+
+  const fetched = answering(403)
+
+  await run()
+  expect(fetched).toHaveBeenCalledTimes(1)
+  fetched.mockImplementation((async () => Response.json(ANSWER)) as unknown as typeof fetch)
+  document.cookie = `${SIGNED_IN_COOKIE}=two; path=/`
+  document.dispatchEvent(new Event('kay:navigate'))
+  await settle()
+  expect(fetched).toHaveBeenCalledTimes(2)
+  expect(document.querySelector(BUTTON)?.textContent).toBe('Edit this page')
+})
+
+test('a cookie merely ending in the hint name is no hint', async () => {
+  document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
+  document.cookie = `x_${HINT_COOKIE}=1; path=/`
+  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+
+  const fetched = answering(200)
+
+  await run()
+  document.cookie = `x_${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  expect(fetched).not.toHaveBeenCalled()
 })
