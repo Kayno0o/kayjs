@@ -344,6 +344,7 @@ export default defineMessages({
       add: 'Ajouter à {list}',
       addAfter: 'Ajouter après {item}',
       addBefore: 'Ajouter avant {item}',
+      caption: '{list} : {item}',
       empty: '{list} : aucun élément, Entrée en ajoute un',
       item: '{item}, de {list}',
     },

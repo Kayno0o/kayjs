@@ -123,7 +123,9 @@ The "Browse the page" button next to it lets the page's links, menus and tabs wo
 
 ### Lists on the page
 
-When the page shows a list, such as the tags of a post or the blocks of a home page, point at one of its items and a small toolbar appears just above its top right corner (below it when the item is at the top of the window), never over the item itself. It moves the item up or down, adds a new one after it and removes it. For a list of blocks, Add asks which kind of block. A list inside an item has its own toolbar, stacked beyond the toolbar of the item that holds it. An empty list has an "Add to" button where its items would be.
+When the page shows a list, such as the tags of a post or the blocks of a home page, point at one of its items and a small toolbar appears just above its top right corner (below it when the item is at the top of the window), never over the item itself. It moves the item up or down, adds a new one after it and removes it. For a list of blocks, Add asks which kind of block.
+
+The toolbar names what it acts on, the list and the item ("Steps: Item 1"), and outlines that item on the page while the pointer or the focus is on it. A list inside an item has its own toolbar, stacked with the toolbar of the item that holds it, each naming its own. An empty list has an "Add to" button where its items would be.
 
 Everything has a keyboard way. Tab to a field in the item, then press Alt and Shift with the up or down arrow to move the item, Alt and Shift with Delete to remove it, or Alt and Shift with Enter to open a menu of what you can do with it. Tab reaches an empty list, and Enter adds its first item. After the last field of an item, Tab goes to its buttons, then on to what follows the item.
 

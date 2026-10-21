@@ -44,6 +44,8 @@ export interface ListBar {
   add: boolean
   remove: boolean
   style: string
+  // Where the item is, for the outline the bar draws on it while it is hovered or focused.
+  outline: string
 }
 
 // One of the answers a menu next to the page offers.
@@ -64,11 +66,11 @@ export interface Removed {
 
 const LIST_ATTRIBUTE = 'data-kay-list'
 
-// The size of a bar, which the places above and below an item are told by.
+// The size of a bar, which the places above and below an item are told by: its caption is cut at 128px (editor.css), so it is at most BAR_WIDTH wide.
 const BAR_TOP = 4
 const BAR_GAP = 36
 const BAR_HEIGHT = 30
-const BAR_WIDTH = 108
+const BAR_WIDTH = 240
 
 function targetOfElement(element: Element): ListTarget | undefined {
   const value = element.getAttribute(LIST_ATTRIBUTE)
@@ -246,6 +248,7 @@ export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emp
       down: targetOf('down', index, items.length) !== undefined,
       ...limits(list, items.length),
       style: `top:${top}px;right:${root.clientWidth - Math.max(Math.min(box.right, space.right), BAR_WIDTH)}px`,
+      outline: `left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`,
     })
   }
 
@@ -264,6 +267,7 @@ export function barsFor(anchors: Node[], drafts: Drafts, empty: PageList[] = emp
         up: false,
         down: false,
         ...limits(list, 0),
+        outline: '',
         style: `top:${Math.min(Math.max(box.top, 0), space.bottom - BAR_GAP) + BAR_TOP}px;left:${Math.min(Math.max(box.left, 0), space.right - BAR_GAP) + BAR_TOP}px`,
       })
     }

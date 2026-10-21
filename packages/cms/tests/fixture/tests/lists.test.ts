@@ -10,6 +10,9 @@ const MENU = '.kcms-marker-menu'
 const DOWN = `${BAR} button:nth-child(2)`
 const ADD = `${BAR} button:nth-child(3)`
 const REMOVE = `${BAR} button:nth-child(4)`
+// The size a bar is counted as when it is placed above or below its item (BAR_WIDTH, BAR_HEIGHT of page-lists.ts).
+const BAR_WIDTH = 240
+const BAR_HEIGHT = 30
 const ALT_SHIFT = { modifiers: ['Alt', 'Shift'] } as never
 
 const opened: { close: () => void }[] = []
@@ -465,6 +468,93 @@ test('the focus on an item puts its bar outside it as well', async () => {
   const [item, bar] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
 
   expect(overlaps(item, bar)).toBe(false)
+}, 60_000)
+
+const captions = (page: Page) => page.evaluate(() => [...document.querySelectorAll('.kcms-list-bar')].map(bar => bar.querySelector('.kcms-list-caption')?.textContent))
+
+test('each bar says which list and item it acts on, nested ones apart', async () => {
+  const page = await open()
+
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+  expect(await captions(page)).toEqual(['Steps: Item 1'])
+  expect(await page.evaluate(() => document.querySelector('.kcms-list-bar')!.getAttribute('aria-label'))).toBe('Item 1, of Steps')
+
+  await showBarAt(page, '.columns .cells li:first-child', 150, 2)
+
+  const [inner, outer] = await captions(page) as [string, string]
+
+  expect(inner).toMatch(/^Cells: /)
+  expect(outer).toMatch(/^Columns: /)
+  expect(outer).toContain('Left')
+}, 60_000)
+
+test('a long caption is cut with an ellipsis and the bar stays in its room', async () => {
+  const page = await open()
+
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+  await page.evaluate(() => {
+    document.querySelector('.kcms-list-caption')!.textContent = 'A very long title of a list, with an item title longer still'
+  })
+
+  const [style, bar] = await page.evaluate(() => {
+    const caption = getComputedStyle(document.querySelector('.kcms-list-caption')!)
+
+    return [[caption.textOverflow, caption.whiteSpace], document.querySelector('.kcms-list-bar')!.getBoundingClientRect().width]
+  }) as [string[], number]
+
+  expect(style).toEqual(['ellipsis', 'nowrap'])
+  expect(bar).toBeLessThanOrEqual(BAR_WIDTH)
+}, 60_000)
+
+test('a bar outlines its item on the page while the pointer or the focus is on it, without moving the page', async () => {
+  const page = await open()
+  const outline = () => page.evaluate(() => {
+    const element = document.querySelector('.kcms-list-outline')
+
+    if (!element || getComputedStyle(element).display === 'none')
+      return undefined
+
+    const { left, top, width, height } = element.getBoundingClientRect()
+    const item = document.querySelector('ol.steps li')!.getBoundingClientRect()
+
+    return { same: [left - item.left, top - item.top, width - item.width, height - item.height].every(gap => Math.abs(gap) < 1), page: document.documentElement.scrollHeight }
+  })
+
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+
+  const before = await page.evaluate(() => document.documentElement.scrollHeight)
+
+  expect(await outline()).toBeUndefined()
+  await page.hover(`${BAR} button:nth-child(2)`)
+  await page.waitUntil(() => document.querySelector('.kcms-list-outline') !== null && getComputedStyle(document.querySelector('.kcms-list-outline')!).display !== 'none')
+  expect(await outline()).toEqual({ same: true, page: before })
+
+  // Off the bar, onto the page elsewhere: the bar goes with the pointer's item, and its outline with it.
+  await page.hover('h1')
+  await page.waitUntil(() => document.querySelector('.kcms-list-bar') === null)
+  expect(await outline()).toBeUndefined()
+
+  await page.evaluate(() => {
+    const element = document.querySelector<HTMLElement>('ol.steps li')!
+
+    window.scrollBy({ top: element.getBoundingClientRect().top - 120 })
+    element.focus()
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-list-bar') !== null)
+  await page.press('Tab')
+  await page.waitUntil(() => document.activeElement?.closest('.kcms-list-bar') != null)
+  expect((await outline())?.same).toBe(true)
+}, 60_000)
+
+test('a bar stays within the size the places above and below its item count on', async () => {
+  const page = await open()
+
+  await showBarAt(page, 'ol.steps li:first-child', 120)
+
+  const [bar] = await boxes(page, BAR) as [Box]
+
+  expect(bar.right - bar.left).toBeLessThanOrEqual(BAR_WIDTH)
+  expect(bar.bottom - bar.top).toBeLessThanOrEqual(BAR_HEIGHT)
 }, 60_000)
 
 test('Tab goes from an item to its bar and on, Shift+Tab comes back', async () => {

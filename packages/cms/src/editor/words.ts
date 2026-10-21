@@ -119,6 +119,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.missing.dismissed',
   'cms.pageList.add',
   'cms.pageList.addAfter',
+  'cms.pageList.caption',
   'cms.pageList.empty',
   'cms.pageList.item',
   'cms.redirects.addFailure',

@@ -24,3 +24,6 @@ const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar:
         IconButton(icon={arrowDown} label={wording('cms.reorder.down', 'Move {item} down', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.down} onClick={() => onMove(bar, 'down')})
         IconButton(icon={plus} label={wording('cms.pageList.addAfter', 'Add after {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.add} aria-haspopup={bar.blocks ? 'menu' : undefined} onClick={event => onAdd(bar, event)})
         IconButton(icon={trash} label={wording('cms.field.removeItem', 'Remove {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.remove} onClick={() => onRemove(bar)})
+        // What the bar acts on, for the eyes; the toolbar's label says it to the rest. After the buttons in the markup, before them on screen.
+        span.kcms-list-caption(aria-hidden="true") {wording('cms.pageList.caption', '{list}: {item}', { list: bar.list, item: bar.item })}
+        .kcms-list-outline(style={bar.outline})
