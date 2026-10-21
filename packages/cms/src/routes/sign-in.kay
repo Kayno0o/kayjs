@@ -1,0 +1,54 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { localPath, s } from 'kay'
+import { overHttps } from 'kay/library'
+import { wording } from 'kay/words'
+import { probe, signInTarget } from '../access'
+import { adminTitle } from '../listing'
+import { hintCookie } from '../page-link'
+import { settings } from '../settings'
+
+// The one screen an anonymous visitor may open: the guard is the sign-in's own.
+export const page = { guards: false, noindex: true, sitemap: false }
+
+export const signIn = action(s.Object({
+  password: s.String({ minLength: 1, maxLength: 500, error: 'Type the password.' }),
+  redirect: s.Optional(s.String({ maxLength: 2000 })),
+}), async ({ password, redirect }, ctx) => {
+  const { passwords } = await probe(ctx)
+  const role = passwords?.match(password)
+
+  if (!passwords || role === undefined)
+    return ctx.fail(401, { message: wording('cms.signIn.wrong', 'That is not the right password.') })
+
+  ctx.cookies.set(passwords.issue(role, overHttps(ctx.request)))
+  ctx.cookies.set(hintCookie(overHttps(ctx.request)))
+  ctx.redirect(localPath(redirect, settings().prefix))
+}, {
+  // Ten tries per visitor every quarter of an hour: plenty for a typo, far too few to guess a password.
+  rateLimit: { max: 10, window: '15m' },
+})
+
+// Where to go after: a path of this site, never another one.
+const back = localPath(ctx.url.searchParams.get('redirect'), settings().prefix)
+const { signedIn, passwords } = await probe(ctx)
+
+if (signedIn)
+  ctx.redirect(back)
+
+// Not a site with a password: kayjs-auth's own sign-in page, else the screens' guard answers.
+if (!passwords)
+  ctx.redirect(signInTarget(ctx, back) ?? settings().prefix)
+---
+head
+  title {adminTitle(wording('cms.signIn.title', 'Sign in'))}
+.kcms-sign-in
+  h1 {wording('cms.signIn.title', 'Sign in')}
+  form.kcms-sign-in-form(action={signIn})
+    input(type="hidden" name="redirect" value={back})
+    if signIn.failed()?.data as data
+      p.kcms-sign-in-error(role="alert") {data.message}
+    FormField(label={wording('cms.signIn.password', 'Password')} name="password" required)
+      input(field="password" type="password" autocomplete="current-password")
+    Button(type="submit" tone="accent" label={wording('cms.signIn.submit', 'Sign in')})

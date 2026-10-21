@@ -3,6 +3,7 @@ import type { FormScope } from '../form'
 import EntryBody from '../components/entry-body.kay'
 import EntryField from '../components/entry-field.kay'
 import EntryNotices from '../components/entry-notices.kay'
+import SessionEnded from '../components/session-ended.kay'
 import { fieldsOf } from '../fields'
 import { formRows } from '../layout'
 
@@ -11,6 +12,7 @@ const { form } = props<{ form: FormScope }>()
 
 const rows = memo(() => formRows(fieldsOf(form.collection.schema), form.collection.body !== undefined, form.collection.layout?.form))
 ---
+SessionEnded
 EntryNotices(form={form})
 for row, i of rows() key={i}
   .kcms-row

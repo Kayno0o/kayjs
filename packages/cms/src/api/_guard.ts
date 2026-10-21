@@ -1,9 +1,12 @@
 import type { GuardContext } from 'kay'
+import type { Action } from '../roles'
 import { guard } from 'kay'
 import { READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
+import { forbidden, may, routePath } from '../access'
 import { authors } from '../authors'
+import { leavesPublication } from '../publishing'
 import { settings } from '../settings'
 
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
@@ -17,6 +20,26 @@ const ICON_PAGE = /\/api\/cms\/icons$/
 const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
 const DEV_STATE = /\/api\/cms\/dev$/
+
+// What a role may be limited from, by the route: publishing, deleting, uploading and the redirects.
+const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
+const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
+const UPLOAD = /\/api\/cms\/files\/[^/]+$/
+const UNUSED_UPLOADS = /\/api\/cms\/files\/unused\/delete$/
+
+// Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
+function actionOf(method: string, path: string): Action | undefined {
+  if (REDIRECTS.test(path))
+    return 'redirects'
+
+  if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path))
+    return 'delete'
+
+  if (method === 'POST' && PUBLISH.test(path))
+    return 'publish'
+
+  return method === 'POST' && UPLOAD.test(path) ? 'upload' : undefined
+}
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext): boolean {
@@ -65,6 +88,18 @@ export default guard(async (ctx) => {
     return ctx.deny(403, refusal(editing, READ_METHODS.has(method)))
 
   await admits(ctx)
+
+  if (settings().roles !== undefined) {
+    const path = routePath(ctx.url)
+    const needed = actionOf(method, path)
+
+    if (needed !== undefined && !await may(ctx, needed))
+      return forbidden(ctx, needed)
+
+    // A save that flips the draft flag or a publish date is a publish as much as the route is.
+    if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
+      return forbidden(ctx, 'publish')
+  }
 
   const identity = await author?.(ctx)
 

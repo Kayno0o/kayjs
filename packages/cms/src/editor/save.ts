@@ -1,14 +1,44 @@
+import type { Attempted } from '@kaynooo/kayjs-ui'
 import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
 import type { RedirectStatus } from '../missing'
-import { attempt, toast } from '@kaynooo/kayjs-ui'
+import { attempt as attemptCall, toast } from '@kaynooo/kayjs-ui'
 import { call, focusInvalid } from 'kay'
 import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import filesApi from '../api/files'
 import redirectsApi from '../api/redirects'
 import { entryKey } from '../markers'
+import { isSignedOut, setSessionEnded } from './session'
 import { uploading } from './upload'
+
+// `attempt` that tells an ended sign-in apart from a failure: it toasts that the session ended and shows the way to sign in again, and leaves the edits where they are.
+async function attempt<T>(run: () => Promise<T>, failure: string): Promise<Attempted<T> | undefined> {
+  let signedOut = false
+
+  const result = await attemptCall(async () => {
+    try {
+      return await run()
+    }
+    catch (error) {
+      if (!isSignedOut(error))
+        throw error
+
+      signedOut = true
+
+      return undefined as T
+    }
+  }, failure)
+
+  setSessionEnded(signedOut)
+
+  if (!signedOut)
+    return result
+
+  toast.error(wording('cms.session.toast', 'Your session has ended. Sign in again to save.'))
+
+  return undefined
+}
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
 // `told` is the toast a save this one waited for ended on, which a refusal worded the same does not repeat.

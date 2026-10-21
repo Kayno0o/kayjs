@@ -1,0 +1,13 @@
+--- server
+import { localize } from 'kay/i18n'
+import { signOutOf } from '../access'
+import { HINT_COOKIE } from '../page-link'
+
+// Signing out needs no guard: it ends a sign-in that may have expired already, and does nothing else.
+export const page = { guards: false }
+
+export const signOut = action(async (ctx) => {
+  await signOutOf(ctx)
+  ctx.cookies.delete({ name: HINT_COOKIE, path: '/' })
+  ctx.redirect(localize('/'))
+})

@@ -15,6 +15,8 @@ export default defineMessages({
       noCollections: 'Aucune collection',
       noCollectionsHint: 'Ce site ne déclare aucune collection de contenu.',
       search: 'Rechercher',
+      signedInAs: 'Connecté : {name}',
+      signOut: 'Se déconnecter',
       searchLabel: 'Rechercher dans les entrées',
       skip: 'Aller au contenu',
       unreadable: 'Illisible',
@@ -188,9 +190,11 @@ export default defineMessages({
       uploading: 'Envoi {percent}\u00A0%',
     },
     guard: {
+      forbidden: 'Votre rôle ne permet pas de : {action}',
       needsGuard: 'Enregistrer demande cms({ guard })',
       notEditing: 'Pas en mode édition',
       notOnPage: 'Cette entrée n\'est sur aucune des pages ouvertes en mode édition',
+      signedOut: 'Connectez-vous pour continuer',
     },
     locales: {
       body: 'Corps',
@@ -273,6 +277,12 @@ export default defineMessages({
       moved: '{item} déplacé en position {position} sur {count}',
       up: 'Monter {item}',
     },
+    role: {
+      delete: 'supprimer',
+      publish: 'publier ou dépublier',
+      redirects: 'modifier les redirections',
+      upload: 'envoyer un fichier',
+    },
     save: {
       deleteFailure: 'Suppression impossible',
       deleted: 'Supprimé',
@@ -297,6 +307,18 @@ export default defineMessages({
       duplicated: 'Dupliqué',
       duplicateFailure: 'Duplication impossible',
       notDuplicated: 'Non dupliqué : {message}',
+    },
+    session: {
+      ended: 'Votre session a pris fin, donc rien n\'a été enregistré. Vos modifications sont conservées ici.',
+      signIn: 'Se reconnecter',
+      then: 'Revenez ensuite sur cet onglet et enregistrez de nouveau.',
+      toast: 'Votre session a pris fin. Reconnectez-vous pour enregistrer.',
+    },
+    signIn: {
+      password: 'Mot de passe',
+      submit: 'Se connecter',
+      title: 'Connexion',
+      wrong: 'Ce n\'est pas le bon mot de passe.',
     },
     slug: {
       creates: 'Crée le dossier {folder}',

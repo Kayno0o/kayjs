@@ -1,0 +1,13 @@
+---
+import { wording } from 'kay/words'
+import { sessionEnded, signInHref } from '../editor/session'
+import { shipWords } from '../editor/words'
+
+// Says an expired sign-in ended a change, in place of "Could not save", with a way to sign in again that keeps this page and its edits.
+shipWords()
+---
+if sessionEnded()
+  .kcms-session-ended.kcms-refusal(role="alert")
+    p {wording('cms.session.ended', 'Your session has ended, so this was not saved. Your edits are kept here.')}
+    a(href={signInHref()} target="_blank" rel="noopener") {wording('cms.session.signIn', 'Sign in again')}
+    p {wording('cms.session.then', 'Then come back to this tab and save again.')}

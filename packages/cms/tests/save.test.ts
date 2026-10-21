@@ -12,6 +12,7 @@ const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')
 const { createDrafts } = await import('../src/drafts')
 const { deleteSaved, deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
+const { sessionEnded } = await import('../src/editor/session')
 const { uploadFile, uploading } = await import('../src/editor/upload')
 
 // What kay's build gives an API module's default export in the browser: where it is served.
@@ -157,6 +158,45 @@ describe('deleteSaved', () => {
     expect(await deleteSaved(post, 'v1')).toBe(true)
     expect(await deleteSaved(post)).toBe(true)
     expect(sent.map(({ method, url }) => [method, url])).toEqual([['DELETE', '/api/cms/entries/posts/hello?version=v1'], ['DELETE', '/api/cms/entries/posts/hello']])
+  })
+})
+
+describe('a sign-in that ended', () => {
+  function answering(...statuses: number[]) {
+    spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      const status = statuses.shift() ?? 200
+
+      return status === 200 ? Response.json({ saved: true, version: 'v2' }) : new Response('Sign in to continue', { status })
+    }) as unknown as typeof fetch)
+  }
+
+  it('says the session ended instead of a failed save, keeps the edits, and clears once a save goes through', async () => {
+    answering(401, 200)
+
+    const drafts = opened()
+
+    drafts.set(post, 'title', 'Edited')
+
+    expect(await saveDraft(drafts, post)).toBe(false)
+    expect(sessionEnded()).toBe(true)
+    expect(drafts.changed(post)).toBe(true)
+    expect(toasts().map(toast => toast.message)).toEqual(['Your session has ended. Sign in again to save.'])
+
+    expect(await saveDraft(drafts, post)).toBe(true)
+    expect(sessionEnded()).toBe(false)
+  })
+
+  it('says it for a delete too, and not for a refusal that is no sign-in', async () => {
+    answering(401, 403)
+
+    expect(await deleteSaved(post, 'v1')).toBe(false)
+    expect(sessionEnded()).toBe(true)
+    expect(toasts().map(toast => toast.message)).toEqual(['Your session has ended. Sign in again to save.'])
+
+    toasts.set([])
+    expect(await deleteSaved(post, 'v1')).toBe(false)
+    expect(sessionEnded()).toBe(false)
+    expect(toasts().map(toast => toast.message)).not.toContain('Your session has ended. Sign in again to save.')
   })
 })
 

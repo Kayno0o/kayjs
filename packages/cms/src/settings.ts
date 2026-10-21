@@ -2,10 +2,13 @@ import type { Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { CollectionLayout } from './kay/contract'
+import type { Action } from './roles'
 import { byteSize, lazily } from 'kay/library'
 import { workingTree } from './files'
 import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
+import { trackPasswords } from './password'
+import { checkRoles } from './roles'
 
 export interface UploadOptions {
   types?: string[] | undefined
@@ -43,6 +46,8 @@ export interface CmsOptions {
   collections?: Record<string, CollectionLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-cms-edit-page` and is shown in its place.
   pageLink?: false | undefined
+  // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
+  roles?: Record<string, readonly Action[]> | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
@@ -63,6 +68,8 @@ export interface CmsSettings {
   onSave: CmsOptions['onSave']
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
   pageLink: boolean
+  // The actions each role may do, or undefined when every editor the guard admits may do all of them.
+  roles: ReadonlyMap<string, ReadonlySet<Action>> | undefined
   layouts: ReadonlyMap<string, CollectionLayout>
 }
 
@@ -84,7 +91,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, collections, pageLink }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, collections, pageLink, roles }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -93,7 +100,9 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, onSave, pageLink: pageLink !== false, layouts: checkLayouts(collections) }
+  const tracked = trackPasswords(guard)
+
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections) }
 
   return current
 }

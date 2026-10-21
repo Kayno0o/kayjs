@@ -49,6 +49,35 @@ body {
   font-weight: 600;
 }
 
+.kcms-admin-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.kcms-admin-who form {
+  margin: 0;
+}
+
+.kcms-sign-in {
+  display: grid;
+  max-width: 24rem;
+  margin: 3rem auto;
+  gap: 1rem;
+}
+
+.kcms-sign-in-form {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
+}
+
+.kcms-sign-in-error {
+  margin: 0;
+  color: var(--color-kui-error);
+}
+
 /* Out of sight until the keyboard reaches it, then the first thing on the page. */
 .kcms-skip {
   position: absolute;

@@ -1,9 +1,12 @@
 --- server
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
+import { memberOf } from '../access'
 import { screenPath } from '../paths'
+import { signOut } from './_actions.kay'
 import { settings } from '../settings'
 import './admin.css'
 
@@ -14,6 +17,8 @@ export const page = { layouts: false, noindex: true }
 
 const { prefix, logo } = settings()
 // kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
+// Who is signed in, when the guard let the request in: the sign-in screen, which no guard covers, shows no one.
+const member = await memberOf(ctx)
 const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 // The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
 ---
@@ -31,6 +36,11 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
       a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
       a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
     a.kcms-admin-site(href={localize('/')}) {wording('cms.admin.viewSite', 'View the site')}
+    if member
+      .kcms-admin-who
+        span {wording('cms.admin.signedInAs', 'Signed in as {name}', { name: member.name })}
+        form(action={signOut})
+          Button(type="submit" variant="ghost" size="sm" label={wording('cms.admin.signOut', 'Sign out')})
   main.kcms-admin-main#kcms-main(tabindex="-1")
     slot
 Toaster

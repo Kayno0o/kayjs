@@ -43,6 +43,36 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
+## Signing in and roles
+
+A visitor the guard turns away as anonymous lands on a sign-in screen, not a bare 403, and comes back to the exact page they asked for, query included. The screen is the sign-in page of kayjs-auth when the app has one, or the cms's own when the guard is `passwordGuard`.
+
+For a small site with no members, `passwordGuard` is the whole setup. It takes one password, or one per role:
+
+```ts
+import { cms, passwordGuard } from '@kaynooo/kayjs-cms'
+
+cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
+cms({ guard: passwordGuard({ editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSWORD }, { maxAge: '30d' }) })
+```
+
+A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` says otherwise, and it is a signed cookie, so changing a password signs out everyone who used it. An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries every quarter of an hour.
+
+The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
+
+By default everyone the guard admits can do everything. `roles` limits what a role may do beyond editing:
+
+```ts
+cms({
+  guard: auth.guard({ require: 'staff' }),
+  roles: { staff: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] },
+})
+```
+
+The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries and unused uploads), `upload` and `redirects` (the missing pages screen and its API). A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks.
+
+If the sign-in ends while an editor is typing, the save says the session ended instead of "Could not save", keeps the edits, and offers a link to sign in again in a new tab. Come back to the first tab and save again.
+
 ## Edit mode
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
