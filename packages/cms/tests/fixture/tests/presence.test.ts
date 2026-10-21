@@ -11,6 +11,15 @@ afterAll(async () => {
   await built.close()
 })
 
+test('two lists open on the same entries do not say they are being edited', async () => {
+  await using first = await built.open('/admin/collections/posts?as=Bob')
+  await using second = await built.open('/admin/collections/posts?as=Cy')
+
+  await Bun.sleep(2000)
+  expect(await first.evaluate(() => document.querySelectorAll('.kcms-entry-watch').length)).toBe(0)
+  expect(await second.evaluate(() => document.querySelectorAll('.kcms-entry-watch').length)).toBe(0)
+}, 60_000)
+
 test('the on-page editor and the list join an entry\'s room: editors name each other, and a list only shows that the entry is being edited', async () => {
   const screenSays = () => document.querySelector('.kcms-entry-presence')?.textContent?.trim()
   const pageSays = () => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim()
