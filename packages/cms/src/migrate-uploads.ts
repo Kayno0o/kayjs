@@ -3,10 +3,8 @@ import type { Adoption } from './media'
 import { files, typeOfName } from 'kay/server'
 import { log } from './log'
 import { adoptUploads, contentId, isUploadKey, MEDIA_FOLDER } from './media'
-import { idOf, readUploads } from './orphans'
-import { collectionNamed, entryOf, saveEntry, versionOf } from './store'
-
-const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g
+import { idOf, listUploads, readUploads } from './orphans'
+import { collectionNamed, entryOf, saveEntry } from './store'
 
 // The text with each older key replaced by its copy's, wherever a path holds it: a key is not part of a longer word or path.
 function swapKeys(text: string, swaps: ReadonlyMap<string, string>, pattern: RegExp): string {
@@ -16,9 +14,7 @@ function swapKeys(text: string, swaps: ReadonlyMap<string, string>, pattern: Reg
 // The value with its strings swapped, however deep in lists, blocks and groups; the value itself when none holds an older key, so a change is told by identity.
 function swapIn(value: unknown, swaps: ReadonlyMap<string, string>, pattern: RegExp): unknown {
   if (typeof value === 'string') {
-    const next = swapKeys(value, swaps, pattern)
-
-    return next === value ? value : next
+    return swapKeys(value, swaps, pattern)
   }
 
   if (Array.isArray(value)) {
@@ -53,7 +49,21 @@ export interface Migrated {
 // Copies every older per-collection upload that an entry names into the shared folder, named by its hash, and points the entries naming it at the copy, so an app ends on one layout without writing anything.
 // An entry is saved against the version it was read at, through the configured saver, so another server running this at once, or a save made since, makes it skip that entry and leaves the upload for the next boot. The older file stays where it was: pages the site has not rebuilt from still name it, and it is listed by the unused-uploads screen once no entry does.
 export async function migrateUploads(): Promise<Migrated> {
-  const read = await readUploads()
+  const listing = await listUploads()
+
+  if ('blocked' in listing) {
+    log.warn(`the older uploads were not moved to the shared folder, as ${listing.blocked.join('; ')}`)
+
+    return { moved: 0, pending: 0 }
+  }
+
+  const isOlder = (key: string) => !key.startsWith(`${MEDIA_FOLDER}/`) && isUploadKey(key)
+
+  // The common case, nothing left from an older release, costs one listing and reads no entry.
+  if (!listing.stored.some(file => isOlder(file.key)))
+    return { moved: 0, pending: 0 }
+
+  const read = await readUploads(listing)
 
   if ('blocked' in read) {
     log.warn(`the older uploads were not moved to the shared folder, as ${read.blocked.join('; ')}`)
@@ -64,8 +74,9 @@ export async function migrateUploads(): Promise<Migrated> {
   const older = read.stored.filter((file) => {
     const id = idOf(file.key)
 
-    return id !== undefined && !file.key.startsWith(`${MEDIA_FOLDER}/`) && isUploadKey(file.key) && read.usedBy.has(id)
+    return id !== undefined && isOlder(file.key) && read.usedBy.has(id)
   })
+  const shared = read.stored.map(file => file.key).filter(key => key.startsWith(`${MEDIA_FOLDER}/`))
   const adoptions = new Map<string, Adoption>()
   const plans = new Map<string, Plan>()
 
@@ -77,7 +88,9 @@ export async function migrateUploads(): Promise<Migrated> {
 
     // The stored bytes are the ones the first upload already stripped; the name's extension keeps the type the key had.
     const blob = new File([await stored.arrayBuffer()], file.key.split('/').at(-1)!, { type: typeOfName(file.key) })
-    const to = await files.put(blob, { folder: MEDIA_FOLDER, id: await contentId(blob) })
+    const id = await contentId(blob)
+    // A copy a run before this one made is not written again.
+    const to = shared.find(key => key.startsWith(`${MEDIA_FOLDER}/${id}.`)) ?? await files.put(blob, { folder: MEDIA_FOLDER, id })
 
     adoptions.set(file.key, { from: file.key, to, size: blob.size, at: file.modified?.getTime(), done: false })
 
@@ -90,6 +103,9 @@ export async function migrateUploads(): Promise<Migrated> {
     }
   }
 
+  // The copies' records, with the names the uploads were given, are written before any entry points at a copy: an index that cannot be written stops the move rather than lose them.
+  await adoptUploads([...adoptions.values()])
+
   const failed = new Set<string>()
 
   for (const { ref, swaps } of plans.values()) {
@@ -101,7 +117,7 @@ export async function migrateUploads(): Promise<Migrated> {
 
   const done = [...adoptions.values()].map(adoption => ({ ...adoption, done: !failed.has(adoption.from) }))
 
-  await adoptUploads(done)
+  await adoptUploads(done.filter(each => each.done))
 
   return { moved: done.filter(each => each.done).length, pending: failed.size }
 }
@@ -115,14 +131,14 @@ async function point(ref: EntryRef, swaps: ReadonlyMap<string, string>): Promise
     if (now?.data === undefined)
       return false
 
-    const pattern = new RegExp(`(?<![\\w-])(?:${[...swaps.keys()].map(key => key.replace(REGEXP_SPECIAL, '\\$&')).join('|')})(?![\\w-])`, 'g')
+    const pattern = new RegExp(`(?<![\\w-])(?:${[...swaps.keys()].map(key => RegExp.escape(key)).join('|')})(?![\\w-])`, 'g')
     const data = swapIn(now.data, swaps, pattern) as Record<string, unknown>
     const body = now.body === undefined ? undefined : swapKeys(now.body, swaps, pattern)
 
     if (data === now.data && body === now.body)
       return false
 
-    const version = collection.kind === 'loaded' ? undefined : await versionOf(ref) ?? now.version
+    const { version } = now
     const outcome = await saveEntry({ ...ref, data, body }, { version, verb: 'update', bodyKept: true })
 
     if ('saved' in outcome)

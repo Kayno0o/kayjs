@@ -144,3 +144,15 @@ test('an entry changed since it was read keeps its older upload pending, and the
   expect(await migrateUploads()).toEqual({ moved: 1, pending: 0 })
   expect(await libraryUploads()).toMatchObject({ total: 1 })
 })
+
+test('with nothing left from an older release no entry is read, and an unreadable index stops the move before any entry is saved', async () => {
+  await files.put(png(), { folder: MEDIA_FOLDER })
+  expect(await migrateUploads()).toEqual({ moved: 0, pending: 0 })
+
+  const old = await files.put(png(other), { folder: 'posts' })
+
+  await make('posts', 'a', { title: 'A', photo: files.url(old) })
+  await files.put(new Blob(['not json'], { type: 'application/json' }), { private: true, id: 'cms-media-index' })
+  await expect(migrateUploads()).rejects.toThrow()
+  expect((await dataOf('posts', 'a'))?.photo).toBe(files.url(old))
+})

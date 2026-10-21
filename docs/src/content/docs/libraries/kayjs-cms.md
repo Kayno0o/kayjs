@@ -390,7 +390,7 @@ Under a text still equal to the default locale's, or empty while the default has
 
 Every upload goes to one folder shared by all collections, named by the hash of its file, so sending the same file twice stores it once. The media library at `<prefix>/media` lists them with a preview, the size, who sent it and the entries using it, and lets you rename one (the name shown there, never the file's address) or delete one nothing uses. It shows 48 uploads a page and has a search box for the name.
 
-Uploads an older release kept in a folder per collection move over by themselves when the server starts: each one an entry names is copied into the shared folder, and the entries naming it are saved pointing at the copy, through the same saver as any edit (one commit per entry on Forgejo). Nothing changes in the app.
+Uploads an older release kept in a folder per collection move over by themselves when the server starts: each one an entry names is copied into the shared folder, and the entries naming it are saved pointing at the copy, through the same saver as any edit (one commit per entry on Forgejo). Nothing changes in the app, though under `kay dev` the first start rewrites the content files that name an older upload.
 
 The old file stays where it was, since pages the site has not rebuilt from still name it; the library hides it and the unused-uploads screen offers it for deletion once no entry names it. An entry that cannot be saved right then is tried again at the next start.
 

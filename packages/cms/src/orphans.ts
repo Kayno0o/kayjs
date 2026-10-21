@@ -1,4 +1,4 @@
-import type { EntryRef } from './kay/contract'
+import type { CollectionInfo, EntryRef } from './kay/contract'
 import { files } from 'kay/server'
 import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
@@ -41,8 +41,8 @@ export interface Read {
 export const idOf = (key: string) => KEY_ID.exec(key)?.[1]
 
 // Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
-export async function readUploads(): Promise<Read | { blocked: string[] }> {
-  const blocked: string[] = []
+// Every upload of the CMS's folders, or why they cannot be listed, with the collections they sit under.
+export async function listUploads(): Promise<{ stored: Stored[], listed: CollectionInfo[] } | { blocked: string[] }> {
   // Only the names: a loaded collection's loader runs once, in `entries`, and not again to count its entries.
   const listed = await collections({ counts: false })
   const folders = [...new Set([MEDIA_FOLDER, ...listed.map(collection => uploadFolder(collection.name))])].filter(folder => !PRIVATE_FOLDER.test(folder))
@@ -57,6 +57,19 @@ export async function readUploads(): Promise<Read | { blocked: string[] }> {
 
     return { blocked: [wording('cms.uploads.listFailure', 'The files cannot be listed: {reason}', { reason: error instanceof Error ? error.message : String(error) })] }
   }
+
+  return { stored, listed }
+}
+
+// Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
+export async function readUploads(listing?: { stored: Stored[], listed: CollectionInfo[] }): Promise<Read | { blocked: string[] }> {
+  const blocked: string[] = []
+  const found = listing ?? await listUploads()
+
+  if ('blocked' in found)
+    return found
+
+  const { stored, listed } = found
 
   const usedBy = new Map<string, Map<string, EntryRef>>()
 
@@ -170,7 +183,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
   const named = (key: string) => index[key]?.name ?? key.split('/').at(-1)!
   const found = read.stored
     .filter(file => idOf(file.key) !== undefined && !moved.has(file.key) && (needle === '' || named(file.key).toLowerCase().includes(needle) || file.key.toLowerCase().includes(needle)))
-    .toSorted((a, b) => (b.modified?.getTime() ?? 0) - (a.modified?.getTime() ?? 0))
+    .toSorted((a, b) => (index[b.key]?.at ?? b.modified?.getTime() ?? 0) - (index[a.key]?.at ?? a.modified?.getTime() ?? 0))
   const pages = Math.max(1, Math.ceil(found.length / LIBRARY_PAGE))
   const page = Math.min(pages, Math.max(1, Number.isInteger(options.page) ? options.page! : 1))
   const now = Date.now()
