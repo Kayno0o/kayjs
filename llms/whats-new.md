@@ -4,11 +4,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
+- kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, the entries referring to it follow the new slug, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
 
 ## 1.65.0
 
-- kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, the entries referring to it follow the new slug, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
 - kayjs-cms keeps the last 50 saves of every entry of a SQLite or Postgres collection and its deleted entries for 30 days, by default, to list, compare and restore from an entry's History button and the list's Trash; `cms({ history: false })` turns it off ([History and the trash](../packages/cms/llms/history.md)).
 - kayjs-ui's TabNav keeps the window scrolled where it was when a tab is followed, so a bar needs no `data-keep-scroll` ([TabNav](../packages/ui/llms/tables-navigation-and-layout.md)).
 - kayjs-cms keeps every upload in one folder, named by the hash of its file so a file sent twice is stored once, and has a media library at `<prefix>/media` listing them with a preview, size and the entries using each, to rename or delete; `files.put(file, { id })` names a key ([kayjs-cms](../packages/cms/llms/uploads.md), [Files](files.md)).
