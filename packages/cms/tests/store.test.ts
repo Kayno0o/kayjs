@@ -50,6 +50,7 @@ const content: typeof Content = {
   MarkdownError,
   collectionLoader: () => undefined,
   collections: async () => collectionList,
+  entryPage: async () => undefined,
   collectionInfo: async (name, options) => {
     infoCalls.push([name, options])
 

@@ -425,6 +425,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     hosts: options.runtimeRedirects?.hosts,
     served: () => [...served.paths(), ...client.pages.keys(), ...table.paths.keys()],
     pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
+    base,
   })
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)

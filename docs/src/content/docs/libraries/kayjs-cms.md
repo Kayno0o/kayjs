@@ -493,7 +493,7 @@ You declare nothing for this. The versions sit in the same table as the entries,
 
 ### After a save
 
-`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate` or `delete`), the author and, for a folder entry, the commit.
+`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one.
 
 ```ts
 cms({

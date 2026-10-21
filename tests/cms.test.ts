@@ -9,7 +9,7 @@ import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
-import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
+import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -825,6 +825,12 @@ describe('the collections a CMS edits', () => {
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
+  })
+
+  it('gives the file of an entry that replaces another in its format, and the page it would have', async () => {
+    expect(await entrySource('pages', 'about-us', { title: 'About', order: 1 }, { create: true, replacing: 'contact' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/about-us.yaml' } })
+    expect(await entrySource('pages', 'about-us', { title: 'About', order: 1 }, { create: true })).toMatchObject({ file: { path: expect.stringMatching(/about-us\.md$/) } })
+    expect(await entryPage('articles', { slug: 'renamed', locale: 'fr', data: { title: 'Nouveau' } })).toBe('/articles/renamed')
   })
 
   // kayjs-cms's script check leaves a body bodyHtml cannot read to this refusal.

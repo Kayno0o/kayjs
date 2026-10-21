@@ -169,3 +169,51 @@ export async function forgetRevisions(ref: EntryRef): Promise<void> {
     log.error(`${ref.collection}/${ref.slug}'s revisions could not be forgotten`, error)
   }
 }
+
+// Moves an entry's revisions to the slug it was renamed to, replacing any the new slug held; never throws, as the rename is written.
+export async function moveRevisions(from: EntryRef, to: EntryRef): Promise<void> {
+  const hidden = hiddenOf(from.collection, 'history')
+
+  if (hidden === undefined)
+    return
+
+  const place = placeOf(from)
+  const target = placeOf(to)
+
+  try {
+    const ats = await indexOf(hidden, place)
+
+    if (ats.length === 0)
+      return
+
+    const writes: { slug: string, data: unknown, body?: string | undefined }[] = []
+    const kept: number[] = []
+
+    for (const at of ats) {
+      const row = await rowOf(hidden, revisionPlace(place, at))
+
+      if (row) {
+        kept.push(at)
+        writes.push({ slug: revisionPlace(target, at), data: row.data, body: row.body })
+      }
+    }
+
+    // What an earlier entry of that slug left is replaced, as a new entry starts its history over.
+    await forgetRevisions(to)
+
+    writes.push({ slug: target, data: { ats: kept } satisfies Index })
+
+    if (hidden.saveMany) {
+      await hidden.saveMany(writes)
+    }
+    else {
+      for (const write of writes)
+        await hidden.save!(write)
+    }
+
+    await forgetRevisions(from)
+  }
+  catch (error) {
+    log.error(`${from.collection}/${from.slug}'s revisions could not be moved to ${to.slug}`, error)
+  }
+}

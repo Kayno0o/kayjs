@@ -1,18 +1,19 @@
-import type { Commit, FileChange, Identity } from './files'
+import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
+import { redirectMovedPage } from 'kay/library'
 import { wording } from 'kay/words'
 import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
 import { fieldsOf } from './fields'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { hiddenOf } from './hidden'
-import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
+import { collectionInfo, entries, entryFile, entryPage, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
-import { missingReferences } from './references'
-import { openTrail } from './revisions'
+import { missingReferences, referrersOf } from './references'
+import { moveRevisions, openTrail } from './revisions'
 import { settings } from './settings'
 import { discardTrashed, keepDeleted } from './trash'
 import { scriptInBody } from './unsafe'
@@ -537,6 +538,175 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
   }
 
   return outcome
+}
+
+// The most entries named in the refusal of a rename.
+const REFERRERS_NAMED = 3
+
+// Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, and the page it had redirects to the page it has, without the app writing anything.
+// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or another entry refers to this one by its slug. `version` is the one the editor opened.
+export async function renameEntry(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome & { slug?: string }> {
+  let outcome: SaveOutcome
+
+  try {
+    outcome = await renameOne(ref, slug, options)
+  }
+  finally {
+    forgetCounts()
+  }
+
+  if (!('saved' in outcome))
+    return outcome
+
+  await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
+
+  return { ...outcome, slug }
+}
+
+async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+  const collection = await collectionNamed(ref.collection)
+
+  if (collection.single)
+    return refused(ref, wording('cms.store.singleRename', '{collection} holds one entry, which cannot be renamed', { collection: collectionTitle(collection) }))
+
+  const existing = await entryOf(ref, collection)
+
+  if (!existing)
+    return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+  if (!existing.data)
+    return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
+
+  if (slug === ref.slug)
+    return refused(ref, wording('cms.store.sameSlug', '{slug} is the slug already', { slug }), 'slug')
+
+  const target = { ...ref, slug }
+  const data = typeof existing.data.slug === 'string' ? { ...existing.data, slug } : existing.data
+
+  // A reference names its entry by the slug, so every entry naming this one would point at nothing.
+  const named = (await referrersOf(collection.name, [ref.slug])).get(ref.slug) ?? []
+
+  if (named.length > 0)
+    return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}: change them to name the new slug first', { slug: ref.slug, names: named.slice(0, REFERRERS_NAMED).join(', ') + (named.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')
+
+  const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, data, { version, required }) : await renameFile(collection, existing, target, data, { author, version, required })
+
+  if (!('saved' in moved))
+    return moved
+
+  await pointRedirect(existing, target, data)
+
+  return moved
+}
+
+async function renameFile(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { author, version, required }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+  const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
+
+  if (collection.dir === undefined)
+    return refused(ref, wording('cms.store.outside', '{collection}\'s folder lies outside the repository, so its files cannot be committed', { collection: collection.name }))
+
+  const saver = settings().files
+  const { move } = saver
+
+  if (move === undefined)
+    return refused(ref, wording('cms.store.noMove', 'The saver of this site cannot rename files'))
+
+  if (required && version === undefined && existing.version !== undefined)
+    return unversioned(ref)
+
+  const from = await entryFile(collection.name, ref.slug, { locale: ref.locale })
+
+  if ('issues' in from)
+    return from
+
+  const source = await entrySource(collection.name, target.slug, data, { locale: ref.locale, body: existing.body, create: true, replacing: ref.slug })
+
+  if ('issues' in source)
+    return source
+
+  const change: FileMove = {
+    from: { repoPath: from.file.repoPath, absolute: from.file.absolute },
+    to: { repoPath: source.file.repoPath, absolute: source.file.absolute },
+    text: source.file.text,
+    message: `content(${collection.name}): rename ${ref.slug} to ${target.slug}`,
+    author,
+    base: version,
+  }
+
+  try {
+    return { saved: true, commit: await saver.move!(change), version: fileVersion(source.file.text) }
+  }
+  catch (error) {
+    if (error instanceof SaveConflict)
+      return { ...refused(target, error.message), ...error.creating || error.current === undefined ? {} : { conflict: { version: error.current } } }
+
+    if (!(error instanceof ForgeError))
+      throw error
+
+    log.error(`renaming ${change.from.repoPath} failed`, error)
+
+    return refused(target, error.message)
+  }
+}
+
+async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, target: EntryRef, data: Record<string, unknown>, { version, required = false }: { version?: string | undefined } & VersionRule): Promise<SaveOutcome> {
+  const ref = { collection: collection.name, slug: existing.slug, locale: existing.locale }
+
+  return inTurn(collection.name, async () => {
+    const stale = required || version !== undefined ? await staleLoaded(ref, collection.schema, version, required) : undefined
+
+    if (stale)
+      return stale
+
+    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data, body: existing.body }, { create: true, replacing: ref.slug })
+
+    if (refusedNew !== undefined && refusedNew.length > 0)
+      return { issues: refusedNew }
+
+    // The entry is not deleted, so it does not go to the trash: it is the same entry under another slug.
+    let removal: Awaited<ReturnType<typeof removeEntry>>
+
+    try {
+      removal = await removeEntry(collection.name, ref.slug, ref.locale)
+    }
+    catch (error) {
+      await takeBack(target)
+
+      throw error
+    }
+
+    if (removal.issues !== undefined && removal.issues.length > 0) {
+      await takeBack(target)
+
+      return { issues: removal.issues }
+    }
+
+    await moveRevisions(ref, target)
+
+    const after = await readAfter(target, collection.name)
+
+    return { saved: true, version: after && contentVersion(after, collection.schema) }
+  })
+}
+
+// Removes the entry a rename wrote under its new slug, once the old could not be removed.
+async function takeBack(target: EntryRef): Promise<void> {
+  try {
+    await removeEntry(target.collection, target.slug, target.locale)
+  }
+  catch (error) {
+    log.error(`${target.collection}/${target.slug} could not be taken back after its rename failed`, error)
+  }
+}
+
+// Redirects the page the entry had to the page it has, which a site without that page, or a redirect refused for its paths, goes without: the rename stays.
+async function pointRedirect(existing: StoredEntry, target: EntryRef, data: Record<string, unknown>): Promise<void> {
+  try {
+    redirectMovedPage(existing.url, await entryPage(target.collection, { slug: target.slug, locale: target.locale, data }))
+  }
+  catch (error) {
+    log.warn(`${existing.slug}'s page could not be redirected to ${target.slug}'s`, error)
+  }
 }
 
 // Hands a change to the configured saver, turning a conflict or a forge that failed into the issue the editor shows.

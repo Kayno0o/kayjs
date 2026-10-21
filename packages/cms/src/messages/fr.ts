@@ -404,6 +404,10 @@ export default defineMessages({
       staleDelete: 'Cet éditeur n\'affiche pas le fichier tel qu\'il est maintenant, il ne le supprimera pas : rechargez la page pour le voir, puis supprimez à nouveau',
       staleSave: 'Cet éditeur est plus ancien que le serveur : copiez vos modifications, rechargez la page, puis refaites-les',
       singleDuplicate: '{collection} contient une seule entrée, qui ne peut pas être dupliquée',
+      singleRename: '{collection} contient une seule entrée, qui ne peut pas être renommée',
+      sameSlug: '{slug} est déjà le slug',
+      noMove: 'Le système d\'enregistrement de ce site ne sait pas renommer les fichiers',
+      renameReferred: '{slug} est référencée par {names} : faites-les pointer vers le nouveau slug d\'abord',
     },
     table: {
       editing: 'En cours de modification par {names}',

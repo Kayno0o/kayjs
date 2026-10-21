@@ -6,7 +6,7 @@ import type { Collection, ContentLoader, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
@@ -521,12 +521,24 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
 
   return Promise.all(placed.map(async (entry) => {
     const decoded = entry.problem === undefined ? decodedData(collection, entry) : undefined
-    const { url: urlOf } = collection.options
-    // The collection's `url` reads the data as the schema decodes it, so an entry the schema refuses takes the route's page.
-    const url = urlOf && decoded ? urlOf({ slug: entry.slug, locale: entry.locale, data: decoded.data }) : await site?.urls(collection, entry)
+    const url = await pageUrl(collection, entry, decoded)
 
     return { ...entry, draft: entry.problem === undefined && draftOf(collection, entry, decoded?.data ?? entry.data), ...url !== undefined && { url } }
   }))
+}
+
+// The path of the page showing an entry: the collection's `url` called with the data as the schema decodes it, so an entry the schema refuses takes the route's page.
+async function pageUrl(collection: Collection<unknown>, entry: { slug: string, locale?: string | undefined }, decoded: { data: unknown } | undefined): Promise<string | undefined> {
+  const { url: urlOf } = collection.options
+
+  return urlOf && decoded ? urlOf({ slug: entry.slug, locale: entry.locale, data: decoded.data }) : site?.urls(collection, entry)
+}
+
+// The path of the page an entry would have under this slug and locale, as `entries()` gives `url`, for an entry not written yet or about to be: a CMS moving an entry redirects the page it had to the page it has.
+export async function entryPage(name: string, entry: { slug: string, locale?: string | undefined, data: unknown }): Promise<string | undefined> {
+  const collection = collectionNamed(name)
+
+  return pageUrl(collection, entry, decodedData(collection, { slug: entry.slug, locale: entry.locale, data: entry.data as SourceEntry['data'], problem: undefined }))
 }
 
 // A localized collection's entries by what pairs them with their translations, then locale, each holding its slug: what a list reads to show the locales an entry lacks, in place of every entry.
@@ -609,7 +621,7 @@ export async function translations(name: string): Promise<TranslationIndex> {
 
 // Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a new `a/index` included, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
 // A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
-export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
+export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry, replacing?: string): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
   const { slug, locale, data, body } = entry
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues: DraftIssue[] = []
@@ -625,19 +637,19 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
     issues.push({ ...at, path: '', message: `holds ${valueKind(data)} as its data, not an object of fields` })
 
   if (isFields(data))
-    issues.push(...await uniqueIssues(name, collection, at, data))
+    issues.push(...await uniqueIssues(name, collection, at, data, replacing))
 
   return { issues, compiled }
 }
 
 // Each `unique` field whose value another entry of the collection already holds, in the same locale when it is localized.
-async function uniqueIssues(name: string, collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>): Promise<DraftIssue[]> {
+async function uniqueIssues(name: string, collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>, replacing?: string): Promise<DraftIssue[]> {
   const fields = uniqueFields(collection.options.schema).filter(field => data[field] !== undefined && data[field] !== null)
 
   if (fields.length === 0)
     return []
 
-  const others = (await entries(name, at.locale === undefined ? {} : { locale: at.locale })).filter(other => other.slug !== at.slug)
+  const others = (await entries(name, at.locale === undefined ? {} : { locale: at.locale })).filter(other => other.slug !== at.slug && other.slug !== replacing)
   const issues: DraftIssue[] = []
 
   for (const field of fields) {
@@ -658,15 +670,15 @@ function uniqueFields(schema: TSchema): string[] {
 }
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.
-// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds.
-export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
+// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds. `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed: its values do not count as taken for a `unique` field, and the new file has its file's format.
+export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)
     throw new KayError('content-api-misuse', `kay: entrySource() writes a folder collection's files, and ${name} is loaded: saveEntry() hands its entries to its loader's save`)
 
   const entry = { slug, data, ...options.locale !== undefined && { locale: options.locale }, ...options.body !== undefined && { body: options.body } }
-  const { issues } = await entryIssues(name, collection, entry)
+  const { issues } = await entryIssues(name, collection, entry, options.replacing)
 
   if (issues.length > 0)
     return { issues }
@@ -680,7 +692,11 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   if (existing !== undefined && options.body !== undefined && !MARKDOWN.test(existing))
     return { issues: [{ collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '', body: true, message: `goes to ${existing}, a data file holding no body` }] }
 
-  const relativeFile = existing ?? `${place}.${options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'}`
+  // An entry that replaces another keeps its file's format.
+  const replaced = options.replacing === undefined ? undefined : (await entryPlace(name, dir, options.replacing, options.locale)).existing
+  const format = replaced === undefined ? '' : extname(replaced).slice(1)
+  const fallback = options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'
+  const relativeFile = existing ?? `${place}.${format === '' ? fallback : format}`
   const file = fileIn(name, dir, relativeFile)
   const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? (await readEntry(dir, existing)).body : undefined)
 
@@ -768,14 +784,15 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
+// `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed, whose values do not count as taken for a `unique` field.
 // `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves and removes run in turn, so two creates here never both find the slug free.
-export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
+export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
   const turn = takeTurn(collection.name)
 
   try {
-    const { issues } = await entryIssues(name, collection, entry)
+    const { issues } = await entryIssues(name, collection, entry, options.replacing)
 
     if (issues.length > 0)
       return { issues }
@@ -783,7 +800,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     await turn.ready
 
     // A save ahead in turn may have taken the value.
-    const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>)
+    const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>, options.replacing)
 
     if (taken.length > 0)
       return { issues: taken }

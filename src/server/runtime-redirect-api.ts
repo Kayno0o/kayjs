@@ -8,7 +8,7 @@ import { kayLog } from '../runtime/log'
 import { pathOf } from './log'
 import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, NOT_FOUND_FILE, sharedStore, storeFile } from './not-found'
 import { requestUrl } from './request-url'
-import { answerFor } from './runtime-redirects'
+import { answerFor, plainPath } from './runtime-redirects'
 
 const NOT_FOUND = 404
 // A page whose entry ended answers it, which an editor's redirect for the path still wins over.
@@ -19,12 +19,14 @@ const TRAILING_SLASHES = /\/+$/
 
 let rules: RuntimeRules = { hosts: [], configured: {} }
 let hosts: readonly string[] = []
+let mount = ''
 let pagesOf: (() => string[]) | undefined
 let statuses: Record<string, RedirectStatus> = {}
 let sorted: { from: string[], paths: string[] } | undefined
 
 // What the running app lets an editor add, from its config: the redirects of kay.config.ts, which win and count in a chain; the hosts a target may name besides the site's own; the paths the site serves.
-export function knowRuntimeRules(options: { redirects: Record<string, string>, statuses?: Record<string, RedirectStatus> | undefined, hosts?: readonly string[] | undefined, served?: (() => string[]) | undefined, pages?: (() => string[]) | undefined }): void {
+export function knowRuntimeRules(options: { redirects: Record<string, string>, statuses?: Record<string, RedirectStatus> | undefined, hosts?: readonly string[] | undefined, served?: (() => string[]) | undefined, pages?: (() => string[]) | undefined, base?: string | undefined }): void {
+  mount = options.base ?? ''
   hosts = (options.hosts ?? []).map(host => host.toLowerCase())
   rules = { hosts, configured: options.redirects, served: options.served }
   statuses = options.statuses ?? {}
@@ -87,6 +89,43 @@ export function addRuntimeRedirect(from: string, to: string, options: { status?:
 
     return added
   })!
+}
+
+// The path of a page URL as the server's routes know it, the mount point taken off: undefined for another site's URL, or a path outside the mount point.
+function sitePath(url: string): string | undefined {
+  if (!url.startsWith('/') || url.startsWith('//'))
+    return undefined
+
+  if (mount === '')
+    return url
+
+  return url === mount || url.startsWith(`${mount}/`) || url.startsWith(`${mount}?`) ? url.slice(mount.length) || '/' : undefined
+}
+
+// Redirects the page an entry had to the one it has now, as `entries()` gives their `url`s, when an editor moves it (a CMS renaming a slug): the redirects that led to the old page lead to the new one, so a chain of moves stays one hop, and one from the new page is removed, so moving back is no loop.
+// Does nothing for a page on another site or no page, or when the path stays; throws like `addRuntimeRedirect` for a path it refuses.
+export function redirectMovedPage(from: string | undefined, to: string | undefined, options: { status?: RuntimeStatus | undefined, file?: string | undefined } = {}): void {
+  const old = from === undefined ? undefined : sitePath(from)
+  const now = to === undefined ? undefined : sitePath(to)
+
+  if (old === undefined || now === undefined || plainPath(old) === plainPath(now))
+    return
+
+  const { file } = options
+
+  inStore(file, true, (store) => {
+    // Nothing answers the page that exists again, and a redirect from it would make the way back a loop.
+    store.redirects.remove(plainPath(now))
+
+    for (const row of store.redirects.list()) {
+      if (row.status !== 410 && row.to.startsWith('/') && plainPath(row.to) === plainPath(old))
+        store.redirects.add(row.from, now, row.status, rules)
+    }
+
+    const added = store.redirects.add(old, now, options.status, rules)
+
+    store.forget(added.from)
+  })
 }
 
 // Removes a redirect, and says whether there was one.

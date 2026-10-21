@@ -50,7 +50,7 @@ A save refreshes the collection in the process that handled it, and each loader 
 
 ## After a save
 
-`cms({ onSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `onSave: async ({ collection, slug, locale, verb, author, commit }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore` or `delete`; `commit` is what a folder entry's saver made. A throw is logged and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is logged.
+`cms({ onSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `onSave: async ({ collection, slug, locale, verb, author, commit }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore`, `rename` (`slug` is the new one, `from` the old) or `delete`; `commit` is what a folder entry's saver made. A throw is logged and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is logged.
 
 What is refreshed before the hook runs, with nothing to call:
 

@@ -20,8 +20,10 @@ export interface SaveEvent {
   collection: string
   slug: string
   locale?: string | undefined
-  // What the editor did: a new entry is `add`, a changed one `update`, and `move` is one entry of a reorder.
-  verb: 'add' | 'update' | 'publish' | 'unpublish' | 'move' | 'duplicate' | 'delete' | 'restore'
+  // What the editor did: a new entry is `add`, a changed one `update`, `move` is one entry of a reorder and `rename` a new slug, the old one being `from`.
+  verb: 'add' | 'update' | 'publish' | 'unpublish' | 'move' | 'duplicate' | 'delete' | 'restore' | 'rename'
+  // The slug an entry had before a `rename`.
+  from?: string | undefined
   author?: Identity | undefined
   // The commit a folder entry's saver made, such as a forge's.
   commit?: Commit | undefined
