@@ -807,7 +807,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 function heldConnections(): string {
   const others = (browser?.pages ?? 1) - 1
 
-  return others < MAX_HOST_CONNECTIONS - 1 ? '' : `; ${others} other pages are still open, and a browser holds only ${MAX_HOST_CONNECTIONS} connections to a host, which a page following a live value keeps open until it is closed: close the pages a test is done with, as \`await using page = await site.open(...)\` does`
+  return others < MAX_HOST_CONNECTIONS ? '' : `; ${others} other pages are still open, and a browser holds only ${MAX_HOST_CONNECTIONS} connections to a host, which a page following a live value keeps open until it is closed: close the pages a test is done with, as \`await using page = await site.open(...)\` does`
 }
 
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
