@@ -4,7 +4,7 @@ import { afterAll, expect, it } from 'bun:test'
 import { scratchDir } from './scratch'
 
 const SRC = join(import.meta.dir, '..', 'src', 'test')
-const NAMES = ['fetch', 'Request', 'Response', 'Headers', 'FormData', 'Blob', 'File', 'URL', 'AbortController', 'WebSocket']
+const NAMES = ['fetch', 'Request', 'Response', 'Headers', 'Blob', 'File', 'URL', 'URLSearchParams', 'AbortController', 'AbortSignal', 'WebSocket']
 
 const dirs: string[] = []
 
@@ -37,6 +37,21 @@ it('serves and fetches with Bun', async () => {
   }
 })
 
+it('reads a form into a FormData that Bun can still send', async () => {
+  document.body.innerHTML = '<form><input name="a" value="1"><select name="b"><option value="x" selected>x</option></select></form>'
+
+  const data = new FormData(document.querySelector('form')!)
+  const server = Bun.serve({ port: 0, fetch: async request => Response.json([...(await request.formData()).entries()]) })
+
+  try {
+    expect([...data.entries()]).toEqual([['a', '1'], ['b', 'x']])
+    expect(await (await fetch(String(server.url), { method: 'POST', body: data })).json()).toEqual([['a', '1'], ['b', 'x']])
+  }
+  finally {
+    await server.stop(true)
+  }
+})
+
 it('keeps every web global native, with a document beside them', () => {
   expect(typeof document.createElement).toBe('function')
 
@@ -48,6 +63,6 @@ it('keeps every web global native, with a document beside them', () => {
   const child = Bun.spawn(['bun', 'test', '--preload', join(SRC, 'preload.ts'), '--preload', join(SRC, 'dom.ts'), file], { cwd: dir, stdout: 'pipe', stderr: 'pipe', stdin: 'ignore', env: { ...process.env, KAY_TEST_CHILD: '1' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  expect(`${out}${err}`).toContain('2 pass')
+  expect(`${out}${err}`).toContain('3 pass')
   expect(code).toBe(0)
 }, 60_000)

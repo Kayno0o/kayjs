@@ -5,8 +5,16 @@ import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader,
 const ANSWER = { label: 'Edit this page', href: '/admin/page' }
 const BUTTON = 'html > a'
 
+// A status 0 stands for a redirect a guard answered, which no Response can carry.
+function reply(status: number, body: unknown) {
+  if (status === 200)
+    return Response.json(body)
+
+  return status === 0 ? { status: 0, ok: false, type: 'opaqueredirect' } : new Response(null, { status })
+}
+
 function answering(status: number, body: unknown = ANSWER) {
-  return spyOn(globalThis, 'fetch').mockImplementation((async () => status === 200 ? Response.json(body) : new Response(null, { status })) as unknown as typeof fetch)
+  return spyOn(globalThis, 'fetch').mockImplementation((async () => reply(status, body)) as unknown as typeof fetch)
 }
 
 // The listeners a run leaves on the document, so a later page swap reaches only its own.
