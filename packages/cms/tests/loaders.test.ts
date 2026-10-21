@@ -204,6 +204,14 @@ describe('a loader watching its database', () => {
     other.close()
   })
 
+  test('a write to another collection of the file invalidates nothing', async () => {
+    const path = join(await scratchDir('loader-'), 'two.db')
+    const pages = sqliteLoader({ name: 'two-pages', database: path, watch: '40ms' })
+    const posts = sqliteLoader({ name: 'two-posts', database: new Database(path) })
+
+    expect(await readsDuring(pages, async () => posts.save!({ slug: 'p', data: { title: 'P' } }))).toBe(1)
+  })
+
   test('watch: false looks no more', async () => {
     const path = join(await scratchDir('loader-'), 'quiet.db')
     const quiet = sqliteLoader({ name: 'quiet', database: path, watch: false })

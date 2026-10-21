@@ -1,7 +1,7 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -39,9 +39,9 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
   const table = tableOf(options.table)
   const key = seededKey(name)
   let ready: Promise<SQL> | undefined
-  // The rows' count and the newest transaction that wrote one: an insert, an update and a delete each move it, whoever made them.
-  const watching = watcher(name, options.watch, '2s', async () => {
-    const [row] = await clientOf(options.sql).unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(max(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
+  // The rows' count and the sum of the transactions that wrote them: an insert, an update and a delete each move it, whoever made them, whatever order they commit in.
+  const watching = watcher(name, `${scopeOf(options.sql)}/${table}`, options.watch, '2s', async () => {
+    const [row] = await clientOf(options.sql).unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
 
     return row!.signature
   })

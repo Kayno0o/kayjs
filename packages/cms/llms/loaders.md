@@ -42,7 +42,7 @@ SQLite stores the JSON as written; Postgres stores `jsonb`, which reorders an ob
 
 A save refreshes the collection in the process that handled it, and each loader looks at its database for changes of its own, so the others follow with nothing declared:
 
-- `watch` is how often it looks, `'1s'` for SQLite (`PRAGMA data_version`, which moves when another connection committed) and `'2s'` for Postgres (the collection's row count and newest write); `false` looks no more. The timer never keeps the process alive and starts with the first read.
+- `watch` is how often it looks, `'1s'` for SQLite (`PRAGMA data_version`, which moves when another connection committed, then a hash of the collection's rows, so a write to another collection changes nothing) and `'2s'` for Postgres (the collection's row count and the sum of the transactions that wrote them); `false` looks no more. The timer never keeps the process alive and starts with the first read.
 - A change found drops the collection's entries as a save does: the next read loads them afresh, the pages that read them and the sitemap are refreshed, `live: true` pages follow in every tab, and a `publishAt` or `unpublishAt` date is read again. A save made here is not looked for again.
 - The same finds an edit made outside the CMS, a row changed with `sqlite3` or `psql`, a script or another app: it shows within `watch`, with no reload command, admin refresh or webhook to wire.
 - `ttl` is no longer needed for this: it still refreshes the entries when a change goes unseen, such as a loader of your own. A folder collection or an API behind a loader of your own has no database to look at: call `posts.invalidate()` from a webhook route ([Content from a CMS](../../../llms/content-cms.md)), or restart.

@@ -80,12 +80,37 @@ export interface Watcher {
   settle: () => Promise<void>
 }
 
-// Looks at a cheap `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit.
-export function watcher(name: string, watch: LoaderOptions['watch'], fallback: string, signature: () => string | Promise<string>): Watcher {
-  const every = watch === false ? undefined : Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`, 'kayjs-cms') * 1000)
+// The longest delay a timer holds before it fires at once.
+const MAX_INTERVAL_MS = 2 ** 31 - 1
+
+const scopes = new WeakMap<object, number>()
+let scopeCount = 0
+
+// Names the database a loader was given: its path or URL, else an id for the object the app handed over.
+export function scopeOf(database: string | object): string {
+  if (typeof database === 'string')
+    return database
+
+  let id = scopes.get(database)
+
+  if (id === undefined)
+    scopes.set(database, id = ++scopeCount)
+
+  return `#${id}`
+}
+
+// The running watcher of each collection, so a module a dev server evaluates again replaces its loader's timer instead of adding one.
+const running = new Map<string, () => void>()
+
+// Looks at a `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit. `force` asks for a reading even where the database says nothing moved. `scope` tells databases apart that hold collections of one name.
+export function watcher(name: string, scope: string, watch: LoaderOptions['watch'], fallback: string, signature: (force: boolean) => string | Promise<string>): Watcher {
+  const every = watch === false ? undefined : Math.min(MAX_INTERVAL_MS, Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`, 'kayjs-cms') * 1000))
+  const id = `${scope}\u0000${name}`
   let known: string | undefined
   let timer: ReturnType<typeof setInterval> | undefined
   let looking = false
+  // Moves with each `settle`, so a look that began before one does not overwrite what it stored.
+  let epoch = 0
 
   const look = async () => {
     if (looking)
@@ -94,9 +119,10 @@ export function watcher(name: string, watch: LoaderOptions['watch'], fallback: s
     looking = true
 
     try {
-      const now = await signature()
+      const before = epoch
+      const now = await signature(false)
 
-      if (now !== known) {
+      if (before === epoch && now !== known) {
         known = now
         invalidate(contentKey(name))
       }
@@ -114,13 +140,21 @@ export function watcher(name: string, watch: LoaderOptions['watch'], fallback: s
       if (every === undefined || timer !== undefined)
         return
 
+      known = await signature(true)
+      running.get(id)?.()
       timer = setInterval(() => void look(), every)
       timer.unref()
-      known = await signature()
+
+      const mine = timer
+
+      running.set(id, () => clearInterval(mine))
     },
     settle: async () => {
-      if (timer !== undefined)
-        known = await signature()
+      if (timer === undefined)
+        return
+
+      epoch++
+      known = await signature(true)
     },
   }
 }

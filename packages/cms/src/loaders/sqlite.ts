@@ -3,7 +3,7 @@ import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { existsError, loadedOf, placeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -19,8 +19,19 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   const key = seededKey(name)
   let opened: Database | undefined
   let ready: Promise<Database> | undefined
-  // `data_version` moves when another connection committed, a process or the `sqlite3` tool, never for this one's own writes.
-  const watching = watcher(name, options.watch, '1s', () => String(opened!.query<{ data_version: number }, []>('PRAGMA data_version').get()!.data_version))
+  // `data_version` moves when another connection committed, a process or the `sqlite3` tool, in any table of the file; the collection's rows are read and hashed only then, so a write to another collection or table invalidates nothing.
+  let version: number | undefined
+  let fingerprint = ''
+  const watching = watcher(name, `${scopeOf(options.database)}/${table}`, options.watch, '1s', (force) => {
+    const now = opened!.query<{ data_version: number }, []>('PRAGMA data_version').get()!.data_version
+
+    if (force || now !== version) {
+      version = now
+      fingerprint = String(Bun.hash(opened!.query<Row, [string]>(`SELECT place, data, body FROM ${table} WHERE collection = ? ORDER BY place`).all(name).map(row => `${row.place}\u0000${row.data}\u0000${row.body ?? ''}`).join('\u0001')))
+    }
+
+    return fingerprint
+  })
 
   const open = async (): Promise<Database> => {
     if (opened !== undefined)
@@ -98,6 +109,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
       const db = await database()
 
       upsert(db, entry, entry.create === true)
+      await watching.settle()
     },
     saveMany: async (entries) => {
       const db = await database()
@@ -106,11 +118,13 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
         for (const entry of entries)
           upsert(db, entry, false)
       })()
+      await watching.settle()
     },
     remove: async (entry) => {
       const db = await database()
 
       db.query(`DELETE FROM ${table} WHERE collection = ? AND place = ?`).run(name, placeOf(entry))
+      await watching.settle()
     },
   }
 }
