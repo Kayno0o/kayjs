@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/bare/src/routes'
 const ITEMS = `import { t } from 'elysia'

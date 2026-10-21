@@ -7,9 +7,9 @@ import process from 'node:process'
 import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { pages } from '../src/server'
 import { browse, browserPath } from '../src/test'
 import { listeningPort } from './listening'
+import { pages } from './shared-pages'
 
 const CLI = resolve('src/cli.ts')
 const MAGIC = Buffer.from([0x5E, 0x2A, 0x4D, 0x18, 0x20, 0, 0, 0])

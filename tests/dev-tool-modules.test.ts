@@ -3,8 +3,8 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadDevModules } from '../src/runtime/dev-tool'
-import { pages } from '../src/server'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const MODULE_PATHS = /"(\/_kay\/dev\/extension\/[^"]+)"/g
 

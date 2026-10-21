@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { a11yProblem } from '../src/runtime/dev-a11y'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/bare/src/routes'
 

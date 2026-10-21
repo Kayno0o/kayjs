@@ -4,10 +4,10 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { writeShadowTypes } from '../src/check'
-import { pages } from '../src/server'
 import { exportedEndpoints } from '../src/server/endpoints'
 import { falseKeys, scanEndpoints } from '../src/server/routes'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const ACTION = (name: string, settings: string, body: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\n${body}\n`
 const ADMINS = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n'

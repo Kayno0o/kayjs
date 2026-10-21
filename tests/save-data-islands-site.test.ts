@@ -1,9 +1,9 @@
 import type { TestSite } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/save-data-islands/src/routes'
 const PRELOAD = /<link rel="modulepreload" href="([^"]*)"(?: data-load)?>/g

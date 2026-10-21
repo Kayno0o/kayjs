@@ -5,12 +5,12 @@ import { Database } from 'bun:sqlite'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { openSqlite } from '../src/runtime/sqlite.server'
-import { pages } from '../src/server'
 import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
 import { dropStore, missingPaths, pageRequested, sharedStore } from '../src/server/not-found'
 import { configuredRedirects, knowRuntimeRules, missingRedirector, sitePaths } from '../src/server/runtime-redirect-api'
 import { answerFor, RedirectRefused, redirectSet } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const rules = { hosts: [] as string[], configured: {} as Record<string, string> }
 

@@ -8,13 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } fro
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { configuredSite, setSite } from '../src/runtime/site'
-import { memoryStore, pages, session, sqliteStore } from '../src/server'
+import { memoryStore, session, sqliteStore } from '../src/server'
 import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { sealWith } from '../src/server/seal'
 import { sqliteStoreAt } from '../src/server/session'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const SECRET = 'a test secret that is long enough to seal'
 const COOKIE_VALUE = /^session=([^;]*)/

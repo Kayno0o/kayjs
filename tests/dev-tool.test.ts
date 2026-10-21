@@ -10,9 +10,9 @@ import { startDevTool } from '../src/runtime/dev-tool'
 import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
 import { ISLAND_PARAM } from '../src/runtime/server-islands'
-import { pages } from '../src/server'
 import { DEV_BOOT, liveReload, problemsBlock } from '../src/server/dev'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // The fields of a request block the Request tab reads.
 const PAGE = { page: 'src/routes/index.kay', layouts: [], params: {}, id: 'abc', guards: [], status: 200, loads: [] }

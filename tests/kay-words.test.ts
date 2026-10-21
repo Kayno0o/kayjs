@@ -7,9 +7,9 @@ import { libraryMessageExtensions } from '../src/build/manifests'
 import { messageProblems } from '../src/check/messages'
 import { sizeText } from '../src/runtime/size-text'
 import { wording } from '../src/runtime/words.server'
-import { pages } from '../src/server'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/kay-words'
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }

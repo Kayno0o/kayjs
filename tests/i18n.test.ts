@@ -15,13 +15,13 @@ import { flattenMessages, localeName, localePath, localizedLink, matchLinksWith,
 import { localize, relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { logSink, setLogSink } from '../src/runtime/log'
-import { pages } from '../src/server'
 import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
 import { compiledLinks } from '../src/server/links'
 import { hookPrerendered } from '../src/server/page-hook'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/i18n'
 const routes = `${FIXTURE}/src/routes`

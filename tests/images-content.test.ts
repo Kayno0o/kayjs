@@ -12,11 +12,11 @@ import { contentPlace, loadEntries, markdownOf, setContentMode, setContentPlace,
 import { compileMarkdown } from '../src/content/markdown'
 import { image, imageUrl, parseWidths, setImageWidths, setPlaceholders } from '../src/runtime/image'
 import { placeholderColor } from '../src/runtime/placeholder'
-import { pages } from '../src/server'
 import { setImageColors } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
 import { countColorReads } from './color-reads'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 

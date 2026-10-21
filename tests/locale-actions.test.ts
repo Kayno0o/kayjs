@@ -1,7 +1,7 @@
 import type { I18nConfig } from '../src/config'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/locale-actions/src/routes'
 const messages = 'tests/fixtures/i18n/src/messages'

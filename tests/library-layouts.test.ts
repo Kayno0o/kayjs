@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/library-chrome'
 // A base path is stripped by the proxy in front of kay, so requests carry none.

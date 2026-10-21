@@ -5,7 +5,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun
 import { Elysia } from 'elysia'
 import { probeWait } from '../src/build/verify'
 import { check, configCheckOptions } from '../src/check'
-import { pages } from '../src/server'
 import { liveLimits, remoteLimits } from '../src/server/config-limits'
 import { webpQuality } from '../src/server/image'
 import { probeHealth } from '../src/server/lifecycle'
@@ -14,6 +13,7 @@ import { hostedStatus, readRedirects } from '../src/server/redirects'
 import { remoteImages, remotePatterns } from '../src/server/remote'
 import { securityHeaders } from '../src/server/security'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/production/src/routes'
 

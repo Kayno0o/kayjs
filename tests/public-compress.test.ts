@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { addRuntimeRedirect, removeRuntimeRedirect } from '../src/server/library'
 import { missingPaths } from '../src/server/not-found'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // Public text files are compressed on the fly: what a client gets, in every encoding, must not depend on how the server keeps them between requests.
 const SMALL = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><path d="M0 0h4v4z"/></svg>'

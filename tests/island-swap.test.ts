@@ -1,9 +1,9 @@
 import type { TestPage } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { browse, browserPath } from '../src/test'
 import { scratchBuild } from './prerendered'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/island-swap/src/routes'
 const browserInstalled = browserPath() !== undefined

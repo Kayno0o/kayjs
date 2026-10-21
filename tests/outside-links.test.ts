@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { leavesSite } from '../src/runtime/outside'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/outside-links/src/routes'
 const LINK = /<a\b[^>]*>/g

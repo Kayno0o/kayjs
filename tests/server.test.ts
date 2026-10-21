@@ -17,7 +17,7 @@ import { outputDir } from '../src/build/assets'
 import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { currentPage } from '../src/runtime/html'
-import { inlineScriptHashes, pages } from '../src/server'
+import { inlineScriptHashes } from '../src/server'
 import { crossSiteResponse } from '../src/server/actions'
 import { chooseInlineStyles, INLINE_LIMIT, readClient, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
@@ -40,6 +40,7 @@ import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
 import { prerendered, refusedPrerender, scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 // No _404.kay nor _error.kay: failures answer in plain text.

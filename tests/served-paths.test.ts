@@ -4,9 +4,9 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { bootProblems } from '../src/check/boot'
-import { pages } from '../src/server'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const CLI = resolve('src/cli.ts')
 

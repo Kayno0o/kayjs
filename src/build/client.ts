@@ -142,6 +142,9 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
 }
 
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
+  rootMargin(options.hydration?.visible, '200px', 'visible')
+  rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
+
   const sources = await readClientSources(root, options)
 
   await clearClientOutput(root)

@@ -14,10 +14,11 @@ import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { serveFeeds, writeContentManifests } from '../src/content/server'
 import { sanitizeHtml } from '../src/runtime'
 import { html } from '../src/runtime/rendered'
-import { pages, shutdown } from '../src/server'
+import { shutdown } from '../src/server'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/content'
 const routes = `${FIXTURE}/src/routes`

@@ -6,12 +6,13 @@ import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { refuseStaticConfig } from '../src/build/static'
 import { image } from '../src/runtime/image'
-import { imageSize, pages, processImage } from '../src/server'
+import { imageSize, processImage } from '../src/server'
 import * as avifCodec from '../src/server/avif'
 import { applyImageConfig, writeImageVariants } from '../src/server/image'
 import { imageHeader, isAvif } from '../src/server/image-format'
 import { gif } from './gif'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const dir = await scratchDir('image-sources-')

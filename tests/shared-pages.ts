@@ -11,6 +11,7 @@ type PagesOptions = NonNullable<Parameters<typeof bundlingPages>[0]>
 const builds = new Map<string, Promise<ClientBuild>>()
 
 // `pages()` for the tests that bundle the islands as the server boots: the build is made once per root and client options for the whole file, each into an output of its own so a later build never rewrites the files an earlier server serves.
+// A test reading the default output (`clientDir(root)`) or changing the fixture between two servers keeps `pages()` from `src/server`.
 // A development server and a prebuilt one go through `pages()` itself, and the key ignores function-valued options such as `plugins`, which no test here passes; the Bun check and boot-failure recording of `pages()` are skipped too.
 export async function pages(options: PagesOptions = {}): Promise<Awaited<ReturnType<typeof bundlingPages>>> {
   if (options.dev || options.prebuilt !== false)

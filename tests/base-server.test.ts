@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { joinBase } from '../src/runtime/base'
-import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
+import { pages } from './shared-pages'
 
 // Apart from tests/static.test.ts, and not to run beside tests/i18n-links.test.ts in one process: `pages()` on the static fixture's routes puts the checkout's `.kay` loader in the process, and a process serves one project, so a test site of a copy fails there with the way out.
 describe('base on a server', () => {

@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
-import { pages } from '../src/server'
 import { testSite } from '../src/test'
 import { parsingRoutes } from './elysia'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/api-limits'
 const routes = `${FIXTURE}/src/routes`

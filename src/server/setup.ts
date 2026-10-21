@@ -86,11 +86,6 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   const source = projectSource()
 
   await source.prepare(root, config.settings)
-  // Awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
-  const loadingClient = loadClient()
-
-  void Promise.allSettled([loadingClient])
-
   const routes = await source.routes(paths.routes, mounts)
 
   refuseClashes(paths.routes, routes)
@@ -128,6 +123,11 @@ async function setupWith(project: Project, loadClient: () => Promise<ClientBuild
   }
 
   setMarkdownDefaults(config.markdown)
+
+  // Started once what refuses a config is done, so a refused one builds nothing; awaited where the first thing reading it needs it, so what does not depend on it is done while it builds.
+  const loadingClient = loadClient()
+
+  void Promise.allSettled([loadingClient])
 
   // Imported while the client builds; the content place and collections are not installed yet, so an extension or API module reading them at import time is not supported.
   const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)

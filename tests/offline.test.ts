@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { inlineScriptHashes, pages } from '../src/server'
+import { inlineScriptHashes } from '../src/server'
 import { registerScript, serveServiceWorker } from '../src/server/offline'
 import { ServedPaths } from '../src/server/served-paths'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/static/src/routes'
 const SETTINGS = /^const KAY = (.+)$/m

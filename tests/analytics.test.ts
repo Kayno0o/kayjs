@@ -3,11 +3,11 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
 import { forwardsSettled, warningsReset } from '../src/server/analytics-server'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 interface Received { method: string, path: string, search: string, headers: Headers, body: unknown }
 

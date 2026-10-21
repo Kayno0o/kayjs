@@ -2,12 +2,12 @@ import type { RenderedPage } from '../src/check/seo'
 import type { KayConfig } from '../src/config'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { readManifest } from '../src/server/client'
 import { publicCacheRules } from '../src/server/public'
-
 import { scratchBuild } from './prerendered'
+
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const ROOT = 'tests/fixtures/site-output'
 

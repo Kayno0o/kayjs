@@ -3,8 +3,8 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
-import { pages } from '../src/server'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // What a guard, an endpoint and an action do from the `x-do` header, so one handler answers every case.
 const STOP = `  const todo = request.headers.get('x-do')\n\n  if (todo === 'redirect')\n    redirect('/elsewhere')\n\n  if (todo === 'redirect-301')\n    redirect('/moved', 301)\n\n  if (todo === 'deny')\n    deny(402, 'Pay first')\n\n  if (todo === 'not-found')\n    notFound()\n`

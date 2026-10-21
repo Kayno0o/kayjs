@@ -1,9 +1,9 @@
 import type { RouterShape } from '../src/server/params'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { slashSpelling } from '../src/server/params'
 import { canonicalPath, decodePath, guardUrl } from '../src/server/routes'
+import { pages } from './shared-pages'
 
 // Pins what a page request answers (status, headers in order, body) on the paths the per-request work touches, so a change to that work shows any byte it moves.
 const routes = 'tests/fixtures/server-cases/src/routes'

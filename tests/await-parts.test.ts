@@ -6,9 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Await } from '../src/runtime/await.server'
 import { html } from '../src/runtime/rendered'
 import { readSnapshots } from '../src/runtime/snapshots'
-import { pages, renderToString } from '../src/server'
+import { renderToString } from '../src/server'
 import { PART_MS, streamDocument } from '../src/server/stream'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const CLIENT: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }
 const decoder = new TextDecoder()

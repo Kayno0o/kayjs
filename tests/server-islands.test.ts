@@ -7,12 +7,12 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { hydrateIslands } from '../src/runtime/client'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
-import { pages } from '../src/server'
 import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
 import { renders } from './fixtures/server-islands/src/renders'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/server-islands/src/routes'
 const STAMP = /<p class="stamp">(stamp-\d+)<\/p>/g

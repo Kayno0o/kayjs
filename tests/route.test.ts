@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { route } from '../src/runtime/route'
-import { pages } from '../src/server'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // Nothing is registered here, so every pattern and params are accepted and the cases are about the string.
 describe('route()', () => {

@@ -7,9 +7,9 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { runCommand } from '../src/commands/command'
 import { dev as devCommand } from '../src/commands/dev'
-import { pages } from '../src/server'
 import { answeredWithoutError, DEV_ERRORS_FILE, recordRequestError, trackDevErrors } from '../src/server/dev-errors'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const saved = process.env.KAY_DEV_CODE

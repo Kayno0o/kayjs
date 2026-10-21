@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const site = 'tests/fixtures/site/src/routes'
 const redirects = 'tests/fixtures/locale-actions/src/routes'

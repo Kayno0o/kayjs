@@ -8,10 +8,10 @@ import { afterAll, afterEach, describe, expect, it, mock, setSystemTime, spyOn }
 import { Elysia } from 'elysia'
 import { onKeysInvalidated, refreshLocally } from '../src/runtime/cache'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
-import { pages } from '../src/server'
 import { feed } from './fixtures/production/src/news'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 afterEach(() => {
   setSystemTime()

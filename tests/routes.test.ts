@@ -4,10 +4,10 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { DEV_REQUEST, DEV_ROUTES } from '../src/server/dev'
 import { redirectedBy } from '../src/server/dev-notes'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 

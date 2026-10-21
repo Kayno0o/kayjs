@@ -10,7 +10,7 @@ import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setImageWidths, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
-import { imageSize, pages, processImage } from '../src/server'
+import { imageSize, processImage } from '../src/server'
 import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, pruneVariants, serveImages, VARIANT_KEEP_MS, variantLevel, variantName, writeImageVariants } from '../src/server/image'
@@ -19,6 +19,7 @@ import { stripImageMetadata } from '../src/server/image-metadata'
 import { decodePng, encodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const uploads = await mkdtemp(join(tmpdir(), 'kay-uploads-'))

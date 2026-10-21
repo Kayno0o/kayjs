@@ -3,8 +3,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const SECRET = 'db password=hunter2'
 const NativeRequest = Request

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { head, headMark, setsIslandTitle } from '../src/runtime/head'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const app = new Elysia().use(await pages({ routes: 'tests/fixtures/title/src/routes', prebuilt: false, security: false }))
 

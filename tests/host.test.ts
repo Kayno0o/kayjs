@@ -5,9 +5,9 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { dev } from '../src/dev'
 import { createProject, PRESETS } from '../src/new'
-import { pages } from '../src/server'
 import { probeHealth } from '../src/server/lifecycle'
 import { fixtureCopy, scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const repo = resolve(import.meta.dir, '..')
 

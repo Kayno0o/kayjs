@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { gzipSync } from 'node:zlib'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
 import { setupStore } from '../src/server/app-store'
 import { sqliteData } from '../src/server/sqlite-data'
@@ -14,6 +13,7 @@ import { vitalsScript } from '../src/server/vitals-script'
 import { bucketOf, memoryVitals, sqliteVitals, valueOf, vitalsReport, WINDOW_DAYS } from '../src/server/vitals-store'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // Assigning undefined to an environment variable stores the text "undefined".
 function restoreEnvironment(value: string | undefined): void {

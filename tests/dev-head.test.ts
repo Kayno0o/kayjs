@@ -2,9 +2,9 @@ import type { DevHead } from '../src/server/dev'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { DEV_HEAD } from '../src/server/dev'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const HEAD = /<head>([\s\S]*)<\/head>/
 const LONG = 'A sentence about the shop that goes on and on '.repeat(5)

@@ -2,9 +2,9 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
-import { pages } from '../src/server'
 import { isCrossSite } from '../src/server/actions'
 import { siteOrigin } from '../src/server/seo'
+import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const HEAD = /<head>([\s\S]*)<\/head>/

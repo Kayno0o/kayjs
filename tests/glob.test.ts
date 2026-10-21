@@ -5,8 +5,8 @@ import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { expandGlobs, globFiles } from '../src/build/glob'
 import { kay } from '../src/build/plugin'
-import { pages } from '../src/server'
 import { registerLoader } from '../src/server/loader'
+import { pages } from './shared-pages'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/glob')
 const DEMOS = ['./demos/a.ts', './demos/b.ts', './demos/draft.ts']

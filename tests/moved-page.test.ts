@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { redirectMovedPage, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
 import { knowRuntimeRules } from '../src/server/runtime-redirect-api'
+import { pages } from './shared-pages'
 
 const paths = ['/fr/mp-a', '/mp-a', '/mp-b', '/mp-c', '/mp-old', '/mp-new']
 

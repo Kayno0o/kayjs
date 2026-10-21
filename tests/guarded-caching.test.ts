@@ -1,8 +1,8 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 // Reads a header and nothing else: `x-deny` refuses, `x-go` redirects.
 const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, redirect }) => {\n  request.headers.get(\'authorization\')\n\n  if (request.headers.has(\'x-deny\'))\n    deny(401, \'Sign in\')\n\n  if (request.headers.has(\'x-go\'))\n    redirect(\'/login\')\n})\n'

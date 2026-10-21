@@ -1,10 +1,10 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { carbonPerView, ecoindexScore } from '../src/build/footprint-models'
-import { pages } from '../src/server'
 import { DEV_FOOTPRINT } from '../src/server/dev'
 import { devFootprint } from '../src/server/dev-footprint'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const ask = (query: string, headers: Record<string, string> = { 'x-kay-dev': '1' }) => devFootprint(new Request(`http://localhost${DEV_FOOTPRINT}?${query}`, { headers }))
 

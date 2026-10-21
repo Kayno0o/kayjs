@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const app = new Elysia().use(await pages({ routes: 'tests/fixtures/island-counts/src/routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }))
 

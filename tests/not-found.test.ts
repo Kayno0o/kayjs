@@ -4,13 +4,13 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
 import { clearMissing, dismissMissing } from '../src/server/library'
 import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, referrerOf, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
 import { readRuntimeRedirects } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
 

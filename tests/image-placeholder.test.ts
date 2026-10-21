@@ -6,13 +6,13 @@ import { kay } from '../src/build/plugin'
 import { image as setImage } from '../src/runtime/dom-image'
 import { image, registerImage, setPlaceholders } from '../src/runtime/image'
 import { learnedVersion, learnPlaceholder, placeholderColor, registerPlaceholder } from '../src/runtime/placeholder'
-import { pages } from '../src/server'
 import { dominantColor, dominantColorOf } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
 import { allowsStyleAttributes } from '../src/server/security'
 import { countColorReads } from './color-reads'
 import { gif } from './gif'
 import { fixtureCopy, scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 

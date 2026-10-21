@@ -4,8 +4,8 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { Elysia } from 'elysia'
-import { pages } from '../src/server'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 setDefaultTimeout(60_000)
 

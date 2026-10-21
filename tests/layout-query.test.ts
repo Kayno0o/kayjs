@@ -3,9 +3,9 @@ import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { layoutQueries } from '../src/check/shadow'
 import { s } from '../src/runtime'
-import { pages } from '../src/server'
 import { chainQuery } from '../src/server/query'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/layout-query/src/routes'
 const READ = /<p class="read">([^<]*)<\/p>/

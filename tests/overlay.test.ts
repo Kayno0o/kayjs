@@ -2,10 +2,11 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { KayCompileError } from '../src/build/transform'
-import { inlineScriptHashes, pages } from '../src/server'
+import { inlineScriptHashes } from '../src/server'
 import { bootFailure } from '../src/server/dev'
 import { compileErrorPage, errorPage } from '../src/server/overlay'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const SCRIPT_BODY = /<script[^>]*>([\s\S]*?)<\/script>/g
 const code = process.env.KAY_DEV_CODE

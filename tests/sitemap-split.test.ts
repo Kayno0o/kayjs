@@ -2,9 +2,9 @@ import type { LocaleSettings } from '../src/runtime/i18n'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
-import { pages } from '../src/server'
 import { setSitemapLimits, SITEMAP_LIMITS, sitemapParts } from '../src/server/sitemap'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const CLI = resolve('src/cli.ts')
 // The limits are lowered so a few dozen pages split.

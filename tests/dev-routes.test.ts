@@ -4,12 +4,12 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
-import { pages } from '../src/server'
 import { analytics, vitals } from '../src/server/analytics'
 import { DEV_ROUTES } from '../src/server/dev'
 import { plumbing } from '../src/server/plumbing'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const NONE: PlumbingServed = { actions: false, publicEnv: false, preview: false, cspReports: false, buildFiles: [], mounted: [] }
 const ALWAYS = ['GET /_kay/*', 'GET /_kay/image', 'GET /_kay/card', 'GET /_kay/files/*', 'POST /_kay/live', 'POST /_kay/error']

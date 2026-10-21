@@ -26,6 +26,11 @@ describe('hydration margins', () => {
     }
   }, 60_000)
 
+  it('refuses it before reading the sources', async () => {
+    await expect(buildClient('tests/fixtures/no-such-project', { hydration: { visible: '10rem' } })).rejects.toThrow(/hydration\.visible/)
+    await expect(buildClient('tests/fixtures/no-such-project', { hydration: { serverIslands: '5vh' } })).rejects.toThrow(/hydration\.serverIslands/)
+  })
+
   it('hands the config\'s margins to the browser build', () => {
     expect(clientOptionsOf({ hydration: { visible: '50px' } }, { dev: false, underKayDev: false }).hydration).toEqual({ visible: '50px' })
     expect(clientOptionsOf({}, { dev: false, underKayDev: false }).hydration).toBeUndefined()

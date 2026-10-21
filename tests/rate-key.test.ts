@@ -1,10 +1,10 @@
 import type { Action } from '../src/runtime'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
-import { pages } from '../src/server'
 import { protectionRefusal } from '../src/server/protection'
 import { testSite } from '../src/test'
 import { parsingRoutes } from './elysia'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/rate-keys/src/routes'
 const locals = (request: Request) => ({ user: request.headers.get('x-user') ?? undefined })

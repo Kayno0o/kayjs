@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { testSite } from '../src/test'
+import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/mcp/src/routes'
 const api = 'tests/fixtures/mcp/src/api'

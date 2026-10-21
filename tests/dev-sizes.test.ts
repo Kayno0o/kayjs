@@ -4,9 +4,9 @@ import { mkdir, rm, utimes } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { testWorker } from '../src/build/assets'
-import { pages } from '../src/server'
 import { DEV_SIZES } from '../src/server/dev'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const report = (exported: boolean, routes: StoredReport['routes']): StoredReport => ({ version: 1, exported, islands: {}, routes })
 

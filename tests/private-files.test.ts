@@ -6,10 +6,11 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { testWorker } from '../src/build/assets'
 import { cacheDir } from '../src/project'
-import { diskFiles, memoryFiles, pages } from '../src/server'
+import { diskFiles, memoryFiles } from '../src/server'
 import { dropOpenCache, privateDir } from '../src/server/private-dir'
 import { setupStorage, storedImage } from '../src/server/storage'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const modeOf = async (path: string) => (await lstat(path)).mode & 0o777
 const KEY = `private/${'a'.repeat(20)}.txt`

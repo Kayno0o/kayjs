@@ -4,7 +4,7 @@ import { Elysia } from 'elysia'
 import { compileKay } from '../src/compiler'
 import { startInspector } from '../src/runtime/dev-inspector'
 import { startDevTool } from '../src/runtime/dev-tool'
-import { pages } from '../src/server'
+import { pages } from './shared-pages'
 
 const SOURCE = `---
 const count = signal(0)

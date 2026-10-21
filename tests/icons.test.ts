@@ -10,8 +10,8 @@ import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
 import { trustHtml } from '../src/runtime/sanitize'
-import { pages } from '../src/server'
 import { fixtureCopy } from './scratch'
+import { pages } from './shared-pages'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/icons')
 const scratch = await mkdtemp(join(tmpdir(), 'kay-icons-'))
