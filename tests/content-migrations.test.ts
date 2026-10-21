@@ -231,6 +231,56 @@ describe('migrations', () => {
     expect(rows[0]!.data).toEqual({ title: 'Fixed by hand', price: 2, visible: true })
   })
 
+  it('read a loader without get once for all the entries it carries over', async () => {
+    const { loader, saved, rows } = store('migrated-many', Array.from({ length: 5 }, (_, index) => ({ slug: `old-${index}`, data: { name: `Old ${index}`, price: index } })))
+    let loads = 0
+    const counted = { ...loader, load: () => {
+      loads++
+
+      return rows.map(row => structuredClone(row))
+    } }
+
+    expect((await collection(counted, { schema, migrations: steps }).all()).length).toBe(5)
+    expect(saved).toHaveLength(5)
+    expect(loads).toBe(2)
+  })
+
+  it('write back in the collection\'s turn, behind an editor\'s save already under way and without deadlocking a save that loads it', async () => {
+    const { loader } = store('migrated-turn', [{ slug: 'old', data: { name: 'Old', price: 1 } }])
+    const order: string[] = []
+    const release = Promise.withResolvers<void>()
+    const slow = { ...loader, save: async (entry: Parameters<typeof loader.save>[0]) => {
+      order.push(`save ${entry.slug}`)
+
+      if (entry.slug === 'editor') {
+        await release.promise
+        order.push('done editor')
+      }
+
+      loader.save(entry)
+    } }
+    const packs = collection(slow, { schema, migrations: steps })
+    const before = registerCollections([['turns', packs]])
+
+    try {
+      const editing = saveEntry('turns', { slug: 'editor', data: { title: 'Editor', price: 2, visible: true } })
+
+      await Bun.sleep(20)
+
+      const reading = packs.all()
+
+      await Bun.sleep(20)
+      expect(order).toEqual(['save editor'])
+      release.resolve()
+      expect(await editing).toEqual({})
+      expect((await reading).map(entry => entry.slug)).toEqual(['old'])
+      expect(order).toEqual(['save editor', 'done editor', 'save old'])
+    }
+    finally {
+      registerCollections(before)
+    }
+  })
+
   it('reports a localized entry without a slug as the collection does, not as a crash', async () => {
     const { loader, saved } = store('migrated-slugless', [{ data: { name: 'No slug', price: 1 } } as Row])
 

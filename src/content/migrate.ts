@@ -3,6 +3,7 @@ import type { ContentLoader, LoadedEntry } from './index'
 import type { RawEntry } from './load'
 import { kayLog } from '../runtime/log'
 import { compiledCheck } from '../server/schema-check'
+import { inTurn } from './turns'
 import { withDefaults } from './validate'
 
 // One step carrying a stored entry's data from the shape it had to a newer one; it gets a copy to change or replace.
@@ -125,25 +126,33 @@ export function migrateLoaded(name: string, given: unknown[], schema: TSchema, m
   return { items, carried }
 }
 
-// Hands the migrated entries to the loader's `save` once, so the next read finds them in the new shape. An entry the loader no longer holds as it was read, because an editor saved it meanwhile, is left to that save. A save that fails is logged, the entry staying migrated for this read and tried again at the next.
+// Hands the migrated entries to the loader's `save` once, so the next read finds them in the new shape. It runs in the collection's turn, so an editor's save in this process cannot interleave, and an entry the loader no longer holds as it was read, because someone saved it meanwhile, is left to that save. A save that fails is logged, the entry staying migrated for this read and tried again at the next.
 export async function writeBack(loader: ContentLoader, carried: Carried[], localized: boolean, preview: boolean): Promise<void> {
-  const { save } = loader
-
-  if (save === undefined || carried.length === 0)
+  if (loader.save === undefined || carried.length === 0)
     return
 
+  await inTurn(loader.name, async () => writeCarried(loader, carried, localized, preview))
+}
+
+async function writeCarried(loader: ContentLoader, carried: Carried[], localized: boolean, preview: boolean): Promise<void> {
+  const { save } = loader
   let written = 0
+  let held: LoadedEntry[] | undefined
 
   for (const { entry, was } of carried) {
     const split = localized ? entry.slug.indexOf('/') : -1
 
     try {
-      const current = await currentOf(loader, entry.slug, preview)
+      // A loader without `get` is read once for every carried entry, not once per entry.
+      if (!loader.get)
+        held ??= await loader.load({ preview })
+
+      const current = loader.get ? await loader.get(entry.slug, { preview }) : held!.find(each => each.slug === entry.slug)
 
       if (JSON.stringify(current?.data) !== JSON.stringify(was))
         continue
 
-      await save({ slug: split === -1 ? entry.slug : entry.slug.slice(split + 1), ...split !== -1 && { locale: entry.slug.slice(0, split) }, data: entry.data, ...entry.body !== undefined && { body: entry.body } })
+      await save!({ slug: split === -1 ? entry.slug : entry.slug.slice(split + 1), ...split !== -1 && { locale: entry.slug.slice(0, split) }, data: entry.data, ...entry.body !== undefined && { body: entry.body } })
       written++
     }
     catch (error) {
@@ -153,9 +162,4 @@ export async function writeBack(loader: ContentLoader, carried: Carried[], local
 
   if (written > 0)
     kayLog('info', `kay: ${written === 1 ? 'an entry' : `${written} entries`} of ${loader.name} carried over by its migrations`)
-}
-
-// The entry as the loader holds it now: from its `get` when it has one, else from `load`.
-async function currentOf(loader: ContentLoader, slug: string, preview: boolean): Promise<LoadedEntry | undefined> {
-  return loader.get ? loader.get(slug, { preview }) : (await loader.load({ preview })).find(each => each.slug === slug)
 }
