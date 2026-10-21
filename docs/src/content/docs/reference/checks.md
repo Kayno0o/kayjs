@@ -74,6 +74,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `constant-signal` | warn | islands | A signal that is only ever read |
 | `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser; a static component the build promotes to an island is reported by `kay check` only, not in the editor |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
+| `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |

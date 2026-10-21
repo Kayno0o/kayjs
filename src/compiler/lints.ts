@@ -243,6 +243,13 @@ export const LINTS = {
     wrong: '--- server\nimport theme from \'./theme.css\'\n---\np {theme.length}',
     right: '--- server\nimport theme from \'./theme.css\' with { type: \'text\' }\n---\np {theme.length}',
   },
+  'async-reply': {
+    level: 'warn',
+    group: 'code',
+    summary: 'An `async` function returning `ask()` from kayjs-ai: the reply is a thenable, so the function awaits it and the action, API route or `await` block reading it gets the whole text at once, with no streaming. The fix removes `async`; a function that awaits something first returns `ask(...).stream()` instead. Found in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))\n---\np x',
+    right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
+  },
   'positional-key': {
     level: 'warn',
     group: 'islands',

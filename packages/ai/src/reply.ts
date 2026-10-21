@@ -277,6 +277,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       return text.then(onFulfilled, onRejected)
     },
     [Symbol.asyncIterator]: () => read(true),
+    stream: () => ({ [Symbol.asyncIterator]: () => read(true) }),
     deltas: (options?: DeltasOptions) => ({ [Symbol.asyncIterator]: () => read(false, options?.onRestart) }),
     progress: () => ({ [Symbol.asyncIterator]: progress }),
     get calls() {

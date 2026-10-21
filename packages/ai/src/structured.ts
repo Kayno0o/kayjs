@@ -53,7 +53,7 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
 
   const once = async (): Promise<Value> => answered ??= answer()
 
-  return {
+  const reply: StructuredReply<Value, unknown> = {
     // eslint-disable-next-line kaynooo/no-then -- the thenable's own `then`, passed through
     then: async (onFulfilled, onRejected) => once().then(onFulfilled, onRejected),
     [Symbol.asyncIterator]: () => {
@@ -100,6 +100,7 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
         },
       }
     },
+    stream: () => ({ [Symbol.asyncIterator]: () => reply[Symbol.asyncIterator]() }),
     deltas: base.deltas,
     get usage() {
       return base.usage
@@ -112,4 +113,6 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
     },
     stop: base.stop,
   }
+
+  return reply
 }

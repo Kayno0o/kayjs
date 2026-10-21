@@ -145,6 +145,57 @@ describe('css-import-without-text', () => {
   })
 })
 
+describe('async-reply', () => {
+  const server = (body: string, imports = 'import { ask } from \'@kaynooo/kayjs-ai\'') => `--- server\n${imports}\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
+  const reply = 'export const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))'
+
+  it('reports an async arrow returning ask() in an action, with a fix removing async', () => {
+    const source = server(reply)
+
+    expect(lints(source).filter(d => d.code === 'async-reply')).toEqual([{ code: 'async-reply', severity: 'warning', at: 'ask(messages)' }])
+    expect(fixed(source)).toEqual([server(reply.replace('async ', ''))])
+  })
+
+  it('reports the same function as a block body, a declaration, a method and a namespace call', () => {
+    const found = (body: string, imports?: string) => lints(server(body, imports)).filter(d => d.code === 'async-reply').length
+
+    expect(found('export const a = async (m: never) => { return ask(m) }')).toBe(1)
+    expect(found('export async function a(m: never) { return ask(m) }')).toBe(1)
+    expect(found('export const o = { async a(m: never) { return ask(m) } }')).toBe(1)
+    expect(found('export const a = async (m: never) => ai.ask(m)', 'import * as ai from \'@kaynooo/kayjs-ai\'')).toBe(1)
+    expect(found('export const a = async (m: never) => run(m)', 'import { ask as run } from \'@kaynooo/kayjs-ai\'')).toBe(1)
+    expect(fixed(server('export async function a(m: never) { return ask(m) }'))).toEqual([server('export function a(m: never) { return ask(m) }')])
+  })
+
+  it('reports one that awaits before returning it with no fix, as removing async would not compile', () => {
+    const source = server('export const a = async (input: string) => { const m = await load(input); return ask(m) }')
+
+    expect(lints(source).filter(d => d.code === 'async-reply')).toEqual([{ code: 'async-reply', severity: 'warning', at: 'ask(m)' }])
+    expect(fixed(source)).toEqual([])
+  })
+
+  it('leaves alone what streams or awaits on purpose', () => {
+    const found = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply')
+
+    expect(found('export const a = ({ messages }: { messages: never }) => ask(messages)')).toEqual([])
+    expect(found('export const a = async (m: never) => { const text = await ask(m); return text.trim() }')).toEqual([])
+    expect(found('export const a = async (m: never) => { const f = () => ask(m); return f }')).toEqual([])
+    expect(found('export const a = async (m: never) => ask(m).stream()')).toEqual([])
+    expect(found('export async function* a(m: never) { return ask(m) }')).toEqual([])
+    expect(lints(server(reply, 'import { ask } from \'./ask\'')).filter(d => d.code === 'async-reply')).toEqual([])
+    expect(lints(server(`// kay-allow async-reply\n${reply}`)).filter(d => d.code === 'async-reply')).toEqual([])
+  })
+
+  it('reads a plain module, where an API route is written', () => {
+    const route = 'import { ask } from \'@kaynooo/kayjs-ai\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/chat\', async ({ body }) => ask(body.messages))\n'
+    const found = moduleChecks(route)
+
+    expect(found.map(d => d.code)).toEqual(['async-reply'])
+    expect(route.slice(found[0]!.start, found[0]!.end)).toBe('ask(body.messages)')
+    expect(moduleChecks(route.replace('async ', ''))).toEqual([])
+  })
+})
+
 describe('the checks that read a module', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
     const twice = 'import theme from \'./theme.css\'\nconst a = 1\nconst a = 2\n'

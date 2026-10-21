@@ -21,6 +21,22 @@ describe('the reply of ask()', () => {
     expect(typeof reply[Symbol.asyncIterator]).toBe('function')
   })
 
+  it('streams through stream(), which is no thenable, so an async function returns it as it is', async () => {
+    const stream = ask('Hi').stream()
+    const returned = await (async () => stream)()
+
+    expect('then' in returned).toBe(false)
+    expect(returned).toBe(stream)
+
+    const seen: string[] = []
+
+    for await (const text of returned)
+      seen.push(text)
+
+    expect(seen.length).toBeGreaterThan(1)
+    expect(seen.at(-1)).toBe('Fake reply to: Hi')
+  })
+
   it('asks nothing until it is read', async () => {
     const reply = ask('Hi')
 

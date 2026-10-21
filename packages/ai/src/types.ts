@@ -160,6 +160,8 @@ export interface DeltasOptions {
 // A reply: `await` gives its whole text, `for await` its snapshots, each the text so far, which an `await` block and a streaming action take as they are.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
 export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
+  // The snapshots, as `for await` gives them, in an object that is no thenable: an `async` function returns it as it is, where it would await the reply itself and lose the streaming.
+  stream: () => AsyncIterable<string>
   // The pieces as they came, not the text so far.
   deltas: (options?: DeltasOptions) => AsyncIterable<string>
   // The token counts once the reply ended (with the cache reads and writes when the provider reported them), or undefined when the provider gave none or the reply failed; never rejects. Reading it starts the reply.
@@ -186,6 +188,8 @@ export type DeepPartial<Value> = Value extends string
 // The reply to an ask with a `schema`: `await` gives the object, checked, `for await` the object so far, and the rest is the reply's own.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
 export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot> {
+  // The snapshots, as `for await` gives them, in an object that is no thenable, so an `async` function returns it as it is.
+  stream: () => AsyncIterable<Snapshot>
   // The pieces of the JSON text as they came; after a tool step that wrote some text `onRestart` is called, and the pieces from then on are the answer's.
   deltas: (options?: DeltasOptions) => AsyncIterable<string>
   readonly usage: Promise<Usage | undefined>

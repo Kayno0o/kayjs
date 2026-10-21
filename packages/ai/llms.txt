@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - `ask()` runs on the server, where the key lives: call it in a `--- server` fence, an action, a job or an API route. An island importing it fails `kay build`, which is how the key stays out of the browser. Reach it from an island through an action.
-- The reply is a thenable async iterable, not a Promise: `await ask(...)` is the full text, `for await` gives snapshots (the text so far), and an `await` block or a handler returning it streams. Return it from a plain arrow, `({ messages }) => ask(messages)`: an `async` handler returning it awaits it and the answer is the full text only.
+- The reply is a thenable async iterable, not a Promise: `await ask(...)` is the full text, `for await` gives snapshots (the text so far), and an `await` block or a handler returning it streams. Return it from a plain arrow, `({ messages }) => ask(messages)`, or `ask(...).stream()` from a handler that awaits first: `kay check` reports an `async` one returning the reply itself (`async-reply`).
 - Nothing is sent until the reply is first read, so an `await ask()` an island's server render skips bills nothing. A reader leaving early, the visitor leaving the page, or `options.signal` aborts the provider request.
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
 - Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.

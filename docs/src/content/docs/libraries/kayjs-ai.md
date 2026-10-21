@@ -76,7 +76,7 @@ export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.Unio
 p Chat
 ```
 
-Return the reply from a plain arrow function, as above. An `async` handler waits for the whole text before it answers, so nothing streams.
+Return the reply from a plain arrow function, as above: `kay check` reports an `async` handler returning it (`async-reply`), which would wait for the whole text so nothing streams. A handler that must `await` first returns `ask(...).stream()`.
 
 An action keeps its guards, its schema and its rate limits. Each call bills, so set a limit and keep the history short in the schema.
 

@@ -88,6 +88,20 @@ describe('ask with a schema', () => {
     expect(await reply.usage).toMatchObject({ outputTokens: expect.any(Number) })
   })
 
+  it('streams the object through stream(), which an async function returns as it is', async () => {
+    fakeAi.reply({ data: answer })
+
+    const returned = await (async () => ask('Review it', { schema: verdict }).stream())()
+    const seen: unknown[] = []
+
+    expect('then' in returned).toBe(false)
+
+    for await (const value of returned)
+      seen.push(value)
+
+    expect(seen.at(-1)).toEqual(answer)
+  })
+
   it('still answers text when there is no schema', async () => {
     const text: string = await ask('x')
 

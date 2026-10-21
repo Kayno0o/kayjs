@@ -287,10 +287,89 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
+const AI_PACKAGE = '@kaynooo/kayjs-ai'
+const ASYNC_KEYWORD = /^(?:(?:static|public|private|protected|override)\s+)*(async\s+)/
+
+type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration | t.ObjectMethod | t.ClassMethod | t.ClassPrivateMethod
+
+function isFunction(node: t.Node): node is FunctionNode {
+  return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ObjectMethod' || node.type === 'ClassMethod' || node.type === 'ClassPrivateMethod'
+}
+
+// What the function itself returns and whether it awaits, its inner functions left alone.
+function returnsAndAwaits(fn: FunctionNode): { returned: t.Node[], awaits: boolean } {
+  const returned: t.Node[] = fn.body.type === 'BlockStatement' ? [] : [fn.body]
+  let awaits = false
+
+  eachNode(fn.body, (node) => {
+    if (isFunction(node))
+      return false
+
+    if (node.type === 'ReturnStatement' && node.argument)
+      returned.push(node.argument)
+    else if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await))
+      awaits = true
+
+    return true
+  })
+
+  return { returned, awaits }
+}
+
+// An `async` function returning `ask()` from kayjs-ai: the async function awaits the reply, which is a thenable, so the answer arrives as its whole text and the action or `await` block reading it never streams. Without an `await` in it, `async` can go; with one, the reply is returned as `.stream()`.
+export function asyncReplies(fence: ParsedFence): Diagnostic[] {
+  if (!fence.code.includes(AI_PACKAGE) || !fence.code.includes('async'))
+    return []
+
+  const names = new Set<string>()
+  const namespaces = new Set<string>()
+
+  for (const node of fence.ast.program.body) {
+    if (node.type !== 'ImportDeclaration' || node.source.value !== AI_PACKAGE || node.importKind === 'type')
+      continue
+
+    for (const specifier of node.specifiers) {
+      if (specifier.type === 'ImportNamespaceSpecifier')
+        namespaces.add(specifier.local.name)
+      else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'ask')
+        names.add(specifier.local.name)
+    }
+  }
+
+  if (names.size === 0 && namespaces.size === 0)
+    return []
+
+  const isAsk = (node: t.Node): node is t.CallExpression => node.type === 'CallExpression' && (node.callee.type === 'Identifier'
+    ? names.has(node.callee.name)
+    : node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.object.type === 'Identifier' && namespaces.has(node.callee.object.name) && node.callee.property.type === 'Identifier' && node.callee.property.name === 'ask')
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(fence.ast.program, (node) => {
+    if (!isFunction(node) || !node.async || ((node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') && node.generator))
+      return
+
+    const { returned, awaits } = returnsAndAwaits(node)
+    const keyword = ASYNC_KEYWORD.exec(fence.code.slice(node.start!))
+
+    for (const call of returned.filter(isAsk)) {
+      diagnostics.push({
+        ...fence.shift(call),
+        code: 'async-reply',
+        message: 'This `ask()` is returned from an `async` function, which awaits it: the answer arrives as its whole text, with no streaming',
+        note: 'the reply is a thenable async iterable, and an action or an `await` block streams it only when it is returned as it is',
+        help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is' : 'remove `async`',
+        fixes: !awaits && keyword ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
+      })
+    }
+  })
+
+  return diagnostics
+}
+
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -309,5 +388,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...browser ? serverOnlyImports(module) : []]
 }
