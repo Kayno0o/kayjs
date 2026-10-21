@@ -783,6 +783,31 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it.serial('gives the server the address it listens on as its site when no SITE_URL or ORIGIN sets one, and keeps the one that is set', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, '.seen')
+    const cli = join(import.meta.dir, '../src/cli.ts')
+    const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'SITE_URL' && name !== 'ORIGIN'))
+
+    await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, String(process.env.SITE_URL))\nsetInterval(() => undefined, 1000)\n`)
+
+    try {
+      for (const [dotenv, expected] of [['', 'http://localhost:4123'], ['SITE_URL=https://shop.example\n', 'https://shop.example'], ['ORIGIN=https://old.example\n', 'undefined']] as const) {
+        await Bun.write(join(root, '.env'), dotenv)
+
+        const child = Bun.spawn(['bun', cli, 'dev', root, '--port', '4123'], { stdout: 'ignore', stderr: 'pipe', env })
+
+        await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
+        child.kill('SIGTERM')
+        expect(await child.exited).toBe(0)
+        await rm(seen, { force: true })
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it.serial('runs from the command line on the project a directory names, or with the entry --entry names, on the port --port names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, '.seen')

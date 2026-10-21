@@ -34,6 +34,11 @@ const PORTS_TRIED = 100
 // Where a server listens when the app names no hostname: this machine alone, unless `kay dev --host` opens it to the network.
 const HOST = process.env.KAY_DEV_HOST ?? 'localhost'
 
+// A site with no `SITE_URL` (nor the deprecated `ORIGIN`) is at the address `kay dev` serves it on, so OAuth callbacks, mailed links and canonical links need no setup in development; `site` in kay.config.ts still wins.
+// It is the port asked for: a busy one moves the server on, which a callback registered with a provider would not follow either.
+if ((process.env.SITE_URL ?? '') === '' && (process.env.ORIGIN ?? '') === '')
+  process.env.SITE_URL = `http://localhost:${Number(process.env.BUN_PORT ?? process.env.PORT ?? process.env.NODE_PORT ?? 3000) || 3000}`
+
 // An exported or `.env` `HOST` is production's address and must not open the development server to the network, so the app's `process.env.HOST` is left unset here.
 delete process.env.HOST
 
