@@ -56,7 +56,8 @@ describe('the command is reached from the extension', () => {
     const [symbol] = Object.getOwnPropertySymbols(viaModule)
     const found = await (viaModule as unknown as Record<symbol, (root: string) => Promise<unknown>>)[symbol!]!(FIXTURE)
 
-    expect(found).toBe((await import('./fixture/src/auth')).auth)
+    // Imported by a computed path, so this file's type check does not take in the fixture's own modules.
+    expect(found).toBe(((await import(`${FIXTURE}/src/auth`)) as { auth: unknown }).auth)
   })
 
   test('a plugin that is not a createAuth result is told', async () => {
