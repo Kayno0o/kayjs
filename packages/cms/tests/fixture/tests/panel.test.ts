@@ -131,6 +131,19 @@ test('the values of the resize separator account for what a docked dev tool hold
   expect(await values()).toEqual(['328', '328'])
 })
 
+test('the values of the bottom separator account for a bottom-docked dev tool, which pads the root without changing its content', async () => {
+  const page = await open(390, 800)
+  const grip = () => page.evaluate(() => [document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuenow'), document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax')])
+
+  expect(await grip()).toEqual(['400', '640'])
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--kay-dev-inset-bottom', '400px')
+    document.documentElement.style.paddingBottom = '400px'
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax') === '240')
+  expect(await grip()).toEqual(['240', '240'])
+})
+
 test('an editor left collapsed never shows open while the page loads', async () => {
   const page = await open(390, 800)
 

@@ -20,6 +20,10 @@ import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
 import './editor.css'
 
+// Where across the window the top is probed for a header, and the positions that hold one there.
+const PROBES = [0.25, 0.5, 0.75]
+const PINNED = new Set(['fixed', 'sticky'])
+
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
 const { entries } = props<EditorProps>()
 
@@ -41,6 +45,7 @@ const clear = signal(0)
 let panel: HTMLElement | undefined
 // While an edge is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = false
+let frame = 0
 
 const layout = (): Layout => ({ open: open(), dock: chosen(), side: side(), bottom: bottom() })
 // None until the window is measured, which the server cannot do.
@@ -61,15 +66,18 @@ function measureHeld(): void {
 function measureClear(): void {
   let bottom = 0
 
-  for (const x of [0.25, 0.5, 0.75]) {
+  for (const x of PROBES) {
     for (const hit of document.elementsFromPoint(window.innerWidth * x, 1)) {
       if (panel?.contains(hit))
         continue
 
       for (let element: Element | null = hit; element && element !== document.body; element = element.parentElement) {
+        if (!PINNED.has(getComputedStyle(element).position))
+          continue
+
         const box = element.getBoundingClientRect()
 
-        if (['fixed', 'sticky'].includes(getComputedStyle(element).position) && box.top <= 1 && box.height <= 240)
+        if (box.top <= 1 && box.height <= 240)
           bottom = Math.max(bottom, box.bottom)
       }
     }
@@ -80,9 +88,22 @@ function measureClear(): void {
 }
 
 function measure(): void {
-  room = { width: window.innerWidth, height: window.innerHeight }
+  if (window.innerWidth !== room().width || window.innerHeight !== room().height)
+    room = { width: window.innerWidth, height: window.innerHeight }
+
   measureHeld()
   measureClear()
+}
+
+// Scrolls and size changes arrive in bursts, so they are measured once a frame.
+function measureSoon(): void {
+  if (frame !== 0)
+    return
+
+  frame = requestAnimationFrame(() => {
+    frame = 0
+    measure()
+  })
 }
 
 onMount(() => {
@@ -95,15 +116,21 @@ onMount(() => {
   measure()
   ready = true
 
-  // A docked dev tool pads the page, which the root's size shows.
-  const watch = new ResizeObserver(measure)
+  // A docked dev tool pads the page, which the root's content shows at the side and its border box at the bottom.
+  const content = new ResizeObserver(measureSoon)
+  const border = new ResizeObserver(measureSoon)
 
-  watch.observe(document.documentElement)
-  onCleanup(() => watch.disconnect())
+  content.observe(document.documentElement)
+  border.observe(document.documentElement, { box: 'border-box' })
+  onCleanup(() => {
+    content.disconnect()
+    border.disconnect()
+    cancelAnimationFrame(frame)
+  })
 })
 
 listen(() => window, 'resize', measure)
-listen(() => window, 'scroll', measureClear, { passive: true })
+listen(() => window, 'scroll', measureSoon, { passive: true })
 
 effect(() => {
   const value = layout()
@@ -145,13 +172,18 @@ function startResize(event: PointerEvent): void {
 
   // A cancelled drag, as when the browser takes a touch over, ends it too, keeping the size it reached.
   const end = () => {
+    if (!dragging)
+      return
+
     dragging = false
     writeLayout(browserStorage(), layout())
+    handle.removeEventListener('lostpointercapture', end)
     handle.removeEventListener('pointermove', move)
     handle.removeEventListener('pointerup', end)
     handle.removeEventListener('pointercancel', end)
   }
 
+  handle.addEventListener('lostpointercapture', end)
   handle.addEventListener('pointerup', end)
   handle.addEventListener('pointercancel', end)
 }
