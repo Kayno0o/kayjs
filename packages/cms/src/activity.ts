@@ -27,7 +27,7 @@ const written = new Map<string, number>()
 let latest = 0
 
 async function trim(hidden: ContentLoader, rows: Awaited<ReturnType<ContentLoader['load']>>): Promise<void> {
-  const newest = [...rows].sort((a, b) => (b.data as Row).at - (a.data as Row).at)
+  const newest = rows.filter(row => isEvent(row.data)).sort((a, b) => (b.data as Row).at - (a.data as Row).at)
 
   await Promise.all(newest.slice(KEPT).map(async row => hidden.remove!({ slug: row.slug })))
 }
