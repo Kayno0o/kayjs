@@ -3,8 +3,11 @@ type VariantClasses = string | Readonly<Record<string, string>>
 
 type VariantTable = Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>
 
-// The values a variant takes as a prop: a variant with only `true` and `false` entries is a boolean.
-type VariantValue<Values> = [keyof Values & string] extends ['true' | 'false'] ? boolean : keyof Values & string
+// The names of a variant's values, a numeric key such as `2` included.
+type ValueNames<Values> = `${keyof Values & (string | number)}`
+
+// The values a variant takes as a prop: a variant with only `true` and `false` entries is a boolean, and a numeric key takes the number as well as its text.
+type VariantValue<Values> = [ValueNames<Values>] extends [never] ? never : [ValueNames<Values>] extends ['true' | 'false'] ? boolean : ValueNames<Values> | (ValueNames<Values> extends `${infer Number extends number}` ? Number : never)
 
 type VariantValues<Variants extends VariantTable> = { [Name in keyof Variants]?: VariantValue<Variants[Name]> | undefined }
 
@@ -35,7 +38,7 @@ export function recipe<const Variants extends VariantTable = Record<never, never
 
     for (const [name, options] of variants) {
       const given = values[name] ?? defaults[name]
-      const key = given == null ? undefined : String(given)
+      const key = typeof given === 'string' || typeof given === 'number' || typeof given === 'boolean' ? String(given) : undefined
       const entry = key !== undefined && Object.hasOwn(options, key) ? options[key] : undefined
 
       classes.push(partClasses(entry, part))

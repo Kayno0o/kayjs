@@ -639,11 +639,13 @@ export function templateFacts(file: KayFile, recipe?: string): TemplateFacts {
 // A component with a recipe has parts even when its template marks none: its root is the single top element.
 function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
   facts.recipe = recipe
-  facts.helpers.add('partClass')
 
   if (!facts.parts) {
     facts.parts = { names: new Map(), root: 'none', merges: true }
     markRoot(facts.parts, file.template)
+
+    if (facts.parts.root !== 'none')
+      facts.helpers.add('partClass')
 
     if (facts.parts.implicit?.component)
       facts.helpers.add('partsClass')

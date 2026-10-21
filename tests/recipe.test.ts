@@ -80,6 +80,7 @@ describe('recipe()', () => {
 
   it('reads own entries only, and names its variants', () => {
     expect(button({ tone: 'constructor' as 'x' })).toBe('a')
+    expect(button({ tone: ['y'] as unknown as 'x' })).toBe('a')
     expect(button.variants).toEqual(['tone', 'on'])
   })
 
@@ -198,6 +199,14 @@ describe('a component with a recipe, as an island', () => {
 })
 
 describe('compiling a recipe', () => {
+  it('leaves a recipe in a server fence where it is, and reports one in a page', () => {
+    const server = compileKay('--- server\nimport { recipe } from \'kay\'\nconst c = recipe({ parts: ctx.url.pathname })\n---\nmain a\n', 'src/routes/index.kay', { check: true })
+    const page = compileKay('---\nimport { recipe } from \'kay\'\nconst c = recipe({ parts: \'a\' })\n---\nmain a\n', 'src/routes/index.kay', { check: true, page: true })
+
+    expect(server.tsx.indexOf('ctx.url.pathname')).toBeGreaterThan(server.tsx.indexOf('function'))
+    expect(page.diagnostics.map(diagnostic => diagnostic.message)).toContain('A page or a layout takes no variants')
+  })
+
   it('types the variant props off the recipe, beside the class from the parts', () => {
     const { tsx } = compileKay(CARD, 'src/card.kay', { check: true })
 
@@ -230,7 +239,7 @@ async function problems(page: string): Promise<string[]> {
   const root = await scratchDir('recipe-check-')
 
   try {
-    const sources = { 'tsconfig.json': tsconfig, 'src/card.kay': CARD, 'src/chip.kay': '---\nimport { recipe } from \'kay\'\nconst chip = recipe({ variants: { tone: { a: \'x\', b: \'y\' } } })\n---\nspan.chip a\n', 'src/routes/index.kay': page }
+    const sources = { 'tsconfig.json': tsconfig, 'src/card.kay': CARD, 'src/chip.kay': '---\nimport { recipe } from \'kay\'\nconst chip = recipe({ variants: { tone: { a: \'x\', b: \'y\' }, cols: { 1: \'grid-cols-1\', 2: \'grid-cols-2\' } }, defaults: { cols: 1 } })\n---\nspan.chip a\n', 'src/routes/index.kay': page }
 
     await Promise.all(Object.entries(sources).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
@@ -243,12 +252,16 @@ async function problems(page: string): Promise<string[]> {
 
 describe('kay check on a component with a recipe', () => {
   it('passes the variants, a boolean one bare, and a recipe with no props declaration, and reports nothing unused', async () => {
-    expect(await problems(`${BOTH_IMPORTS}Card(title="a" tone="danger" compact)\nCard(title="b" compact={false})\nChip(tone="b")\nChip\n`)).toEqual([])
+    expect(await problems(`${BOTH_IMPORTS}Card(title="a" tone="danger" compact)\nCard(title="b" compact={false})\nChip(tone="b" cols={2})\nChip(cols="1")\nChip\n`)).toEqual([])
   })
 
   it('reports an unknown variant value at the call', async () => {
     expect(await problems(`${CARD_IMPORT}Card(title="a" tone="nope")\n`)).toEqual([expect.stringContaining('nope')])
     expect(await problems(`${CHIP_IMPORT}Chip(tone="c")\n`)).toEqual([expect.stringContaining('"c"')])
+  })
+
+  it('reports a number no numeric variant has', async () => {
+    expect(await problems(`${CHIP_IMPORT}Chip(cols={3})\n`)).toEqual([expect.stringContaining('3')])
   })
 
   it('reports a boolean variant given a string', async () => {

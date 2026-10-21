@@ -73,6 +73,7 @@ export interface ScriptAnalysis {
   props?: PropsDeclaration
   // The name of the `const card = recipe({ ... })` of the script, which moves to module level so the props type can take its type: the component takes its variant props from it.
   recipe?: string | undefined
+  recipeSpan?: Span | undefined
   // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
   functions: string[]
   diagnostics: Diagnostic[]
@@ -106,7 +107,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
     return analysis
   }
 
-  const split = splitFence(source, script, serverNames, analysis, templateReads)
+  const split = splitFence(source, script, serverNames, analysis, templateReads, true)
 
   if (!split)
     return analysis
@@ -137,6 +138,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
 
   analysis.body.push(...split.tail)
   analysis.recipe = split.recipes[0]?.name
+  analysis.recipeSpan = split.recipes[0]?.span
 
   for (const extra of split.recipes.slice(1))
     analysis.diagnostics.push({ ...extra.span, message: 'A component has one recipe', help: 'put its variants in the first `recipe({ ... })`' })
@@ -182,7 +184,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
 
 // Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = []): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span }[] }) | undefined {
+function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = [], withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span }[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -195,7 +197,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
   const statements: FenceStatement[] = []
   const recipes: { name: string, span: Span }[] = []
-  const recipeCalls = recipeNames(ast.program.body)
+  const recipeCalls = withRecipes ? recipeNames(ast.program.body) : new Set<string>()
   let cursor = fence.start
   // Broken statements written before a statement that leaves the body, kept for the next one that stays.
   let carried: Span[] = []

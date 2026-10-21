@@ -659,8 +659,12 @@ class ModuleShell {
       b.addSource(binding.fallback).add(') }).value;\n')
     }
 
-    if (props.rest)
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.map(binding => binding.key), ...this.facts.parts?.merges ? ['class'] : []].map(key => JSON.stringify(key)).concat(this.facts.parts?.merges && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : []).join(', ')});\n`)
+    if (props.rest) {
+      const owned = this.facts.parts?.merges === true
+      const keys = [...props.bindings.map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : []]
+
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${keys.join(', ')});\n`)
+    }
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.
     if (!this.options.rewrites && props.bindings.length > 0) {

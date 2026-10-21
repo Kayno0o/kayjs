@@ -89,6 +89,7 @@ section
 - The recipe reaches the same parts `class` does: `part="head"` elements, the root, and a part that is a component, which takes its entry as a string. The variant props never reach `...rest`.
 - In an island, a variant changed at runtime swaps its classes. `kay check` reports a value no variant has at the call, `Card(tone="nope")`.
 - A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props or signals. As with parts, it also declares no `class` prop.
+- Give a variant its default in the recipe's `defaults`, not in the props destructuring, which the recipe does not read. A numeric value is written as a key, `cols: { 1: 'grid-cols-1' }`, and passed as `cols={1}` or `cols="1"`. A page or a layout takes no recipe.
 - `recipe(...)` is a function too: `card({ tone: 'danger' }, 'head')` returns the classes of a part, `root` when none is named.
 
 ### Serve a file at a fixed path

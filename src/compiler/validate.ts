@@ -128,6 +128,9 @@ class Validator {
     if (this.file.typeParameters && server)
       this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
 
+    if (this.options.pageFile === true && script.recipeSpan)
+      this.error(script.recipeSpan, 'A page or a layout takes no variants', { note: 'a recipe types the props of a component, which a page does not have', help: 'move the recipe to a component' })
+
     if (this.options.pageFile !== true && templateFacts(this.file, script.recipe).parts) {
       const type = script.props?.type
       const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && PROPS_CLASS.test(this.text(type)) ? type : undefined)
