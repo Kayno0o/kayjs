@@ -1,0 +1,11 @@
+---
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+
+const items = [
+  { label: 'Home', href: '/' },
+  { label: 'Libraries', href: '/docs/libraries' },
+  { label: 'kayjs-ui', href: '/docs/libraries/kayjs-ui' },
+  { label: 'Breadcrumb' },
+]
+---
+Breadcrumb(items={items} label="Breadcrumb")

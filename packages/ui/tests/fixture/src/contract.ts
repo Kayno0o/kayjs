@@ -3,6 +3,7 @@ import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
@@ -81,6 +82,7 @@ export const COMPONENTS = {
   'avatar': Avatar,
   'badge': Badge,
   'bar-list': BarList,
+  'breadcrumb': Breadcrumb,
   'button': Button,
   'card-row': CardRow,
   'card': Card,
@@ -149,6 +151,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'avatar': { name: 'Grace', label: 'Grace' },
   'badge': { label: 'Draft', icon },
   'bar-list': { rows, onSelect: noop },
+  'breadcrumb': { label: 'Trail', items: [{ label: 'Home', href: '/' }, { label: 'Moons' }] },
   'button': { label: 'Save', icon },
   'card-row': { left: 'L', right: 'R', actions: 'A', children: 'Mars' },
   'card': { title: 'Moons', children: 'Phobos' },

@@ -175,6 +175,33 @@ describe('controls', () => {
   })
 })
 
+describe('breadcrumb', () => {
+  test('Breadcrumb is a named nav listing the trail, the last item the current page and no link', async () => {
+    expect(await attributes('/breadcrumb', '#long nav', ['aria-label'])).toEqual([{ 'aria-label': 'Trail' }])
+    expect((await find('/breadcrumb', '#long li')).map(item => [item.text, attr(item, 'data-middle')])).toEqual([['Home', null], ['…', null], ['Moons', ''], ['Jupiter', null], ['Europa', null]])
+    expect((await find('/breadcrumb', '#long a')).map(link => link.attributes.href)).toEqual(['/', '/moons', '/moons/jupiter'])
+    expect((await find('/breadcrumb', '#long [aria-current]')).map(found => [found.text, found.tag])).toEqual([['Europa', 'span']])
+  })
+
+  test('a trail of three items has no ellipsis, and only a structured one writes the BreadcrumbList', async () => {
+    expect((await find('/breadcrumb', '#short .kui-breadcrumb-more'))).toEqual([])
+
+    const scripts = await find('/breadcrumb', 'script[type="application/ld+json"]')
+
+    expect(scripts).toHaveLength(1)
+    expect(JSON.parse(scripts[0]!.text)).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      'itemListElement': [
+        { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://example.com/' },
+        { '@type': 'ListItem', 'position': 2, 'name': 'Moons', 'item': 'https://example.com/moons' },
+        { '@type': 'ListItem', 'position': 3, 'name': 'Jupiter', 'item': 'https://example.com/moons/jupiter' },
+        { '@type': 'ListItem', 'position': 4, 'name': 'Europa' },
+      ],
+    })
+  })
+})
+
 describe('layout', () => {
   test('AppHeader is a header holding its brand, one named nav and its end area, sticky unless told not to', async () => {
     expect((await find('/layout', '#app-header header > .kui-app-header-brand, #app-header header .kui-site-nav, #app-header header > .kui-app-header-end')).map(found => found.attributes.class?.match(KUI_CLASS)?.[0])).toEqual(['kui-app-header-brand', 'kui-site-nav', 'kui-app-header-end'])

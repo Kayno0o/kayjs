@@ -1,0 +1,10 @@
+---
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+
+const trail = [{ label: 'Home', href: '/' }, { label: 'Moons', href: '/moons' }, { label: 'Jupiter', href: '/moons/jupiter' }, { label: 'Europa' }]
+---
+main
+  #long
+    Breadcrumb(items={trail} label="Trail" structured)
+  #short
+    Breadcrumb(items={trail.slice(2)} label="Short")

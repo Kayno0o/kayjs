@@ -1,0 +1,15 @@
+---
+import { jsonLd, siteUrl } from 'kay/seo'
+
+const { items } = props<{ items: readonly { label: string, href?: string | undefined }[] }>()
+
+const last = items.length - 1
+// The page on screen is listed without a URL, as search engines accept.
+const trail = jsonLd({
+  '@type': 'BreadcrumbList',
+  'itemListElement': items.map((item, index) => ({ '@type': 'ListItem', 'position': index + 1, 'name': item.label, ...index < last && item.href !== undefined ? { item: siteUrl(item.href) } : {} })),
+})
+---
+// A component of its own, since a `head` block sits at the top level of a template and holds no condition.
+head
+  script(type="application/ld+json") {trail}

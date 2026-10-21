@@ -1938,6 +1938,50 @@
     @apply block h-auto w-full;
   }
 
+  .kui-breadcrumb {
+    @apply block;
+  }
+
+  .kui-breadcrumb-list {
+    @apply m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-kui-subtext0;
+  }
+
+  /* The separator is drawn here, with an empty alternative text, so a screen reader hears the list alone. */
+  .kui-breadcrumb-item + .kui-breadcrumb-item::before,
+  .kui-breadcrumb-item + .kui-breadcrumb-more::before,
+  .kui-breadcrumb-more + .kui-breadcrumb-item::before {
+    content: '/' / '';
+    @apply mr-2 text-kui-overlay1;
+  }
+
+  .kui-breadcrumb-link {
+    @apply text-kui-subtext0 underline-offset-2 hover:text-kui-text hover:underline;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-breadcrumb-text:where([aria-current='page']) {
+    @apply text-kui-text;
+  }
+
+  .kui-breadcrumb-more {
+    @apply hidden;
+  }
+
+  /* On a phone the middle of a long trail gives way to an ellipsis. */
+  @media (width < theme(--breakpoint-sm)) {
+    .kui-breadcrumb-item[data-middle] {
+      @apply hidden;
+    }
+
+    .kui-breadcrumb-more {
+      @apply list-item;
+    }
+  }
+
   .kui-tab-nav {
     @apply flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px;
   }
