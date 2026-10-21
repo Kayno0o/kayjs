@@ -111,3 +111,38 @@ describe('kay check', () => {
     expect(reported.filter(([file]) => !String(file).endsWith('.ts')).map(([message]) => message).toSorted()).toEqual([SETTING('guards'), SETTING('layouts')])
   })
 })
+
+describe('a guards or layouts getter or method', () => {
+  it.each([
+    ['a getter', 'export const page = { get guards() { return false } }\n', 'guards'],
+    ['an async method', 'export const page = { async guards() { return false } }\n', 'guards'],
+    ['a generator method', 'export const page = { *layouts() {} }\n', 'layouts'],
+    ['a setter', 'export const page = { set layouts(value) {} }\n', 'layouts'],
+    ['a quoted getter', 'export const page = { get \'guards\'() { return false } }\n', 'guards'],
+  ])('is found for %s', (_name, source, key) => {
+    expect(unreadSettings(source).map(found => found.key)).toEqual([key])
+  })
+
+  it('is reported at its line in an endpoint and in an api module', async () => {
+    const dir = await scratchDir('open-settings-methods-')
+
+    try {
+      await Promise.all([
+        Bun.write(`${dir}/routes/get.json.ts`, 'export const page = {\n  get guards() {\n    return false\n  },\n}\nexport function GET() {\n  return \'x\'\n}\n'),
+        Bun.write(`${dir}/routes/async.json.ts`, 'export const page = {\n  noindex: true,\n  async layouts() {\n    return false\n  },\n}\nexport function GET() {\n  return \'x\'\n}\n'),
+        Bun.write(`${dir}/api/notes.ts`, 'import { api } from \'kay/server\'\n\nexport default api({\n  get guards() {\n    return false\n  },\n}).get(\'/\', () => [])\n'),
+      ])
+
+      const { problems } = await writeShadowTypes(dir, { routes: 'routes', api: 'api' })
+
+      expect(problems.filter(found => found.message.startsWith('kay reads')).map(found => [relative(dir, found.file), found.line, found.message]).toSorted()).toEqual([
+        ['api/notes.ts', 4, SETTING('guards')],
+        ['routes/async.json.ts', 3, SETTING('layouts')],
+        ['routes/get.json.ts', 2, SETTING('guards')],
+      ])
+    }
+    finally {
+      await Bun.$`rm -rf ${dir}`.quiet()
+    }
+  })
+})

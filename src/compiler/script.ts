@@ -7,7 +7,7 @@ import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
 import { SENDABLE_CLASSES } from './expression'
-import { PAGE, PAGE_SETTINGS } from './page-settings'
+import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 // What `kay` exports that a static component may use and stay static.
@@ -410,7 +410,7 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
 
         // The server reads these two from the source, so a value held in a variable would keep the guards and layouts with no message.
         if ((key === 'guards' || key === 'layouts') && !LITERAL_SETTING.test(text(property)))
-          analysis.diagnostics.push({ ...shift(property.value), message: `kay reads \`${key}\` as a literal \`true\` or \`false\``, help: `write \`${key}: false\` itself: the server reads it from the source, so a variable or an expression is ignored` })
+          analysis.diagnostics.push({ ...shift(property.value), ...unreadSettingReport(key) })
 
         settings.set(key, { key: shift(property.key), value: shift(property.value) })
       }

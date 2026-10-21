@@ -410,7 +410,8 @@ export interface UnreadSetting {
   index: number
 }
 
-const SETTING_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*/iy
+// A getter, setter, async or generator method may lead the key: the entry is then not a literal, so it is reported.
+const SETTING_KEY = /(?:(?:async|get|set)\s+(?=[\w$'"*]))?\*?\s*(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*/iy
 const LITERAL_SETTING = /(?:[A-Za-z_$][\w$]*|'[^'\n]*'|"[^"\n]*")\s*:\s*(?:true|false)(?![\w$])/y
 const LITERAL_SETTINGS = new Set(['guards', 'layouts'])
 

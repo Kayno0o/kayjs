@@ -1,6 +1,7 @@
 import type { CheckDiagnostic } from '.'
 import type { ServedProject } from './shadow-types'
 import { positionAt } from '../compiler/mapping'
+import { unreadSettingReport } from '../compiler/page-settings'
 import { API_OPTIONS } from '../server/api-modules'
 import { unreadSettings } from '../server/routes'
 
@@ -22,8 +23,9 @@ export async function unreadOpenSettings({ endpoints, apiModules }: ServedProjec
       end: index + (key === '...' ? 3 : key.length),
       code: 'page-settings-invalid',
       severity: 'error',
-      message: key === '...' ? `kay reads each setting of ${where} as written` : `kay reads \`${key}\` as a literal \`true\` or \`false\``,
-      help: key === '...' ? 'write it `key: value`, with no spread or computed key, as `guards` and `layouts` could be among them' : `write \`${key}: false\` itself: the server reads it from the source, so a variable or an expression is ignored`,
+      ...(key === '...'
+        ? { message: `kay reads each setting of ${where} as written`, help: 'write it `key: value`, with no spread or computed key, as `guards` and `layouts` could be among them' }
+        : unreadSettingReport(key)),
     }))
   }))
 
