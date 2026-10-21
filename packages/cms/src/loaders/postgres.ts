@@ -39,11 +39,21 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
   const table = tableOf(options.table)
   const key = seededKey(name)
   let ready: Promise<SQL> | undefined
-  // The rows' count and the sum of the transactions that wrote them: an insert, an update and a delete each move it, whoever made them, whatever order they commit in.
-  const watching = watcher(name, `${scopeOf(options.sql)}/${table}`, options.watch, '2s', async () => {
-    const [row] = await clientOf(options.sql).unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
+  // The rows' count and the sum of the transactions that wrote them move with an insert, an update and a delete, whoever made them, but also with a `VACUUM FREEZE` or any rewrite of the rows that changed nothing; so the rows are read and hashed only when it moves, and what is reported is that hash.
+  let moved: string | undefined
+  let fingerprint = ''
+  const watching = watcher(name, `${scopeOf(options.sql)}/${table}`, options.watch, '2s', async (force) => {
+    const client = clientOf(options.sql)
+    const [row] = await client.unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
 
-    return row!.signature
+    if (force || row!.signature !== moved) {
+      const [hash] = await client.unsafe<{ hash: string }[]>(`SELECT md5(coalesce(string_agg(place || chr(1) || data::text || chr(1) || coalesce(body, ''), chr(2) ORDER BY place), '')) AS hash FROM ${table} WHERE collection = $1`, [name])
+
+      moved = row!.signature
+      fingerprint = hash!.hash
+    }
+
+    return fingerprint
   })
 
   const open = async (): Promise<SQL> => {

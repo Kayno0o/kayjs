@@ -205,6 +205,13 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
     broadcast({ keys: [...dropped] })
 }
 
+// Drops `key` and what is built from it as `invalidate` does, in this process alone and with nothing sent to the others: for a change every process finds by itself, so none echoes it to the rest.
+export function invalidateLocally(key: string): void {
+  const matches = (name: string) => name === key
+
+  dropAndTell(matches, matches, new Set([key]))
+}
+
 // Drops what is built from `key` and tells the listeners it changed, in this process alone: the key's own value stays and nothing is sent to the other processes. For a change the clock made, which every process sees by itself.
 export function refreshLocally(key: string): void {
   const reads = (name: string) => name === key

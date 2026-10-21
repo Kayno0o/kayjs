@@ -467,7 +467,7 @@ cms({
 })
 ```
 
-It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is logged and the save stays.
+It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is logged and the save stays. A hook still running after 10 seconds is logged and the save answers without it.
 
 ## Where files are saved
 

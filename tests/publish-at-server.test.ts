@@ -108,6 +108,31 @@ describe('a prerendered site with a scheduled entry', () => {
     })
   })
 
+  it('keeps the sitemap through an invalidation of a key it did not read, and tells a CDN to revalidate it', async () => {
+    await build(async (scratch) => {
+      const app = await schedulesAfter(scratch, 60_000)
+      const first = await app.handle(new Request('http://localhost/sitemap.xml'))
+      const etag = first.headers.get('etag')!
+
+      expect(first.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+      expect(etag).toMatch(/^W\//)
+      schedule.items = [...schedule.items, { slug: 'added', title: 'Added', at: new Date(Date.now() - 1000).toISOString() }]
+      invalidate('somewhere-else')
+      expect(await visit(app, '/sitemap.xml')).not.toHaveProperty('text', expect.stringContaining('/talks/added'))
+
+      const same = await app.handle(new Request('http://localhost/sitemap.xml', { headers: { 'if-none-match': etag } }))
+
+      expect([same.status, same.headers.get('etag')]).toEqual([304, etag])
+      talks.invalidate()
+
+      const changed = await app.handle(new Request('http://localhost/sitemap.xml', { headers: { 'if-none-match': etag } }))
+
+      expect(changed.status).toBe(200)
+      expect(changed.headers.get('etag')).not.toBe(etag)
+      expect(await changed.text()).toContain('/talks/added')
+    })
+  })
+
   it('takes an ending entry down at its time from the listing, its prerendered page, the sitemap and the feed, the page then answering what the app chose', async () => {
     await build(async (scratch) => {
       schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: '2999-01-01' }]

@@ -134,18 +134,45 @@ async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Pro
   return entry.slug === SINGLE_SLUG ? undefined : refused(entry, wording('cms.store.singleSlug', '{collection} holds one entry, written as {slug}', { collection: collectionTitle(collection), slug: SINGLE_SLUG }))
 }
 
-// Tells `cms({ onSave })` of a change that went through; its failure is logged, as the change is written.
+// The longest the editor waits for `cms({ onSave })`, which runs before the save answers.
+export const SAVE_HOOK_LIMIT_MS = 10_000
+let hookLimit = SAVE_HOOK_LIMIT_MS
+
+// For tests, which cannot wait ten seconds; not for apps. No argument restores the limit.
+export function setSaveHookLimit(ms = SAVE_HOOK_LIMIT_MS): void {
+  hookLimit = ms
+}
+
+// Tells `cms({ onSave })` of a change that went through; its failure or a hook still running past the limit is logged, as the change is written.
 async function saved(event: SaveEvent): Promise<void> {
   const hook = settings().onSave
 
   if (hook === undefined)
     return
 
+  let timer: ReturnType<typeof setTimeout> | undefined
+
   try {
-    await hook(event)
+    // A hook given up on may still fail later, which is logged as well.
+    const running = (async () => {
+      try {
+        await hook(event)
+      }
+      catch (error) {
+        log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
+      }
+
+      return 'done' as const
+    })()
+    const late = new Promise<'late'>((resolve) => {
+      timer = setTimeout(resolve, hookLimit, 'late')
+    })
+
+    if (await Promise.race([running, late]) === 'late')
+      log.error(`onSave for ${event.collection}/${event.slug} did not finish in ${hookLimit / 1000} s; the save does not wait for it`)
   }
-  catch (error) {
-    log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
+  finally {
+    clearTimeout(timer)
   }
 }
 

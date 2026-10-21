@@ -201,7 +201,7 @@ describe('a sitemap built without a lastmod', () => {
       const first = await fetched()
 
       expect(await first.text()).not.toContain('<lastmod>')
-      expect(first.headers.get('cache-control')).toBe('public, max-age=60')
+      expect(first.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
       down.sitemapDatabaseDown = false
       expect(await (await fetched()).text()).not.toContain('<lastmod>')
       setSystemTime(Date.now() + 61_000)
@@ -209,7 +209,7 @@ describe('a sitemap built without a lastmod', () => {
       const rebuilt = await fetched()
 
       expect(await rebuilt.text()).toContain('<lastmod>2026-05-06</lastmod>')
-      expect(rebuilt.headers.get('cache-control')).toBe('public, max-age=3600')
+      expect(rebuilt.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     }
     finally {
       setSystemTime()
@@ -232,7 +232,7 @@ describe('a sitemap with a lastmod that is no date', () => {
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
       const first = await fetched()
 
-      expect(first.headers.get('cache-control')).toBe('public, max-age=3600')
+      expect(first.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
       await first.text()
       setSystemTime(Date.now() + 61_000)
       await (await fetched()).text()

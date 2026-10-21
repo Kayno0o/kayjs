@@ -9,14 +9,16 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { NotFoundError } from 'elysia'
 import { KayError } from '../compiler/errors'
-import { onKeysInvalidated } from '../runtime/cache'
+import { ALL_READS, onKeysInvalidated } from '../runtime/cache'
 import { escape } from '../runtime/escape'
 import { kayLog } from '../runtime/log'
 import { importModule } from './bundle'
 import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
+import { readsOf } from './page-reads'
 import { chainSetting, pageSetting } from './page-settings'
-import { listedIn, listedParams, pathOf } from './prerendered'
+import { listedIn, listedParams, pageEtag, pathOf } from './prerendered'
+import { matchesEtag, REVALIDATE } from './public'
 import { onPublished } from './publishing'
 import { reportServerError } from './report'
 import { routeChain, slashedPath } from './routes'
@@ -58,14 +60,18 @@ export interface SitemapOptions {
 export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRoute[], origin: string, options: SitemapOptions = {}): void {
   // With locales by domain, each host lists its own pages: a sitemap may only name URLs of the host it is on.
   // `files` holds the documents of the sitemap: the one `/sitemap.xml`, or its index followed by each part.
-  const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, (request: Request) => Promise<Response>>, at: number, degraded: boolean }>()
+  // `reads` are the cache keys and collections the build read, once it has finished: an invalidation drops the sitemap only when it names one of them.
+  const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, { etag: string, reply: (request: Request) => Promise<Response> }>, at: number, degraded: boolean, reads?: string[] }>()
   const settings = options.locales
 
-  // An entry published at its time, or saved by a CMS, shows in the sitemap then, not up to an hour later: any invalidation builds it afresh on its next request.
+  // An entry published at its time, or saved by a CMS, shows in the sitemap then, not up to an hour later: an invalidation of a key the build read, or while it is still reading, builds it afresh on its next request.
   const hear = () => {
     const stopPublished = onPublished(() => cached.clear())
-    const stopInvalidated = onKeysInvalidated(() => {
-      cached.clear()
+    const stopInvalidated = onKeysInvalidated((matches) => {
+      for (const [locale, sitemap] of cached) {
+        if (!sitemap.reads || sitemap.reads.some(key => key === ALL_READS || matches(key)))
+          cached.delete(locale)
+      }
 
       return []
     })
@@ -94,11 +100,21 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
 
       const built: typeof sitemap = { files: Promise.resolve([]), replies: new Map(), at: Date.now(), degraded: false }
 
-      built.files = sitemapFiles(routes, origin, options.trailingSlash, settings, locale, (error) => {
-        // A lastmod that is no date or a limit passed stays so on the next build: only an error the app threw, such as a database down, is worth building again soon.
-        built.degraded ||= !(error instanceof KayError && error.code === 'page-settings-invalid')
-        report(error)
-      }, publicOrigin, options.base)
+      built.files = (async () => {
+        const { result, reads, invalidated } = await readsOf(async () => sitemapFiles(routes, origin, options.trailingSlash, settings, locale, (error) => {
+          // A lastmod that is no date or a limit passed stays so on the next build: only an error the app threw, such as a database down, is worth building again soon.
+          built.degraded ||= !(error instanceof KayError && error.code === 'page-settings-invalid')
+          report(error)
+        }, publicOrigin, options.base))
+
+        // A key it read was invalidated meanwhile, so what it built is not kept.
+        if (invalidated && cached.get(locale) === built)
+          cached.delete(locale)
+        else
+          built.reads = reads
+
+        return result
+      })()
       cached.set(locale, sitemap = built)
     }
 
@@ -114,12 +130,19 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
       if (files[index] === undefined)
         throw new NotFoundError()
 
-      let reply = sitemap.replies.get(index)
+      let kept = sitemap.replies.get(index)
 
-      if (!reply)
-        sitemap.replies.set(index, reply = fixedReply(files[index], { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${(sitemap.degraded ? DEGRADED_MS : CACHE_MS) / 1000}` }))
+      // Revalidated on each request, so a CDN holds no sitemap past a save, and the copy it keeps costs a 304 between saves.
+      if (!kept) {
+        const etag = `W/${pageEtag(files[index])}`
 
-      return await reply(request)
+        sitemap.replies.set(index, kept = { etag, reply: fixedReply(files[index], { 'content-type': 'application/xml; charset=utf-8', 'cache-control': REVALIDATE, etag }) })
+      }
+
+      if (matchesEtag(request.headers.get('if-none-match'), kept.etag))
+        return new Response(null, { status: 304, headers: { 'etag': kept.etag, 'cache-control': REVALIDATE } })
+
+      return await kept.reply(request)
     }
     catch (error) {
       if (error instanceof NotFoundError)

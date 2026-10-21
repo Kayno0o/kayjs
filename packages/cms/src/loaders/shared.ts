@@ -1,7 +1,6 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
-import { invalidate } from 'kay/cache'
 import { contentKey } from 'kay/content'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
 export interface SeedEntry {
@@ -102,7 +101,7 @@ export function scopeOf(database: string | object): string {
 // The running watcher of each collection, so a module a dev server evaluates again replaces its loader's timer instead of adding one.
 const running = new Map<string, () => void>()
 
-// Looks at a `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit. `force` asks for a reading even where the database says nothing moved. `scope` tells databases apart that hold collections of one name.
+// Looks at a `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit. Each process finds a change by itself, so the drop is not broadcast; one a save here or a broadcast from another process already dropped is taken as known, not found again. `force` asks for a reading even where the database says nothing moved. `scope` tells databases apart that hold collections of one name.
 export function watcher(name: string, scope: string, watch: LoaderOptions['watch'], fallback: string, signature: (force: boolean) => string | Promise<string>): Watcher {
   const every = watch === false ? undefined : Math.min(MAX_INTERVAL_MS, Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`, 'kayjs-cms') * 1000))
   const id = `${scope}\u0000${name}`
@@ -111,6 +110,8 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
   let looking = false
   // Moves with each `settle`, so a look that began before one does not overwrite what it stored.
   let epoch = 0
+  // True while this watcher's own drop runs, which its listener must not take for a save.
+  let dropping = false
 
   const look = async () => {
     if (looking)
@@ -124,7 +125,14 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
 
       if (before === epoch && now !== known) {
         known = now
-        invalidate(contentKey(name))
+        dropping = true
+
+        try {
+          invalidateLocally(contentKey(name))
+        }
+        finally {
+          dropping = false
+        }
       }
     }
     catch {
@@ -132,6 +140,20 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
     }
     finally {
       looking = false
+    }
+  }
+
+  const settle = async () => {
+    if (timer === undefined)
+      return
+
+    epoch++
+
+    try {
+      known = await signature(true)
+    }
+    catch {
+      // The next look finds the difference, if any, and drops the entries once more.
     }
   }
 
@@ -146,15 +168,19 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
       timer.unref()
 
       const mine = timer
+      // A drop of the collection made elsewhere, a save here or one another process broadcast, already shows in the database: the next look must not report it again.
+      const stopHearing = onKeysInvalidated((matches) => {
+        if (!dropping && matches(contentKey(name)))
+          void settle()
 
-      running.set(id, () => clearInterval(mine))
-    },
-    settle: async () => {
-      if (timer === undefined)
-        return
+        return []
+      })
 
-      epoch++
-      known = await signature(true)
+      running.set(id, () => {
+        clearInterval(mine)
+        stopHearing()
+      })
     },
+    settle,
   }
 }
