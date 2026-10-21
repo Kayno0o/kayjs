@@ -20,6 +20,6 @@ The rest is split by topic, each file read whole with one command:
 - [Setup, pages, the signed-in user, sessions and guards](llms/setup.md): the setup, the prebuilt pages, the signed-in user, sessions, guards and gates
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](llms/oauth-passkeys-two-factor.md): OAuth providers, two-factor, passkeys, the recent proof sensitive changes ask for, and the account page
 - [Passwords, guests, mailed links and security mails](llms/passwords-and-mails.md): passwords, guest sessions, mailed links (verification, reset, magic links) and security mails
-- [The OAuth server for MCP clients and bearer tokens](llms/oauth-server-and-tokens.md): signing an AI agent in through the OAuth server, and bearer tokens
+- [The OAuth server for MCP clients, bearer tokens and forward auth](llms/oauth-server-and-tokens.md): signing an AI agent in through the OAuth server, bearer tokens, and guarding other sites for a reverse proxy
 - [Events, the audit log, admin and organizations](llms/admin-and-organizations.md): auth events and the audit log, the admin pages, organizations and roles
 - [Bots, breached passwords, limits, stores, testing and the dev tool](llms/hardening-and-testing.md): proof of work and breached passwords, limits, the stores, testing an app using it, and the dev tool tab

@@ -2,6 +2,7 @@ import type { OAuthClient } from './authorize/clients'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
 import type { AuthEventInfo } from './events'
+import type { ForwardAuthCore } from './forwardAuth'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
 import type { createOAuthClient } from './oauth/client'
@@ -114,6 +115,8 @@ export interface Core {
   email?: EmailCore | undefined
   // Set when the app is an OAuth server for MCP clients: the prebuilt pages and a store keeping its data are there.
   oauthServer?: { fetchDocument: (url: string) => Promise<unknown>, documents: Map<string, { client: OAuthClient, expires: number }>, defaultScopes: string[] } | undefined
+  // Set with the `forwardAuth` option: the domains a sign-in may return to, and whether two-factor is needed to pass.
+  forward?: ForwardAuthCore | undefined
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<never, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined

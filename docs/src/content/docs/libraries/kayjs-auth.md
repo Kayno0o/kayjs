@@ -539,6 +539,54 @@ Each link and code lasts a fixed time: a day for verification, an hour for a res
 
 The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `authPages`, `mailExtension` and `authMailer`, and no sign-in page of its own.
 
+## Guarding other sites
+
+`forwardAuth` turns the app into the sign-in of other sites behind a reverse proxy. The proxy asks the app before each request, lets it through with who the user is, or sends the visitor to sign in and back.
+
+```ts
+createAuth({
+  sessions: session<AuthSessionData>({ secret, cookie: 'login', domain: 'example.com' }),
+  url: 'https://auth.example.com',
+  forwardAuth: 'example.com',
+  // ...
+})
+```
+
+The cookie needs the domain so the guarded sites receive it. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
+
+The route is `/auth/forward`. For a person signed in with a session it answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` (the roles, comma-separated). A guest, a bearer token and a sign-in waiting for its second factor are not signed in. Otherwise it answers 401 with the sign-in page in `Location`, which brings the visitor back to the page they asked for. `/auth/forward?role=admin` also refuses a user without that role with a 403.
+
+```nginx
+location = /_auth {
+  internal;
+  proxy_pass http://127.0.0.1:3000/auth/forward;
+  proxy_method GET;
+  proxy_pass_request_body off;
+  proxy_set_header Content-Length "";
+  proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+  proxy_set_header X-Forwarded-For $remote_addr;
+}
+
+location / {
+  auth_request /_auth;
+  auth_request_set $remote_user $upstream_http_remote_user;
+  auth_request_set $remote_name $upstream_http_remote_name;
+  auth_request_set $remote_email $upstream_http_remote_email;
+  auth_request_set $remote_groups $upstream_http_remote_groups;
+  auth_request_set $signin $upstream_http_location;
+  error_page 401 = @signin;
+  proxy_set_header Remote-User $remote_user;
+  proxy_set_header Remote-Name $remote_name;
+  proxy_set_header Remote-Email $remote_email;
+  proxy_set_header Remote-Groups $remote_groups;
+  proxy_pass http://127.0.0.1:8080;
+}
+
+location @signin { return 302 $signin; }
+```
+
+The proxy must overwrite the `Remote-*` headers, as above, so a visitor cannot send their own. For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?redirect=1` and `authResponseHeaders`. For Caddy, use `forward_auth auth:3000 { uri /auth/forward?redirect=1; copy_headers Remote-User Remote-Name Remote-Email Remote-Groups }`. The `?redirect=1` makes the app answer 302 instead of 401, because these two hand its answer to the browser as it is.
+
 ## Letting an AI agent sign in
 
 An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `authPages()` and a store that keeps OAuth data (`memoryStore` and `pgStore` do), your app is its own OAuth authorization server.

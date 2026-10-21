@@ -12,6 +12,7 @@ import type { AuthSessionData, BareUser, Core, OAuthApp, Profile, SignedIn, User
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { AuditCursorInput, AuditEntry, AuthEventInfo } from './events'
 import type { DataExport } from './export'
+import type { ForwardAuthOptions, ForwardDomains } from './forwardAuth'
 import type { ScopeRequirement } from './gate'
 import type { LimitsOption } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
@@ -45,6 +46,7 @@ import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, request
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
 import { exportData } from './export'
+import { forwardOf, serveForwardAuth } from './forwardAuth'
 import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { resolveLimits } from './limits'
@@ -190,6 +192,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   proxy?: KayConfig['proxy'] | undefined
   // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryStore` and `pgStore` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
   oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly Scope[] | undefined } | undefined
+  // A route for a reverse proxy to ask before it lets a request through to a site it guards (nginx `auth_request`, Traefik or Caddy forward auth): `${prefix}/forward` answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` for a signed-in person's session, or 401 with the sign-in page's URL as `Location`, which returns to the guarded site afterwards when it is on these domains or their subdomains. `requireTwoFactor` also refuses a user who has not set it up.
+  forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: ((user: BareUser | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
@@ -1187,6 +1191,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
   }
 
+  if (core.forward)
+    serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
+
   const evaluate = async (user: BareUser, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
     if (typeof grant === 'string')
       return isGranted(grant, user.roles)
@@ -1442,6 +1449,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
     },
     oauthServer: oauthServerOf(options, pages),
+    forward: forwardOf(options.forwardAuth),
     oauth,
     refreshers: new Map(),
     allow: options.allow,

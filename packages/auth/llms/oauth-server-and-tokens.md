@@ -20,3 +20,39 @@
 - `tokens()`, `revokeToken(id)` and `enableTwoFactor(code)` need a session too: through a bearer token they answer `[]`, `false` and `signed-out`, so a leaked token cannot list or revoke its siblings nor turn on a second factor. So does everything asking for a `proof` or `reprove()`: the second factor and recovery codes, passkeys, password, address and account deletion answer `signed-out` under a token, whatever proof it sends.
 - `tokens()` lists `{ id, label, scopes, createdAt, lastUsedAt, expiresAt, expired }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token ends with a password change, a reset and `signOutEverywhere`, each of which may answer a stolen device, so the devices sign in again after one.
 - A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection, `await store.get(ws)` checking the token again past 30 seconds and closing the socket once it is refused: the handshake for a client that cannot send a cookie or a header with its upgrade, such as a device's browser widget on another origin.
+
+## Guarding other sites for a reverse proxy
+
+- `forwardAuth: 'example.com'` in `createAuth` (a domain, a list, or `{ domains, requireTwoFactor? }`) serves `GET ${prefix}/forward` for nginx `auth_request`, Traefik `forwardAuth` and Caddy `forward_auth`, and `${prefix}/forward/return`. Domains are checked at startup (two labels at least, no scheme, port or path). The sign-in session cookie must reach the guarded sites: `session({ cookie: 'login', domain: 'example.com' })`, as a `__Host-` cookie carries no domain.
+- `/auth/forward` answers 204 for a person's session with `Remote-User` (username, else email, else id), `Remote-Name` (the same), `Remote-Email` and `Remote-Groups` (roles, comma-joined), always all four, empty when unknown; non-ASCII values are percent-encoded. Otherwise it answers 401 with `Location`: the sign-in page's full URL (`site` in kay.config.ts or `url`), returning through `/auth/forward/return?to=` to the URL asked for when that is `https` on the domains or their subdomains, else the plain sign-in page. `?redirect=1` answers 302 instead of 401, for Traefik and Caddy, which hand the answer to the browser. Every answer is `no-store`.
+- It reads the URL asked for from `X-Original-URL` (nginx sets it) or `X-Forwarded-Proto`, `-Host` and `-Uri`. A guest, a bearer token and a session stopped at the second factor are anonymous. `?role=admin` (repeatable, any of) answers 403 for a user without it, inheritance honoured; `requireTwoFactor` sends a user without two-factor to `/auth/account/security` with a 401. The request's own `Remote-*` headers are never read: the proxy must overwrite them on the way to the site.
+- Only GET: nginx needs `proxy_method GET`. The return route sends anything but the allowed domains (another scheme, credentials, a lookalike host, a relative URL) home.
+
+```nginx
+location = /_auth {
+  internal;
+  proxy_pass http://127.0.0.1:3000/auth/forward;
+  proxy_method GET;
+  proxy_pass_request_body off;
+  proxy_set_header Content-Length "";
+  proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+  proxy_set_header X-Forwarded-For $remote_addr;
+}
+location / {
+  auth_request /_auth;
+  auth_request_set $remote_user $upstream_http_remote_user;
+  auth_request_set $remote_name $upstream_http_remote_name;
+  auth_request_set $remote_email $upstream_http_remote_email;
+  auth_request_set $remote_groups $upstream_http_remote_groups;
+  auth_request_set $signin $upstream_http_location;
+  error_page 401 = @signin;
+  proxy_set_header Remote-User $remote_user;
+  proxy_set_header Remote-Name $remote_name;
+  proxy_set_header Remote-Email $remote_email;
+  proxy_set_header Remote-Groups $remote_groups;
+  proxy_pass http://127.0.0.1:8080;
+}
+location @signin { return 302 $signin; }
+```
+
+- Traefik: `forwardAuth: { address: 'http://auth:3000/auth/forward?redirect=1', authResponseHeaders: [Remote-User, Remote-Name, Remote-Email, Remote-Groups] }`. Caddy: `forward_auth auth:3000 { uri /auth/forward?redirect=1; copy_headers Remote-User Remote-Name Remote-Email Remote-Groups }`. Behind a proxy set `proxy: { hops: 1 }` in kay.config.ts so limits count the visitor's address.
