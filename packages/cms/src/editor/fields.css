@@ -88,6 +88,10 @@
   min-width: 0;
 }
 
+.kcms-item-body[hidden] {
+  display: none;
+}
+
 .kcms-fold svg {
   transition: transform 0.15s;
 }

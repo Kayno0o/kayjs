@@ -65,6 +65,13 @@ describe('reorderKey', () => {
     expect(last.defaultPrevented).toBe(true)
   })
 
+  it('leaves the key to a textarea, where it selects a paragraph on macOS', () => {
+    const inText = pressed('ArrowUp', { target: { tagName: 'TEXTAREA' } as unknown as EventTarget })
+
+    expect(reorderKey(inText, 1, 3)).toBeUndefined()
+    expect(inText.defaultPrevented).toBe(false)
+  })
+
   it('moves the item otherwise, and leaves other keys and taken ones alone', () => {
     const middle = pressed('ArrowUp')
     const plain = pressed('a')

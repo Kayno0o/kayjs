@@ -12,6 +12,7 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import copy from '~icons/tabler/copy'
+import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { emptyValue, isCompact, itemAt, itemTitle } from '../fields'
 import { joinPath } from '../paths'
@@ -59,7 +60,7 @@ const addButton = () => box?.querySelector('[data-kcms-add]')
 
 // What a list says of its size: how many items it holds, and the bounds its schema sets.
 function countText(): string {
-  return count() === 1 ? wording('cms.list.count', '1 item') : wording('cms.list.count', '{count} items', { count: count() })
+  return wording('cms.list.count', count() === 1 ? '1 item' : '{count} items', { count: count() })
 }
 
 function boundsText(): string | undefined {
@@ -70,9 +71,9 @@ function boundsText(): string | undefined {
     return wording('cms.list.between', 'Between {min} and {max} items', { min, max })
 
   if (min !== undefined)
-    return wording('cms.list.atLeast', 'At least {min} items', { min })
+    return wording('cms.list.atLeast', min === 1 ? 'At least 1 item' : 'At least {min} items', { min })
 
-  return max === undefined ? undefined : wording('cms.list.atMost', 'At most {max} items', { max })
+  return max === undefined ? undefined : wording('cms.list.atMost', max === 1 ? 'At most 1 item' : 'At most {max} items', { max })
 }
 
 // The folds follow the items they were made on: every change of the list says how it moved them.
@@ -84,12 +85,12 @@ function fold(at: number): void {
   mirror(states => states.map((state, place) => place === at ? !state : state))
 }
 
-function add(): void {
-  if (!list || atMax())
+function append(value: unknown): void {
+  if (atMax())
     return
 
   removed.set(undefined)
-  set([...items(), emptyValue(list.item)])
+  set([...items(), value])
   focusItem(rows, count() - 1)
 }
 
@@ -107,7 +108,10 @@ function remove(at: number): void {
   if (!list || atMin())
     return
 
-  removed.set({ at, title: itemTitle(list, items()[at], at), value: items()[at] })
+  const title = itemTitle(list, items()[at], at)
+
+  removed.set({ at, title, value: items()[at] })
+  announce(wording('cms.list.removed', '{item} removed', { item: title }))
   mirror(states => states.filter((_, place) => place !== at))
   set(items().filter((_, place) => place !== at))
   focusItem(rows, at, addButton())
@@ -129,12 +133,14 @@ function undo(): void {
 
 // A move is said to a screen reader, whose focus follows the item but does not read where it landed. A numbered item is named by the place it left, as its number at the new place would read as the one it now holds.
 function moveItem(from: number, to: number): void {
+  const title = list ? itemTitle(list, items()[from], from) : ''
+
   removed.set(undefined)
   mirror(states => reordered(states, from, to))
   set(reordered(items(), from, to))
 
-  if (field.kind === 'list')
-    announceMove(itemAt(field, from).label, to, items().length)
+  if (list)
+    announceMove(title, to, count())
 }
 
 // Alt and Shift with an arrow in any control of an item moves it, as the buttons beside it do.
@@ -176,15 +182,15 @@ function setJson(next: string): void {
                   .kcms-item-controls
                     Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
                     IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                    IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove item {n}', { n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                    IconButton(icon="delete" label={wording('cms.list.remove', 'Remove {item}', { item: title })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
                 else
                   .kcms-item-head
-                    IconButton.kcms-fold(icon="chevron" label={foldedAt(i) ? wording('cms.list.expand', 'Expand {item}', { item: title }) : wording('cms.list.collapse', 'Collapse {item}', { item: title })} variant="ghost" size="sm" aria-expanded={foldedAt(i) ? 'false' : 'true'} data-kcms-item-control onClick={() => fold(i)})
+                    IconButton.kcms-fold(icon="chevron" data-kcms-fold label={foldedAt(i) ? wording('cms.list.expand', 'Expand {item}', { item: title }) : wording('cms.list.collapse', 'Collapse {item}', { item: title })} variant="ghost" size="sm" aria-expanded={foldedAt(i) ? 'false' : 'true'} data-kcms-item-control onClick={() => fold(i)})
                     span.kcms-item-title {title}
                     .kcms-item-controls
                       Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
                       IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                      IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove item {n}', { n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                      IconButton(icon="delete" label={wording('cms.list.remove', 'Remove {item}', { item: title })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
                   .kcms-item-body(role="group" aria-label={title} hidden={foldedAt(i)})
                     if current.item.kind === 'group'
                       for child of current.item.fields key={child.key}
@@ -192,13 +198,13 @@ function setJson(next: string): void {
                     else
                       FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
           if removed() as gone
-            p.kcms-item-removed(role="status")
+            p.kcms-item-removed
               span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
               Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={atMax()} onClick={undo})
           if !atMax()
             if current.item.kind === 'image' || current.item.kind === 'file'
-              FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} many onChange={path => set([...items(), path])})
-            Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add onClick={add})
+              FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} many onChange={path => append(path)})
+            Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add onClick={() => append(emptyValue(current.item))})
     when 'group'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for child of current.fields key={child.key}

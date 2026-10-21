@@ -143,7 +143,7 @@ An array field is a list of items. A list of single values, such as strings, sho
 
 A new item starts from the `default` of the item's schema, and a select with no default stays unpicked.
 
-Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
+Up, down, duplicate and remove buttons sit beside an item, and Alt+Shift with the up or down arrow moves it from inside its fields, a multi-line text excepted. Removing an item says so and offers Undo, and focus goes to the item that took its place, or to the new item after Add. A screen reader is told where a moved item landed, such as `Moved Tag to 2 of 3`, or `Moved Item 1 to 2 of 3` in a list whose items are numbered, naming the place the item left. The order saved is the order shown.
 
 ## Field kinds of your own
 

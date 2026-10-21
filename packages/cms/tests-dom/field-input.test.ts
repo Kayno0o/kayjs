@@ -144,17 +144,37 @@ test('removing an item can be undone at its place, and focus lands on the item t
 
   await click('button[aria-label^="Remove"]', 1)
   expect(drafted()).toEqual(['a', 'c'])
-  expect(root.querySelector('[role="status"]')?.textContent).toContain('Item 2 removed')
+  expect(root.querySelector('.kcms-item-removed')?.textContent).toContain('Item 2 removed')
   expect(document.activeElement).toBe(rows()[1]!.querySelector('input'))
   await click('.kcms-item-removed button')
   expect(drafted()).toEqual(['a', 'b', 'c'])
-  expect(root.querySelector('[role="status"]')).toBeNull()
+  expect(root.querySelector('.kcms-item-removed')).toBeNull()
   expect(document.activeElement).toBe(rows()[1]!.querySelector('input'))
   await click('button[aria-label^="Remove"]', 2)
   await click('button[aria-label^="Remove"]', 1)
   await click('button[aria-label^="Remove"]', 0)
   expect(drafted()).toEqual([])
   expect(document.activeElement).toBe(root.querySelector('[data-kcms-add]'))
+})
+
+test('removing the item before a folded one puts focus on the folded one\'s fold button, which a hidden field cannot take', async () => {
+  const { click, rows } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }, { name: 'Bo', role: 'b' }])
+
+  await click('.kcms-fold', 1)
+  await click('button[aria-label^="Remove"]', 0)
+  expect(rows()).toHaveLength(1)
+  expect(document.activeElement).toBe(rows()[0]!.querySelector('.kcms-fold'))
+})
+
+test('a group item is named by its title in every button and in the move announcement', async () => {
+  const { root, click } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }, { name: 'Bo', role: 'b' }])
+
+  expect(root.querySelector('button[aria-label="Remove Ada"]')).not.toBeNull()
+  await click('[data-kcms-move="down"]', 0)
+  for (let wait = 0; wait < 50 && (said() ?? '') === ''; wait++)
+    await Bun.sleep(20)
+
+  expect(said()).toBe('Moved Ada to 2 of 2')
 })
 
 test('Add puts focus in the new item', async () => {

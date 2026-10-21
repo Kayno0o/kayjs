@@ -27,7 +27,8 @@ export function targetOf(direction: Direction, index: number, count: number): nu
 export function reorderKey(event: KeyboardEvent, from: number, count: number): { direction: Direction, to: number | undefined } | undefined {
   const direction = keyDirection(event)
 
-  if (event.defaultPrevented || direction === undefined)
+  // Option with Shift and an arrow selects a paragraph in a textarea on macOS, so a textarea keeps the key and its item moves by its buttons.
+  if (event.defaultPrevented || direction === undefined || (event.target as Element | null)?.tagName === 'TEXTAREA')
     return undefined
 
   event.preventDefault()
@@ -68,7 +69,10 @@ export function focusItem(rows: Element | null | undefined, index: number, fallb
   flush()
 
   const items = rows?.querySelectorAll(':scope > [data-kcms-row]') ?? []
-  const target = items[Math.min(index, items.length - 1)]?.querySelector<HTMLElement>(CONTROLS) ?? fallback
+  const row = items[Math.min(index, items.length - 1)]
+  const field = row?.querySelector<HTMLElement>(CONTROLS)
+  // A folded item holds its fields in a hidden body, which takes no focus: its fold button stands for it.
+  const target = field?.closest('[hidden]') ? row?.querySelector<HTMLElement>('[data-kcms-fold]') : field ?? fallback
 
   if (target instanceof HTMLElement)
     target.focus()

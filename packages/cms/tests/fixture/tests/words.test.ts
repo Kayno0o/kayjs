@@ -53,7 +53,7 @@ test('the built editor sends the browser the messages it only reads after the pa
   const built = await testSite({ root: ROOT, browser: true })
 
   try {
-    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.field.removeItem', 'cms.entry.save']))
+    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.list.remove', 'cms.entry.save']))
     expect(sent((await built.visit('/fr/admin/collections/posts')).html)).toEqual(expect.arrayContaining(['cms.table.title']))
     expect(sent((await built.visit('/fr/admin/uploads')).html)).toEqual(expect.arrayContaining(['cms.uploads.deleteMany', 'cms.uploads.empty']))
     expect(sent((await built.visit('/admin/page?path=/blog/hello')).html)).toEqual([])
@@ -69,7 +69,7 @@ test('the editor reads the locale in the browser: a list item, a button and the 
   try {
     const page = await built.open('/fr/admin/collections/posts/hello')
 
-    await page.waitUntil(() => document.querySelector('[aria-label="Retirer l\'élément 1"]') !== null)
+    await page.waitUntil(() => document.querySelector('[aria-label="Retirer Élément 1"]') !== null)
     expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-editor .kui-btn')].map(button => button.textContent))).toContain('Ajouter')
 
     const products = await built.open('/fr/admin/collections/products/mug')
