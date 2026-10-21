@@ -99,8 +99,7 @@ export function serveForwardAuth(plugin: Elysia, core: Core, forward: ForwardAut
         if (wanted.length > 0 && !wanted.some(role => granted(role, person)))
           return new Response(null, { status: 403, headers })
 
-        // A passkey stands for the password and the second factor both, so a user who holds one passes.
-        if (!forward.requireTwoFactor || person.twoFactor || (await core.store.passkeys.listByUser(person.id)).length > 0) {
+        if (!forward.requireTwoFactor || person.twoFactor) {
           const name = person.username ?? person.email ?? person.id
 
           return new Response(null, { status: 204, headers: { ...headers, 'remote-user': headerValue(name), 'remote-name': headerValue(name), 'remote-email': headerValue(person.email ?? ''), 'remote-groups': headerValue(person.roles.join(',')) } })
@@ -109,7 +108,7 @@ export function serveForwardAuth(plugin: Elysia, core: Core, forward: ForwardAut
 
       const root = siteRoot(core, request)
       const original = returnTarget(requestedUrl(request.headers), forward.domains)
-      // A signed-in user the second factor is missing for sets it up on the app's security page, which the prebuilt pages have; without them there is nowhere to send them.
+      // A signed-in user the second factor is missing for sets it up on the app's security page, where a passkey user adds an authenticator app, which the prebuilt pages have; without them there is nowhere to send them.
       const setup = person !== null ? core.securityPage : undefined
 
       if (person !== null && setup === undefined)

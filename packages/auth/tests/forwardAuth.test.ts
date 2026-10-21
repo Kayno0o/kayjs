@@ -152,7 +152,7 @@ describe('a proxy asking whether to let a request through', () => {
     expect(locationOf(await ask(browser())).pathname).toBe('/auth/sign-in')
   })
 
-  test('requireTwoFactor lets a user who holds a passkey through, and sends the others to the security page of the pages\' prefix', async () => {
+  test('requireTwoFactor sends a user to the security page, a passkey holder too, as the session does not say how it signed in; the page is under of the pages\' prefix', async () => {
     const app = testApp({ url: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
     const made = await app.auth.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
 
@@ -165,7 +165,7 @@ describe('a proxy asking whether to let a request through', () => {
     expect(locationOf(await browser.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).pathname).toBe('/account-area/account/security')
 
     await app.store.passkeys.create({ id: 'key', userId: made.user.id, name: 'Laptop', publicKey: 'k', counter: 0, transports: [], multiDevice: false, backedUp: false, userVerified: true, createdAt: new Date(), lastUsedAt: null })
-    expect((await browser.fetch('/auth/forward')).status).toBe(204)
+    expect(locationOf(await browser.fetch('/auth/forward')).pathname).toBe('/account-area/account/security')
   })
 
   test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {

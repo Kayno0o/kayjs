@@ -87,7 +87,7 @@ describe('the cookie marking a browser as signed in', () => {
     }
     finally {
       process.env.NODE_ENV = previous
-      setSite(site?.origin)
+      setSite(site?.origin, site?.slashed ? 'always' : 'never')
     }
   })
 
@@ -97,8 +97,9 @@ describe('the cookie marking a browser as signed in', () => {
     const lineOf = async (body: object) => cookiesOf(await app.browser().fetch('/password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier: 'ada@example.com', password: PASSWORD, ...body }) })).split('\n').find(cookie => cookie.startsWith('kay_user='))!
 
     expect(ada.id).toBeString()
-    expect(await lineOf({ remember: true })).toMatch(/Max-Age=\d+/)
-    expect(await lineOf({})).toMatch(/Max-Age=\d+/)
+    // The session plugin's absoluteMaxAge, 90 days by default.
+    expect(await lineOf({ remember: true })).toContain('Max-Age=7776000')
+    expect(await lineOf({})).toContain('Max-Age=7776000')
     expect(await lineOf({ remember: false })).not.toContain('Max-Age')
   })
 

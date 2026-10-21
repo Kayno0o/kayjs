@@ -2,6 +2,7 @@ import type { Parsed } from 'kay/library'
 import type { KayConfig } from 'kay/server'
 import { parseArgs } from 'node:util'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { configuredSite, setSite } from 'kay/library'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, typedSecret } from '../src/createUserCommand'
@@ -177,7 +178,7 @@ describe('reading a secret on a terminal', () => {
     try {
       await seen('Password: ')
       child.terminal!.close()
-      expect(await Promise.race([child.exited, hangs(5000)])).not.toBe('hung')
+      expect(await Promise.race([child.exited, hangs(5000)])).toBe(0)
     }
     finally {
       child.kill()
@@ -224,6 +225,26 @@ describe('the order of the command', () => {
     expect(asked).toBe(0)
     expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('email taken')
     expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('config broken')
+  })
+})
+
+describe('the command in production', () => {
+  test('loads an auth with forwardAuth whose site is only in kay.config.ts', async () => {
+    const previous = process.env.NODE_ENV ?? 'test'
+    const before = configuredSite()
+
+    process.env.NODE_ENV = 'production'
+    setSite(undefined)
+
+    try {
+      const config: KayConfig = { site: 'https://auth.example.test', extensions: [authPages({ auth: async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryStore(), forwardAuth: 'example.test' }) }) })] }
+
+      expect(await run(['prod@example.com'], PASSWORD, config)).toMatchObject({ code: 0 })
+    }
+    finally {
+      process.env.NODE_ENV = previous
+      setSite(before?.origin)
+    }
   })
 })
 

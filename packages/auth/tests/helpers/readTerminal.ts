@@ -3,6 +3,9 @@ import { readFromTerminal } from '../../src/createUserCommand'
 
 // A terminal that goes away hangs the process up; this one stays to see its input end.
 process.on('SIGHUP', () => undefined)
+// Writing to a terminal that went away fails, which is no part of what is tested.
+process.stdout.on('error', () => undefined)
+process.stderr.on('error', () => undefined)
 process.on('exit', () => console.log(`exit raw=${process.stdin.isRaw}`))
 console.log(`start raw=${process.stdin.isRaw}`)
 

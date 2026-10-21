@@ -246,7 +246,7 @@ A function `(password) => boolean` checks against a list of your own instead.
 
 Each sign-in of a person sets a `kay_user` cookie that a script of your site can read, and a sign-out clears it. A guest does not set it. The server never reads it and it grants nothing: it only tells a script that asking the server may be worth it. kayjs-cms uses it to show an editor the Edit this page button right after signing in.
 
-It is `Secure` when the session cookie is. It lasts as long as a session can, so a remembered editor still sees the link after restarting the browser. A sign-in that asked not to be remembered gets a cookie the browser drops on closing.
+It is `Secure` when the session cookie is. It lasts as long as a session can, an idle one included, so a remembered editor still sees the link after restarting the browser. A sign-in that asked not to be remembered gets a cookie the browser drops on closing.
 
 ## Account changes
 
@@ -562,7 +562,7 @@ createAuth({
 
 The cookie needs the domain so the guarded sites receive it. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
 
-Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user holding a passkey has two-factor, and one without it is sent to the account security page.
+Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
 The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or `url` in `createAuth` the app stops at startup in production.
 

@@ -2,8 +2,10 @@
 import type { KayCommand } from 'kay/library'
 import type { UserMaker } from './pages'
 import process from 'node:process'
+import { setSite } from 'kay/library'
 import { CHECK_USER, LOAD_AUTH } from './pages'
 
+const TRAILING_SLASH = /\/$/
 const END_OF_INPUT = '\u0004'
 const INTERRUPT = '\u0003'
 const BACKSPACE = new Set(['\u007F', '\b'])
@@ -36,7 +38,12 @@ export function typedSecret(value: string, chunk: string): { value: string, end?
 export async function readFromTerminal(label: string): Promise<string | undefined> {
   const { stdin } = process
   const restore = () => {
-    stdin.setRawMode(false)
+    // A terminal that went away refuses to leave raw mode.
+    try {
+      stdin.setRawMode(false)
+    }
+    catch {}
+
     stdin.pause()
     process.stderr.write('\n')
   }
@@ -138,6 +145,10 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       const email = isEmail ? login : values.email as string | undefined
       const username = isEmail ? values.username as string | undefined : login
       const roles = values.role as string[] | undefined
+
+      // The site the app's auth reads while it loads, as the server sets it before it does.
+      if (config.site !== undefined)
+        setSite(config.site.replace(TRAILING_SLASH, '') + (config.base ?? '').replace(TRAILING_SLASH, ''), config.trailingSlash)
 
       try {
         // The app's auth loads, and the login is checked, before a password is asked twice for a user that cannot be made.
