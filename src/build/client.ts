@@ -16,6 +16,8 @@ import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
+import { gitIgnoredNames, isSource } from '../dev/sources'
+import { tailwindDesign } from '../format/tailwind'
 import { projectPaths } from '../project'
 import { kayLog } from '../runtime/log'
 import { apiStubs, apiTrees } from '../server/api-modules'
@@ -324,8 +326,13 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
 }
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
+// Only an app with Tailwind reads them, and only its sources: a test or a hidden file read here would be one more input a test edit makes `kay dev` build again for.
 export async function classTableOf(root: string, { words }: Pick<ClientSources, 'words'>): Promise<ClassTable | undefined> {
-  const markup = await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })
+  if (await tailwindDesign(root) === undefined)
+    return undefined
+
+  const ignored = gitIgnoredNames(root)
+  const markup = (await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
 
   return buildClassTable(root, markup.flatMap(file => fileWords(file)).concat([...words]))
 }
