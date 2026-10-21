@@ -9,11 +9,14 @@ try {
 }
 catch {}
 
-export function closeAfterTests(close: () => Promise<void>): void {
+// Answers what takes the site off the registry again, for a site a test closes by hand.
+export function closeAfterTests(close: () => Promise<void>): () => void {
   sites.add(close)
+
+  return () => void sites.delete(close)
 }
 
-async function closeSites(): Promise<void> {
+export async function closeSites(): Promise<void> {
   const open = [...sites]
 
   sites.clear()

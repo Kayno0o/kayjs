@@ -692,7 +692,9 @@ The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, su
 
 To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user. It mints the cookie the app reads from a plain request: `__Host-session` in production when `site` in kay.config.ts is https, else `session`. A request over https reads `__Host-session` alone, so `{ secure: true }` asks for it, as for a site without `site` behind a proxy that says it was reached over https, and `{ secure: false }` asks for `session`.
 
-To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username, signs an existing one in as they are, and sets the session cookie on the site. It takes the fields of `createUser` (`password`, `roles`, `emailVerified` and `locale` too) and `data` for the fields of your `user` schema, and throws when an existing member's email, username, roles or data differ from the ones you give, and works with `pgStore` as with `memoryStore`. Call it again to switch member, and `auth.signOut(site)` to sign out.
+To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username, signs an existing one in as they are, and sets the session cookie on the site. It takes the fields of `createUser` (`password`, `roles`, `emailVerified` and `locale` too), and `data` for the fields of your `user` schema. It works on any store. Call it again to switch member, and `auth.signOut(site)` to sign out.
+
+An existing member whose email, username, roles or data differ from the ones you give makes `signInAs` throw, so a test never runs as someone other than the member it named.
 
 ```ts
 const cookie = await auth.sessionCookie(user.id)

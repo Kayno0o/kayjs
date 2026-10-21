@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { afterAll, expect, test } from 'bun:test'
+import { expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
 
@@ -9,8 +9,6 @@ const PASSWORD = 'correct horse battery'
 const RAW_KEY = /\bauth\.[a-z]+(?:\.[a-zA-Z]+)+\b/
 
 const site = await testSite({ root: ROOT, browser: { path: browserPath() }, onError: () => undefined })
-
-afterAll(async () => site.close())
 
 async function register(email: string) {
   const page = await site.open('/auth/register?redirect=%2Fauth%2Faccount%2Fsecurity')

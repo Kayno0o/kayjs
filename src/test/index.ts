@@ -360,6 +360,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return server
   }
 
+  // Takes the site off the registry that closes it once the tests ran, as a close by hand leaves nothing to close.
+  let forget: () => void = () => undefined
   const scoped = (defaults: Record<string, string>): TestSite => {
     const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
       const url = new NativeURL(path, ORIGIN)
@@ -570,6 +572,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         return page
       },
       close: async () => {
+        forget()
+
         for (const page of opened)
           page.close()
 
@@ -647,7 +651,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   const site = scoped(options.headers ?? {})
 
-  closeAfterTests(site.close)
+  forget = closeAfterTests(site.close)
 
   return site
 }

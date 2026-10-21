@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test'
+import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
 import { refusals } from '../src/testing'
 
@@ -19,8 +19,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
   beforeAll(async () => {
     site = await testSite({ root: ROOT, browser: { path }, onError: () => undefined })
   }, 120_000)
-
-  afterAll(async () => site?.close())
 
   test('a message streams its reply in as markdown, and the history is posted whole with the next one', async () => {
     const page = await site.open('/assistant')

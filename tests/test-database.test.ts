@@ -23,7 +23,7 @@ export const Member = defineTable('member', f => ({
   name: f.varchar(40).unique(),
 }))
 
-export default defineConfig({ db: new Database({ url: process.env.DATABASE_URL, tables: [Member] }), migrationsDir: 'migrations' })
+export default defineConfig({ db: new Database({ url: process.env.DATABASE_URL, tables: [Member] })__MIGRATIONS__ })
 `
 
 const SEED = `import { Member } from '../pg-orm.config'
@@ -51,14 +51,15 @@ it('starts from the seed, and keeps its own rows', async () => {
 `
 }
 
-async function project(seeded: boolean): Promise<string> {
+// `migrationsDir` is left out of the config when undefined, which pg-orm reads as `migrations`.
+async function project(seeded: boolean, migrationsDir?: string): Promise<string> {
   const dir = resolve(await scratchDir('test-database-'))
 
   await Bun.write(join(dir, 'bunfig.toml'), `[test]\npreload = [${JSON.stringify(PRELOAD)}]\n`)
   await Bun.write(join(dir, 'kay.config.ts'), 'export default {}\n')
   await Bun.write(join(dir, '.env.test'), 'DATABASE_URL=sqlite://data/test.db\n')
-  await Bun.write(join(dir, 'pg-orm.config.ts'), CONFIG)
-  await Bun.write(join(dir, 'migrations', '0001_member.sql'), MIGRATION)
+  await Bun.write(join(dir, 'pg-orm.config.ts'), CONFIG.replace('__MIGRATIONS__', migrationsDir === undefined ? '' : `, migrationsDir: ${JSON.stringify(migrationsDir)}`))
+  await Bun.write(join(dir, migrationsDir ?? 'migrations', '0001_member.sql'), MIGRATION)
   await Bun.write(join(dir, 'tests', 'one.test.ts'), members('Linus'))
   await Bun.write(join(dir, 'tests', 'two.test.ts'), members('Grace'))
 
@@ -97,6 +98,38 @@ describe('kay/test/preload\'s database for each test file', () => {
     const { code, report } = await run(dir, ['--isolate'])
 
     expect(report).toContain('2 pass')
+    expect(code).toBe(0)
+  }, 60_000)
+
+  it('reads a migrationsDir the config names, the default one when it names none', async () => {
+    for (const migrationsDir of [undefined, 'db/changes']) {
+      const dir = await project(true, migrationsDir)
+      const { code, report } = await run(dir, ['--isolate'])
+
+      expect(report).toContain('2 pass')
+      expect(code).toBe(0)
+    }
+  }, 60_000)
+
+  it('gives each file its own copy under --parallel too', async () => {
+    const dir = await project(true)
+    const { code, report } = await run(dir, ['--parallel'])
+    const urls = [...report.matchAll(/URL (\S+)/g)].map(match => match[1])
+
+    expect(report).toContain('2 pass')
+    expect(code).toBe(0)
+    expect(new Set(urls).size).toBe(2)
+    expect(readdirSync(join(dir, 'data')).filter(file => !file.includes('_tpl_'))).toEqual([])
+  }, 60_000)
+
+  it('leaves an empty DATABASE_URL alone, the copy needing a database to copy', async () => {
+    const dir = await project(true)
+
+    await Bun.write(join(dir, '.env.test'), 'DATABASE_URL=\n')
+    await Bun.write(join(dir, 'tests', 'one.test.ts'), `import { expect, it } from 'bun:test'\nit('keeps it empty', () => { expect(process.env.DATABASE_URL).toBe('') })\n`)
+
+    const { code } = await run(dir, ['tests/one.test.ts'])
+
     expect(code).toBe(0)
   }, 60_000)
 
