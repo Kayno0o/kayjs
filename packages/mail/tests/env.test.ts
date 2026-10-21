@@ -5,7 +5,7 @@ describe('the mail extension\'s environment', () => {
   it('lists the mail variables with the server required in production only, so an app lists them without wiring', () => {
     const { env } = mail({ module: './src/mail' })
 
-    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'SMTP_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO'])
+    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'MAIL_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO'])
     expect(env!.properties.MAIL_URL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.MAIL_FROM).not.toMatchObject({ requiredInProduction: true })
     expect(mail({ server: async () => ({}) as never }).env).toBeDefined()

@@ -219,7 +219,7 @@ function smtpEnv({ optional = false, listed = false }: { optional?: boolean, lis
   return s.Object({
     MAIL_URL: hostOptional ? s.Optional(s.String(listed ? { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional', requiredInProduction: true } : {})) : s.String(),
     MAIL_INSECURE: s.Optional(s.Boolean()),
-    SMTP_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
+    MAIL_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
     MAIL_DKIM_SELECTOR: s.Optional(s.String()),
     MAIL_DKIM_PRIVATE_KEY: s.Optional(s.String()),
     MAIL_DKIM_DOMAIN: s.Optional(s.String()),
@@ -233,7 +233,7 @@ function defined<T extends object>(options: T): Partial<T> {
   return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) as Partial<T>
 }
 
-// SMTP from `MAIL_URL`, `MAIL_INSECURE`, `SMTP_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+// SMTP from `MAIL_URL`, `MAIL_INSECURE`, `MAIL_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
   const env = defineEnv(smtpEnv({ optional }))
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
@@ -248,7 +248,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   if (dkimKey !== undefined)
     checkKey(dkimKey, 'MAIL_DKIM_PRIVATE_KEY')
 
-  const rateLimit = rateFromText(env.SMTP_RATE_LIMIT)
+  const rateLimit = rateFromText(env.MAIL_RATE_LIMIT)
 
   let transport: Transport | undefined
   const sender = () => from ?? named(env.MAIL_FROM ?? defaultSender() ?? 'kay@localhost', fromName)

@@ -50,7 +50,7 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 | Variable | Use |
 | --- | --- |
 | `MAIL_URL` | The server to send through, such as `smtp://user:pass@mail.example.com:465`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
-| `SMTP_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
+| `MAIL_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
 | `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
 | `MAIL_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
 | `MAIL_FROM` | Optional. The sender, `noreply@` the site's host when left out. A site with no domain, such as `localhost`, gives none. |
@@ -59,7 +59,7 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 
 On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
 
-The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_INSECURE`, `SMTP_DKIM_*` and `SMTP_FROM`, still work until 1.73, with a warning naming the new one. `SMTP_RATE_LIMIT` keeps its name for now.
+The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT`, still work until 1.73, with a warning naming the new one.
 
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 

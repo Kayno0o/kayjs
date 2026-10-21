@@ -590,7 +590,8 @@ describe('configuration', () => {
     process.env.NODE_ENV = 'production'
     delete process.env.MAIL_URL
     delete process.env.MAIL_FROM
-    Object.assign(process.env, { SMTP_HOST: 'smtp.example.com', SMTP_PORT: '587', SMTP_USER: 'site@example.com', SMTP_PASS: 'p:ss', SMTP_FROM: 'old@example.com', SMTP_INSECURE: 'false' })
+    delete process.env.MAIL_RATE_LIMIT
+    Object.assign(process.env, { SMTP_HOST: 'smtp.example.com', SMTP_PORT: '587', SMTP_USER: 'site@example.com', SMTP_PASS: 'p:ss', SMTP_FROM: 'old@example.com', SMTP_INSECURE: 'false', SMTP_RATE_LIMIT: '2/1s' })
 
     const lines = await logged(async () => {
       expect(mailer({ queue: { name: 'legacy-names' } }).configured).toBe(true)
@@ -602,17 +603,19 @@ describe('configuration', () => {
     expect(env.MAIL_URL).toBe('smtp://site%40example.com:p%3Ass@smtp.example.com:587')
     expect(env.MAIL_FROM).toBe('old@example.com')
     expect(env.MAIL_INSECURE).toBe('false')
-    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringMatching(/rename .*SMTP_FROM to MAIL_FROM.*MAIL_URL/)]])
+    expect(env.MAIL_RATE_LIMIT).toBe('2/1s')
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([['warn', expect.stringMatching(/rename .*SMTP_FROM to MAIL_FROM.*SMTP_RATE_LIMIT to MAIL_RATE_LIMIT.*MAIL_URL/)]])
   })
 
   it('prefers a new name over the old one set beside it', () => {
     process.env.NODE_ENV = 'production'
-    Object.assign(process.env, { SMTP_HOST: 'old.example.com', MAIL_URL: 'smtp://new.example.com:25', SMTP_FROM: 'old@example.com', MAIL_FROM: 'new@example.com' })
+    Object.assign(process.env, { SMTP_HOST: 'old.example.com', MAIL_URL: 'smtp://new.example.com:25', SMTP_FROM: 'old@example.com', MAIL_FROM: 'new@example.com', SMTP_RATE_LIMIT: '2/1s', MAIL_RATE_LIMIT: '5/1s' })
     mailer({ queue: { name: 'legacy-both' } })
 
     const env: Record<string, string | undefined> = process.env
 
     expect(env.MAIL_URL).toBe('smtp://new.example.com:25')
     expect(env.MAIL_FROM).toBe('new@example.com')
+    expect(env.MAIL_RATE_LIMIT).toBe('5/1s')
   })
 })

@@ -244,14 +244,14 @@ describe('mailer({ smtp })', () => {
     expect(server.received.at(-1)?.from).toContain('site@')
   })
 
-  it('lets its rate limit replace SMTP_RATE_LIMIT', async () => {
+  it('lets its rate limit replace MAIL_RATE_LIMIT', async () => {
     const started = performance.now()
 
     await inProduction(server.port, async () => {
       const mail = mailer({ queue: { name: 'smtp-rate' }, smtp: { rateLimit: { max: 1000, window: '1s' }, maxConnections: 1 } })
 
       await Promise.all([1, 2].map(async n => mail.send({ to: 'bob@example.com', subject: `Rate ${n}`, text: 'Hi' })))
-    }, { SMTP_RATE_LIMIT: '1/1s' })
+    }, { MAIL_RATE_LIMIT: '1/1s' })
 
     expect(performance.now() - started).toBeLessThan(900)
   })
