@@ -193,7 +193,7 @@ function lineBroken(source: string, span: { start: number, end: number }, text: 
   const indent = HORIZONTAL_SPACE.exec(source.slice(lineStart))![0]
   const following = HORIZONTAL_SPACE.exec(source.slice(span.end))![0]
 
-  if ((/^(?:\r?\n|$)/).test(source.slice(span.end + following.length)))
+  if (LINE_END.test(source.slice(span.end + following.length)))
     return { range: [span.start, span.end], text }
 
   return { range: [span.start, span.end + following.length], text: text + indent }
