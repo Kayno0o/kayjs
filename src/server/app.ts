@@ -20,6 +20,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { MAPS_DIR } from '../build/assets'
+import { KayError } from '../compiler/errors'
 import { pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
@@ -312,6 +313,21 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   return (await pagesApp(project, loadClient)).app
 }
 
+// The modules declaring an `s.Public` field run before any build starts, so a name meant for the server alone is refused first and the values are there before a page or the browser reads them. Returns their paths.
+async function loadPublicModules(root: string): Promise<string[]> {
+  const files = publicEnvFiles(root)
+  const inFence = files.find(file => file.endsWith('.kay'))
+
+  if (inFence !== undefined)
+    throw new KayError('config-invalid', `kay: ${inFence} declares an s.Public field, which a .kay file cannot give the browser: declare it in a .ts module under src`)
+
+  const paths = files.map(file => join(root, file))
+
+  await Promise.all(paths.map(async (path): Promise<void> => void await import(path)))
+
+  return paths
+}
+
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
 export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
@@ -320,6 +336,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   refuseOptions(options)
 
+  const publicModules = options.publicEnv ? await loadPublicModules(root) : []
   const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned))
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, endpoints, appManifest, extensions, api: apiImport } = setup
@@ -409,11 +426,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
   }
 
-  if (options.publicEnv) {
-    // The modules declaring an `s.Public` field run first, so the values are there before a page or the browser reads them.
-    await Promise.all(publicEnvFiles(root).map(async (file): Promise<void> => void await import(join(root, file))))
-    servePublicEnv(app, options.publicEnv)
-  }
+  if (options.publicEnv)
+    servePublicEnv(app, options.publicEnv, publicModules)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)

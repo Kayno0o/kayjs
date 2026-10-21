@@ -1,5 +1,6 @@
 import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
+import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { resolveProject } from '../src/project'
@@ -14,9 +15,9 @@ const cards = { routes: 'tests/fixtures/cards/src/routes', fonts: [{ family: 'Ar
 const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
 
 // Serves `options` with a client loader that only counts, answering how many builds the server started and what it refused with.
-async function refusal(options: PagesOptions): Promise<{ builds: number, message: string }> {
+async function refusal(options: PagesOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
   let builds = 0
-  const project = resolveProject(process.cwd(), { routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false })
+  const project = resolveProject(root, { routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false })
   const loadClient = (): ClientBuild => {
     builds++
 
@@ -106,6 +107,27 @@ describe('a refused config naming files of the project', () => {
     expect(page.message).toContain('data.json.kay and')
     expect(page.message).toContain('data.json.ts both serve /data.json')
     expect(page.builds).toBe(0)
+  })
+
+  it('refuses an s.Public field named as a secret, and one in a .kay file', async () => {
+    const dir = await scratchDir('refused-public-')
+    const env = (name: string) => `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv(s.Object({ ${name}: s.Public(s.String({ default: 'x' })) }))\n`
+
+    await Bun.write(`${dir}/src/env.ts`, env('STRIPE_SECRET'))
+    await Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n')
+
+    const secret = await refusal({ routes: `${dir}/routes`, publicEnv: { type: 'object', properties: {} } as never }, dir)
+
+    expect(secret.message).toContain('s.Public declares STRIPE_SECRET')
+    expect(secret.builds).toBe(0)
+
+    await rm(`${dir}/src/env.ts`)
+    await Bun.write(`${dir}/src/map.kay`, '---\nimport { s } from \'kay\'\nconst field = s.Public(s.String())\n---\nh1 Map\n')
+
+    const fence = await refusal({ routes: `${dir}/routes`, publicEnv: { type: 'object', properties: {} } as never }, dir)
+
+    expect(fence.message).toContain('src/map.kay declares an s.Public field')
+    expect(fence.builds).toBe(0)
   })
 
   it('refuses an endpoint the router cannot answer, and a page name first when both scans reject', async () => {

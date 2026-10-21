@@ -133,9 +133,9 @@ describe('s.Public', () => {
       const env = defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.String()), KAY_TEST_ZOOM: s.Public(s.Optional(s.Integer({ default: 3 }))), KAY_TEST_HIDDEN: s.String() }), { KAY_TEST_MAP_KEY: 'pk', KAY_TEST_HIDDEN: 'x' })
 
       expect(env.KAY_TEST_HIDDEN).toBe('x')
-      expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({ KAY_TEST_MAP_KEY: 'pk', KAY_TEST_ZOOM: 3 })
-
       const response = await servePublicApp().handle(new Request('http://localhost/_kay/env.js'))
+
+      expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({ KAY_TEST_MAP_KEY: 'pk', KAY_TEST_ZOOM: 3 })
 
       expect(await response.text()).toBe('export default {"KAY_TEST_MAP_KEY":"pk","KAY_TEST_ZOOM":3}\n')
     }
@@ -149,6 +149,39 @@ describe('s.Public', () => {
       expect(() => defineEnv(s.Object({ [name]: s.Public(s.String()) }), { [name]: 'v' }), name).toThrow(`kay: s.Public declares ${name}, which every visitor reads`)
 
     expect(() => defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.Secret()) }), { NODE_ENV: 'test' })).toThrow('kay: s.Public declares KAY_TEST_MAP_KEY')
+  })
+
+  it('serves the values of the modules each boot names, not those another boot of the process left', async () => {
+    defineEnv(s.Object({ KAY_TEST_BOOT_ONE: s.Public(s.String()) }), { KAY_TEST_BOOT_ONE: 'one' })
+
+    const own = new Elysia()
+    const other = new Elysia()
+
+    servePublicEnv(own, t.Object({}), [import.meta.path])
+    expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toMatchObject({ KAY_TEST_BOOT_ONE: 'one' })
+    servePublicEnv(other, t.Object({}), ['/elsewhere/src/env.ts'])
+    expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({})
+    expect(await (await other.handle(new Request('http://localhost/_kay/env.js'))).text()).toBe('export default {}\n')
+    expect(await (await own.handle(new Request('http://localhost/_kay/env.js'))).text()).toContain('"KAY_TEST_BOOT_ONE":"one"')
+  })
+
+  it('forgets what the build could not read once another boot does not name its module', async () => {
+    buildingWithoutEnv()
+
+    try {
+      defineEnv(s.Object({ KAY_TEST_UNREAD_PUBLIC: s.Public(s.String()) }), {})
+    }
+    finally {
+      ;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.building')] = undefined
+    }
+
+    const own = new Elysia()
+    const other = new Elysia()
+
+    servePublicEnv(own, t.Object({}), [import.meta.path])
+    servePublicEnv(other, t.Object({}), [])
+    expect((await own.handle(new Request('http://localhost/_kay/env.js'))).status).toBe(500)
+    expect((await other.handle(new Request('http://localhost/_kay/env.js'))).status).toBe(200)
   })
 
   it('leaves a public field the build could not read out, as the page reading it throws, and fails the browser module', async () => {
@@ -169,7 +202,7 @@ describe('s.Public', () => {
 function servePublicApp(): Elysia {
   const app = new Elysia()
 
-  servePublicEnv(app, t.Object({}))
+  servePublicEnv(app, t.Object({}), [import.meta.path])
 
   return app
 }

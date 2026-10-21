@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 // What the environment loader and the commands that run without it share, apart from `./env` so `kay check` and the editor load no Elysia.
@@ -41,14 +41,18 @@ export function recordEnv(schema: EnvSchemaRecord, declaredBy: (...args: never[]
   if (found === undefined)
     return
 
-  // The frames above `declaredBy` are left out, so the first one left is whoever called it.
+  found.push({ schema, file: callerFile(declaredBy) })
+}
+
+// The file that called `declaredBy`, a library of kay's call counted as its caller's: the frames above `declaredBy` are left out, so the first one left is whoever called it.
+export function callerFile(declaredBy: (...args: never[]) => unknown): string | undefined {
   const holder: { stack?: string } = {}
 
   Error.captureStackTrace(holder, declaredBy)
 
   const files = (holder.stack ?? '').split('\n').map(line => FRAME_FILE.exec(line.trim())?.[1])
 
-  found.push({ schema, file: files.find(file => file !== undefined && !inLibrary(file)) })
+  return files.find(file => file !== undefined && !inLibrary(file))
 }
 
 // Whether `file` belongs to a package of kay's libraries, by the name in the nearest package.json.
@@ -86,8 +90,27 @@ export const PUBLIC_ENV_PATH = '/_kay/env.js'
 
 const PUBLIC_FIELD = /\bs\.Public\s*\(/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
+// What each file read last held, by its size and time, so a command asking for the files several times reads each one once.
+const scanned = new Map<string, { stamp: string, declares: boolean }>()
 
 // The files under `src` declaring a field with `s.Public`, found by reading them as text so `kay build`, `kay check` and `kay routes` know the project sends the browser an environment without loading its modules.
 export function publicEnvFiles(root: string): string[] {
-  return [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && PUBLIC_FIELD.test(readFileSync(join(root, file), 'utf8')))
+  return [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter((file) => {
+    if (TEST_FILE.test(file))
+      return false
+
+    const path = join(root, file)
+    const { size, mtimeMs } = statSync(path)
+    const stamp = `${size}:${mtimeMs}`
+    const known = scanned.get(path)
+
+    if (known?.stamp === stamp)
+      return known.declares
+
+    const declares = PUBLIC_FIELD.test(readFileSync(path, 'utf8'))
+
+    scanned.set(path, { stamp, declares })
+
+    return declares
+  })
 }
