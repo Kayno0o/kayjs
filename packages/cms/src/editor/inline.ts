@@ -24,6 +24,7 @@ const sources = new Map<string, InlineSource>()
 // Elements whose own keys and clicks act on a page, left to the form.
 const CONTROLS = 'button, summary, input, select, textarea, label'
 const LINE_BREAKS = /[\r\n]+/g
+const EDGE_BREAKS = /^[\r\n]+|[\r\n]+$/g
 
 // Lets the page's clicks type in the entry's fields until the returned function is called.
 export function registerInline(key: string, source: InlineSource): () => void {
@@ -118,7 +119,10 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
   const controller = new AbortController()
   const { signal } = controller
   let emptied = false
-  const commit = () => drafts.set(entry, path, inlineValue(field, element.textContent ?? ''))
+  // Read as rendered, as the browser makes a line of its own for a pasted line break (a `div` or `br`) that `textContent` would glue to the text around it.
+  // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText is the rendered text, with the line breaks textContent lacks
+  const typed = () => element.innerText.replace(EDGE_BREAKS, '')
+  const commit = () => drafts.set(entry, path, inlineValue(field, typed()))
   const end = () => {
     controller.abort()
     for (const name of ['contenteditable', 'data-kay-typing', 'role', 'aria-label'])
@@ -142,7 +146,7 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
       event.preventDefault()
   }, { signal })
   element.addEventListener('input', () => {
-    emptied = !field.required && (element.textContent ?? '') === ''
+    emptied = !field.required && typed() === ''
 
     if (!emptied)
       commit()

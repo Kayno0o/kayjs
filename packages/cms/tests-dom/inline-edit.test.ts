@@ -182,6 +182,8 @@ test('HTML typed or pasted stays text, and line breaks do not stay', async () =>
   expect(await draft('title')).toBe('<img src=x onerror="alert(1)"> & <b>bold</b>')
   expect(title!.children).toHaveLength(0)
 
+  // happy-dom lays nothing out, so its `innerText` stands for the rendered text, which keeps a line break as one.
+  Object.defineProperty(title!, 'innerText', { get: () => title!.textContent })
   await type(title!, 'one\ntwo three')
 
   expect(await draft('title')).toBe('one two three')
