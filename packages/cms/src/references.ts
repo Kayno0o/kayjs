@@ -54,7 +54,7 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
   return result
 }
 
-// A collection that could hold references to the target failed to read, so the entries naming it are not all known.
+// A collection that could hold references to the target failed to read, so the entries naming it are not all known. `names` is empty when the list of collections itself failed.
 export class UnreadReferrers extends Error {
   constructor(readonly names: string[]) {
     super(`${names.join(', ')} failed to read for the references to be found`)
@@ -78,7 +78,7 @@ export async function referrersWith(target: string, slugs: Iterable<string>, { s
     log.error(`the collections failed to read for the references to ${target}`, error)
 
     if (strict)
-      throw new UnreadReferrers(['the collections'])
+      throw new UnreadReferrers([])
 
     return result
   }

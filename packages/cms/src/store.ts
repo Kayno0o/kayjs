@@ -653,7 +653,9 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     if (!(error instanceof UnreadReferrers))
       throw error
 
-    return refused(target, wording('cms.store.renameUnread', '{names} could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug, names: error.names.join(', ') }), 'slug')
+    const unread = error.names.length === 0 ? wording('cms.store.renameUnlisted', 'The collections could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug }) : wording('cms.store.renameUnread', '{names} could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug, names: error.names.join(', ') })
+
+    return refused(target, unread, 'slug')
   }
 
   // An entry that cannot be saved from here cannot be pointed at the new slug.

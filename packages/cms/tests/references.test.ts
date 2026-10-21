@@ -19,8 +19,15 @@ const held: Record<string, { slug: string, locale?: string, data: Record<string,
   friends: [{ slug: 'ada', data: { name: 'Ada', friend: 'ada' } }, { slug: 'bob', data: { name: 'Bob', friend: 'ada' } }],
 }
 
+let listing = true
+
 void mock.module('../src/kay/content', () => ({
-  collections: async () => [people, posts, friends, broken, notes],
+  collections: async () => {
+    if (!listing)
+      throw new Error('database down')
+
+    return [people, posts, friends, broken, notes]
+  },
   entries: async (name: string, filter?: { slug?: string }) => {
     if (name === 'broken')
       throw new Error('database down')
@@ -29,7 +36,7 @@ void mock.module('../src/kay/content', () => ({
   },
 }))
 
-const { referrersOf, missingReferences } = await import('../src/references')
+const { referrersOf, referrersWith, missingReferences, UnreadReferrers } = await import('../src/references')
 
 describe('referrersOf', () => {
   test('names the entries pointing at a slug through a field, a list or a group, in any collection', async () => {
@@ -58,6 +65,22 @@ describe('referrersOf', () => {
 
   test('reads nothing for no slug', async () => {
     expect((await referrersOf('people', [])).size).toBe(0)
+  })
+})
+
+describe('referrersWith, strict', () => {
+  test('names the collection that fails to read, and none when the list of collections itself fails', async () => {
+    await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toMatchObject({ names: ['Broken'] })
+    listing = false
+
+    try {
+      await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toBeInstanceOf(UnreadReferrers)
+      await expect(referrersWith('people', ['ada'], { strict: true })).rejects.toMatchObject({ names: [] })
+      expect((await referrersWith('people', ['ada'])).size).toBe(0)
+    }
+    finally {
+      listing = true
+    }
   })
 })
 
