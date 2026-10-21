@@ -28,7 +28,7 @@ export default api().post('/', ({ headers, status }) => {
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  preview: { secret: process.env.PREVIEW_SECRET! },
+  preview: {},
 })
 ```
 
@@ -103,7 +103,7 @@ export default api().post('/', ({ headers, status }) => {
 
 ```ts
 export default defineConfig({
-  preview: { secret: process.env.PREVIEW_SECRET! },
+  preview: {},
 })
 ```
 
@@ -119,7 +119,7 @@ export default defineConfig({
 - `enterPreview(ctx)` from `kay/server` sets the cookie from a guard, a page or an action whose `ctx` carries cookies, such as a guard letting a signed-in editor in; `exitPreview(ctx)` from `kay/server` clears it, as `/_kay/preview?exit&path=/` does for anyone.
 - `previewing()` from `kay` is true while the server renders for a visitor in preview mode, for a layout to show a banner with a link out: `if previewing()` then `a(href="/_kay/preview?exit&path=/") Leave preview`.
 - In the browser `previewing()` is false.
-- `preview.secret` is at least 32 random characters, read from the environment: it signs the cookie and the links, so changing it ends every preview.
+- `preview.secret` is [the app secret](environment.md#the-app-secret) derived for preview when left out; give one to keep it apart, at least 32 random characters, read from the environment. It signs the cookie and the links, so changing it ends every preview.
 - A server without `preview` ignores the cookie, and `previewUrl` and `enterPreview` throw there.
 
 Edit mode, which marks the page for a CMS's on-page editor, and the editor itself are in [Edit mode and the CMS editor](content-edit.md).

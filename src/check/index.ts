@@ -84,7 +84,7 @@ export interface CheckOptions {
   openapi?: boolean | OpenApiConfig | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
-  // Set by `kay build --static`: a static host reads no `SITE_URL` or `ORIGIN` once built, so a missing site is reported.
+  // Set by `kay build --static`: a static host reads no `SITE_URL` once built, so a missing site is reported.
   exported?: boolean | undefined
 }
 

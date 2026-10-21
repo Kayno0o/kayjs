@@ -38,7 +38,7 @@ export const posts = collection(postgresLoader({ name: 'posts', sql: process.env
 
 ### Wiring a live CMS
 
-1. `kay add cms`, and set `preview.secret` in `kay.config.ts` (edit mode is kay's preview mode).
+1. `kay add cms`, and set `preview: {}` in `kay.config.ts` (edit mode is kay's preview mode, signed with a key from `KAY_SECRET`).
 2. Declare each editable collection over a loader as above, `order`, `draft`, `publishAt` and `localized` working as on a folder.
 3. Add `cms({ guard })` to `extensions`, the guard being who may edit, such as kayjs-auth's `auth.guard({ require: 'editor' })`. A loader needs no `files` saver: that is for folder entries.
 4. Put the database where a deploy keeps it: a volume for the SQLite file, the app's `DATABASE_URL` for Postgres.

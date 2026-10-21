@@ -197,7 +197,7 @@ describe('seo head', () => {
         expect((await loadConfig('tests/fixtures/seo')).site).toBeUndefined()
         await pages({ routes: ROUTES, prebuilt: false })
 
-        expect(() => currentSiteOrigin()).toThrow('nor SITE_URL or ORIGIN')
+        expect(() => currentSiteOrigin()).toThrow('nor SITE_URL')
       }
 
       process.env.ORIGIN = 'http://localhost:4701/'
@@ -246,7 +246,7 @@ describe('seo head', () => {
         await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
 
         if (expected === undefined)
-          expect(() => currentSiteOrigin()).toThrow('nor SITE_URL or ORIGIN')
+          expect(() => currentSiteOrigin()).toThrow('nor SITE_URL')
         else
           expect(currentSiteOrigin()).toBe(expected)
       }

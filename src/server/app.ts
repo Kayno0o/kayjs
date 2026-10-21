@@ -94,7 +94,7 @@ const DYNAMIC_PATH = /[:*?]/
 // The NODE_ENV values kay acts on, anything else running without the production defaults.
 const KNOWN_ENVIRONMENTS = new Set(['development', 'production', 'test'])
 // What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
-const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts, SITE_URL or ORIGIN.'
+const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -551,9 +551,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (env !== undefined && !KNOWN_ENVIRONMENTS.has(env) && !mode.dev && !exported)
     kayLog('warn', `NODE_ENV is ${JSON.stringify(env)}, which kay does not know, so this server runs without the production defaults: it bundles its browser code as it boots, logs no requests and compresses nothing unless the log and compress options say so, does not take the site's https for a request behind a proxy and answers a refused API request with the schema it failed; set NODE_ENV=production where the app is deployed`)
 
-  // `kay build` leaves a server's site to `SITE_URL` or `ORIGIN` at boot, so this is where one with none is told.
+  // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
   if (site === undefined && options.seo !== undefined && !mode.dev && !exported)
-    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
+    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
 
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings, robots: options.robots, base })

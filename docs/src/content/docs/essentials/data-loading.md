@@ -175,7 +175,7 @@ For a secret, use `s.Secret()`. It is a string of at least 32 characters that pr
 
 ```ts
 export const env = defineEnv(s.Object({
-  SESSION_SECRET: s.Secret(),
+  DOWNLOAD_KEY: s.Secret(),
 }))
 ```
 
@@ -191,7 +191,7 @@ kay env
 
 ```
 DATABASE_URL    src/env.ts  string   always
-SESSION_SECRET  src/env.ts  string (secret)  production
+DOWNLOAD_KEY    src/env.ts  string (secret)  production
 SMTP_HOST       the extension @kaynooo/kayjs-mail  string  production
 PORT            kay         integer  optional    3000
 ```

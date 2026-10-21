@@ -229,7 +229,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           throw new KayError('export-server-render', 'kay: it reads a live value, which only a server holds and signs the connection to per request; drop `prerender` from `export const page`, or read the value in a component the page does not render at build time')
 
         if (options.exportAll && readsSite)
-          throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts, SITE_URL nor ORIGIN sets')
+          throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
 
         if (options.exportAll && islands.length > 0)
           throw new KayError('export-server-render', `kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)

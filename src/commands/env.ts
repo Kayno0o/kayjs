@@ -26,8 +26,8 @@ const KAY_VARIABLES: EnvVariable[] = [
   { name: 'PORT', type: 'integer', required: false, default: 3000, description: 'the port the server listens on' },
   { name: 'HOST', type: 'string', required: false, description: 'the address the server listens on' },
   { name: 'SITE_URL', type: 'string (uri)', required: false, description: 'the origin the site is public at, unless `site` in kay.config.ts sets it' },
-  { name: 'ORIGIN', type: 'string (uri)', required: false, description: 'the origin the site is public at when `SITE_URL` is unset, unless `site` in kay.config.ts sets it; a value that is no http(s) origin is ignored' },
-  { name: 'KAY_SECRET', type: 'string', required: false, description: 'at least 32 random characters, signing form stamps, links to private files and the flash cookie, unless `secret` in kay.config.ts sets it' },
+  { name: 'ORIGIN', type: 'string (uri)', required: false, description: 'deprecated, read until kay 1.73: the origin the site is public at when `SITE_URL` is unset; set `SITE_URL` instead, a value that is no http(s) origin being ignored' },
+  { name: 'KAY_SECRET', type: 'string', required: false, description: 'at least 32 random characters, sealing sessions and signing form stamps, links to private files, the flash cookie and preview links, each under a key of its own; commas separate a rotation list, the first sealing and every one opening; unless `secret` in kay.config.ts sets it' },
 ]
 
 // Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.

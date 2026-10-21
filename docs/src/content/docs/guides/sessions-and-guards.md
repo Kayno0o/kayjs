@@ -43,16 +43,12 @@ Put a value for later in a plugin's `derive` or `resolve`, not onto `ctx.locals`
 
 ## Sessions
 
-`session()` from `kay/server` is a plugin that adds `ctx.locals.session`. Give it a secret of at least 32 characters, kept out of the repository, and a store.
+`session()` from `kay/server` is a plugin that adds `ctx.locals.session`. Give it a store. It seals its cookie with the app's secret, `KAY_SECRET`, which production sets and development derives.
 
 ```ts
 import { session, sqliteStore } from 'kay/server'
-import { env } from './env'
 
-export const sessions = session<{ userId: string }>({
-  secret: env.SESSION_SECRET,
-  store: sqliteStore('sessions.sqlite'),
-})
+export const sessions = session<{ userId: string }>({ store: sqliteStore('sessions.sqlite') })
 ```
 
 Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
@@ -108,13 +104,23 @@ await ctx.locals.session.lifetime(input.remember ? '90d' : 'browser')
 
 A library that must follow the app's session reads `ctx.locals.session.settings`: the `maxAge`, `absoluteMaxAge` and `browserMaxAge` the plugin resolved, in seconds.
 
+### The app secret
+
+kay has one secret, `KAY_SECRET` (or `secret` in `kay.config.ts`, which wins), at least 32 random characters. Generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`. It serves everything kay seals or signs, each under a key of its own: the session cookie, kayjs-auth, form stamps, links to private files, the flash cookie and preview links. Nothing else needs a secret, so a site needs no `SESSION_SECRET`, `AUTH_SECRET` or `PREVIEW_SECRET`.
+
+Development and tests derive one for the checkout, so a fresh clone runs with nothing set. A production site without it refuses `session()` and `preview`, naming `KAY_SECRET`.
+
+`session()` reads it from the environment when it is called. Keep the secret in `KAY_SECRET`, or give `session({ secret })` yourself.
+
 ### Changing the secret
 
-Give `secret` a list to rotate it. The first secret seals new cookies, and every one in the list opens old cookies.
+Separate several secrets with commas in `KAY_SECRET`, or give `secret` a list, to rotate it. The first secret seals new cookies, and every one in the list opens old cookies.
 
-```ts
-session({ secret: [env.SESSION_SECRET, env.OLD_SESSION_SECRET], store })
+```sh
+KAY_SECRET=new-secret-at-least-32-characters,old-secret-at-least-32-characters
 ```
+
+To keep a session secret apart from the app's, give it a list of its own: `session({ secret: [env.SESSION_SECRET, env.OLD_SESSION_SECRET], store })`.
 
 A cookie sealed by an older secret is sealed again with the first on its next use. Drop the old secret once those cookies have expired.
 
@@ -135,7 +141,7 @@ The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named
 To share the session between subdomains, such as `app.example.com` and `auth.example.com`, set `domain` to the visited host or a parent of it. The cookie then loses the `__Host-` prefix, since that prefix forbids a domain.
 
 ```ts
-session({ secret: env.SESSION_SECRET, store, domain: 'example.com' })
+session({ store, domain: 'example.com' })
 ```
 
 Every subdomain must share the same secret and store. A value that is no host name, such as `localhost:3000`, throws at boot.

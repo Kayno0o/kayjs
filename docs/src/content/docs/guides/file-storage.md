@@ -59,7 +59,7 @@ A route of your own that takes uploads can judge them the way the file route doe
 
 The page rendering the link, behind its guard, decides who gets the file. Use `files.url(key, { expires: '1d' })` for a longer link.
 
-The link is signed with the app's `secret` or `KAY_SECRET`. See [Config](/reference/config).
+The link is signed with a key made from the app's secret. See [The app secret](/guides/sessions-and-guards#the-app-secret).
 
 A route of your own can answer with `files.response(key, request)` instead.
 
@@ -67,7 +67,7 @@ A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers
 
 The time is rounded up to the next ten minutes at most. Pages rendered a few minutes apart then give the same link, which the browser keeps cached.
 
-The key that signs is made from the session's secret. Without `session()` it comes from `secret` in `kay.config.ts` or `KAY_SECRET`, then from the preview secret. Without any, it is a key made for the process. A restart changes it, several processes do not share it, and a production server warns about it once.
+The key that signs is made from the app's secret, `secret` in `kay.config.ts` or `KAY_SECRET`. Without one, it is a key made for the process. A restart changes it, several processes do not share it, and a production server warns about it once.
 
 A script that signs a link with no server running reads `KAY_SECRET`.
 

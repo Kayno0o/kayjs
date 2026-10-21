@@ -31,8 +31,8 @@ export default defineConfig({
     // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot without it.
     files: process.env.FORGEJO_TOKEN ? forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
-  // Edit mode is kay's preview mode: it needs the secret signing its cookie.
-  preview: { secret: process.env.PREVIEW_SECRET },
+  // Edit mode is kay's preview mode; its cookie is signed with a key derived from KAY_SECRET.
+  preview: {},
 })
 ```
 

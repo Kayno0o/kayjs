@@ -34,8 +34,8 @@ export default defineConfig({
     // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot so.
     files: process.env.FORGEJO_TOKEN ? forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
-  // Edit mode is kay's preview mode: it needs the secret signing its cookie.
-  preview: { secret: process.env.PREVIEW_SECRET },
+  // Edit mode is kay's preview mode; its cookie is signed with a key derived from KAY_SECRET.
+  preview: {},
 })
 ```
 
@@ -531,7 +531,7 @@ A reorder saves two entries, and the loader writes them in one transaction: it n
 
 To wire the whole thing:
 
-1. Run `kay add cms` and set `preview.secret`.
+1. Run `kay add cms` and set `preview: {}` in `kay.config.ts`, with `KAY_SECRET` set in production.
 2. Declare each editable collection over a loader, as above.
 3. Add `cms({ guard })` to `extensions`, with the guard of who may edit. A loader needs no `files` saver, which is for folder entries.
 4. Keep the database where a deploy leaves it: a volume for the SQLite file, your `DATABASE_URL` for Postgres.

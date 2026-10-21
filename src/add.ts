@@ -258,7 +258,7 @@ async function readManifest(dir: string): Promise<{ text: string, manifest: Mani
   return { text, manifest }
 }
 
-// The session secret and the database URL a feature needs: a new .env is written whole, an existing one gets the keys it lacks and a conflict for one set to something else.
+// The database URL a feature needs: a new .env is written whole, an existing one gets the keys it lacks and a conflict for one set to something else.
 function mergeEnv(disk: string | undefined, content: string, { writes, conflicts }: Plan): void {
   if (disk === undefined) {
     writes.set('.env', content)
@@ -275,7 +275,7 @@ function mergeEnv(disk: string | undefined, content: string, { writes, conflicts
 
     if (existing === undefined)
       missing.push(line)
-    else if (unquote(existing[2]!) !== unquote(value!) && key !== 'SESSION_SECRET')
+    else if (unquote(existing[2]!) !== unquote(value!))
       conflicts.push(`.env: ${existing[0].trim()} is not what the feature uses: set ${line} by hand`)
   }
 

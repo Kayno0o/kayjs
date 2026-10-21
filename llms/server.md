@@ -24,12 +24,8 @@ export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 
 ```ts
 import { session, sqliteStore } from 'kay/server'
-import { env } from './env'
 
-export const sessions = session<{ userId: string }>({
-  secret: env.SESSION_SECRET,
-  store: sqliteStore('sessions.sqlite'),
-})
+export const sessions = session<{ userId: string }>({ store: sqliteStore('sessions.sqlite') })
 ```
 
 The server entry exports the app using it before the pages: `export const app = new Elysia().use(sessions).use(await pages())`.
@@ -109,12 +105,8 @@ export const signIn = action(credentials, async (input, ctx) => {
 
 ```ts
 import { session } from 'kay/server'
-import { env } from './env'
 
-export const sessions = session<{ userId: string }>({
-  secret: env.SESSION_SECRET,
-  domain: 'example.com',
-})
+export const sessions = session<{ userId: string }>({ domain: 'example.com' })
 ```
 
 ### Protect a section of the site
@@ -184,9 +176,9 @@ export default defineConfig({ requireGuards: true })
 - The session keeps it through its extensions and `regenerate()`, a store getting it as `set`'s `maxAge`, until `destroy()`, never past `absoluteMaxAge`.
 - A lifetime that is no positive duration throws.
 - `settings` is `{ maxAge, absoluteMaxAge, browserMaxAge }` as the plugin resolved them, in seconds and defaults included, for a library that follows the app's session instead of asking for the lifetimes again.
-- `secret` is at least 32 characters, read from the environment; the placeholder an older `kay new` wrote to `.env.example` is refused.
+- `secret` is the app's own, `KAY_SECRET`, when left out ([The app secret](environment.md#the-app-secret)), so `session()` needs no option and the app no `SESSION_SECRET`; give one to keep the session's apart, at least 32 characters, read from the environment. The placeholder an older `kay new` wrote to `.env.example` is refused.
 - `deriveSecret(purpose)` on what `session()` returns gives a library its own key from the secret (HKDF, a list of 43-character texts in the order of the secrets), unrelated to the cookie's key: kayjs-auth uses it when `auth()` has no `secret`.
-- A list rotates secrets: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use. A key derived from the first also signs form stamps, links to private files and the flash cookie, so a rotation refuses those already out, as a restart does without any secret.
+- A list rotates secrets, commas in `KAY_SECRET` doing it for the app's own: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use. A key derived from the first also signs form stamps, links to private files and the flash cookie, so a rotation refuses those already out, as a restart does without any secret.
 - Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so.
 - Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store.
 - In production `session()` without a store logs a warning as the server boots saying so.

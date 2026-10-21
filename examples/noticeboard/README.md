@@ -11,7 +11,7 @@ A club noticeboard running kay with its libraries together. Members join and sig
 From the root of kay's repository, `bun install` once, then here:
 
 ```sh
-cp .env.example .env    # then fill in the two secrets
+cp .env.example .env    # then fill in the secret
 docker compose up -d --wait
 bun run db:migrate
 bun run dev

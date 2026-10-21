@@ -30,16 +30,16 @@ In a kay project with a server and Tailwind, `kay add auth` installs the package
 ```ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
 import { createAuth, memoryStore } from '@kaynooo/kayjs-auth'
-import { session } from 'kay/server'
+import { session, sqliteStore } from 'kay/server'
 
 export const auth = createAuth({
-  sessions: session<AuthSessionData>({ secret: process.env.SESSION_SECRET! }),
+  sessions: session<AuthSessionData>({ store: sqliteStore('data/sessions.sqlite') }),
   store: memoryStore(),
   pages: true,
 })
 ```
 
-kayjs-auth takes its key from the session's secret, so one secret serves both. Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
+The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)). Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
 
 With the default, the TOTP secrets and stored provider tokens are sealed with a key derived from the session secret. When you rotate it, keep the old session secrets in the list for as long as that data exists, or set `secret` separately. To move an app from `AUTH_SECRET` to the default, pass `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
 

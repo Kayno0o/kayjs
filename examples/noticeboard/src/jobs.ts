@@ -1,8 +1,8 @@
 import { AuthUsers } from '@kaynooo/kayjs-auth/pg'
+import { siteUrl } from 'kay/seo'
 import { queue } from 'kay/server'
 import { db } from './db'
 import { Notice } from './db/notice'
-import { env } from './env'
 import { mail } from './mail'
 import Announcement from './mails/announcement.kay'
 
@@ -18,5 +18,5 @@ export const announcements = queue('announcements', async ({ noticeId }: { notic
   const author = users.find(user => user.id === notice.author_id)?.username ?? 'A member'
 
   for (const user of users.filter(each => each.id !== notice.author_id && each.email !== null))
-    await mail.enqueue({ to: user.email!, subject: `New notice: ${notice.title}`, view: Announcement, props: { title: notice.title, author, url: `${env.SITE_URL}/notices/${notice.id}` } })
+    await mail.enqueue({ to: user.email!, subject: `New notice: ${notice.title}`, view: Announcement, props: { title: notice.title, author, url: siteUrl(`/notices/${notice.id}`) } })
 }, { attempts: 3 })

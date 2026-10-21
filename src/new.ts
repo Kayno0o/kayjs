@@ -1,5 +1,4 @@
 import type { ConfigSettings, Feature, Host } from './templates'
-import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -201,13 +200,11 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }
 
-  // The app's session secret and development database, never committed. With Postgres the app connects as app_rw, which cannot change the schema, and the migrations as the owner; COMPOSE_FILE makes a bare `docker compose` start that database.
+  // The development database, never committed. With Postgres the app connects as app_rw, which cannot change the schema, and the migrations as the owner; COMPOSE_FILE makes a bare `docker compose` start that database.
   if (has('auth')) {
-    const secret = `SESSION_SECRET=${randomBytes(32).toString('hex')}\n`
-
     files['.env'] = has('postgres')
-      ? `${secret}DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
-      : `${secret}DATABASE_URL=sqlite://data/app.db\n`
+      ? `DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
+      : `DATABASE_URL=sqlite://data/app.db\n`
   }
 
   return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name)]))

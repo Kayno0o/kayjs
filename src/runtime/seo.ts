@@ -47,7 +47,7 @@ export function siteOrigin(): string {
 }
 
 function unsetSite(reader: string): Error {
-  return new Error(`kay: ${reader} reads site in kay.config.ts, the origin the site is public at, which it does not set, nor SITE_URL or ORIGIN`)
+  return new Error(`kay: ${reader} reads site in kay.config.ts, the origin the site is public at, which it does not set, nor SITE_URL`)
 }
 
 export interface Crumb {

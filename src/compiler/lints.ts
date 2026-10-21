@@ -383,7 +383,7 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
-    summary: '`seo` set with no `site`, in kay.config.ts, `SITE_URL` or `ORIGIN`, on a site `kay build --static` exports: pages get no canonical link and no `og:url`, a share image no absolute URL, and the site no sitemap or robots.txt. A server reads `SITE_URL`, else `ORIGIN`, when it boots, and warns then of having none.',
+    summary: '`seo` set with no `site`, in kay.config.ts or `SITE_URL`, on a site `kay build --static` exports: pages get no canonical link and no `og:url`, a share image no absolute URL, and the site no sitemap or robots.txt. A server reads `SITE_URL`, else `ORIGIN`, when it boots, and warns then of having none.',
     wrong: 'seo: { name: \'Example\' }',
     right: 'site: \'https://example.com\',\nseo: { name: \'Example\' }',
   },

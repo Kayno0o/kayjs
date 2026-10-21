@@ -20,7 +20,7 @@ import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
 import { MIN_SECRET_LENGTH, sameText } from './seal'
-import { useStampSecret } from './stamp'
+import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 import { visitAs } from './visit'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
@@ -79,11 +79,23 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
     return
   }
 
-  if (typeof config.secret !== 'string' || config.secret.length < MIN_SECRET_LENGTH)
-    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof config.secret === 'string' ? `${config.secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+  const secret: unknown = config.secret ?? appPreviewSecret()
 
-  useStampSecret(config.secret, 'preview')
-  settings = { secret: config.secret, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+  if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH)
+    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof secret === 'string' ? `${secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+
+  useStampSecret(secret, 'preview')
+  settings = { secret, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+}
+
+// A key of preview's own, derived from the app's secret so what signs a preview link never passes for the session's or the stamps'.
+function appPreviewSecret(): string {
+  const secrets = appSecrets()
+
+  if (secrets === undefined)
+    throw noAppSecret('preview in kay.config.ts')
+
+  return Buffer.from(nodeCrypto().hkdfSync('sha256', secrets[0]!, '', 'kay preview', 32)).toString('base64url')
 }
 
 // Renders for a visitor in preview mode, in edit mode too when `edit` is set, with the entries `drafts` holds standing in for theirs.

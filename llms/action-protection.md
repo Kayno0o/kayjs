@@ -59,7 +59,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 #### Minimum time
 
 - `minTime: '3s'` refuses a form posted sooner than that after its page rendered, with 422 and `errors['']`.
-- A form posting to the action renders a hidden `kay_since` field by itself, a stamp of when it rendered bound to the action and signed with a key derived from the session's secret, else from `secret` in kay.config.ts or `KAY_SECRET` (at least 32 random characters, so an app without sessions needs no `session()` for one), else from the preview `secret`, else a key of the process, which a restart changes and a production server warns of once, naming where the secret goes; a test server never warns.
+- A form posting to the action renders a hidden `kay_since` field by itself, a stamp of when it rendered bound to the action and signed with a key derived from [the app secret](environment.md#the-app-secret) (so an app without sessions needs no `session()` for one), else a key of the process, which a restart changes and a production server warns of once, naming where the secret goes; a test server never warns.
 - A plain form post whose stamp is missing, forged, another action's or older than `maxAge`, a day by default, fails the same way, and the page it answers keeps the stamp the form rendered with, so the visitor does not wait again from zero.
 - A prerendered page holding such a form is still rendered once: the server signs a fresh stamp into it on every visit, as it splices in an inline server island, so the page goes out gzipped rather than in brotli and kept by no cache.
 - `minTime: { after: '3s', maxAge: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.

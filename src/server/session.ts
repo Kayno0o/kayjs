@@ -14,7 +14,7 @@ import { requestCookies } from './cookies'
 import { onReload } from './reload'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from './seal'
-import { useStampSecret } from './stamp'
+import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
 
@@ -33,8 +33,8 @@ export type SameSite = 'lax' | 'strict' | 'none'
 const SAME_SITE = new Set<unknown>(['lax', 'strict', 'none'])
 
 export interface SessionOptions {
-  // At least 32 characters, from the environment. A list rotates them: the first seals new cookies, every one opens old ones.
-  secret: string | string[]
+  // At least 32 characters, from the environment. A list rotates them: the first seals new cookies, every one opens old ones. The app's own secret (`secret` in kay.config.ts or `KAY_SECRET`, one derived in development) when left out.
+  secret?: string | string[] | undefined
   // Defaults to `session`; over https and without `domain`, the cookie goes out as `__Host-session`.
   cookie?: string | undefined
   // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
@@ -110,8 +110,13 @@ const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => 
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
-export function session<Data extends object = SessionData>(options: SessionOptions) {
-  const secrets = [options.secret].flat()
+export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
+  const fallback = options.secret === undefined ? appSecrets() : undefined
+
+  if (options.secret === undefined && fallback === undefined)
+    throw noAppSecret('session()')
+
+  const secrets = [options.secret ?? fallback!].flat()
 
   if (weakSecrets(secrets))
     throw new KayError('config-invalid', `kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)

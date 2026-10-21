@@ -555,8 +555,8 @@ const APP_COMPOSE = `services:
     ports:
       - 127.0.0.1:3000:3000
     environment:
-      # At least 32 characters, kept out of the repository.
-      SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
+      # At least 32 characters, kept out of the repository: it seals the sessions.
+      KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
       # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
       DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
@@ -592,8 +592,8 @@ const SQLITE_COMPOSE = `services:
     ports:
       - 127.0.0.1:3000:3000
     environment:
-      # At least 32 characters, kept out of the repository.
-      SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
+      # At least 32 characters, kept out of the repository: it seals the sessions.
+      KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: sqlite://data/app.db
       # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
       DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
@@ -725,13 +725,12 @@ function authFiles({ has, tw }: Setup): Record<string, string> {
 
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
     'src/env.ts': `import process from 'node:process'
 import { defineEnv, s } from 'kay/server'
 
-// Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
+// Read once as the server boots; \`kay new\` wrote the development database to .env, and production sets its own. The sessions' secret is kay's, KAY_SECRET, which development and tests derive.
 export const env = defineEnv(s.Object({
-  SESSION_SECRET: s.Secret(),
   DATABASE_URL: s.String(),
   PORT: s.Integer({ default: 3000 }),
   HOST: s.Optional(s.String()),
@@ -824,10 +823,9 @@ volumes:
 `,
     },
     'src/session.ts': `import { session, sqliteStore } from 'kay/server'
-import { env } from './env'
 
 // The data stays on the server, so signing out ends a session for good, and tests keep theirs in memory; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
-export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('data/sessions.sqlite') })
+export const sessions = session<{ name: string }>({ store: sqliteStore('data/sessions.sqlite') })
 `,
     'src/server.ts': `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
@@ -902,7 +900,7 @@ form${tw('.mt-4')}(action={signOut})
 function authTestFiles({ has }: Setup): Record<string, string> {
   return {
     // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
-    '.env.test': `SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
+    '.env.test': `DATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
     // Read by `kay/test/preload`, which copies the migrated database for each test file and runs this on it once.
     'tests/seed.ts': `import type { Database } from '@kaynooo/pg-orm'
 import { Member } from '../src/db/member'

@@ -29,7 +29,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { asConfigError, configError, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { asConfigError, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -80,6 +80,15 @@ export const SIGNED_IN_HINT = 'kay_user'
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
+
+// What createCore builds on the site's origin, once it has one.
+interface SiteBound {
+  url: string | undefined
+  oauth: Core['oauth']
+  refreshers: Core['refreshers']
+  site: string
+  passkeys: Core['passkeys']
+}
 const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const DEFAULT_GUEST_MAX_AGE = 30 * 24 * 60 * 60
@@ -129,7 +138,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads. Left out, kayjs-auth derives its own from the session's secret, so one secret serves both.
   secret?: string | string[] | undefined
   store: AuthStore
-  // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
+  // The site's public origin, such as `https://example.com`: OAuth callbacks and mailed links are built on it. The `site` of kay.config.ts or `SITE_URL` when left out.
   url?: string | undefined
   // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
   prefix?: Prefix | undefined
@@ -1244,12 +1253,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const plugin = new Elysia({ name: 'kayjs-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
     .use(options.sessions as unknown as Elysia)
+    .onStart(() => core.settle())
     .derive((ctx) => {
       const { session } = ctx as unknown as { session?: Session<AuthSessionData> }
 
       // Elysia uses a plugin once per app, so a plugin of the app's own that used the session plugin first keeps it to itself, out of the routes auth reaches.
       if (!session)
         throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
+
+      core.settle()
 
       const address = clientAddress(ctx.request, ctx.server, options.proxy)
 
@@ -1362,7 +1374,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   if (core.forward) {
     if (!rootUsable(core))
-      throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts or `url` in createAuth')
+      throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or `url` in createAuth')
 
     serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
   }
@@ -1653,30 +1665,67 @@ function noSecret(): never {
 
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
   const prefix = options.prefix ?? '/auth'
-  const oauth: Core['oauth'] = new Map()
 
   const oauthApps = Object.entries(options.oauth ?? {})
-  const url = options.url?.replace(TRAILING_SLASH, '')
+  const given = options.url?.replace(TRAILING_SLASH, '')
   const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
   const pages = pagesOf(options.pages)
   const paths = pages && pagePaths(pages.prefix)
 
-  if ((oauthApps.length > 0 || options.email) && url === undefined)
-    throw configError('OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
+  const needsUrl = oauthApps.length > 0 || options.email !== undefined
+  let bound: SiteBound | undefined
 
-  for (const [name, app] of oauthApps)
-    oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
+  // What depends on the site's origin: `url` if given, else the `site` of kay.config.ts or SITE_URL, which a server knows once it set up. An auth made while the app's modules load asks again when first used, and keeps what it built once it has an origin.
+  const bind = (): SiteBound => {
+    if (bound)
+      return bound
+
+    const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
+
+    if (needsUrl && url === undefined)
+      throw new Error('kayjs-auth: OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or `url` in createAuth')
+
+    const clients: Core['oauth'] = new Map()
+
+    for (const [name, app] of oauthApps)
+      clients.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
+
+    const made: SiteBound = {
+      url,
+      oauth: clients,
+      refreshers: new Map(),
+      site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
+      passkeys: url === undefined
+        ? undefined
+        : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
+    }
+
+    if (url !== undefined)
+      bound = made
+
+    refreshersFor(made)
+
+    return made
+  }
 
   const core: Core = {
     store: options.store,
     keys: deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret()),
-    url,
+    get url() {
+      return bind().url
+    },
+    settle() {
+      if (needsUrl)
+        bind()
+    },
     prefix,
     signInPage: options.signInPage ?? paths?.signIn ?? '/',
     ownSignInPage: options.signInPage,
     twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
     pages,
-    site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
+    get site() {
+      return bind().site
+    },
     limits: resolveLimits(options.limits, options.rateLimit),
     rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
     rules: asConfigError(() => resolveRules(options.rules)),
@@ -1684,9 +1733,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     securityPage: paths?.security,
     locate: options.locate,
     scopes: new Set(options.scopes),
-    passkeys: url === undefined
-      ? undefined
-      : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
+    get passkeys() {
+      return bind().passkeys
+    },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
@@ -1700,8 +1749,12 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     },
     oauthServer: oauthServerOf(options, pages),
     forward: forwardOf(options.forwardAuth),
-    oauth,
-    refreshers: new Map(),
+    get oauth() {
+      return bind().oauth
+    },
+    get refreshers() {
+      return bind().refreshers
+    },
     allow: options.allow,
     signUp: options.signUp ?? true,
     defaultRoles: [...(options.defaultRoles ?? [])],
@@ -1719,24 +1772,29 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
   }
 
-  for (const [name, { client }] of oauth) {
-    core.refreshers.set(name, createOAuthTokenRefresher({
-      oauth: client,
-      key: subject => `${name}:${subject.identity.providerId}`,
-      load: subject => subject.credential,
-      save: async (subject, tokens) => {
-        // A refusal can be a race another process won, its rotated token saved since this one was read: that one stays.
-        if (tokens === null && (await core.store.identities.find(name, subject.identity.providerId))?.refreshToken !== subject.identity.refreshToken)
-          return
+  function refreshersFor(made: SiteBound): void {
+    for (const [name, { client }] of made.oauth) {
+      made.refreshers.set(name, createOAuthTokenRefresher({
+        oauth: client,
+        key: subject => `${name}:${subject.identity.providerId}`,
+        load: subject => subject.credential,
+        save: async (subject, tokens) => {
+          // A refusal can be a race another process won, its rotated token saved since this one was read: that one stays.
+          if (tokens === null && (await core.store.identities.find(name, subject.identity.providerId))?.refreshToken !== subject.identity.refreshToken)
+            return
 
-        const sealed = sealTokens(core, name, subject.identity.providerId, tokens)
+          const sealed = sealTokens(core, name, subject.identity.providerId, tokens)
 
-        // A refresh that rotates no refresh token leaves the one held usable.
-        await core.store.identities.update(name, subject.identity.providerId, tokens && tokens.refreshToken === undefined ? { ...sealed, refreshToken: subject.identity.refreshToken } : sealed)
-      },
-      onError: error => log.error(`refreshing a ${name} token failed`, error),
-    }))
+          // A refresh that rotates no refresh token leaves the one held usable.
+          await core.store.identities.update(name, subject.identity.providerId, tokens && tokens.refreshToken === undefined ? { ...sealed, refreshToken: subject.identity.refreshToken } : sealed)
+        },
+        onError: error => log.error(`refreshing a ${name} token failed`, error),
+      }))
+    }
   }
+
+  if (given !== undefined || configuredSite() !== undefined)
+    bind()
 
   return core
 }

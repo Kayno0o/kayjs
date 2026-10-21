@@ -91,7 +91,10 @@ export interface User<Data extends object = Record<string, unknown>> extends Bar
 export interface Core {
   store: AuthStore
   keys: Keys
+  // The site's public origin: `url` of createAuth, else the site kay.config.ts or SITE_URL sets.
   url?: string | undefined
+  // Builds what depends on the site's origin, throwing while OAuth sign-in or mailed links lack one; a server asks as it boots and on each request until it has one.
+  settle: () => void
   prefix: string
   signInPage: string
   // The `signInPage` the app gave, which a guard sends visitors to even without the prebuilt pages.

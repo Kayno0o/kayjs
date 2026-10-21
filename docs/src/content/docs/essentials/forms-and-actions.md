@@ -489,7 +489,7 @@ export const contact = action(schema, send, {
 ---
 ```
 
-`minTime` stamps are signed. An app with no `session()` gives the signing key as `secret` in `kay.config.ts`, or as `KAY_SECRET`, at least 32 random characters.
+`minTime` stamps are signed with a key made from the app's secret, `KAY_SECRET` or `secret` in `kay.config.ts` ([The app secret](/guides/sessions-and-guards#the-app-secret)), so an app with no `session()` needs no more.
 
 Without one, a production server signs with a key of its own process. A restart changes that key and other replicas do not share it, and the server says so once in its log.
 

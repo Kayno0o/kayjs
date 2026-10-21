@@ -65,7 +65,7 @@ export function isPublicSite(config: SiteSeo, exported = false): boolean {
   return config.site !== undefined || config.seo !== undefined || exported
 }
 
-// What kay.config.ts leaves out of a public site's head; `sources` are the project's .kay files, any of which may set an `og:image`. A missing site only counts for a static export, a server reading `SITE_URL` or `ORIGIN` at boot.
+// What kay.config.ts leaves out of a public site's head; `sources` are the project's .kay files, any of which may set an `og:image`. A missing site only counts for a static export, a server reading `SITE_URL` at boot.
 export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<string>, exported = false, configSource?: string): CheckDiagnostic[] {
   const found: CheckDiagnostic[] = []
   const report = lintReporter(config, false, found)
@@ -73,7 +73,7 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
   const at = (...path: string[]) => ({ file, ...locate(path) })
 
   if (exported && config.seo !== undefined && config.site === undefined)
-    report('missing-site', { ...at('site'), message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` (or `ORIGIN`) where the site builds' })
+    report('missing-site', { ...at('site'), message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` where the site builds' })
 
   const descriptions = localizedTexts(config.seo?.description)
 

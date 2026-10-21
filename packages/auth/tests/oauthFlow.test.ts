@@ -107,8 +107,10 @@ describe('starting an OAuth sign-in', () => {
     expect((await browser().fetch('/auth/gitlab')).status).toBe(404)
   })
 
-  test('needs the site\'s URL to build callbacks', () => {
-    expect(() => testApp({ oauth: { discord: { provider: discordProvider(), clientId: 'a', clientSecret: 'b' } } })).toThrow('need `url`')
+  test('needs the site\'s origin to build callbacks, told on the first request when nothing gives one', async () => {
+    const response = await testApp({ oauth: { discord: { provider: discordProvider(), clientId: 'a', clientSecret: 'b' } } }).browser().fetch('/auth/discord')
+
+    expect(response.status).toBe(500)
   })
 })
 

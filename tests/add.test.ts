@@ -9,14 +9,13 @@ import { addExtension, addFeatures, detectFeatures, handEdit, restore, runnerOf,
 import { createProject, PRESETS } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
-const SECRET = /^SESSION_SECRET=.*$/m
 
-// The order of a manifest's keys and of an ignore file's lines does not matter, and a secret is random.
+// The order of a manifest's keys and of an ignore file's lines does not matter.
 async function content(dir: string, path: string): Promise<unknown> {
   if (path === 'package.json')
     return await Bun.file(join(dir, path)).json() as unknown
 
-  const text = (await Bun.file(join(dir, path)).text()).replace(SECRET, 'SESSION_SECRET=x')
+  const text = await Bun.file(join(dir, path)).text()
 
   return path.endsWith('ignore') ? text.split('\n').toSorted() : text
 }
@@ -470,7 +469,7 @@ it('reads export prefixed and quoted values of .env', async () => {
 
     const sqlite = await projectWith(other, PRESETS.app.features)
 
-    await writeFile(join(sqlite, '.env'), 'export SESSION_SECRET="x"\nexport DATABASE_URL="sqlite://data/app.db"\n')
+    await writeFile(join(sqlite, '.env'), 'export DATABASE_URL="sqlite://data/app.db"\n')
     await expect(addFeatures(sqlite, ['postgres'], { install: false })).rejects.toThrow('.env: export DATABASE_URL="sqlite://data/app.db" is not what the feature uses')
   }
   finally {

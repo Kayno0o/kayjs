@@ -36,8 +36,8 @@ services:
     ports:
       - 3000:3000
     environment:
-      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
-      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+      # At least 32 characters, kept out of the repository: it seals the sessions and kayjs-auth's data.
+      KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/noticeboard
       SITE_URL: ${SITE_URL:?set SITE_URL, the public origin mailed links start with}
       SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}

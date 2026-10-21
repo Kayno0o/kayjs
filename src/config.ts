@@ -27,6 +27,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
+import { kayLog } from './runtime/log'
 import { bundled, importModule } from './server/bundle'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
@@ -41,7 +42,7 @@ export interface KayConfig {
   publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
   lang?: string | undefined
-  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, else `ORIGIN`, so one build serves each host it is deployed to.
+  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to; a `site` written here wins over `SITE_URL`. `ORIGIN` is read when both are unset, deprecated.
   site?: string | undefined
   seo?: SeoConfig | undefined
   // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
@@ -135,8 +136,8 @@ export interface KayConfig {
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
-  // What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, read from the environment as `secret: process.env.KAY_SECRET`. `KAY_SECRET` alone does the same, and a `session()` secret takes its place. Without any, a key of the process signs them, which a restart changes and other replicas do not share.
-  secret?: string | undefined
+  // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a server using none signs with a key of the process, which a restart changes and other replicas do not share.
+  secret?: string | string[] | undefined
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | false | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
@@ -205,8 +206,8 @@ export interface RobotsConfig {
 }
 
 export interface PreviewConfig {
-  // Signs preview links and the preview cookie, never carried in a URL: at least 32 random characters, read from the environment.
-  secret: string
+  // Signs preview links and the preview cookie, never carried in a URL: at least 32 random characters, read from the environment. A key derived from the app's secret (`KAY_SECRET`) when left out.
+  secret?: string | undefined
   // How long a visitor stays in preview mode once in, seconds or a string such as '2h'; an hour by default.
   maxAge?: Duration | undefined
 }
@@ -613,8 +614,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
-// The site's URL the environment gives: `SITE_URL`, which the app set for kay and so fails loudly when wrong, else `ORIGIN`, which SvelteKit's adapter-node reads, so a server started for either finds its own address.
-// `ORIGIN` is generic and other tooling sets it, so one that is no bare http(s) origin is skipped.
+let warnedOrigin = false
+
+// The site's URL the environment gives: `SITE_URL`, which the app set for kay and so fails loudly when wrong, else the deprecated `ORIGIN`, which SvelteKit's adapter-node reads and kay read before `SITE_URL`.
+// `ORIGIN` is generic and other tooling sets it, so one that is no bare http(s) origin is skipped, and one that is used is told once.
 export function siteFromEnv(): string | undefined {
   const { SITE_URL, ORIGIN } = process.env
 
@@ -623,7 +626,15 @@ export function siteFromEnv(): string | undefined {
 
   const url = ORIGIN === undefined ? undefined : URL.parse(ORIGIN)
 
-  return url !== null && url !== undefined && (url.protocol === 'https:' || url.protocol === 'http:') && url.pathname === '/' && url.search === '' && url.hash === '' ? ORIGIN : undefined
+  if (url === null || url === undefined || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.pathname !== '/' || url.search !== '' || url.hash !== '')
+    return undefined
+
+  if (!warnedOrigin) {
+    warnedOrigin = true
+    kayLog('warn', 'the site is public at the origin ORIGIN holds, which kay reads until 1.73 only: set SITE_URL to it instead')
+  }
+
+  return ORIGIN
 }
 
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {

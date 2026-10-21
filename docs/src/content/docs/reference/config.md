@@ -70,7 +70,7 @@ Every option is optional. The tables give each option's default. The full refere
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
 | `markdown` | `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
-| `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
+| `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links; left out, a key is made from the app's `secret`. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `store` | Where jobs, schedule locks, rate limit counts, presence members and Web Vitals live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms, vitals }` of your own. See [Background jobs](/guides/background-jobs) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale, and `messages`, the folder of the message files (`src/messages` by default). See [Internationalization](/guides/i18n) |
@@ -98,7 +98,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `security` | The CSP and security headers every response carries, or `false` for none. See [Security](/guides/security) |
 | `proxy` | How many proxies sit in front (`true` for one, a number for more, `false` for none), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. See [Trust a proxy](/guides/security#trust-a-proxy) |
 | `compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
-| `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`. At least 32 random characters; `KAY_SECRET` when left out. A `session()` secret takes its place |
+| `secret` | The app's one secret, at least 32 random characters: it seals `session()`, signs form stamps, links to private files and the flash cookie, and keys `preview`. `KAY_SECRET` when left out. A list, or commas in `KAY_SECRET`, rotates it. See [The app secret](/guides/sessions-and-guards#the-app-secret) |
 | `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |
 | `log` | One line per request, and kay's own messages. On in production as text; `'json'` writes one JSON object each, a function receives each `LogEntry`, and `false` turns the request lines off |
 | `maxSize` | The most an action or API request may send, bytes or a size such as `'4mb'`, 1 MB by default. A bigger one answers 413. See [The request body limit](/guides/security#the-request-body-limit) |

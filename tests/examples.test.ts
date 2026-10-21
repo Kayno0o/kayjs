@@ -15,7 +15,7 @@ const LISTENING = /localhost:(\d+)/
 const SOME_PASSED = / [1-9]\d* pass/
 // A Postgres whose user may create databases, as the app template's tests take: CI sets it.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
-const SECRETS = { SESSION_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', AUTH_SECRET: 'only-for-tests-too-abcdefghijklmnop0123456789' }
+const SECRETS = { KAY_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', SITE_URL: 'http://localhost:3000' }
 
 // Every app the repository ships: the documentation site and each example.
 async function shippedApps(): Promise<string[]> {

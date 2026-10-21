@@ -5,6 +5,7 @@ import { prerendering } from '../runtime/html'
 import { kayLog } from '../runtime/log'
 import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
+import { devSecret } from './dev-secret'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith } from './seal'
 
 const KEY_BYTES = 32
@@ -22,17 +23,59 @@ export function useStampSecret(value: string, from: Exclude<StampSource, 'proces
     secret = { key: new Uint8Array(nodeCrypto().hkdfSync('sha256', value, '', 'kay stamps', KEY_BYTES)), from }
 }
 
-// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both. A short one is refused, as the session's is.
-export function setupStampSecret(configured: string | undefined): void {
-  const value = configured === undefined || configured === '' ? process.env.KAY_SECRET : configured
+// What separates the secrets of a rotation list, in `secret` and in `KAY_SECRET`.
+const SECRET_SEPARATOR = /\s*,\s*/
+// The app's own secrets as `setupStampSecret` read them: `secret` in the config, else `KAY_SECRET`.
+let configuredSecrets: string[] | undefined
 
-  if (value === undefined || value === '')
+function listed(value: string | string[] | undefined): string[] | undefined {
+  const secrets = [value ?? []].flat().flatMap(text => text.trim().split(SECRET_SEPARATOR)).filter(text => text !== '')
+
+  return secrets.length === 0 ? undefined : secrets
+}
+
+function refuseWeak(secrets: string[], where: string): void {
+  const weak = secrets.find(secret => secret.length < MIN_SECRET_LENGTH)
+
+  if (weak !== undefined)
+    throw new KayError('config-invalid', `kay: ${where} holds a secret ${weak.length} characters long: the app's secret signs form stamps, links to private files and the flash cookie, and seals sessions, so each is at least ${MIN_SECRET_LENGTH} random characters, commas separating a rotation list; generate one with ${GENERATE_SECRET}`)
+}
+
+// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both, and a list rotating: the first signs, every one opens. A short one is refused.
+export function setupStampSecret(configured: string | string[] | undefined): void {
+  const fromConfig = listed(configured)
+  const secrets = fromConfig ?? listed(process.env.KAY_SECRET)
+
+  configuredSecrets = secrets
+
+  if (secrets === undefined)
     return
 
-  if (value.length < MIN_SECRET_LENGTH)
-    throw new KayError('config-invalid', `kay: ${configured === undefined ? 'KAY_SECRET' : '`secret` in kay.config.ts'} is ${value.length} characters long: it signs form stamps, links to private files and the flash cookie, so it is at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)
+  refuseWeak(secrets, fromConfig === undefined ? 'KAY_SECRET' : '`secret` in kay.config.ts')
+  useStampSecret(secrets[0]!, 'config')
+}
 
-  useStampSecret(value, 'config')
+// The secrets the app has for what it seals and signs: the config's or `KAY_SECRET`, else in development and under test one derived for this checkout, else none. Read anywhere, before the server set up too, as `KAY_SECRET` is in the environment from the start.
+export function appSecrets(): string[] | undefined {
+  if (configuredSecrets !== undefined)
+    return configuredSecrets
+
+  const fromEnv = listed(process.env.KAY_SECRET)
+
+  if (fromEnv !== undefined) {
+    refuseWeak(fromEnv, 'KAY_SECRET')
+
+    return fromEnv
+  }
+
+  const mode = process.env.NODE_ENV
+
+  return mode === 'development' || mode === 'test' ? [devSecret('KAY_SECRET')] : undefined
+}
+
+// What an app without any secret is told: where one goes.
+export function noAppSecret(use: string): KayError {
+  return new KayError('config-invalid', `kay: ${use} has no secret: set KAY_SECRET (or \`secret\` in kay.config.ts) to at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)
 }
 
 // A production server says so the first time it signs with the process's own key, which no restart and no other replica shares.
