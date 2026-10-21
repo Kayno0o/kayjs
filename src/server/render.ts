@@ -55,7 +55,7 @@ import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
 import { pageToken } from './prerendered'
-import { noteEditedEntries, noteProbedEntries } from './preview'
+import { noteEditedEntries, noteProbedEntries, withoutShareToken } from './preview'
 import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
@@ -717,6 +717,8 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   }
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
+
+  withoutShareToken(url)
   // The search params as text until the page's schema reads them; most pages never look.
   let query: Readonly<Record<string, unknown>> | undefined
   let raw: Readonly<Record<string, unknown>> | undefined

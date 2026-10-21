@@ -1,0 +1,15 @@
+--- server
+import { s } from 'kay'
+import { news } from '../../content.config'
+
+export const page = { query: s.Object({ page: s.Optional(s.String()) }, { additionalProperties: false }) }
+
+const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
+const { href, search } = ctx.url
+const shown = ctx.query.page ?? 'none'
+---
+head
+  link(rel="canonical" href={href})
+h1 {entry.data.title}
+p.page {shown}
+p.search {search}

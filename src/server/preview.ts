@@ -333,6 +333,12 @@ export function exitPreview(ctx: { cookies: CookieMap }): void {
   ctx.cookies.delete({ name: PREVIEW_COOKIE, path: settingsFor('exitPreview()').base || '/' })
 }
 
+// A share link's token taken out of a URL once kay has read it, so a page never sees it in `ctx.url` or `ctx.query`, nor copies it into its own links.
+export function withoutShareToken(url: URL): void {
+  if (url.searchParams.has(SHARE_PARAM))
+    url.searchParams.delete(SHARE_PARAM)
+}
+
 // The entry a request's share link names, when the link is signed by this site for the page asked and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
 export function sharedEntry(request: Request): PreviewScope | undefined {
   if (!settings)

@@ -52,6 +52,27 @@ describe('an entry-scoped preview link', () => {
     expect(previewUrl('/news/roadmap?a=1#top', { entry: roadmap })).toMatch(/^\/news\/roadmap\?a=1&kay_preview=[\w.-]+#top$/)
   })
 
+  it('hides the token from the page: a strict query schema serves the draft, a canonical link and the query keep no token, a real param survives', async () => {
+    const app = await pages({ ...options, prebuilt: false })
+    const link = previewUrl('/news-strict/roadmap', { entry: roadmap })
+    const token = link.slice(link.indexOf('?') + 1)
+    const plain = await visit(app, '/news-strict/roadmap?page=2')
+    const shared = await visit(app, `/news-strict/roadmap?page=2&${token}`)
+    const bare = await visit(app, link)
+
+    expect(plain.status).toBe(404)
+    expect(shared.status).toBe(200)
+    expect(shared.html).toContain('<h1>Next year</h1>')
+    expect(shared.html).toContain('<p class="page">2</p>')
+    expect(shared.html).toContain('<p class="search">?page=2</p>')
+    expect(shared.html).toContain('href="http://localhost/news-strict/roadmap?page=2"')
+    expect(shared.html).not.toContain('kay_preview')
+    expect(bare.status).toBe(200)
+    expect(bare.html).not.toContain('kay_preview')
+    // A param the schema refuses is still refused, token or not.
+    expect((await visit(app, `/news-strict/roadmap?other=1&${token}`)).status).not.toBe(200)
+  })
+
   it('shows no other entry\'s draft, on any page', async () => {
     const app = await pages({ ...options, prebuilt: false })
 
