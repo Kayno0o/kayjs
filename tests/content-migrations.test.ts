@@ -82,7 +82,7 @@ describe('a stored entry the schema refuses', () => {
 
       expect(warned).toHaveLength(1)
       expect(warned[0]!.message).toContain('2 stored entries of bad-')
-      expect(warned[0]!.message).toContain('stale price: Property \'price\' is missing')
+      expect(warned[0]!.message).toContain('stale price: Price is required')
       expect(warned[0]!.message).toContain('migrations')
     })
   }
