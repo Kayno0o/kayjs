@@ -723,7 +723,7 @@ The screens have a chrome of their own, with none of your site's layouts, header
 
 Give the header a logo in the cms settings: name a module in `kay.config.ts` as `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kaynooo/kayjs-cms`).
 
-`src` is a file of `public/` or an https URL, shown before the name, and `width`, `height` and `href` are optional (`href` is not used here, as the header links to the admin). `cms({ logo: '/logo.svg' })` still works until 1.73 and gives an image with no `alt`; the settings win when both are set.
+`src` is a file of `public/` or an https URL, shown before the name, and `width`, `height` and `href` are optional (`href` is not used here, as the header links to the admin, and the image is drawn 1.5rem high whatever the size, which only gives its proportions). A `src` that is no path of the site or https URL answers the admin with a 500 naming it. `cms({ logo: '/logo.svg' })` still works until 1.73 and gives an image with no `alt`; the settings win when both are set.
 
 The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 

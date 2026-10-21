@@ -30,6 +30,15 @@ describe('the header of the layout', () => {
     expect(text).toStartWith('Fixture\n\nWelcome, Ada')
   })
 
+  it('renders a logo with no width, leaving the attribute out', async () => {
+    branding.logo = { src: 'https://fixture.test/logo.png', alt: 'Fixture' }
+
+    const { html } = await render(Welcome)
+
+    expect(html).toContain('<img src="https://fixture.test/logo.png" alt="Fixture"')
+    expect(html).not.toMatch(/<img[^>]* width=/)
+  })
+
   it('links the logo when the settings give where it goes', async () => {
     branding.logo = { src: 'https://fixture.test/logo.png', alt: 'Fixture', width: 120, href: 'https://fixture.test/' }
 

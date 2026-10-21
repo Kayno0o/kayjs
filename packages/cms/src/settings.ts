@@ -38,8 +38,7 @@ export interface MemberInfo {
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
-  // Moved to the settings module: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` with a `logo` of `{ src, alt }` in it (see `Settings`). Still read until 1.73, as a path of the site or an https URL, with an empty `alt`; a `logo` in the settings wins over it.
-  // @deprecated
+  /** @deprecated Moved to the settings module: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` with a `logo` of `{ src, alt }` in it (see `Settings`). Still read until 1.73, as a path of the site or an https URL, with an empty `alt`; a `logo` in the settings wins over it. */
   logo?: string | undefined
   // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through.
   guard?: Guard | LazyGuard | undefined
