@@ -59,8 +59,8 @@ test('a path with and without its trailing slash is one row with two visits and 
 
   const page = await site.visit('/admin/not-found')
 
-  expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(2)').map(cell => cell.text.trim())).toEqual(['Path/Empty'])
-  expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(3)').map(cell => cell.text.trim())).toEqual(['Visits2'])
+  expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(2)').map(cell => cell.text.trim())).toEqual(['Path /Empty'])
+  expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(3)').map(cell => cell.text.trim())).toEqual(['Visits 2'])
 })
 
 test('adds the suggested redirect, which answers at once and is listed with its Remove, then undoes it; a hostile target is refused', async () => {

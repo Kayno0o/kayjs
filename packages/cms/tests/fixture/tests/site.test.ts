@@ -212,7 +212,7 @@ test('a collection\'s list shows the columns and the row actions its layout name
   const page = await site.visit('/admin/collections/shop')
 
   expect(page.find('.kcms-entries th').map(head => head.text.trim()).filter(head => head !== 'Select all')).toEqual(['Title', 'Price', 'Live', 'Actions'])
-  expect(page.find('.kcms-entries td').map(cell => cell.text.trim()).filter(text => text !== '')).toEqual(['TitleLamp', 'Price30', 'LiveYes', 'Actions', 'TitleVase', 'Price12.5', 'LiveNo', 'Actions'])
+  expect(page.find('.kcms-entries td').map(cell => cell.text.trim()).filter(text => text !== '')).toEqual(['Title Lamp', 'Price 30', 'Live Yes', 'Actions', 'Title Vase', 'Price 12.5', 'Live No', 'Actions'])
   expect(page.find('.kcms-entries a').map(link => link.text)).toEqual(['Lamp', 'Vase'])
   expect(page.find('.kcms-row-actions button').map(button => button.attributes['aria-label'] ?? button.text)).toEqual(['Delete Lamp', 'Delete Vase'])
   expect((await site.visit('/admin/collections/shop?q=vase')).find('.kcms-entries a').map(link => link.text)).toEqual(['Vase'])
