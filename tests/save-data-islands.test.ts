@@ -34,6 +34,12 @@ afterEach(() => {
 const slot = (name: string, attributes = '') => `<slot data-component="${name}.kay" data-props="[{}]"${attributes}><button>${name}</button></slot>`
 const wait = async (ms = 20) => new Promise(resolve => setTimeout(resolve, ms))
 
+// Waits for the islands to be observed, which happens after an import a loaded host takes longer than a fixed wait over.
+async function observing(count: number): Promise<void> {
+  for (let tries = 0; observed.length < count && tries < 100; tries++)
+    await wait()
+}
+
 // The components loaded, in the order the browser asked for them.
 async function hydrated(markup: string, settle = 20): Promise<string[]> {
   const loaded: string[] = []
@@ -81,6 +87,7 @@ describe('an island with no hydrate of its own', () => {
     saving()
 
     expect(await hydrated(slot('a') + slot('b'))).toEqual([])
+    await observing(2)
     expect(observed.map(({ target }) => target.textContent).toSorted()).toEqual(['a', 'b'])
   })
 
@@ -96,7 +103,7 @@ describe('an island with no hydrate of its own', () => {
 
     document.body.innerHTML = slot('a') + slot('b')
     await hydrateIslands(registry)
-    await wait()
+    await observing(2)
     intersect('b')
     await wait()
 
