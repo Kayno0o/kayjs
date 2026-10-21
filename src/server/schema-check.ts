@@ -39,13 +39,18 @@ export function refusals(check: TypeCheck<TSchema>, value: unknown, keyOf: (poin
   return refused
 }
 
+// A JSON pointer segment as the key it names, `a~1b` as `a/b`.
+export function unescaped(segment: string): string {
+  return segment.replaceAll('~1', '/').replaceAll('~0', '~')
+}
+
 export function fieldOf(pointer: string): string {
-  return FIELD.exec(pointer)?.[1] ?? ''
+  return unescaped(FIELD.exec(pointer)?.[1] ?? '')
 }
 
 // A validation path as a dotted one, `tags.0`.
 export function dottedPath(pointer: string): string {
-  return pointer.split('/').slice(1).map(segment => segment.replaceAll('~1', '/').replaceAll('~0', '~')).join('.')
+  return pointer.split('/').slice(1).map(unescaped).join('.')
 }
 
 // The schema's own reason for an error, such as `Expected string`.

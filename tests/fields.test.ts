@@ -196,6 +196,22 @@ describe('readQuery', () => {
     expect(() => query('?n=x', t.Object({ n: t.Integer() }))).toThrow(Denied)
   })
 
+  it('names a refused field holding a slash or a tilde by its own name', () => {
+    const message = (search: string) => {
+      try {
+        query(search, t.Object({ 'a/b': t.Integer(), 'c~d': t.Integer() }))
+      }
+      catch (error) {
+        return (error as Denied).message
+      }
+
+      return undefined
+    }
+
+    expect(message('?a%2Fb=x&c~d=1')).toStartWith('Invalid query: a/b: ')
+    expect(message('?a%2Fb=1&c~d=x')).toStartWith('Invalid query: c~d: ')
+  })
+
   it('words a refusal with the field\'s error function as with a string, and keeps the default wording for one that throws', () => {
     const message = (search: string, schema: unknown) => {
       try {

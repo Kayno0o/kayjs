@@ -33,8 +33,15 @@ export const migrate: Command = {
       return 1
     }
 
-    if (from === 'content')
+    if (from === 'content') {
+      if (values.outdir !== undefined || values.out !== undefined) {
+        printFailure('migrate', 'kay migrate content rewrites the entry files in place and takes no --outdir or --out', format)
+
+        return 1
+      }
+
       return migrateContent(resolve(dir), format, values.quiet === true)
+    }
 
     if (typeof values.out === 'string' && typeof values.outdir === 'string' && resolve(values.out) !== resolve(values.outdir)) {
       printFailure('migrate', '--out is the older spelling of --outdir, and the two name different directories; keep --outdir', format)
@@ -118,11 +125,11 @@ async function migrateContent(root: string, format: ProblemFormat, quiet: boolea
 
   if (!quiet) {
     for (const file of rewritten)
-      done('rewrote', file)
+      done('rewrote', relative(process.cwd(), join(root, file)))
   }
 
   for (const { file, message } of failed)
-    console.error(`${colors.bold.red('failed')} ${file}: ${message}`)
+    console.error(`${colors.bold.red('failed')} ${relative(process.cwd(), join(root, file))}: ${message}`)
 
   console.log(declared === 0 ? 'no folder collection declares `migrations`' : `${count(rewritten.length, 'file')} rewritten${failed.length > 0 ? `, ${failed.length} failed` : ''}`)
 

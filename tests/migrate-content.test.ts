@@ -1,5 +1,6 @@
+import { readdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { rewrittenSource } from '../src/content/rewrite'
@@ -83,6 +84,30 @@ describe('kay migrate content', () => {
 
       // Run again, nothing is left to carry over.
       expect((await migrate(root)).out).toContain('0 files rewritten')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('refuses --outdir and --out, which it would ignore, and names a rewritten file from the working directory', async () => {
+    const root = await project()
+
+    try {
+      await Bun.write(join(root, 'src/content/packs/old.json'), '{"name":"Old","price":"1"}')
+
+      for (const flag of ['--outdir', '--out']) {
+        const refused = await migrate(root, flag, join(root, 'x'))
+
+        expect(refused.code).toBe(1)
+        expect(refused.err).toContain('takes no --outdir or --out')
+        expect(await Bun.file(join(root, 'src/content/packs/old.json')).json()).toEqual({ name: 'Old', price: '1' })
+      }
+
+      const { out } = await migrate(root)
+
+      expect(out).toContain(relative(process.cwd(), join(root, 'src/content/packs/old.json')))
+      expect(readdirSync(join(root, 'src/content/packs'))).toEqual(['old.json'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

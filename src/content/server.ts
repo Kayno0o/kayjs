@@ -16,8 +16,9 @@ import { TRAILING_SLASH } from '../runtime/base'
 import { nameCollection } from '../runtime/fields'
 import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { importModule } from '../server/bundle'
-import { defaultLocaleState, hostLocale, stateFor } from '../server/i18n'
+import { catalogFiles, defaultLocaleState, hostLocale, stateFor } from '../server/i18n'
 import { pageEtag } from '../server/prerendered'
 import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
@@ -79,22 +80,46 @@ export async function namedCollections(root: string, config?: string): Promise<[
   return collections
 }
 
-// What a build or a check reads entries in: the site's default locale, so a refusal reads as the CMS words it for that locale's editor, else no locale and the English.
+// The site's default locale, so a refusal reads as the CMS words it for that locale's editor, else the English.
 async function entryLocale(root: string): Promise<LocaleState | undefined> {
   try {
     return await defaultLocaleState(root, await loadConfig(root))
   }
-  catch {
+  catch (error) {
+    kayLog('warn', 'kay: the config failed to load, so an entry\'s refusal is worded in English', error)
+
     return undefined
   }
 }
 
-const inLocale = <Result>(state: LocaleState | undefined, run: () => Result): Result => state === undefined ? run() : runInLocale(state, run)
+// The catalogs a refusal is worded from, so a check sees one written after it ran.
+async function catalogsOf(root: string): Promise<string[]> {
+  try {
+    return catalogFiles(root, await loadConfig(root))
+  }
+  catch {
+    return []
+  }
+}
+
+// What a build or a check reads entries in: run as is, and again in the site's default locale only when it refuses, the one case that words anything.
+async function decodedIn<Result>(root: string, run: () => Result): Promise<Result> {
+  try {
+    return run()
+  }
+  catch (error) {
+    if (!(error instanceof ContentError))
+      throw error
+
+    const state = await entryLocale(root)
+
+    return state === undefined ? run() : runInLocale(state, run)
+  }
+}
 
 // Compiles every collection from its files and writes what the server reads in production, failing on the first collection with a bad entry. A loader's collection is read when the server runs.
 export async function writeContentManifests(root: string, clientBase: string, config?: string): Promise<number> {
   let count = 0
-  const locale = await entryLocale(root)
 
   for (const collection of await projectCollections(root, config)) {
     if (collection.dir === undefined)
@@ -103,7 +128,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
     const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
 
     try {
-      inLocale(locale, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+      await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
     }
     catch (error) {
       throw withMigrationHint(error, collection.options.migrations)
@@ -125,9 +150,8 @@ export async function contentProblems(root: string, config?: string, site = true
   const problems: ContentProblem[] = []
   const uses: ComponentUse[] = []
   const feeds: CollectionFeed[] = []
-  // What the collections were read from, beside the modules loaded: the config and each folder of entries.
-  const read = [projectPaths(root, { content: config }).content]
-  const locale = await entryLocale(root)
+  // What the collections were read from, beside the modules loaded: the config, the catalogs and each folder of entries.
+  const read = [projectPaths(root, { content: config }).content, ...await catalogsOf(root)]
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed)
@@ -147,7 +171,7 @@ export async function contentProblems(root: string, config?: string, site = true
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
 
-      inLocale(locale, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+      await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
 
       if (collection.options.localized === true)
         problems.push(...await draftEntryProblems(root, entries))
@@ -156,7 +180,10 @@ export async function contentProblems(root: string, config?: string, site = true
       if (!(error instanceof ContentError))
         throw error
 
-      problems.push(...error.problems)
+      // The hint of the build's error, on the first refused entry of the collection.
+      const { problems: refused, hint } = withMigrationHint(error, collection.options.migrations) as ContentError
+
+      problems.push(...refused.map((problem, index) => index === 0 && hint !== undefined ? { ...problem, message: `${problem.message}; ${hint}` } : problem))
     }
   }
 

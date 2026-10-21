@@ -1,5 +1,5 @@
 import type { TSchema } from 'elysia'
-import { compiledCheck, refusals } from './schema-check'
+import { compiledCheck, refusals, unescaped } from './schema-check'
 
 export interface AnswerIssue {
   // Where the value is wrong, as a person writes it: `author.name`, `tags[1]`, empty for the value itself.
@@ -17,7 +17,7 @@ function pathOf(pointer: string): string {
   let path = ''
 
   for (const [, raw = ''] of pointer.matchAll(SEGMENT)) {
-    const segment = raw.replaceAll('~1', '/').replaceAll('~0', '~')
+    const segment = unescaped(raw)
 
     path += INDEX.test(segment) ? `[${segment}]` : `${path === '' ? '' : '.'}${segment}`
   }

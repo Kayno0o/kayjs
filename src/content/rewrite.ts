@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
+import { writeAtomically } from '../build/files'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { draftCommentLine, entryFiles, parseEntry } from './load'
@@ -79,7 +80,7 @@ export async function migrateFolders(root: string): Promise<{ collections: Rewri
         if (JSON.stringify(parseEntry(name, text).data) !== JSON.stringify(data))
           throw new Error('holds a value its format cannot write back as it is')
 
-        await writeFile(path, text)
+        await writeAtomically(path, text)
         result.rewritten.push(file)
       }
       catch (error) {

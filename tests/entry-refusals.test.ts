@@ -5,9 +5,12 @@ import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { humanize } from '../packages/cms/src/fields'
 import { checkContent } from '../src/check/project'
+import { loadConfig } from '../src/config'
 import { writeContentManifests } from '../src/content/server'
 import { ContentError, dataIssues, decodeEntries } from '../src/content/validate'
 import { runInLocale } from '../src/runtime/locale-state'
+import { logSink, setLogSink } from '../src/runtime/log'
+import { defaultLocaleState } from '../src/server/i18n'
 import { fixtureCopy } from './scratch'
 
 const schema = t.Object({
@@ -198,14 +201,35 @@ describe('kay build and kay check', () => {
     const bare = await site('import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n')
 
     try {
-      expect((await checkContent(french, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date n\'est pas valide'])
-      expect((await checkContent(bare, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date is not valid'])
+      expect((await checkContent(french, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date n\'est pas valide; fix the files, or declare `migrations` on the collection to carry them over, then run `kay migrate content` to rewrite them'])
+      expect((await checkContent(bare, undefined, true)).problems.map(problem => problem.message)).toEqual(['date: Date is not valid; fix the files, or declare `migrations` on the collection to carry them over, then run `kay migrate content` to rewrite them'])
 
       await expect(writeContentManifests(resolve(french), join(french, 'out'), undefined)).rejects.toThrow('date: Date n\'est pas valide')
     }
     finally {
       await rm(french, { recursive: true, force: true })
       await rm(bare, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('log a catalog that fails to load and leave the English', async () => {
+    const broken = await site('export const messages = {}\n')
+    const logged: string[] = []
+    const previous = logSink()
+
+    setLogSink((_level, message) => void logged.push(message))
+
+    try {
+      expect(await defaultLocaleState(resolve(broken), await loadConfig(resolve(broken)))).toBeUndefined()
+      expect(logged).toEqual(['kay: the site\'s catalogs failed to load, so an entry\'s refusal is worded in English'])
+    }
+    finally {
+      if (previous)
+        setLogSink(previous)
+      else
+        delete (globalThis as Record<symbol, unknown>)[Symbol.for('kay.log')]
+
+      await rm(broken, { recursive: true, force: true })
     }
   }, 30_000)
 })

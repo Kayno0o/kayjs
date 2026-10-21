@@ -39,6 +39,7 @@ import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { guardUrl } from './routes'
+import { fieldOf } from './schema-check'
 import { readPersonally } from './scope'
 import { carryContext } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
@@ -116,8 +117,6 @@ const FORM_ACTION = /(<form\b[^>]*?\saction=")([^"]*\/_kay\/action\/[^"#]*)/gi
 // Names the page a refused post was answered with, on the forms that page holds: the browser then shows the action's URL, which their next post sends as its `Referer`.
 const BACK_PARAMETER = 'kay_back'
 
-// The top-level field of a validation path such as `/address/street`.
-const FIELD = /^\/([^/]*)/
 // Elysia names a file it refuses `body.<field>`.
 const BODY_PREFIX = /^body\./
 
@@ -986,7 +985,7 @@ async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<V
   const errors: Record<string, string> = {}
 
   for (const issue of error.all) {
-    const field = 'path' in issue ? FIELD.exec(issue.path)?.[1] ?? '' : ''
+    const field = 'path' in issue ? fieldOf(issue.path) : ''
     const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
     const custom = ('path' in issue ? fieldMessage(action.schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
 

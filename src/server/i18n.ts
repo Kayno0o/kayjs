@@ -9,6 +9,7 @@ import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
 import { importModule } from './bundle'
@@ -272,14 +273,23 @@ export async function renderState(locale: string | undefined): Promise<LocaleSta
   return { ...translations, settings: i18n.settings, path: '/', ...i18n.implicit && { implicit: true } }
 }
 
-// The state of the site's default locale from its catalogs, for what runs outside a request, such as `kay build` and `kay check` wording an entry's refusal; undefined where the catalogs cannot be read, which leaves the English.
+// Every locale's catalogs, present or not, which a check watches so that one written later is read.
+export function catalogFiles(root: string, config: Pick<KayConfig, 'i18n' | 'lang' | 'extensions'>): string[] {
+  const locales = config.i18n ? localeSettings(config.i18n).locales : [config.lang ?? DEFAULT_LANG]
+
+  return locales.flatMap(locale => [messagesFile(root, config.i18n ?? {}, locale), ...extensionMessageFiles(root, config.extensions, locale)])
+}
+
+// The state of the site's default locale from its catalogs, for what runs outside a request, such as `kay build` and `kay check` wording an entry's refusal; undefined where the catalogs cannot be read, which is logged and leaves the English.
 export async function defaultLocaleState(root: string, config: Pick<KayConfig, 'i18n' | 'lang' | 'extensions'>): Promise<LocaleState | undefined> {
   try {
     const i18n = config.i18n ? await loadI18n(root, config.i18n, config.extensions) : await implicitI18n(root, config.lang, config.extensions)
 
     return stateFor(i18n, i18n.settings.defaultLocale, '/', new Request('http://localhost/'))
   }
-  catch {
+  catch (error) {
+    kayLog('warn', 'kay: the site\'s catalogs failed to load, so an entry\'s refusal is worded in English', error)
+
     return undefined
   }
 }

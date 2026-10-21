@@ -331,7 +331,7 @@ describe('kay check', () => {
       // The two files alone: the fixture's own pass.
       expect(new Set(diagnostics.map(diagnostic => diagnostic.file))).toEqual(new Set([`${copy}/src/content/posts/broken.md`, `${copy}/src/routes/typo.kay`]))
       expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
-      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
+      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 6, message: expect.stringContaining('uses <Missing>, which the collection\'s components do not name') })
       expect(diagnostics.some(diagnostic => diagnostic.file === `${copy}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)
       // A component's props are typed as a template's would be: a string where it takes a number, a prop it does not take.
       expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 8, message: expect.stringMatching(/^<Counter> takes other props: Type 'string' is not assignable to type 'number'/) })

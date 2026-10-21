@@ -2,7 +2,7 @@ import type { TSchema } from 'elysia'
 import type { RawEntry } from './load'
 import type { ComponentSegment, Segment } from './markdown'
 import { errorText } from '../server/field-errors'
-import { compiledCheck, dottedPath, fieldOf, refusals } from '../server/schema-check'
+import { compiledCheck, dottedPath, fieldOf, refusals, unescaped } from '../server/schema-check'
 import { entryRefusal, kayWord } from '../server/words'
 
 export interface ContentProblem {
@@ -19,7 +19,7 @@ export class ContentError extends Error {
   override name = 'ContentError'
   readonly code = 'content-invalid'
 
-  constructor(readonly problems: ContentProblem[], hint?: string) {
+  constructor(readonly problems: ContentProblem[], readonly hint?: string) {
     super(`kay: ${problems.length === 1 ? 'an entry does' : `${problems.length} entries do`} not match the collection\n${problems.map(problem => `  ${problem.file}:${problem.line} ${problem.message}`).join('\n')}${hint === undefined ? '' : `\n${hint}`}`)
   }
 }
@@ -29,8 +29,6 @@ interface FieldSchema {
   properties?: Record<string, FieldSchema>
   items?: FieldSchema
 }
-
-const unescaped = (segment: string): string => segment.replaceAll('~1', '/').replaceAll('~0', '~')
 
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
 export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
@@ -84,7 +82,7 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
     for (const [pointer, message] of refusals(check, data, path => path, issue => refusalSentence(schema, issue))) {
       const path = dottedPath(pointer)
 
-      problems.push({ file: entry.file, line: entry.lines[unescaped(fieldOf(pointer))] ?? 1, message: path === '' ? message : `${path}: ${message}` })
+      problems.push({ file: entry.file, line: entry.lines[fieldOf(pointer)] ?? 1, message: path === '' ? message : `${path}: ${message}` })
     }
   }
 
