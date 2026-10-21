@@ -106,3 +106,8 @@ export const ledger = collection({
 export const journal = collection(sqliteLoader({ name: 'journal', database: ':memory:' }), {
   schema: s.Object({ title: s.String({ minLength: 1 }) }),
 })
+
+// A loaded collection in SQLite that opts out of the history, the trash and the activity log.
+export const scratch = collection(sqliteLoader({ name: 'scratch', database: ':memory:' }), {
+  schema: s.Object({ title: s.String({ minLength: 1 }) }),
+})

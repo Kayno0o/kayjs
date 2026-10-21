@@ -78,3 +78,37 @@ test('a deleted entry is restored through the trash API, which leaves the trash 
 test('restoring from the trash of an unknown collection is a 404', async () => {
   expect((await site.fetch('/api/cms/trash/nowhere/1/restore', { method: 'POST' })).status).toBe(404)
 })
+
+test('the activity screen lists a save then a delete newest first, pages, and leaves out a collection that opts out', async () => {
+  expect(await post('journal/logged', { data: { title: 'Logged' }, create: true })).toMatchObject({ saved: true })
+  expect(await post('scratch/quiet', { data: { title: 'Quiet' }, create: true })).toMatchObject({ saved: true })
+
+  const opened = await (await site.fetch('/api/cms/entries/journal/logged')).json() as { entry: { version: string } }
+
+  await site.fetch(`/api/cms/entries/journal/logged?version=${opened.entry.version}`, { method: 'DELETE' })
+  expect((await site.visit('/admin')).find('a[href="/admin/activity"]')).toHaveLength(1)
+
+  const page = await site.visit('/admin/activity')
+  const rows = page.find('.kcms-revision').map(row => row.text)
+  const deleted = rows.findIndex(text => text.includes('Deleted') && text.includes('logged'))
+  const created = rows.findIndex(text => text.includes('Created') && text.includes('logged'))
+
+  expect(deleted).toBeGreaterThanOrEqual(0)
+  expect(created).toBeGreaterThan(deleted)
+  expect(page.text('main')).not.toContain('quiet')
+  expect(page.title()).toContain('Activity')
+  expect((await site.visit('/admin/collections/scratch')).find('a[href="/admin/trash/scratch"]')).toHaveLength(0)
+})
+
+test('the activity screen pages at the page size', async () => {
+  for (let n = 0; n < 55; n++)
+    expect(await post(`journal/many-${n}`, { data: { title: `n${n}` }, create: true })).toMatchObject({ saved: true })
+
+  const first = await site.visit('/admin/activity')
+  const second = await site.visit('/admin/activity?page=2')
+
+  expect(first.find('.kcms-revision')).toHaveLength(50)
+  expect(second.find('.kcms-revision').length).toBeGreaterThan(0)
+  expect(second.find('.kcms-revision').length).toBeLessThan(50)
+  expect(first.find('a[href*="page=2"]').length).toBeGreaterThan(0)
+})
