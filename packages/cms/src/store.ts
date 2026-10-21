@@ -3,6 +3,7 @@ import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCol
 import type { SaveEvent } from './settings'
 import { redirectMovedPage } from 'kay/library'
 import { wording } from 'kay/words'
+import { recordActivity } from './activity'
 import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
 import { fieldsOf } from './fields'
@@ -155,6 +156,8 @@ export function setSaveHookLimit(ms = SAVE_HOOK_LIMIT_MS): void {
 
 // Tells `cms({ onSave })` of a change that went through; its failure or a hook still running past the limit is logged, as the change is written.
 async function saved(event: SaveEvent): Promise<void> {
+  await recordActivity(event)
+
   const hook = settings().onSave
 
   if (hook === undefined)

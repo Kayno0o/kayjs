@@ -1,13 +1,16 @@
+import type { Activity } from './activity'
 import type { Change } from './changes'
 import type { Edit } from './history'
 import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
+import { activityOf } from './activity'
 import { changesBetween } from './changes'
 import { countEntries } from './counts'
+import { hiddenOf } from './hidden'
 import { readEdits, readLastEdit } from './history'
 import { collections, entries, translations } from './kay/content'
-import { collectionPath, entryPath, entryTitle, newEntryPath, pageRows } from './listing'
+import { collectionPath, collectionTitle, entryPath, entryTitle, newEntryPath, pageOf, pageRows } from './listing'
 import { log } from './log'
 import { revisionsOf } from './revisions'
 import { settings } from './settings'
@@ -251,4 +254,39 @@ export async function trashScreen(name: string): Promise<TrashScreen | undefined
   const rows = (await trashOf(name)).map(item => ({ id: item.id, at: item.at, author: item.author, slug: item.slug, locale: item.locale, title: entryTitle(collection, { slug: item.slug, locale: item.locale, data: item.data as SourceEntry['data'], body: item.body, draft: false }) }))
 
   return { prefix: settings().prefix, collection, rows }
+}
+
+// An editor's action as the page shows it, with the entry's screen when the action left one.
+export interface ActivityRow {
+  at: number
+  verb: Activity['verb']
+  collection: string
+  title: string
+  slug: string
+  locale?: string | undefined
+  from?: string | undefined
+  author?: string | undefined
+  href?: string | undefined
+}
+
+export interface ActivityScreen {
+  prefix: string
+  // Newest first.
+  rows: ActivityRow[]
+  page: number
+  pages: number
+}
+
+// What the activity log reads, every collection's events together and paged; undefined when no collection keeps any.
+export async function activityScreen(page: number | undefined): Promise<ActivityScreen | undefined> {
+  const { prefix, pageSize } = settings()
+  const keeping = (await collections()).filter(collection => hiddenOf(collection.name, 'activity') !== undefined)
+
+  if (keeping.length === 0)
+    return undefined
+
+  const events = (await Promise.all(keeping.map(async collection => (await activityOf(collection.name)).map(event => ({ event, title: collectionTitle(collection) }))))).flat().sort((a, b) => b.event.at - a.event.at)
+  const shown = pageOf(events, page ?? 1, pageSize)
+
+  return { prefix, page: shown.page, pages: shown.pages, rows: shown.rows.map(({ event, title }) => ({ ...event, title, href: event.verb === 'delete' ? undefined : entryPath(prefix, event) })) }
 }

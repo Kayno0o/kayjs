@@ -529,6 +529,12 @@ To leave one collection out, give it `history: false` in `collections`: `cms({ c
 
 A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
 
+### Seeing what editors did
+
+When a collection keeps a history, the content list has an Activity button. It opens one page listing what editors did across the collections, newest first, a page at a time: who, when, and whether the entry was created, saved, published, unpublished, duplicated, deleted, restored or renamed.
+
+Each line links to the entry, except a deleted one. The log keeps the last 500 events of each collection, and a collection left out with `history: false` adds nothing to it.
+
 ### After a save
 
 `cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one.

@@ -3,6 +3,19 @@ import { defineMessages } from 'kay/i18n'
 // The French of every `cms.*` key the screens and the editor look up, which a site on a French page gets with no setup and overrides key by key in its own `src/messages/fr.ts`.
 export default defineMessages({
   cms: {
+    activity: {
+      add: 'Créée',
+      delete: 'Supprimée',
+      duplicate: 'Dupliquée',
+      empty: 'Rien pour le moment',
+      emptyHint: 'Ce que les éditeurs enregistrent, publient, suppriment, rétablissent ou renomment à partir de maintenant est listé ici.',
+      publish: 'Publiée',
+      rename: 'Renommée, avant {from}',
+      restore: 'Rétablie',
+      title: 'Activité',
+      unpublish: 'Dépubliée',
+      update: 'Enregistrée',
+    },
     admin: {
       brand: 'Administration du contenu',
       collectionUnreadable: 'Cette collection ne peut pas être lue',

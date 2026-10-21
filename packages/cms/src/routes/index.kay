@@ -9,8 +9,9 @@ import { wording } from 'kay/words'
 import EntryEdited from '../components/entry-edited.kay'
 import Refused from '../components/refused.kay'
 import { denials } from '../access'
+import { hiddenOf } from '../hidden'
 import { collections } from '../kay/content'
-import { adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
+import { activityPath, adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
 import { screenPath } from '../paths'
 import { indexRows } from '../screens'
 import { settings } from '../settings'
@@ -18,6 +19,7 @@ import { settings } from '../settings'
 const { prefix } = settings()
 const all = await collections()
 const localized = all.some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
+const logged = all.some(collection => hiddenOf(collection.name, 'activity') !== undefined)
 const denied = await denials(ctx)
 const groups = groupCollections(await indexRows(), row => row.layout)
 ---
@@ -31,6 +33,8 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
       Refused(label={wording('cms.missing.title', 'Missing pages')} reason={reason})
     else
       Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
+    if logged
+      Button(href={activityPath(prefix)} label={wording('cms.activity.title', 'Activity')})
     Button(href={screenPath(prefix, '/media')} label={wording('cms.admin.media', 'Media')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for group of groups key={group.name ?? ''}

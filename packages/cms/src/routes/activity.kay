@@ -1,0 +1,19 @@
+--- server
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { s } from 'kay'
+import { wording } from 'kay/words'
+import ActivityLog from '../components/activity-log.kay'
+import { adminTitle } from '../listing'
+import { activityScreen } from '../screens'
+
+export const page = { query: s.Object({ page: s.Optional(s.Integer()) }) }
+
+const { rows, page: current, pages } = await activityScreen(ctx.query.page) ?? ctx.notFound()
+const url = ctx.url
+---
+head
+  title {adminTitle(wording('cms.activity.title', 'Activity'))}
+PageSection(title={wording('cms.activity.title', 'Activity')} level={1})
+  ActivityLog(rows={rows})
+  Pagination(page={current} pages={pages} url={url})

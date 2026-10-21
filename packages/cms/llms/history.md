@@ -1,4 +1,4 @@
-# History and the trash
+# History, the trash and the activity log
 
 A collection read through a SQLite or Postgres loader keeps what an editor saved, the last 50 saves of each entry, which the editor lists, compares and restores, and what an editor deleted, for 30 days. It needs nothing declared, and `cms({ history: false })` turns it off, `cms({ collections: { notes: { history: false } } })` for one collection (no revisions, no trash, no buttons; what it kept stays in the store).
 
@@ -18,9 +18,15 @@ A collection read through a SQLite or Postgres loader keeps what an editor saved
 - `cms({ history: { trash: '7d' } })` keeps them for another duration, `false` keeps none. What is older is dropped when the trash is read, with no timer, and the revisions of an entry never made again go with it. Turning the trash off leaves the rows already there untouched. A restored entry comes back without its old place in an ordered collection.
 - A trash that cannot be written is logged and the delete goes on, so it cannot be undone. A delete the collection refuses keeps nothing, and the trash holds the entry as the loader gave it, so a restore after the schema changed may be refused for what it now requires.
 
+## The activity log
+
+- `<prefix>/activity`, an Activity button on the content list, lists what editors did across the collections, newest first and paged by `pageSize`: who, when, and created, saved, published, unpublished, duplicated, deleted, restored or renamed (with the old slug) which entry, linked to its screen unless it was deleted. It shows once a collection keeps a history, and a folder collection, one with `history: false` or `cms({ history: false })` adds nothing to it.
+- Each event is a small row of a third hidden collection, `activity`, written when the change is, so two saves at once never write over each other and a delete or rename is in it whether or not the trash is on. A reorder is not logged, and a save that changes nothing is, as the editor did save.
+- The last 500 events of each collection are kept: what is past them is dropped when the log is read, and by a process once in 100 events it writes.
+
 ## Which collections
 
 - The history is written through the collection's own loader, into hidden collections of its store: `sqliteLoader` and `postgresLoader` keep them in the same table as the entries (under names no collection can have), so no table, setting or migration is added.
-- A loader of your own gets history by giving `sibling(kind)`, which returns a loader for a hidden collection of that kind (`'history'`, `'trash'`) in the same store. Without it the collection keeps none, and its screens show no History button. Give the hidden loader a `get(place)` too, or each read of a revision loads the whole hidden collection.
+- A loader of your own gets history by giving `sibling(kind)`, which returns a loader for a hidden collection of that kind (`'history'`, `'trash'`, `'activity'`: a loader answering the others for a kind it does not know would mix the activity into its trash) in the same store. Without it the collection keeps none, and its screens show no History button. Give the hidden loader a `get(place)` too, or each read of a revision loads the whole hidden collection.
 - A folder collection keeps none: its files are in git, and the forge or the repository has their history.
 - Every read and write is a `get` and a `save` of one row per entry; each revision is its own row beside an index row, so a save reads the index and the newest revision, then writes the new revision and the index, and a revision beyond the cap is removed.

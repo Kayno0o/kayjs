@@ -1,0 +1,36 @@
+---
+import type { ActivityRow } from '../screens'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import { wording } from 'kay/words'
+import EntryEdited from './entry-edited.kay'
+
+// What editors did, newest first: who, when, what and to which entry.
+const { rows } = props<{ rows: ActivityRow[] }>()
+
+function action(row: ActivityRow): string {
+  switch (row.verb) {
+    case 'add': return wording('cms.activity.add', 'Created')
+    case 'publish': return wording('cms.activity.publish', 'Published')
+    case 'unpublish': return wording('cms.activity.unpublish', 'Unpublished')
+    case 'duplicate': return wording('cms.activity.duplicate', 'Duplicated')
+    case 'delete': return wording('cms.activity.delete', 'Deleted')
+    case 'restore': return wording('cms.activity.restore', 'Restored')
+    case 'rename': return wording('cms.activity.rename', 'Renamed from {from}', { from: row.from ?? '' })
+    default: return wording('cms.activity.update', 'Saved')
+  }
+}
+---
+if rows.length === 0
+  EmptyState(title={wording('cms.activity.empty', 'Nothing yet')} description={wording('cms.activity.emptyHint', 'What editors save, publish, delete, restore or rename from now on is listed here.')})
+else
+  ol.kcms-history
+    for row of rows key={`${row.at}/${row.collection}/${row.slug}/${row.locale ?? ''}/${row.verb}`}
+      li.kcms-revision
+        .kcms-revision-head
+          EntryEdited(at={row.at} moment author={row.author})
+          Badge(label={action(row)})
+          if row.href as href
+            a(href={href}) {row.title}: {row.locale ? `${row.slug} (${row.locale})` : row.slug}
+          else
+            span {row.title}: {row.locale ? `${row.slug} (${row.locale})` : row.slug}

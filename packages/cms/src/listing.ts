@@ -387,6 +387,11 @@ export function historyPath(prefix: string, ref: EntryRef): string {
   return slugged(screenPath(prefix, `/history/${encodeURIComponent(ref.collection)}`), ref)
 }
 
+// The screen of what editors did, across the collections.
+export function activityPath(prefix: string): string {
+  return screenPath(prefix, '/activity')
+}
+
 // The screen of a collection's deleted entries.
 export function trashPath(prefix: string, collection: string): string {
   return screenPath(prefix, `/trash/${encodeURIComponent(collection)}`)

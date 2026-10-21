@@ -369,7 +369,7 @@ describe('history gaps', () => {
     const trash = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
     const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` })
 
-    restore = registerCollections([['notes', collection({ ...inner, sibling: kind => plainHidden(kind === 'history' ? history : trash) }, { schema })]])
+    restore = registerCollections([['notes', collection({ ...inner, sibling: kind => plainHidden({ history, trash }[kind] ?? new Map()) }, { schema })]])
     configure({ history: { revisions: 2 } })
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await saveEntry({ ...ref, data: { title: 'Two' } })
