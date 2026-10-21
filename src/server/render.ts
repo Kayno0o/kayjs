@@ -281,7 +281,8 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
   return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
 }
 
-// What each guard did, for the dev tool: those before a refusal passed, the one refusing says how, the rest did not run.
+// What each guard did, for the dev tool: a guard's redirect goes out through `renderFailure` with the same spelling, so its outcome names the `Location` sent.
+// Those before a refusal passed, the one refusing says how, the rest did not run.
 function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined, spelling?: RenderOptions['redirectSpelling']): NonNullable<Rendering['guards']> {
   const refused = refusal ? guards.indexOf(refusal.guard) : -1
 
