@@ -18,7 +18,7 @@ import { ContentError } from '../src/content/validate'
 import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, unclickableFields, withFieldMarks } from '../src/runtime/fields'
-import { child, element, loop, spreadAttributes } from '../src/runtime/html'
+import { attribute, child, element, loop, spreadAttributes } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { navigation } from '../src/runtime/navigation'
@@ -1545,6 +1545,30 @@ describe('preview mode', () => {
       const html = withFieldMarks(marks, () => `<p>${child([entry.data.from, ' to ', entry.data.to])}</p>`)
 
       expect(placeFieldMarks(html, marks)).toBe('<p><!--kay-field crew:a:from-->3<!--/kay-field--> to <!--kay-field crew:a:to-->5<!--/kay-field--></p>')
+    }, true)
+  })
+
+  it('marks a number rendered whole in an attribute or a text whatever renders before it', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'crew', { slug: 'a', data: { ratings: [{ label: 'Speed', value: 4 }, { label: 'Aim', value: 2 }] }, Content: () => renderedHtml('') }) as { data: { ratings: { label: string, value: number }[] } }
+      const placed = (render: (rating: { label: string, value: number }) => string) => placeFieldMarks(withFieldMarks(marks, () => render(merge(entry.data.ratings[0]!) as { label: string, value: number })), marks)
+      // A component reads its props before its tag renders, and a role or a `min` between them is no field.
+      const bar = ({ label, value }: { label: string, value: number }, before = () => '') => `<span${before()}${attribute('aria-label', label)}${attribute('aria-valuenow', value)}></span>`
+
+      expect(placed(rating => bar(rating, () => attribute('role', 'meter')))).toBe('<span role="meter" aria-label="Speed" data-kay-field-aria-label="crew:a:ratings.0.label" aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"></span>')
+      expect(placed(rating => `<span${attribute('role', 'meter')}${attribute('aria-valuemin', 0)}${attribute('aria-valuenow', rating.value)}></span>`)).toBe('<span role="meter" aria-valuemin="0" aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"></span>')
+      expect(placed(({ label, value }) => `<span${attribute('title', label)}>${child(value)}</span>`)).toBe('<span title="Speed" data-kay-field-title="crew:a:ratings.0.label" data-kay-field="crew:a:ratings.0.value">4</span>')
+      // Through two components, the props copied at each hand-down.
+      const outer = (rating: { label: string, value: number }) => bar(merge(merge(rating)) as typeof rating, () => attribute('role', 'meter'))
+
+      expect(placed(outer)).toContain('aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"')
+      // A number read for logic as well, before and after it renders.
+      expect(placed((rating) => {
+        const steps = [1, 2, 3, 4, 5].filter(step => step <= rating.value).length
+
+        return `${attribute('data-steps', steps)}${bar(rating, () => attribute('role', 'meter'))}${rating.value >= 4 ? '' : 'low'}`
+      })).toContain('aria-valuenow="4" data-kay-field-aria-valuenow="crew:a:ratings.0.value"')
     }, true)
   })
 

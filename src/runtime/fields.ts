@@ -167,7 +167,7 @@ export function markedText(value: string | number, markup: string, part = false)
 
 // ` data-kay-field-<name>="..."` beside an attribute whose value a field gave.
 export function markedAttribute(name: string, value: unknown): string {
-  const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value) : undefined
+  const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value, false, false) : undefined
 
   return ref === undefined ? '' : ` ${ATTRIBUTE.field}-${name}="${fieldMarks.marking!.refs[ref]!}"`
 }
@@ -238,14 +238,14 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
 
 const anyRead = () => true
 
-function fieldOf(value: string | number, part = false): number | undefined {
+function fieldOf(value: string | number, part = false, forgets = true): number | undefined {
   const marks = fieldMarks.marking!
   const ref = typeof value === 'string' ? claim(marks.unrendered.get(value), anyRead) : claim(marks.numbers, read => read.value === value)
 
   marks.renders++
 
-  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field.
-  if (ref === undefined && !(part && typeof value === 'string'))
+  // A value no field gave is not a field's, and forgets the numbers read, so one rendered later, a row's index say, is not taken for the field; an attribute's forgets nothing, a `role` or an `aria-valuemin` between a number and its attribute being no sign it is computed.
+  if (ref === undefined && forgets && !(part && typeof value === 'string'))
     marks.numbers.length = 0
 
   return ref
