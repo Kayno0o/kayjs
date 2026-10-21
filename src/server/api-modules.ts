@@ -72,7 +72,8 @@ function servedPath(value: unknown, what: string): string {
 }
 
 const GUARD = '_guard.ts'
-const API_OPTIONS = /\bapi\s*\(\s*\{/
+
+export const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.
 const NOT_A_MODULE = /(?:^|\/)_|\.(?:test|spec|d)\.ts$/
 const INDEX = /(?:^|\/)index$/

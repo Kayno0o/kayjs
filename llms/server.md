@@ -240,7 +240,7 @@ export default defineConfig({ requireGuards: true })
 - Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
 - `export const page = { guards: false }` runs none of the guards above a page or its actions, a sign-in page under a root guard asking for a session; in a layout, none above its actions; in an endpoint, none above it.
 - An API module does so with `api({ guards: false })`.
-- Both are read from the source as written, as `layouts: false` is, so a value held in a variable keeps the guards.
+- Both are read from the source as written, as `layouts: false` is, so `kay check` and `kay dev` report a `guards` or `layouts` held in a variable, an expression or a spread rather than ignore it.
 - `requireGuards: true` in kay.config.ts fails closed: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay build --static` refuses to write such a page or endpoint.
 - A layout a library mounts asks no guard of its actions, which still run the guards above it, and the OpenAPI document is served when every module is open.
 - `kay check` reports each one as `unguarded-route`.

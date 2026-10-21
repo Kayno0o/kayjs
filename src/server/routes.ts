@@ -389,12 +389,8 @@ function layoutAccess(trees: RouteMount[], layout: string, read: LayoutsRead): L
 // The keys set to `false` in the object literal `head` opens, `export const page = { ... }` unless named, read without parsing the module: the server never loads a compiler.
 export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
   const keys = new Set<string>()
-  const found = codeMatch(source, head)
 
-  if (!found)
-    return keys
-
-  const keyAt = (at: number) => {
+  for (const at of entryStarts(source, head)) {
     FALSE_KEY.lastIndex = at
     const key = FALSE_KEY.exec(source)
     // The literal itself, not an expression starting with it: a comma or the closing brace follows.
@@ -404,18 +400,72 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
       keys.add(key[1] ?? key[2] ?? key[3]!)
   }
 
+  return keys
+}
+
+export interface UnreadSetting {
+  // The setting's key, or `...` for a spread or a computed key, which may carry any.
+  key: string
+  // Where the entry starts in the source.
+  index: number
+}
+
+const SETTING_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*/iy
+const LITERAL_BOOLEAN = /(?:true|false)(?![\w$])/y
+const LITERAL_SETTINGS = new Set(['guards', 'layouts'])
+
+// The entries of the object literal `head` opens that kay does not read as written: a spread or a computed key, which may carry `guards` or `layouts`, and a `guards` or `layouts` set to anything but a literal `true` or `false`, which the server ignores.
+export function unreadSettings(source: string, head = PAGE_EXPORT): UnreadSetting[] {
+  const found: UnreadSetting[] = []
+
+  for (const index of entryStarts(source, head)) {
+    if (source.startsWith('...', index) || source[index] === '[') {
+      found.push({ key: '...', index })
+
+      continue
+    }
+
+    SETTING_KEY.lastIndex = index
+    const key = SETTING_KEY.exec(source)
+    const name = key ? key[1] ?? key[2] ?? key[3]! : undefined
+
+    if (name === undefined || !LITERAL_SETTINGS.has(name))
+      continue
+
+    const colon = codeAfter(source, SETTING_KEY.lastIndex)
+    let literal = false
+
+    if (source[colon] === ':') {
+      LITERAL_BOOLEAN.lastIndex = codeAfter(source, colon + 1)
+      literal = LITERAL_BOOLEAN.test(source) && [',', '}'].includes(source[codeAfter(source, LITERAL_BOOLEAN.lastIndex)]!)
+    }
+
+    if (!literal)
+      found.push({ key: name, index })
+  }
+
+  return found
+}
+
+// Where each entry of the object literal `head` opens starts, past its brace or a comma: a key, a spread, or the bracket of a computed key.
+function entryStarts(source: string, head: RegExp): number[] {
+  const starts: number[] = []
+  const found = codeMatch(source, head)
+
+  if (!found)
+    return starts
+
   let depth = 1
   // Where a key of the object itself may start: past its brace or a comma.
   let atKey = true
 
   for (let i = found.index + found[0].length; i < source.length && depth > 0; i++) {
     const char = source[i]!
-
     const end = literalEnd(source, i)
 
     if (end !== -1) {
       if (depth === 1 && atKey && (char === '\'' || char === '"'))
-        keyAt(i)
+        starts.push(i)
 
       if (char !== '/')
         atKey = false
@@ -423,6 +473,9 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
       i = end
     }
     else if (char === '{' || char === '(' || char === '[') {
+      if (depth === 1 && atKey && char === '[')
+        starts.push(i)
+
       depth++
       atKey = false
     }
@@ -433,15 +486,14 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
       atKey = true
     }
     else if (!SPACE.test(char)) {
-      if (depth === 1 && atKey) {
-        keyAt(i)
-      }
+      if (depth === 1 && atKey)
+        starts.push(i)
 
       atKey = false
     }
   }
 
-  return keys
+  return starts
 }
 
 // The first match of `pattern` in code, not in a comment, a string or a template literal.

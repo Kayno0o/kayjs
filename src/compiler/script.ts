@@ -406,6 +406,10 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
           continue
         }
 
+        // The server reads these two from the source, so a value held in a variable would keep the guards and layouts with no message.
+        if ((key === 'guards' || key === 'layouts') && property.value.type !== 'BooleanLiteral')
+          analysis.diagnostics.push({ ...shift(property.value), message: `kay reads \`${key}\` as a literal \`true\` or \`false\``, help: `write \`${key}: false\` itself: the server reads it from the source, so a variable or an expression is ignored` })
+
         settings.set(key, { key: shift(property.key), value: shift(property.value) })
       }
 

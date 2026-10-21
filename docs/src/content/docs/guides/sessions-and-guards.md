@@ -223,7 +223,7 @@ Only what the app derives is in `ctx.locals` at that point. Read the user from w
 
 ### Public routes
 
-A page that anyone may reach under a guard, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`. It and its actions run none of the guards above.
+A page that anyone may reach under a guard, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`. It and its actions run none of the guards above. Write `false` itself: kay reads it from the source, so `kay check` and `kay dev` report a variable or an expression there rather than ignore it.
 
 ```kay
 --- server

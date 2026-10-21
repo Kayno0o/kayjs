@@ -41,7 +41,7 @@ export const ERRORS = {
   },
   'fence-invalid': {
     group: 'compile',
-    summary: 'A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings.',
+    summary: 'A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings, a `guards` or `layouts` in it that is no literal `true` or `false`.',
     fix: { file: 'llms/components.md', heading: 'File layout' },
   },
   'fence-syntax': {
@@ -51,7 +51,7 @@ export const ERRORS = {
   },
   'page-settings-invalid': {
     group: 'compile',
-    summary: 'A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`.',
+    summary: 'A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`.',
     fix: { file: 'llms/routing.md', heading: 'Page settings' },
   },
   'signal-misuse': {
