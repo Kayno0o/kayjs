@@ -808,7 +808,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
       })
 
       if (imported.length === 0 || impure.length > 0)
-        return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
+        return stop(`${length === 0 ? 'reads' : 'imports'} ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
 
       continue
     }

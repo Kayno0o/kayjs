@@ -169,7 +169,7 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
   return spans
 }
 
-// Parses a fence once, moves its imports and types to module level and finds which of `globals` it reads undeclared; the other statements are left in order, then what follows the last.
+// Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
 function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)

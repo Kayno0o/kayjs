@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 // The entries an app imports from, in the order a name found in several is attributed: `kay` first, as its values need no import in a component.
-const ENTRIES = ['kay', 'kay/server', 'kay/cache', 'kay/i18n', 'kay/words', 'kay/content', 'kay/seo', 'kay/image', 'kay/icons', 'kay/markdown', 'kay/params', 'kay/edit', 'kay/island', 'kay/await', 'kay/html', 'kay/test', 'kay/dev-tool', 'kay/analytics', 'kay/pg-orm']
+const ENTRIES = ['kay', 'kay/server', 'kay/cache', 'kay/i18n', 'kay/words', 'kay/content', 'kay/seo', 'kay/image', 'kay/icons', 'kay/markdown', 'kay/params', 'kay/edit', 'kay/island', 'kay/await', 'kay/html', 'kay/test', 'kay/dev-tool', 'kay/analytics', 'kay/pg-orm', 'kay/mount', 'kay/compiler', 'kay/bun', 'kay/library']
 const EXPORT_ALL = /^export\s*\*\s*from\s*['"](\.[^'"]+)['"]/gm
 const UNKNOWN_NAME = /^Cannot find name '([\w$]+)'/
 const EXTENSIONS = ['', '.ts', '/index.ts']

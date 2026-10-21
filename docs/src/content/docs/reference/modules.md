@@ -11,7 +11,9 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-Inside a `.kay` file, everything `kay` exports needs no import, nor do `props` and the translation `t`. Everything from another entry is imported, and components, such as `T`, are always imported. A type is imported with `import type`. In a `.ts` file nothing is added; `kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path.
+Inside a `.kay` file, everything `kay` exports needs no import, nor do `props` and the translation `t`. Everything from another entry is imported, and components, such as `T`, are always imported. A type is imported with `import type`.
+
+In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path. A module an island also imports takes `s` from `kay`, which has the lighter browser build. A name only a template reads, such as `route` in a link, is imported in the script.
 
 ## kay
 

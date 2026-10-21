@@ -727,8 +727,7 @@ function authFiles({ has, tw }: Setup): Record<string, string> {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
     '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
     'src/env.ts': `import process from 'node:process'
-import { s } from 'kay'
-import { defineEnv } from 'kay/server'
+import { defineEnv, s } from 'kay/server'
 
 // Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
 export const env = defineEnv(s.Object({

@@ -179,9 +179,9 @@ ul
 
 ### Imports kay adds
 
-- Every value `kay` exports (`signal`, `persisted`, `navigate`, `s`, `action`, `localPath` and the rest) needs no import in a script or a server fence: the compiler imports it from `kay` when the file reads it without declaring or importing a name of its own. A type is still imported, `import type { Signal } from 'kay'`.
+- Every value `kay` exports (`signal`, `persisted`, `navigate`, `s`, `action`, `localPath` and the rest) needs no import in a script or a server fence: the compiler imports it from `kay` when the fence reads it without declaring or importing a name of its own. A template expression imports nothing, so a name only the template reads, such as `route` in a link, is imported in the script. A type is still imported, `import type { Signal } from 'kay'`.
 - The translation `t` of `kay/i18n` needs no import either, in a template or any fence. Everything from another entry (`defineConfig` from `kay/server`, `cached` from `kay/cache`, `T` from `kay/i18n`, `collection` from `kay/content`) is imported, and `kay check` names the entry when a name is unknown.
-- In a `.ts` module nothing is added, so `action` is imported there. `kay/server` also exports `s`, so a server module (`env.ts`, an API route) imports `defineEnv` and `s` from one path.
+- In a `.ts` module nothing is added, so `action` is imported there. `kay/server` also exports `s`, so a server module (`env.ts`, an API route) imports `defineEnv` and `s` from one path; a module an island also imports takes `s` from `kay`, which has the lighter browser build.
 
 ### Props
 

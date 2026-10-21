@@ -1,4 +1,5 @@
 import { expect, it } from 'bun:test'
+import { unknownNameHelp } from '../src/check/export-homes'
 import { insertImport } from '../src/imports'
 
 const cms = 'import { cms } from \'@kaynooo/kayjs-cms\''
@@ -59,4 +60,12 @@ it('reads a block comment sharing its line with code as code, a triple-slash dir
   expect(insertImport('/* a */ export const x = 1\n\nconst y = 2\n/* b */\n\nfoo()\n', z)).toBe(`${z}\n\n/* a */ export const x = 1\n\nconst y = 2\n/* b */\n\nfoo()\n`)
   expect(insertImport('/// <reference types="bun" />\nexport {}\n', z)).toBe(`/// <reference types="bun" />\n${z}\n\nexport {}\n`)
   expect(insertImport('\uFEFFimport { a } from \'a\'\nexport {}\n', 'import { b } from \'b\'')).toBe('\uFEFFimport { a } from \'a\'\nimport { b } from \'b\'\nexport {}\n')
+})
+
+it('hints the entry of kay exporting a name nothing declares, and nothing for a name no entry exports', () => {
+  expect(unknownNameHelp('Cannot find name \'defineEnv\'.')).toContain('from \'kay/server\'')
+  expect(unknownNameHelp('Cannot find name \'T\'. Did you mean \'t\'?')).toContain('from \'kay/i18n\'')
+  expect(unknownNameHelp('Cannot find name \'collection\'.')).toContain('from \'kay/content\'')
+  expect(unknownNameHelp('Cannot find name \'navigate\'.')).toContain('from \'kay\'')
+  expect(unknownNameHelp('Cannot find name \'nothingExportsThis\'.')).toBeUndefined()
 })

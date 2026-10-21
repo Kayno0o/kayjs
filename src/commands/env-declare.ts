@@ -234,7 +234,7 @@ export async function declareRawEnv(root: string, undeclared: ReadonlySet<string
 
   // The schema goes first, so a failed write leaves no file importing what is not there.
   if (schema.existing === undefined) {
-    await writeFile(schema.file, `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv(s.Object({\n${fields.map(line => `  ${line},\n`).join('')}}))\n`)
+    await writeFile(schema.file, `import { defineEnv, s } from 'kay/server'\n\nexport const env = defineEnv(s.Object({\n${fields.map(line => `  ${line},\n`).join('')}}))\n`)
   }
   else {
     const text = await readFile(schema.file, 'utf8')
