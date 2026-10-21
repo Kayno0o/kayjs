@@ -2,7 +2,7 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.64.0
+## 1.65.0
 
 ### kayjs-cms stops at boot for `form.body` on a collection with no Markdown body
 
