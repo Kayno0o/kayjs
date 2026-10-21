@@ -27,7 +27,7 @@ export async function leavesPublication(request: Request, path: string): Promise
     return false
 
   try {
-    const name = collectionName
+    const name = decodeURIComponent(collectionName)
     const collection = await collectionNamed(name)
     const fields = [collection.draftField, collection.publishField, collection.unpublishField].filter(field => field !== undefined)
 
@@ -35,7 +35,7 @@ export async function leavesPublication(request: Request, path: string): Promise
       return true
 
     const data = sent.data as Record<string, unknown>
-    const screen = await entryScreen({ collection: name, slug, locale: typeof sent.locale === 'string' ? sent.locale : undefined })
+    const screen = await entryScreen({ collection: name, slug: decodeURIComponent(slug), locale: typeof sent.locale === 'string' ? sent.locale : undefined })
     const saved = screen?.entry?.data
 
     // A new entry starts as a draft, with nothing scheduled.

@@ -14,7 +14,7 @@ const saved: Record<string, unknown> = { title: 'Hello', draft: false, publishAt
 void mock.module('kay/server', () => ({ ...server, editRequested: () => false, editedEntry: () => false }))
 void mock.module('../src/store', () => ({
   collectionNamed: async (name: string) => ({ name, draftField: 'draft', publishField: 'publishAt', unpublishField: undefined }),
-  entryScreen: async ({ slug }: { slug: string }) => ({ entry: slug === 'hello' ? { data: saved } : undefined }),
+  entryScreen: async ({ slug }: { slug: string }) => ({ entry: slug === 'hello' || slug === 'café' ? { data: saved } : undefined }),
 }))
 
 const { default: apiGuard } = await import('../src/api/_guard')
@@ -176,6 +176,12 @@ describe('roles', () => {
       Object.assign(ctx, { request: new Request(url, { method: 'POST', body, ...type === undefined ? {} : { headers: { 'content-type': type } } }) })
       expect(await statusOf(ctx), String(type)).toBe(403)
     }
+  })
+
+  test('a save of an entry whose slug is percent-encoded finds the entry it edits', async () => {
+    auth()
+    expect(await statusOf(ask({ path: '/entries/posts/caf%C3%A9', body: { data: { ...saved, title: 'Changed' } }, user: { roles: ['editor'] } }))).toBe(200)
+    expect(await statusOf(ask({ path: '/entries/posts/caf%C3%A9', body: { data: { ...saved, draft: true } }, user: { roles: ['editor'] } }))).toBe(403)
   })
 
   test('a save is held to the publishing rights too: it may not flip the draft flag or the publish date', async () => {
