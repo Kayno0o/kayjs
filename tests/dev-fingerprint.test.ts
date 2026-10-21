@@ -48,8 +48,20 @@ async function write(files: Record<string, string>, settled = true): Promise<voi
   }
 }
 
+// Waits for the record of the build whose manifest is on disk, not one a build before it left.
 async function recorded(): Promise<void> {
-  for (const start = Date.now(); !existsSync(join(outputDir(project), FINGERPRINT)); await Bun.sleep(10)) {
+  const current = async () => {
+    try {
+      const saved = await Bun.file(join(outputDir(project), FINGERPRINT)).json() as { manifest: string }
+
+      return saved.manifest === Bun.hash(await Bun.file(join(outputDir(project), 'manifest.json')).text()).toString(36)
+    }
+    catch {
+      return false
+    }
+  }
+
+  for (const start = Date.now(); !await current(); await Bun.sleep(10)) {
     if (Date.now() - start > 15_000)
       throw new Error('no fingerprint was written')
   }
@@ -208,7 +220,6 @@ describe('the build an earlier kay dev left', () => {
 
     await Bun.write(join(project, 'src/one.kay'), ISLAND('edited'))
     expect((await build(['src/one.kay'])).failed).toBe(false)
-    await Bun.sleep(100)
     await recorded()
     // Written a moment ago, but read by the build that followed.
     expect(await buildsAgain()).toBe(false)
@@ -222,15 +233,10 @@ describe('the build an earlier kay dev left', () => {
 
     await Bun.write(join(project, 'src/one.kay'), ISLAND('edited'))
 
-    const first = build(['src/one.kay'])
-
+    // As `kay dev` queues them: the next build begins as the one before answers, while its record waits on the maps still being rewritten.
+    expect((await build(['src/one.kay'])).failed).toBe(false)
     await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}$`\n')
-
-    const second = build(['src/util.ts'])
-
-    await first
-    await second
-    await Bun.sleep(100)
+    expect((await build(['src/util.ts'])).failed).toBe(false)
     await recorded()
     expect(await buildsAgain()).toBe(false)
   })
@@ -249,7 +255,6 @@ describe('the build an earlier kay dev left', () => {
     await Bun.write(join(project, 'src/one.kay'), ISLAND('edited'))
     await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}#`\n')
     expect((await started(['src/one.kay', 'src/util.ts'])).failed).toBe(false)
-    await Bun.sleep(100)
     await recorded()
     expect(bundle()).toContain('edited')
     expect(bundle()).toContain('}#')
