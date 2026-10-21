@@ -803,6 +803,13 @@ describe('deprecated-markup-prop', () => {
     expect(rewritten(component('import type { JSX, Snippet } from \'kay\'', '', 'props<{ a?: JSX.Element, b?: Snippet }>()'))).toEqual([component('import type { Snippet } from \'kay\'', '', 'props<{ a?: Snippet, b?: Snippet }>()')])
   })
 
+  it('keeps JSX in the import when a parameter type copied into the new one names it, and gives a this parameter no fix', () => {
+    const imports = 'import type { JSX } from \'kay\''
+
+    expect(rewritten(component(imports, '', 'props<{ trigger: (attrs: JSX.IntrinsicElements[\'button\']) => JSX.Element }>()'))).toEqual([component('import type { JSX, Snippet } from \'kay\'', '', 'props<{ trigger: Snippet<[attrs: JSX.IntrinsicElements[\'button\']]> }>()')])
+    expect(rewritten(component(imports, '', 'props<{ row: (this: Window, a: number) => JSX.Element }>()'))).toEqual([])
+  })
+
   it('has no fix while another Snippet is declared in the file', () => {
     const source = component('import type { JSX } from \'kay\'', 'type Snippet = string\n\n', 'props<{ actions?: JSX.Element }>()')
 

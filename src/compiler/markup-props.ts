@@ -138,7 +138,7 @@ function argumentsOf(type: t.TSFunctionType, code: string): string | undefined {
   for (const param of params) {
     const annotation = param.typeAnnotation?.type === 'TSTypeAnnotation' ? param.typeAnnotation.typeAnnotation : undefined
 
-    if (!annotation)
+    if (!annotation || (param.type === 'Identifier' && param.name === 'this'))
       return undefined
 
     const written = code.slice(annotation.start!, annotation.end!)
@@ -161,7 +161,6 @@ function fixOf(fence: ParsedFence, source: string, found: Rewrite[], namespace: 
     return undefined
 
   const { statement, specifier } = namespace
-  const kept = statement.specifiers.filter(other => other !== specifier)
   const alreadyThere = statement.specifiers.some(other => other.type === 'ImportSpecifier' && importedName(other) === SNIPPET)
 
   // Another name `Snippet` in the file would be shadowed by the import.
@@ -170,24 +169,19 @@ function fixOf(fence: ParsedFence, source: string, found: Rewrite[], namespace: 
 
   const edits = found.map(({ node, text }) => ({ ...fence.shift(node), text: text! }))
   const masked = [...edits, fence.shift(statement)].reduce((text, { start, end }) => text.slice(0, start) + ' '.repeat(end - start) + text.slice(end), source)
-  const stillUsed = new RegExp(`\\b${jsx.replace('$', '\\$')}\\b`).test(masked)
+  const name = new RegExp(`\\b${jsx.replace('$', '\\$')}\\b`)
+  // A parameter type copied into the new text may name it too.
+  const stillUsed = name.test(masked) || edits.some(edit => name.test(edit.text))
   const at = fence.shift(specifier)
 
   if (stillUsed && !alreadyThere)
     edits.push({ start: at.end, end: at.end, text: `, ${statement.importKind !== 'type' && specifier.importKind === 'type' ? 'type ' : ''}${SNIPPET}` })
   else if (!stillUsed && !alreadyThere)
     edits.push({ ...at, text: `${statement.importKind !== 'type' && specifier.importKind === 'type' ? 'type ' : ''}${SNIPPET}` })
-  else if (!stillUsed && kept.length === 0)
-    edits.push({ ...fence.shift(statement), ...removal(source, fence.shift(statement)) })
   else if (!stillUsed)
     edits.push(removeSpecifier(statement, specifier, fence))
 
   return { title: 'Write `Snippet`', edits, safe: true }
-}
-
-// The statement and the line break after it.
-function removal(source: string, span: { start: number, end: number }): { start: number, end: number, text: string } {
-  return { start: span.start, end: source[span.end] === '\n' ? span.end + 1 : span.end, text: '' }
 }
 
 // A specifier with the comma beside it.
