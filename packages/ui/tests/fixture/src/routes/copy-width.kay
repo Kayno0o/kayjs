@@ -1,5 +1,6 @@
 ---
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import '../app.css'
 ---
 main
   CopyButton#short(text="x" copiedFor="6s" label="Copy")

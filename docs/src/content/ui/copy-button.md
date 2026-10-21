@@ -6,7 +6,7 @@ description: A button that copies a text to the clipboard and confirms it.
 
 `text` is what is copied and `label` names the button. For `copiedFor` after a successful copy, two seconds by default and a duration with its unit such as `500ms`, it reads `copiedLabel` (`Copied!` by default), and `failure` is toasted when the browser refuses. A status region after the button, visually hidden, says `copiedLabel` too, as screen readers do not read a button's new text: the component renders these two elements.
 
-Both labels sit inside the button, in a `.kui-copy-btn-text` span, the one not showing hidden from sight and from screen readers, so the button keeps the width of the wider one through the copy. The shorter label is centred in that width.
+The button keeps the width of the wider of `label` and `copiedLabel` through the copy: the label not showing is drawn invisibly beside the one showing, so the button's text and accessible name stay the visible label. The shorter label is centred.
 
 ## Rich text
 

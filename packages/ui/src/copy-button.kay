@@ -44,9 +44,7 @@ async function press() {
 }
 ---
 button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(tone, className)} data-variant={variant} data-size={size} onClick={press})
-  // Both labels share one grid cell, so the button keeps the wider one's width; the one not showing is hidden from sight and from the accessible name.
-  span.kui-copy-btn-text
-    span(aria-hidden={copied() ? 'true' : undefined}) {label}
-    span(aria-hidden={copied() ? undefined : 'true'}) {copiedLabel}
+  // The label not showing is drawn invisibly by CSS from `data-other`, so the button keeps the wider label's width while its text and accessible name stay the one showing.
+  span.kui-copy-btn-text(data-other={copied() ? label : copiedLabel}) {copied() ? copiedLabel : label}
 // A button's new text is not read out, so the copy is said here too.
 span.kui-copy-btn-live(role="status") {copied() ? copiedLabel : ''}

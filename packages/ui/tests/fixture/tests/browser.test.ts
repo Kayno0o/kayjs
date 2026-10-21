@@ -755,15 +755,17 @@ inBrowser('a CopyButton on a served page', () => {
     })
     const ids = ['short', 'longer', 'shorter', 'ghost-xs', 'inline-lg']
     const widths = async () => page.evaluate((list: string[]) => list.map(id => document.getElementById(id)!.getBoundingClientRect().width), ids)
-    // The names Chromium gives the buttons, which leave out what is aria-hidden or invisible.
+    // The names Chromium gives the buttons, which leave out the invisible label and come uppercased, as the buttons are drawn.
     const names = async () => {
       const { nodes } = await page.cdp<{ nodes: { role?: { value: string }, name?: { value: string } }[] }>('Accessibility.getFullAXTree')
 
-      return nodes.filter(node => node.role?.value === 'button').map(node => node.name?.value)
+      return nodes.filter(node => node.role?.value === 'button').map(node => node.name?.value.toLowerCase())
     }
+    const texts = async () => page.evaluate((list: string[]) => list.map(id => document.getElementById(id)!.textContent), ids)
     const before = await widths()
 
-    expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+    expect(await texts()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+    expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'].map(name => name.toLowerCase()))
 
     for (const id of ids)
       await page.click(`#${id}`)
@@ -771,11 +773,13 @@ inBrowser('a CopyButton on a served page', () => {
     await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 5)
 
     expect(await widths()).toEqual(before)
-    expect(await names()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'])
+    expect(await texts()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'])
+    expect(await names()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'].map(name => name.toLowerCase()))
     await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 0, { timeout: 10_000 })
 
     expect(await widths()).toEqual(before)
-    expect(await names()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+    expect(await texts()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
+    expect(await names()).toEqual(['copy', 'copy', 'copy the install command', 'copy', 'copy'])
     expect(page.errors).toEqual([])
   }, 120_000)
 })

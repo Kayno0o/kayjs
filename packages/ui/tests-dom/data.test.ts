@@ -61,8 +61,6 @@ describe('Avatar', () => {
 })
 
 describe('CopyButton', () => {
-  // The label showing: the one not showing is aria-hidden, so it is not in the button's accessible name.
-  const shown = (root: ParentNode) => root.querySelector('#copy')?.querySelector('span > span:not([aria-hidden])')?.textContent
   const { clipboard } = navigator
   const { ClipboardItem } = globalThis
 
@@ -96,7 +94,7 @@ describe('CopyButton', () => {
     await settle()
 
     expect(written).toEqual([{ 'text/plain': 'https://kaynooo.fr', 'text/html': '<b>kaynooo.fr</b>' }])
-    expect(shown(root)).toBe('Copied!')
+    expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
     expect(root.querySelector('#copy + [role="status"]')?.textContent).toBe('Copied!')
   })
 
@@ -110,11 +108,11 @@ describe('CopyButton', () => {
       click(root.querySelector('#copy'))
       await clock.elapse(10)
       await clock.settle()
-      expect(shown(root)).toBe('Copied!')
+      expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
       await clock.elapse(lasts - 100)
-      expect(shown(root)).toBe('Copied!')
+      expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
       await clock.elapse(200)
-      expect(shown(root)).toBe('Copy link')
+      expect(root.querySelector('#copy')?.textContent).toBe('Copy link')
       clock.stop()
       mounted?.unmount()
     }
@@ -128,6 +126,6 @@ describe('CopyButton', () => {
     await settle()
 
     expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not copy to the clipboard')
-    expect(shown(root)).toBe('Copy link')
+    expect(root.querySelector('#copy')?.textContent).toBe('Copy link')
   })
 })
