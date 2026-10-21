@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.61.0
 
 - `kay dev` follows a `.env` edit for a value that expands another (`A=$HOME/x`, `B=${A}`), which kept its first value, and the process loading `kay.config.ts` for the editor types reads the new `.env` values as the server does ([Dev server](dev-server.md)).
 - A post behind a proxy that ends TLS swaps its page in place: the redirect back is a path, so the browser no longer reads `http:` against its own `https:` and loads the page in full ([Actions](actions.md#forms)).
