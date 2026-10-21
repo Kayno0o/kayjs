@@ -453,7 +453,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     const section = attribute(element, 'section')
 
-    if (section?.kind === 'boolean' && (element.name !== 'a' || !has(element, 'href')))
+    if (section?.kind === 'boolean' && (element.name !== 'a' || !(has(element, 'href') || element.attributes.some(candidate => candidate.kind === 'spread'))))
       lint(section.name, 'section-not-a-link', 'A `section` only marks a link', { note: 'kay marks a link carrying it as current on the pages below it, and writes the attribute out of the page', help: 'put it on an `a` with an `href`, or remove it' })
 
     const autocomplete = staticValue(element, 'autocomplete')

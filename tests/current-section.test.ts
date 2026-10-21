@@ -49,4 +49,12 @@ describe('a link marked section', () => {
       expect(await marks(site, '/en')).toEqual(['home:page'])
     }
   })
+
+  it('holds under a base and a locale prefix together', async () => {
+    const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true }, base: '/repo', trailingSlash: 'always' }))
+
+    expect(await marks(site, '/en/docs/guide/')).toEqual(['docs:true', 'guide:page'])
+    expect(await marks(site, '/en/')).toEqual(['home:page'])
+    expect(await marks(site, '/fr/docs/')).toEqual(['docs:page', 'up:page'])
+  })
 })

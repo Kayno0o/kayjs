@@ -1329,6 +1329,17 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('takes section on a link only', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nconst path = "/"\n---\na(href="/" section) Home\na(href={path} section) Other\ndiv(section) No\n' })
+
+    try {
+      expect((await check(root)).map(diagnostic => [diagnostic.line, firstLine(diagnostic.message)])).toEqual([[6, expect.stringContaining('only marks a link')], [6, expect.stringContaining('HtmlAttributes<"div">')]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('passes a component the class it merges with a spread or a shorthand as one string, which its props type', async () => {
     const root = await scratchProject({
       'src/box.kay': '---\nconst { label, class: className } = props<{ label: string, class?: string }>()\n---\np(class={className}) {label}\n',

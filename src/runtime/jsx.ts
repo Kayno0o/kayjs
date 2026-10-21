@@ -157,9 +157,10 @@ interface SpelledAttributes {
   output: { for?: AttributeValue }
 }
 
-// kay's own, never written out: a `head` title marked `raw` is left out of `seo.titleTemplate`.
+// kay's own, never written out: a `head` title marked `raw` is left out of `seo.titleTemplate`, and a link marked `section` is also current on the pages below it.
 interface KayAttributes {
   title: { raw?: boolean | undefined }
+  a: { section?: boolean | undefined }
 }
 
 type HtmlAttributes<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes<HTMLElementTagNameMap[Tag]>

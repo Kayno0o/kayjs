@@ -1107,6 +1107,20 @@ describe('shorthand classes with a decimal', () => {
   })
 })
 
+describe('section link', () => {
+  it('never writes section, in the server or the browser markup, and marks only the server one', () => {
+    for (const output of ['html', 'dom'] as const) {
+      for (const link of ['a(href="/docs" section) Docs', 'a(href={path} section) Docs', 'a(href="/docs" hreflang="en" section) Docs']) {
+        const result = compileKay(`---\nconst path = '/docs'\n---\n${link}\n`, 'test.kay', { output })
+
+        expect(result.diagnostics).toEqual([])
+        expect(result.tsx).not.toContain('section')
+        expect(result.tsx.includes('currentPage')).toBe(output === 'html')
+      }
+    }
+  })
+})
+
 describe('image placeholder', () => {
   const page = (img: string) => `---\nimport { image } from 'kay/image'\nimport hero from './hero.png'\n---\n${img}\n`
   const compiled = (img: string, output: 'html' | 'dom') => compileKay(page(img), 'test.kay', { output })
