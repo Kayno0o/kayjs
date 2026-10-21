@@ -49,8 +49,8 @@ export async function listeningPort(child: Piped & { stdout: ReadableStream<Uint
   return pattern.exec(output)![1]!
 }
 
-// Runs the server under a shell ignoring SIGTERM, which is all Bun signals. The server keeps the shell's stdin, `<&0` undoing the null one a shell gives a background job.
-const SUPERVISOR = 'trap "" TERM; "$@" <&0 & child=$!; trap \'kill -KILL $child; exit 0\' HUP; wait $child'
+// Runs the server under a shell ignoring SIGTERM, which is all Bun signals. The server keeps the shell's stdin through fd 3: a POSIX shell (busybox's on Alpine) points a background job's stdin at /dev/null before its redirections run, so `<&0` would read that.
+const SUPERVISOR = 'exec 3<&0; trap "" TERM; "$@" <&3 3<&- & child=$!; trap \'kill -KILL $child; exit 0\' HUP; wait $child'
 
 interface SuiteServerOptions<In extends 'ignore' | 'pipe', Err extends 'ignore' | 'pipe'> {
   cwd?: string
