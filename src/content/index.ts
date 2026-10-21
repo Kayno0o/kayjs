@@ -469,7 +469,14 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const { list } = await loaded()
       const entry = list.find(candidate => !hidden(candidate))
 
-      return entry ? editableEntries(name, [entry], blockItem)[0]!.data : fallback ?? options.seed
+      if (entry)
+        return editableEntries(name, [entry], blockItem)[0]!.data
+
+      // The seed is marked as the entry the first save writes, so a page showing it can be edited before that save.
+      if (fallback === undefined && options.seed !== undefined)
+        return editableEntries(name, [{ slug: 'index', data: options.seed, Content: () => html('') }], blockItem)[0]!.data
+
+      return fallback ?? options.seed
     },
     // Holds `reset`, which the listener only holds weakly.
     invalidate: () => {

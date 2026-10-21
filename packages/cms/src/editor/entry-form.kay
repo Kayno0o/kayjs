@@ -41,6 +41,7 @@ const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefin
 // The page editor asks no author, so its editors are counted, and named ones are told of them.
 const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
+let created = false
 const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 onCleanup(onSaved.stop)
@@ -94,7 +95,9 @@ async function save(): Promise<void> {
   let saved = false
 
   try {
-    saved = await saveDraft(drafts, entry, { onSaved: (outcome) => {
+    // A single collection's seed is no entry yet: the first save writes it.
+    saved = await saveDraft(drafts, entry, { create: source.value()?.seeded === true && !created, onSaved: (outcome) => {
+      created = true
       onSaved(outcome)
 
       if (outcome.rebuilding)

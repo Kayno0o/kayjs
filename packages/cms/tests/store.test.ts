@@ -3,7 +3,7 @@ import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { countEntries } from '../src/counts'
@@ -688,6 +688,37 @@ describe('duplicateEntry', () => {
     expect(await duplicateEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(await duplicateEntry({ collection: 'home', slug: 'index' })).toHaveProperty('issues.0.message', 'Home holds one entry, which cannot be duplicated')
     expect(saved).toEqual([])
+  })
+})
+
+describe('a single collection\x27s seed, through the entries route', () => {
+  const seeded: CollectionInfo = { ...home, name: 'seeded', dir: 'content/seeded', seed: { title: 'Welcome' } }
+  const read = async (collection: string, slug: string) => entriesApi.handle(new Request(`http://site.test/${collection}/${slug}`))
+
+  beforeEach(() => {
+    collectionList.push(seeded)
+  })
+  afterEach(() => {
+    collectionList.splice(collectionList.indexOf(seeded), 1)
+  })
+
+  test('opens as the entry its first save writes, the form to save it as new', async () => {
+    const answer = await read('seeded', 'index')
+
+    expect(answer.status).toBe(200)
+    expect(await answer.json()).toMatchObject({ entry: { slug: 'index', data: { title: 'Welcome' } }, seeded: true })
+  })
+
+  test('opens nothing for another slug, a single collection with no seed, or once its entry exists', async () => {
+    expect((await read('seeded', 'other')).status).toBe(404)
+    expect((await read('home', 'index')).status).toBe(404)
+
+    stored.seeded = [{ slug: 'index', data: { title: 'Written' }, draft: false }]
+
+    const written = await (await read('seeded', 'index')).json() as { entry: { data: unknown }, seeded?: true }
+
+    expect(written.entry.data).toEqual({ title: 'Written' })
+    expect(written.seeded).toBeUndefined()
   })
 })
 

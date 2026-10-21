@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `iconProps(set, 'tabler:home')` draws the prefixed name `iconField` stores, `undefined` for another set's prefix ([Images](images.md)).
+- A `single` collection still showing its `seed` is editable on the page in edit mode, its fields marked as the entry's first save writes ([A collection of one entry](content.md)).
 - `kay/test` keeps Chrome open five minutes after the last page closes instead of one second, so a file pausing between pages launches it once ([Browser tests](testing-browser.md)).
 - `kay/test/dom` keeps `fetch`, `Response` and the other web classes as Bun's, so a preloaded DOM no longer breaks a test serving with `Bun.serve` ([Testing](testing.md)).
 - kayjs-ui's Table hands `@bulk` keys, `selected` and `onSelect` the type of its `rowKey`, so a `string[]` parameter takes them with no cast ([Tables](../packages/ui/llms/tables-navigation-and-layout.md)).
