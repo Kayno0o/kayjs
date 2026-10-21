@@ -82,11 +82,11 @@ export interface CmsTest {
   entry: (collection: string, slug: string, options?: Pick<EntryRef, 'locale'>) => Promise<StoredEntry | undefined>
 }
 
-async function answered(response: Response, what: string): Promise<unknown> {
+async function answered(response: Response, what: string, missing = false): Promise<unknown> {
   if (response.status === 401 || response.status === 403)
     throw new Error(`kayjs-cms: ${what} was refused with ${response.status}: sign the site in first with \`cms.signInAs()\`, as a role the guard admits`)
 
-  if (!response.ok && response.status !== 404)
+  if (!response.ok && !(missing && response.status === 404))
     throw new Error(`kayjs-cms: ${what} answered ${response.status}: ${await response.text()}`)
 
   return response.status === 404 ? undefined : response.json()
@@ -107,7 +107,7 @@ export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch'>): CmsTest {
     },
     entry: async (collection, slug, options = {}) => {
       const query = options.locale === undefined ? '' : `?locale=${encodeURIComponent(options.locale)}`
-      const found = await answered(await site.fetch(`${path(collection, slug)}${query}`), `reading ${collection}/${slug}`) as { entry?: StoredEntry } | undefined
+      const found = await answered(await site.fetch(`${path(collection, slug)}${query}`), `reading ${collection}/${slug}`, true) as { entry?: StoredEntry } | undefined
 
       return found?.entry
     },

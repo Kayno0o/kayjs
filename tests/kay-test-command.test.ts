@@ -73,15 +73,15 @@ async function project(withBunfig: boolean): Promise<string> {
   return dir
 }
 
-async function run(dir: string, command: string[]): Promise<{ code: number, report: string }> {
-  const child = Bun.spawn(command, { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_ROOT: dir } })
+async function run(dir: string, command: string[], extra: Record<string, string> = {}): Promise<{ code: number, report: string }> {
+  const child = Bun.spawn(command, { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...extra, KAY_ROOT: dir } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, report: out + err }
 }
 
-async function kayTest(dir: string, args: string[] = []) {
-  return run(dir, [process.execPath, CLI, 'test', ...args])
+async function kayTest(dir: string, args: string[] = [], extra: Record<string, string> = {}) {
+  return run(dir, [process.execPath, CLI, 'test', ...args], extra)
 }
 
 async function withDatabase(dir: string): Promise<void> {
@@ -152,6 +152,17 @@ describe('kay test', () => {
     expect(report).toContain('kaboom')
     expect(report).toMatch(/at boom \(\S+src\/routes\/index\.kay:6:/)
     expect(code).not.toBe(0)
+  }, 60_000)
+
+  it('reports a failure at the .kay line when Bun colours its report', async () => {
+    const dir = await project(false)
+
+    await Bun.write(join(dir, 'tests', 'boom.test.ts'), `import { it } from 'bun:test'\nimport { boom } from '../src/routes/index.kay'\n\nit('throws', () => { boom() })\n`)
+
+    const { report } = await kayTest(dir, ['tests/boom.test.ts'], { FORCE_COLOR: '1' })
+
+    // eslint-disable-next-line no-control-regex
+    expect(report.replaceAll(/\u001B\[[0-9;]*m/g, '')).toMatch(/at boom \(\S+src\/routes\/index\.kay:6:/)
   }, 60_000)
 
   it('passes the arguments on to bun test and answers its exit code', async () => {

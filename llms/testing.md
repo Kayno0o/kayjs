@@ -153,7 +153,7 @@ A test never writes into the project's `src/content`: a folder collection moves 
 
 ### Test a component's handlers
 
-`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it.
+`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it. Registering replaces `setTimeout` and makes `document` exist, so a file stubbing timers or rendering pages before its first mount imports `kay/test/dom` at its top instead.
 
 ```ts
 import { expect, it } from 'bun:test'

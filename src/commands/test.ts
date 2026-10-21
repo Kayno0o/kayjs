@@ -1,13 +1,19 @@
 import type { Command } from './command'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import process from 'node:process'
 import { mapPosition } from '../build/sourcemap'
 import { transformKay } from '../build/transform'
 import { projectRoot } from './command'
 import { USAGES } from './usages'
 
-// A `.kay` position in Bun's report, the path absolute, with nothing but colour codes before it.
+// A `.kay` position in Bun's report, the path absolute.
 const KAY_POSITION = /(\/[^\s()]+\.kay):(\d+):(\d+)/g
+// The colour codes Bun puts between the parts of a position when it writes to a terminal.
+// eslint-disable-next-line no-control-regex
+const COLOUR_CODES = /\u001B\[[0-9;]*m/g
+const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
+// A watching run clears the screen itself, which only a terminal does, so it keeps the terminal.
+const WATCHING = new Set(['--watch', '--hot'])
 
 // Runs `bun test` in the project with what a kay project's tests need, so nothing but a test script is written: each file in modules of its own (`--isolate`, which gives each file its own test database), `kay/test/preload` loaded, and the `.kay` positions Bun reports pointed at the lines of the source.
 export const test: Command = {
@@ -22,20 +28,44 @@ export const test: Command = {
     if (root === undefined)
       return 1
 
-    const color = process.stdout.isTTY && process.env.NO_COLOR === undefined
+    const watching = positionals.some(argument => WATCHING.has(argument))
+    const color = (process.stdout.isTTY || process.stderr.isTTY) && process.env.NO_COLOR === undefined && process.env.FORCE_COLOR === undefined
     const child = Bun.spawn([process.execPath, 'test', '--isolate', '--preload', 'kay/test/preload', ...positionals], {
       cwd: root,
       stdin: 'inherit',
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: watching ? 'inherit' : 'pipe',
+      stderr: watching ? 'inherit' : 'pipe',
       env: { ...process.env, ...color && { FORCE_COLOR: '1' } },
     })
-    const mapper = framesIn(root)
+    // The child gets the signal and ends with its report, which is still relayed, so nothing it holds (databases, ports, Chrome) outlives a cancelled run.
+    const forward = (signal: NodeJS.Signals) => () => void child.kill(signal)
+    const handlers = FORWARDED.map(signal => [signal, forward(signal)] as const)
 
-    await Promise.all([relay(child.stdout, process.stdout, mapper), relay(child.stderr, process.stderr, mapper)])
+    for (const [signal, handler] of handlers)
+      process.on(signal, handler)
 
-    return child.exited
+    try {
+      if (!watching) {
+        const mapper = framesIn(root)
+
+        await Promise.all([relay(child.stdout as ReadableStream<Uint8Array>, process.stdout, mapper), relay(child.stderr as ReadableStream<Uint8Array>, process.stderr, mapper)])
+      }
+
+      return await child.exited
+    }
+    finally {
+      for (const [signal, handler] of handlers)
+        process.off(signal, handler)
+    }
   },
+}
+
+// Writes what a closed pipe (`kay test | head`) refuses to nowhere.
+function write(to: NodeJS.WriteStream, text: string): void {
+  try {
+    to.write(text)
+  }
+  catch {}
 }
 
 // Copies a stream line by line, mapping the lines that name a `.kay` position; an unfinished line is written at once unless it names one, so a progress marker does not wait for its newline.
@@ -50,32 +80,47 @@ async function relay(from: ReadableStream<Uint8Array>, to: NodeJS.WriteStream, m
     pending = text.slice(end)
 
     if (end > 0)
-      to.write(text.slice(0, end).split('\n').map((line, index, lines) => index === lines.length - 1 ? line : map(line)).join('\n'))
+      write(to, text.slice(0, end).split('\n').map((line, index, lines) => index === lines.length - 1 ? line : map(line)).join('\n'))
 
     if (pending !== '' && !pending.includes('.kay')) {
-      to.write(pending)
+      write(to, pending)
       pending = ''
     }
   }
 
+  pending += decoder.decode()
+
   if (pending !== '')
-    to.write(map(pending))
+    write(to, map(pending))
 }
 
-// Maps a line's `.kay` positions, from the position in the code the loader compiled the file to, which the test process's own loader compiles the same way.
+// Maps a line's `.kay` positions, from the position in the code the loader compiled the file to.
+// A line coloured on a terminal is mapped without its colours, as they split the position.
 function framesIn(root: string): (line: string) => string {
-  const known = new Set<string>()
+  const compiledAt = new Map<string, number>()
 
-  return line => line.replace(KAY_POSITION, (found, file: string, row: string, column: string) => {
-    if (!known.has(file)) {
-      known.add(file)
+  const mapped = (line: string) => line.replace(KAY_POSITION, (found, file: string, row: string, column: string) => {
+    try {
+      const modified = statSync(file, { throwIfNoEntry: false })?.mtimeMs
 
-      try {
+      if (modified === undefined)
+        return found
+
+      if (compiledAt.get(file) !== modified) {
         transformKay(readFileSync(file, 'utf8'), file, { target: 'ssr', hydratable: true, root })
+        compiledAt.set(file, modified)
       }
-      catch {}
+    }
+    catch {
+      return found
     }
 
     return mapPosition(file, row, column) ?? found
   })
+
+  return (line) => {
+    const plain = line.replaceAll(COLOUR_CODES, '')
+
+    return plain === line || !plain.includes('.kay:') ? mapped(line) : mapped(plain)
+  }
 }

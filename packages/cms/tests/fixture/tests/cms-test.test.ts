@@ -48,3 +48,11 @@ test('a site that is not signed in cannot save or read, and says how to sign in'
   editor.signOut()
   await expect(editor.entry('posts', 'hello')).rejects.toThrow('sign the site in first')
 })
+
+test('a collection that does not exist is an error, not an empty answer', async () => {
+  const site = await siteWith('pw-editor')
+  const editor = cmsTest(site)
+
+  await editor.signInAs()
+  await expect(editor.save('nowhere', 'a', { title: 'A' })).rejects.toThrow('answered 404')
+})
