@@ -283,7 +283,8 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     if (collection.kind !== 'folder')
       return { ...listed, total }
 
-    const last = await editsOf(listed.rows.flatMap(row => seen.get(key(row.slug, row.locale)) ?? []))
+    // Rows a sort by edit ordered already carry theirs.
+    const last = listed.rows.every(row => row.modifiedAt !== undefined) ? undefined : await editsOf(listed.rows.flatMap(row => seen.get(key(row.slug, row.locale)) ?? []))
 
     const rows = await Promise.all(listed.rows.map(async (row) => {
       const path = seen.get(key(row.slug, row.locale))?.path

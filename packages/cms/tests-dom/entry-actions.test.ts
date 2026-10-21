@@ -314,7 +314,7 @@ test('Create and add another creates the entry, then leaves for an empty form', 
   const root = await open(undefined, POSTS, true)
 
   // A page URL for the navigation after the save to resolve against.
-  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/new/posts')
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/start')
   await type(root, 'Next one')
   ;(button(root, 'Create and add another') as HTMLButtonElement).click()
   await pause()
@@ -324,4 +324,5 @@ test('Create and add another creates the entry, then leaves for an empty form', 
   expect(posts).toHaveLength(1)
   expect(String(posts[0]![0])).toContain('next-one')
   expect(JSON.parse(String((posts[0]![1] as RequestInit).body))).toMatchObject({ create: true })
+  expect(window.location.pathname).toBe('/admin/new/posts')
 })

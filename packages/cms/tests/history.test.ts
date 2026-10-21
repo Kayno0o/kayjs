@@ -23,6 +23,9 @@ beforeAll(async () => {
   await writeFile(join(dir, 'content/b é.md'), 'b')
   await git('add', '.')
   await git('commit', '-q', '-m', 'second', '--author=Grace <grace@example.com>')
+  await writeFile(join(dir, 'content/q"t.md'), 'q')
+  await git('add', '.')
+  await git('commit', '-q', '-m', 'third', '--author=Linus <linus@example.com>')
   await writeFile(join(dir, 'content/loose.md'), 'loose')
   setContentPlace(dir, dir)
 })
@@ -35,6 +38,7 @@ it('reads each file\'s last commit in one go, and the modification time of a fil
   const edits = await readEdits(['content/a.md', 'content/b é.md', 'content/loose.md', 'content/missing.md'])
 
   expect(edits.get('content/a.md')).toMatchObject({ author: 'Ada' })
+  expect((await readEdits(['content/q"t.md'])).get('content/q"t.md')).toMatchObject({ author: 'Linus' })
   expect(edits.get('content/b é.md')).toMatchObject({ author: 'Grace' })
   expect(edits.get('content/loose.md')?.author).toBeUndefined()
   expect(edits.get('content/loose.md')?.at).toBeGreaterThan(0)
@@ -43,6 +47,6 @@ it('reads each file\'s last commit in one go, and the modification time of a fil
 })
 
 it('gives the last commit touching a folder', async () => {
-  expect(await readLastEdit('content')).toMatchObject({ author: 'Grace' })
+  expect(await readLastEdit('content')).toMatchObject({ author: 'Linus' })
   expect(await readLastEdit('nowhere')).toBeUndefined()
 })
