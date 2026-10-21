@@ -474,7 +474,7 @@ async function loadLibrary(dir: string, name: string, project: LibraryProject): 
     path = Bun.resolveSync(`${LIBRARIES[name]![0]!}/add`, dir)
   }
   catch {
-    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install keeps kay add from installing it: it has to be installed to say what it writes`)
+    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install or --dry-run keeps kay add from installing it: it has to be installed to say what it writes`)
   }
 
   const module = await import(path) as { default?: LibraryFeature | ((project: LibraryProject) => LibraryFeature) }
@@ -616,7 +616,7 @@ async function addLibraries(dir: string, core: readonly Feature[], libraries: re
   try {
     let next = plan
 
-    if (missing.length > 0 && options.install !== false) {
+    if (missing.length > 0 && options.install !== false && options.dryRun !== true) {
       await installPackages(dir, missing, options.bun ?? process.execPath)
 
       // The package.json changed on disk, so the merge starts over from it.
@@ -649,6 +649,8 @@ async function writePlan(dir: string, { writes }: Plan): Promise<string[]> {
 }
 
 export interface AddOptions {
+  // Plans the files and notes without writing or installing anything, so a library has to be installed already to be planned.
+  dryRun?: boolean | undefined
   install?: boolean | undefined
   // The executable that runs `add` and `install`, `bun` itself unless a test stands in for it.
   bun?: string | undefined
@@ -692,8 +694,8 @@ export async function addFeatures(dir: string, names: readonly string[], options
   if (libraries.length > 0)
     plan = await addLibraries(dir, core, libraries, plan, options)
 
-  const written = await writePlan(dir, plan)
-  const install = options.install !== false && (plan.writes.has('package.json') || libraries.length > 0)
+  const written = options.dryRun === true ? [...plan.writes.keys()].sort() : await writePlan(dir, plan)
+  const install = options.install !== false && options.dryRun !== true && (plan.writes.has('package.json') || libraries.length > 0)
 
   if (install) {
     const done = await spawn([options.bun ?? process.execPath, 'install'], dir)

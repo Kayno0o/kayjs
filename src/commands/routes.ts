@@ -56,7 +56,7 @@ const MASKABLE_ICON = /^\/icon-maskable-/
 // Every route the project serves, as its server would boot, without running a page or a guard: what a URL that does not match was meant to hit. API modules run as they are imported, as the server imports them.
 export const routes: Command = {
   usage: USAGES.routes,
-  options: { format: { type: 'string' } },
+  options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {
     const format = formatOption('routes', values.format)
@@ -89,7 +89,7 @@ export const routes: Command = {
 
     const { routes: listed, unlisted } = await listRoutes(root)
 
-    console.log(formatListing(listed) + (unlisted.length === 0 ? '' : `\n\nNot listed: the routes ${unlisted.join(' and ')} ${unlisted.length === 1 ? 'adds' : 'add'} when the server starts.`))
+    console.log(formatListing(listed) + (unlisted.length === 0 || values.quiet === true ? '' : `\n\nNot listed: the routes ${unlisted.join(' and ')} ${unlisted.length === 1 ? 'adds' : 'add'} when the server starts.`))
 
     return 0
   },

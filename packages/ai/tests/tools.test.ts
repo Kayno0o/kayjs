@@ -26,7 +26,7 @@ async function conversation(prompt = 'go', extra: { maxSteps?: number, offer?: s
 }
 
 // The results the model was sent back in the last ask.
-function lastResults(): { id: string, content: string, failed: boolean }[] {
+function lastResults(): { id: string, content: string, ok: boolean, failed: boolean }[] {
   return fakeAi.last()!.messages.at(-1)!.results!
 }
 
@@ -61,7 +61,7 @@ describe('actions as tools', () => {
 
     expect(second.messages.map(message => message.role)).toEqual(['user', 'assistant', 'user'])
     expect(second.messages[1]!.calls).toEqual([{ id: 'x1', name: 'add_note', arguments: '{"title":"Milk"}' }])
-    expect(second.messages[2]!.results).toEqual([{ id: 'x1', content: expect.stringContaining('Milk'), failed: false }])
+    expect(second.messages[2]!.results).toEqual([{ id: 'x1', content: expect.stringContaining('Milk'), ok: true, failed: false }])
     expect(outcome.usage!.inputTokens).toBe(fakeAi.asked.reduce((sum, asked) => sum + asked.messages.reduce((all, message) => all + Math.ceil(message.content.length / 4) + (message.results ?? []).reduce((n, result) => n + Math.ceil(result.content.length / 4), 0), 0), 0))
   })
 

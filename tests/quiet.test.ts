@@ -157,7 +157,7 @@ describe('usage on a refusal', () => {
     expect(build.stderr).not.toContain('--\' ')
     expect(build.stderr.trimEnd().split('\n')).toHaveLength(2)
     expect(missing.stderr).toBe('kay i18n missing: unknown option --bogus\nUsage: kay i18n missing [locale] [dir] [--format text|json]\n')
-    expect(extra.stderr).toBe('kay: unexpected argument b\nUsage: kay upgrade [dir] [--dry-run]\n')
+    expect(extra.stderr).toBe('kay: unexpected argument b\nUsage: kay upgrade [dir] [--dry-run] [--quiet]\n')
   })
 
   it('names a near option, and prints that command alone for --help', async () => {

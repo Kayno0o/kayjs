@@ -31,7 +31,7 @@ const WATCH_DEBOUNCE_MS = 50
 // `--format github` annotates a CI diff and `--format json` gives tools one document; the exit code is the same in every format.
 export const check: Command = {
   usage: USAGES.check,
-  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'since': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
+  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'only': { type: 'string' }, 'since': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals }) => {
     const { project, entry } = values
@@ -82,6 +82,7 @@ export const check: Command = {
         ...typeof entry === 'string' ? ['--entry', entry] : [],
         ...values['deny-warnings'] === true ? ['--deny-warnings'] : [],
         ...values.fix === true ? ['--fix'] : [],
+        ...values['dry-run'] === true ? ['--dry-run'] : [],
         ...values.quiet === true ? ['--quiet'] : [],
         ...only === undefined ? [] : ['--only', only],
         ...since === undefined ? [] : ['--since', since],
@@ -99,7 +100,7 @@ export const check: Command = {
     const started = performance.now()
 
     try {
-      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
+      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true || values['dry-run'] === true, dryRun: values['dry-run'] === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
 
       if (found === 0 && format !== 'json')
         done('checked', 'with no problems', performance.now() - started)
@@ -232,7 +233,7 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, dryRun, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, dryRun: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
   let everything = await checkTypes(root, options)
   const checkScope = async () => {
@@ -251,16 +252,17 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   // A prop's type, its reads and the tags passing it are fixed together, so a run narrowed to one file fixes the others of that migration too.
   const migration = (diagnostic: CheckDiagnostic) => diagnostic.code === 'deprecated-signal-prop'
   const fixable = diagnostics.some(migration) ? [...diagnostics, ...everything.filter(diagnostic => migration(diagnostic) && !diagnostics.includes(diagnostic))] : diagnostics
-  const fixed = fix ? await applySafeFixes(root, since === undefined ? fixable : fixable.filter(inMinor)) : 0
+  const fixed = fix ? await applySafeFixes(root, since === undefined ? fixable : fixable.filter(inMinor), !dryRun) : 0
 
   if (fixed > 0) {
     // JSON is the whole of stdout; quiet, what is left is all that is said.
     if (format === 'json')
-      console.error(`kay check: fixed ${count(fixed, 'problem')}`)
+      console.error(`kay check: ${dryRun ? 'would fix' : 'fixed'} ${count(fixed, 'problem')}`)
     else if (!quiet)
-      done('fixed', count(fixed, 'problem'))
+      done(dryRun ? 'would fix' : 'fixed', count(fixed, 'problem'))
 
-    diagnostics = await checkScope()
+    if (!dryRun)
+      diagnostics = await checkScope()
   }
 
   // The app's own checks run once, after the fixes.
@@ -268,7 +270,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   if (only === undefined && since === undefined) {
     const env = await envProblems(root, config, scope)
 
-    diagnostics.push(...fix && process.env[UPGRADE_FROM] === undefined ? await declareRawReads(root, env, format, quiet) : env, ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
+    diagnostics.push(...fix && !dryRun && process.env[UPGRADE_FROM] === undefined ? await declareRawReads(root, env, format, quiet) : env, ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
   }
 
   if (since !== undefined)

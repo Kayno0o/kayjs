@@ -2,8 +2,8 @@ import type { CheckDiagnostic } from '.'
 import type { Fix } from '../compiler/ast'
 import { ownFile } from './diagnose'
 
-// Applies the first safe fix of each problem in the project's own files to its file, leaving out one whose edits overlap another's, and answers how many problems that fixed. A library's files are its own to fix.
-export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[]): Promise<number> {
+// Applies the first safe fix of each problem in the project's own files to its file, leaving out one whose edits overlap another's, and answers how many problems that fixed, or would with `write` false, which touches no file. A library's files are its own to fix.
+export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[], write = true): Promise<number> {
   const byFile = Map.groupBy(diagnostics.flatMap((diagnostic) => {
     const fix = diagnostic.fixes?.find(candidate => candidate.safe)
 
@@ -21,6 +21,9 @@ export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[
       taken.push(...fix.edits)
       fixed++
     }
+
+    if (!write)
+      continue
 
     const source = await Bun.file(file).text()
 

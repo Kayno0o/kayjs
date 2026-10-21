@@ -67,7 +67,7 @@ const outcome = await site.call(assistant, { messages })
 
 ### What the model is told when a call goes wrong
 
-Every failure is a result with `failed` set, in words the model can correct from, never an exception, so the loop goes on:
+Every failure is a result with `ok` false (`failed` is still set until 1.73), in words the model can correct from, never an exception, so the loop goes on:
 
 | case | result |
 | --- | --- |
@@ -95,4 +95,4 @@ A model reads text an attacker may have written (a page, an email, a visitor's m
 
 ### Both providers
 
-Anthropic gets `tools` with `input_schema`, the assistant's `tool_use` blocks and the user's `tool_result` blocks (`is_error` when failed). OpenAI-compatible servers get `tools` as functions, the assistant's `tool_calls` and one `tool` message per result; argument deltas are joined by index and a server sending a call whole, or with no id, works. A provider built by hand yields `{ toolUse }` pieces ([The fake, errors and providers](testing-and-errors.md)).
+Anthropic gets `tools` with `input_schema`, the assistant's `tool_use` blocks and the user's `tool_result` blocks (`is_error` when not `ok`). OpenAI-compatible servers get `tools` as functions, the assistant's `tool_calls` and one `tool` message per result; argument deltas are joined by index and a server sending a call whole, or with no id, works. A provider built by hand yields `{ toolUse }` pieces ([The fake, errors and providers](testing-and-errors.md)).

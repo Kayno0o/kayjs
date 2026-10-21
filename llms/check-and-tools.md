@@ -68,13 +68,14 @@ kay fmt --check
 
 ### Check and inspect commands
 
-- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]`:
+- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--dry-run] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]`:
   - Type-check the project, `.kay` files included;
   - The first path is the project when it is a directory holding a `kay.config.ts`, `package.json` or `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither;
   - The other paths, files or directories relative to the current directory, a symlink read as what it points to, narrow the report, and `--fix`, to the problems in them, the project still checked as a whole, and one outside the project fails the check;
   - `--watch` checks again on every change, tests included, each check a `kay check` of its own, so an edit to `kay.config.ts` counts and a check that cannot run, or exits before reporting, leaves the watch going, clearing the previous report in a terminal, and an interrupt or a closed terminal stops the check running and what it started, a second interrupt killing them;
   - `checks: [fn]` in kay.config.ts (a library's `extensions` config may add its own) runs the app's own checks with kay's, so they get its text, `--format json` and `github` output, the MCP `check` tool, `--watch` and its exit code. Each `fn({ root, routes, report })` may be async: `report({ level, message, file, line, column, code })` adds a problem, `level` being `'error'` (the default) or `'warning'`, `file` relative to the project (kay.config.ts by default) and `line` and `column` 1 by default; `await routes()` gives what `kay routes` lists, read once, when a check asks. A check that throws, or does not finish within 30 seconds, is one error naming it as `checks[n]`, and the others still run. They run once, after `--fix`, and `--only` and `--since` leave them out; a path given to narrow the report keeps the findings in it.
   - `-p` is relative to `dir`, and a tsconfig that is missing or matches no files fails the check.
+  - `--dry-run` counts the fixes `--fix` would apply (`would fix 3 problems`) and writes nothing.
   - `--since 1.46` reports and, with `--fix`, fixes the `deprecated` lints that came in that minor alone, as `kay upgrade` runs it; it does not go with `--only`.
   - `--entry` names the server entry whose `app` types `ctx.locals` and the app routes, `src/server.ts` by default, as `kay build --entry` does (see [Locals](server.md#locals)).
   - It fails on errors, and on warnings too with `--deny-warnings` (see [Lints and warnings](lints.md#lints-and-warnings)).
@@ -108,16 +109,16 @@ kay fmt --check
   - Lists the environment variables the project declares, for a deploy script to compare with a compose or an env file: each `defineEnv` schema in the modules under `src` (imported without the server's environment, so their top-level code runs and its output goes to stderr; the server entry is not run, and a schema it declares is not listed; a schema built inside a function is not seen), `publicEnv`, the `env` schema of each extension, and kay's own `PORT`, `HOST`, `SITE_URL`, `ORIGIN` and `KAY_SECRET`;
   - Each with its source, type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default; a module that does not load is named as not read.
   - With `--compose` and `--example`, or `env` in kay.config.ts, compares them with those files, else with the project's production `compose*.yaml` and `.env.example`, and exits 1 on an error; `kay check` does the same. `--write` appends the declared variables the example lacks ([Server](server.md)).
-- `kay i18n missing [locale] [dir] [--format text|json]` and `kay i18n accept <locale> [dir]`:
+- `kay i18n missing [locale] [dir] [--format text|json]` and `kay i18n accept <locale> [dir] [--dry-run]`:
   - List what each locale lacks against the default one, messages and localized entries; accept a locale's draft messages, deleting their `// draft` comments (see [Locales](locales.md#messages)).
   - `kay i18n` alone lists every `i18n` command, those a library adds included, such as `kay i18n translate <locale> [--dry-run]` of `@kaynooo/kayjs-ai`, which fills the missing messages and entries as drafts.
-- `kay upgrade [dir] [--dry-run]`:
+- `kay upgrade [dir] [--dry-run] [--quiet]`:
   - Move the `kay` and `@kaynooo/kayjs-*` ranges of `package.json` that are version ranges of the registry, `npm:@kaynooo/kayjs@~1.45.0` or `~1.45.0` (a path, workspace or git source is left), to `~<latest>` with the registry's answer, install, then run the installed kay's `kay check --fix --since <minor>` once per minor between the version the app was on and the one it moves to, oldest first, listing them from the installed kay's `kay explain deprecated --format json`, then `kay check --fix`, which prints what is left to do by hand and sets the exit code.
   - `--dry-run` lists the packages it would move and writes, installs and rewrites nothing.
   - An app already on the latest is left as it is, a registry older than the app's range never moves it back, and a failed install puts `package.json` back as it was. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
 - `kay explain [lint|error|group] [--format text|json]`:
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
-- `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
+- `kay fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
 - `kay fmt --from-html [file] [--format text|json]`:
   - Print the HTML in `file`, or on stdin (`-` too), as a formatted `.kay` template, through the translation `kay migrate astro` uses: tag shorthand, static classes as `.class` and the id as `#id`, `class="..."` kept for a class the shorthand cannot hold (an unclosed `[`), the space a line break makes between inline siblings (`#[b a] #[i b]`), attributes in parentheses, text on its element's line with inline elements as `#[tag text]`, `<script>` and `<style>` as their text, an HTML comment as a `//` comment (not rendered), a document's `head` children in a `head` block.
@@ -127,7 +128,7 @@ kay fmt --check
   - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
 - `kay test [bun test arguments]...`:
   - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer (see [Testing](testing.md)).
-- `kay types [dir] [--quiet]`:
+- `kay types [dir] [--format text|json] [--quiet]`:
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
 - `kay lsp`, `kay screenshot` and `kay mcp` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).
 

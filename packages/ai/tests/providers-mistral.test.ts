@@ -133,7 +133,7 @@ describe('Mistral through the OpenAI-compatible provider', () => {
 
     expect(first).toEqual([{ toolUse: { id: 'abc123xyz', name: 'add_note', arguments: '{"title":"Milk"}' } }, { finish: 'stop' }, { usage: { inputTokens: 9, outputTokens: 4 } }])
 
-    const second = await collect(model.stream({ ...REQUEST, messages: [...REQUEST.messages, { role: 'assistant', content: '', calls: [{ id: 'abc123xyz', name: 'add_note', arguments: '{"title":"Milk"}' }] }, { role: 'user', content: '', results: [{ id: 'abc123xyz', content: '{"id":1}', failed: false }] }] }, new AbortController().signal))
+    const second = await collect(model.stream({ ...REQUEST, messages: [...REQUEST.messages, { role: 'assistant', content: '', calls: [{ id: 'abc123xyz', name: 'add_note', arguments: '{"title":"Milk"}' }] }, { role: 'user', content: '', results: [{ id: 'abc123xyz', content: '{"id":1}', ok: true, failed: false }] }] }, new AbortController().signal))
 
     expect(second).toContainEqual({ text: 'Done' })
     expect((server.seen.at(-1)!.body.messages as object[]).at(-1)).toEqual({ role: 'tool', tool_call_id: 'abc123xyz', content: '{"id":1}' })

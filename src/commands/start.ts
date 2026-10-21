@@ -20,9 +20,9 @@ const STOPS = new Set<string>(['SIGINT', 'SIGTERM', 'SIGHUP'])
 // Serves the last build as the deployed server would: the executable `kay build --compile` made, else the server entry, in production.
 export const start: Command = {
   usage: USAGES.start,
-  options: { entry: { type: 'string' }, port: { type: 'string' } },
+  options: { entry: { type: 'string' }, port: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values: { entry: option, port }, positionals: [path] }, refuse) => {
+  run: async ({ values: { entry: option, port, quiet }, positionals: [path] }, refuse) => {
     if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
 
@@ -40,9 +40,10 @@ export const start: Command = {
       return 1
     }
 
-    await warnStale(root, built.mtimeMs)
+    if (quiet !== true)
+      await warnStale(root, built.mtimeMs)
 
-    const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs)
+    const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs, quiet === true)
     const env = await environmentWithoutDotenv(root)
     const forwarded = new Set<string>()
     let server: Bun.Subprocess | undefined
@@ -79,20 +80,20 @@ export const start: Command = {
 }
 
 // The executable the last build compiled, while it is still there, else the project's entry, or kay's own server of its pages when it has none.
-async function serverCommand(root: string, output: string, builtAt: number): Promise<string[]> {
+async function serverCommand(root: string, output: string, builtAt: number, quiet: boolean): Promise<string[]> {
   const record = Bun.file(join(output, EXECUTABLE_RECORD))
   // Relative to the root, so a copy of the project runs its own.
   const executable = await record.exists() ? resolve(root, await record.text()) : undefined
   const compiled = executable === undefined ? undefined : statSync(executable, { throwIfNoEntry: false })
 
   if (executable !== undefined && compiled) {
-    if (compiled.mtimeMs < builtAt)
+    if (compiled.mtimeMs < builtAt && !quiet)
       console.warn(`kay start: the executable ${relative(process.cwd(), executable)} is older than the build, which a failed \`kay build\` leaves; run \`kay build --compile\` again`)
 
     return [executable]
   }
 
-  if (executable !== undefined)
+  if (executable !== undefined && !quiet)
     console.warn(`kay start: the executable the last build compiled, ${relative(process.cwd(), executable)}, is gone; starting the server entry instead`)
 
   const entry = await configuredEntry(root, output)

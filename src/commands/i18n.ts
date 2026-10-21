@@ -68,9 +68,9 @@ export const i18nMissing: Command = {
 // Deletes the `// draft` comment of every message of a locale's file, a person having checked them.
 export const i18nAccept: Command = {
   usage: USAGES['i18n accept'],
-  options: {},
+  options: { 'dry-run': { type: 'boolean' } },
   positionals: 2,
-  run: async ({ positionals: [locale, path] }, refuse) => {
+  run: async ({ values, positionals: [locale, path] }, refuse) => {
     if (locale === undefined)
       return refuse('i18n accept needs the locale whose drafts to accept')
 
@@ -100,6 +100,12 @@ export const i18nAccept: Command = {
 
     if (accepted === 0) {
       console.log(`${shown} holds no draft`)
+
+      return 0
+    }
+
+    if (values['dry-run'] === true) {
+      done('Would accept', `${count(accepted, 'draft')} in ${shown}`)
 
       return 0
     }

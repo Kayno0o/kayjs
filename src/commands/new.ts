@@ -3,19 +3,25 @@ import type { Command, Parsed } from './command'
 import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
-import { count, done, shellQuote } from './command'
+import { count, done, failureProblem, formatOption, printDocument, shellQuote } from './command'
 import { USAGES } from './usages'
 
 export const scaffold: Command = {
   usage: USAGES.new,
-  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, forge: { type: 'string' }, host: { type: 'string' }, runner: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
+  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'host': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
+    const format = formatOption('new', values.format)
+
     if (dir === undefined || dir === '')
       return refuse()
 
+    if (format === undefined)
+      return 1
+
     try {
       const { template, with: added, without: removed, yes } = values
+      const dryRun = values['dry-run'] === true
 
       if (template !== undefined && !PRESET_NAMES.includes(template as Preset)) {
         console.error(`kay new: --template is ${String(template)}, which is none of ${PRESET_NAMES.join(', ')}`)
@@ -25,7 +31,7 @@ export const scaffold: Command = {
 
       // `--host` named the forge before `kay dev --host` named an address: it still works, saying so.
       if (values.host !== undefined && values.forge === undefined && values.quiet !== true)
-        console.error('kay new: --host is now --forge (kay dev --host is an address); --host still works for now')
+        console.error('kay new: --host is now --forge (kay dev --host is an address); --host still works until 1.73')
 
       const forge = values.forge ?? values.host
 
@@ -72,9 +78,22 @@ export const scaffold: Command = {
         return 1
       }
 
-      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined })
+      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, dryRun })
 
-      done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
+      if (format === 'json') {
+        printDocument({ dir, features, files, dryRun })
+
+        return 0
+      }
+
+      done(dryRun ? 'would create' : 'created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
+
+      if (dryRun && values.quiet !== true) {
+        for (const path of files)
+          console.log(`  ${path}`)
+
+        return 0
+      }
 
       // With Postgres, the database runs in the container its compose.dev.yaml describes, migrated before the first start; SQLite is a file, which `bun run dev` migrates.
       if (values.quiet !== true)
@@ -83,7 +102,12 @@ export const scaffold: Command = {
       return 0
     }
     catch (error) {
-      console.error(error instanceof Error ? error.message : error)
+      const message = error instanceof Error ? error.message : String(error)
+
+      console.error(message)
+
+      if (format === 'json')
+        printDocument({ errors: 1, warnings: 0, problems: [failureProblem(message, format)] })
 
       return 1
     }

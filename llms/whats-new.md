@@ -33,6 +33,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A lifetime is `maxAge` across kay and kayjs-auth: `files.url(key, { maxAge })`, `session.maxAge()`, a token's `maxAge`, `email.maxAge`, the `maxAge` a mail hands its template, `remember: { maxAge }` and `invitations: { maxAge }`; `kay upgrade` renames the old names ([Upgrading](upgrading.md)).
 - kayjs-cms: `forgejo({ baseUrl })` names the forge's address as the other service options do; `kay upgrade` renames `url` ([kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-mail: `mailer({ locale })` and a message's `locale` replace `lang`, as kayjs-auth names the language of a mail; `kay upgrade` renames the mailer's ([kayjs-mail](../packages/mail/llms.txt)).
+- `--dry-run` on `kay check` (with the fixes), `kay fmt`, `kay new`, `kay add`, `kay migrate` and `kay i18n accept`, `--quiet` on `kay start`, `kay render`, `kay routes` and `kay upgrade`, `--format json` on `kay add`, `kay new` and `kay types` ([details](project.md)); a tool outcome says `ok` rather than `failed` ([details](../packages/ai/llms/tools.md)).
 
 ## 1.69.0
 

@@ -3849,6 +3849,21 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('counts the fixes --fix would apply with --dry-run, writing none', async () => {
+    const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
+    const root = await scratchProject({ 'src/a.kay': button })
+
+    try {
+      expect((await runCheck(root, '--dry-run')).report).toStartWith('would fix 1 problem\n')
+      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(button)
+      expect((await runCheck(root, '--fix', '--dry-run')).report).toStartWith('would fix 1 problem\n')
+      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(button)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('applies the safe fixes in the paths named alone with --fix', async () => {
     const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
     const root = await scratchProject({ 'src/a.kay': button, 'src/b.kay': button })

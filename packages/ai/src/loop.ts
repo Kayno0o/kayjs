@@ -193,7 +193,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       if (signal.aborted)
         return
 
-      results.push({ id: use.id, content: ran.result, failed: ran.status === 'failed' })
+      results.push({ id: use.id, content: ran.result, ok: ran.status !== 'failed', failed: ran.status === 'failed' })
 
       yield { tool: { ...call, ...ran } }
     }

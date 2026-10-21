@@ -52,10 +52,12 @@ kay new my-app --template app --without docker
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in SQLite |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
-| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works for now, with a warning |
+| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works until 1.73, with a warning |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |
+| `--dry-run` | Lists the files it would write, and writes none |
+| `--format text\|json` | `json` prints one document with the directory, the features and the files |
 | `--quiet` | Prints the summary line only |
 
 In a terminal with none of these options, `kay new` asks for a preset, then for each feature.
@@ -402,7 +404,7 @@ It then runs the kay it installed. Each minor you skipped may have replaced a fo
 
 A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
-`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. The old forms it would then fix are known only to the new version, so they are not listed.
+`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed.
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
@@ -566,7 +568,8 @@ kay migrate astro . --outdir ../kay-site
 | Option | Effect |
 | --- | --- |
 | `[dir]` | The Astro project, the current directory by default |
-| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. `--out` is the older spelling and still works |
+| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. `--out` is the older spelling and still works until 1.73, with a warning |
+| `--dry-run` | Lists what it would write, and writes none |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.
 
@@ -613,7 +616,11 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 ## Quiet and plain output
 
-`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate`, `kay new` and `kay types` take `--quiet`. They print the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all. Every other command refuses it.
+Every command that prints takes `--quiet`, and the commands that write take `--dry-run`. `--quiet` prints the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all. `kay start` leaves out its warnings about a stale build, `kay render` its status line and `kay routes` the note about the routes the server adds when it starts.
+
+`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay migrate`, `kay i18n accept` and `kay upgrade`. `kay fmt --check` stays the verify-only form: it fails when a file is not formatted. `kay types`, `kay build` and `kay dev` write only generated output under `.kay` and `dist`, never a file of yours, so they take none.
+
+`kay add`, `kay new` and `kay types` also take `--format json`.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files

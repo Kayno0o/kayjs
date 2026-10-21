@@ -31,7 +31,7 @@ const OWN_SOCKET = /^kay-render-(\d+)-/
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
   usage: USAGES.render,
-  options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' } },
+  options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [url, path] }, refuse) => {
     const { entry: option, method, body, include } = values
@@ -128,9 +128,9 @@ export const render: Command = {
 
       if (include === true)
         console.error([`${response.status} ${response.statusText}`, ...[...response.headers].map(([name, value]) => `${name}: ${value}`)].join('\n'))
-      else if (REDIRECT_STATUS.has(response.status) && location !== null)
+      else if (values.quiet !== true && REDIRECT_STATUS.has(response.status) && location !== null)
         console.error(`kay render: ${response.status} ${response.statusText}, to ${location}`)
-      else if (response.status >= 400)
+      else if (values.quiet !== true && response.status >= 400)
         console.error(`kay render: ${response.status} ${response.statusText}`)
 
       // Awaited, as the process exits once this returns, which would cut a long page short on a pipe.

@@ -60,6 +60,8 @@ export interface NewOptions {
   host?: Host | undefined
   // The label of the runner the CI jobs run on, the host's own image by default: `debian` on Forgejo, `ubuntu-latest` on GitHub.
   runner?: string | undefined
+  // Lists the files without writing any, nor packing a checkout of kay into `vendor`.
+  dryRun?: boolean | undefined
 }
 
 // What checking or unchecking a feature leaves checked: checking takes what it needs along, unchecking drops what needs it.
@@ -154,7 +156,10 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   await refuseTarget(target)
 
-  const files = await projectFiles(dir, features, options.kay, {}, options.host, options.runner)
+  const files = await projectFiles(dir, features, options.kay ?? (options.dryRun === true ? 'dry-run' : undefined), {}, options.host, options.runner)
+
+  if (options.dryRun === true)
+    return Object.keys(files).sort()
 
   // The session secret in .env is for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
   await mkdir(dir, { recursive: true })

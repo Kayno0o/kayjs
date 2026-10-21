@@ -1,23 +1,35 @@
 import type { Command } from './command'
 import { resolve } from 'node:path'
 import { addFeatures } from '../add'
-import { count, done } from './command'
+import { count, done, failureProblem, formatOption, printDocument } from './command'
 import { USAGES } from './usages'
 
 export const add: Command = {
   usage: USAGES.add,
-  options: { 'no-install': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
+  options: { 'no-install': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [features, dir = '.'] }, refuse) => {
     const names = [...new Set((features ?? '').split(',').map(name => name.trim()).filter(name => name !== ''))]
+    const format = formatOption('add', values.format)
 
     if (names.length === 0)
       return refuse()
 
-    try {
-      const { written, installed, notes } = await addFeatures(resolve(dir), names, { install: values['no-install'] !== true })
+    if (format === undefined)
+      return 1
 
-      done('added', `${names.join(', ')}, ${count(written.length, 'file')} written${installed ? ', dependencies installed' : ''}`)
+    const dryRun = values['dry-run'] === true
+
+    try {
+      const { written, installed, notes } = await addFeatures(resolve(dir), names, { install: values['no-install'] !== true, dryRun })
+
+      if (format === 'json') {
+        printDocument({ features: names, written, installed, notes, dryRun })
+
+        return 0
+      }
+
+      done(dryRun ? 'would add' : 'added', `${names.join(', ')}, ${count(written.length, 'file')} ${dryRun ? 'to write' : 'written'}${installed ? ', dependencies installed' : ''}`)
 
       if (values.quiet !== true) {
         for (const path of written)
@@ -30,7 +42,12 @@ export const add: Command = {
       return 0
     }
     catch (error) {
-      console.error(error instanceof Error ? error.message : error)
+      const message = error instanceof Error ? error.message : String(error)
+
+      console.error(message)
+
+      if (format === 'json')
+        printDocument({ errors: 1, warnings: 0, problems: [failureProblem(message, format)] })
 
       return 1
     }

@@ -61,7 +61,7 @@ function turnOf(message: ProviderMessage): { role: string, content: unknown } {
     return { role: message.role, content: message.content }
 
   if (message.results !== undefined)
-    return { role: 'user', content: message.results.map(({ id, content, failed }) => ({ type: 'tool_result', tool_use_id: id, content, ...failed ? { is_error: true } : {} })) }
+    return { role: 'user', content: message.results.map(({ id, content, ok }) => ({ type: 'tool_result', tool_use_id: id, content, ...ok ? {} : { is_error: true } })) }
 
   return {
     role: 'assistant',

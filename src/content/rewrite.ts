@@ -39,8 +39,8 @@ export interface RewrittenCollection {
   failed: { file: string, message: string }[]
 }
 
-// Rewrites the files of every folder collection that declares `migrations`, in the entries a step carried to the shape the schema accepts; an entry the schema accepts or no step helps is left as it is. A loader's collection writes its entries back through its `save` when it is read.
-export async function migrateFolders(root: string): Promise<{ collections: RewrittenCollection[], declared: number }> {
+// Rewrites the files of every folder collection that declares `migrations`, in the entries a step carried to the shape the schema accepts; an entry the schema accepts or no step helps is left as it is. With `write` false the files are only listed. A loader's collection writes its entries back through its `save` when it is read.
+export async function migrateFolders(root: string, write = true): Promise<{ collections: RewrittenCollection[], declared: number }> {
   const content = (await loadConfig(root)).content
   const collections: RewrittenCollection[] = []
   let declared = 0
@@ -80,7 +80,9 @@ export async function migrateFolders(root: string): Promise<{ collections: Rewri
         if (JSON.stringify(parseEntry(name, text).data) !== JSON.stringify(data))
           throw new Error('holds a value its format cannot write back as it is')
 
-        await writeAtomically(path, text)
+        if (write)
+          await writeAtomically(path, text)
+
         result.rewritten.push(file)
       }
       catch (error) {

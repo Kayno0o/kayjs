@@ -64,6 +64,8 @@ interface PackageJson {
 export interface MigrateProjectOptions {
   // The `kay` dependency of the project written around the pages, as `kay new --kay` takes it.
   kay?: string | undefined
+  // Lists what would be written, writing nothing.
+  dryRun?: boolean | undefined
 }
 
 function kebab(name: string): string {
@@ -188,8 +190,11 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
       return false
     }
 
-    await mkdir(dirname(target), { recursive: true })
-    await Bun.write(target, content)
+    if (options.dryRun !== true) {
+      await mkdir(dirname(target), { recursive: true })
+      await Bun.write(target, content)
+    }
+
     into.push(path)
 
     return true
@@ -317,7 +322,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
   }
 
   if (scaffold) {
-    const project = await projectFiles(out, new Set(featuresOf(root, config, dependencies)), options.kay, settings)
+    const project = await projectFiles(out, new Set(featuresOf(root, config, dependencies)), options.kay ?? (options.dryRun === true ? 'dry-run' : undefined), settings)
 
     const carried = withPackages(project['package.json']!, astro)
     const own = JSON.parse(project['package.json']!) as PackageJson

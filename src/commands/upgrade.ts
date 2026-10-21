@@ -70,17 +70,22 @@ const registryDeps = registryDepsFor(process.execPath)
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {
   usage: USAGES.upgrade,
-  options: { 'dry-run': { type: 'boolean' } },
+  options: { 'dry-run': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }) => {
     const root = projectRoot('upgrade', dir)
 
-    return root === undefined ? 1 : upgradeProject(root, registryDeps, { dryRun: values['dry-run'] === true })
+    return root === undefined ? 1 : upgradeProject(root, registryDeps, { dryRun: values['dry-run'] === true, quiet: values.quiet === true })
   },
 }
 
 // With `dryRun`, lists the packages that would move and touches nothing: no write, no install, no rewrite.
-export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false }: { dryRun?: boolean } = {}): Promise<number> {
+export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false, quiet = false }: { dryRun?: boolean, quiet?: boolean } = {}): Promise<number> {
+  // Quiet, the steps are not announced: what would move, and how it ended, still are.
+  const step = (verb: string, rest: string) => {
+    if (!quiet)
+      done(verb, rest)
+  }
   const manifest = join(root, 'package.json')
 
   if (!existsSync(manifest)) {
@@ -165,7 +170,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   await Bun.write(manifest, source)
-  done('moved', changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
+  step('moved', changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
   if (!await deps.install(root, changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
     await Bun.write(manifest, original)
@@ -183,13 +188,13 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   for (const since of await crossed(root, from, latestKay, deps)) {
-    done('rewriting', `what ${since} deprecated`)
-    await deps.kay(root, ['check', '--fix', '--since', since], false, { [UPGRADE_FROM]: from })
+    step('rewriting', `what ${since} deprecated`)
+    await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
   }
 
-  done('checking', 'what is left')
+  step('checking', 'what is left')
 
-  const left = await deps.kay(root, ['check', '--fix'], false, { [UPGRADE_FROM]: from })
+  const left = await deps.kay(root, ['check', '--fix', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
 
   if (left.code === 0)
     done('upgraded', `to kay ${latestKay}, nothing left to do by hand`)

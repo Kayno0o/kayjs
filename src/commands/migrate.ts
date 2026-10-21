@@ -12,7 +12,7 @@ import { USAGES } from './usages'
 // `kay migrate astro` translates an Astro project's `.astro` files and content config, in place or into `--outdir` (`--out` as before), a directory with no package.json getting the kay project around them, and lists what is left to do by hand; `kay migrate content` rewrites the entry files of the folder collections whose `migrations` carried them to the schema's shape.
 export const migrate: Command = {
   usage: USAGES.migrate,
-  options: { outdir: { type: 'string' }, out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { 'outdir': { type: 'string' }, 'out': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {
     const [from, dir = '.'] = positionals
@@ -40,7 +40,7 @@ export const migrate: Command = {
         return 1
       }
 
-      return migrateContent(resolve(dir), format, values.quiet === true)
+      return migrateContent(resolve(dir), format, values.quiet === true, values['dry-run'] === true)
     }
 
     if (typeof values.out === 'string' && typeof values.outdir === 'string' && resolve(values.out) !== resolve(values.outdir)) {
@@ -49,12 +49,16 @@ export const migrate: Command = {
       return 1
     }
 
+    if (typeof values.out === 'string' && values.outdir === undefined && values.quiet !== true)
+      console.error('kay migrate: --out is now --outdir; --out still works until 1.73')
+
     const outdir = values.outdir ?? values.out
+    const dryRun = values['dry-run'] === true
     const out = typeof outdir === 'string' ? resolve(outdir) : resolve(dir)
     let migrated: Awaited<ReturnType<typeof migrateAstroProject>>
 
     try {
-      migrated = await migrateAstroProject(resolve(dir), out)
+      migrated = await migrateAstroProject(resolve(dir), out, { dryRun })
     }
     catch (error) {
       printFailure('migrate', error, format)
@@ -67,7 +71,7 @@ export const migrate: Command = {
     const noted = notes.map(each => ({ file: relative(process.cwd(), join(dir, each.file)), line: each.line, ...each.target !== undefined && { target: shown(each.target) }, message: each.message }))
 
     if (format === 'json') {
-      printDocument({ written: written.map(shown), kept: skipped.map(shown), copied: copied.length, notes: noted })
+      printDocument({ dryRun, written: written.map(shown), kept: skipped.map(shown), copied: copied.length, notes: noted })
 
       return 0
     }
@@ -77,7 +81,7 @@ export const migrate: Command = {
 
     if (!quiet) {
       for (const file of written)
-        done('wrote', shown(file))
+        done(dryRun ? 'would write' : 'wrote', shown(file))
 
       for (const file of skipped)
         console.log(`${colors.bold.yellow('kept')} ${shown(file)}, which exists`)
@@ -89,9 +93,9 @@ export const migrate: Command = {
     if (noted.length > 0)
       console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${noted.map(each => `${each.file}:${each.line}${each.target === undefined ? '' : ` (${each.target})`}: ${each.message}`).join('\n')}`)
 
-    console.log(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
+    console.log(`\n${count(written.length, 'file')} ${dryRun ? 'to write' : 'written'}, ${count(notes.length, 'item')} left to do by hand`)
 
-    if (written.includes('package.json') && !quiet)
+    if (written.includes('package.json') && !quiet && !dryRun)
       console.log(`\n  ${colors.cyan(`cd ${shellQuote(relative(process.cwd(), out) || '.')} && bun install && bun run dev`)}`)
 
     return 0
@@ -99,13 +103,13 @@ export const migrate: Command = {
 }
 
 // Rewrites the files of the folder collections that declare `migrations`, which `kay build` and the server only migrate as they read.
-async function migrateContent(root: string, format: ProblemFormat, quiet: boolean): Promise<number> {
+async function migrateContent(root: string, format: ProblemFormat, quiet: boolean, dryRun: boolean): Promise<number> {
   buildingWithoutEnv()
 
   let migrated: { collections: RewrittenCollection[], declared: number }
 
   try {
-    migrated = await (await import('../content/rewrite')).migrateFolders(root)
+    migrated = await (await import('../content/rewrite')).migrateFolders(root, !dryRun)
   }
   catch (error) {
     printFailure('migrate', error, format)
@@ -118,20 +122,20 @@ async function migrateContent(root: string, format: ProblemFormat, quiet: boolea
   const failed = collections.flatMap(each => each.failed)
 
   if (format === 'json') {
-    printDocument({ rewritten, failed })
+    printDocument({ rewritten, failed, dryRun })
 
     return failed.length > 0 ? 1 : 0
   }
 
   if (!quiet) {
     for (const file of rewritten)
-      done('rewrote', relative(process.cwd(), join(root, file)))
+      done(dryRun ? 'would rewrite' : 'rewrote', relative(process.cwd(), join(root, file)))
   }
 
   for (const { file, message } of failed)
     console.error(`${colors.bold.red('failed')} ${relative(process.cwd(), join(root, file))}: ${message}`)
 
-  console.log(declared === 0 ? 'no folder collection declares `migrations`' : `${count(rewritten.length, 'file')} rewritten${failed.length > 0 ? `, ${failed.length} failed` : ''}`)
+  console.log(declared === 0 ? 'no folder collection declares `migrations`' : `${count(rewritten.length, 'file')} ${dryRun ? 'to rewrite' : 'rewritten'}${failed.length > 0 ? `, ${failed.length} failed` : ''}`)
 
   return failed.length > 0 ? 1 : 0
 }

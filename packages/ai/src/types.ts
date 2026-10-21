@@ -30,10 +30,13 @@ export interface ToolUse {
   arguments: string
 }
 
-// What a call gave back to the model; `failed` when it was refused, failed or could not be understood.
+// What a call gave back to the model; not `ok` when it was refused, failed or could not be understood, `content` then saying why in words the model can correct from.
 export interface ToolOutcome {
   id: string
   content: string
+  ok: boolean
+  // `!ok`, still set until 1.73 for a provider written against the old field.
+  /** @deprecated read `ok` */
   failed: boolean
 }
 

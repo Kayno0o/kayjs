@@ -44,7 +44,7 @@ const AFTER: ProviderRequest = {
   messages: [
     { role: 'user', content: 'Add milk' },
     { role: 'assistant', content: 'Adding.', calls: [{ id: 'c1', name: 'add_note', arguments: '{"title":"Milk"}' }, { id: 'c2', name: 'add_note', arguments: '{bad' }] },
-    { role: 'user', content: '', results: [{ id: 'c1', content: '{"id":1}', failed: false }, { id: 'c2', content: 'The arguments are not valid JSON', failed: true }] },
+    { role: 'user', content: '', results: [{ id: 'c1', content: '{"id":1}', ok: true, failed: false }, { id: 'c2', content: 'The arguments are not valid JSON', ok: false, failed: true }] },
   ],
 }
 

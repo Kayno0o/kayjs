@@ -40,13 +40,14 @@ async function fromHtml(paths: string[], check: boolean, format: ProblemFormat):
   }
 }
 
-// Formats in place, or with `--check` lists the files that are not formatted and fails.
+// Formats in place; with `--check` lists the files that are not formatted and fails, with `--dry-run` lists them and succeeds.
 export const fmt: Command = {
   usage: USAGES.fmt,
-  options: { 'check': { type: 'boolean' }, 'from-html': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'check': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'from-html': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: paths }) => {
-    const write = values.check !== true
+    const verify = values.check === true
+    const write = !verify && values['dry-run'] !== true
     const format = formatOption('fmt', values.format)
     let result: Awaited<ReturnType<typeof formatFiles>>
 
@@ -66,7 +67,7 @@ export const fmt: Command = {
     }
 
     const { changed, errors } = result
-    const failed = errors.length > 0 || (!write && changed.length > 0)
+    const failed = errors.length > 0 || (verify && changed.length > 0)
 
     if (format === 'json') {
       const problems = await printedProblems(errors.flatMap(({ file, source, diagnostics }) => diagnostics.map(diagnostic => fromCompile(file, source, diagnostic))))
@@ -86,8 +87,10 @@ export const fmt: Command = {
       done('formatted', count(changed.length, 'file'))
 
     for (const file of changed) {
-      if (!write)
+      if (verify)
         console.error(`not formatted: ${relative(process.cwd(), file)}`)
+      else if (!write)
+        done('would format', relative(process.cwd(), file))
       else if (values.quiet !== true)
         done('formatted', relative(process.cwd(), file))
     }
