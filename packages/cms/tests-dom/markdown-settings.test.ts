@@ -3,7 +3,7 @@ import type { FormLayout, ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 
-const schema = { type: 'object', properties: { intro: { 'type': 'string', 'x-kay': { kind: 'markdown' } } } }
+const schema = { type: 'object', properties: { intro: { 'type': 'string', 'x-kay': { kind: 'markdown' } }, extra: { type: 'object', properties: { note: { 'type': 'string', 'x-kay': { kind: 'markdown' } } } } } }
 let mounted: Mounted | undefined
 
 afterEach(() => {
@@ -47,4 +47,11 @@ test('the collection\'s toolbar reaches a Markdown field as it reaches the body'
   await settle()
 
   expect(buttons(mounted.root)).toEqual(['Italic'])
+})
+
+test('and one inside a group', async () => {
+  mounted = await mountComponent('src/components/entry-field-probe.kay', { name: 'extra', collection: collectionWith({ toolbar: ['heading'] }) })
+  await settle()
+
+  expect(buttons(mounted.root)).toEqual(['Heading'])
 })

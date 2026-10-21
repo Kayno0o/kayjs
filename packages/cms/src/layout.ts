@@ -8,7 +8,7 @@ import { fieldsOf, pairedFields } from './fields'
 export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'unpublish', 'duplicate', 'editOnPage', 'delete']
 const ACTIONS = new Set<string>(ROW_ACTIONS)
 
-// MarkdownEditor's buttons, which tests/layout.test.ts holds to kayjs-ui's list; kept here so the editor's bundle does not take kayjs-ui's index for a list of names.
+// MarkdownEditor's buttons, which tests/layout.test.ts holds to kayjs-ui's list; kept here because kay.config.ts loads this file, which must not pull kayjs-ui's index and its components.
 export const TOOLBAR_BUTTONS: readonly ToolbarAction[] = ['bold', 'italic', 'heading', 'bulletList', 'numberedList', 'link', 'image']
 
 // What a field named `#body` stands for, and `body` too unless the schema has a data field of that name.
@@ -70,7 +70,10 @@ function checkToolbar(where: string, value: unknown): boolean | ToolbarAction[] 
   if (typeof value === 'boolean')
     return value
 
-  const names = strings(where, value)
+  if (!Array.isArray(value) || value.some(name => typeof name !== 'string'))
+    throw new Error(`kayjs-cms: \`${where}\` takes true, false or a list of buttons (${TOOLBAR_BUTTONS.join(', ')}), got ${JSON.stringify(value)}`)
+
+  const names = value as string[]
 
   distinct(where, names)
 
