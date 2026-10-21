@@ -2,15 +2,18 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.66.0
+## Unreleased
 
 - `previewUrl(path, { entry })` from `kay/server` gives a signed link showing one entry's draft on its page alone, with no cookie nor preview mode for the visitor ([Preview mode](content-cms.md)); kayjs-cms's entry screen has a Share preview button for it ([screens](../packages/cms/llms/screens.md)).
 - kayjs-cms has an activity log at `<prefix>/activity`: who created, saved, published, deleted, restored or renamed which entry and when, across the collections that keep a history ([The activity log](../packages/cms/llms/history.md)).
 - kayjs-cms: `cms({ collections: { notes: { history: false } } })` keeps no revisions nor trash for one collection ([History and the trash](../packages/cms/llms/history.md)).
+- kayjs-cms's editor adds, removes and reorders a list's items, blocks included, on the page: a toolbar on the item under the pointer or the focus, an Add on an empty list, Alt+Shift with the arrows, Delete or Enter on the keyboard, and Undo for a removal ([Screens](../packages/cms/llms/screens.md)).
+
+## 1.66.0
+
 - kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, the entries referring to it follow the new slug, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
 - kayjs-cms's editor outlines the field under the pointer and, with a toggle (on by default on a phone), every marked field, attributes and comment pairs included; it asks which field when an element holds several, names each tab stop, and has a Browse toggle that lets links and menus work with the editor open ([Screens](../packages/cms/llms/screens.md)).
 - kayjs-cms moves the uploads an older release kept per collection into its shared `cms-media` folder when the server starts, pointing the entries at the copies, and its media library pages 48 uploads at a time with a search ([kayjs-cms](../packages/cms/llms/uploads.md)).
-- kayjs-cms's editor adds, removes and reorders a list's items, blocks included, on the page: a toolbar on the item under the pointer or the focus, an Add on an empty list, Alt+Shift with the arrows, Delete or Enter on the keyboard, and Undo for a removal ([Screens](../packages/cms/llms/screens.md)).
 
 ## 1.65.0
 
