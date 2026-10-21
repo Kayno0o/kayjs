@@ -1,0 +1,8 @@
+---
+import Quick from '../components/quick.kay'
+---
+head
+  title Loaded
+h1 Loaded
+Quick(name="load" hydrate="load")
+Quick(name="client" hydrate="client")

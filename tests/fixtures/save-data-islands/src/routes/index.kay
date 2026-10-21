@@ -1,5 +1,6 @@
 ---
 import Count from '../components/count.kay'
+import Quick from '../components/quick.kay'
 ---
 head
   title Home
@@ -9,7 +10,7 @@ a.next(href="/next") Next
 div(style="height: 3000px")
 Count(name="below")
 div(style="height: 3000px")
-Count(name="load" hydrate="load")
+Quick(name="load" hydrate="load")
 Count(name="idle" hydrate="idle")
 Count(name="far" hydrate="visible")
-Count(name="client" hydrate="client")
+Quick(name="client" hydrate="client")

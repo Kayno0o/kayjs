@@ -991,7 +991,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const defers = client.entry !== undefined && scan?.modes.includes('defer') === true
   const shipsEntry = hasIslands || posts || follows || defers
   const checked = posts ? formsScript(forms, options.dev) : ''
-  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers) + checked + workScript(forms, options.prerendering === true) : ''
+  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands.immediate) + checked + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const polish = typographyFor(lang, options.typography)
   const body = polish ? polish(markup) : markup
@@ -1190,8 +1190,9 @@ function stylesheets(client: ClientBuild, files: string[]): string {
 
 // Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` island or a deferred server island when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
 // A page without islands needs no hydration script, only the entry swapping pages.
-function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean): string {
-  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}`, () => {
+// `immediate` is the islands hydrating at once for a visitor saving data, whose chunk preloads a page for that visitor keeps: they are marked `data-load` where the page drops island-only preloads, which the marked link no longer matches.
+function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, immediate?: Set<string>): string {
+  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}\n${immediate === undefined ? '-' : [...immediate].sort().join('\n')}`, () => {
     const chunks = new Set(client.entryImports)
 
     // Waiting for an island to be visible or idle, or a deferred server island to near the viewport, needs its own chunk, which the entry would ask for only once it ran.
@@ -1200,12 +1201,18 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
         chunks.add(chunk)
     }
 
+    const now = new Set<string>()
+
     for (const id of islands) {
-      for (const chunk of client.islands[id] ?? [])
+      for (const chunk of client.islands[id] ?? []) {
         chunks.add(chunk)
+
+        if (immediate?.has(id) === true)
+          now.add(chunk)
+      }
     }
 
-    return `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydration ? hydrationScript : ''}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
+    return `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}"${now.has(chunk) ? ' data-load' : ''}>`).join('')}${hydration ? hydrationScript : ''}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
   })
 }
 

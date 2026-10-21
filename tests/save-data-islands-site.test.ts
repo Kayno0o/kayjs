@@ -6,7 +6,7 @@ import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
 
 const ROUTES = 'tests/fixtures/save-data-islands/src/routes'
-const PRELOAD = /<link rel="modulepreload" href="([^"]*)">/g
+const PRELOAD = /<link rel="modulepreload" href="([^"]*)"(?: data-load)?>/g
 const WHEN = /hydrate-when-\w+\.js/
 const ON = { 'save-data': 'on' }
 
@@ -67,6 +67,42 @@ describe.each([
     }
   })
 
+  it('keeps the chunks of the islands hydrating at once, load or client, for a visitor saving data, and injects no waiting code when nothing else drops', async () => {
+    const { app, remove } = await served()
+
+    try {
+      const full = preloads(await read(app, '/loaded'))
+      const html = await read(app, '/loaded', ON)
+
+      expect(preloads(html)).toEqual(full)
+      expect(full.length).toBeGreaterThan(0)
+      expect(full.some(href => WHEN.test(href))).toBe(false)
+      expect(html).toContain('data-load>')
+    }
+    finally {
+      await remove()
+    }
+  })
+
+  it('keeps the chunk of a load island next to a page\'s default ones, which drop', async () => {
+    const { app, remove } = await served()
+
+    try {
+      const full = await read(app, '/')
+      const saving = await read(app, '/', ON)
+      const marked = [...full.matchAll(/<link rel="modulepreload" href="([^"]*)" data-load>/g)].map(match => match[1]!)
+
+      expect(marked.length).toBeGreaterThan(0)
+      expect(preloads(saving)).not.toEqual(preloads(full))
+
+      for (const href of marked)
+        expect(saving).toContain(`href="${href}" data-load>`)
+    }
+    finally {
+      await remove()
+    }
+  })
+
   it.each([
     ['off', { 'save-data': 'off' }],
     ['absent', {}],
@@ -110,6 +146,11 @@ describe.each([
       expect(saving.length).toBeGreaterThan(0)
       expect(saving.length).toBeLessThan(full.length)
       expect(saving.every(href => href.startsWith('/docs/'))).toBe(true)
+
+      const loaded = await read(app, '/loaded', ON)
+
+      expect([...loaded.matchAll(/<link rel="modulepreload" href="[^"]*" data-load>/g)].length).toBeGreaterThan(0)
+      expect(loaded).not.toMatch(/<link rel="modulepreload" href="(?!\/docs\/)/)
     }
     finally {
       await remove()
