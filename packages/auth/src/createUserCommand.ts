@@ -58,6 +58,8 @@ export async function readFromTerminal(label: string): Promise<string | undefine
     stdin.setRawMode(true)
   }
   catch {
+    process.stderr.write('\n')
+
     return undefined
   }
 

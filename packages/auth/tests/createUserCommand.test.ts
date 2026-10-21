@@ -5,7 +5,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { configuredSite, setSite } from 'kay/library'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
-import { createUserCommand, typedSecret } from '../src/createUserCommand'
+import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
 import { memoryStore } from '../src/memoryStore'
 import { authExtension, authPages } from '../src/pages'
 import { SECRET } from './helpers/app'
@@ -185,32 +185,41 @@ describe('reading a secret on a terminal', () => {
     }
   })
 
-  test('leaves no helper behind when the process that started it dies', async () => {
-    const script = `const child = Bun.spawn([process.execPath, ${JSON.stringify(`${import.meta.dir}/helpers/readTerminal.ts`)}], { terminal: { data: () => {} } }); console.log(child.pid); await Bun.sleep(300); process.kill(process.pid, 'SIGKILL')`
-    const starter = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
-    const pid = Number((await new Response(starter.stdout).text()).trim())
-    const alive = () => {
-      try {
-        process.kill(pid, 0)
+  // The test runner's stdin is no terminal, so these two stand in for one with a setRawMode of their own.
+  test('ends with nothing when the terminal refuses raw mode', async () => {
+    const original: unknown = Reflect.get(process.stdin, 'setRawMode')
+    const write = spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-        return true
-      }
-      catch {
-        return false
-      }
+    process.stdin.setRawMode = () => {
+      throw new Error('setRawMode failed with errno: 5')
     }
 
     try {
-      const deadline = Date.now() + 5000
-
-      while (alive() && Date.now() < deadline)
-        await Bun.sleep(50)
-
-      expect(alive()).toBe(false)
+      expect(await readFromTerminal('Password: ')).toBeUndefined()
     }
     finally {
-      if (alive())
-        process.kill(pid, 'SIGKILL')
+      Reflect.set(process.stdin, 'setRawMode', original)
+      write.mockRestore()
+    }
+  })
+
+  test('ends with nothing when reading the terminal fails, as it does once the other end is gone', async () => {
+    const original: unknown = Reflect.get(process.stdin, 'setRawMode')
+    const write = spyOn(process.stderr, 'write').mockImplementation(() => true)
+    const before = process.stdin.listenerCount('error')
+
+    process.stdin.setRawMode = () => process.stdin
+
+    try {
+      const reading = readFromTerminal('Password: ')
+
+      process.stdin.emit('error', Object.assign(new Error('EIO: i/o error, read'), { code: 'EIO' }))
+      expect(await reading).toBeUndefined()
+      expect(process.stdin.listenerCount('error')).toBe(before)
+    }
+    finally {
+      Reflect.set(process.stdin, 'setRawMode', original)
+      write.mockRestore()
     }
   })
 
