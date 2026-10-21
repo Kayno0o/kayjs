@@ -12,8 +12,9 @@ import { openPath } from '../screens'
 import { settings } from '../settings'
 
 const { prefix } = settings()
-const localized = (await collections()).some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
-const listed = await Promise.all((await collections()).map(async collection => ({ collection, href: await openPath(collection) })))
+const all = await collections()
+const localized = all.some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
+const listed = await Promise.all(all.map(async collection => ({ collection, href: await openPath(collection) })))
 ---
 head
   title {adminTitle(wording('cms.admin.content', 'Content'))}

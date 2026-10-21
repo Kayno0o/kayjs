@@ -441,7 +441,7 @@ function leaveJson(): void {
         .kcms-adorned
           TextInput(type="date" aria-label={current.label} required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? cleared : next)})
           Button(label={wording('cms.field.today', 'Today')} variant="inline" onClick={() => set(today())})
-          if text() !== '' && !current.required
+          if text() !== '' && !starred()
             Button(label={wording('cms.field.clear', 'Clear')} variant="inline" onClick={() => set(cleared)})
     when 'datetime'
       DatetimeInput(label={current.label} hint={current.hint} issue={issue()} required={starred()} value={text()} onChange={next => set(next ?? cleared)})

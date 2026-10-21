@@ -109,7 +109,7 @@ function bodyId(name: string, byName: ReadonlyMap<string, Field>): string {
 }
 
 // The field a layout name stands for: a top-level key, else a dotted path down through groups, `address.street`.
-function resolve(fields: Field[], name: string): Field | undefined {
+export function resolve(fields: Field[], name: string): Field | undefined {
   const exact = fields.find(field => String(field.key) === name)
 
   if (exact !== undefined || !name.includes('.'))

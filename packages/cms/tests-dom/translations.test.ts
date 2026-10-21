@@ -52,5 +52,17 @@ test('a new translation opens as a draft copy of the entry it comes from', async
   const root = await open({ collection: withDraft, locale: 'de', copy: { locale: 'en', slug: 'about', data: { title: 'About', summary: 'Us' } }, source })
   const title = [...root.querySelectorAll<HTMLInputElement>('input')].find(input => input.closest('.kui-form-field')?.textContent?.startsWith('Title'))!
 
+  const draft = [...root.querySelectorAll<HTMLInputElement>('input[type=checkbox]')].find(box => box.closest('label')?.textContent?.includes('Draft'))
+
   expect(title.value).toBe('About')
+  expect(draft?.checked).toBe(true)
+})
+
+test('shows the text of the locale compared, and a link to hide it', async () => {
+  const translations = { locales: [{ locale: 'en', slug: 'about' }, { locale: 'fr', slug: 'about' }], source, compare: { ...source, data: { title: 'About us', summary: 'Hello there' } } }
+  const root = await open({ entry: about, translations })
+  const aside = root.querySelector('.kcms-compare')
+
+  expect(aside?.textContent).toContain('Hello there')
+  expect([...root.querySelectorAll<HTMLAnchorElement>('.kcms-locales a')].map(link => link.textContent)).toContain('Hide')
 })

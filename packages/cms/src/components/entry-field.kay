@@ -4,30 +4,19 @@ import FieldInput from '../editor/field-input.kay'
 import type { Field } from '../fields'
 import { wording } from 'kay/words'
 import { fieldsOf, pairedFields } from '../fields'
+import { resolve } from '../layout'
 import { gapOf, translatable } from '../translations'
 
 // One field of an entry's form by its key in the schema, a group or a list with the fields inside it, or by its dotted path to a field inside a group, `address.street`. Unknown names throw, naming the schema's.
 // `field` is the form layout's own copy of it, a group without the fields the layout placed elsewhere.
 const { form, name, field: given } = props<{ form: FormScope, name: string, field?: Field | undefined }>()
 
-function lookup(fields: Field[], path: string): Field | undefined {
-  const exact = fields.find(candidate => String(candidate.key) === path)
-
-  if (exact || !path.includes('.'))
-    return exact
-
-  const [head, ...rest] = path.split('.')
-  const group = fields.find(candidate => String(candidate.key) === head)
-
-  return group?.kind === 'group' ? lookup(group.fields, rest.join('.')) : undefined
-}
-
 const field = memo(() => {
   if (given)
     return given
 
   const fields = fieldsOf(form.collection.schema)
-  const found = lookup(fields, name)
+  const found = resolve(fields, name)
 
   const paired = pairedFields(fields).get(name)
 
@@ -41,8 +30,10 @@ const field = memo(() => {
 })
 
 // In a locale other than the default's, a text still reading as the default locale's, or empty beside it, is said under the field.
+const translated = form.source === undefined ? new Set<string>() : new Set(translatable(form.collection).map(candidate => String(candidate.key)))
+
 const note = () => {
-  if (form.source === undefined || !translatable(form.collection).some(candidate => String(candidate.key) === name))
+  if (form.source === undefined || !translated.has(name))
     return undefined
 
   const gap = gapOf(form.drafts.value(form.entry, name), form.source.data?.[name])
