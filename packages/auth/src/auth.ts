@@ -133,7 +133,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   prefix?: Prefix | undefined
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
   site?: string | undefined
-  // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous page navigation.
+  // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous visitor opening a page.
   signInPage?: string | undefined
   // Where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak, as with an `allow` list.
   failurePage?: string | undefined
@@ -302,7 +302,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return held
   }
 
-  // The signed-in user, who must be there: an anonymous page navigation goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
+  // The signed-in user, who must be there: an anonymous visitor opening a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
   // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds.
   async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User<UserData>> {
     const user = await this.user()
@@ -1368,7 +1368,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => gate(app.use(plugin))
     },
 
-    // A `_guard.ts` default export. An anonymous page navigation (a GET or HEAD from a browser opening a page) goes to `redirect`, the prebuilt sign-in page with `pages`, else `signInPage`, with where they were going as `?redirect=`, or gets a 401 without any, as does any post; a user who does not meet `require` gets a 403.
+    // A `_guard.ts` default export. An anonymous GET or HEAD that may be a page opening (not a browser fetch, nor a request for JSON) goes to `redirect`, the prebuilt sign-in page with `pages`, else `signInPage`, with where they were going as `?redirect=`, or gets a 401 without any, as does any post; a user who does not meet `require` gets a 403.
     // A scoped bearer token passes only with one of `scope`.
     guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
       const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? guardPageOf(core) : guardOptions.redirect

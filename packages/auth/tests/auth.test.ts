@@ -350,30 +350,31 @@ describe('guard', () => {
     expect(await run(auth.guard(), guardContext({ locals: anonymous, method: 'POST' }))).toBe('deny 401')
   })
 
-  test('only a navigation is redirected: a fetch for JSON or an API call keeps its 401, with the prebuilt pages or a signInPage', async () => {
+  test('only what is clearly not a page opening keeps its 401: a fetch or a client asking for JSON, with the prebuilt pages or a signInPage', async () => {
     const own = testApp({ signInPage: '/login' })
     const pages = testApp({ pages: true })
-    const json = { 'sec-fetch-mode': 'cors', 'accept': 'text/html' }
 
     for (const { auth } of [own, pages]) {
       const anonymous = await contextOf(auth.plugin)
       const sentTo = auth === own.auth ? '/login' : '/auth/sign-in'
+      const redirected = `redirect ${sentTo}?redirect=%2F`
 
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: { 'sec-fetch-mode': 'navigate' } }))).toBe(`redirect ${sentTo}?redirect=%2F`)
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, method: 'HEAD', headers: { 'sec-fetch-mode': 'navigate' } }))).toBe(`redirect ${sentTo}?redirect=%2F`)
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: { accept: 'text/html,application/xhtml+xml' } }))).toBe(`redirect ${sentTo}?redirect=%2F`)
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: { accept: 'application/json' } }))).toBe('deny 401')
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: { accept: '*/*' } }))).toBe('deny 401')
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: {} }))).toBe('deny 401')
-      expect(await run(auth.guard(), guardContext({ locals: anonymous, headers: json }))).toBe('deny 401')
-      expect(await run(auth.guard({ redirect: '/elsewhere' }), guardContext({ locals: anonymous, headers: json }))).toBe('deny 401')
+      for (const headers of [{ 'sec-fetch-mode': 'navigate' }, { 'sec-fetch-mode': 'nested-navigate' }, { accept: 'text/html,application/xhtml+xml' }, { accept: '*/*' }, {}])
+        expect(await run(auth.guard(), guardContext({ locals: anonymous, headers }))).toBe(redirected)
+
+      expect(await run(auth.guard(), guardContext({ locals: anonymous, method: 'HEAD', headers: {} }))).toBe(redirected)
+
+      for (const headers of [{ 'sec-fetch-mode': 'cors', 'accept': 'text/html' }, { 'sec-fetch-mode': 'same-origin' }, { accept: 'application/json' }, { accept: 'application/json, text/plain' }])
+        expect(await run(auth.guard(), guardContext({ locals: anonymous, headers }))).toBe('deny 401')
+
+      expect(await run(auth.guard({ redirect: '/elsewhere' }), guardContext({ locals: anonymous, headers: { accept: 'application/json' } }))).toBe('deny 401')
     }
   })
 
   test('requireUser sends an anonymous visitor the same way, and answers a fetch with the 401', async () => {
     const withPage = testApp({ signInPage: '/login' })
     const without = testApp()
-    const ask = async (setup: typeof withPage, headers: Record<string, string> = { 'sec-fetch-mode': 'navigate' }) => {
+    const ask = async (setup: typeof withPage, headers: Record<string, string> = {}) => {
       const { auth } = (await contextOf(setup.auth.plugin, '', headers)) as { auth: Auth }
 
       try {
@@ -420,8 +421,7 @@ describe('guard', () => {
   })
 })
 
-// A browser opening a page unless the headers say otherwise.
-function guardContext({ locals, path = '/', method = 'GET', headers = { 'sec-fetch-mode': 'navigate' } }: { locals: object, path?: string, method?: string, headers?: Record<string, string> }): GuardContext {
+function guardContext({ locals, path = '/', method = 'GET', headers = {} }: { locals: object, path?: string, method?: string, headers?: Record<string, string> }): GuardContext {
   const url = new URL(`http://localhost${path}`)
 
   return {

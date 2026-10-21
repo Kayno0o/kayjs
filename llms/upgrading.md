@@ -4,9 +4,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.63.0
 
-### kayjs-auth's guard redirects only a navigation, and to `signInPage` without `pages`
+### kayjs-auth's guard answers a fetch with a 401, and redirects to `signInPage` without `pages`
 
-`auth.guard()` and `requireUser()` redirect an anonymous request to the sign-in page only when it is a page navigation: a GET or HEAD with `Sec-Fetch-Mode: navigate`, or, with no such header, an `Accept` including `text/html`. Any other request, a fetch for JSON or a `curl` with `*/*` included, now gets the 401 where the prebuilt `pages` redirected every GET. An app that sets `signInPage` in `createAuth` without `pages` now has a page navigation redirected there with `?redirect=`, where it got a 401. A test driving a guarded page with `site.fetch` or `visit` sends `headers: { 'sec-fetch-mode': 'navigate' }` to be redirected. No lint can recognise it.
+`auth.guard()` and `requireUser()` redirect an anonymous GET or HEAD to the sign-in page unless it clearly is not a page opening: a browser fetch (a `Sec-Fetch-Mode` other than `navigate` or `nested-navigate`) or a client whose `Accept` names neither `text/html` nor `*/*`, such as `application/json`, now gets the 401 where the prebuilt `pages` redirected it. Everything else, a test's or curl's request with no headers included, redirects as before. An app that sets `signInPage` in `createAuth` without `pages` now has such a request redirected there with `?redirect=`, where it got a 401; a GET route returning JSON under that guard keeps its 401 when the client sends `Accept: application/json`. No lint can recognise it.
 
 ### An entry's page takes its head from the entry
 
