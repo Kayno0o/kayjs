@@ -141,13 +141,15 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     if (rendered) {
       rendered.count++
 
-      if (when === 'idle' || when === 'visible')
+      if (when === 'idle' || when === 'visible') {
         rendered.lazy++
-      else
+      }
+      else {
         rendered.eager.add(id)
 
-      if (when === 'load' || browserOnly)
-        rendered.immediate.add(id)
+        if (when === 'load' || browserOnly)
+          rendered.immediate.add(id)
+      }
     }
 
     try {

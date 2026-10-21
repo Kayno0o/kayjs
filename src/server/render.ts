@@ -1192,7 +1192,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
 // A page without islands needs no hydration script, only the entry swapping pages.
 // `immediate` is the islands hydrating at once for a visitor saving data, whose chunk preloads a page for that visitor keeps: they are marked `data-load` where the page drops island-only preloads, which the marked link no longer matches.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, immediate?: Set<string>): string {
-  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}\n${immediate === undefined ? '-' : [...immediate].sort().join('\n')}`, () => {
+  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}\n\0${immediate === undefined ? '-' : [...immediate].sort().join('\n')}`, () => {
     const chunks = new Set(client.entryImports)
 
     // Waiting for an island to be visible or idle, or a deferred server island to near the viewport, needs its own chunk, which the entry would ask for only once it ran.

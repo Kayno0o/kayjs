@@ -120,7 +120,7 @@ async function read(html: string): Promise<Found> {
         element.onEndTag(() => void tables.splice(tables.indexOf(table), 1))
       },
     })
-    .on('thead, tbody, tfoot', { element: () => void (tables.at(-1) !== undefined && (tables.at(-1)!.grouped = true)) })
+    .on('thead, tbody, tfoot', { element: () => void (inert === 0 && tables.at(-1) !== undefined && (tables.at(-1)!.grouped = true)) })
     .on('tr', {
       element: () => {
         const table = tables.at(-1)

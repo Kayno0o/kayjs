@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, expect, mock, setSystemTime, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
 import { scratchDir } from 'kay/test'
+import { encodePng } from '../../../src/server/png'
 import { setupStorage } from '../../../src/server/storage'
 
 const shape = { schema: { type: 'object' }, components: [], localized: false } satisfies Omit<CollectionInfo, 'name' | 'kind'>
@@ -196,4 +197,15 @@ test('scans each collection once to delete any number of uploads, listing the co
   expect((await deleteUnusedUploads(uploads) as { deleted: string[] }).deleted.toSorted()).toEqual(uploads.toSorted())
   expect(reads).toEqual(['posts', 'products'])
   expect(infoCalls).toEqual([{ counts: false }])
+})
+
+test('lists a coloured upload by its key id, used or not', async () => {
+  const opaque = () => new File([new Uint8Array(encodePng(new Uint8Array(4 * 4).fill(255), 2, 2))], 'flat.png', { type: 'image/png' })
+  const used = await files.put(opaque(), { folder: 'posts' })
+  const stray = await files.put(opaque(), { folder: 'posts' })
+
+  expect(used).toMatch(/\.2x2-ffffff\.png$/)
+  stored = { posts: [entry('a', { photo: files.url(used) })], products: [] }
+  aged()
+  expect(await unusedKeys()).toEqual([stray])
 })

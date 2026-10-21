@@ -19,7 +19,7 @@ import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
-import { decodable, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
+import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -68,10 +68,7 @@ const MOST_ANSWERED = 1024
 // A longer URL is answered without being kept, so junk query strings cannot pin megabytes.
 const LONGEST_ANSWERED = 2048
 
-export { MAX_UPLOAD_PIXELS }
 export const DEFAULT_QUALITY = 80
-// Variants and cards drawn on request, each holding its source's decoded pixels, at most this many at once, so a burst of new images cannot take the memory of all of them.
-export const drawing = limiter(4)
 // Images a build decodes at once, each held whole while its variants are written from it.
 const DECODED_AT_ONCE = 4
 
@@ -233,8 +230,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
-  // The versions of files whose decode failed, so a request for one, a conditional one included, does not run the failing decode again.
-  const undecodable = new Set<string>()
+  // The variants, by file version, whose drawing failed, so a request for one, a conditional one included, does not run the failing decode again.
+  const undecodable = new Map<string, true>()
   // The color of a runtime image, by the version of its file.
   const colors = new Map<string, Promise<string | undefined>>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
@@ -393,10 +390,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
 
     const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
+    // A failure belongs to the kind of variant that hit it, so a card or an AVIF failing leaves the widths in WebP alone.
+    const kind = typeof variant === 'object' && variant.aspect ? 'crop' : 'resize'
+    const failure = `${version}\n${format}\n${variant === 'card' ? 'card' : kind}`
     // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
     const refused = () => own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
 
-    if (file === cached && undecodable.has(version))
+    if (file === cached && undecodable.has(failure))
       return refused()
 
     let writing = pending.get(cached)
@@ -438,10 +438,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         if (typeof (error as { syscall?: unknown }).syscall === 'string')
           throw error
 
-        if (undecodable.size >= MOST_ANSWERED)
-          undecodable.delete(undecodable.values().next().value!)
-
-        undecodable.add(version)
+        keep(undecodable, failure, true)
 
         return refused()
       }

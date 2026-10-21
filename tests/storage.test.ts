@@ -264,6 +264,8 @@ describe('stored images', () => {
     expect(key).toMatch(/^[\da-f]{20}\.40x30-c86432\.png$/)
     expect(image(files.url(key))).toMatchObject({ width: 40, height: 30, style: 'background-color:#c86432' })
     expect(image(files.url(key), { placeholder: false }).style).toBeUndefined()
+    expect(await files.put(flat(), { folder: 'a/b' })).toMatch(/^a\/b\/[\da-f]{20}\.40x30-c86432\.png$/)
+    expect(await files.put(flat(), { private: true })).toMatch(/^private\/[\da-f]{20}\.40x30-c86432\.png$/)
     expect(await files.put(flat(100))).toMatch(/^[\da-f]{20}\.40x30\.png$/)
     expect(await files.put(new File([gif(40, 10, [3, 90])], 'moving.gif', { type: 'image/gif' }))).toMatch(/^[\da-f]{20}\.40x10\.gif$/)
     // A key without a color, such as one stored before, is read as ever.

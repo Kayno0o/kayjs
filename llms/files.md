@@ -104,7 +104,7 @@ if upload.progress() !== undefined
 ### Storing and linking
 
 - `files.put(file, options)` stores a `File` or `Blob` and resolves with its new key, `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200-c86432.jpg`, for the app to save where it keeps its data.
-- The extension is the file name's, else its type's, else `bin`; an image's key holds its size and, for a still image with no transparency, the mean colour read once on upload, which `img` and `image()` read off it without opening the file (the colour is shown until the image loads, as for an imported one, see [Responsive images](images.md#responsive-images)); a key stored before has none, and keeps working.
+- The extension is the file name's, else its type's, else `bin`; an image's key holds its size and, for a still image with no transparency, the mean colour read once on upload, which `img` and `image()` read off it without opening the file (the colour is shown until the image loads, as for an imported one, see [Responsive images](images.md#responsive-images)); an AVIF, an animated GIF, a transparent image and a key stored before have none, and keep working; the key is 7 characters longer with a colour.
 - A key is never written twice, so replacing a file stores a new one: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is in.
 - `folder` is letters, digits, `-` and `_` in segments split by `/`, and does not start with `private` in any case.
 - `files.url(key)` is where a page links it, a path of the site as a template's `href` is, written without the base: `/_kay/files/<key>`.

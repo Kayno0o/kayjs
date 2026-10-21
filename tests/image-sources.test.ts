@@ -154,6 +154,10 @@ describe('gif and avif sources', () => {
         // The first request may learn it fails; every later one answers without a decode.
         const first = await get(`/uploads/${name}`, 'w=2')
         const etag = first.headers.get('etag')
+
+        // The card is its own kind of variant: it fails once on its own.
+        await get(`/uploads/${name}`, 'card')
+
         const before = decodes
 
         await get(`/uploads/${name}`, 'w=2')

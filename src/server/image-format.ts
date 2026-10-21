@@ -1,4 +1,5 @@
 import { decodeAvif } from './avif'
+import { limiter } from './limit'
 
 // What an image's first bytes say it is, for the formats Bun.Image cannot be trusted with: AVIF, which it decodes only through the system's codec, and GIF, of which it reads the first frame.
 const GIF = [0x47, 0x49, 0x46, 0x38]
@@ -8,6 +9,8 @@ const HEAD = 64
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
+// Variants and cards drawn on request and colours read on upload, each holding its source's decoded pixels, at most this many at once, so a burst of new images cannot take the memory of all of them.
+export const drawing = limiter(4)
 
 export function isGif(bytes: Uint8Array): boolean {
   return GIF.every((byte, index) => bytes[index] === byte)

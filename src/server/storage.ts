@@ -9,7 +9,7 @@ import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { typeOfName } from './file-type'
 import { dominantColor, imageColors } from './image-color'
-import { imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
+import { drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
 import { requestUrl } from './request-url'
@@ -249,7 +249,7 @@ export const files = {
     const stored = strip ? new Blob([stripImageMetadata(await data.bytes())], { type: data.type }) : data
     const size = SIZED.test(extension) ? await imageSize(stored) : undefined
     // Read once here and kept in the key, so a page paints it with no lookup, whatever the store.
-    const color = size?.animated === false && extension !== 'avif' && imageColors() ? await dominantColor(stored, MAX_UPLOAD_PIXELS) : undefined
+    const color = size?.animated === false && extension !== 'avif' && imageColors() ? await drawing(async () => dominantColor(stored, MAX_UPLOAD_PIXELS)) : undefined
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
     const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}${color === undefined ? '' : `-${color}`}` : ''}.${extension}`
     const store = await activeStore()

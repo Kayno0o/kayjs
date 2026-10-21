@@ -27,7 +27,7 @@ for key of photos key={key}
 
 A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200-c86432.jpg`. An image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one, without opening the file.
 
-It holds the image's average colour too, read once when you store it, which the image's box shows until it loads. Transparent images, animated GIFs and files stored before this have no colour in their key and show none.
+It holds the image's average colour too, read once when you store it, which the image's box shows until it loads. Transparent images, AVIF files, animated GIFs and files stored before this have no colour in their key and show none. A key is 7 characters longer with one.
 
 A JPEG, PNG, WebP, AVIF or HEIC is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken. Its colour profile and orientation stay. A file of those formats kay cannot read through is refused. Use `files.put(file, { keepMetadata: true })` to store it byte for byte.
 
