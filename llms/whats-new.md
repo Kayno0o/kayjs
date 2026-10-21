@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-cms keeps the last 50 saves of every entry of a SQLite or Postgres collection and its deleted entries for 30 days, by default, to list, compare and restore from an entry's History button and the list's Trash; `cms({ history: false })` turns it off ([History and the trash](../packages/cms/llms/history.md)).
+- kayjs-ui's TabNav keeps the window scrolled where it was when a tab is followed, so a bar needs no `data-keep-scroll` ([TabNav](../packages/ui/llms/tables-navigation-and-layout.md)).
 - kayjs-cms keeps every upload in one folder, named by the hash of its file so a file sent twice is stored once, and has a media library at `<prefix>/media` listing them with a preview, size and the entries using each, to rename or delete; `files.put(file, { id })` names a key ([kayjs-cms](../packages/cms/llms/uploads.md), [Files](files.md)).
 - `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })` from `kay/content` declares a list of items of several types, stored with a `type` key and read as a union discriminated on it, and kayjs-cms adds, reorders and removes them by type and marks their fields in edit mode ([kayjs-cms](../packages/cms/llms/fields.md#blocks)).
 - `kay i18n translate` translates the texts inside `blocks()` lists, each item by its type ([kayjs-ai](../packages/ai/llms/translating.md)).

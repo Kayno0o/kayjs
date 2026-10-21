@@ -1312,6 +1312,36 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('keeps the scroll when a TabNav tab is followed, and restores it going back', async () => {
+    const fresh = await open('/')
+
+    try {
+      await fresh.goto('/tabbed')
+      await fresh.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+        scrollTo(0, 1100)
+      })
+      await fresh.evaluate(() => document.querySelector<HTMLElement>('.kui-tab-nav a[href="/tabbed-two"]')!.click())
+      await fresh.waitFor('h1', { text: 'Tabbed two' })
+
+      expect(await fresh.evaluate(() => ({ kept: scrollY > 1000, swapped: (window as { kayAlive?: boolean }).kayAlive === true, href: document.querySelector('.kui-tab-nav a[href="/tabbed"]')?.getAttribute('href') }))).toEqual({ kept: true, swapped: true, href: '/tabbed' })
+
+      await fresh.evaluate(() => scrollTo(0, 1500))
+      await fresh.evaluate(() => document.querySelector<HTMLElement>('.kui-tab-nav a[href="/tabbed"]')!.click())
+      await fresh.waitUntil(() => document.title === 'Tabbed')
+
+      expect(await fresh.evaluate(() => scrollY > 1400)).toBe(true)
+
+      // Back restores the position the entry saved.
+      await fresh.back()
+      await fresh.waitUntil(() => document.title === 'Tabbed two')
+      await fresh.waitUntil(() => scrollY > 1400 && scrollY < 1600)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('goes back to a jump within the page by scrolling, the page left as it is', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

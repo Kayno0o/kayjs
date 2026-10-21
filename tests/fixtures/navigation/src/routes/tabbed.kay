@@ -1,0 +1,9 @@
+---
+import TabNav from '../../../../../packages/ui/src/tab-nav.kay'
+---
+head
+  title Tabbed
+h1 Tabbed
+div(style="height: 1200px")
+TabNav(links={[{ href: '/tabbed', label: 'First' }, { href: '/tabbed-two', label: 'Second' }]} current="/tabbed" label="Tabs")
+div(style="height: 3000px")
