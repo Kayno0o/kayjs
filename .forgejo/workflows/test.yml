@@ -136,14 +136,16 @@ jobs:
           su postgres -c "createdb -O test kayjs_auth_test"
           echo "KAYJS_AUTH_TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kayjs_auth_test" >> "$GITHUB_ENV"
 
-      # Every test file in this one checkout, the slowest first by tests/timings.json, on half the host's 12 cores: a worker per core held the whole machine the runner shares.
-      # Each file's duration here is written into this checkout's tests/timings.json, which the step below prints.
+      # Every test file in this one checkout, the slowest first by .kay/timings.json (scripts/timings.ts builds it from tests/timings.json, with an early start for a file not measured yet), on half the host's 12 cores: a worker per core held the whole machine the runner shares.
+      # Each file's duration here is written into this checkout's .kay/timings.json, which the step below prints, whole on one line for scripts/timings.ts to read back from the log, so a session's runs schedule by the last green run's measurement.
       - name: Tests
         run: bun run test --parallel=6 --update-timings
 
       - name: Slowest test files
         if: ${{ !cancelled() }}
-        run: jq -r '.files | to_entries | sort_by(-.value) | .[:40][] | "\(.value / 1000 | floor)s \(.key)"' tests/timings.json
+        run: |
+          jq -r '.files | to_entries | sort_by(-.value) | .[:40][] | "\(.value / 1000 | floor)s \(.key)"' .kay/timings.json
+          echo "KAY_TIMINGS $(jq -c . .kay/timings.json)"
 
       - name: Check and test the libraries
         run: |
