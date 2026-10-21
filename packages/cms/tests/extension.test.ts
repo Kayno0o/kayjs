@@ -113,7 +113,7 @@ describe('the dev tool\'s CMS tab', () => {
     const response = await ask()
 
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(await response.json()).toEqual({ editing: false, prefix: '/studio', exit: '/api/cms/preview/exit' })
+    expect(await response.json()).toMatchObject({ editing: false, prefix: '/studio', exit: '/api/cms/preview/exit', words: { editing: 'You are in edit mode on this site.', edit: 'Edit this page', readFailure: 'Could not read the edit mode: {failure}' } })
   })
 
   test('answers nothing outside kay dev', async () => {

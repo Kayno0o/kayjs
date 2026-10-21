@@ -7,6 +7,21 @@ interface CmsState {
   editing: boolean
   prefix: string
   exit: string
+  words?: Record<string, string>
+}
+
+// The English the tab falls back to: the server words the rest in the page's language with its answer, so the texts shown before one arrives or when it fails are the last answer's, else these.
+const ENGLISH: Record<string, string> = {
+  editing: 'You are in edit mode on this site.',
+  notEditing: 'You are not in edit mode.',
+  edit: 'Edit this page',
+  leave: 'Leave edit mode',
+  guard: 'The screens\' guard decides whether you may.',
+  screens: 'Open the screens',
+  readFailure: 'Could not read the edit mode: {failure}',
+  leaveFailure: 'Could not leave edit mode: {failure}',
+  unavailable: 'kayjs-cms answers here under `kay dev` alone.',
+  answered: 'the server answered {status}',
 }
 
 function base(): string {
@@ -27,6 +42,10 @@ function screenPath(prefix: string, path = ''): string {
 
 export default function cmsDevTool(tool: DevTool): void {
   let asked = 0
+  let words = ENGLISH
+
+  const say = (key: string, values: Record<string, string> = {}) => (words[key] ?? ENGLISH[key]!).replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
+  const reason = (error: unknown) => error instanceof Error ? error.message : String(error)
   const tab = tool.tab({ id: 'cms', label: 'CMS', icon: 'pencil', shown: () => void show() })
   const empty = (text: string) => {
     tab.count(0)
@@ -42,19 +61,20 @@ export default function cmsDevTool(tool: DevTool): void {
 
       if (response.status === 404) {
         if (ask === asked)
-          empty('kayjs-cms answers here under `kay dev` alone.')
+          empty(say('unavailable'))
 
         return
       }
 
       if (!response.ok)
-        throw new Error(`the server answered ${response.status}`)
+        throw new Error(say('answered', { status: String(response.status) }))
 
       state = await response.json() as CmsState
+      words = state.words ?? ENGLISH
     }
     catch (error) {
       if (ask === asked)
-        empty(`Could not read the edit mode: ${error instanceof Error ? error.message : String(error)}`)
+        empty(say('readFailure', { failure: reason(error) }))
 
       return
     }
@@ -62,11 +82,11 @@ export default function cmsDevTool(tool: DevTool): void {
     if (ask !== asked)
       return
 
-    const status = tool.make('div', state.editing ? 'good' : 'note', state.editing ? 'You are in edit mode on this site.' : 'You are not in edit mode.')
-    const toggle = tool.make('button', 'tool', state.editing ? 'Leave edit mode' : 'Edit this page')
-    const note = tool.make('div', 'note', state.editing ? '' : 'The screens\' guard decides whether you may.')
+    const status = tool.make('div', state.editing ? 'good' : 'note', state.editing ? say('editing') : say('notEditing'))
+    const toggle = tool.make('button', 'tool', state.editing ? say('leave') : say('edit'))
+    const note = tool.make('div', 'note', state.editing ? '' : say('guard'))
     const actions = tool.make('div', 'actions')
-    const screens = tool.make('a', 'link', 'Open the screens')
+    const screens = tool.make('a', 'link', say('screens'))
 
     tab.count(state.editing ? 1 : 0)
     toggle.type = 'button'
@@ -87,13 +107,13 @@ export default function cmsDevTool(tool: DevTool): void {
         const response = await fetch(`${base()}${state.exit}`, { method: 'POST' })
 
         if (!response.ok)
-          throw new Error(`the server answered ${response.status}`)
+          throw new Error(say('answered', { status: String(response.status) }))
 
         location.reload()
       }
       catch (error) {
         toggle.disabled = false
-        note.textContent = `Could not leave edit mode: ${error instanceof Error ? error.message : String(error)}`
+        note.textContent = say('leaveFailure', { failure: reason(error) })
       }
     }
 

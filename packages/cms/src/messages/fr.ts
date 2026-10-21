@@ -29,6 +29,17 @@ export default defineMessages({
       tooShort: '{field} demande au moins {min} caractères',
       tooSmall: '{field} doit valoir {min} au moins',
     },
+    dev: {
+      answered: 'le serveur a répondu {status}',
+      editing: 'Vous êtes en mode édition sur ce site.',
+      guard: 'La garde des écrans décide si vous en avez le droit.',
+      leave: 'Quitter le mode édition',
+      leaveFailure: 'Impossible de quitter le mode édition : {failure}',
+      notEditing: 'Vous n\'êtes pas en mode édition.',
+      readFailure: 'Impossible de lire le mode édition : {failure}',
+      screens: 'Ouvrir les écrans',
+      unavailable: 'kayjs-cms ne répond ici que sous `kay dev`.',
+    },
     editor: {
       discard: 'Les abandonner et arrêter',
       discardAsk: 'Vous avez des modifications non enregistrées. Arrêter les abandonne.',

@@ -397,4 +397,28 @@ describe('the libraries\' dev tool tabs', () => {
     expect(posted).toEqual(['exit'])
     fetching.mockRestore()
   })
+
+  it('words the CMS tab with the texts the server answers in the page\'s language, and fills in a failure', async () => {
+    let status = 200
+    const words = { editing: 'Vous êtes en mode édition.', notEditing: 'Pas en mode édition.', edit: 'Modifier cette page', leave: 'Quitter', guard: 'La garde décide.', screens: 'Ouvrir les écrans', readFailure: 'Lecture impossible : {failure}', leaveFailure: 'Sortie impossible : {failure}', answered: 'le serveur a répondu {status}', unavailable: 'Seulement sous kay dev.' }
+    const fetching = answering({
+      'GET /_kay/cms': () => status === 200 ? Response.json({ editing: false, prefix: '/admin', exit: '/api/cms/preview/exit', words }) : new Response(null, { status }),
+    })
+
+    tool = startDevTool()
+    cmsDevTool(tool)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-cms')!.click()
+    await Bun.sleep(0)
+    expect(panel('cms').textContent).toContain('Pas en mode édition.')
+    expect(panel('cms').querySelector('button')!.textContent).toBe('Modifier cette page')
+    expect(panel('cms').querySelector('a')!.textContent).toBe('Ouvrir les écrans')
+
+    // A failed read keeps the language of the last answer.
+    status = 500
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-problems')!.click()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-cms')!.click()
+    await Bun.sleep(0)
+    expect(panel('cms').textContent).toContain('Lecture impossible : le serveur a répondu 500')
+    fetching.mockRestore()
+  })
 })
