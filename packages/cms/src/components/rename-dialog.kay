@@ -8,6 +8,7 @@ import { wording } from 'kay/words'
 import type { SlugReport } from '../slug'
 import Refused from './refused.kay'
 import { slugify } from '../slug'
+import './rename-dialog.css'
 
 // The dialog that renames an entry's slug, for the entry's editor and for a row of the list: a new slug to type, cleaned as it is typed, checked against the slugs the collection holds before the server is asked.
 // `blocked` is why Rename cannot go ahead whatever is typed, as edits not saved yet. `referrers` are the entries that name the entry, which the rename points at the new slug. `rename` answers true once renamed, and tells `onRefused` what the server refused it for.

@@ -54,8 +54,15 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
   return result
 }
 
-// The entries behind `referrersOf`, with their collection.
-export async function referrersWith(target: string, slugs: Iterable<string>): Promise<Map<string, Referrer[]>> {
+// A collection that could hold references to the target failed to read, so the entries naming it are not all known.
+export class UnreadReferrers extends Error {
+  constructor(readonly names: string[]) {
+    super(`${names.join(', ')} failed to read for the references to be found`)
+  }
+}
+
+// The entries behind `referrersOf`, with their collection. `strict` throws an `UnreadReferrers` when a collection fails to read, instead of leaving it out.
+export async function referrersWith(target: string, slugs: Iterable<string>, { strict = false }: { strict?: boolean } = {}): Promise<Map<string, Referrer[]>> {
   const wanted = new Set(slugs)
   const result = new Map<string, Referrer[]>()
 
@@ -70,20 +77,29 @@ export async function referrersWith(target: string, slugs: Iterable<string>): Pr
   catch (error) {
     log.error(`the collections failed to read for the references to ${target}`, error)
 
+    if (strict)
+      throw new UnreadReferrers(['the collections'])
+
     return result
   }
 
   const read = await Promise.allSettled(referring.map(async collection => ({ collection, found: await entries(collection.name, {}) })))
 
+  const unread: string[] = []
+
   for (const [i, outcome] of read.entries()) {
     if (outcome.status === 'rejected') {
       log.error(`${referring[i]!.name}'s entries failed to read for the references to ${target}`, outcome.reason)
+      unread.push(collectionTitle(referring[i]!))
 
       continue
     }
 
     collect(outcome.value.collection, outcome.value.found, target, wanted, result)
   }
+
+  if (strict && unread.length > 0)
+    throw new UnreadReferrers(unread)
 
   return result
 }

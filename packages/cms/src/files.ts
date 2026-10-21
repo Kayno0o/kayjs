@@ -259,32 +259,42 @@ export function forgejo({ url, repo, branch, token, timeout: wait = '15s', fetch
     return post([file], { message, author }, repoPath, operation === 'create', signal, posting)
   }
 
-  // The file deleted at `from` and created at `to` in one commit, which git reads as a rename.
+  // The file deleted at `from` and created at `to` in one commit, which git reads as a rename. The versions of the files are read together, so the many referrers of a rename stay under the one timeout.
   async function commitMove({ from, to, text, message, author, base, also = [] }: FileMove, signal: AbortSignal, posting: () => void): Promise<Commit> {
-    const sha = await currentSha(from.repoPath, signal)
+    const [sha, taken, ...held] = await Promise.all([from.repoPath, to.repoPath, ...also.map(change => change.repoPath)].map(async path => currentSha(path, signal)))
 
     checkBase(base, sha)
 
     if (sha === undefined)
       throw new SaveConflict(null)
 
-    if (await currentSha(to.repoPath, signal) !== undefined)
+    if (taken !== undefined)
       throw new SaveConflict(undefined, true)
 
     const files: object[] = [{ operation: 'delete', path: from.repoPath, sha }, { operation: 'create', path: to.repoPath, content: Buffer.from(text).toString('base64') }]
 
-    for (const change of also) {
-      const held = await currentSha(change.repoPath, signal)
+    for (const [i, change] of also.entries()) {
+      checkBase(change.base, held[i], change.repoPath)
 
-      checkBase(change.base, held, change.repoPath)
-
-      if (held === undefined)
+      if (held[i] === undefined)
         throw new SaveConflict(null, false, change.repoPath)
 
-      files.push({ operation: 'update', path: change.repoPath, sha: held, content: Buffer.from(change.text).toString('base64') })
+      files.push({ operation: 'update', path: change.repoPath, sha: held[i], content: Buffer.from(change.text).toString('base64') })
     }
 
-    return post(files, { message, author }, from.repoPath, false, signal, posting)
+    try {
+      return await post(files, { message, author }, from.repoPath, false, signal, posting)
+    }
+    catch (error) {
+      // The forge refuses the commit without saying which file it found changed: when it is not the moved one, a referrer saved since is named.
+      if (!(error instanceof SaveConflict) || error.at !== undefined || (error.current !== undefined && error.current !== sha))
+        throw error
+
+      const now = await Promise.all(also.map(async change => conflictVersion(async () => currentSha(change.repoPath, AbortSignal.timeout(timeout)))))
+      const changed = also.findIndex((_, i) => now[i] !== undefined && now[i] !== held[i])
+
+      throw changed < 0 ? error : new SaveConflict(now[changed], false, also[changed]!.repoPath)
+    }
   }
 
   // Turns what a request threw into the error a save reports; once the commit was sent, the forge may have made it without its answer arriving.

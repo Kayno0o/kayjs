@@ -419,6 +419,7 @@ export default defineMessages({
       noMove: 'Le système d\'enregistrement de ce site ne sait pas renommer les fichiers',
       renameReferred: '{slug} est référencée par {names}, qui ne peuvent pas être enregistrées ici : faites-les pointer vers le nouveau slug d\'abord',
       renameStale: 'Une entrée référençant {slug} a été enregistrée pendant le renommage : réessayez',
+      renameUnread: '{names} n\'a pas pu être lu pour trouver les entrées référençant {slug}, le renommage n\'a donc pas eu lieu : réessayez',
     },
     table: {
       editing: 'En cours de modification par {names}',

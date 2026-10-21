@@ -12,7 +12,7 @@ import { collectionInfo, entries, entryFile, entryPage, entrySource, removeEntry
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
-import { missingReferences, pointReferences, referrersWith } from './references'
+import { missingReferences, pointReferences, referrersWith, UnreadReferrers } from './references'
 import { moveRevisions, openTrail } from './revisions'
 import { settings } from './settings'
 import { pairKey } from './translations'
@@ -553,6 +553,8 @@ interface Pointing {
   body: string | undefined
   // The version it was read at, for the save to name.
   version: string | undefined
+  // Whether it can be saved from here: a folder outside the repository cannot be committed to, nor one whose version cannot be read be saved without a base.
+  savable: boolean
 }
 
 // Whether an entry naming the old slug follows the rename. A localized collection's entry names the entry of its own locale, so only that locale's follow; one with no locale names the entry by its slug whichever the locale, so it follows unless another locale still holds the old slug.
@@ -565,7 +567,7 @@ function follows(collection: CollectionInfo, renamed: EntryRef, locale: string |
 
 // The entries to point at the new slug, each read again with the version it is at, so a save made since is never written over.
 async function pointings(collection: CollectionInfo, ref: EntryRef, slug: string): Promise<Pointing[]> {
-  const found = (await referrersWith(collection.name, [ref.slug])).get(ref.slug) ?? []
+  const found = (await referrersWith(collection.name, [ref.slug], { strict: true })).get(ref.slug) ?? []
 
   if (found.length === 0)
     return []
@@ -578,12 +580,25 @@ async function pointings(collection: CollectionInfo, ref: EntryRef, slug: string
       continue
 
     const at = { collection: holder.name, slug: entry.slug, locale: entry.locale }
+
+    if (holder.kind === 'folder' && holder.dir === undefined) {
+      const outside = entry.data && pointReferences(holder, entry.data, collection.name, ref.slug, slug)
+
+      if (outside)
+        result.push({ collection: holder, ref: at, label, data: outside, body: undefined, version: undefined, savable: false })
+
+      continue
+    }
+
     const version = holder.kind === 'loaded' ? undefined : await versionOf(at)
     const now = await entryOf(at, holder)
     const data = now?.data && pointReferences(holder, now.data, collection.name, ref.slug, slug)
 
-    if (data)
-      result.push({ collection: holder, ref: at, label, data, body: now.body, version: version ?? now.version })
+    if (data) {
+      const read = version ?? now.version
+
+      result.push({ collection: holder, ref: at, label, data, body: now.body, version: read, savable: holder.kind === 'loaded' || read !== undefined })
+    }
   }
 
   return result
@@ -629,10 +644,20 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   const target = { ...ref, slug }
   const keepPairing = await pairingKey(collection, existing)
   const data = renamedData(collection, existing.data, ref.slug, slug, keepPairing)
-  const plan = await pointings(collection, ref, slug)
+  let plan: Pointing[]
 
-  // A folder outside the repository cannot be committed to, so an entry in it cannot be pointed at the new slug.
-  const unsavable = plan.filter(each => each.collection.kind === 'folder' && each.collection.dir === undefined).map(each => each.label)
+  try {
+    plan = await pointings(collection, ref, slug)
+  }
+  catch (error) {
+    if (!(error instanceof UnreadReferrers))
+      throw error
+
+    return refused(target, wording('cms.store.renameUnread', '{names} could not be read to find the entries naming {slug}, so it was not renamed: try again', { slug: ref.slug, names: error.names.join(', ') }), 'slug')
+  }
+
+  // An entry that cannot be saved from here cannot be pointed at the new slug.
+  const unsavable = plan.filter(each => !each.savable).map(each => each.label)
 
   if (unsavable.length > 0)
     return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}, which cannot be saved here: change them to name the new slug first', { slug: ref.slug, names: unsavable.slice(0, REFERRERS_NAMED).join(', ') + (unsavable.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')

@@ -1,5 +1,6 @@
 import type { FileSaver } from '../src/files'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
@@ -23,6 +24,7 @@ const visitSchema = s.Object({ title: s.String(), spot: s.Optional(reference('sp
 let count = 0
 let dir: string
 let restore: ReturnType<typeof registerCollections>
+let registered: Parameters<typeof registerCollections>[0]
 const original = contentPlace()
 
 const redirects = () => runtimeRedirects().filter(row => row.from.includes('rn-')).map(row => [row.from, row.to]).sort()
@@ -45,7 +47,7 @@ beforeEach(async () => {
 
   const table = `notes_${++count}`
 
-  restore = registerCollections([
+  registered = [
     ['posts', collection(join(dir, 'posts'), { schema, url: entry => `/rn-blog/${entry.slug}` })],
     ['pages', collection(join(dir, 'pages'), { schema, localized: true, url: entry => `/${entry.locale}/rn-p/${entry.slug}` })],
     ['authors', collection(join(dir, 'authors'), { schema })],
@@ -55,7 +57,8 @@ beforeEach(async () => {
     ['visits', collection(join(dir, 'visits'), { schema: visitSchema })],
     ['guides', collection(join(dir, 'guides'), { schema: s.Object({ title: s.String(), spot: s.Optional(reference('spots')) }), localized: true })],
     ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema, url: entry => `/rn-notes/${entry.slug}` })],
-  ])
+  ]
+  restore = registerCollections(registered)
   configure({ files: workingTree() })
 })
 
@@ -385,6 +388,48 @@ describe('renaming an entry other entries refer to', () => {
     expect(outcome).toMatchObject({ saved: true, slug: 'lovelace', unpointed: ['Books: Engine'] })
     expect(await dataOf('books', 'plain')).toMatchObject({ author: 'lovelace' })
     expect(await dataOf('books', 'engine')).toMatchObject({ author: 'ada' })
+  })
+
+  test('refuses the rename when a referring folder lies outside the repository, writing nothing', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'cms-outside-'))
+
+    try {
+      await Bun.write(join(outside, 'engine.json'), JSON.stringify({ title: 'Engine', author: 'ada' }))
+      registerCollections([...registered, ['shelf', collection(outside, { schema })]])
+      await make('authors', 'ada', { title: 'Ada' })
+
+      const outcome = await renameEntry(ADA, 'lovelace')
+
+      expect(outcome).toMatchObject({ issues: [{ key: 'slug', message: expect.stringContaining('Shelf') }] })
+      expect(await dataOf('authors', 'ada')).toBeDefined()
+      expect(await dataOf('authors', 'lovelace')).toBeUndefined()
+      expect(redirects()).toEqual([])
+    }
+    finally {
+      registerCollections(registered)
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  test('refuses the rename, writing nothing, when a referring collection fails to read', async () => {
+    let down = false
+
+    registerCollections([...registered, ['shelf', collection({ name: 'shelf', load: async () => down ? Promise.reject(new Error('database down')) : [] }, { schema })]])
+    await make('authors', 'ada', { title: 'Ada' })
+    await make('books', 'engine', { title: 'Engine', author: 'ada' })
+    down = true
+
+    try {
+      const outcome = await renameEntry(ADA, 'lovelace')
+
+      expect(outcome).toMatchObject({ issues: [{ key: 'slug', message: expect.stringContaining('Shelf') }] })
+      expect(await dataOf('authors', 'ada')).toBeDefined()
+      expect(await dataOf('authors', 'lovelace')).toBeUndefined()
+      expect(await dataOf('books', 'engine')).toMatchObject({ author: 'ada' })
+    }
+    finally {
+      registerCollections(registered)
+    }
   })
 
   test('a rename with no referrer reports none unpointed', async () => {

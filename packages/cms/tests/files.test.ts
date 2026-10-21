@@ -12,7 +12,7 @@ interface Sent {
 }
 
 // A Forgejo answering the contents API from a table of files, recording each request.
-function forge(files: Record<string, string>, refuse?: Response) {
+function forge(files: Record<string, string>, refuse?: Response, onPost?: () => void) {
   const sent: Sent[] = []
   const request = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = String(input)
@@ -20,8 +20,11 @@ function forge(files: Record<string, string>, refuse?: Response) {
 
     sent.push({ url, method, headers: init?.headers as Record<string, string>, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) })
 
-    if (method === 'POST')
+    if (method === 'POST') {
+      onPost?.()
+
       return refuse ?? Response.json({ commit: { sha: 'c0ffee', html_url: 'https://git.example.com/me/site/commit/c0ffee' } }, { status: 201 })
+    }
 
     const path = decodeURIComponent(new URL(url).pathname.replace(/^.*\/contents\//, ''))
     const sha = files[path]
@@ -327,6 +330,36 @@ describe('moving a file', () => {
 
     expect(conflict.at).toBe('content/books/engine.md')
     expect(stale.sent.filter(each => each.method === 'POST')).toEqual([])
+  })
+
+  test('forgejo names the referrer a racing save changed when the commit is refused, and the moved file when it is the one that changed', async () => {
+    const also = { repoPath: 'content/books/engine.md', absolute: '/unused/engine', text: 'pointed', message: 'm', base: 'a1' }
+    const files: Record<string, string> = { 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a1' }
+    const referrer = forge(files, Response.json({ message: 'conflict' }, { status: 409 }), () => files['content/books/engine.md'] = 'a2')
+
+    expect((await failureOf<SaveConflict>(referrer.saver.move!({ ...move, also: [also] }))).at).toBe('content/books/engine.md')
+
+    const moved: Record<string, string> = { 'content/posts/old.md': 'b10b', 'content/books/engine.md': 'a1' }
+    const own = forge(moved, Response.json({ message: 'conflict' }, { status: 409 }), () => moved['content/posts/old.md'] = 'b20b')
+
+    expect((await failureOf<SaveConflict>(own.saver.move!({ ...move, also: [also] }))).at).toBeUndefined()
+  })
+
+  test('forgejo reads the versions of a move and its referrers together, under the one timeout', async () => {
+    const slow = async (input: string | URL | Request, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+      const free = String(input).includes('/new.md')
+      const answer = () => init?.method === 'POST' ? Response.json({ commit: { sha: 'c0ffee' } }) : Response.json(free ? { message: 'not found' } : { sha: 'a1' }, { status: free ? 404 : 200 })
+      const timer = setTimeout(() => resolve(answer()), 40)
+
+      init?.signal?.addEventListener('abort', () => {
+        clearTimeout(timer)
+        reject(init.signal?.reason)
+      })
+    })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '150ms', fetch: slow as typeof fetch })
+    const also = ['one', 'two', 'three'].map(name => ({ repoPath: `content/books/${name}.md`, absolute: `/unused/${name}`, text: 'pointed', message: 'm', base: 'a1' }))
+
+    await saver.move!({ ...move, from: { repoPath: 'content/posts/old.md', absolute: '/unused/old' }, to: { repoPath: 'content/posts/new.md', absolute: '/unused/new' }, base: 'a1', also })
   })
 
   test('the working tree writes the files that named the moved one with it, or none when one changed', async () => {
