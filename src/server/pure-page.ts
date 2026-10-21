@@ -92,6 +92,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   iconField: 'free',
   findIcons: 'request',
   untranslated: 'free',
+  blocks: 'free',
   renderMarkdown: 'free',
   bodyHtml: 'free',
   highlightCode: 'free',
