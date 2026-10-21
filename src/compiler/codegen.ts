@@ -156,6 +156,7 @@ class ModuleShell {
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
   private jsxTemplate: JsxTemplate | undefined
+  private typedParts: { type?: string, helper: boolean } | undefined
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -341,23 +342,32 @@ class ModuleShell {
 
   // The `class` prop the template's parts give a component, typed from them so the app declares nothing: a string for the root, when there is one, or an object of a string per part, and of the called component's own `class` for a part that is one.
   private partsType(): { type?: string, helper: boolean } {
+    return this.typedParts ??= this.buildPartsType()
+  }
+
+  private buildPartsType(): { type?: string, helper: boolean } {
     const parts = this.facts.parts
 
-    if (!parts?.merges || this.server)
+    if (!parts?.merges)
       return { helper: false }
 
     const imported = new Set(this.script.imports.map(binding => binding.local))
     let helper = false
-    const entries = [...parts.names].toSorted(([a], [b]) => Number(b === 'root') - Number(a === 'root')).map(([name, component]) => {
-      const typed = component !== undefined && imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined))
+    const entries = [...parts.names].toSorted(([a], [b]) => Number(b === 'root') - Number(a === 'root')).map(([name, components]) => {
+      const types = new Set(components.map((component) => {
+        if (component === undefined || !imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined)))
+          return 'string'
 
-      helper ||= typed
+        helper = true
 
-      return `${JSON.stringify(name)}?: ${typed ? `KayPartOf<typeof ${component}>` : 'string'}`
+        return `KayPartOf<typeof ${component}>`
+      }))
+
+      return `${JSON.stringify(name)}?: ${[...types].join(' | ')}`
     })
     const object = `{ ${entries.join('; ')} }`
 
-    return { type: `{ class?: ${parts.root === 'none' ? '' : 'string | '}${object} }`, helper }
+    return { type: `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} }`, helper }
   }
 
   // The component function's head: its type parameters and props, read off `__props`.

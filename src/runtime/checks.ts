@@ -268,6 +268,12 @@ type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicEleme
 // The `class` a part that is a call of this component takes, as the component types it: a string for its root, or an object of its own parts.
 export type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
+// An object of classes by part name, `{ head: 'p-6' }`, told from a `{ name: condition }` object by its string values.
+type PartsObject<Item> = 0 extends 1 & Item ? never : Item extends readonly unknown[] ? never : Item extends object ? [Extract<Item[keyof Item], string>] extends [never] ? never : Item : never
+
+// The `class` a component call gets from its shorthand, `class` and spreads merged, which cannot hold the parts object of a component with parts.
+export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? string | undefined : { kayError: 'A parts object cannot be merged with a shorthand or a spread: write the root\'s classes as root, class={{ root: "mt-4", head: "p-6" }}' }
+
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
   For: {
@@ -276,8 +282,9 @@ export interface TemplateHelpers {
   }
   staticFor: <T>(each: readonly T[] | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
-  componentClass: (list: readonly unknown[]) => string | undefined
+  componentClass: <List extends readonly unknown[]>(list: List) => ComponentClass<List>
   partClass: (props: unknown, part: string) => unknown
+  partsClass: (list: readonly unknown[]) => unknown
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
   Try: (props: { block: JSX.Element, failed?: JSX.Element }) => JSX.Element

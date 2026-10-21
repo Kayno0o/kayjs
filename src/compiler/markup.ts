@@ -434,11 +434,21 @@ export abstract class TemplateWriter {
   protected classList(classes: NonNullable<ElementPlan['classes']>): void {
     const { b } = this
 
+    const { expression } = classes
+    const items: (() => void)[] = []
+
+    if (classes.text !== '' || (expression === undefined && classes.parts === undefined))
+      items.push(() => b.add(JSON.stringify(classes.text)))
+
+    if (expression !== undefined)
+      items.push(() => b.add('(').addSource(expression).add(')'))
+
+    for (const part of classes.parts ?? [])
+      items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
+
     b.add('[')
 
-    const text = classes.text === '' && (classes.expression || classes.parts) ? [] : [JSON.stringify(classes.text)]
-
-    for (const [index, item] of [...text.map(item => () => b.add(item)), ...classes.expression ? [() => b.add('(').addSource(classes.expression!).add(')')] : [], ...(classes.parts ?? []).map(part => () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))].entries()) {
+    for (const [index, item] of items.entries()) {
       if (index > 0)
         b.add(', ')
 
@@ -488,7 +498,7 @@ export abstract class TemplateWriter {
     for (const part of parts)
       items.push(() => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
 
-    b.add(element.component ? `${helperName('componentClass')}([` : '[')
+    b.add(element.component ? `${helperName(parts.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
     for (const [index, item] of items.entries()) {
       if (index > 0)
         b.add(', ')

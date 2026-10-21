@@ -7,6 +7,8 @@ import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { installClassTable } from '../src/runtime/class-table'
 import { child } from '../src/runtime/html'
+import { partClass } from '../src/runtime/values'
+import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
 await plugin(kay())
@@ -21,9 +23,12 @@ const files: Record<string, string> = {
   'plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv.base(class={className}) plain\n',
   'rooted.kay': 'header.p-2(part="top") a\nfooter.p-2(part="root") b\n',
   'wrapper.kay': '---\nimport Card from \'./card.kay\'\n---\nCard(title="w" part="root" class="from-wrapper") inside\n',
-  'island.kay': '---\nconst { title } = props<{ title: string }>()\nlet count = 0\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n  button(part="action" onClick={() => count++}) {count}\n',
-  'pages.kay': 'main.p-2(part="page") page\n',
-  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\n',
+  'btn.kay': '---\nconst { onClick, class: className, ...rest } = props<{ onClick: () => void, class?: string, [key: string]: unknown }>()\n---\nbutton.btn.p-2({...rest} class={className} onClick={onClick})\n  slot\n',
+  'island.kay': '---\nimport Btn from \'./btn.kay\'\nconst { title, items } = props<{ title: string, items: string[] }>()\nconst count = signal(0)\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n  if count > 0\n    p(part="shown") shown\n  for item of items\n    li(part="item") {item}\n  Btn(part="action" onClick={() => count++}) {count}\n',
+  '_layout.kay': 'main.p-2(part="page") page\n',
+  'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
+  'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
+  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
 }
 
 beforeAll(async () => {
@@ -97,31 +102,37 @@ describe('a component with parts, on the server', () => {
     expect(await render('calls.kay')).toContain('<section class="card p-4 from-wrapper outer">')
   })
 
-  it('renders data-part in a page, which has no props to take a class from', async () => {
-    expect(await render('pages.kay')).toBe('<main class="p-2" data-part="page">page</main>')
+  it('renders the classes of a library component compiled from node_modules', async () => {
+    expect(await render('calls.kay')).toContain('<section class="card p-4"><header class="p-6" data-part="head">lib</header></section>')
+  })
+
+  it('renders data-part in a layout, which has no props to take a class from', async () => {
+    expect(await render('_layout.kay')).toBe('<main class="p-2" data-part="page">page</main>')
   })
 })
 
 // Each element's tag, class and data-part, in order, whatever order the attributes were written in.
 function summary(element: Element): [string, string | null, string | null][] {
-  return [...element.querySelectorAll('section, header, button')].map(found => [found.localName, found.getAttribute('class'), found.getAttribute('data-part')])
+  return [...element.querySelectorAll('section, header, p, li, button')].map(found => [found.localName, found.getAttribute('class'), found.getAttribute('data-part')])
 }
 
 describe('a component with parts, as an island', () => {
   let render!: (fn: () => unknown, element: Element) => () => void
   let island!: (props: object) => unknown
+  let client!: (props: object) => unknown
 
   beforeAll(async () => {
     GlobalRegistrator.register()
-    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Island from \'./island.kay\'\n\nexport { Island, render }\n')
+    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Island from \'./island.kay\'\n\nexport { Client, Island, render }\n')
 
     const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay()] })
 
     if (!build.success)
       throw new AggregateError(build.logs, 'client build failed')
 
-    const module = await import(build.outputs[0]!.path) as { Island: typeof island, render: typeof render }
+    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Island: typeof island, render: typeof render }
 
+    client = module.Client
     island = module.Island
     render = module.render
   }, 60_000)
@@ -130,34 +141,52 @@ describe('a component with parts, as an island', () => {
     await GlobalRegistrator.unregister()
   })
 
-  it('renders the classes and data-part the server renders', async () => {
-    const props = { title: 'hi', class: { root: 'mt-6', head: 'p-6' } }
-    const server = await import(join(scratch, 'island.kay')) as { default: (props: object) => unknown }
-    const html = child(server.default(props)).replace(MARKERS, '')
+  function mount(component: (props: object) => unknown, props: object): { root: HTMLElement, stop: () => void } {
     const root = document.createElement('div')
 
     document.body.append(root)
 
-    const stop = render(() => island(props), root)
+    return { root, stop: render(() => component(props), root) }
+  }
 
+  it('renders the classes and data-part the server renders, in an if, a for and a component call', async () => {
+    const props = { title: 'hi', items: ['a', 'b'], class: { root: 'mt-6', head: 'p-6', item: 'p-8', action: 'p-9' } }
+    const server = await import(join(scratch, 'island.kay')) as { default: (props: object) => unknown }
     const holder = document.createElement('div')
 
-    holder.innerHTML = html
+    holder.innerHTML = child(server.default(props)).replace(MARKERS, '')
 
-    expect(summary(root)).toEqual([['section', 'card p-4 mt-6', null], ['header', 'p-6', 'head'], ['button', null, 'action']])
+    const { root, stop } = mount(island, props)
+
+    expect(summary(root)).toEqual([['section', 'card p-4 mt-6', null], ['header', 'p-6', 'head'], ['li', 'p-8', 'item'], ['li', 'p-8', 'item'], ['button', 'btn p-9', 'action']])
     expect(summary(holder)).toEqual(summary(root))
     stop()
   })
 
-  it('merges a string class onto the root', async () => {
-    const root = document.createElement('div')
+  it('follows a class the page builds from a signal', async () => {
+    const props = { title: 'hi', items: [], class: { shown: 'text-lg' } }
+    const { root, stop } = mount(island, props)
 
-    document.body.append(root)
+    expect(root.querySelector('p')).toBeNull()
+    root.querySelector('button')?.click()
+    await settle()
 
-    const stop = render(() => island({ title: 'hi', class: 'mt-4' }), root)
+    expect(summary(root).find(([tag]) => tag === 'p')).toEqual(['p', 'text-lg', 'shown'])
+    stop()
+  })
+
+  it('merges a string class onto the root', () => {
+    const { root, stop } = mount(island, { title: 'hi', items: [], class: 'mt-4' })
 
     expect(root.querySelector('section')?.getAttribute('class')).toBe('card p-4 mt-4')
     expect(root.querySelector('header')?.getAttribute('data-part')).toBe('head')
+    stop()
+  })
+
+  it('renders a client-only component\'s parts', () => {
+    const { root, stop } = mount(client, { class: { root: 'mt-2', head: 'p-3' } })
+
+    expect(summary(root)).toEqual([['section', 'card mt-2', null], ['header', 'p-3', 'head']])
     stop()
   })
 })
@@ -169,6 +198,17 @@ describe('kay check on parts', () => {
 
   it('reports a component with parts that also destructures class', () => {
     expect(diagnostics('---\nconst { class: className } = props<{ class?: string }>()\n---\nsection(class={className})\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
+  })
+
+  it('reports a component with parts whose props type declares class', () => {
+    expect(diagnostics('---\nconst all = props<{ class?: string }>()\n---\nsection\n  div(part="head") a\n').some(message => message.includes('takes `class` from its parts'))).toBe(true)
+  })
+
+  it('reads a part\'s own entry only', () => {
+    expect(partClass({ class: { head: 'p-6' } }, 'constructor')).toBeUndefined()
+    expect(partClass({ class: 'mt-4' }, 'head')).toBeUndefined()
+    expect(partClass({ class: 'mt-4' }, 'root')).toBe('mt-4')
+    expect(partClass(undefined, 'root')).toBeUndefined()
   })
 
   it('lets a page or layout with parts and a class prop through', () => {
@@ -185,7 +225,7 @@ describe('kay check on parts', () => {
     const nested = compileKay('---\nimport Card from \'./card.kay\'\n---\nsection\n  Card(part="card") a\n', 'src/panel.kay', { check: true }).tsx
 
     expect(one).toContain('class?: string | { "root"?: string; "head"?: string }')
-    expect(several).toContain('class?: { "top"?: string; "bottom"?: string }')
+    expect(several).toContain('class?: { "top"?: string; "bottom"?: string } | { kayError:')
     expect(nested).toContain('"card"?: KayPartOf<typeof Card>')
   })
 })

@@ -136,11 +136,16 @@ export function classText(value: unknown): string {
 }
 
 // The `class` a component gets when its call merges a shorthand, a `class` attribute or a spread's: one string, as a `class?: string` prop takes it, or none when nothing is set.
-export function componentClass(list: readonly unknown[]): unknown {
+export function componentClass(list: readonly unknown[]): string | undefined {
+  return classText(list) || undefined
+}
+
+// The class of a call that hands a part's entry on, which is the parts object of a component with parts of its own, or a string: the rest of the call's classes join that component's root.
+export function partsClass(list: readonly unknown[]): unknown {
   const parts = list.find(isParts)
 
   if (parts === undefined)
-    return classText(list) || undefined
+    return componentClass(list)
 
   const rest = list.filter(item => item !== parts)
 
@@ -167,7 +172,7 @@ export function partClass(props: unknown, part: string): unknown {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return part === 'root' ? value : undefined
 
-  const entry = (value as Record<string, unknown>)[part]
+  const entry = Object.hasOwn(value, part) ? (value as Record<string, unknown>)[part] : undefined
 
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }

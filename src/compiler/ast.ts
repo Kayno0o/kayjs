@@ -454,7 +454,7 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-export type TemplateHelper = 'For' | 'componentClass' | 'partClass'
+export type TemplateHelper = 'For' | 'componentClass' | 'partClass' | 'partsClass'
 
 // What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
 export interface TemplateFacts {
@@ -578,7 +578,7 @@ const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // The parts a template names with `part="head"`, which a component's `class` prop reaches by name.
 export interface PartFacts {
   // Each part, with the component it is a call of when it is one: its class is then that component's own.
-  names: Map<string, string | undefined>
+  names: Map<string, (string | undefined)[]>
   // Where the string form of `class` goes: the part marked `root`, else the template's single top element, else nowhere.
   root: 'marked' | 'implicit' | 'none'
   implicit?: ElementNode | undefined
@@ -620,7 +620,7 @@ function markRoot(parts: PartFacts, template: Node[]): void {
   if (only?.kind === 'element' && !isSlot(only)) {
     parts.root = 'implicit'
     parts.implicit = only
-    parts.names.set('root', only.component ? only.name : undefined)
+    parts.names.set('root', [only.component ? only.name : undefined])
   }
 }
 
@@ -647,11 +647,16 @@ export function templateFacts(file: KayFile): TemplateFacts {
 
       if (part !== undefined) {
         facts.parts ??= { names: new Map(), root: 'none', merges: true }
-        facts.parts.names.set(part, node.component ? node.name : undefined)
+        const tag = node.component ? node.name : undefined
+        const tags = facts.parts.names.get(part) ?? []
+
+        if (!tags.includes(tag))
+          facts.parts.names.set(part, [...tags, tag])
+
         facts.helpers.add('partClass')
 
         if (node.component)
-          facts.helpers.add('componentClass')
+          facts.helpers.add('partsClass')
       }
     }
     else if (node.kind === 'snippet') {
@@ -680,7 +685,7 @@ export function templateFacts(file: KayFile): TemplateFacts {
     markRoot(facts.parts, file.template)
 
     if (facts.parts.implicit?.component)
-      facts.helpers.add('componentClass')
+      facts.helpers.add('partsClass')
   }
 
   return file.facts = facts

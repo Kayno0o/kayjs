@@ -17,6 +17,8 @@ const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
 // A part's name, which becomes a key of the component's `class` type.
 const PART_NAME = /^[A-Z][\w-]*$/i
+// A props type declaring a `class` member of its own.
+const PROPS_CLASS = /(?:^|[\s{;,])class\??\s*:/
 // `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
@@ -127,10 +129,11 @@ class Validator {
       this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
 
     if (this.options.pageFile !== true && templateFacts(this.file).parts) {
-      const taken = script.props?.bindings.find(binding => binding.key === 'class')
+      const type = script.props?.type
+      const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && PROPS_CLASS.test(this.text(type)) ? type : undefined)
 
       if (taken)
-        this.error(taken.local, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+        this.error(taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
     }
 
     if (server && script.props)

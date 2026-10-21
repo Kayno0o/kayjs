@@ -55,7 +55,7 @@ section.rounded.border
 
 - A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities; one name may sit on several elements, every row of a `for`, and inside an `if` or a slot.
 - A part that is a component, `Button(part="action")`, hands its entry to that component's own `class`, a string or an object of its parts: `class={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread there.
-- Write the root's classes as `root` in an object, not as a shorthand beside it: `Card.mt-4(class={{ head: 'p-6' }})` cannot tell the object from a `{ cls: condition }` one.
+- A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(class={{ head: 'p-6' }})`, as it could be a `{ cls: condition }` one: `kay check` reports it, so write the root's classes as `root`.
 - `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. `...rest` leaves `class` out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 
