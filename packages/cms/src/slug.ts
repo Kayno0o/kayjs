@@ -1,8 +1,9 @@
 // What a new entry's slug is helped with: written from a title, cleaned as it is typed, and checked against the slugs the collection holds.
-const MARKS = /\p{M}/gu
+// The marks of a Latin letter, which are dropped; another script's keep theirs, as they change the word.
+const MARKS = /(?<=\p{Script=Latin})\p{M}+/gu
 const LETTERS = { œ: 'oe', æ: 'ae', ß: 'ss', ø: 'o', đ: 'd', ł: 'l', þ: 'th' } as const
 const LIGATURE = /[œæßøđłþ]/g
-const OTHER = /[^\p{L}\p{N}/_-]+/gu
+const OTHER = /[^\p{L}\p{M}\p{N}/_-]+/gu
 const DASHES = /-{2,}/g
 const SLASHES = /\/{2,}/g
 const AROUND_SLASH = /-*\/-*/g
@@ -16,6 +17,7 @@ export function slugify(text: string, { final = false }: { final?: boolean } = {
   const slug = text
     .normalize('NFKD')
     .replace(MARKS, '')
+    .normalize('NFC')
     .toLowerCase()
     .replace(LIGATURE, letter => LETTERS[letter as keyof typeof LETTERS])
     .replace(OTHER, '-')

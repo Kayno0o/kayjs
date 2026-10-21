@@ -12,6 +12,9 @@ describe('slugify', () => {
     expect(slugify('你好 世界', { final: true })).toBe('你好-世界')
     expect(slugify('مرحبا بالعالم', { final: true })).toBe('مرحبا-بالعالم')
     expect(slugify('Café Привет', { final: true })).toBe('cafe-привет')
+    // Marks that belong to another script's letters stay.
+    for (const word of ['हिन्दी', 'สวัสดี', 'がっこう', 'йод', '한국어'])
+      expect(slugify(word, { final: true })).toBe(word)
   })
 
   test('keeps folders, one slash between them, and no dash against a slash', () => {

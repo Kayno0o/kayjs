@@ -395,7 +395,9 @@ When the server refuses a save, the form takes you to what is wrong. The focus g
 
 Fixing one field clears that field's message and leaves the others. A field the form does not show gets a message of its own above the form, with no link.
 
-The form also checks as you type. A field with a minimum or maximum length, a pattern, or a minimum or maximum number gets the matching limit on its input, and says what is wrong once you leave it. A required field is marked `required` on every control, and a pattern becomes the input's own `pattern` only when it is anchored at both ends (`^...$`) and has no `\p{...}` or `\u{...}` escape, since HTML anchors a pattern itself; the form checks any other. The server still decides on a save.
+The form also checks as you type. A field with a minimum or maximum length, a pattern, or a minimum or maximum number gets the matching limit on its input, and says what is wrong once you leave it. A required field is marked `required` on every control, and a pattern becomes the input's own `pattern` only when it is anchored at both ends (`^...$`) and has no `\p{...}` or `\u{...}` escape and no character beyond the basic plane, since HTML anchors a pattern itself.
+
+The form checks any other pattern. The server still decides on a save.
 
 A JSON box that does not parse blocks the save. It says `Meta is not valid JSON` under the box, and nothing is sent until you fix it. A slug that is already taken is marked on the slug field, and typing another one clears it.
 

@@ -118,6 +118,8 @@ test('the target box asks for the site\'s paths holding what is typed, and offer
   const { root } = await open({})
 
   await type(root, 'ab')
+  await Bun.sleep(250)
+  await settle()
   expect([...root.querySelectorAll('datalist option')].map(item => item.getAttribute('value'))).toEqual(['/about'])
   expect(asked).toContain('ab')
 })

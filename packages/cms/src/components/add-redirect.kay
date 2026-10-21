@@ -19,10 +19,19 @@ const answer = (): RedirectStatus => editing && (status === 301 || status === 30
 const offered = signal<string[]>([])
 const listId = `kcms-paths-${path.replace(/\s/g, '_')}`
 let asked = 0
+// Typing asks once it pauses, as each answer costs the server a guard check.
+const TYPING_PAUSE_MS = 150
 
 // Only the latest answer is kept, as the answers may come back out of order.
-async function offer(text: string): Promise<void> {
+async function offer(text: string, wait = 0): Promise<void> {
   const turn = ++asked
+
+  if (wait > 0)
+    await new Promise(resolve => setTimeout(resolve, wait))
+
+  if (turn !== asked)
+    return
+
   const paths = await sitePathsLike(text)
 
   if (turn === asked)
@@ -38,7 +47,7 @@ const add = editing ? wording('cms.redirects.save', 'Save') : wording('cms.missi
     datalist(id={listId})
       for site of offered() key={site}
         option(value={site})
-    TextInput(value={typed()} onInput={(text) => { typed = text; void offer(text) }} onFocus={() => { void offer(typed()) }} placeholder="/" list={listId} aria-label={wording('cms.missing.targetLabel', 'Target of the redirect from {path}', { path })} size={20})
+    TextInput(value={typed()} onInput={(text) => { typed = text; void offer(text, TYPING_PAUSE_MS) }} onFocus={() => { void offer(typed()) }} placeholder="/" list={listId} aria-label={wording('cms.missing.targetLabel', 'Target of the redirect from {path}', { path })} size={20})
     Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentLabel', 'Make the redirect from {path} permanent (308)', { path })})
     Button(label={add} aria-label={editing ? wording('cms.redirects.saveLabel', 'Save the redirect from {path} to {target}', { path, target: typed() }) : wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim(), answer()) }})
   Button(label={wording('cms.missing.gone', 'Gone')} aria-label={wording('cms.missing.goneLabel', 'Answer 410 Gone for {path}', { path })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, '', 410) }})
