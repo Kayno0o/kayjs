@@ -21,6 +21,9 @@ export default defineMessages({
       viewSite: 'Voir le site',
     },
     editor: {
+      discard: 'Les abandonner et arrêter',
+      discardAsk: 'Vous avez des modifications non enregistrées. Arrêter les abandonne.',
+      keepEditing: 'Continuer à modifier',
       dockBottom: 'Placer l\'éditeur en bas',
       dockSide: 'Placer l\'éditeur sur le côté',
       draftFailure: 'La page n\'a pas pu afficher vos modifications : {failure}',
@@ -35,6 +38,11 @@ export default defineMessages({
       title: 'Modifier cette page',
     },
     entry: {
+      differs: 'Les deux côtés ont changé : {fields}.',
+      notRestored: 'Les modifications non enregistrées de {time} ont été écartées : cette entrée a été enregistrée depuis.',
+      restored: 'Vos modifications non enregistrées de {time} sont revenues. Réinitialiser les abandonne.',
+      takeTheirs: 'Prendre leur version',
+      theirsFailure: 'Impossible de charger leur version',
       alsoOpen: 'Aussi ouvert : {names}',
       body: 'Contenu',
       conflict: 'Si vous gardez vos modifications, la prochaine sauvegarde écrasera cet autre enregistrement.',
@@ -174,6 +182,8 @@ export default defineMessages({
       staleSave: 'Cet éditeur est plus ancien que le serveur : copiez vos modifications, rechargez la page, puis refaites-les',
     },
     table: {
+      editing: 'En cours de modification par {names}',
+      editingUnnamed: 'En cours de modification',
       actions: 'Actions',
       broken: 'Illisible',
       deleteLabel: 'Supprimer {title}',
