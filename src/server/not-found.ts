@@ -628,8 +628,14 @@ export function unansweredPaths(file?: string): MissingPath[] {
 }
 
 // Forgets one path in the list of missing ones, in this process's store while it has one open, else in the file (or `file`); false when it was not listed. It is listed again if a visitor asks for it again.
-export function dismissMissing(path: string, file?: string): boolean {
-  return inMissing(file, store => store.forget(path)) ?? false
+// Several paths are forgotten in one open of the store, and the count of those that were listed comes back.
+export function dismissMissing(path: string, file?: string): boolean
+export function dismissMissing(paths: readonly string[], file?: string): number
+export function dismissMissing(paths: string | readonly string[], file?: string): boolean | number {
+  if (typeof paths === 'string')
+    return inMissing(file, store => store.forget(paths)) ?? false
+
+  return inMissing(file, store => paths.filter(path => store.forget(path)).length) ?? 0
 }
 
 // Forgets every missing path, and says how many there were.

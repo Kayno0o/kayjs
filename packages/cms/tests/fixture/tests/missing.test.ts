@@ -185,17 +185,28 @@ test('names the page of the site that links to a missing path, with the time of 
   expect(page.find('thead th').map(th => th.text)).toContain('Last visit (UTC)')
 })
 
-test('offers the site\'s paths for the target, once for every row, and no hostile referrer page as a link', async () => {
+test('sends no site paths with the page, offers them as a target is typed, and no hostile referrer page as a link', async () => {
   await site.fetch('/hostile-referrer-cms', { headers: { referer: 'http://localhost//evil.example/x' } })
 
   const page = await listed('/hostile-referrer-cms')
 
-  expect(page.find('datalist option').map(option => option.attributes.value)).toEqual(expect.arrayContaining(['/about']))
-  const boxes = page.find('.kcms-missing-add input[list]')
-
-  expect(boxes.length).toBeGreaterThan(0)
-  expect(boxes.every(input => input.attributes.list === 'kcms-site-paths')).toBe(true)
+  expect(page.find('datalist option')).toEqual([])
   expect(page.find('main a').map(link => link.attributes.href).filter(href => href?.includes('evil.example'))).toEqual([])
+
+  const offered = async (q: string) => (await site.fetch(`/api/cms/redirects/paths?q=${encodeURIComponent(q)}`)).json() as Promise<string[]>
+
+  expect(await offered('ABO')).toContain('/about')
+  expect(await offered('')).toContain('/about')
+  expect(await offered('no-such-page-anywhere')).toEqual([])
+  expect((await site.fetch('/api/cms/redirects/paths', { headers: { 'x-deny': '1' } })).status).toBe(403)
+})
+
+test('keeps the 301 or 302 status of a stored redirect edited in place', async () => {
+  for (const status of [301, 302])
+    expect((await post('', { from: '/old-status-cms', to: '/empty', status })).status).toBe(200)
+
+  expect((await site.fetch('/old-status-cms', { redirect: 'manual' })).status).toBe(302)
+  expect((await post('/remove', { froms: ['/old-status-cms'] })).status).toBe(200)
 })
 
 test('lists the redirects of kay.config.ts read-only, under a base and a trailing slash', async () => {

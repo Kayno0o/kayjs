@@ -1,5 +1,6 @@
 import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
+import type { RedirectStatus } from '../missing'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { call, focusInvalid } from 'kay'
 import { wording } from 'kay/words'
@@ -249,7 +250,7 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
 
 // Adds the redirect from a missing path to its target and says how it went; true once added. The rows are stale either way, the caller refreshing them.
 // 308 is permanent and 410 says the path is gone, with no target. A path that has a redirect takes the new target and status, which is how one is edited.
-export async function addMissingRedirect(from: string, to: string, status: 307 | 308 | 410): Promise<boolean> {
+export async function addMissingRedirect(from: string, to: string, status: RedirectStatus): Promise<boolean> {
   const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to, status } }), wording('cms.redirects.addFailure', 'Could not add the redirect'))
 
   if (done)
@@ -259,8 +260,18 @@ export async function addMissingRedirect(from: string, to: string, status: 307 |
 }
 
 // Removes redirects added from the screen, so their paths answer 404 again; true once removed.
-export async function removeAddedRedirects(froms: string[]): Promise<boolean> {
-  const done = await attempt(async () => call(redirectsApi, '/remove', { method: 'post', body: { froms } }), wording('cms.redirects.removeFailure', 'Could not remove the redirect'))
+// With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
+export async function removeAddedRedirects(froms: string[], throws = false): Promise<boolean> {
+  const run = async () => call(redirectsApi, '/remove', { method: 'post', body: { froms } })
+
+  if (throws) {
+    await run()
+    toast.success(wording('cms.redirects.removed', 'Redirect removed'))
+
+    return true
+  }
+
+  const done = await attempt(run, wording('cms.redirects.removeFailure', 'Could not remove the redirect'))
 
   if (done)
     toast.success(wording('cms.redirects.removed', 'Redirect removed'))
@@ -269,11 +280,31 @@ export async function removeAddedRedirects(froms: string[]): Promise<boolean> {
 }
 
 // Forgets missing paths, all of them when none is named; true once done. They are listed again if a visitor asks for them again.
-export async function dismissMissingPaths(paths?: string[]): Promise<boolean> {
-  const done = await attempt(async () => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' }), wording('cms.missing.dismissFailure', 'Could not dismiss the paths'))
+// With `throws`, a failure is thrown instead of toasted, for a confirm that words it itself and stays open.
+export async function dismissMissingPaths(paths?: string[], throws = false): Promise<boolean> {
+  const run = async () => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' })
+
+  if (throws) {
+    await run()
+    toast.success(wording('cms.missing.dismissed', 'Dismissed'))
+
+    return true
+  }
+
+  const done = await attempt(run, wording('cms.missing.dismissFailure', 'Could not dismiss the paths'))
 
   if (done)
     toast.success(wording('cms.missing.dismissed', 'Dismissed'))
 
   return done !== undefined
+}
+
+// The paths of the site holding the text typed, for a redirect's target box; none when they cannot be read, as the box takes any path typed.
+export async function sitePathsLike(q: string): Promise<string[]> {
+  try {
+    return await call(redirectsApi, '/paths', { query: { q } })
+  }
+  catch {
+    return []
+  }
 }

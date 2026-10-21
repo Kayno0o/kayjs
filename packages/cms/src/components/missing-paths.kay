@@ -1,6 +1,6 @@
 ---
 import type { Column } from '@kaynooo/kayjs-ui'
-import type { MissingRow } from '../missing'
+import type { MissingRow, RedirectStatus } from '../missing'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
@@ -12,20 +12,20 @@ import { addMissingRedirect, dismissMissingPaths } from '../editor/save'
 import { shipWords } from '../editor/words'
 import AddRedirect from './add-redirect.kay'
 
-// `hint` says why the list may be empty, which depends on the server's mode; `listId` names the datalist of the site's paths the target boxes offer.
-const { rows, hint, listId } = props<{ rows: MissingRow[], hint: string, listId: string }>()
+// `hint` says why the list may be empty, which depends on the server's mode.
+const { rows, hint } = props<{ rows: MissingRow[], hint: string }>()
 
 // Looks up what an addition says once the page has loaded, so the page sends it.
 shipWords()
 
-async function add(from: string, to: string, status: 307 | 308 | 410): Promise<void> {
+async function add(from: string, to: string, status: RedirectStatus): Promise<void> {
   if (await addMissingRedirect(from, to, status))
     await refresh()
 }
 
-// Without paths, the whole list.
-async function dismiss(paths?: string[]): Promise<boolean> {
-  const done = await dismissMissingPaths(paths)
+// Without paths, the whole list. The confirmed one throws its failure to the confirm, which words it and stays open.
+async function dismiss(paths?: string[], throws = false): Promise<boolean> {
+  const done = await dismissMissingPaths(paths, throws)
 
   if (done)
     await refresh()
@@ -44,7 +44,7 @@ const columns: Column<MissingRow>[] = [
 ---
 if rows.length > 0
   .kcms-missing-clear
-    ConfirmDelete(message={wording('cms.missing.clearMessage', 'Forget all the paths listed? They are listed again as visitors ask for them.')} label={wording('cms.missing.clear', 'Clear the list')} trigger="button" failure={wording('cms.missing.dismissFailure', 'Could not dismiss the paths')} size="sm" variant="ghost" onConfirm={async () => { await dismiss() }})
+    ConfirmDelete(message={wording('cms.missing.clearMessage', 'Forget all the paths listed? They are listed again as visitors ask for them.')} label={wording('cms.missing.clear', 'Clear the list')} trigger="button" failure={wording('cms.missing.dismissFailure', 'Could not dismiss the paths')} size="sm" variant="ghost" onConfirm={async () => { await dismiss(undefined, true) }})
 Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={{ key: 'hits', direction: 'desc' }} selectable)
   @bulk(keys, clear)
     Button(label={wording('cms.missing.dismissSelected', 'Dismiss {count} selected', { count: keys.length })} size="sm" variant="ghost" onClick={async () => { if (await dismiss(keys.map(String))) clear() }})
@@ -58,7 +58,7 @@ Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={
         if row.from !== ''
           small {row.from}
     else if column.key === 'actions'
-      AddRedirect(path={row.path} suggested={row.target} onAdd={add} listId={listId})
+      AddRedirect(path={row.path} suggested={row.target} onAdd={add})
       Button(label={wording('cms.missing.dismiss', 'Dismiss')} aria-label={wording('cms.missing.dismissLabel', 'Dismiss {path}', { path: row.path })} size="sm" variant="ghost" onClick={async () => { await dismiss([row.path]) }})
     else if row.target as target
       .kcms-missing-target

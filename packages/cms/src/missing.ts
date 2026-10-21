@@ -6,12 +6,14 @@ import { log } from './log'
 // The most paths the screen lists: the file keeps 1000, and the island sends every row it shows.
 export const SHOWN = 200
 const REFERRERS_SHOWN = 3
-// The most paths offered for a target, which the page sends once.
-const PATHS_OFFERED = 1000
+// The most paths offered for a target at once: the box asks again as more is typed, so none is out of reach.
+const PATHS_OFFERED = 50
 
 // The most rows a bulk action sends.
 export const MAX_BULK = 1000
 const MINUTE_END = 16
+
+export type RedirectStatus = 301 | 302 | 307 | 308 | 410
 
 export interface MissingRow {
   path: string
@@ -34,7 +36,7 @@ export interface AddedRedirect {
   from: string
   // Empty for a 410.
   to: string
-  status: number
+  status: RedirectStatus
   // When it was added, in UTC.
   at: string
 }
@@ -46,7 +48,7 @@ export interface ConfiguredRedirect {
   status: number
 }
 
-export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[], configured: ConfiguredRedirect[], paths: string[] } | { failure: string }
+export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[], configured: ConfiguredRedirect[] } | { failure: string }
 
 // A time as the screen words it, in UTC so a server and an editor in two zones read the same.
 function minute(time: number): string {
@@ -97,7 +99,6 @@ export function readMissing(): MissingScreen {
       ...missingRows(unansweredPaths()),
       added: runtimeRedirects().map(({ from, to, status, addedAt }: RuntimeRedirect) => ({ from, to, status, at: minute(addedAt) })),
       configured: configuredRedirects(),
-      paths: sitePaths().slice(0, PATHS_OFFERED),
     }
   }
   catch (error) {
@@ -107,10 +108,17 @@ export function readMissing(): MissingScreen {
   }
 }
 
+// The paths of the site holding the text typed, for a target box to offer.
+export function sitePathsLike(text: string): string[] {
+  const wanted = text.trim().toLowerCase()
+
+  return sitePaths().filter(path => path.toLowerCase().includes(wanted)).slice(0, PATHS_OFFERED)
+}
+
 // Adds the redirect to the set the server reads while it runs, which forgets the path as missing; the reason it was refused, worded, or undefined once added.
-// A 307, which browsers do not keep, so the editor can still undo it; 308 is permanent, and 410 says the path is gone for good, with no target.
+// A 307, which browsers do not keep, so the editor can still undo it; 308 is permanent, and 410 says the path is gone for good, with no target. A 301 or 302 stored before keeps its status when edited.
 // A path that has a redirect already takes the new target and status: that is how one is edited.
-export function addRedirect(from: string, to: string, status: 307 | 308 | 410 = 307): string | undefined {
+export function addRedirect(from: string, to: string, status: RedirectStatus = 307): string | undefined {
   try {
     addRuntimeRedirect(from, to, { status })
 
@@ -133,7 +141,7 @@ export function removeRedirects(froms: string[]): number {
 
 // Forgets the paths in the list, which come back if a visitor asks for them again; how many were listed.
 export function dismissPaths(paths: string[]): number {
-  return paths.filter(path => dismissMissing(path)).length
+  return dismissMissing(paths)
 }
 
 // Forgets every listed path; how many there were.

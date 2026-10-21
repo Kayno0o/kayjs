@@ -261,9 +261,13 @@ Check each upload before you confirm. A URL written by hand in a page, or a file
 
 When a visitor asks a production server for a page it does not have, kay counts the path. The screen at `<prefix>/not-found` lists those paths, the most visited first, with the sites visitors came from, the pages of your own site that linked there, the time of the last visit and, where kay can tell, the page they most likely meant. Paths that a redirect already answers are left out.
 
-Each path has an Add redirect button: one click for the suggested target, or a box to type the target of a path with no suggestion. The redirect is saved where the running server reads it, so it answers at once, with no deploy, and the path leaves the list.
+A page of your site counts as having linked only when the visit's `Host` is your site's: behind a proxy that does not forward it, only the hosts are kept.
 
-Below the list, the redirects added here show Edit, to give a path another target or status, and Remove, which undoes one. Tick several rows to remove them at once. The redirects of `kay.config.ts` are listed after them, to read. All of it needs the `guard` you gave `cms()`.
+Each path has an Add redirect button: one click for the suggested target, or a box to type the target of a path with no suggestion. The target box offers the pages of your site that hold what you type.
+
+The redirect is saved where the running server reads it, so it answers at once, with no deploy, and the path leaves the list.
+
+Below the list, the redirects added here show Edit, to give a path another target or status, and Remove, which undoes one. A 301 or 302 stored earlier keeps its status when you change only its target. Tick several rows to remove them at once. The redirects of `kay.config.ts` are listed after them, to read. All of it needs the `guard` you gave `cms()`.
 
 A redirect answers with a 307, which browsers do not keep, so Remove undoes it for everyone. Tick Permanent beside Add redirect for a 308 instead: browsers keep it, so Remove does not reach a visitor who has followed it already.
 

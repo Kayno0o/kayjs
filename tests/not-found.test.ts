@@ -341,6 +341,20 @@ describe('dismissing missing paths', () => {
     expect(unansweredPaths(file)).toEqual([])
     expect(dismissMissing('/x', join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(false)
   })
+
+  it('dismisses several paths in one open of the file, counting those that were listed', async () => {
+    const file = join(await scratchDir('not-found-'), 'missing.sqlite')
+    const store = missingStore(file)
+
+    for (const path of ['/a', '/b', '/c'])
+      store.hit(path, undefined, never)
+
+    store.close()
+
+    expect(dismissMissing(['/a', '/c', '/zzz'], file)).toBe(2)
+    expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/b'])
+    expect(dismissMissing(['/a'], join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(0)
+  })
 })
 
 describe('countMissing', () => {

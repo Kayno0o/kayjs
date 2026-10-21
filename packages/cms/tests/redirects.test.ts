@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { addRedirect, clearPaths, dismissPaths, readMissing, removeRedirects } from '../src/missing'
+import { addRedirect, clearPaths, dismissPaths, readMissing, removeRedirects, sitePathsLike } from '../src/missing'
 
 function added() {
   const screen = readMissing()
@@ -52,11 +52,12 @@ describe('adding a redirect from the screen', () => {
     expect(removeRedirects(['/bulk-a', '/bulk-b', '/bulk-none'])).toBe(2)
   })
 
-  test('lists the config\'s redirects and the paths the site serves, for the screen', () => {
+  test('lists the config\'s redirects for the screen, and the site\'s paths only for a target typed', () => {
     const screen = readMissing()
 
     expect('configured' in screen && screen.configured).toEqual(expect.any(Array))
-    expect('paths' in screen && screen.paths).toEqual(expect.any(Array))
+    expect('paths' in screen).toBe(false)
+    expect(sitePathsLike('abo')).toEqual(expect.any(Array))
   })
 })
 
