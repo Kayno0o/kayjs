@@ -98,7 +98,7 @@ async function sitemapLoading(app: Parameters<typeof visit>[0]) {
 describe('a prerendered site with a scheduled entry', () => {
   it('shows it at its time in the listing, its own page, the sitemap and the feed, with no request to rebuild anything', async () => {
     await build(async (scratch) => {
-      const app = await schedulesAfter(scratch, 1500)
+      const app = await schedulesAfter(scratch, 900)
 
       expect((await visit(app, '/talks')).text).not.toContain('Soon0')
       expect((await visit(app, '/talks/soon0')).status).toBe(404)
@@ -170,7 +170,7 @@ describe('a prerendered site with a scheduled entry', () => {
       const app = await serve(scratch)
 
       expect(await visit(app, '/talks/ending')).toEqual({ status: 200, text: expect.stringContaining('<h1>Ending</h1>') })
-      schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: new Date(Date.now() + 1200).toISOString() }]
+      schedule.items = [{ slug: 'now', title: 'Now' }, { slug: 'ending', title: 'Ending', ends: new Date(Date.now() + 800).toISOString() }]
       talks.invalidate()
       expect((await visit(app, '/talks')).text).toContain('Ending')
 
@@ -206,7 +206,7 @@ describe('a prerendered site with a scheduled entry', () => {
 
   it('waits for each date in turn, the nearest first', async () => {
     await build(async (scratch) => {
-      const app = await schedulesAfter(scratch, 2400, 800)
+      const app = await schedulesAfter(scratch, 1500, 600)
 
       expect(await until(app, '/talks', 'Soon1')).toContain('Soon1')
       expect((await visit(app, '/talks')).text).not.toContain('Soon0')
@@ -282,7 +282,7 @@ describe('a prerendered site with a scheduled entry', () => {
 
       const [first, second] = [await serve(scratch), await serve(scratch)]
 
-      schedule.items = [{ slug: 'soon0', title: 'Soon0', at: new Date(Date.now() + 1200).toISOString() }]
+      schedule.items = [{ slug: 'soon0', title: 'Soon0', at: new Date(Date.now() + 800).toISOString() }]
       talks.invalidate()
       expect((await visit(first, '/talks')).text).not.toContain('Soon0')
 
@@ -296,7 +296,7 @@ describe('a prerendered site with a scheduled entry', () => {
 
   it('goes on publishing when the server stops and listens again', async () => {
     await build(async (scratch) => {
-      const app = await schedulesAfter(scratch, 1500)
+      const app = await schedulesAfter(scratch, 900)
 
       expect((await visit(app, '/sitemap.xml')).text).not.toContain('/talks/soon0')
       app.listen(0)
@@ -321,7 +321,7 @@ describe('a prerendered site with a scheduled entry', () => {
       try {
         app.listen(0)
         await app.stop()
-        await Bun.sleep(1200)
+        await Bun.sleep(900)
         expect(heard).toBe(0)
       }
       finally {

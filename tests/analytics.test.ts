@@ -674,23 +674,27 @@ describe('under a base and a trailing slash', () => {
 
 describe('answering at once', () => {
   it('answers a visit before a slow provider does', async () => {
+    // The provider answers once the test lets it, so the visit's answer is shown to come first without a clock.
+    const gate = Promise.withResolvers<void>()
+    const reached = Promise.withResolvers<void>()
     const slow = Bun.serve({ port: 0, async fetch() {
-      await Bun.sleep(1500)
+      reached.resolve()
+      await gate.promise
 
       return Response.json({})
     } })
 
     try {
       const app = await site({ provider: 'plausible', host: `http://localhost:${slow.port}` })
-      const started = performance.now()
-
       const response = await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '203.0.113.240' } }))
 
       expect(response.status).toBe(204)
-      expect(performance.now() - started).toBeLessThan(1000)
+      await reached.promise
+      gate.resolve()
       await forwardsSettled()
     }
     finally {
+      gate.resolve()
       await slow.stop(true)
     }
   })

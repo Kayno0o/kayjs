@@ -1024,13 +1024,18 @@ describe('the url an action\'s guards see', () => {
 
 describe('await blocks', () => {
   it('keeps a page whose block is slow open past Bun\'s idle timeout, an empty comment at a time', async () => {
-    const slow = (async () => {
-      await Bun.sleep(KEEP_ALIVE_MS + 300)
-
-      return 'late'
-    })()
+    // The block settles when the test says, after the keep-alive interval the stream set ran once: the interval is caught and run by hand, so no 5 s pass.
+    const later = Promise.withResolvers<string>()
+    const slow = later.promise
+    const interval = spyOn(globalThis, 'setInterval')
     const stream = streamDocument('<html><body>', [{ id: 'k1', value: slow, ready: (value: string) => value }], { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }, false, () => undefined)
     const chunks: string[] = []
+    const tick = interval.mock.calls.find(([, ms]) => ms === KEEP_ALIVE_MS)![0] as () => void
+
+    interval.mockRestore()
+    expect(KEEP_ALIVE_MS).toBeLessThan(10_000)
+    tick()
+    later.resolve('late')
 
     for await (const chunk of stream)
       chunks.push(new TextDecoder().decode(chunk))
@@ -1039,7 +1044,7 @@ describe('await blocks', () => {
     expect(chunks[1]).toBe('<!---->')
     expect(chunks[2]).toStartWith('<template data-kay-await="k1">late</template>')
     expect(chunks.at(-1)).toBe('</body></html>')
-  }, KEEP_ALIVE_MS + 5000)
+  })
 
   async function chunksOf(path: string): Promise<string[]> {
     const response = await app.handle(new Request(`http://localhost${path}`))

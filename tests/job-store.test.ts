@@ -3,7 +3,7 @@ import type { JobStore, StoredJob } from '../src/server'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { Database, generateMigration } from '@kaynooo/pg-orm'
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { createJobTables, pgJobs, sqliteJobs } from '../src/server'
 import { jobTables } from '../src/server/pg-orm'
@@ -19,20 +19,36 @@ function job(overrides: Partial<StoredJob> = {}): StoredJob {
 
 const REQUIRED = <T>(value: T | undefined): T => value as T
 
-// Holds are read against a clock the store picks (Postgres: its own), so the cases take real time and leases long enough to stay held or short enough to wait out.
+// Holds are read against a clock the store picks: the caller's for memory and SQLite, which a case moves on (`skew`) instead of waiting, and Postgres's own, which a case waits out in real time with leases long enough to stay held or short enough to wait out.
 const LONG = 60_000
-const SHORT = 700
-const SHORT_PAST = 800
+const SHORT = 400
+const SHORT_PAST = 500
+
+let skew = 0
+
+const clockNow = (): number => Date.now() + skew
 
 async function claimFor(store: JobStore, lease = LONG, queue = 'q'): Promise<StoredJob | undefined> {
-  const now = Date.now()
+  const now = clockNow()
 
   return store.claim(queue, now, now + lease)
 }
 
 const heldOf = (claimed: StoredJob | undefined): number => REQUIRED(claimed?.heldUntil)
 
-describe.each(kinds)('job store contract, $name', ({ open }) => {
+describe.each(kinds)('job store contract, $name', ({ name, open }) => {
+  // Lets `ms` go by for the store's clock.
+  async function pass(ms: number): Promise<void> {
+    if (name === 'postgres')
+      await Bun.sleep(ms)
+    else
+      skew += ms
+  }
+
+  afterEach(() => {
+    skew = 0
+  })
+
   it('hands a due job to one claim only, and again once its hold ran out', async () => {
     const store = await open()
     const added = job()
@@ -43,7 +59,7 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
 
     expect([first, second].filter(Boolean)).toHaveLength(1)
     expect(await claimFor(store)).toBeUndefined()
-    await Bun.sleep(SHORT_PAST)
+    await pass(SHORT_PAST)
     expect((await claimFor(store))?.attempts).toBe(2)
   })
 
@@ -54,7 +70,7 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
 
     const claimed = await claimFor(store, 5000)
 
-    expect(Math.abs(heldOf(claimed) - (Date.now() + 5000))).toBeLessThan(2000)
+    expect(Math.abs(heldOf(claimed) - (clockNow() + 5000))).toBeLessThan(2000)
   })
 
   describe('key', () => {
@@ -115,13 +131,13 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const store = await open()
       const added = job({ key: 'k' })
 
-      expect(await store.state!('q', { key: 'k' }, Date.now())).toBeUndefined()
+      expect(await store.state!('q', { key: 'k' }, clockNow())).toBeUndefined()
       await store.add(added)
-      expect(await store.state!('q', { key: 'k' }, Date.now())).toMatchObject({ id: added.id, status: 'waiting', key: 'k' })
+      expect(await store.state!('q', { key: 'k' }, clockNow())).toMatchObject({ id: added.id, status: 'waiting', key: 'k' })
       await claimFor(store, SHORT)
-      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'running', attempts: 1 })
-      await Bun.sleep(SHORT_PAST)
-      expect(await store.state!('q', { key: 'k' }, Date.now())).toMatchObject({ status: 'waiting' })
+      expect(await store.state!('q', { id: added.id }, clockNow())).toMatchObject({ status: 'running', attempts: 1 })
+      await pass(SHORT_PAST)
+      expect(await store.state!('q', { key: 'k' }, clockNow())).toMatchObject({ status: 'waiting' })
       await store.fail(added.id, 'boom')
       expect(await store.state!('q', { key: 'k' }, 0)).toMatchObject({ status: 'failed', error: 'boom' })
       expect(await store.state!('other', { key: 'k' }, 0)).toBeUndefined()
@@ -153,13 +169,13 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
 
       await store.add(added)
       await store.progress!(added.id, heldOf(await claimFor(store)), '[1]')
-      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBe('[1]')
+      expect((await store.state!('q', { key: 'k' }, clockNow()))?.progress).toBe('[1]')
       await store.retry(added.id, 10, 'again')
-      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBe('[1]')
+      expect((await store.state!('q', { key: 'k' }, clockNow()))?.progress).toBe('[1]')
 
       const second = await claimFor(store)
 
-      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
+      expect((await store.state!('q', { key: 'k' }, clockNow()))?.progress).toBeUndefined()
       await store.progress!(added.id, heldOf(second), '[2]')
       await store.fail(added.id, 'boom')
       expect((await store.failed('q'))[0]?.progress).toBe('[2]')
@@ -174,16 +190,16 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const first = heldOf(await claimFor(store, SHORT))
 
       await store.progress!(added.id, first + 999, '[stale]')
-      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
-      await Bun.sleep(SHORT_PAST)
+      expect((await store.state!('q', { key: 'k' }, clockNow()))?.progress).toBeUndefined()
+      await pass(SHORT_PAST)
 
       const second = heldOf(await claimFor(store))
 
       await store.progress!(added.id, first, '[late]')
-      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
+      expect((await store.state!('q', { key: 'k' }, clockNow()))?.progress).toBeUndefined()
       await store.complete(added.id)
       await store.progress!(added.id, second, '[after]')
-      expect(await store.state!('q', { key: 'k' }, Date.now())).toBeUndefined()
+      expect(await store.state!('q', { key: 'k' }, clockNow())).toBeUndefined()
     })
   })
 
@@ -195,14 +211,14 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       await store.add(added)
 
       const held = heldOf(await claimFor(store))
-      const runAt = Date.now() + SHORT
+      const runAt = clockNow() + SHORT
 
       await store.release!(added.id, held + 999, runAt)
       expect(await claimFor(store)).toBeUndefined()
       await store.release!(added.id, held, runAt)
       expect(await claimFor(store)).toBeUndefined()
       expect(await store.nextRunAt('q')).toBe(runAt)
-      await Bun.sleep(SHORT_PAST)
+      await pass(SHORT_PAST)
 
       const again = REQUIRED(await claimFor(store))
 
@@ -229,7 +245,7 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
 
       const late = heldOf(await claimFor(store, SHORT))
 
-      await Bun.sleep(SHORT_PAST)
+      await pass(SHORT_PAST)
 
       const current = heldOf(await claimFor(store))
 
@@ -242,8 +258,8 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       await store.complete(added.id, late)
       expect(await store.retry(added.id, 0, 'late', late)).toBe(false)
       expect(await store.fail(added.id, 'late', '[redacted]', late)).toBe(false)
-      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'running', attempts: 2, payload: '[]' })
-      expect(await store.state!('q', { id: added.id }, Date.now())).not.toHaveProperty('error')
+      expect(await store.state!('q', { id: added.id }, clockNow())).toMatchObject({ status: 'running', attempts: 2, payload: '[]' })
+      expect(await store.state!('q', { id: added.id }, clockNow())).not.toHaveProperty('error')
       expect(await claimFor(store)).toBeUndefined()
     })
 
@@ -251,7 +267,7 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const { store, added, current } = await taken()
 
       expect(await store.retry(added.id, 0, 'again', current)).not.toBe(false)
-      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'waiting', error: 'again' })
+      expect(await store.state!('q', { id: added.id }, clockNow())).toMatchObject({ status: 'waiting', error: 'again' })
 
       const next = heldOf(await claimFor(store))
 

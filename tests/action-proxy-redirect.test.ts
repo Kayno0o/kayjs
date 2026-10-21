@@ -22,8 +22,20 @@ const FORWARDED: Record<string, Record<string, string>> = {
 
 interface Variant { base: string, trailingSlash: 'always' | 'never' | 'ignore', dev: boolean, proxy: Proxy, site?: string }
 
-async function serve(routes: string, { base, trailingSlash, dev, proxy, site: configured }: Variant): Promise<Elysia> {
-  return new Elysia().use(await pages({ routes, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined }))
+// One app per routes folder and variant for the file, as the tests only post to it and read the answer.
+const served = new Map<string, Promise<Elysia>>()
+
+async function serve(routes: string, variant: Variant): Promise<Elysia> {
+  const key = JSON.stringify([routes, variant])
+  const { base, trailingSlash, dev, proxy, site: configured } = variant
+  let app = served.get(key)
+
+  if (app === undefined) {
+    app = (async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined })))()
+    served.set(key, app)
+  }
+
+  return app
 }
 
 interface Sent { page?: string, referer?: string, back?: string, headers?: Record<string, string>, how: Post }

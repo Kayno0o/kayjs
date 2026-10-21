@@ -18,6 +18,8 @@ const ROOT = 'tests/fixtures/live-presence'
 const GRACE_MS = 600
 // A browser reconnects slower than a request, so its tests keep a longer grace.
 const BROWSER_GRACE_MS = 1500
+// The shorter grace of the browser tests that wait for a tab to leave and never reconnect one.
+const QUICK_GRACE_MS = 300
 const SERVER_GRACE = presenceGrace.ms
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const ROOM = 'kay:presence:entry:1'
@@ -49,12 +51,24 @@ async function enter(site: TestSite, user: string, tab: string, path = '/entry/1
 // What a room holds, without the tab each member is stored beside.
 const held = (rooms: ReturnType<typeof memoryRooms>, room: string) => rooms.members(room).map(text => text.slice(text.indexOf(':') + 1))
 
+// Waits until `when` (a timestamp), the end of a quiet stretch a test asserts nothing happened in.
+const until = async (when: number) => Bun.sleep(Math.max(0, when - Date.now()))
+
 async function leaves(rooms: ReturnType<typeof memoryRooms>, room: string, left: number, within = 10_000): Promise<void> {
   for (let waited = 0; rooms.members(room).length !== left; waited += 50) {
     if (waited > within)
       throw new Error(`the room kept ${rooms.members(room).length} members instead of ${left}`)
 
     await Bun.sleep(50)
+  }
+}
+
+async function waitFor(done: () => boolean, within = 10_000): Promise<void> {
+  for (let waited = 0; !done(); waited += 10) {
+    if (waited > within)
+      throw new Error('the state never came')
+
+    await Bun.sleep(10)
   }
 }
 
@@ -186,6 +200,7 @@ describe('presence on the server', () => {
   it('takes a tab out after the grace, and not while a reconnect came within it', async () => {
     const watching = await enter(site, 'Bob', 'bob-tab')
     const first = await enter(site, 'Ann', 'ann-tab')
+    const { proofs, keys } = await visit(site, '/entry/1', 'Ann')
 
     await watching.next()
     await first.next()
@@ -195,25 +210,27 @@ describe('presence on the server', () => {
 
     await first.close()
 
-    // The same tab asks again within the grace, so the others are told nothing.
-    const again = await enter(site, 'Ann', 'ann-tab')
+    // The same tab asks again within the grace (its proofs already read, so the ask is one request), and the others are told nothing once the first grace has run out.
+    const again = new Feed(await connect(site, proofs, keys, 'ann-tab'))
 
     await again.next()
-    await Bun.sleep(GRACE_MS * 2)
-    expect(held(rooms, ROOM)).toEqual([BOB, ANN])
 
     const quiet = Symbol('quiet')
     const told = watching.next()
     const wait = async () => {
-      await Bun.sleep(100)
+      await until(left + GRACE_MS + 200)
 
       return quiet
     }
 
     expect(await Promise.race([told, wait()])).toBe(quiet)
+    expect(held(rooms, ROOM)).toEqual([BOB, ANN])
+
+    const closed = Date.now()
+
     await again.close()
     await leaves(rooms, ROOM, 1)
-    expect(Date.now() - left).toBeGreaterThanOrEqual(GRACE_MS * 2)
+    expect(Date.now() - closed).toBeGreaterThanOrEqual(GRACE_MS - 20)
     expect(await told).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), []]])
     await watching.close()
     await leaves(rooms, ROOM, 0)
@@ -229,13 +246,16 @@ describe('presence on the server', () => {
 
     await first.next()
     await watching.next()
+
+    const closed = Date.now()
+
     await first.close()
 
     const second = new Feed(await connect(site, proofs, keys, 'ann-tab'))
 
     await second.next()
     expect(held(rooms, ROOM)).toEqual([BOB, ANN])
-    await Bun.sleep(GRACE_MS * 2)
+    await until(closed + GRACE_MS + 200)
     expect(held(rooms, ROOM)).toEqual([BOB, ANN])
     await second.close()
     await watching.close()
@@ -310,11 +330,12 @@ describe('presence across processes', () => {
       other.publish(ROOM, '', {})
       expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), [BOB]]])
 
-      // A process that crashed leaves its members behind until the store stops counting them, which the next recheck of the room finds.
+      // A process that crashed leaves its members behind until the store stops counting them, which the next recheck of the room finds: a publish asks for it at once, as the recheck every few seconds would.
       other.close()
       setSystemTime(new Date(Date.now() + 11_000))
 
       try {
+        rooms.publish(ROOM, '', {})
         expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), []]])
       }
       finally {
@@ -348,7 +369,7 @@ describe('a tab reconnecting to another process', () => {
       other.add(ROOM, 'ann-tab@elsewhere', `ann-tab:${ANN}`)
       other.publish(ROOM, '', {})
       await ann.close()
-      await Bun.sleep(GRACE_MS * 2)
+      await waitFor(() => rooms.members(ROOM).filter(text => text.startsWith('ann-tab:')).length === 1)
       expect(await bob.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), [ANN]]])
       expect(rooms.members(ROOM).filter(text => text.startsWith('ann-tab:'))).toHaveLength(1)
       await bob.close()
@@ -394,6 +415,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
   })
 
   it('lists the other tab\'s member in each of two tabs, and empties the list of the one left when the other closes', async () => {
+    presenceGrace.ms = QUICK_GRACE_MS
     await using ann = await site.open('/entry/1?as=Ann')
     await using bob = await site.open('/entry/1?as=Bob')
 
@@ -417,6 +439,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
   }, 30_000)
 
   it('counts the tabs on a page for presence() with no argument', async () => {
+    presenceGrace.ms = QUICK_GRACE_MS
     await using first = await site.open('/crowd')
     await using second = await site.open('/crowd')
     await using third = await site.open('/crowd')
@@ -428,6 +451,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
   }, 30_000)
 
   it('keeps a hidden tab in its room', async () => {
+    presenceGrace.ms = QUICK_GRACE_MS
     await using hidden = await site.open('/entry/1?as=Ann')
     await using watching = await site.open('/entry/1?as=Bob')
 
@@ -436,11 +460,12 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await Bun.sleep(BROWSER_GRACE_MS * 2)
+    await Bun.sleep(QUICK_GRACE_MS * 3)
     expect(await watching.text('p.names')).toBe('Ann')
   }, 30_000)
 
   it('leaves the room of a page the tab swapped away from, and keeps the member of a swap to the same room listed throughout', async () => {
+    presenceGrace.ms = BROWSER_GRACE_MS
     await using leaving = await site.open('/entry/1?as=Ann')
     await using watching = await site.open('/entry/1?as=Bob')
 
@@ -453,9 +478,10 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
     })
     await leaving.click('a.same')
     await leaving.waitUntil(() => location.search === '?as=Ann&n=2')
-    await Bun.sleep(BROWSER_GRACE_MS * 2)
+    await Bun.sleep(BROWSER_GRACE_MS + 400)
     expect(await watching.evaluate(() => (Reflect.get(window, 'seen') as string[]).filter(text => text !== 'Ann'))).toEqual([])
     expect(await watching.text('p.names')).toBe('Ann')
+    presenceGrace.ms = QUICK_GRACE_MS
     await leaving.click('a.plain')
     await leaving.waitUntil(() => location.pathname === '/plain')
     await watching.waitUntil(() => document.querySelector('p.names')?.textContent === '', LEFT)
