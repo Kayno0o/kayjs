@@ -7,6 +7,7 @@ import { call, focusInvalid } from 'kay'
 import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import filesApi from '../api/files'
+import historyApi from '../api/history'
 import redirectsApi from '../api/redirects'
 import { entryKey } from '../markers'
 import { isSignedOut, setSessionEnded } from './session'
@@ -263,6 +264,17 @@ export async function unpublishSaved(ref: EntryRef): Promise<boolean> {
 // Tells the editor a publish, an unpublish or a schedule change waits for the edits typed so far to be saved, which they would otherwise carry along.
 export function refuseUnsaved(): void {
   toast.error(wording('cms.save.saveFirst', 'You have unsaved changes. Save or cancel them first, so this does not save them too.'))
+}
+
+// Saves an older version of an entry again, naming the version the editor opened, and says how it went; true once restored.
+export async function restoreVersion(ref: EntryRef, at: number, version?: string | undefined): Promise<boolean> {
+  const outcome = await attempt(async () => call(historyApi, '/:collection/:slug/restore', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    body: { at, ...localeOf(ref), ...versionOf(version) },
+  }), wording('cms.history.restoreFailure', 'Could not restore'))
+
+  return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }
 
 // Moves an entry one place up or down in its collection's order and says how it went; true once moved.

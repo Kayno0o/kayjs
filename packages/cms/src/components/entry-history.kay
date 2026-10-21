@@ -1,0 +1,57 @@
+---
+import type { ScreenCollection, StoredEntry } from '../kay/contract'
+import type { HistoryRow } from '../screens'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import { navigate } from 'kay'
+import { wording } from 'kay/words'
+import { restoreVersion } from '../editor/save'
+import { shipWords } from '../editor/words'
+import { entryPath } from '../listing'
+import EntryEdited from './entry-edited.kay'
+
+// The saved versions of an entry, newest first: who saved each and how, what it changed, and a button that saves it again. The entry's version is named by the restore, so a restore over a save made since is refused.
+const { prefix, collection, entry, rows } = props<{ prefix: string, collection: ScreenCollection, entry: StoredEntry, rows: HistoryRow[] }>()
+
+// Looks up what a restore says once the page has loaded, so the page sends it.
+shipWords()
+
+const ref = { collection: collection.name, slug: entry.slug, locale: entry.locale }
+
+const verbs: Record<string, string> = {
+  add: wording('cms.history.add', 'Created'),
+  update: wording('cms.history.update', 'Saved'),
+  publish: wording('cms.history.publish', 'Published'),
+  unpublish: wording('cms.history.unpublish', 'Unpublished'),
+  duplicate: wording('cms.history.duplicate', 'Duplicated'),
+  restore: wording('cms.history.restore', 'Restored from an older version'),
+  original: wording('cms.history.original', 'Before the first saved change'),
+}
+
+async function restore(row: HistoryRow): Promise<void> {
+  if (await restoreVersion(ref, row.at, entry.version))
+    await navigate(entryPath(prefix, ref))
+}
+---
+if rows.length === 0
+  EmptyState(title={wording('cms.history.empty', 'No saved version yet')} description={wording('cms.history.emptyHint', 'Each save from now on is kept here, so an older version can be brought back.')})
+else
+  ol.kcms-history
+    for row of rows key={row.at}
+      li.kcms-revision
+        .kcms-revision-head
+          if row.at > 0
+            EntryEdited(at={row.at} moment author={row.author})
+          Badge(label={verbs[row.verb] ?? row.verb})
+          if row.current
+            Badge(tone="info" label={wording('cms.history.current', 'Current')})
+          else
+            ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreLabel', 'Restore')} message={wording('cms.history.restoreMessage', 'Restore this version? It is saved as a new version, and the current one stays in the history.')} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row) }})
+        if row.changes.length > 0
+          dl.kcms-changes
+            for change of row.changes key={change.label}
+              dt {change.label}
+              dd
+                del {change.before}
+                ins {change.after}

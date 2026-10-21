@@ -25,7 +25,7 @@ import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack }
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
-export { blocks, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
+export { blocks, collectionInfo, collectionLoader, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
@@ -99,6 +99,8 @@ export interface ContentLoader<Data = unknown> {
   saveMany?: ((entries: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined }[]) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
+  // A hidden collection in the same store, named by what a CMS keeps in it (`history`, `trash`), whose entries never show in this one: kayjs-cms keeps an entry's revisions and its deleted entries there, so a loader without it has no history.
+  sibling?: ((kind: string) => ContentLoader) | undefined
 }
 
 // The fields of the data holding a number, which `order` may name.

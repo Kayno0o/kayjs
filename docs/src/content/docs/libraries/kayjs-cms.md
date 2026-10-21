@@ -475,6 +475,14 @@ The refresh covers the pages that read the collection, the sitemap, `live: true`
 
 A collection whose entries come from a loader of your own has no database to look at. Call `invalidate()` on it from a webhook route, or restart.
 
+### Bringing back an older version
+
+A collection kept by `sqliteLoader` or `postgresLoader` remembers what editors save. Each entry has a History button: it lists the last 50 saves, newest first, with who made each one, when, and which fields it changed. Restore saves an older version again as a new one, so nothing is lost and the history keeps growing.
+
+You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
+
+`cms({ history: { revisions: 100 } })` keeps more or fewer, and `cms({ history: false })` turns it off. A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
+
 ### After a save
 
 `cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate` or `delete`), the author and, for a folder entry, the commit.

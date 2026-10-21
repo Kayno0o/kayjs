@@ -60,6 +60,11 @@ export function seededKey(name: string): string {
   return `\u0001seeded:${name}`
 }
 
+// The name a collection's hidden sibling (`history`, `trash`) is keyed by in the shared table, which no collection name matches as it starts with a control character.
+export function siblingName(name: string, kind: string): string {
+  return `\u0001${kind}:${name}`
+}
+
 export function loadedOf(row: Row): LoadedEntry {
   return row.body === null ? { slug: row.place, data: JSON.parse(row.data) as unknown } : { slug: row.place, data: JSON.parse(row.data) as unknown, body: row.body }
 }

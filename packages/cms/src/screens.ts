@@ -1,12 +1,15 @@
+import type { Change } from './changes'
 import type { Edit } from './history'
 import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
+import { changesBetween } from './changes'
 import { countEntries } from './counts'
 import { readEdits, readLastEdit } from './history'
 import { collections, entries, translations } from './kay/content'
 import { collectionPath, entryPath, newEntryPath, pageRows } from './listing'
 import { log } from './log'
+import { revisionsOf } from './revisions'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 import { pairKey, translationReport } from './translations'
@@ -179,4 +182,43 @@ async function readEntries(collection: CollectionInfo): Promise<SourceEntry[] | 
 
     return undefined
   }
+}
+
+export interface HistoryRow {
+  // 0 for the entry as it stood before its first recorded save.
+  at: number
+  author?: string | undefined
+  verb: string
+  // What this save changed from the one before; empty for the entry's first.
+  changes: Change[]
+  // Whether the entry holds this version now, which needs no restoring.
+  current: boolean
+}
+
+export interface HistoryScreen {
+  prefix: string
+  collection: ScreenCollection
+  entry: StoredEntry
+  // Newest first.
+  rows: HistoryRow[]
+}
+
+// What an entry's history reads; undefined for a collection or an entry the site lacks, or a collection that keeps no history.
+export async function historyScreen(ref: EntryRef): Promise<HistoryScreen | undefined> {
+  const screen = await readEntry(ref)
+
+  if (!screen?.entry?.data || screen.collection.history !== true)
+    return undefined
+
+  const { collection, entry } = screen
+  const revisions = await revisionsOf(ref)
+  const rows = revisions.map((revision, index) => ({
+    at: revision.at,
+    author: revision.author,
+    verb: revision.verb,
+    changes: index === 0 ? [] : changesBetween(collection.schema, revisions[index - 1]!, revision),
+    current: Bun.deepEquals(revision.data, entry.data) && (revision.body ?? '') === (entry.body ?? ''),
+  }))
+
+  return { prefix: settings().prefix, collection, entry, rows: rows.reverse() }
 }

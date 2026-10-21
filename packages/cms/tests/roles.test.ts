@@ -2,6 +2,7 @@ import type { GuardContext } from 'kay'
 import { describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
 import { passwordGuard, SESSION_COOKIE } from '../src/password'
+import { isRestrained } from '../src/publishing'
 import { configure } from '../src/settings'
 
 class Denied {
@@ -96,6 +97,17 @@ describe('roles', () => {
 
     for (const [method, path] of RESTRICTED)
       expect(await statusOf(ask({ method, path, user: { roles: ['editor'] } })), path).toBe(403)
+  })
+
+  test('any editor may restore an older version, which leaves the publication of a role that may not publish alone', async () => {
+    auth()
+
+    const editor = ask({ path: '/history/posts/hello/restore', body: { at: 1 }, user: { roles: ['editor'] } })
+    const publisher = ask({ path: '/history/posts/hello/restore', body: { at: 1 }, user: { roles: ['publisher'] } })
+
+    expect(await statusOf(editor)).toBe(200)
+    expect(await statusOf(publisher)).toBe(200)
+    expect([isRestrained(editor.request), isRestrained(publisher.request)]).toEqual([true, false])
   })
 
   test('a role allows exactly the actions it lists', async () => {

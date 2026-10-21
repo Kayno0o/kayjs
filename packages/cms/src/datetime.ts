@@ -178,3 +178,16 @@ export function editedDay(time: number, zone?: string, lang?: string): string {
     return new Date(time).toISOString().slice(0, 10)
   }
 }
+
+// The day and the time of day of a save, as `editedDay` writes the day; the UTC minute as `2026-10-21 14:05` where no zone is known.
+export function editedMoment(time: number, zone?: string, lang?: string): string {
+  if (zone === undefined)
+    return `${new Date(time).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+
+  try {
+    return new Intl.DateTimeFormat(lang === '' ? undefined : lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(time)
+  }
+  catch {
+    return `${new Date(time).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+  }
+}

@@ -378,10 +378,19 @@ export function collectionPath(prefix: string, collection: string): string {
   return screenPath(prefix, `/collections/${encodeURIComponent(collection)}`)
 }
 
-export function entryPath(prefix: string, { collection, slug, locale }: EntryRef): string {
+export function entryPath(prefix: string, ref: EntryRef): string {
+  return slugged(collectionPath(prefix, ref.collection), ref)
+}
+
+// The screen of an entry's history.
+export function historyPath(prefix: string, ref: EntryRef): string {
+  return slugged(screenPath(prefix, `/history/${encodeURIComponent(ref.collection)}`), ref)
+}
+
+function slugged(base: string, { slug, locale }: EntryRef): string {
   const parts = slug.split('/')
   // A loaded slug may start with `/` or hold `//`, which a path keeps only escaped.
-  const path = `${collectionPath(prefix, collection)}/${parts.includes('') ? encodeURIComponent(slug) : parts.map(encodeURIComponent).join('/')}`
+  const path = `${base}/${parts.includes('') ? encodeURIComponent(slug) : parts.map(encodeURIComponent).join('/')}`
 
   return locale === undefined ? path : `${path}?locale=${encodeURIComponent(locale)}`
 }

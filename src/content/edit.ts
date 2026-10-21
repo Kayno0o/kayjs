@@ -2,7 +2,7 @@ import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { IconProps, IconSet } from '../runtime/icons'
-import type { Collection, Entry } from './index'
+import type { Collection, ContentLoader, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
@@ -500,6 +500,11 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...count !== undefined && { count },
     ...problem !== undefined && { problem },
   }
+}
+
+// The loader filling the collection exported as `name`, or undefined for a folder's or an unknown name; for a CMS keeping its own rows beside the entries through the loader's `sibling`.
+export function collectionLoader(name: string): ContentLoader | undefined {
+  return registered.find(([exported]) => exported === name)?.[1].loader
 }
 
 // The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; those the filter keeps alone, a folder reading no other file.

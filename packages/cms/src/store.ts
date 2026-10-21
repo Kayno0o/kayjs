@@ -6,11 +6,13 @@ import { forgetCounts } from './counts'
 import { publishTime } from './datetime'
 import { fieldsOf } from './fields'
 import { fileVersion, ForgeError, SaveConflict } from './files'
+import { hiddenOf } from './hidden'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded, saveEntries as saveLoadedMany } from './kay/content'
 import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { missingReferences } from './references'
+import { openTrail } from './revisions'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
@@ -31,8 +33,10 @@ export async function findCollection(name: string): Promise<ScreenCollection | u
   const found = await collectionInfo(name)
   const given = settings().layouts.get(name)
 
+  const history = found?.kind === 'loaded' && hiddenOf(name, 'history') !== undefined ? { history: true as const } : {}
+
   // Without the icon, which the content list draws on the server and the editor's islands would otherwise carry with each page.
-  return found && given ? { ...found, layout: { group: given.group, order: given.order, form: given.form, list: given.list } } : found
+  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history }
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.
@@ -113,7 +117,7 @@ export async function versionOf(ref: EntryRef): Promise<string | undefined> {
   return await file.exists() ? fileVersion(await file.bytes()) : undefined
 }
 
-function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): { issues: Issue[] } {
+export function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): { issues: Issue[] } {
   const at: { key?: Issue['key'], body?: true } = {}
 
   if (key === 'body')
@@ -233,10 +237,13 @@ async function writeEntry(entry: DraftEntry, { create = false, version, required
       if (stale)
         return stale
 
+      const trail = await openTrail(entry, create ? undefined : async () => storedState((await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]))
       const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
       if (issues !== undefined && issues.length > 0)
         return { issues }
+
+      await trail?.record({ data: entry.data, body: entry.body, verb: verb ?? (create ? 'add' : 'update') }, author)
 
       return versioned ? { saved: true, version: await loadedVersion(entry, collection.schema) } : { saved: true }
     })
@@ -317,6 +324,10 @@ async function removeOne(ref: EntryRef, author: Identity | undefined, { version,
   const committed = await commitChange(ref, { repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}`, author, base: version })
 
   return 'issues' in committed ? committed : { saved: true, commit: committed.commit }
+}
+
+function storedState(entry: SourceEntry | undefined): { data: Record<string, unknown>, body?: string | undefined } | undefined {
+  return entry?.data === undefined ? undefined : { data: entry.data, body: entry.body }
 }
 
 // Sets the collection's draft field to false, keeping the rest of the entry as saved.

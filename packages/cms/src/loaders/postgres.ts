@@ -1,7 +1,7 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -106,6 +106,8 @@ export function postgresLoader(options: PostgresLoaderOptions): ContentLoader {
   return {
     name,
     ...ttl === undefined ? {} : { ttl },
+    // Looked at by hand only, so no timer.
+    sibling: kind => postgresLoader({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
     load: async () => {
       const sql = await database()
 

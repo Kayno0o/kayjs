@@ -1,3 +1,4 @@
+import type { CollectionInfo } from './kay/contract'
 import { collectionNamed, entryScreen, heldDate } from './store'
 
 const SAVE = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
@@ -13,6 +14,41 @@ export async function withHold(request: Request, collectionName: string, data: R
   const collection = await collectionNamed(collectionName)
 
   return collection.publishField === undefined ? data : { ...data, [collection.publishField]: heldDate(collection) }
+}
+
+// The restores of a role that may not publish: what they restore leaves the draft flag and the dates as they are.
+const restrained = new WeakSet<Request>()
+
+export function restrain(request: Request): void {
+  restrained.add(request)
+}
+
+export function isRestrained(request: Request): boolean {
+  return restrained.has(request)
+}
+
+// `data` with the draft flag and the publish and unpublish dates of the entry it replaces, so restoring an older version publishes or withdraws nothing; without an entry, a draft, or held back by a far date in a collection with no draft flag.
+export function keepingPublication(collection: Pick<CollectionInfo, 'draftField' | 'publishField' | 'unpublishField' | 'schema'>, data: Record<string, unknown>, current: Record<string, unknown> | undefined): Record<string, unknown> {
+  const kept = { ...data }
+
+  for (const field of [collection.draftField, collection.publishField, collection.unpublishField]) {
+    if (field === undefined)
+      continue
+
+    if (current !== undefined && current[field] !== undefined)
+      kept[field] = current[field]
+    else
+      delete kept[field]
+  }
+
+  if (current === undefined) {
+    if (collection.draftField !== undefined)
+      kept[collection.draftField] = true
+    else if (collection.publishField !== undefined)
+      kept[collection.publishField] = heldDate(collection)
+  }
+
+  return kept
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

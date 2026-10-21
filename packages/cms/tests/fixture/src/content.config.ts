@@ -1,5 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, fieldInput, imageField } from 'kay/content'
+import { sqliteLoader } from '../../../src/loaders/sqlite'
 import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
@@ -99,4 +100,9 @@ export const ledger = collection({
   },
 }, {
   schema: s.Object({ name: s.String({ minLength: 1 }), note: s.Nullable(s.String()) }),
+})
+
+// A loaded collection in SQLite, which keeps the history of its entries.
+export const journal = collection(sqliteLoader({ name: 'journal', database: ':memory:' }), {
+  schema: s.Object({ title: s.String({ minLength: 1 }) }),
 })

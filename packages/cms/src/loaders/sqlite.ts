@@ -3,7 +3,7 @@ import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -89,6 +89,8 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   return {
     name,
     ...ttl === undefined ? {} : { ttl },
+    // Looked at by hand only, so no timer.
+    sibling: kind => sqliteLoader({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
     load: async () => {
       const db = await database()
 

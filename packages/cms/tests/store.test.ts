@@ -48,6 +48,7 @@ let keeping = false
 const content: typeof Content = {
   bodyHtml,
   MarkdownError,
+  collectionLoader: () => undefined,
   collections: async () => collectionList,
   collectionInfo: async (name, options) => {
     infoCalls.push([name, options])

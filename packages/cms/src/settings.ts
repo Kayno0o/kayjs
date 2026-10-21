@@ -1,9 +1,9 @@
-import type { Guard, GuardContext } from 'kay'
+import type { DurationText, Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout } from './kay/contract'
 import type { Action } from './roles'
-import { byteSize, lazily } from 'kay/library'
+import { byteSize, lazily, optionMs } from 'kay/library'
 import { workingTree } from './files'
 import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
@@ -21,7 +21,7 @@ export interface SaveEvent {
   slug: string
   locale?: string | undefined
   // What the editor did: a new entry is `add`, a changed one `update`, and `move` is one entry of a reorder.
-  verb: 'add' | 'update' | 'publish' | 'unpublish' | 'move' | 'duplicate' | 'delete'
+  verb: 'add' | 'update' | 'publish' | 'unpublish' | 'move' | 'duplicate' | 'delete' | 'restore'
   author?: Identity | undefined
   // The commit a folder entry's saver made, such as a forge's.
   commit?: Commit | undefined
@@ -60,6 +60,15 @@ export interface CmsOptions {
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
   onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
+  // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `false` turns both off.
+  history?: false | { revisions?: number | undefined, trash?: DurationText | false | undefined } | undefined
+}
+
+// What `cms({ history })` comes to: undefined when off.
+export interface HistorySettings {
+  revisions: number
+  // How long a deleted entry is kept, in milliseconds; undefined keeps none.
+  trash: number | undefined
 }
 
 export interface CmsSettings {
@@ -80,7 +89,11 @@ export interface CmsSettings {
   // The actions each role may do, or undefined when every editor the guard admits may do all of them.
   roles: ReadonlyMap<string, ReadonlySet<Action>> | undefined
   layouts: ReadonlyMap<string, GivenLayout>
+  history: HistorySettings | undefined
 }
+
+const DEFAULT_REVISIONS = 50
+const DEFAULT_TRASH: DurationText = '30d'
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 
@@ -100,7 +113,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -111,9 +124,21 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: checkRoles(roles, guard !== undefined), layouts: checkLayouts(collections), history: checkHistory(history) }
 
   return current
+}
+
+function checkHistory(history: CmsOptions['history']): HistorySettings | undefined {
+  if (history === false)
+    return undefined
+
+  const { revisions = DEFAULT_REVISIONS, trash = DEFAULT_TRASH } = history ?? {}
+
+  if (!Number.isInteger(revisions) || revisions < 1)
+    throw new Error(`kayjs-cms: \`cms({ history: { revisions } })\` is ${JSON.stringify(revisions)}; it takes a positive whole number of saves to keep per entry`)
+
+  return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`', 'kayjs-cms') }
 }
 
 // The bytes `uploads.maxSize` stands for, whole and positive, else the default; a size that is none throws as kay.config.ts loads.

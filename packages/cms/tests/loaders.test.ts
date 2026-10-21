@@ -54,6 +54,18 @@ function contract(label: string, make: (options: { name: string, seed?: SeedEntr
       expect(calls).toBe(1)
     })
 
+    test2('gives a hidden sibling in the same table that the collection never lists', async () => {
+      const posts = make({ name: 'posts', seed, table: 'siblings' })
+      const history = posts.sibling!('history')
+
+      await history.save!({ slug: 'a', data: { revisions: [1] } })
+      expect(await history.get!('a', { preview: false })).toEqual({ slug: 'a', data: { revisions: [1] } })
+      expect((await posts.load({ preview: false })).map(entry => entry.slug)).toEqual(['a', 'b', 'fr/x'])
+      expect(await history.count!({ preview: false })).toBe(1)
+      await history.remove!({ slug: 'a' })
+      expect(await history.load({ preview: false })).toEqual([])
+    })
+
     test2('keeps collections apart in one table', async () => {
       const posts = make({ name: 'posts', seed, table: 'apart' })
       const pages = make({ name: 'pages', seed: [{ slug: 'home', data: { title: 'Home' } }], table: 'apart' })

@@ -6,7 +6,7 @@ import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, routePath } from '../access'
 import { authors } from '../authors'
-import { leavesPublication } from '../publishing'
+import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
@@ -29,6 +29,7 @@ const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish)$/
 const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
 const UPLOAD = /\/api\/cms\/files\/[^/]+$/
 const MEDIA_RENAME = /\/api\/cms\/files\/media\/rename$/
+const RESTORE = /\/api\/cms\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
 const UNUSED_UPLOADS = /\/api\/cms\/files\/unused\/delete$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
@@ -101,11 +102,17 @@ export default guard(async (ctx) => {
     const path = routePath(ctx.url)
     const needed = actionOf(method, path)
 
+    // Restoring undoes an edit or a delete, which any editor may; what it restores never publishes or withdraws for a role that may not.
+    const restoring = method === 'POST' && RESTORE.test(path)
+
+    if (restoring && !await may(ctx, 'publish'))
+      restrain(ctx.request)
+
     if (needed !== undefined && !await may(ctx, needed))
       return forbidden(ctx, needed)
 
     // A save that flips the draft flag or a publish date is a publish as much as the route is.
-    if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
+    if (method === 'POST' && needed === undefined && !restoring && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
       return forbidden(ctx, 'publish')
   }
 

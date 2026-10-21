@@ -1,0 +1,20 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { s } from 'kay'
+import { wording } from 'kay/words'
+import EntryHeader from '../../../components/entry-header.kay'
+import EntryHistory from '../../../components/entry-history.kay'
+import { adminTitle, entryPath, entryTitle } from '../../../listing'
+import { historyScreen } from '../../../screens'
+
+export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
+
+const ref = { collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }
+const { prefix, collection, entry, rows } = await historyScreen(ref) ?? ctx.notFound()
+const title = entryTitle(collection, entry)
+---
+head
+  title {adminTitle(wording('cms.history.pageTitle', 'History of {title}', { title }))}
+EntryHeader(prefix={prefix} collection={collection} title={title} subtitle={wording('cms.history.title', 'History')})
+  Button(href={entryPath(prefix, ref)} label={wording('cms.history.back', 'Back to the entry')})
+EntryHistory(prefix={prefix} collection={collection} entry={entry} rows={rows})
