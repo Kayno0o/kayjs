@@ -74,5 +74,5 @@ The screens fit a 375 px phone: no sideways scroll, lists stacked as cards, cont
 - [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions; an app's page at a screen's path; `createEntryForm` and the entry parts to build an entry screen
 - [Uploads and image fields](llms/uploads.md): what a file or image field does, the upload route and its limits, the picker, alt text and sizes kept beside an image, and the unused-uploads screen
 - [Edit this page link](llms/page-links.md): the link an editor's browser finds on each page, `pageLink: false`, a link of your own, and how an entry finds its page
-- [Field kinds and entering a field](llms/fields.md): `fieldInput` (placeholder, unit, rows, labels, lines, when), what the schema sets, `customField`
+- [Field kinds and entering a field](llms/fields.md): `fieldInput` (placeholder, unit, rows, labels, lines, when), what the schema sets, `customField`, ready-made kinds (`colorField`, `moneyField`, `tagsField`, `linkField`, `geoField`, `iconField`)
 - [Texts and languages](llms/words.md): the `cms.*` messages that word every text of the screens and the editor

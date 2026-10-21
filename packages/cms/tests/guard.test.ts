@@ -72,6 +72,8 @@ describe('the API guard', () => {
 
     expect(await admitted(context('GET', '/entries/posts/hello', true))).toBe(true)
     expect(await admitted(context('GET', '/files/rules', true))).toBe(true)
+    expect(await admitted(context('GET', '/icons', true))).toBe(true)
+    expect(await admitted(context('GET', '/icons', false))).toBe(false)
     expect(await admitted(context('POST', '/preview/exit', true))).toBe(true)
 
     for (const [method, path] of [['POST', '/entries/posts/hello'], ['POST', '/entries/posts/hello/publish'], ['POST', '/entries/posts/hello/unpublish'], ['POST', '/entries/posts/hello/move'], ['DELETE', '/entries/posts/hello'], ['PUT', '/entries/posts/hello'], ['POST', '/files/posts'], ['POST', '/files/unused/delete'], ['POST', '/redirects'], ['POST', '/entries/preview/exit']] as const)

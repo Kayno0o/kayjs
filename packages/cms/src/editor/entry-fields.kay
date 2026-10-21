@@ -14,8 +14,8 @@ const rows = memo(() => formRows(fieldsOf(form.collection.schema), form.collecti
 EntryNotices(form={form})
 for row, i of rows() key={i}
   .kcms-row
-    for item of row key={item === 'body' ? '#body' : item.key}
+    for item of row key={item === 'body' ? '#body' : item.at ?? item.key}
       if item === 'body'
         EntryBody(form={form})
       else
-        EntryField(form={form} name={String(item.key)})
+        EntryField(form={form} name={item.at ?? String(item.key)} field={item})

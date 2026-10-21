@@ -26,6 +26,8 @@ interface FieldBase {
   inputType?: 'text' | 'email' | 'url' | 'tel' | 'search'
   // The rows a multi-line text starts at, which it grows from.
   rows?: number
+  // Set by a form layout that places a field of a group by its dotted path: the path the field is edited at.
+  at?: string
   // The sibling this field waits for a value in.
   when?: string
   // Listed as required but allowed to be null: emptied, it stores `null`, as leaving the key out would be refused.
@@ -52,6 +54,9 @@ export interface UploadHints {
 
 export type Field
   = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json' }
+    // A hex colour, a list of words and an icon of the set a server registered, which `colorField`, `tagsField` and `iconField` report.
+    | FieldBase & { kind: 'color' | 'tags' }
+    | FieldBase & { kind: 'icon', set: string }
     | FieldBase & { kind: 'image' | 'file', upload?: UploadHints | undefined }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
@@ -63,7 +68,7 @@ export type Field
     | FieldBase & { kind: 'custom', name: string }
 
 // The kinds a schema's `x-kay` hint may name that need nothing beyond the hint; any other name is the app's own.
-type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom' | 'image' | 'file'>
+type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom' | 'image' | 'file' | 'color' | 'tags' | 'icon'>
 const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'json'] satisfies Hinted[])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
@@ -169,6 +174,15 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
   if (hint?.kind === 'image' || hint?.kind === 'file')
     return { ...base, kind: hint.kind, upload: uploadHints(hint) }
 
+  if (hint?.kind === 'hex-color')
+    return { ...base, kind: 'color' }
+
+  if (hint?.kind === 'tag-list')
+    return { ...base, kind: 'tags' }
+
+  if (hint?.kind === 'icon-name' && typeof hint.set === 'string')
+    return { ...base, kind: 'icon', set: hint.set }
+
   if (hint !== undefined)
     return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Hinted } : { ...base, kind: 'custom', name: hint.kind }
 
@@ -233,7 +247,7 @@ function limitsOf(schema: JsonSchema): Limits | undefined {
 }
 
 // The kinds whose control holds one value an editor may leave empty, so `required` and the limits apply to what is typed.
-const CHECKED = new Set<Field['kind']>(['text', 'textarea', 'markdown', 'number', 'integer', 'date', 'datetime', 'select', 'image', 'file', 'json'])
+const CHECKED = new Set<Field['kind']>(['text', 'textarea', 'markdown', 'number', 'integer', 'date', 'datetime', 'select', 'image', 'file', 'json', 'color', 'icon'])
 
 // Why a field's value would be refused by its schema, worded as the server words it, or undefined when it holds; the form shows it as the value is typed, before a save asks the server.
 export function checkField(field: Field, value: unknown): string | undefined {
@@ -500,6 +514,7 @@ export function emptyValue(field: Field): unknown {
       return undefined
     case 'list':
     case 'lines':
+    case 'tags':
       return []
     case 'group':
       return Object.fromEntries(field.fields.map(child => [child.key, emptyValue(child)]))
@@ -513,6 +528,8 @@ export function emptyValue(field: Field): unknown {
     case 'reference':
     case 'file':
     case 'image':
+    case 'color':
+    case 'icon':
       return ''
   }
 }

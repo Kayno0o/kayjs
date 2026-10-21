@@ -1,0 +1,81 @@
+---
+import type { IconProps } from 'kay/icons'
+import type { Field } from '../fields'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { call, trustHtml } from 'kay'
+import { wording } from 'kay/words'
+import iconsApi from '../api/icons'
+import './fields.css'
+
+// The controls kayjs-cms builds in for the ready-made kinds: a colour, a list of tags and an icon of a set.
+// `cleared` is what an emptied optional field stores.
+const { field, value, onChange, cleared, label, hint, issue, required, touch } = props<{ field: Field & { kind: 'color' | 'tags' | 'icon' }, value: unknown, onChange: (next: unknown) => void, cleared: null | undefined, label: string, hint: string | undefined, issue: string | undefined, required: boolean, touch: () => void }>()
+
+const HEX = /^#[0-9a-f]{6}$/i
+
+const text = () => typeof value === 'string' ? value : ''
+const tags = () => Array.isArray(value) ? value.filter((tag): tag is string => typeof tag === 'string') : []
+const typing = signal('')
+
+function addTags(typed: string): void {
+  const fresh = [...new Set(typed.split(',').map(word => word.trim()).filter(word => word !== '' && !tags().includes(word)))]
+
+  typing.set('')
+
+  if (fresh.length > 0)
+    onChange([...tags(), ...fresh])
+}
+
+function removeTag(at: number): void {
+  const left = tags().filter((_, place) => place !== at)
+
+  onChange(left.length === 0 && !required ? cleared : left)
+}
+
+function tagKey(event: KeyboardEvent): void {
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault()
+    addTags(typing())
+  }
+  else if (event.key === 'Backspace' && typing() === '' && tags().length > 0) {
+    removeTag(tags().length - 1)
+  }
+}
+
+// The markup comes from the server's own icon set through the cms API, which carries no mark of it as vouched for.
+const drawn = (icons: { name: string, icon: Omit<IconProps, 'innerHTML'> & { innerHTML: string } }[]) => icons.map(({ name, icon }) => ({ name, icon: { ...icon, innerHTML: trustHtml(icon.innerHTML) } }))
+
+// The icon picked, drawn first when the first page leaves it out, so the editor sees what the field holds.
+async function findIcons(query: string, limit: number, offset: number): Promise<{ name: string, icon: IconProps }[]> {
+  const set = field.kind === 'icon' ? field.set : ''
+  const page = drawn(await call(iconsApi, '/', { query: { set, query, limit, offset } }))
+  const held = text()
+
+  if (query !== '' || offset > 0 || held === '' || page.some(choice => choice.name === held))
+    return page
+
+  const exact = drawn(await call(iconsApi, '/', { query: { set, query: held.slice(held.indexOf(':') + 1), limit: 20, offset: 0 } })).find(choice => choice.name === held)
+
+  return exact ? [exact, ...page] : page
+}
+---
+match field.kind
+  when 'tags'
+    FormField(label={label} hint={hint} issue={issue} required={required} group)
+      .kcms-tags
+        for tag, i of tags() key={tag}
+          span.kcms-tag
+            | {tag}
+            IconButton(icon="close" label={wording('cms.field.removeTag', 'Remove {tag}', { tag })} size="xs" variant="ghost" onClick={() => removeTag(i)})
+        TextInput.kcms-tag-box(placeholder={wording('cms.field.newTag', 'Add a tag')} aria-label={label} value={typing()} onInput={next => typing.set(next)} onKeyDown={tagKey} onBlur={() => { addTags(typing()); touch() }})
+  when 'color'
+    FormField(label={label} hint={hint} issue={issue} required={required} group)
+      .kcms-color
+        input.kcms-swatch(type="color" aria-label={label} value={HEX.test(text()) ? text().toLowerCase() : '#000000'} onInput={event => { onChange(event.currentTarget.value); touch() }})
+        TextInput(placeholder="#1a2b3c" aria-label={label} value={text()} onInput={next => onChange(next === '' && !required ? cleared : next)} onBlur={touch} maxlength={7})
+  else
+    FormField(label={label} hint={hint} issue={issue} required={required} group)
+      IconPicker(search={findIcons} value={text()} onChange={next => { onChange(next === '' && !required ? cleared : next); touch() }})

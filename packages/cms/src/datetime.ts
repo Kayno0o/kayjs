@@ -68,6 +68,16 @@ export function useEditorZone(): () => string | undefined {
   return zone
 }
 
+// The editor's day on the browser's own clock, as a date input holds it: `2026-10-21`.
+export function today(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+// The current minute as an instant, which a datetime field stores.
+export function thisMinute(now = Date.now()): string {
+  return new Date(Math.floor(now / 60_000) * 60_000).toISOString()
+}
+
 // What a `datetime-local` input shows for a stored date: its minute on the wall clock of `zone`, UTC by default.
 export function inputValue(stored: string, zone?: string): string {
   const time = timeOf(stored)

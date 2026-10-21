@@ -70,11 +70,11 @@ export function fieldId(ref: EntryRef, part: string): string {
   return `kcms-${[ref.collection, ref.slug, ref.locale ?? '', part].join('-').replaceAll(NOT_ID, '_')}`
 }
 
-// The first key of a dotted path: the field of the entry's data it lies in.
-export function topKey(path: string): string {
-  const dot = path.indexOf('.')
+// The path and every path above it: `a.b.c` gives `a`, `a.b` and `a.b.c`.
+export function prefixes(path: string): string[] {
+  const segments = pathSegments(path)
 
-  return dot < 0 ? path : path.slice(0, dot)
+  return segments.map((_, at) => segments.slice(0, at + 1).join('.'))
 }
 
 // The paths where two entries' data differ, down to the leaves, then `BODY` when their Markdown bodies do.

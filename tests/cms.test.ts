@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, fieldInput, fileField, imageField, removeEntry, saveEntry } from '../src/content'
+import { collection, collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, removeEntry, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -266,6 +266,40 @@ describe('the collections a CMS edits', () => {
     expect(() => imageField({ maxSize: '0mb' })).toThrow('imageField({ maxSize })')
     expect(() => imageField({ minWidth: 0 })).toThrow('minWidth')
     expect(() => imageField({ minHeight: 1.5 })).toThrow('minHeight')
+  })
+
+  it('ready-made kinds report their kind and refuse what they cannot hold', () => {
+    const json = (field: unknown) => JSON.parse(JSON.stringify(field)) as Record<string, unknown>
+    const color = TypeCompiler.Compile(colorField())
+    const tags = TypeCompiler.Compile(tagsField())
+    const link = TypeCompiler.Compile(linkField())
+    const geo = TypeCompiler.Compile(geoField())
+    const money = TypeCompiler.Compile(moneyField({ currency: 'EUR' }))
+
+    expect(json(colorField())['x-kay']).toEqual({ kind: 'hex-color' })
+    expect(['#1a2b3c', '#ABCDEF'].map(value => color.Check(value))).toEqual([true, true])
+    expect(['', 'red', '#12345', '#1234567', 'javascript:x'].map(value => color.Check(value))).toEqual([false, false, false, false, false])
+    expect(json(tagsField())['x-kay']).toEqual({ kind: 'tag-list' })
+    expect([tags.Check(['a', 'b']), tags.Check(['a', 'a']), tags.Check(['']), tags.Check([])]).toEqual([true, false, false, true])
+    expect([link.Check({ label: 'Book', href: '/book' }), link.Check({ label: 'Book', href: 'https://x.fr' }), link.Check({ label: '', href: '/x' }), link.Check({ label: 'x', href: 'javascript:alert(1)' }), link.Check({ label: 'x', href: 'data:text/html,x' })]).toEqual([true, true, false, false, false])
+    expect([geo.Check({ lat: 48.8, lng: 2.3 }), geo.Check({ lat: 91, lng: 0 }), geo.Check({ lat: 0, lng: -181 }), geo.Check({ lat: 0 })]).toEqual([true, false, false, false])
+    expect(json(moneyField({ currency: 'EUR' }))['x-kay-input']).toEqual({ suffix: '€' })
+    expect(json(moneyField())).not.toHaveProperty('x-kay-input')
+    expect([money.Check(12.5), money.Check(0), money.Check(-1)]).toEqual([true, true, false])
+    expect(() => moneyField({ currency: 'EURO' })).toThrow('ISO 4217')
+  })
+
+  it('an icon field registers its set, pages through the icons whose name holds the query and refuses a name with no prefix', () => {
+    const set = { prefix: 'mini', icons: { 'home': { body: '<path d="M0 0"/>' }, 'home-2': { body: '<path d="M1 1"/>' }, 'star': { body: '<path d="M2 2"/>' } }, aliases: { house: { parent: 'home' } } }
+    const field = iconField(set)
+
+    expect((JSON.parse(JSON.stringify(field)) as Record<string, unknown>)['x-kay']).toEqual({ kind: 'icon-name', set: 'mini' })
+    expect(TypeCompiler.Compile(field).Check('mini:home')).toBe(true)
+    expect(TypeCompiler.Compile(field).Check('home')).toBe(false)
+    expect(findIcons('mini', 'HOME', 10, 0).map(found => found.name)).toEqual(['mini:home', 'mini:home-2'])
+    expect(findIcons('mini', 'home', 1, 1).map(found => found.name)).toEqual(['mini:home-2'])
+    expect(findIcons('mini', '', 100, 0)).toHaveLength(4)
+    expect(findIcons('unknown', '', 10, 0)).toEqual([])
   })
 
   it('reports a custom field kind in the schema beside the schema it wraps, so saves validate by it alone', () => {

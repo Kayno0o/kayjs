@@ -54,6 +54,54 @@ describe('formRows', () => {
   })
 })
 
+describe('formRows with dotted names', () => {
+  const nested = fieldsOf({
+    properties: {
+      name: { type: 'string' },
+      address: { type: 'object', properties: { street: { type: 'string' }, city: { type: 'string' }, geo: { type: 'object', properties: { lat: { type: 'number' }, lng: { type: 'number' } } } } },
+    },
+  })
+  const placed = (rows: ReturnType<typeof formRows>) => rows.map(row => row.map(item => item === 'body' ? '#body' : item.at ?? item.key))
+  const inside = (rows: ReturnType<typeof formRows>) => {
+    const group = rows.flat().find(item => item !== 'body' && item.key === 'address')
+
+    return group !== undefined && group !== 'body' && group.kind === 'group' ? group.fields.map(field => field.key) : undefined
+  }
+
+  test('places a nested field in a row, the group keeping the others', () => {
+    const rows = formRows(nested, false, { fields: [['name', 'address.city']] })
+
+    expect(placed(rows)).toEqual([['name', 'address.city'], ['address']])
+    expect(inside(rows)).toEqual(['street', 'geo'])
+    expect(rows[0]![1]).toMatchObject({ key: 'city', at: 'address.city' })
+  })
+
+  test('hides a nested field, a group left empty, and everything under a hidden group', () => {
+    expect(inside(formRows(nested, false, { hide: ['address.street'] }))).toEqual(['city', 'geo'])
+    expect(placed(formRows(nested, false, { hide: ['address.street', 'address.city', 'address.geo'] }))).toEqual([['name']])
+    expect(placed(formRows(nested, false, { fields: ['address.street'], hide: ['address'] }))).toEqual([['name']])
+  })
+
+  test('reaches two levels down, and shows a path once', () => {
+    const rows = formRows(nested, false, { fields: ['address.geo.lat', 'address.geo.lat'] })
+
+    expect(placed(rows)[0]).toEqual(['address.geo.lat'])
+    expect(placed(rows).flat().filter(id => id === 'address.geo.lat')).toHaveLength(1)
+    expect(inside(rows)).toEqual(['street', 'city', 'geo'])
+  })
+
+  test('skips a path the schema lacks, a list index and a path through a plain field', () => {
+    expect(placed(formRows(nested, false, { fields: ['address.zip', 'name.first', 'address.__proto__'] }))).toEqual([['name'], ['address']])
+  })
+
+  test('reports a path the schema lacks like a top-level name', () => {
+    const collection: CollectionInfo = { name: 'people', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { address: { type: 'object', properties: { city: { type: 'string' } } } } } }
+    const layouts = checkLayouts({ people: { form: { fields: ['address.city', 'address.zip'], hide: ['address.nope.x'] } } })
+
+    expect(layoutProblems([collection], layouts)).toEqual(['people\'s form names address.zip, which its schema lacks', 'people\'s form names address.nope.x, which its schema lacks'])
+  })
+})
+
 describe('listColumns and cellText', () => {
   test('keeps the named fields once, of a kind a cell can show, the schema\'s own title and actions fields included', () => {
     expect(listColumns(fields, { columns: ['price', 'tags', 'price', 'nope', 'title', 'actions', '__proto__'] }).map(field => field.key)).toEqual(['price', 'title', 'actions'])

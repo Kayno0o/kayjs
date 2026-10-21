@@ -189,6 +189,26 @@ The price is a number, stored as `600`, with the euro sign beside the box. `rows
 
 `when` shows a field only once a field next to it has a value, and the server warns at boot when no field is next to it; use it on an optional field, and know that a hidden field the schema refuses is shown with its message. `placeholder`, `prefix`, `suffix` and `type` (`'tel'` say) shape a one-line box, and `titleField` names the field of a list's items that heads each one.
 
+## Ready-made kinds
+
+Fields a site rebuilds each time come with the editor's control. Name the kind in the schema, from `kay/content`:
+
+```ts
+import tabler from '@iconify-json/tabler/icons.json'
+import { colorField, geoField, iconField, linkField, moneyField, tagsField } from 'kay/content'
+
+s.Object({
+  accent: colorField(),
+  price: moneyField({ currency: 'EUR' }),
+  labels: tagsField(),
+  cta: linkField(),
+  place: geoField(),
+  icon: iconField(tabler),
+})
+```
+
+A colour is picked or typed as `#rrggbb`. Money is a number with the currency's symbol beside the box. Tags are words typed into one box, added with Enter or a comma. A link is a label and an address, a place a latitude and a longitude. An icon is picked from a grid with search, and the icon set stays on the server. A select with many options opens on a search box, and a date has Today and Clear buttons.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.
@@ -428,7 +448,7 @@ cms({ collections: { shop: {
 } } })
 ```
 
-In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form.
+In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
 
 In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `unpublish`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
 

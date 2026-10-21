@@ -1,13 +1,18 @@
 ---
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
-import { inputValue, storedValue, useEditorZone } from '../datetime'
+import { inputValue, storedValue, thisMinute, useEditorZone } from '../datetime'
 
 // A date and time on the wall clock of the editor's zone, which the browser tells once mounted (UTC before), stored as the instant it names.
 const { hint, issue, label, onChange, required, value } = props<{ hint: string | undefined, issue: string | undefined, label: string, onChange: (stored: string | undefined) => void, required: boolean, value: string }>()
 
 const zone = useEditorZone()
 ---
-FormField(label={label} hint={[hint, wording('cms.field.zone', 'Time in {zone}', { zone: zone() ?? 'UTC' })].filter(Boolean).join(' ')} issue={issue} required={required})
-  TextInput(type="datetime-local" required={required} value={inputValue(value, zone())} onInput={next => onChange(storedValue(next ?? '', zone()))})
+FormField(label={label} hint={[hint, wording('cms.field.zone', 'Time in {zone}', { zone: zone() ?? 'UTC' })].filter(Boolean).join(' ')} issue={issue} required={required} group)
+  .kcms-adorned
+    TextInput(type="datetime-local" aria-label={label} required={required} value={inputValue(value, zone())} onInput={next => onChange(storedValue(next ?? '', zone()))})
+    Button(label={wording('cms.field.now', 'Now')} variant="inline" onClick={() => onChange(thisMinute())})
+    if value !== '' && !required
+      Button(label={wording('cms.field.clear', 'Clear')} variant="inline" onClick={() => onChange(undefined)})

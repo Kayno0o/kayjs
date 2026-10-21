@@ -8,7 +8,7 @@ import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import { sinceText } from '../datetime'
 import { BODY } from '../markers'
-import { fieldId, topKey } from '../paths'
+import { fieldId, prefixes } from '../paths'
 
 // What went wrong with the entry as a whole: edits brought back from an earlier visit, its file not parsing, a save refused (after a conflict, the fields both sides changed, with Keep my edits and Take their version), issues on the entry, and issues on a field or the body that nothing renders.
 const { form } = props<{ form: FormScope }>()
@@ -73,8 +73,11 @@ async function takeTheirs(): Promise<void> {
   }
 }
 
+// The form layout hides a field by its path, which keeps an issue inside a group that is drawn from showing beside it.
+const hiddenBy = (path: string) => (form.collection.layout?.form?.hide ?? []).some(hidden => path === hidden || path.startsWith(`${hidden}.`))
+
 // Whether the form draws the field an issue is about, so the issue shows beside it.
-const drawn = (issue: Issue) => issue.key !== undefined ? form.shown.has(`#${issue.key}`) : issue.body === true ? form.shown.has('#body') : issue.path !== '' && form.shown.has(topKey(issue.path))
+const drawn = (issue: Issue) => issue.key !== undefined ? form.shown.has(`#${issue.key}`) : issue.body === true ? form.shown.has('#body') : issue.path !== '' && !hiddenBy(issue.path) && prefixes(issue.path).some(path => form.shown.has(path))
 const unseen = () => form.drafts.issues(form.entry).filter(issue => !drawn(issue))
 const listed = () => form.drafts.issues(form.entry).filter(drawn)
 

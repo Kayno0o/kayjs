@@ -24,7 +24,7 @@ import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack }
 import { ContentError, decodeEntries, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, UploadFieldOptions, WrittenEntry } from './edit'
-export { collectionInfo, collections, customField, entries, entryFile, entrySource, fieldInput, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry, unique, untranslated } from './edit'
+export { collectionInfo, collections, colorField, customField, entries, entryFile, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntry, tagsField, unique, untranslated } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'

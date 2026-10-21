@@ -35,6 +35,14 @@ describe('how a field is entered', () => {
     expect(one({ anyOf: [{ const: 'draft' }, { const: 'live', title: 'En ligne' }], ...labels })).toMatchObject({ options: [{ label: 'Brouillon' }, { label: 'En ligne' }] })
   })
 
+  it('reads the ready-made kinds, an icon needing the set it picks from', () => {
+    expect(one({ 'type': 'string', 'x-kay': { kind: 'hex-color' } }).kind).toBe('color')
+    expect(one({ 'type': 'array', 'items': { type: 'string' }, 'x-kay': { kind: 'tag-list' } }).kind).toBe('tags')
+    expect(one({ 'type': 'string', 'x-kay': { kind: 'icon-name', set: 'tabler' } })).toMatchObject({ kind: 'icon', set: 'tabler' })
+    expect(one({ 'type': 'string', 'x-kay': { kind: 'icon-name' } })).toMatchObject({ kind: 'custom', name: 'icon-name' })
+    expect(emptyValue(one({ 'type': 'array', 'items': { type: 'string' }, 'x-kay': { kind: 'tag-list' } }))).toEqual([])
+  })
+
   it('names the sibling a field waits for', () => {
     expect(one({ 'type': 'string', 'x-kay-input': { when: 'link' } }).when).toBe('link')
   })

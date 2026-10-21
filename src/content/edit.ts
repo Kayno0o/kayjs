@@ -1,6 +1,7 @@
 import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { DraftEntry, DraftIssue } from '../runtime/edit'
+import type { IconProps, IconSet } from '../runtime/icons'
 import type { Collection, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
@@ -10,6 +11,7 @@ import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
+import { iconNames, iconProps } from '../runtime/icons'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
@@ -26,7 +28,7 @@ import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './va
 const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says; `customField` names any other kind, which the app's own component edits.
-export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
+export type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name'
 
 // A value an entry's data holds, which an island takes as a prop.
 export type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
@@ -35,6 +37,8 @@ export type DataValue = string | number | boolean | bigint | null | undefined | 
 export interface FieldHint {
   kind: string
   collection?: string | undefined
+  // The prefix of the icon set an icon field picks from, registered by `iconField`.
+  set?: string | undefined
   // The types the editor takes for this field, exact or as `image/*`, which the CMS's `uploads` still has to take for the route to accept one.
   accept?: string[] | undefined
   // The most bytes an upload may weigh.
@@ -296,6 +300,92 @@ export function fileField(options?: UploadStringOptions<UploadFieldOptions>): Re
   const { hint, rest } = uploadHint('file', options, 'fileField')
 
   return t.String({ ...webOnly(rest), 'x-kay': hint })
+}
+
+// A hex colour, `#1a2b3c`, which a CMS edits with a colour picker beside the code.
+export function colorField(options?: StringOptions): ReturnType<typeof t.String> {
+  return t.String({ 'error': 'must be a colour such as #1a2b3c', ...options, 'pattern': '^#[0-9a-fA-F]{6}$', 'x-kay': { kind: 'hex-color' } })
+}
+
+// What a money field takes beyond a number's own options: the ISO code of its currency, shown as its symbol after the box.
+export type MoneyFieldOptions = NonNullable<Parameters<typeof t.Number>[0]> & { currency?: string | undefined }
+
+// An amount of money as a number, never below zero unless `minimum` says so, entered with its currency's symbol beside it.
+export function moneyField(options?: MoneyFieldOptions): ReturnType<typeof t.Number> {
+  const { currency, ...rest } = options ?? {}
+
+  const amount = t.Number({ minimum: 0, ...rest })
+
+  return currency === undefined ? amount : fieldInput(amount, { suffix: currencySymbol(currency) })
+}
+
+function currencySymbol(currency: string): string {
+  try {
+    const part = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find(found => found.type === 'currency')
+
+    return part?.value ?? currency
+  }
+  catch {
+    throw new KayError('content-api-misuse', `kay: moneyField({ currency: ${JSON.stringify(currency)} }) is no ISO 4217 currency code, such as 'EUR'`)
+  }
+}
+
+// A list of distinct, non-empty words, which a CMS edits as chips typed into one box.
+export function tagsField(options?: NonNullable<Parameters<typeof t.Array>[1]>): ReturnType<typeof t.Array<ReturnType<typeof t.String>>> {
+  return t.Array(t.String({ minLength: 1 }), { ...options, 'uniqueItems': true, 'x-kay': { kind: 'tag-list' } })
+}
+
+// A call to action: the words of a link and where it goes, a path or an http(s) address.
+export function linkField(options?: Parameters<typeof t.Object>[1]) {
+  return t.Object({ label: t.String({ title: 'Label', minLength: 1 }), href: t.String({ title: 'Address', ...webOnly({ minLength: 1 }) }) }, options)
+}
+
+// A point on the map, in degrees.
+export function geoField(options?: Parameters<typeof t.Object>[1]) {
+  return t.Object({ lat: t.Number({ title: 'Latitude', minimum: -90, maximum: 90 }), lng: t.Number({ title: 'Longitude', minimum: -180, maximum: 180 }) }, options)
+}
+
+const iconSets = new Map<string, IconSet>()
+
+// A string field holding the name of an icon of an iconify set, `tabler:home` say, which a CMS edits with a searchable grid: the set stays on the server, which the editor asks for the page of icons it shows.
+export function iconField(set: IconSet, options?: StringOptions): ReturnType<typeof t.String> {
+  iconSets.set(set.prefix, set)
+
+  return t.String({ 'error': `must be an icon name such as ${set.prefix}:${iconNames(set)[0] ?? 'name'}`, ...options, 'pattern': '^[\\w-]+:[\\w-]+$', 'x-kay': { kind: 'icon-name', set: set.prefix } })
+}
+
+// A page of the icons of a set `iconField` registered whose name holds `query`, each as `{ name: 'prefix:icon', icon }`; none for an unknown set.
+export function findIcons(prefix: string, query: string, limit: number, offset: number): { name: string, icon: IconProps }[] {
+  const set = iconSets.get(prefix)
+  const needle = query.trim().toLowerCase()
+  const found: { name: string, icon: IconProps }[] = []
+  let skipped = 0
+
+  if (set === undefined)
+    return found
+
+  for (const name of iconNames(set)) {
+    if (!name.includes(needle))
+      continue
+
+    const icon = iconProps(set, name)
+
+    if (icon === undefined)
+      continue
+
+    if (skipped < offset) {
+      skipped++
+
+      continue
+    }
+
+    found.push({ name: `${prefix}:${name}`, icon })
+
+    if (found.length >= limit)
+      break
+  }
+
+  return found
 }
 
 // A string field holding Markdown, which a CMS edits as it edits a body.

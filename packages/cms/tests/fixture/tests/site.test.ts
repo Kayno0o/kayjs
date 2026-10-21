@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, setSystemTime, test } from 'bun:test'
-import { saveEntry } from 'kay/content'
+import { iconField, saveEntry } from 'kay/content'
 import { files } from 'kay/server'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
@@ -595,6 +595,22 @@ test('an image upload answers its size, a file that is no image none, and the up
   expect(images).not.toContain(pdf.path)
   expect((await listed()).find(upload => upload.path === image.path)?.name).toMatch(/\.1x1-[\da-f]{6}\.png$/)
   expect((await site.fetch('/api/cms/files/nope')).status).toBe(404)
+})
+
+test('the icons route pages through the set an icon field registered, caps a page and answers nothing for an unknown set or a hostile query', async () => {
+  iconField({ prefix: 'probe', icons: Object.fromEntries(Array.from({ length: 150 }, (_, at) => [`i${at}`, { body: '<path d="M0 0"/>' }])) })
+
+  const page = async (query: string) => await (await site.fetch(`/api/cms/icons?${query}`)).json() as { name: string, icon: { innerHTML: string } }[]
+
+  expect((await page('set=probe&query=&limit=5&offset=2')).map(found => found.name)).toEqual(['probe:i2', 'probe:i3', 'probe:i4', 'probe:i5', 'probe:i6'])
+  expect(await page('set=probe&query=&limit=5000&offset=0')).toHaveLength(100)
+  expect((await page('set=probe&query=I14&limit=50&offset=0')).map(found => found.name)).toContain('probe:i149')
+  expect((await page('set=probe&query=&limit=1&offset=0'))[0]?.icon.innerHTML).toBe('<path d="M0 0"/>')
+  expect(await page('set=nope&query=&limit=5&offset=0')).toEqual([])
+  expect(await page('set=probe&query=%5E.*%24%28&limit=5&offset=0')).toEqual([])
+  expect((await site.fetch('/api/cms/icons?set=probe&query=&limit=0&offset=0')).status).toBe(422)
+  expect((await site.fetch(`/api/cms/icons?set=probe&query=${'x'.repeat(201)}&limit=5&offset=0`)).status).toBe(422)
+  expect((await site.fetch('/api/cms/icons?set=probe&query=&limit=5&offset=-1')).status).toBe(422)
 })
 
 test('the editor is told the types and the size an upload may have', async () => {

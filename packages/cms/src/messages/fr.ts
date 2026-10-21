@@ -109,11 +109,17 @@ export default defineMessages({
     },
     field: {
       add: 'Ajouter',
+      clear: 'Vider',
       counter: '{count} / {max}',
       invalidJson: '{field} n\'est pas du JSON valide',
       item: 'Élément {n}',
+      newTag: 'Ajouter un mot-clé',
       noKind: 'Aucun éditeur pour le type {kind} : ajoutez src/cms/fields/{kind}.kay. En attendant, il se modifie en JSON.',
+      now: 'Maintenant',
       removeItem: 'Retirer {item}',
+      removeTag: 'Retirer {tag}',
+      search: 'Rechercher dans {field}',
+      today: 'Aujourd\'hui',
       zone: 'Heure de {zone}',
     },
     list: {

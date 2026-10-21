@@ -42,6 +42,34 @@ It wraps any schema, an optional or nullable one too, keeps its kind and keyword
 
 A collection's `description` (`collection({ description })`) is shown to the editor under the title of its list and of its entries.
 
+## Ready-made kinds
+
+Fields a site rebuilds each time, from `kay/content`; a schema names the kind, the editor has the control, and nothing is registered:
+
+```ts
+import tabler from '@iconify-json/tabler/icons.json'
+import { colorField, geoField, iconField, linkField, moneyField, tagsField } from 'kay/content'
+
+s.Object({
+  accent: colorField(),
+  price: moneyField({ currency: 'EUR' }),
+  labels: tagsField({ maxItems: 8 }),
+  cta: linkField(),
+  place: geoField(),
+  icon: iconField(tabler),
+})
+```
+
+- `colorField()`: `#rrggbb`, a colour picker beside the code; the schema refuses any other text.
+- `moneyField({ currency? })`: a number, never below zero unless `minimum` says so, with the currency's symbol after the box (`'EUR'` gives `€`, an ISO 4217 code); the stored figure is the one typed, not cents.
+- `tagsField()`: a list of distinct, non-empty words, entered as chips: Enter or a comma adds, Backspace on the empty box removes the last. It takes a list's own options (`maxItems`).
+- `linkField()`: `{ label, href }`, the `href` a path or an http(s) address. `geoField()`: `{ lat, lng }` in degrees. Both are plain objects the form shows as a group, so a layout can place their parts by path.
+- `iconField(set)`: the name of an icon of an iconify set, `tabler:home`, picked from a grid with search. The set is the JSON the app already imports (`@iconify-json/<prefix>/icons.json`); it stays on the server, which the editor asks for 50 icons at a time through `/api/cms/icons`, readable by whoever may edit. The schema checks the name's shape, not that the set holds it; the page draws it with `iconProps(set, name)` from `kay/icons`.
+
+A long list of options (more than 12) picked with a union of literals or an `enum` opens on a search box; the native list has no icons, so a pick among icons is an `iconField`. A date has Today and Clear, a date and time Now and Clear; Clear is hidden on a required field.
+
+How other schema types show: a `s.Date()` is a date input (use `format: 'date-time'` text for a time), a `t.Transform` is entered as the type it decodes from, and a `t.BigInt()` has no control, so it is edited as JSON: prefer `s.Integer()`.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, a colour, a map point, a rating, is declared once in the schema and given a component, with nothing to register:
