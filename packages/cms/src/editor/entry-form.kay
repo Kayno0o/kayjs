@@ -9,8 +9,9 @@ import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
 import { collectionTitle } from '../listing'
-import { BODY } from '../markers'
+import { BODY, entryKey } from '../markers'
 import { drafts } from './drafts'
+import { registerInline } from './inline'
 import { savedHandler } from './live'
 import { rebuildFinished, rebuildStarted } from './rebuild'
 import { unfoldAround } from './reorder'
@@ -40,6 +41,8 @@ const saving = signal(false)
 const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 onCleanup(onSaved.stop)
+// A click on the page types in the entry's text fields there while this form stands.
+onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, busy: () => saving() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
 const can = resource(editorApi, '/can')
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.

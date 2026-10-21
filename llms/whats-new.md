@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })` from `kay/content` declares a list of items of several types, stored with a `type` key and read as a union discriminated on it, and kayjs-cms adds, reorders and removes them by type and marks their fields in edit mode ([kayjs-cms](../packages/cms/llms/fields.md#blocks)).
 - `kay i18n translate` translates the texts inside `blocks()` lists, each item by its type ([kayjs-ai](../packages/ai/llms/translating.md)).
 - kayjs-ui's MarkdownEditor loads its toolbar apart, so `toolbar={false}` ships none of it, and the toolbar is one Tab stop; kayjs-cms's Preview highlights code with `markdown.highlight`, shows an entry's relative images and takes `form.previewClass` such as `prose` ([MarkdownEditor](../packages/ui/llms/forms.md#markdowneditor), [Arranging and replacing the screens](../packages/cms/llms/screens.md#arrange-a-collection)).
+- kayjs-cms edit mode types a one-line text in place on the page, as plain text, with the form following each keystroke ([kayjs-cms](../packages/cms/llms/screens.md)).
 
 ## 1.64.0
 

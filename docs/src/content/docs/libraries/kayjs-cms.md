@@ -95,6 +95,12 @@ If the sign-in ends while an editor is typing, the save says the session ended i
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
 
+### Typing on the page
+
+Click a one-line text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and a line break becomes a space. Enter or Escape, or a click elsewhere, ends the edit. The form beside the page shows each keystroke, and the page keeps the text you are typing while it renders the draft again.
+
+This works for a text that is the whole content of its element, in an entry, a group, a block or a list of texts, in any locale. A field the page shows inside a longer text, in an attribute, with other formatting around it or as a Markdown body is still brought up in the form by a click, as is any other kind of field. Nothing of this is sent to a visitor outside edit mode.
+
 An entry has such a link when a page shows it. That is the page listing its collection in `prerender` or `sitemap`. For an entry read by its slug, such as a section of the home page, it is the first page without params that reads it. The cms finds that page by rendering those pages once in edit mode, the first time it needs one, and keeps the answer for a few minutes. An entry no page shows has no link.
 
 ### Edit this page

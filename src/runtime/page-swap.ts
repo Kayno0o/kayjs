@@ -884,6 +884,10 @@ function morph(live: Node, next: Node): void {
     return
   }
 
+  // A contenteditable element being typed in keeps its text, caret and attribute: the page it was rendered from holds what is typed already, and a render landing mid-keystroke would put older text back.
+  if (live === document.activeElement && live.getAttribute('contenteditable') !== null && live.getAttribute('contenteditable') !== 'false')
+    return
+
   const other = next as Element
   // Read before the attributes and the children become the next page's, which the defaults come from.
   const typed = typedKept(live, other)

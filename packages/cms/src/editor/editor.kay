@@ -14,6 +14,7 @@ import { call, guardLeave, listen, refresh } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
+import { inlineTargetOf, isTypingInline, startInline } from './inline'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
@@ -264,16 +265,32 @@ function clickedNode(event: MouseEvent): Node | undefined {
   return caret?.nodeType === Node.TEXT_NODE && caret.parentNode === target ? caret : target
 }
 
-// While the editor is open, a click on a marked element edits its field instead of following a link or a button there.
+// While the editor is open, a click on a marked element edits its field instead of following a link or a button there: a one-line text is typed in on the page, any other field is brought up in the form.
 listen(() => document, 'click', (event) => {
   const node = open() ? clickedNode(event) : undefined
-  const [field] = node && !panel?.contains(node) ? fieldsAt(node) : []
+
+  // A click in the text being typed in places the caret.
+  if (node && isTypingInline(node))
+    return
+
+  const found = node && !panel?.contains(node) ? fieldsAt(node) : []
+  const [field] = found
 
   if (!field)
     return
 
   event.preventDefault()
   event.stopPropagation()
+
+  const inline = inlineTargetOf(found, drafts)
+
+  if (inline && !inline.busy()) {
+    startInline(inline, drafts, { x: event.clientX, y: event.clientY })
+    reveal(inline.element, event.clientY)
+
+    return
+  }
+
   focused = field.marker
   reveal(field.element, event.clientY)
 }, { capture: true })

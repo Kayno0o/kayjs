@@ -47,7 +47,8 @@ async function open() {
 
   page.dataset.page = ''
   page.setAttribute('data-kay-field', 'pages:home:sections.1.items.1.label')
-  page.textContent = 'Two'
+  // Styled text is not typed in place, which a plain one would be.
+  page.innerHTML = 'T<em>wo</em>'
   document.body.append(page)
   mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
   await settle()

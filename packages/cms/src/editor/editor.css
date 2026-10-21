@@ -257,6 +257,12 @@ html.kcms-editing [data-kay-body]:hover {
   cursor: pointer;
 }
 
+html.kcms-editing [data-kay-field][contenteditable] {
+  outline: 2px solid var(--color-kui-accent);
+  outline-offset: 2px;
+  cursor: text;
+}
+
 .kcms-entry-actions {
   display: flex;
   flex-wrap: wrap;
