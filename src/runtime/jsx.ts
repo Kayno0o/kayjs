@@ -179,6 +179,9 @@ type SvgElements = { [Tag in Exclude<keyof SVGElementTagNameMap, keyof HTMLEleme
 // A component taking `Props`, such as one passed as a prop to render.
 export type Component<Props = object> = (props: Props) => JSX.Element
 
+// Markup a component takes: `Snippet` is the children or a block with no parameters (`slot`, `@name`), `Snippet<[Item, number]>` markup the component calls with values (`slot name(item, index)`, `@name(item, index)`, a local `snippet`).
+export type Snippet<Args extends unknown[] = []> = Args extends [] ? JSX.Element : (...args: Args) => JSX.Element
+
 // eslint-disable-next-line ts/no-namespace -- TypeScript reads JSX types off a namespace named JSX
 export namespace JSX {
   // What a template renders, and what a component returns or a slot takes.

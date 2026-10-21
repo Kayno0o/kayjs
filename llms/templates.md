@@ -135,9 +135,9 @@ A `slot name` renders the `name` block the parent passes with `@name`, and a pla
 
 ```kay
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
+const { title, actions } = props<{ title: string, actions?: Snippet }>()
 ---
 article.card
   header
@@ -340,9 +340,9 @@ for product of products
 
 ```kay
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
+const { title, actions } = props<{ title: string, actions?: Snippet }>()
 ---
 article.card
   header
@@ -368,7 +368,7 @@ Card(title="Todos")
   p Body text
 ```
 
-A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop.
+A prop taking markup is typed `Snippet` from `kay`: `Snippet` for the children and a block with no parameters, `Snippet<[Item, number]>` for markup the component calls with values, once per row for instance. `@name(a, b)`, a local `snippet` passed as `name={feature}` and `slot name(a, b)` all use it, a fill with other parameters is a `kay check` error, and `slot name` on a prop that is no `Snippet` is reported at the name.
 
 No function reaches the browser, so a static component passing one to an island renders as an island itself, and a layout or a page with a `--- server` fence cannot pass one.
 
@@ -376,11 +376,11 @@ A static component that only islands render is part of them, so it can.
 
 ```kay
 --- <T extends { id: number }>
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
 const { items, row } = props<{
   items: T[]
-  row: (item: T, index: number) => JSX.Element
+  row: Snippet<[item: T, index: number]>
 }>()
 ---
 ul

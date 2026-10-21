@@ -94,9 +94,9 @@ Children of a component go to its `slot`. A `@name` block under it becomes the p
 
 ```kay
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
-const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
+const { title, actions } = props<{ title: string, actions?: Snippet }>()
 ---
 article.card
   header
@@ -119,15 +119,15 @@ Card(title="Todos")
 
 ### Blocks that take parameters
 
-A `@name(x)` block is a function the component calls, for a block that needs the component's own data. The component renders it with `slot name(x)`. This is `src/components/list.kay`.
+A `@name(x)` block is markup the component calls with values, typed `Snippet<[...]>` (`Snippet` alone is markup with no parameters, as the children and `@name` are), for a block that needs the component's own data. The component renders it with `slot name(x)`. This is `src/components/list.kay`.
 
 ```kay
 ---
-import type { JSX } from 'kay'
+import type { Snippet } from 'kay'
 
 const { items, row } = props<{
   items: string[]
-  row: (item: string, index: number) => JSX.Element
+  row: Snippet<[item: string, index: number]>
 }>()
 ---
 ul

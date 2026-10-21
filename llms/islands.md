@@ -190,12 +190,12 @@ const column = elementSize()
 - Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`.
 - Dates, Maps, Sets, bigints, URLs and RegExps arrive as themselves, and a value referenced twice arrives once.
 - They go into the page as JSON in an attribute, quoted with whichever quote it holds fewer of; every page carries them, so pass what the island reads rather than a whole object it picks from.
-- Children and `@name` blocks without parameters pass from any static parent, a page or a layout included: the server renders them with the parent, as static markup the island shows where its template puts `slot` or the prop, and their code never reaches the browser.
+- A `Snippet` prop (children and `@name` blocks without parameters) crosses; a `Snippet<[...]>` is a function and does not (below). Children and `@name` blocks without parameters pass from any static parent, a page or a layout included: the server renders them with the parent, as static markup the island shows where its template puts `slot` or the prop, and their code never reaches the browser.
 - An island among those children is one of its own, hydrating by itself, and keeps its state when the island hides the block and shows it again, or moves it, since the island shows the same nodes each time.
 - A block the island did not show on the server, or a client-only island's, travels in its props as markup and is built once shown.
 - Text alone, as in `Label Save`, is a string prop like any other.
 - The island cannot change what a block renders: one it calls with values takes parameters.
-- A function, a block with parameters, a class instance or a symbol cannot be serialized; an action is the exception, going as its URL ([actions](actions-from-islands.md#pass-an-action-to-a-component)).
+- A function, a `Snippet<[...]>` (a block with parameters or a local `snippet`), a class instance or a symbol cannot be serialized; an action is the exception, going as its URL ([actions](actions-from-islands.md#pass-an-action-to-a-component)).
 - Props are written into the page source, so a field named like a secret (`passwordHash`, `token`, `apiKey`, `email`) is reported as `secret-prop`: pick the fields the island shows, or `// kay-allow secret-prop` for a public one.
 - A static component passing one to an island renders as an island itself, decided as it renders, its own props serialized instead: a component rendering `Picker(format={shout})` hydrates whole, while one passing only data stays static and ships nothing.
 - Its own props must then be serializable, else the component rendering it renders as an island in turn.
