@@ -9,10 +9,12 @@ export const talks = collection({
   load: async () => {
     schedule.loads++
 
+    const items = schedule.items
+
     if (schedule.delay)
       await Bun.sleep(schedule.delay)
 
-    return schedule.items.map(({ slug, title, at, ends }) => ({ slug, data: { title, at, ends } }))
+    return items.map(({ slug, title, at, ends }) => ({ slug, data: { title, at, ends } }))
   },
 }, {
   schema: s.Object({ title: s.String(), at: s.Optional(s.Date()), ends: s.Optional(s.Date()) }),

@@ -81,6 +81,20 @@ async function schedulesAfter(scratch: ScratchBuild, ...after: number[]) {
   return app
 }
 
+// Starts a sitemap build that waits on the talks' load, and hands its visit back once that load has begun.
+async function sitemapLoading(app: Parameters<typeof visit>[0]) {
+  const started = schedule.loads
+
+  schedule.delay = 400
+
+  const visiting = visit(app, '/sitemap.xml')
+
+  for (let wait = 0; schedule.loads === started && wait < 100; wait++)
+    await Bun.sleep(20)
+
+  return { visiting }
+}
+
 describe('a prerendered site with a scheduled entry', () => {
   it('shows it at its time in the listing, its own page, the sitemap and the feed, with no request to rebuild anything', async () => {
     await build(async (scratch) => {
@@ -130,6 +144,21 @@ describe('a prerendered site with a scheduled entry', () => {
       expect(changed.status).toBe(200)
       expect(changed.headers.get('etag')).not.toBe(etag)
       expect(await changed.text()).toContain('/talks/added')
+    })
+  })
+
+  it('does not keep a sitemap built while a key it read was invalidated', async () => {
+    await build(async (scratch) => {
+      const app = await schedulesAfter(scratch, 60_000)
+      const { visiting } = await sitemapLoading(app)
+      const loads = schedule.loads
+
+      schedule.items = [...schedule.items, { slug: 'during', title: 'During', at: new Date(Date.now() - 1000).toISOString() }]
+      talks.invalidate()
+      expect((await visiting).text).not.toContain('/talks/during')
+      schedule.delay = undefined
+      expect((await visit(app, '/sitemap.xml')).text).toContain('/talks/during')
+      expect(schedule.loads).toBeGreaterThan(loads)
     })
   })
 
