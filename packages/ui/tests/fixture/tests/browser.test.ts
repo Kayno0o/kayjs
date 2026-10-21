@@ -182,6 +182,38 @@ inBrowser('LineChart stacked', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart stacked far above one series', () => {
+  test('keeps the axis readable up to a total of 1200 and formats the total as the values', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+    await page.waitFor('#cores .kui-line-chart-plot svg .ct-line')
+
+    const labels = await page.evaluate(() => [...document.querySelectorAll('#cores .ct-label.ct-vertical')].map(label => label.textContent ?? '')) as string[]
+    const numbers = labels.map(label => Number.parseFloat(label))
+
+    expect(labels.every(label => (/^\d+%$/).test(label))).toBe(true)
+    expect(Math.max(...numbers)).toBeGreaterThanOrEqual(1200)
+    expect(Math.min(...numbers)).toBe(0)
+    expect(new Set(labels).size).toBe(labels.length)
+    expect(labels.length).toBeLessThanOrEqual(15)
+
+    await page.evaluate(() => {
+      const overlay = document.querySelector('#cores .kui-line-chart-overlay')!
+
+      overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 1, clientY: overlay.getBoundingClientRect().top + 40 }))
+    })
+    await page.waitFor('#cores .kui-line-chart-tooltip')
+
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#cores .kui-line-chart-tooltip-row')].map(row => row.textContent)) as string[]
+
+    expect(rows).toHaveLength(13)
+    expect(rows[0]).toBe('Core 0100%')
+    expect(rows.at(-1)).toBe('Total1200%')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart in another timezone', () => {
   test('words a timed label in the server\'s zone with its name, then in the viewer\'s own zone once hydrated, with no error', async () => {
     const before = process.env.TZ

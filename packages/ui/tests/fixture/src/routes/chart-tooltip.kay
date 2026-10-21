@@ -5,6 +5,7 @@ import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 const seconds = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 9, 21, 16, 12, index * 10)).toISOString())
 const hours = Array.from({ length: 12 }, (_, index) => new Date(Date.UTC(2026, 9, 21, index * 2, 0, 0)).toISOString())
 const days = Array.from({ length: 7 }, (_, index) => new Date(Date.UTC(2026, 9, 15 + index)).toISOString().slice(0, 10))
+const cores = Array.from({ length: 12 }, (_, core) => ({ name: `Core ${core}`, values: [100, 50 + core, 100] }))
 const spread = [{ name: 'A reasonably long series name', values: seconds.map((_, index) => index) }, { name: 'Other', values: seconds.map((_, index) => index * 2) }]
 ---
 main
@@ -20,3 +21,5 @@ main
     LineChart(label="Formatted" labels={['a', 'b', 'c']} formatLabel={(label, { place }) => `${place === 'tick' ? 'Tick' : 'Point'} ${label}`} series={[{ name: 'Load', values: [1, 2, 3] }]} xLabels)
   article#stacked
     LineChart(label="Stacked" labels={['a', 'b', 'c']} stacked series={[{ name: 'A', values: [1, 2, 3] }, { name: 'B', values: [null, 1, 1] }, { name: 'C', values: [2, 2, null] }]} xLabels)
+  article#cores
+    LineChart(label="Cores" labels={['a', 'b', 'c']} stacked formatValue={value => `${value}%`} series={cores} xLabels)
