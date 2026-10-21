@@ -266,7 +266,7 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
   try {
     const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${PREVIEW_COOKIE}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
 
-    const response = await probing.run(true, async () => handle(new Request(url, { headers, signal: AbortSignal.timeout(timeout) })))
+    const response = await withinTimeout(timeout, async signal => probing.run(true, async () => handle(new Request(url, { headers, signal }))))
 
     await response.body?.cancel()
 
@@ -280,6 +280,31 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
   finally {
     probes.delete(id)
   }
+}
+
+// Runs `run` with a signal aborted once `timeout` has passed, and rejects then even when `run` never looks at the signal: a page that ignores it must not hold the probe.
+async function withinTimeout<T>(timeout: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController()
+
+  // A run abandoned at the timeout may settle later, which the promise ignores.
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error(`it took more than ${timeout} ms`))
+    }, timeout)
+
+    void (async () => {
+      try {
+        resolve(await run(controller.signal))
+      }
+      catch (error) {
+        reject(error)
+      }
+      finally {
+        clearTimeout(timer)
+      }
+    })()
+  })
 }
 
 // Whether the code running renders a page for `entriesReadAt`.

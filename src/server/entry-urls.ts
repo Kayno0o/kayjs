@@ -11,13 +11,15 @@ import { pathOf } from './prerendered'
 import { entriesReadAt, inProbe } from './preview'
 import { slashedPath } from './routes'
 
-// How long the pages found stay known, and the most a page may take to answer.
+// How long the pages found stay known, and the most a page may take to answer by default.
 const SHOWN_TTL_MS = 5 * 60_000
 const PAGE_TIMEOUT_MS = 5000
+// The pages rendered at once, few as each is a render of the site.
+const PROBES_AT_ONCE = 3
 
 // An entry's page: the route whose `prerender` or `sitemap` lists its collection, its one param the entry's slug, in the entry's locale, under the base; another domain's page whole.
 // An entry of no such collection takes the first page without params that shows it, learned by rendering those pages once in edit mode through `handle`: a section a page reads by its slug, a site's settings.
-export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, handle?: (request: Request) => Promise<Response>): EditSite['urls'] {
+export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, handle?: (request: Request) => Promise<Response>, pageTimeout = PAGE_TIMEOUT_MS): EditSite['urls'] {
   let listing: Promise<Map<string, ServedRoute>> | undefined
   let shown: { until: number, pages: Promise<Map<string, string>> } | undefined
 
@@ -47,7 +49,7 @@ export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: T
 
       current.pages = (async () => {
         const failed = { count: 0 }
-        const found = await pagesShowing(routes, handle, base, trailingSlash, settings, failed)
+        const found = await pagesShowing(routes, handle, base, trailingSlash, settings, failed, pageTimeout)
 
         // A probe that failed is tried again by the next screen.
         if (failed.count > 0)
@@ -76,28 +78,39 @@ function readKey(collection: string, slug: string, locale: string): string {
   return `${collection}\0${slug}\0${locale}`
 }
 
-// The first page showing each entry it read, by the entry: pages without params, the shallowest first, each in every locale it is served in.
-async function pagesShowing(routes: ServedRoute[], handle: (request: Request) => Promise<Response>, base: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, failed: { count: number }): Promise<Map<string, string>> {
+// The first page showing each entry it read, by the entry: pages without params, the shallowest first, each in every locale it is served in, bar the screens of the editor's own extension.
+// A few pages render at once, and the first page in that order keeps an entry whatever answers first.
+async function pagesShowing(routes: ServedRoute[], handle: (request: Request) => Promise<Response>, base: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, failed: { count: number }, timeout: number): Promise<Map<string, string>> {
   const pages = new Map<string, string>()
-  const plain = routes.filter(route => route.params.length === 0)
+  const plain = routes.filter(route => route.params.length === 0 && route.editorOwn !== true)
   const depth = (route: ServedRoute) => pathOf(route, {}) === '/' ? 0 : pathOf(route, {}).split('/').length
+  const copies = plain.toSorted((a, b) => depth(a) - depth(b)).flatMap(route => localeCopies(settings, pathOf(route, {})))
+  const reads: (Awaited<ReturnType<typeof entriesReadAt>>)[] = Array.from({ length: copies.length })
+  let next = 0
 
-  for (const route of plain.toSorted((a, b) => depth(a) - depth(b))) {
-    for (const copy of localeCopies(settings, pathOf(route, {}))) {
-      const served = slashedPath(copy.path, trailingSlash)
-      const path = `${base}${served}`
+  const worker = async () => {
+    for (let index = next++; index < copies.length; index = next++) {
+      const copy = copies[index]!
+
       // The server answers paths without the base, which a proxy in front takes off.
-      const read = await entriesReadAt(handle, `${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`, PAGE_TIMEOUT_MS)
+      reads[index] = await entriesReadAt(handle, `${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`, timeout)
+    }
+  }
 
-      if (read === undefined)
-        failed.count++
+  await Promise.all(Array.from({ length: Math.min(PROBES_AT_ONCE, copies.length) }, worker))
 
-      for (const { collection, slug, locale } of read ?? []) {
-        const key = readKey(collection, slug, locale ?? copy.locale ?? '')
+  for (const [index, copy] of copies.entries()) {
+    const read = reads[index]
+    const path = `${base}${slashedPath(copy.path, trailingSlash)}`
 
-        if (!pages.has(key))
-          pages.set(key, copy.host === undefined ? path : `https://${copy.host}${path}`)
-      }
+    if (read === undefined)
+      failed.count++
+
+    for (const { collection, slug, locale } of read ?? []) {
+      const key = readKey(collection, slug, locale ?? copy.locale ?? '')
+
+      if (!pages.has(key))
+        pages.set(key, copy.host === undefined ? path : `https://${copy.host}${path}`)
     }
   }
 

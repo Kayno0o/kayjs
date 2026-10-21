@@ -672,6 +672,51 @@ describe('the collections a CMS edits', () => {
     expect(await entryUrls(routes, '', undefined, settings)(sections, { slug: 'intro' })).toBeUndefined()
   })
 
+  it('ends the probe of a page that never answers, tries it again on the next screen, renders a few pages at once and none of the editor\'s own', async () => {
+    const plain = (pattern: string, own = false) => ({ pattern, file: resolve(`${FIXTURE}/src/routes/news/[slug].kay`), params: [], layouts: [], special: {}, guards: [], ...own && { editorOwn: true } }) as unknown as ServedRoute
+    const asked: string[] = []
+    let running = 0
+    let most = 0
+
+    const handle = async (request: Request) => {
+      const { pathname } = new URL(request.url)
+
+      asked.push(pathname)
+      running++
+      most = Math.max(most, running)
+
+      try {
+        // Ignores the signal, as a page stuck on its own lock would.
+        if (pathname === '/hang')
+          return await new Promise<Response>(() => undefined)
+
+        await Bun.sleep(20)
+        noteProbedEntries(request, [{ collection: 'sections', slug: pathname === '/' ? 'intro' : 'other' }])
+
+        return new Response('page')
+      }
+      finally {
+        running--
+      }
+    }
+
+    const sections = collection({ name: 'sections', load: () => [] }, { schema: t.Object({ title: t.String() }) })
+    const routes = [plain('/hang'), plain('/'), plain('/a'), plain('/b'), plain('/c'), plain('/d'), plain('/admin', true)]
+    const urls = entryUrls(routes, '', undefined, undefined, handle, 100)
+    const started = performance.now()
+
+    expect(await urls(sections, { slug: 'intro' })).toBe('/')
+    expect(performance.now() - started).toBeLessThan(2000)
+    expect(asked).not.toContain('/admin')
+    expect(most).toBeGreaterThan(1)
+    expect(most).toBeLessThanOrEqual(3)
+
+    // The hung page counts as failed, so the next screen asks again.
+    asked.length = 0
+    expect(await urls(sections, { slug: 'intro' })).toBe('/')
+    expect(asked).toContain('/hang')
+  })
+
   it('lists a collection in a sitemap setting as its entries\' page', async () => {
     const route = { pattern: '/partners/:slug', file: resolve(`${FIXTURE}/src/routes/partners/[slug].kay`), params: ['slug'], layouts: [], special: {}, guards: [] } as unknown as ServedRoute
 
