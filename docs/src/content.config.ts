@@ -32,7 +32,7 @@ export const reference = collection({ name: 'reference', load: async () => [...a
 const prop = s.Object({ name: s.String(), type: s.String(), optional: s.Boolean(), default: s.Optional(s.String()), comment: s.Optional(s.String()) })
 
 // One page per kayjs-ui component: its usage from src/content/ui, its props read from its source.
-export const components = collection({ name: 'components', load: loadComponents }, {
+export const components = collection({ name: 'components', load: () => loadComponents() }, {
   schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), props: s.Array(prop) }),
   components: { Callout, Demo, ReadMore },
   sort: byOrder,

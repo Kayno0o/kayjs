@@ -16,7 +16,8 @@ const BASE = '/repo'
 // Keeping a pending block shown while a reload or another document replaces the page costs 19 bytes here, raised for it as it keeps a slow submit from looking dead.
 // Reading whether the visitor asks to save data, so an island with no `hydrate` waits for the viewport, costs about 105 bytes here: it runs before the first island hydrates, so it cannot wait in a chunk.
 // Marking each signal so an assignment to a property or a let holding one writes it costs 36 bytes here, raised for it as it is what lets `box.count = 1` write the signal.
-const EAGER_JS_BUDGET = 8_841
+// A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost about 87 bytes here, raised for them as a stuck navigation otherwise leaves the page dead.
+const EAGER_JS_BUDGET = 8_928
 const LAZY_CHUNKS = ['fetch-island', 'forms', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
