@@ -31,6 +31,9 @@ function route(stream: 'stdout' | 'stderr'): void {
       return (original as (...args: unknown[]) => boolean)(chunk, ...rest)
 
     capture[stream].push(typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk))
+    const done = rest.find(argument => typeof argument === 'function') as (() => void) | undefined
+
+    done?.()
 
     return true
   }
