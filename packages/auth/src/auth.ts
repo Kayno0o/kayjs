@@ -73,15 +73,15 @@ import { readRequestWith, registerViewer } from './viewer'
 
 export type { AuthSessionData, BareUser, OAuthApp, Off, Profile, User } from './core'
 
-const STATE = Symbol('kayjs-auth.state')
-const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
-
-interface RequireUserOptions<Scope extends string, Role extends string> {
+export interface RequireUserOptions<Scope extends string, Role extends string> {
   redirect?: string | undefined
   scope?: ScopeRequirement<Scope> | undefined
   require?: AuthRequirement<Role> | undefined
-  bare?: boolean | undefined
+  bare?: true | undefined
 }
+
+const STATE = Symbol('kayjs-auth.state')
+const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
 
 // Says `requireUser()` reads `require`, so kayjs-cms's `role` refuses a request rather than trust an older kayjs-auth that ignores it.
 const REQUIRES: unique symbol = Symbol.for('kayjs-auth.requires')
@@ -343,13 +343,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds, and a user who does not meet `require` (a role, or any requirement `guard()` takes, with no route params) with a 403 too.
   // `bare: true` answers the `BareUser` of `bareUser()`, with no providers read: for a caller that only wants the checks, as kayjs-cms's `role` does.
   async requireUser(options: RequireUserOptions<Scope, Role> & { bare: true }): Promise<BareUser<UserData>>
-  async requireUser(options?: RequireUserOptions<Scope, Role>): Promise<User<UserData>>
+  async requireUser(options?: RequireUserOptions<Scope, Role> & { bare?: undefined }): Promise<User<UserData>>
   async requireUser(options: RequireUserOptions<Scope, Role> = {}): Promise<User<UserData> | BareUser<UserData>> {
     const record = await this.record()
-    const user = record && publicUser(record) as BareUser<UserData>
     const { redirect, deny } = stoppers(this.request)
 
-    if (!record || !user) {
+    if (!record) {
       const signIn = options.redirect === undefined || options.redirect === '' ? guardPageOf(this.core) : options.redirect
 
       if (signIn !== undefined && isNavigation(this.request))
@@ -357,6 +356,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
       return deny(401, 'Sign in to continue')
     }
+
+    const user = publicUser(record) as BareUser<UserData>
 
     if (options.require !== undefined && !(await this.core.authorize?.(user as BareUser, options.require, READ_METHODS.has(this.request.method) ? 'read' : 'write')))
       return deny(403)

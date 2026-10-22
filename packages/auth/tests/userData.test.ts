@@ -241,6 +241,19 @@ describe('app data and provider ids on the user', () => {
     expect(listed).toHaveBeenCalledTimes(1)
   })
 
+  test('requireUser refuses a user missing the requirement with a 403 before any identities read', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { app, auth, browserOn, store } = setup()
+    const ada = browserOn(new Elysia().use(app).use(auth.plugin).get('/admin', async ({ auth }) => auth.requireUser({ require: 'admin' })))
+
+    await signInWith(ada, 'discord', '1')
+
+    const listed = spyOn(store.identities, 'listByUser')
+
+    expect((await ada.fetch('/admin')).status).toBe(403)
+    expect(listed).not.toHaveBeenCalled()
+  })
+
   test('the admin option sees the provider id of the user it judges', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser } = setup({ admin: async (user: User) => user.providers.discord?.id === '1' })
