@@ -1666,13 +1666,18 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
 }
 
 const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
+const HOST_LIKE = /^(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?|[\w.-]+:\d+)$/
 
 // The origin and the display name the options give, whichever form they are written in: `site` is the origin, and until 1.73 `url` too, while a `site` that is no URL is the name it meant before `name` existed.
 function siteOptions(options: { site?: string | undefined, url?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
   const site = options.site
 
-  if (site !== undefined && !HAS_SCHEME.test(site))
+  if (site !== undefined && !HAS_SCHEME.test(site)) {
+    if (HOST_LIKE.test(site))
+      throw configError(`\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\``)
+
     return { origin: options.url, name: options.name ?? site }
+  }
 
   return { origin: site ?? options.url, name: options.name }
 }

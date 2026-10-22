@@ -48,6 +48,12 @@ describe('authMailer', () => {
     expect(text).toContain('482913')
   })
 
+  it('reads the old site when a hand-built mail has no name', async () => {
+    const { subject } = await authMailer(mail.render).send({ ...link, name: undefined } as unknown as AuthMail)
+
+    expect(subject).toBe('Confirmez votre adresse pour Site')
+  })
+
   it('words the lifetimes kayjs-auth was set to, in the mail\'s language, and the defaults when it sends none', async () => {
     const set = await authMailer(mail.render).send({ ...link, maxAge: { link: 7 * 86_400, code: 20 * 60 } })
     const magic = await authMailer(mail.render).send({ ...link, kind: 'magic-link', locale: 'en', expires: { link: 7200, code: 300 } })

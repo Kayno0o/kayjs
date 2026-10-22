@@ -52,6 +52,15 @@ describe('site and name', () => {
     expect(mail).toMatchObject({ name: 'Example', subject: 'Confirm your email for Example' })
   })
 
+  test('a site that looks like a host but has no scheme is refused, pointing at name', () => {
+    expect(() => testApp({ site: 'example.com' })).toThrow('has no scheme')
+    expect(() => testApp({ site: 'localhost:3000' })).toThrow('https://localhost:3000')
+  })
+
+  test('a site that is a plain name is still a name', async () => {
+    expect(await registered({ url: 'https://site.test', site: 'My site' })).toMatchObject({ name: 'My site' })
+  })
+
   test('a mail with no origin anywhere is refused with the option to set', () => {
     expect(() => testApp({ email: { mailer: { send: () => undefined }, links: LINKS } })).toThrow('set `site` in kay.config.ts or SITE_URL')
   })
