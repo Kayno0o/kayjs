@@ -42,8 +42,8 @@ function write(level: LogLevel, message: string, error: unknown, from: string) {
     console[CONSOLE[level]](`[${from}] ${message}`, error)
 }
 
-export function setLogSink(sink: LogSink): void {
-  (globalThis as { [SINK]?: LogSink })[SINK] = sink
+export function setLogSink(sink: LogSink | undefined): void {
+  (globalThis as { [SINK]?: LogSink | undefined })[SINK] = sink
 }
 
 export function logSink(): LogSink | undefined {

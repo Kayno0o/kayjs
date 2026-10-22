@@ -83,14 +83,23 @@ describe('the shared event poller', () => {
         return outcome === 'busy' ? 'busy' : undefined
       }, failed: 'reading failed' }, true)
 
-      while (done.length < outcomes.length)
+      const until = Date.now() + 2000
+
+      while (done.length < outcomes.length) {
+        if (Date.now() > until) {
+          remove()
+
+          throw new Error(`timed out waiting for ${outcomes.length} runs of the poller, got ${done.length}`)
+        }
+
         await Bun.sleep(10)
+      }
 
       remove()
       expect(logged.filter(line => line.includes('reading failed'))).toHaveLength(2)
     }
     finally {
-      setLogSink(sink!)
+      setLogSink(sink)
     }
   })
 
