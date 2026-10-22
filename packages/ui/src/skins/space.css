@@ -5,14 +5,15 @@
 @theme {
   --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
 
-  --color-kui-canvas: #07080d;
+  --color-kui-canvas: #0a0c13;
+  --color-kui-mantle: color-mix(in oklab, var(--color-kui-canvas), black 55%);
   --color-kui-text: #dfe4f0;
   --color-kui-accent: #bcd4ff;
   --color-kui-success: #7fd8a6;
   --color-kui-warning: #e6c07b;
   --color-kui-info: #7cc4e8;
   --color-kui-error: #ff6b6b;
-  --color-kui-field-border: #5c657a;
+  --color-kui-field-border: #667089;
   --color-kui-surface0: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 4.5%);
   --color-kui-surface1: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 8%);
   --color-kui-surface2: color-mix(in srgb, var(--color-kui-text) 7%, transparent);
@@ -46,29 +47,33 @@
 
 @layer components {
   /* The framed boxes have no line, so the controls that need one draw it again. */
-  :is(.kui-btn, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-chip, .kui-file-drop) {
+  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-chip, .kui-file-drop) {
     --kui-border-width: 1px;
   }
 
+  :is(.kui-segmented, .kui-pagination-step, .kui-chip-label, .kui-file-drop) {
+    border-color: var(--color-kui-field-border);
+  }
+
   /* Overlays lose their line to a shadow that lifts them off the page. */
-  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip) {
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-side-panel, .kui-line-chart-tooltip, .kui-site-nav-list:popover-open) {
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 
-  /* A key: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
-  .kui-btn:where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
-    --kui-shell-line: var(--color-kui-overlay0);
+  /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
+  :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
+    --kui-shell-line: var(--color-kui-field-border);
     --kui-shell-fill: transparent;
   }
 
-  .kui-btn:where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
+  :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
     --kui-shell-line: var(--color-kui-accent);
     --kui-shell-fill: transparent;
     color: var(--color-kui-accent);
   }
 
   /* A themed select: its own chevron drawn as two gradients, and where the browser can style the select itself, its list too. */
-  :is(select.kui-field-input, .kui-form-field select) {
+  :is(select.kui-field-input, .kui-form-field select):not([multiple], [size]) {
     appearance: none;
     padding-right: 1.75rem;
     background-image: linear-gradient(45deg, transparent 50%, var(--color-kui-subtext0) 50%), linear-gradient(135deg, var(--color-kui-subtext0) 50%, transparent 50%);
@@ -78,7 +83,7 @@
   }
 
   @supports (appearance: base-select) {
-    :is(select.kui-field-input, .kui-form-field select) {
+    :is(select.kui-field-input, .kui-form-field select):not([multiple], [size]) {
       appearance: base-select;
       padding-right: var(--spacing-kui-field-x);
       background-image: none;
@@ -115,7 +120,7 @@
   }
 
   /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
-  .kui-checkbox-input {
+  :is(.kui-checkbox-input, .kui-multi-select-checkbox) {
     display: inline-grid;
     place-content: center;
     appearance: none;
@@ -147,6 +152,17 @@
     &:indeterminate::before {
       clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%);
       transform: scale(1);
+    }
+  }
+
+  @media (forced-colors: active) {
+    :is(.kui-checkbox-input, .kui-multi-select-checkbox)::before {
+      background: HighlightText;
+    }
+
+    :is(.kui-checkbox-input, .kui-multi-select-checkbox):checked,
+    :is(.kui-checkbox-input, .kui-multi-select-checkbox):indeterminate {
+      background: Highlight;
     }
   }
 }

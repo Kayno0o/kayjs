@@ -550,6 +550,14 @@ describe('theme.css', () => {
     expect(css).toContain('linear-gradient(45deg')
     expect(css).toContain('clip-path: polygon(14% 44%')
     expect(css).toMatch(/--kui-border-width: 0px/)
+    // Every class its selectors name exists in the theme, and the mantle is a step under the canvas so boxes on it keep an edge.
+    for (const [, name] of skin.matchAll(/\.(kui-[\w-]+)/g))
+      expect(classes, name).toContain(name)
+
+    expect(skin).toMatch(/--color-kui-mantle: color-mix\(in oklab, var\(--color-kui-canvas\), black/)
+    expect(css).toContain('@media (forced-colors: active)')
+    expect(css).toMatch(/\.kui-icon-btn\.kui-shell/)
+    expect(css).toContain(':not([multiple], [size])')
     // The skin sets one colour scheme, so it never asks for light.
     expect(skin).not.toContain('light-dark(')
   })

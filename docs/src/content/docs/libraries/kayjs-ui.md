@@ -65,8 +65,9 @@ Labels, headings and table heads are uppercase unless `--kui-label-case` is `non
 
 The space skin is dark only: a near-black canvas, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
+Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already):
+
 ```css
-@import '@kaynooo/kayjs-ui/theme.css';
 @import '@kaynooo/kayjs-ui/skins/space.css';
 ```
 
