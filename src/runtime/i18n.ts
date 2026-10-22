@@ -311,7 +311,7 @@ export function leadsWithLocale(settings: LocaleSettings, href: string): boolean
   return !settings.hosts && first !== undefined && prefixed(settings, first)
 }
 
-const FILE_EXTENSION = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|pdf|xml|json|txt|css|m?js|map|zip|gz|woff2?|ttf|otf|mp[34]|webm|csv|html?)$/i
+export const FILE_EXTENSION = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|pdf|xml|json|txt|css|m?js|map|zip|gz|woff2?|ttf|otf|mp[34]|webm|csv|html?)$/i
 
 // Whether a link's last segment names a file: it has a dot, and either ends in a file's extension and is no entry's path, `/blog/release.html`, or no collection route takes the path for an entry's slug, `/blog/v1.2`.
 export function namesFile(settings: LocaleSettings, segments: string[], takenByRoute: () => boolean): boolean {
@@ -320,7 +320,7 @@ export function namesFile(settings: LocaleSettings, segments: string[], takenByR
   if (last?.includes('.') !== true)
     return false
 
-  return FILE_EXTENSION.test(last) ? settings.entryFiles?.includes(`/${segments.join('/')}`) !== true : !takenByRoute()
+  return FILE_EXTENSION.test(last) ? settings.entryFiles?.includes(`/${segments.map(pathSegment).join('/')}`) !== true : !takenByRoute()
 }
 
 // A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.

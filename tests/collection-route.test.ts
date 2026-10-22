@@ -243,14 +243,14 @@ describe('a collection route read beyond the entries', () => {
   })
 
   it('has the locale rule take a slug ending in a file extension for a page when an entry has it', async () => {
-    const docs = collection({ name: 'route-files', load: () => [{ slug: 'release.html', data: { title: 'A' } }, { slug: 'a/notes.txt', data: { title: 'B' } }, { slug: 'plain', data: { title: 'C' } }] }, { schema, route: '/blog/*slug' })
+    const docs = collection({ name: 'route-files', load: () => [{ slug: 'release.html', data: { title: 'A' } }, { slug: 'a/notes.txt', data: { title: 'B' } }, { slug: 'plain', data: { title: 'C' } }, { slug: 'v1.2', data: { title: 'E' } }, { slug: 'Café.html', data: { title: 'F' } }] }, { schema, route: '/blog/*slug' })
     const entryFiles = await entryFilePaths([docs, collection({ name: 'unrouted', load: () => [{ slug: 'x.html', data: { title: 'D' } }] }, { schema })])
     const base = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, pages: ['/blog/*'] }
     const linked = { ...linkedSettings(base, [{ pattern: '/blog/*' }], [docs]), entryFiles }
-    const hrefs = ['/blog/release.html', '/blog/release.html/', '/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html']
-    const expected = ['/fr/blog/release.html', '/fr/blog/release.html/', '/fr/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html']
+    const hrefs = ['/blog/release.html', '/blog/release.html/', '/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html', '/blog/Café.html', '/blog/Caf%c3%a9.html', '/blog/release.html?x=1#a']
+    const expected = ['/fr/blog/release.html', '/fr/blog/release.html/', '/fr/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html', '/fr/blog/Café.html', '/fr/blog/Caf%c3%a9.html', '/fr/blog/release.html?x=1#a']
 
-    expect(entryFiles.toSorted()).toEqual(['/blog/a/notes.txt', '/blog/release.html'])
+    expect(entryFiles.toSorted()).toEqual(['/blog/Caf%C3%A9.html', '/blog/a/notes.txt', '/blog/release.html'])
     expect(hrefs.map(href => localizedLink(linked, href, 'fr'))).toEqual(expected)
 
     matchLinksWith(undefined)

@@ -8,7 +8,7 @@ import process from 'node:process'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { entryPath } from '../content/entry-route'
-import { flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
+import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
@@ -181,9 +181,8 @@ export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
 }
 
 const CATCH_ALL = /\*[^/]+/
-const FILE_SLUG = /\.[a-z0-9]+$/i
 
-// The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; an entry that cannot be read is left out, its collection failing where it is read.
+// The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; read once at startup, so an entry added later needs a restart.
 export async function entryFilePaths(collections: { options: { route?: string | undefined }, all: () => Promise<{ slug: string }[]> }[]): Promise<string[]> {
   const paths = await Promise.all(collections.map(async ({ options, all }) => {
     const { route } = options
@@ -192,9 +191,15 @@ export async function entryFilePaths(collections: { options: { route?: string | 
       return []
 
     try {
-      return (await all()).flatMap(({ slug }) => FILE_SLUG.test(slug) ? [entryPath(route, slug)] : []).filter((path): path is string => path !== undefined)
+      return (await all()).flatMap(({ slug }) => {
+        const path = FILE_EXTENSION.test(slug) ? entryPath(route, slug) : undefined
+
+        return path === undefined ? [] : [path]
+      })
     }
-    catch {
+    catch (error) {
+      kayLog('warn', `the entries of ${route} could not be read at startup, so a link to one whose slug ends in a file extension stays a file`, error)
+
       return []
     }
   }))
