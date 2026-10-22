@@ -14,6 +14,8 @@ const SKIPPED = new Set(['node_modules', '.kay', '.git', 'dist', '.output', '.ne
 // Entries a stamp walks before it gives up, so a glob over a huge folder costs one bounded walk per save and the script is simply run again.
 export const MAX_ENTRIES = 20_000
 const QUERY = /\?.*$/
+// A component is loaded for its name and never rendered by a probe, whose result no edit to its body changes: the type check reports a component that does not compile.
+const COMPONENT = /\.kay$/
 const OWN_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
 
 // The modules loaded in this process that are the project's, with the files and folders `read` names, which may not exist yet: a file created later is a change, as one edited is, and so is one added where an `import.meta.glob` looks.
@@ -29,7 +31,7 @@ export function loadedFiles(root: string, read: string[]): string[] {
 
   // A module keyed with a query, such as a component loaded for its island, is the file before it.
   const modules = Object.keys(require.cache).map(path => path.replace(QUERY, '')).filter((path) => {
-    return path.startsWith(sep) && !path.startsWith(OWN_SOURCE) && !path.split(sep).includes('node_modules') && !generated.some(folder => path.startsWith(folder))
+    return path.startsWith(sep) && !COMPONENT.test(path) && !path.startsWith(OWN_SOURCE) && !path.split(sep).includes('node_modules') && !generated.some(folder => path.startsWith(folder))
   })
 
   return [...new Set([...ROOT_FILES.map(file => join(root, file)), ...modules, ...GLOBBED, ...read])]

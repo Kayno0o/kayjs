@@ -360,6 +360,24 @@ describe('kay check', () => {
       await rm(copy, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('reports a config that cannot be loaded after a run that left the props check, and recovers on the next', async () => {
+    const copy = await fixtureCopy('content')
+    const config = join(copy, 'src/content.config.ts')
+    const good = await Bun.file(config).text()
+    const run = async () => check(copy, { site: SITE, lints: { seo: 'allow' } })
+
+    try {
+      expect(await run()).toEqual([])
+      await Bun.write(config, `throw new Error('config broke')\n${good}`)
+      expect((await run()).some(({ message }) => message.includes('config broke'))).toBe(true)
+      await Bun.write(config, good)
+      expect(await run()).toEqual([])
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 60_000)
 })
 
 describe('compiling Markdown', () => {

@@ -4564,8 +4564,8 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reads the collections again in the watch only when a file they read changed', async () => {
-    const config = 'import { appendFileSync } from "node:fs"\nimport { t } from "elysia"\nimport { collection } from "kay/content"\nimport Note from "./note.kay"\n\nappendFileSync(import.meta.dir + "/../loads", "x")\n\nexport const notes = collection("content/notes", { schema: t.Object({}), components: { Note } })\n'
-    const root = await scratchProject({ 'src/content.config.ts': config, 'src/note.kay': 'aside\n  slot\n', 'src/content/notes/a.md': 'Text\n', 'src/a.kay': 'p a\n' })
+    const config = 'import { appendFileSync } from "node:fs"\nimport { t } from "elysia"\nimport { collection } from "kay/content"\nimport Note from "./note.kay"\nimport { shape } from "./helper"\n\nappendFileSync(import.meta.dir + "/../loads", "x")\n\nexport const notes = collection("content/notes", { schema: t.Object({}), components: { Note } })\nexport const size = shape\n'
+    const root = await scratchProject({ 'src/content.config.ts': config, 'src/note.kay': 'aside\n  slot\n', 'src/helper.ts': 'export const shape = 1\n', 'src/content/notes/a.md': 'Text\n', 'src/a.kay': 'p a\n' })
     const loads = async () => (await Bun.file(join(root, 'loads')).text()).length
     const watch = watchChecks(root)
 
@@ -4579,8 +4579,11 @@ describe.concurrent('kay check, unused code', () => {
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
       expect(await watch.report()).toMatchObject({ errors: 0 })
       expect(await loads()).toBe(2)
-      // A component the collection loads is read again.
+      // A component the collection names is loaded and never rendered, so its edit reads nothing again, and a helper the config imports does.
       await Bun.write(join(root, 'src/note.kay'), 'aside\n  slot\n\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(2)
+      await Bun.write(join(root, 'src/helper.ts'), 'export const shape = 2\n')
       expect(await watch.report()).toMatchObject({ errors: 0 })
       expect(await loads()).toBe(3)
     }
