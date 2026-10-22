@@ -61,7 +61,7 @@ export async function relationsMissing(db: SQL, names: readonly string[]): Promi
 }
 
 // Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
-// One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it.
+// One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it, and it runs all its queries on the one connection holding the lock, so a pool of one connection does not wait on itself.
 export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
   const session = await db.reserve()
 
@@ -73,23 +73,23 @@ export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[])
 
     try {
       for (const index of indexes) {
-        if (!await relationsMissing(db, [index.name])) {
+        if (!await relationsMissing(session, [index.name])) {
           // A concurrent build that failed leaves an invalid index, which is dropped to be built again, but one that is invalid while another session still builds it is left alone: its session holds a ShareUpdateExclusiveLock on the table, which pg_locks shows to every role, unlike the progress views, so an autovacuum running meanwhile only delays the repair to the next start. Whether it is building is read before whether it is valid, so a build finishing in between reads as valid.
-          const [building] = await rowsOf<{ building: boolean }>(db.unsafe(`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND mode = 'ShareUpdateExclusiveLock' AND relation = (SELECT indrelid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')) AND database = (SELECT oid FROM pg_database WHERE datname = current_database())) AS building`))
+          const [building] = await rowsOf<{ building: boolean }>(session.unsafe(`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND mode = 'ShareUpdateExclusiveLock' AND relation = (SELECT indrelid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')) AND database = (SELECT oid FROM pg_database WHERE datname = current_database())) AS building`))
 
           if (building?.building === true)
             continue
 
-          const [found] = await rowsOf<{ valid: boolean }>(db.unsafe(`SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
+          const [found] = await rowsOf<{ valid: boolean }>(session.unsafe(`SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
 
           if (found?.valid !== false)
             continue
 
-          await db.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
+          await session.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
         }
 
         try {
-          await db.unsafe(indexStatement(index, true))
+          await session.unsafe(indexStatement(index, true))
         }
         catch (error) {
           // A replica creating the same index at the same moment won it.
@@ -99,7 +99,11 @@ export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[])
       }
     }
     finally {
-      await session`SELECT pg_advisory_unlock(hashtext(${INDEX_LOCK}))`
+      // The pooled connection goes back holding the lock otherwise; a dead one frees it by ending.
+      try {
+        await session`SELECT pg_advisory_unlock(hashtext(${INDEX_LOCK}))`
+      }
+      catch {}
     }
   }
   finally {
