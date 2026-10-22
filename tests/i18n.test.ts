@@ -480,7 +480,7 @@ describe('localized content', () => {
       expect(await loose.all()).toEqual([])
     }
     finally {
-      setLogSink(sink!)
+      setLogSink(sink)
     }
 
     expect(warned).toEqual([expect.stringContaining('loose/hello sits outside a locale folder')])

@@ -153,7 +153,7 @@ describe('loaded collections', () => {
       expect((await notes.all()).map(entry => entry.slug)).toEqual(['b'])
     }
     finally {
-      setLogSink(sink!)
+      setLogSink(sink)
     }
 
     expect(warned).toEqual([expect.stringContaining('notes-refused/a title:')])
