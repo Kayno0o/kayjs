@@ -570,7 +570,7 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
 }
 
 // Whether stored session data matches, a row that does not parse logged and skipped so the rest are still erased.
-function matchesSession(text: string, match: (data: SessionData) => boolean): boolean {
+export function matchesSession(text: string, match: (data: SessionData) => boolean): boolean {
   let data: SessionData
 
   try {

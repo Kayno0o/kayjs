@@ -181,6 +181,22 @@ Without pg-orm migrations, `pgJobs` creates the tables when they are missing and
 
 A claim and its hold use the database's clock, so replicas need not keep their clocks in agreement.
 
+#### The whole app store on Postgres
+
+`pgData(db)` is `sqliteData` on Postgres. It keeps the sessions, the cached values, the jobs, the schedule locks, the rate limit counts, the members of presence rooms and the Web Vitals in `kay_*` tables of the same database, so replicas on several machines share them.
+
+```ts
+import { defineConfig, pgData } from 'kay/server'
+
+export default defineConfig({
+  store: pgData(env.DATABASE_URL),
+})
+```
+
+It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTables` from `kay/server`.
+
+Replicas learn of each other's invalidations and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres works. A presence room shares its members and messages, but keeps no state: `rooms({ state })` over it throws.
+
 ### Your own store
 
 `sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.

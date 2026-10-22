@@ -38,11 +38,11 @@ function statusOf(row: PgStateRow): StoredJobState['status'] {
 }
 
 // What a query resolves with, its rows typed.
-async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
+export async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
   return await query as Row[]
 }
 
-function connectionOf(source: PgJobsSource): SQL {
+export function connectionOf(source: PgJobsSource): SQL {
   if (typeof source === 'string')
     return new Bun.SQL(source)
 

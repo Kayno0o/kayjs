@@ -1,4 +1,4 @@
-import type { CacheStore } from './cache'
+import type { SyncCacheStore } from './cache'
 import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
 import { ALL_READS, trackStore, untrackStore } from './cache'
@@ -64,7 +64,7 @@ function openCache(path: string) {
 
 // Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
 // The file is created by the first value set or invalidation published, so a module naming the store creates nothing in a build, a check or a test: a read opens a file that exists and finds nothing in one that does not.
-export function sqliteCache(path: string): CacheStore {
+export function sqliteCache(path: string): SyncCacheStore {
   let opened: ReturnType<typeof openCache> | undefined
   let closed = false
   const polls: ReturnType<typeof setInterval>[] = []
@@ -78,7 +78,7 @@ export function sqliteCache(path: string): CacheStore {
     return opened
   }
 
-  const store: CacheStore = {
+  const store: SyncCacheStore = {
     get(key) {
       const row = open(false)?.select.get(key)
 

@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An action's third argument groups its checks under `protect: { rateLimit, honeypot, minTime, proofOfWork }`, beside `maxSize`, `messages` and `tool` ([Protecting actions](action-protection.md#protecting-an-action)).
 - `store: sqliteData(path)` also shares every `live()` value between processes and keeps it across restarts ([Live values](live-values.md)).
 - `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, and islands, the service worker, prefetching and kayjs-cms follow ([API modules](api-routes.md#api-modules)).
+- `store: pgData(db)` in kay.config.ts keeps the sessions, `cached` values, jobs, rate counts, presence members and Web Vitals in Postgres for replicas on several machines, as `sqliteData(path)` does in a file ([Queues](queues.md)).
 - A server entry no longer calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` and `HOST` ([Build and start](build-and-start.md)).
 - A component call can hand several parts on, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part ([Styling](../llms/styles-and-assets.md)).
 - kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts that `src/ui.ts` restyles ([Setup](../packages/ui/llms/setup.md)).

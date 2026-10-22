@@ -1,4 +1,4 @@
-import type { CacheStore } from '../src/runtime/cache'
+import type { CacheStore, SyncCacheStore } from '../src/runtime/cache'
 import type { ServedPage } from '../src/server/render'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cached, invalidate, noteRead, onKeysInvalidated } from '../src/runtime/cache'
@@ -14,7 +14,7 @@ afterEach(() => {
 // A store kept in memory, shared the way a SQLite file is, whose `publish` reaches every other store sharing the bus.
 function memoryStore(rows = new Map<string, { text: string, freshUntil: number }>(), bus = new Set<(message: string) => void>()) {
   let listener: ((message: string) => void) | undefined
-  const store: CacheStore = {
+  const store: Omit<SyncCacheStore, 'dependencies'> = {
     get: key => rows.get(key),
     set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }),
     delete: key => void rows.delete(key),
@@ -132,7 +132,7 @@ describe('a key invalidated in another process', () => {
     const before = invalidationCount()
 
     // The other process drops the key and tells this one.
-    theirs.store.publish!(JSON.stringify({ keys: ['k'] }))
+    theirs.store.publish(JSON.stringify({ keys: ['k'] }))
     expect(revalidationOf(page).invalidatedAt).toBeGreaterThan(before)
     expect(revalidationOf(untouched).invalidatedAt).toBe(0)
   })
@@ -287,9 +287,9 @@ describe('onClockHeard', () => {
     mod.trackStore(mine.store)
     const stop = mod.onClockHeard(at => void heard.push(at))
 
-    theirs.store.publish!(JSON.stringify({ pages: [], at: 5 }))
+    theirs.store.publish(JSON.stringify({ pages: [], at: 5 }))
     stop()
-    theirs.store.publish!(JSON.stringify({ pages: [], at: 6 }))
+    theirs.store.publish(JSON.stringify({ pages: [], at: 6 }))
     mod.untrackStore(mine.store)
     expect(heard).toEqual([5])
   })

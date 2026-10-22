@@ -5,18 +5,34 @@ import { durationSeconds } from './duration'
 import { kayLog } from './log'
 import { previewing, renderingForVisitor } from './preview'
 
-// Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
+// Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. A store reading a file answers at once, so `invalidate` is done when it returns; one reached over a network may answer with promises, and `invalidate` then drops the rows in the background, a read waiting for it.
 // A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
 export interface CacheStore {
-  get: (key: string) => { text: string, freshUntil: number } | undefined
+  get: (key: string) => StoredValue | undefined | Promise<StoredValue | undefined>
+  set: (key: string, text: string, freshUntil: number) => void | Promise<void>
+  delete: (key: string) => void | Promise<void>
+  // A store whose `keys` answers at once answers `dependencies` and `get` at once too.
+  keys: () => string[] | Promise<string[]>
+  // What each stored value built from other keys was built from, by key, read without the values: `invalidate` asks it once per store instead of calling `get` for every row no process holds in memory. Optional: without it `get` is called for each.
+  dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
+  // Tells the other processes sharing the store what this one invalidated, and hears what they did, so no process keeps serving a copy another one dropped. Optional: without them an invalidation stays in its process.
+  publish?: (message: string) => void | Promise<void>
+  subscribe?: (listener: (message: string) => void) => void
+}
+
+// A store reading a file, which answers every call at once.
+export interface SyncCacheStore extends CacheStore {
+  get: (key: string) => StoredValue | undefined
   set: (key: string, text: string, freshUntil: number) => void
   delete: (key: string) => void
   keys: () => string[]
-  // What each stored value built from other keys was built from, by key, read without the values: `invalidate` asks it once per store instead of calling `get` for every row no process holds in memory. Optional: without it `get` is called for each.
-  dependencies?: () => Map<string, string[]>
-  // Tells the other processes sharing the store what this one invalidated, and hears what they did, so no process keeps serving a copy another one dropped. Optional: without them an invalidation stays in its process.
-  publish?: (message: string) => void
-  subscribe?: (listener: (message: string) => void) => void
+  dependencies: () => Map<string, string[]>
+  publish: (message: string) => void
+}
+
+export interface StoredValue {
+  text: string
+  freshUntil: number
 }
 
 // What one process tells the others: cache keys it dropped, with the prefixes every key it holds under is dropped by (a `cache()` function's arguments), or prerendered page paths it marked stale.
@@ -47,6 +63,8 @@ type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string
 const entries = new Map<string, Entry>()
 // Every store a call named, which `invalidate` empties too.
 const stores = new Set<CacheStore>()
+// The drops of stored rows still running in the background, which a read of a store waits for so it never meets a row an `invalidate` already dropped.
+const settling = new Set<Promise<void>>()
 // The app's `store.cache`, for each call naming no store of its own.
 let appCache: CacheStore | undefined
 // The keys whose value the app's store could not hold, warned about once each, up to a bound so per-visitor keys cannot grow it.
@@ -218,9 +236,16 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     trackStore(store)
 
   if (!entry && store) {
-    const kept = readStored(store, key)
+    if (settling.size > 0)
+      await Promise.all(settling)
 
-    if (kept) {
+    const read = readStored(store, key)
+    const kept = read instanceof Promise ? await read : read
+
+    // Another call may have loaded the key while this one waited on the store.
+    entry = entries.get(key)
+
+    if (!entry && kept) {
       entry = kept
 
       const deps = [...new Set([...tagKeys, ...kept.deps ?? []])]
@@ -380,6 +405,14 @@ function dropAndTell(named: (key: string) => boolean, built: (key: string) => bo
     dropped.add(name)
 
   for (const store of stores) {
+    const names = store.keys()
+
+    if (names instanceof Promise) {
+      dropLater(store, names, named, built, dropped)
+
+      continue
+    }
+
     // Read once, and only if a row no process holds in memory is left to look at.
     let known: Map<string, string[]> | undefined
 
@@ -387,14 +420,14 @@ function dropAndTell(named: (key: string) => boolean, built: (key: string) => bo
       if (!store.dependencies)
         return storedReads(store, name)
 
-      known ??= store.dependencies()
+      known ??= store.dependencies() as Map<string, string[]>
 
       return known.get(name) ?? []
     }
 
-    for (const name of store.keys()) {
+    for (const name of names) {
       if (named(name) || dropped.has(name) || (!entries.has(name) && builtFrom(name).some(read => read === ALL_READS || built(read)))) {
-        store.delete(name)
+        written(store.delete(name), `cached('${name}') could not drop its stored row`)
         dropped.add(name)
       }
     }
@@ -403,6 +436,69 @@ function dropAndTell(named: (key: string) => boolean, built: (key: string) => bo
   for (const listener of keyListeners) {
     for (const name of listener(name => named(name) || built(name) || dropped.has(name), name => named(name) || dropped.has(name)))
       dropped.add(name)
+  }
+}
+
+// The stored rows of a store that answers with promises: dropped in the background, the keys beyond those memory held told to the other processes and the key listeners once they are.
+function dropLater(store: CacheStore, names: Promise<string[]>, named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): void {
+  const work = dropStored(store, names, named, built, new Set(dropped))
+
+  settling.add(work)
+  void forget(work)
+}
+
+async function forget(work: Promise<void>): Promise<void> {
+  await work
+  settling.delete(work)
+}
+
+async function dropStored(store: CacheStore, names: Promise<string[]>, named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): Promise<void> {
+  try {
+    const known = await store.dependencies?.()
+    const late = new Set<string>()
+
+    for (const name of await names) {
+      const reads = known ? known.get(name) ?? [] : await storedReadsLater(store, name)
+
+      if (named(name) || dropped.has(name) || (!entries.has(name) && reads.some(read => read === ALL_READS || built(read)))) {
+        await store.delete(name)
+
+        if (!dropped.has(name))
+          late.add(name)
+      }
+    }
+
+    if (late.size === 0)
+      return
+
+    for (const listener of keyListeners)
+      listener(name => late.has(name), name => late.has(name))
+
+    broadcast({ keys: [...late] })
+  }
+  catch (error) {
+    kayLog('error', 'dropping the rows a cache store kept failed', error)
+  }
+}
+
+async function storedReadsLater(store: CacheStore, key: string): Promise<string[]> {
+  const kept = await store.get(key)
+
+  return kept ? splitDeps(kept.text).deps ?? [] : []
+}
+
+// A store's write that may answer with a promise: a rejection is logged rather than left unhandled.
+function written(result: void | Promise<void>, what: string): void {
+  if (result instanceof Promise)
+    void logged(result, what)
+}
+
+async function logged(result: Promise<void>, what: string): Promise<void> {
+  try {
+    await result
+  }
+  catch (error) {
+    kayLog('error', what, error)
   }
 }
 
@@ -428,16 +524,34 @@ export function broadcast(invalidation: Invalidation): void {
 
   for (const store of stores) {
     try {
-      store.publish?.(message)
-      failing.delete(store)
+      const sent = store.publish?.(message)
+
+      if (sent instanceof Promise)
+        void delivered(store, sent)
+      else
+        failing.delete(store)
     }
     catch (error) {
-      if (!failing.has(store))
-        kayLog('error', 'an invalidation could not reach the other processes', error)
-
-      failing.add(store)
+      publishFailed(store, error)
     }
   }
+}
+
+async function delivered(store: CacheStore, sent: Promise<void>): Promise<void> {
+  try {
+    await sent
+    failing.delete(store)
+  }
+  catch (error) {
+    publishFailed(store, error)
+  }
+}
+
+function publishFailed(store: CacheStore, error: unknown): void {
+  if (!failing.has(store))
+    kayLog('error', 'an invalidation could not reach the other processes', error)
+
+  failing.add(store)
 }
 
 export function onPagesInvalidated(listener: (paths: string[]) => void): void {
@@ -533,7 +647,7 @@ function writeRow(key: string, entry: Entry, store: CacheStore, inherited: boole
     return
 
   try {
-    store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil)
+    written(store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil), `cached('${key}') could not write its store; keeping the value in memory`)
   }
   catch (error) {
     kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
@@ -561,9 +675,17 @@ function storedText(key: string, value: unknown, inherited: boolean): string | u
 }
 
 // A value the store kept, or nothing when it has none or one it cannot read, which it forgets.
-function readStored(store: CacheStore, key: string): Entry | undefined {
+function readStored(store: CacheStore, key: string): Entry | undefined | Promise<Entry | undefined> {
   const kept = store.get(key)
 
+  return kept instanceof Promise ? storedEntry(store, key, kept) : entryOf(store, key, kept)
+}
+
+async function storedEntry(store: CacheStore, key: string, pending: Promise<StoredValue | undefined>): Promise<Entry | undefined> {
+  return entryOf(store, key, await pending)
+}
+
+function entryOf(store: CacheStore, key: string, kept: StoredValue | undefined): Entry | undefined {
   if (!kept)
     return undefined
 
@@ -573,7 +695,7 @@ function readStored(store: CacheStore, key: string): Entry | undefined {
     return { value: parse(text), freshUntil: kept.freshUntil, loaded: true, ...deps ? { deps } : {} }
   }
   catch {
-    store.delete(key)
+    written(store.delete(key), `cached('${key}') could not drop a stored row it cannot read`)
 
     return undefined
   }
@@ -581,7 +703,7 @@ function readStored(store: CacheStore, key: string): Entry | undefined {
 
 // What a row of a store was built from, for one no process has in memory yet.
 function storedReads(store: CacheStore, key: string): string[] {
-  const kept = store.get(key)
+  const kept = store.get(key) as StoredValue | undefined
 
   return kept ? splitDeps(kept.text).deps ?? [] : []
 }

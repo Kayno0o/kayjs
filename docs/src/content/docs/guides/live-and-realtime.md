@@ -129,7 +129,9 @@ Hand the member to the island from the page's server fence, as a prop: `Editor(e
 
 A tab leaves when it closes, goes to a page without the room, or loses its connection. The others see it go after a few seconds, so a reconnect or a page swap never shows someone leaving and coming back. A hidden tab stays in the room, and a page opened in a hidden tab joins at once.
 
-Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. A page with presence is rendered for each request, so a static export of it fails. The room and the member together take at most 256 characters as JSON. Call `presence` once per room on a page, and expect a room of many tabs to send each the whole list on every join and leave.
+Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. With `pgData(db)` they share the Postgres database instead.
+
+A page with presence is rendered for each request, so a static export of it fails. The room and the member together take at most 256 characters as JSON. Call `presence` once per room on a page, and expect a room of many tabs to send each the whole list on every join and leave.
 
 <ReadMore href="/llms/live-values#presence">The proof, the timing of a leave and the limits are in the full API routes reference.</ReadMore>
 

@@ -75,6 +75,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `retryLater`, `memoryJobs`, `sqliteJobs`, `pgJobs`, `createJobTables`, `jobTables` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
+| `pgData`, `createDataTables`, `dataTables` | The same on Postgres, for replicas on several machines. See [Background jobs](/guides/background-jobs#postgres) |
 | `sqliteData` | One SQLite file for the `store` of `kay.config.ts`: sessions, cached values, live values, jobs, schedule locks, rate limit counts, presence members and Web Vitals. See [Background jobs](/guides/background-jobs) |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
