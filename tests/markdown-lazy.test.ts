@@ -50,6 +50,22 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<h1>Title</h1>\n')
   })
 
+  it('forgets a hold no write took when the island ends, so a later island draws its markup', async () => {
+    const { markdownHtml } = await shell('forgotten')
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+
+    first.innerHTML = '<div></div>'
+    second.innerHTML = '<div><h1>Old</h1></div>'
+
+    const element = second.firstElementChild!
+
+    root(() => hydrate(() => markdownHtml('# a'), first))
+    root(() => hydrate(() => renderEffect(() => property(element, 'innerHTML', '<p>new</p>')), second))
+    flush()
+    expect(element.innerHTML).toBe('<p>new</p>')
+  })
+
   it('draws the text as written in a client-only component of a hydrating island, which has no server markup', async () => {
     const { markdownHtml } = await shell('fresh')
     const container = document.createElement('div')

@@ -107,6 +107,8 @@ export function hydrate<T>(render: () => T, container: Node): T {
   }
   finally {
     claim = previous
+    // A mark no write took must not skip one of an island hydrating later.
+    takeHeldMarkup()
     hydrationEnded()
   }
 }
