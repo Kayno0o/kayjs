@@ -687,6 +687,18 @@ describe('revalidation', () => {
     expect(reached()).toBeLessThanOrEqual(before)
   })
 
+  it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
+    const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
+    const app = await build.serve({ routes, api: 'tests/fixtures/production/src/api', prebuilt: true, security: false, log: false })
+
+    Bun.gc(true)
+    await Bun.sleep(50)
+    Bun.gc(true)
+    expect(echo.getParent()).not.toBeNull()
+    expect(echo.getGlobalRoutes().length).toBeGreaterThan(0)
+    expect(app).toBeDefined()
+  })
+
   it('serves a stale prerendered page while rendering it again in the background, then the new one with its own tag', async () => {
     const { news } = await import('./fixtures/production/src/news')
 

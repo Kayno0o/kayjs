@@ -241,7 +241,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // After the module's own `onError`, which may answer the error itself.
         .onError(({ request, error, code, set }) => reportThrown({ request, error, code, set }, options))
 
-      letGoOfParent(instance, group)
+      letGoOfParent(instance, app)
 
       return mounting
     })
@@ -250,16 +250,16 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   return { limits, routeLimits, mounted }
 }
 
-// What Elysia's `.use` binds a plugin to in its parent, which are protected there.
+// What Elysia's `.use` binds a plugin to in its parent: members its public types leave out.
 interface Parent {
   getServer: () => unknown
   getGlobalRoutes: () => unknown
   getGlobalDefinitions: () => unknown
 }
 
-// `.use(instance)` leaves closures on the module's instance, which the module cache keeps for the process, pointing at the group and so the whole app (kaynooo/kayjs#1895): they are rebound to a weak reference, so an app nothing else holds can be collected.
-function letGoOfParent(instance: object, group: object): void {
-  const parent = new WeakRef(group as unknown as Parent)
+// `.use(instance)` leaves closures on the module's instance, which the module cache keeps for the process, pointing at the group and so the whole app (kaynooo/kayjs#1895): they are rebound to the app through a weak reference, so an app nothing else holds can be collected while one that is running keeps answering them.
+function letGoOfParent(instance: object, app: object): void {
+  const parent = new WeakRef(app as unknown as Parent)
 
   Object.assign(instance, {
     getParent: () => parent.deref() ?? null,
