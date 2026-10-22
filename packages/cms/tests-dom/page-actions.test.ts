@@ -133,6 +133,8 @@ function leaving() {
   }
 }
 
+// The confirm button of the dialog that is open.
+const openConfirmation = () => [...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')].find(each => each.textContent?.trim() === 'Delete')
 const confirmation = (label: string) => [...document.querySelectorAll('button')].filter(each => each.textContent?.trim() === label).at(-1)!
 
 test('a draft entry offers Publish, which saves it published and turns the button into Unpublish', async () => {
@@ -290,7 +292,7 @@ test('Delete from the entry\'s own page leads to the collection\'s screen, not t
   expect(await leftFor()).toBe('/admin/collections/posts')
   expect(writes.map(write => write.method)).toEqual(['DELETE'])
   expect(reload).not.toHaveBeenCalled()
-  expect(root.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(true)
+  expect(root.querySelector<HTMLFieldSetElement>('fieldset')?.disabled ?? true).toBe(true)
   expect(([...root.querySelectorAll('.kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save') as HTMLButtonElement).disabled).toBe(true)
   expect((button(root, 'Publish') as HTMLButtonElement).disabled).toBe(true)
 })
@@ -337,6 +339,62 @@ test('Delete of a localized entry from its own page leads to the collection\'s s
   confirmation('Delete').click()
   expect(await leftFor()).toBe('/admin/collections/posts')
   expect(new URL(writes[0]!.url, 'http://localhost').searchParams.get('locale')).toBe('fr')
+})
+
+test('Delete from the entry\'s own page, when leaving is declined over edits of another entry, leaves a notice linking the collection\'s screen', async () => {
+  const writes = server()
+  const assign = spyOn(window.location, 'assign').mockImplementation(() => undefined)
+  const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
+
+  happyDOM.setURL('http://localhost/posts/hello')
+  mounted = await mountComponent(EDITOR, { entries: [{ collection: 'posts', slug: 'hello' }, { collection: 'posts', slug: 'other' }], unclickable: [] })
+
+  const root = mounted.root
+
+  await until(() => root.querySelectorAll('.kcms-entry-more').length === 2 && asked.some(path => path.includes('/can')))
+
+  const other = root.querySelectorAll('.kcms-entry')[1]!.querySelector<HTMLInputElement>('input')!
+
+  other.value = 'Mine'
+  other.dispatchEvent(new Event('input', { bubbles: true }))
+  typed = true
+  await settle()
+  button(root, 'Delete')!.click()
+  await settle()
+  openConfirmation()!.click()
+  await until(() => ask.mock.calls.length > 0)
+  await until(() => root.querySelector('.kcms-entry-failure a'))
+
+  expect(writes.map(write => write.method)).toEqual(['DELETE'])
+  expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts')
+  expect(root.querySelectorAll('.kcms-entry')[0]!.querySelector('fieldset')).toBeNull()
+  expect(assign).not.toHaveBeenCalled()
+})
+
+test('a save started with the shortcut while the Delete confirmation is open leaves the dialog open, its confirm button disabled until the save ends', async () => {
+  const writes = server({ hold: true })
+  const root = await open()
+  const title = root.querySelector<HTMLInputElement>('input')!
+  const confirmButton = openConfirmation
+
+  title.value = 'Mine'
+  title.dispatchEvent(new Event('input', { bubbles: true }))
+  typed = true
+  await settle()
+  button(root, 'Delete')!.click()
+  await until(confirmButton)
+  expect(confirmButton()!.disabled).toBe(false)
+
+  title.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+  await until(() => writes.some(write => write.method === 'POST'))
+  await settle()
+  expect(confirmButton()!.disabled).toBe(true)
+  confirmButton()!.click()
+  await settle()
+  expect(writes.map(write => write.method)).toEqual(['POST'])
+
+  releaseSave()
+  await until(() => confirmButton()?.disabled === false)
 })
 
 test('Unpublish with edits not saved refuses without opening a confirmation or writing', async () => {

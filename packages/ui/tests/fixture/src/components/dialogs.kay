@@ -9,6 +9,7 @@ const { onClose, onDelete, dirty = false, apiRefusal } = props<{ onClose: () => 
 
 const open = signal(false)
 const bareOpen = signal(false)
+const busy = signal(false)
 
 // A delete made with `call()`, which throws ApiError for a refusal, built here so it is the class the library reads.
 async function removeByApi() {
@@ -49,3 +50,5 @@ Toaster
 button#open-bare(onClick={() => bareOpen.set(true)}) Open bare
 Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen.set(false)})
   input#bare-name(name="bare")
+button#busy(onClick={() => busy.set(!busy())}) Busy
+ConfirmDelete(message="Hold it?" failure="Could not" onConfirm={onDelete} disabled={busy()} trigger="button" class="held")

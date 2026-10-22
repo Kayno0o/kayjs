@@ -205,7 +205,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(16)
+    expect(root.querySelectorAll('dialog')).toHaveLength(17)
 
     click(trigger)
     await settle()
@@ -265,5 +265,31 @@ describe('ConfirmDelete', () => {
 
       expect([name, trigger.hidden, document.activeElement]).toEqual([name, false, trigger])
     }
+  })
+
+  test('disabled disables its trigger, and keeps an open dialog open with its confirm button disabled until it is false again', async () => {
+    const onDelete = jest.fn(async () => Promise.resolve())
+    const root = await dialogs(onDelete)
+    const held = root.querySelector<HTMLButtonElement>('.held')!
+
+    click(held)
+    await settle()
+
+    const dialog = [...root.querySelectorAll<HTMLDialogElement>('dialog')].at(-1)!
+    const confirm = () => [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(each => each.textContent?.trim() === 'Delete')!
+
+    expect(dialog.open).toBe(true)
+    click(root.querySelector('#busy'))
+    await settle()
+    expect(dialog.open).toBe(true)
+    expect(held.disabled).toBe(true)
+    expect(confirm().disabled).toBe(true)
+    click(confirm())
+    await settle()
+    expect(onDelete).not.toHaveBeenCalled()
+
+    click(root.querySelector('#busy'))
+    await settle()
+    expect(confirm().disabled).toBe(false)
   })
 })

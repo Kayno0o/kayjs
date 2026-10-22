@@ -8,7 +8,7 @@ import { wording } from 'kay/words'
 
 const frame = recipe({ parts: { root: '', armed: 'kui-confirm-delete-armed', message: 'kui-confirm-delete-message' } })
 
-const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
+const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -25,6 +25,8 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
   tone?: 'danger' | 'neutral' | undefined
   // An icon by default; `button` is a labelled danger button, for a dialog footer, and `link` a plain underlined text button, for a confirm inside running text.
   trigger?: 'icon' | 'button' | 'link' | undefined
+  // Disables the trigger and the confirm button while the caller is busy; an open dialog stays open, its confirm button disabled until this is false again.
+  disabled?: boolean | undefined
   // `inline` asks in place of the trigger instead of in a dialog: a click arms it into a danger button that deletes and one that cancels, for a row of a list.
   ask?: 'dialog' | 'inline' | undefined
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link". `Delete` by default, `Confirm` when neutral.
@@ -88,20 +90,20 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 if trigger === 'button'
-  Button(label={triggerLabel()} tone={look()} hidden={ask === 'inline' && open()} part="root" onClick={start})
+  Button(label={triggerLabel()} tone={look()} disabled={disabled} hidden={ask === 'inline' && open()} part="root" onClick={start})
 else if trigger === 'link'
-  button.kui-confirm-delete-link(part="root" type="button" hidden={ask === 'inline' && open()} onClick={start}) {triggerLabel()}
+  button.kui-confirm-delete-link(part="root" type="button" disabled={disabled} hidden={ask === 'inline' && open()} onClick={start}) {triggerLabel()}
 else
-  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} hidden={ask === 'inline' && open()} part="root" onClick={start})
+  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} disabled={disabled} hidden={ask === 'inline' && open()} part="root" onClick={start})
 if ask === 'inline'
   if open()
     // Armed by a click, so the focus moves onto the button that deletes.
     span(part="armed" ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
-      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
+      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
   Dialog(open={open()} title={dialogTitle()} dirty={pending()} onOpenChange={() => open.set(false)})
     @footer
       Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
-      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} onClick={confirm})
+      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} onClick={confirm})
     p(part="message") {message}

@@ -28,6 +28,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.entry.deleteMessage',
   'cms.entry.deletePage',
   'cms.entry.deleteReferenced',
+  'cms.entry.deleted',
+  'cms.entry.deletedLeave',
   'cms.entry.differs',
   'cms.entry.frozen',
   'cms.entry.keepEdits',

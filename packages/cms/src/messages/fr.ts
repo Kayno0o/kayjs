@@ -139,6 +139,8 @@ export default defineMessages({
       deleteMessage: 'Supprimer {title} ? C\'est définitif.',
       deletePage: 'Sa page {url} ne répondra plus, et les liens qui y mènent seront cassés.',
       deleteReferenced: 'Référencée par {entries}.',
+      deleted: 'Cette entrée est supprimée.',
+      deletedLeave: 'Aller à la collection',
       draft: 'Brouillon',
       editOnPage: 'Modifier sur la page',
       ended: 'Terminé',

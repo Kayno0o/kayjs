@@ -7,7 +7,7 @@ import { deleteMessage } from '../listing'
 import Refused from './refused.kay'
 
 // Publish or Unpublish, then Delete, of a saved entry, as the entry's screen and the page editor both draw them. Publish and Unpublish are left out for a collection with no draft flag (`draftField` undefined), Delete unless `deletable`.
-// A role that may not do one sees it disabled with the reason from `denied`; Publish and Delete wait while `saving`, and Unpublish asks first unless `dirty`, where the refusal over unsaved edits needs no dialog.
+// A role that may not do one sees it disabled with the reason from `denied`; Publish and Delete wait while `saving`, an open Delete confirmation staying open with its confirm button disabled, and Unpublish asks first unless `dirty`, where the refusal over unsaved edits needs no dialog.
 const { draftField, draft, dirty, saving, denied = {}, title, url, referrers, deletable, onPublish, onUnpublish, onRemove, onAskReferrers } = props<{
   draftField: string | undefined
   draft: boolean
@@ -39,7 +39,5 @@ else if draftField !== undefined
 if deletable
   if denied.delete !== undefined
     Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
-  else if saving
-    Button(label={wording('cms.bulk.delete', 'Delete')} tone="danger" disabled)
   else
-    ConfirmDelete(message={deleteMessage(title, url, 'entry', referrers)} onOpen={onAskReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={onRemove})
+    ConfirmDelete(message={deleteMessage(title, url, 'entry', referrers)} onOpen={onAskReferrers} disabled={saving} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={onRemove})

@@ -119,6 +119,8 @@ Each entry in the editor has Publish (or Unpublish, behind a confirmation) when 
 
 Delete asks first, names the entries that refer to this one, and locks the form once the entry is gone. It then reads the page again. When the page you are on is the deleted entry's own, it opens the collection's screen in the admin instead, as that page no longer exists.
 
+If you decline to leave because other entries hold edits not saved, the form is replaced by a notice with a link to that screen. A save started while the Delete confirmation is open leaves it open, with its confirm button disabled until the save ends.
+
 ### Typing on the page
 
 Click a one-line text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.

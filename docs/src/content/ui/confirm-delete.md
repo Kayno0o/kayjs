@@ -6,6 +6,8 @@ description: A delete trigger that asks for confirmation in a dialog before runn
 
 `onConfirm` does the deletion. The dialog keeps its buttons disabled until the returned promise settles, then closes.
 
+Pass `disabled` while something else is busy, such as a save running. It disables the trigger and the confirm button, and a dialog that is already open stays open until `disabled` is false again.
+
 ## A labelled button
 
 `trigger="button"` draws a labelled danger button instead of the icon, and `label` renames it for a delete the reader knows by another name.
