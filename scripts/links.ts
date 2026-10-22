@@ -20,6 +20,20 @@ const ARCHIVE_PAGE = /^llms\/[\w-]+-archive\.md$/
 const ARCHIVE_ADVICE = 'an archive loses its oldest sections at a release: link the page, or the current one'
 const ARCHIVE_ANCHOR = /-archive\.md#/
 
+// The heading ids of a page, per process and keyed by its text: a page that is overridden or edited since is another text, so it renders fresh while the others are not rendered again on each call.
+const HEADINGS = new Map<string, Set<string>>()
+
+async function headingIds(markdown: string) {
+  let ids = HEADINGS.get(markdown)
+
+  if (ids === undefined) {
+    ids = new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
+    HEADINGS.set(markdown, ids)
+  }
+
+  return ids
+}
+
 // The links of llms.txt, llms/, the docs content, the library references and the home page that no page of the site answers, each as `file: /path#anchor`.
 // `overrides` replaces the text of files under llms/ and llms.txt (by path from the repo root), so a release checks the pages it is about to write before it writes them.
 export async function brokenLinks(overrides: ReadonlyMap<string, string> = new Map()): Promise<string[]> {
@@ -29,12 +43,12 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
   const docsRoot = join(ROOT, 'docs/src/content')
   const files = [...new Bun.Glob('**/*.md').scanSync(docsRoot)]
   const served = new Map<string, Set<string> | undefined>([['/', undefined], ['/llms', undefined]])
-  const headings = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
+  const headings = headingIds
 
   for (const file of files.filter(file => file.startsWith('docs/')))
     served.set(`/${file.slice('docs/'.length, -'.md'.length)}`, await headings(await Bun.file(join(docsRoot, file)).text()))
 
-  for (const component of await loadComponents())
+  for (const component of await loadComponents({ withProps: false }))
     served.set(`/ui/${component.slug}`, await headings(component.body))
 
   for (const name of docs)

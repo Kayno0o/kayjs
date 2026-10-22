@@ -51,11 +51,11 @@ export async function loadLibraries(): Promise<LibraryReference[]> {
   return pages.flat()
 }
 
-// One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props read from its source.
-export async function loadComponents(): Promise<ComponentPage[]> {
+// One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props read from its source, which `withProps: false` leaves empty for a caller that reads only the usage.
+export async function loadComponents({ withProps = true } = {}): Promise<ComponentPage[]> {
   const source = join(PACKAGES, 'kayjs-ui/src')
   const files = [...new Bun.Glob('*.kay').scanSync(source)].sort()
-  const props = propsOf(files.map(file => join(source, file)))
+  const props = withProps ? propsOf(files.map(file => join(source, file))) : new Map<string, Prop[]>()
 
   return Promise.all(files.map(async (file, order) => {
     const slug = file.replace(KAY_FILE, '')
