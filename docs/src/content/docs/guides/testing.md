@@ -148,6 +148,8 @@ await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })
 expect((await site.visit('/auth/account')).status).toBe(200)
 ```
 
+With `auth()` alone in `kay.config.ts` and no `src/auth.ts` module there is no `auth` to import: `authTest(site)` from `@kaynooo/kayjs-auth/test` makes the same calls on the auth `testSite()` built, `await authTest(site).signInAs({ email, username })`.
+
 A `persisted` signal kept in a cookie stores its value in kay's own encoding, so `scheme=light` reads as the default. `persistedCookie(name, value)` gives the right cookie: `site.as(persistedCookie('scheme', 'light'))` renders the first page with `light`.
 
 ## Waiting for a mail

@@ -41,6 +41,14 @@ auth.signOut(site)
 expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
 ```
 
+An app whose kay.config.ts holds `auth()` and no `src/auth.ts` module has no `auth` to import: `authTest(site)` from `@kaynooo/kayjs-auth/test` is the same calls (`signInAs`, `signOut`, `sessionCookie`) on the auth `testSite()` built, so call it after `testSite()`. `kay generate resource` writes its test with it.
+
+```ts
+import { authTest } from '@kaynooo/kayjs-auth/test'
+
+await authTest(site).signInAs({ email: 'ada@example.com', username: 'Ada' })
+```
+
 ## Reference
 
 ### Bots and breached passwords rules

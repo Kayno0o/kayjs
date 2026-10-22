@@ -215,6 +215,16 @@ it('writes files that pass kay check and their own tests', async () => {
 
 const PROJECT = { tailwind: true, tests: true, ui: true, auth: true }
 
+it('signs a resource test in through authTest, or through the former form\'s own auth module', () => {
+  const own = resourceFiles('note', ['title:string'], PROJECT).files['tests/notes.test.ts']!
+  const module = resourceFiles('note', ['title:string'], { ...PROJECT, authModule: true }).files['tests/notes.test.ts']!
+
+  expect(own).toContain('import { authTest } from \'@kaynooo/kayjs-auth/test\'')
+  expect(own).toContain('await authTest(site).signInAs(')
+  expect(module).toContain('import { auth } from \'../src/auth\'')
+  expect(module).toContain('await auth.signInAs(site, ')
+})
+
 it('writes a resource with the table, the actions, the pages and a test, drawn with kayjs-ui when it is installed', () => {
   const ui = resourceFiles('blog-post', ['title:string', 'body:text', 'views:int', 'done:bool'], PROJECT)
   const plain = resourceFiles('category', ['name:string', 'rank:number'], { ...PROJECT, ui: false })

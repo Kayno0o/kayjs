@@ -757,7 +757,7 @@ To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives th
 
 To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username, signs an existing one in as they are, and sets the session cookie on the site. It takes the fields of `createUser` (`password`, `roles`, `emailVerified` and `locale` too), and `data` for the fields of your `user` schema. It works on any store. Call it again to switch member, and `auth.signOut(site)` to sign out.
 
-`auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`.
+`auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`. With `auth()` alone and no `src/auth.ts` module, `authTest(site)` from `@kaynooo/kayjs-auth/test` makes the same calls on the auth `testSite()` built.
 
 An existing member whose email, username, roles or data differ from the ones you give, or who lacks a role you give, makes `signInAs` throw, so a test never runs as someone other than the member it named.
 

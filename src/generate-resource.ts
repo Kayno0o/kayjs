@@ -46,6 +46,8 @@ export interface ResourceProject {
   // Whether kayjs-ui is installed, which the pages are then drawn with.
   ui: boolean
   auth: boolean
+  // Whether `src/auth.ts` exports the app's own `auth` (the form before `auth()` alone), which a test imports to sign in; else `authTest` of kayjs-auth does.
+  authModule?: boolean | undefined
 }
 
 interface Names {
@@ -340,8 +342,9 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
   }
   const object = (posted: boolean, blank?: Field, id = '') => `{ ${id}${fields.map(field => `${field.name}: ${value(field, posted, blank)}`).join(', ')} }`
   const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean')
-  const signIn = project.auth ? '  await auth.signInAs(site, { email: \'ada@example.com\', username: \'Ada\' })\n' : ''
-  const imports = `import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.auth ? 'import { auth } from \'../src/auth\'\n' : ''}import { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
+  const person = `{ email: 'ada@example.com', username: 'Ada' }`
+  const signIn = project.auth ? `  await ${project.authModule ? `auth.signInAs(site, ${person})` : `authTest(site).signInAs(${person})`}\n` : ''
+  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kaynooo/kayjs-auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
   const refusal = blank === undefined ? '' : `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
 
   return `${imports}\nconst site = await testSite()\n\nit('lists the ${plural.toLowerCase()} created', async () => {\n${signIn}  const page = await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  expect(page.text()).toContain('${TYPES[first.type].shown}')\n})\n\nit('edits and deletes a ${label}', async () => {\n${signIn}  await site.submit(update, ${object(true, undefined, 'id: \'1\', ')}, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(200)\n\n  await site.submit(remove, { id: '1' }, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(404)\n})\n${refusal}`

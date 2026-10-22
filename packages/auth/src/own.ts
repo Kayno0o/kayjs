@@ -6,6 +6,7 @@ import type { EmailOptions } from './email'
 import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
+import type { OwnTest } from './test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
@@ -195,6 +196,13 @@ async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<E
   }
 }
 
+// The auth the latest `auth()` with no module built, which `authTest` signs a test site in through.
+let latest: OwnTest | undefined
+
+export function builtOwn(): OwnTest | undefined {
+  return latest
+}
+
 /** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
 export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: AnyElysia }> {
   const { createAuth } = await import('./auth')
@@ -215,6 +223,8 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
     ...mailer && { email: mailer },
     pages: pages === false ? undefined : { prefix: prefix ?? '/auth', home: home ?? '/', ...typeof pages === 'object' && pages },
   })
+
+  latest = made
 
   return made as unknown as UserMaker & { plugin: AnyElysia }
 }

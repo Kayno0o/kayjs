@@ -26,6 +26,7 @@
       "types": "./types/browser.d.ts",
       "default": "./src/browser.ts"
     },
+    "./test": "./src/test.ts",
     "./rules": {
       "types": "./types/rules.d.ts",
       "default": "./src/rules.ts"
