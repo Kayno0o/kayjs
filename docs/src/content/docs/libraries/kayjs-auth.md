@@ -183,7 +183,7 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## The signed-in user in templates
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, so a layout can hand an island its slots:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user` and `ctx.can(role)`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
 
 ```kay
 ---
@@ -205,7 +205,7 @@ nav
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
 
-A page whose imports reach one of the three, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page and `viewer: false` on none, the three then streaming in after the page, which needs JavaScript.
+A page whose imports reach one of the three, or any template reading `ctx`, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page, for an app whose own components call `currentUser`.
 
 ## Signing in with a password
 

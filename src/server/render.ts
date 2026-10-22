@@ -39,6 +39,7 @@ import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
+import { useContexts } from './context-values'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT, typeProblemsBlock } from './dev'
 import { noteRedirect } from './dev-notes'
@@ -175,6 +176,8 @@ export interface RenderOptions {
   guarded?: boolean | undefined
   // How a redirect a guard or the page threw is spelled, with the trailing slash its page has.
   redirectSpelling?: ((location: string) => string) | undefined
+  // The modules of the extensions' `context`, whose request values the pages reaching a template that reads `ctx` load.
+  contexts?: readonly string[] | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
   editor?: string | undefined
 }
@@ -701,8 +704,12 @@ export async function renderUncaught(error: unknown, special: SpecialPages, cont
   return withOutcome(rendering.outcome, async () => renderFailure(error, special, rendering, new Map(), client, options))
 }
 
-function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '' }: RenderOptions): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts }: RenderOptions): Rendering {
   const { request } = context
+
+  if (contexts !== undefined && contexts.length > 0)
+    useContexts(request, contexts, prerendering)
+
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
   const personalCookies = () => {

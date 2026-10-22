@@ -5,13 +5,13 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare where its value goes is an error, `uncalled-signal`, which `kay check --fix` calls. It is written by assigning it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, and `count.set(c => c * 2)` still works; assigning works on any signal a `const`, an import, a `let`, a property (`box.count = 1`) or an array element holds. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, which `kay check --fix` calls. It is written by assigning it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, and `count.set(c => c * 2)` still works; assigning works on any signal a `const`, an import, a `let`, a property (`box.count = 1`) or an array element holds. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; rows of plain objects edited immutably keep their nodes with no key, and `key={post.slug}` names another key.
 - An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes; a rejection before it renders crashes nothing.
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`), in every option, store call and test helper of kay and its libraries; a bare number is a type error that `kay check` fixes (`deprecated-bare-duration`), and a session store's `set` gets its `maxAge` as a `Duration` string (`durationMs` gives its milliseconds).
+- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`) in every option, store call and test helper; a bare number is a type error `kay check` fixes (`deprecated-bare-duration`), and a session store's `set` gets its `maxAge` as a `Duration` string (`durationMs` gives its milliseconds).
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile errors, type errors, requests that threw, islands' browser errors) at their `.kay` lines: read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
@@ -28,7 +28,7 @@ kay's own libraries are released with kay, and each ships its `llms.txt` and `ll
 
 ## Docs
 
-To build a site, read [Build a site](llms/site.md) first. The topic files below cover what it leaves out. Each opens with its common tasks, one sentence and one example apiece; the exact rules follow under Reference, one per bullet.
+To build a site, read [Build a site](llms/site.md) first. The topic files below cover what it leaves out. Each opens with its common tasks, one sentence and one example apiece, then the exact rules under Reference.
 
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
 - [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS
@@ -37,6 +37,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Library conventions](llms/component-library-conventions.md): naming and files
 - [Template lines](llms/templates.md): lines, bindings, `if`/`for`/`await`/`try`
 - [Elements, slots, snippets](llms/templates-elements-slots-snippets.md): attributes, slots
+- [Request values](llms/request-values.md): `ctx.user` in a template, no fence
 - [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards
 - [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): robots.txt, manifest, offline, search
 - [Styles and assets](llms/styles-and-assets.md): component styles, Tailwind, `public/`

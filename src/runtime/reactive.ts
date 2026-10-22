@@ -30,6 +30,8 @@ interface SignalNode<T> extends Source {
 
 // What the server keeps per request it renders: the values its renders wrote to shared signals, its cookies and query, and where an error a `try` block caught goes.
 export interface ServerScope {
+  // The request the render answers, which the values templates read as `ctx` are kept under.
+  request?: Request
   values: WeakMap<object, unknown>
   cookie: (name: string) => string | undefined
   // A query param as the page's `query` schema reads it, for `queryParam` and a persisted signal kept in the query.

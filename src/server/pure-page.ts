@@ -36,6 +36,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   listen: 'free',
   linked: 'free',
   context: 'free',
+  ctx: 'request',
   uid: 'free',
   s: 'free',
   describeField: 'free',

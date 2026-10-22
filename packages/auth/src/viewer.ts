@@ -1,11 +1,13 @@
 import type { Auth } from './auth'
 import type { BareUser } from './core'
+import { log } from './log'
 
 export interface Viewer {
   auth: Auth
   isGranted: (role: string, user: BareUser) => boolean
 }
 
+const asViewer = (user: BareUser | null) => user && !user.guest ? user : null
 const viewers = new WeakMap<Request, Viewer>()
 // The user a layout read ahead of the render, `null` for none: what lets a template show them with no streamed block.
 const loaded = new WeakMap<Request, BareUser | null>()
@@ -25,7 +27,7 @@ export function registerViewer(request: Request, viewer: Viewer): void {
   viewers.set(request, viewer)
 }
 
-// Reads the request's user ahead of the render, for the layout kayjs-auth wraps the pages reaching the components in: a failed read is left to the component, which reads it again and reports it.
+// Reads the request's user ahead of the render: a failed read is reported and leaves the page signed out, while a component calling `currentUser` reads again and reports it too.
 export async function loadViewer(request: Request): Promise<void> {
   try {
     const auth = viewers.get(request)?.auth
@@ -36,7 +38,24 @@ export async function loadViewer(request: Request): Promise<void> {
     loaded.set(request, await auth.bareUser())
     impersonators.set(request, await auth.impersonator())
   }
-  catch {}
+  catch (error) {
+    log.error('could not read the signed-in user ahead of the render', error)
+  }
+}
+
+// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), and `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy.
+export interface ViewerValues {
+  user: BareUser | null
+  can: (role: string) => boolean
+}
+
+export async function viewerValues(request: Request): Promise<ViewerValues> {
+  await loadViewer(request)
+
+  const viewer = viewers.get(request)
+  const user = loaded.has(request) ? asViewer(loaded.get(request)!) : null
+
+  return { user, can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
 }
 
 // The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.
@@ -49,8 +68,6 @@ export function currentViewer(): Viewer & { request: Request } {
 
   return { ...viewer, request }
 }
-
-const asViewer = (user: BareUser | null) => user && !user.guest ? user : null
 
 // The signed-in user of the page being rendered, none for a visitor or a guest, or one lacking `role` (the app's role hierarchy applies). The user itself once the layout loaded it, else a promise a block waits for.
 export function currentUser(role?: string): BareUser | null | Promise<BareUser | null> {

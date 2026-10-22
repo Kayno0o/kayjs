@@ -45,6 +45,8 @@ export type { SearchHit, SearchOptions, SearchPart, SearchResults } from './sear
 export { searchResults, searchSite } from './search-results'
 export type { ShortcutOptions } from './shortcut'
 export { shortcut } from './shortcut'
+export { ctx } from './template-context'
+export type { ContextOfModule, TemplateContext, TemplateValues } from './template-context'
 export type { TransitionClasses } from './transition'
 export type { UiConfig, UiEntry } from './ui'
 export { defineUi } from './ui'

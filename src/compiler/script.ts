@@ -19,7 +19,7 @@ const FIRST_TOKEN = /^[\w$]*/
 // A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
 const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 // What `kay` exports that reads nothing reactive: a script using only these stays a static component.
-const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage', 'recipe'])
+const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage', 'recipe', 'ctx'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
@@ -1301,7 +1301,8 @@ export function codeOf(text: string): string {
 
 // Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.
 function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
-  const written = new Set([...(typed === '' ? [code] : [code, typed]).flatMap(text => text.match(KAY_NAME) ?? []), ...read])
+  // `ctx` in a fence is the request, which only a template reading it unimported gets from `kay`.
+  const written = new Set([...(typed === '' ? [code] : [code, typed]).flatMap(text => (text.match(KAY_NAME) ?? []).filter(name => name !== 'ctx')), ...read])
   const mentioned = [...written].filter(name => !declared.includes(name))
   const found: string[] = []
 

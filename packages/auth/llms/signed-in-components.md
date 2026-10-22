@@ -4,7 +4,7 @@
 
 ### Show or hide a part for the signed-in user
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, so a layout can hand an island its slots:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user` and `ctx.can(role)`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')` ([Request values](../../../llms/request-values.md)):
 
 ```kay
 ---
@@ -28,13 +28,13 @@ nav
 
 ### Show them with the first bytes
 
-A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut` or `UserMenu`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
+A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut`, `UserMenu` or any template reading `ctx`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
 
 - A page reading the session is the visitor's own: no cache shares it between visitors, and a page kept by the build is rendered per request.
 - A read that fails there is left to the components, which read again and report it, showing nothing meanwhile.
-- `viewer: true` in `auth({ ... })` reads the user on every page, for an app whose own components call `currentUser`; `viewer: false` reads it on none, and the three stream in after the page, a block each, which needs JavaScript.
+- `viewer: true` in `auth({ ... })` reads the user on every page, for an app whose own components call `currentUser`; `viewer: false` and the default read it only where a template reads `ctx`.
 
 ## Reference
 
-- `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching the components read the user; `true` reads it on every page, `false` on none.
+- `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching a template reading `ctx` read the user; `true` reads it on every page.
 - `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut` takes none. All three import from `@kaynooo/kayjs-auth/components/<name>.kay`.

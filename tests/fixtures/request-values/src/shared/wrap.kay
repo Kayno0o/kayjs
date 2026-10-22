@@ -1,0 +1,5 @@
+---
+import Gate from '../../lib/gate.kay'
+---
+Gate
+  slot

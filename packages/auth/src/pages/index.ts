@@ -239,14 +239,11 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
 }
 
 const VIEWER_LAYOUT = `${import.meta.dir}/../viewer-layout/_layout.kay`
-const VIEWER_COMPONENTS = ['signed-in', 'signed-out', 'user-menu'].map(name => `${import.meta.dir}/../components/${name}.kay`)
+const CONTEXT = `${import.meta.dir}/../context.ts`
 
-// The layout reading the user ahead of the render: on the pages reaching a component showing it, on every page for `true`, on none for `false`.
-function viewerLayout(viewer: boolean | undefined): { layout?: string | { file: string, reaching: string[] } } {
-  if (viewer === false)
-    return {}
-
-  return { layout: viewer === true ? VIEWER_LAYOUT : { file: VIEWER_LAYOUT, reaching: VIEWER_COMPONENTS } }
+// `ctx.user` and `ctx.can` for the templates, read ahead of the pages reaching one; `viewer: true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
+function viewerExtension(viewer: boolean | undefined): { context: string, layout?: string } {
+  return { context: CONTEXT, ...viewer === true && { layout: VIEWER_LAYOUT } }
 }
 
 export interface AuthExtensionOptions extends AuthPagesOptions {
@@ -256,7 +253,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
-  // `SignedIn`, `SignedOut` and `UserMenu` show on the first bytes, even with JavaScript off, because the user is read before the render of each page whose imports reach one of them, and of no other. `true` reads it on every page, for an app whose own components call `currentUser`; `false` reads it on none, the three then streaming in after the page, which needs JavaScript.
+  // Templates read `ctx.user` and `ctx.can(role)` with no option, as `SignedIn`, `SignedOut` and `UserMenu` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
   viewer?: boolean | undefined
   // `false` builds no plugin, for an app mounting the plugin by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone.
   plugin?: false | undefined
@@ -300,7 +297,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     appFiles: APP_FILES,
     server: async app => (await build(app)).plugin,
     ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
-    ...viewerLayout(options.viewer),
+    ...viewerExtension(options.viewer),
     env: ownEnv(options),
     devTool: DEV_TOOL,
     commands: COMMANDS,
@@ -323,7 +320,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
     ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
-    ...viewerLayout(viewer),
+    ...viewerExtension(viewer),
     devTool: DEV_TOOL,
     commands: COMMANDS,
     prefix,

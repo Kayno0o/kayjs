@@ -237,7 +237,8 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   const diagnostics: CheckDiagnostic[] = []
   const editor = editorOf(root, options.extensions, diagnostics)
   const localEditor = editor !== undefined && linked(editor) ? editor : undefined
-  const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
+  // Kay's own context layout is no extension package to follow: its package is kay itself.
+  const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.filter(mount => mount.reaching !== 'context').map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
   const files = [...new Set(followed.flatMap(library => library.files))]
   const programs = await extensionPrograms(root, options, followed.filter(library => library.extension), tree, diagnostics)
   // The editor finds a package's tsconfig for the files beside the app but not under a `node_modules`, where tsgo takes them as the app's imports: a package of a program is shadowed beside its real path, and the shadows under `node_modules` are a link to them.

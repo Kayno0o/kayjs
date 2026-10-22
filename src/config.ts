@@ -432,6 +432,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   layout?: string | { file: string, reaching: string[] } | undefined
   // Stylesheets the app's own stylesheets may `@apply` utilities from and read `theme()` tokens of with no `@reference` line, as if each began with one: absolute paths, or specifiers Tailwind resolves from the stylesheet. kay adds an `@reference` after the Tailwind import of each stylesheet of the app, which writes no rule, so a stylesheet that already imports or references the file is not loaded twice.
   references?: string[] | undefined
+  // A module whose default export is `defineContext(load)` from `kay/library`, absolute or relative to the project root: `load(request)` returns the request values the extension gives every template as `ctx`, `ctx.user` or `ctx.can('admin')`, with no `--- server` fence. It runs at most once per request, ahead of the render of each page whose imports reach a template that reads `ctx`, and of no other, which is then the visitor's own as a page reading `ctx.locals` is. `kay check` and the editor type `ctx` off the module itself; two extensions giving one key stop the page.
+  context?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
   // A prefix starting with `/_kay/` is absolute, served there whatever `apiPath` is. `former` is the prefix it had under `apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
   api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
@@ -515,6 +517,11 @@ export async function appModules(root: string, { name, appFiles }: Pick<KayExten
 
     return [key, hasAppFile(file) ? await importModule<Record<string, unknown>>(file) : undefined] as const
   })))
+}
+
+// The `context` modules of the extensions, as absolute paths: an executable reads the copy it holds, keyed by where the build found the file.
+export function extensionContexts(root: string, extensions: KayExtension[] | undefined): string[] {
+  return (extensions ?? []).flatMap(({ context }) => context === undefined ? [] : [resolve(bundled()?.root ?? root, context)])
 }
 
 // The module files the extensions name their server plugin by, as the executable holds them.

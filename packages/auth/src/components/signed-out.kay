@@ -1,9 +1,3 @@
----
-import { isSignedOut } from '../viewer'
-
-const signedOut = isSignedOut()
----
-try
-  await signedOut then out
-    if out
-      slot
+// A visitor with no account, or a guest.
+if !ctx.user
+  slot

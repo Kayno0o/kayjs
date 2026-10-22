@@ -1,0 +1,4 @@
+--- server
+export const page = { guards: false }
+---
+p#plain Nothing about the visitor

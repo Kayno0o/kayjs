@@ -2,22 +2,19 @@
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import { currentUser, currentViewer } from '../viewer'
+import { currentViewer } from '../viewer'
 
 // `account={false}` leaves out the link to the account page, as the account page itself does.
 const { account = true } = props<{ account?: boolean }>()
 const features = currentViewer().auth.features()
-const user = currentUser()
 const accountPage = features.pages ? localize(`${features.pages.prefix}/account`) : null
 const home = localize(features.pages?.home ?? '/')
 ---
-try
-  await user then found
-    if found
-      .kayjs-auth.flex.flex-wrap.items-center.gap-3
-        span.text-kui-muted {found.username ?? found.email}
-        if account && accountPage
-          a(href={accountPage}) {wording('auth.account.title', 'Your account')}
-        form(method="post" action={`${features.prefix}/sign-out`})
-          input(type="hidden" name="redirect" value={home})
-          Button(type="submit" label={wording('auth.account.signOut', 'Sign out')})
+if ctx.user as found
+  .kayjs-auth.flex.flex-wrap.items-center.gap-3
+    span.text-kui-muted {found.username ?? found.email}
+    if account && accountPage
+      a(href={accountPage}) {wording('auth.account.title', 'Your account')}
+    form(method="post" action={`${features.prefix}/sign-out`})
+      input(type="hidden" name="redirect" value={home})
+      Button(type="submit" label={wording('auth.account.signOut', 'Sign out')})

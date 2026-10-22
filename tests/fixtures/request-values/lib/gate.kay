@@ -1,0 +1,5 @@
+if ctx.user
+  p#who {ctx.user.name}
+if ctx.can('admin')
+  p#admin Admin
+slot

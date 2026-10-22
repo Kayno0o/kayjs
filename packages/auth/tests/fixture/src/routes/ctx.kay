@@ -1,0 +1,9 @@
+--- server
+export const page = { guards: false }
+---
+if ctx.user as signedIn
+  p#who {signedIn.email}
+else
+  p#who Anonymous
+if ctx.can('admin')
+  p#admin Admin

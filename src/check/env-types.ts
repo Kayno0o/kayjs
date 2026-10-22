@@ -108,6 +108,18 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
       return []
     }
   })
+  // The modules extensions give `ctx` to templates by, typed off the modules themselves, skipping one that does not resolve (the server reports it).
+  const contexts = (options.extensions ?? []).flatMap(({ context }) => {
+    if (context === undefined)
+      return []
+
+    try {
+      return [modulePath(Bun.resolveSync(resolve(root, context), root))]
+    }
+    catch {
+      return []
+    }
+  })
   const content = existsSync(paths.content) ? modulePath(paths.content) : undefined
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
   const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG
@@ -123,11 +135,11 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // The modules declaring a `s.Public` field, whose `defineEnv` results carry the type of what an island reads.
   const publicModules = publicEnvFiles(root).filter(file => file.endsWith('.ts')).map(file => modulePath(join(root, file)))
 
-  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named, publicModules)
+  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named, publicModules, contexts)
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, serverModules: { module: string, name: string }[] = [], endpoints: string[] = [], named: string[] = [], publicModules: string[] = []): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, serverModules: { module: string, name: string }[] = [], endpoints: string[] = [], named: string[] = [], publicModules: string[] = [], contexts: string[] = []): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
@@ -147,13 +159,14 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${pageNames}${modules}${publicEnv} }`,
     ...inferred.length === 0 ? [] : [`  interface Inferred { ${inferred.join(', ')} }`],
+    ...contexts.length === 0 ? [] : [`  interface TemplateValues { values: ${contexts.map(file => `ContextOfModule<typeof import(${importSpecifier(file)})>`).join(' & ')} }`],
     '}',
     '',
     'declare global {',

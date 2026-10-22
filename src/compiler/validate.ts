@@ -5,7 +5,7 @@ import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
-import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, serverIslandOf, templateFacts } from './ast'
+import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer' | 'pageFile'>
 
@@ -35,6 +35,8 @@ const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
 const QUERY: PageSettingName = 'query'
+// A template reading `ctx`, not a member of another object.
+const CTX_READ = /(?<![\w$.])ctx\b/
 // Inside `svg` and `math`, HTML reads a `style` or `script` as markup, not text, back to HTML in a `foreignObject`.
 const FOREIGN = new Set(['svg', 'math'])
 const RAW_TEXT = new Set(['style', 'script'])
@@ -195,6 +197,9 @@ class Validator {
     if (query && this.options.special)
       this.error(query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
+    if ((this.options.island !== undefined || this.options.insideIsland === true) && [...script.implicit, ...server?.implicit ?? []].includes('ctx'))
+      this.ctxInIsland()
+
     const head = this.head(this.file.template)
 
     if (this.file.typeParameters && server)
@@ -247,6 +252,18 @@ class Validator {
       if (attribute.kind !== 'spread' && this.text(attribute.name).toLowerCase() === 'dir')
         this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's language`, { help: 'set `lang` on the page, or in kay.config.ts' })
     }
+  }
+
+  // The request values live on the server, where the first render of an island runs, but its hydration in the browser has none.
+  private ctxInIsland() {
+    let found: Span | undefined
+
+    visitNodes(this.file.template, (node) => {
+      found ??= nodeExpressions(node).find(span => CTX_READ.test(this.text(span)))
+    })
+
+    if (found)
+      this.error(found, '`ctx` is read on the server, which an island, rendering in the browser too, cannot', { help: 'read it in the page or a static component and pass the value in as a prop' })
   }
 
   // An island renders in the browser too, where it keeps the title alone in step with what it reads.

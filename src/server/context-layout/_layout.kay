@@ -1,0 +1,7 @@
+--- server
+import { loadTemplateContext } from 'kay/internal'
+
+// Loads the request values the extensions give templates as `ctx`, ahead of the render of the pages reaching a template that reads it.
+await loadTemplateContext(ctx)
+---
+slot

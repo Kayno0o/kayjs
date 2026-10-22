@@ -11,7 +11,7 @@ import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { extensionServers, serverExtensions } from '../config'
+import { extensionContexts, extensionServers, serverExtensions } from '../config'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -207,5 +207,5 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     followEntryFiles(i18n.settings, collections)
   }
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
 }

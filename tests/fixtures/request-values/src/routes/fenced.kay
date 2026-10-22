@@ -1,0 +1,6 @@
+--- server
+const shown = ctx.url.pathname
+---
+p#path {shown}
+if ctx.user
+  p#name {ctx.user.name}

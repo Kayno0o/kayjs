@@ -33,7 +33,12 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
 
   const url = requestUrl(request)
 
-  return store.run({ values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
+  return store.run({ request, values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
+}
+
+// The request the render being run answers.
+export function scopeRequest(): Request | undefined {
+  return store.getStore()?.request
 }
 
 const outcomes = new AsyncLocalStorage<() => Outcome | null>()

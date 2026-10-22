@@ -6,6 +6,7 @@ export { actionStub, formAction, formChecked, formDescribed, formError, formInva
 export { registerImage } from './image'
 export { registerPlaceholder } from './placeholder'
 export { uiRecipe } from './recipe'
+export { loadTemplateContext } from './template-context'
 
 // Takes the rejection of a server value an `await` block renders by name right where it is declared, so no later statement of the fence can leave it unhandled; any other promise is held by the server until its block takes it.
 export function autoDefer<T>(value: T): T {

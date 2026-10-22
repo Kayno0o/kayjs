@@ -1131,7 +1131,7 @@ describe('a page reading only what its path fixes', () => {
 
   // One page per spelling, each a server fence reading `ctx` the way its name says.
   const KEPT_READS: Record<string, string> = {
-    'direct': 'p {ctx.url.pathname}\n',
+    'direct': '--- server\nconst here = ctx.url.pathname\n---\np {here}\n',
     'split': '--- server\nconst parts = ctx.url.pathname.split(\'/\').filter(Boolean)\n---\np {parts[0]}\n',
     'optional chain': '--- server\nconst path = ctx?.url?.pathname\n---\np {path}\n',
     'compared': '--- server\nconst home = ctx.url.pathname === \'/\'\n---\np {home}\n',
@@ -1142,6 +1142,7 @@ describe('a page reading only what its path fixes', () => {
     'params destructured': '--- server\nconst { params, url: { pathname } } = ctx\n---\np {pathname}{params.slug}\n',
   }
   const STOPPED_READS: Record<string, string> = {
+    'a template reading ctx': 'p {ctx.user}\n',
     'search': 'p {ctx.url.search}\n',
     'search params': 'p {ctx.url.searchParams.get(\'q\')}\n',
     'indexed': 'p {ctx.url[\'search\']}\n',

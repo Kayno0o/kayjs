@@ -10,6 +10,7 @@ export const KAY_VALUES: readonly string[] = [
   'batch',
   'call',
   'context',
+  'ctx',
   'debounced',
   'defer',
   'defineUi',

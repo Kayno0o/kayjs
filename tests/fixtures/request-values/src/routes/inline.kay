@@ -1,0 +1,4 @@
+if ctx.user
+  p#name {ctx.user.name}
+else
+  p#name Guest

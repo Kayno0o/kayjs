@@ -110,8 +110,8 @@ export interface RouteMount {
   apiPath?: string | undefined
   // A layout the extension wraps every page in, outside the app's own: the mount serves no page and holds no other layout.
   outer?: string | undefined
-  // Set with `outer`: the layout wraps only the pages reaching one of these files.
-  reaching?: string[] | undefined
+  // Set with `outer`: the layout wraps only the pages reaching one of these files, or for `'context'` a template that reads `ctx`.
+  reaching?: string[] | 'context' | undefined
 }
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
@@ -364,7 +364,15 @@ export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[
 // The keys each file read so far sets to `false` in its `page`, so a scan reads a layout once however many pages it wraps.
 type LayoutsRead = Map<string, Set<string>>
 
+// The layouts around a page, outermost first. The one loading the values of `ctx` stays first even for a page leaving the chain, as it has no place in what it draws.
 function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
+  const chain = ownLayouts(trees, at, file, read)
+  const loading = trees.flatMap(tree => tree.reaching === 'context' && tree.outer !== undefined && reaches([file, ...chain], 'context', read) ? [tree.outer] : [])
+
+  return [...loading, ...chain]
+}
+
+function ownLayouts(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
   if (setsFalse(file, 'layouts', read))
     return []
 
@@ -375,7 +383,7 @@ function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsR
   if (reset !== -1)
     return layouts.slice(reset)
 
-  const outers = trees.flatMap(tree => tree.outer !== undefined && (tree.reaching === undefined || reaches([file, ...layouts], tree.reaching, read)) ? [tree.outer] : [])
+  const outers = trees.flatMap(tree => tree.outer !== undefined && tree.reaching !== 'context' && (tree.reaching === undefined || reaches([file, ...layouts], tree.reaching, read)) ? [tree.outer] : [])
 
   return [...outers, ...layouts]
 }
@@ -429,15 +437,16 @@ function importsOf(file: string, read: LayoutsRead): string[] {
   return found
 }
 
-// Whether the import graph from `starts` reaches one of `targets`.
-function reaches(starts: string[], targets: string[], read: LayoutsRead): boolean {
+// Whether the import graph from `starts` reaches one of `targets`, or a template reading `ctx` for `'context'`.
+function reaches(starts: string[], targets: string[] | 'context', read: LayoutsRead): boolean {
   let memo = reachRead.get(read)
 
   if (memo === undefined)
     reachRead.set(read, memo = new Map<string, boolean>())
 
-  const wanted = new Set(targets.map(realFile))
-  const key = targets.join('\0')
+  const files = targets === 'context' ? undefined : new Set(targets.map(realFile))
+  const wanted = files === undefined ? (file: string) => readsContext(file, read) : (file: string) => files.has(file)
+  const key = targets === 'context' ? targets : targets.join('\0')
 
   return starts.some((start) => {
     const at = `${key}\0${start}`
@@ -450,12 +459,12 @@ function reaches(starts: string[], targets: string[], read: LayoutsRead): boolea
   })
 }
 
-function walk(start: string, wanted: Set<string>, read: LayoutsRead): boolean {
+function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRead): boolean {
   const seen = new Set<string>()
   const queue = [start]
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
-    if (wanted.has(file))
+    if (wanted(file))
       return true
 
     if (!seen.has(file)) {
@@ -465,6 +474,44 @@ function walk(start: string, wanted: Set<string>, read: LayoutsRead): boolean {
   }
 
   return false
+}
+
+// A fence opens with `---` or `--- server` and closes with `---`.
+const FENCE_LINE = /^---(?:[ \t]+\w+)?[ \t]*$/
+// Over-reads a word in text or a string, which only loads the values for a page that did not need them.
+const CTX_WORD = /(?<![\w$.])ctx\b/
+const contextRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
+
+// Whether the template of a `.kay` file, outside its fences, reads `ctx`.
+function readsContext(file: string, read: LayoutsRead): boolean {
+  if (!KAY_FILE.test(file))
+    return false
+
+  let memo = contextRead.get(read)
+
+  if (memo === undefined)
+    contextRead.set(read, memo = new Map<string, boolean>())
+
+  let found = memo.get(file)
+
+  if (found === undefined) {
+    let inFence = false
+    const template: string[] = []
+
+    try {
+      for (const line of readFileSync(file, 'utf8').split('\n')) {
+        if (FENCE_LINE.test(line))
+          inFence = !inFence
+        else if (!inFence)
+          template.push(line)
+      }
+    }
+    catch {}
+
+    memo.set(file, found = CTX_WORD.test(template.join('\n')))
+  }
+
+  return found
 }
 
 function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
@@ -721,8 +768,11 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
 // The prefix of an outer layout's mount, which no URL starts with.
 const OUTER_PREFIX = '/\0outer'
 
-function outerMount(layout: string, reaching?: string[]): RouteMount {
-  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching && { reaching } }
+// The layout kay mounts first when an extension gives a `context`, loading its values for the pages reaching a template that reads `ctx`.
+const CONTEXT_LAYOUT = `${import.meta.dir}/context-layout/_layout.kay`
+
+function outerMount(layout: string, reaching?: string[] | 'context'): RouteMount {
+  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching !== undefined && { reaching } }
 }
 
 // The files a layout's `reaching` names, which must exist: a typo would wrap no page and say nothing.
@@ -750,10 +800,12 @@ function checkedLayout(root: string, layout: string, verify: boolean): string {
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 // `verify` is false in an executable, whose library code names the folders it was bundled from and whose routes are embedded already.
 export function routeMounts(root: string, extensions: KayExtension[] = [], verify = true): RouteMount[] {
-  return extensions.flatMap(({ routes, editor, layout }) => [
+  const contexts = extensions.some(extension => extension.context !== undefined) ? [outerMount(CONTEXT_LAYOUT, 'context')] : []
+
+  return [...contexts, ...extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
     ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout, verify))) : outerMount(throughLinks(root, checkedLayout(root, layout.file, verify)), reachingFiles(root, layout.reaching, verify))],
-  ])
+  ])]
 }
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.

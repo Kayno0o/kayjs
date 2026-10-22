@@ -13,6 +13,8 @@ export const prove = action(schemas.proof, async (input, ctx) => {
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
+
+  return undefined
 })
 
 export const remove = action(schemas.proof, async (input, ctx) => {

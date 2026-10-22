@@ -1,0 +1,3 @@
+if ctx.can('admin')
+  nav#admin-nav Admin menu
+slot

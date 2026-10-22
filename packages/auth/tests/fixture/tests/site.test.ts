@@ -142,6 +142,28 @@ describe('the prebuilt pages', () => {
     expect(nested.find('.kayjs-auth form button').map(button => button.text)).toEqual(['Sign out'])
   })
 
+  test('a template reads ctx.user and ctx.can with no fence, in the first bytes, and a page reaching no template reads no session', async () => {
+    const anonymous = await (await browser()).visit('/ctx')
+
+    expect(text(anonymous, '#who')).toBe('Anonymous')
+    expect(anonymous.find('#admin')).toHaveLength(0)
+
+    const ada = await signedUp('ctx@example.com')
+    const member = await ada.visit('/ctx')
+
+    expect(text(member, '#who')).toBe('ctx@example.com')
+    expect(member.find('#admin')).toHaveLength(0)
+    expect((await ada.fetch('/ctx')).headers.get('cache-control')).toBe('private, no-cache')
+
+    await store.users.update((await store.users.findByEmail('ctx@example.com'))!.id, { roles: ['admin'] })
+    expect(text(await ada.visit('/ctx'), '#admin')).toBe('Admin')
+
+    const plain = await ada.fetch('/plain')
+
+    expect(plain.status).toBe(200)
+    expect(plain.headers.get('cache-control') ?? '').not.toContain('private')
+  })
+
   test('the pages reached before signing in open under the app\'s guard asking for a session, which keeps its own pages', async () => {
     const visitor = await browser()
 

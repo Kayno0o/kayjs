@@ -5,7 +5,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
-import { CONFIG_FILE, extensionAppFiles, extensionServerModules, pluginFiles, serverExtensions } from '../config'
+import { CONFIG_FILE, extensionAppFiles, extensionContexts, extensionServerModules, pluginFiles, serverExtensions } from '../config'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
@@ -103,7 +103,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const plugins = pluginFiles(root)
   const endpoints = await scanEndpoints(routesDir, mounts)
   const editor = extensionEditor(root, config.extensions)
-  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
