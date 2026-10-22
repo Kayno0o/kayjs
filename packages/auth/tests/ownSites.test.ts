@@ -12,11 +12,11 @@ it('signs each real test site in through its own auth()', async () => {
   const first = await testSite({ root: ROOT })
   const second = await testSite({ root: ROOT, base: '/b' })
 
-  await authTest(first).signInAs({ email: 'ada@example.com', username: 'Ada' })
+  const ada = await authTest(first).signInAs({ email: 'ada@example.com', username: 'Ada' })
 
   expect(await who(first)).toBe('Signed in as ada@example.com')
 
-  const cookie = await authTest(first).sessionCookie((await authTest(first).signInAs({ email: 'ada@example.com', username: 'Ada' })).id)
+  const cookie = await authTest(first).sessionCookie(ada.id)
 
   await authTest(second).signInAs({ email: 'bob@example.com', username: 'Bob' })
 
