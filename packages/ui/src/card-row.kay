@@ -2,7 +2,6 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({ parts: { root: 'kui-card-row', body: 'kui-card-row-body', actions: 'kui-card-row-actions' } })
 
 const { left, right, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & {

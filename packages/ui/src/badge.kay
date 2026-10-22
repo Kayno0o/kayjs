@@ -5,14 +5,14 @@ import { recipe } from 'kay'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
-const badge = recipe({
+const look = recipe({
   parts: { root: 'kui-badge', icon: 'kui-badge-icon' },
   variants: { tone: { neutral: '', accent: '', success: '', warning: '', danger: '', info: '' } },
   defaults: { tone: 'neutral' },
 })
 
 const { tone = 'neutral', icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
   // Drawn as a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.

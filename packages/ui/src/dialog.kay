@@ -2,7 +2,6 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({ parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' } })
 
 const { open, title, level = 2, dirty = false, onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {

@@ -2,15 +2,15 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` restyles the box or a tone.
-const notice = recipe({
+const look = recipe({
   parts: { root: 'kui-notice' },
-  // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
   variants: { tone: { info: '', success: '', warning: '', danger: '' } },
   defaults: { tone: 'info' },
 })
 
 const { tone = 'info', label, compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+  // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
+  tone?: 'info' | 'success' | 'warning' | 'danger' | undefined
   label?: string | undefined
   // A line of text without the box, such as under a form's fields.
   compact?: boolean | undefined

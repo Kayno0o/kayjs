@@ -102,8 +102,8 @@ export default defineUi({
 ```
 
 - Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
-- The parts are the `kui-` classes without the component's prefix: Card has `root`, `head`, `title` and `body`; Dialog `title`, `body` and `footer`; Table `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton` and more, listed in the component's script; Button `root` and `spinner`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button).
-- Button restyled through `button.kay` reaches the button with an `onClick` too, but its `spinner` while busy needs the `internal/busy-button.kay` key.
+- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`; Dialog `root`, `title`, `body` and `footer`; Table `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`; Button `root` and `spinner`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
+- A Button with an `onClick` hands its root classes to its busy button, so `button.kay` reaches it, but its `spinner` part is set through the `@kaynooo/kayjs-ui/internal/busy-button.kay` key, `class={{ spinner: ... }}` included.
 - The other components have no parts yet and still restyle through their `kui-` classes.
 
 ### Testing an app's use of it

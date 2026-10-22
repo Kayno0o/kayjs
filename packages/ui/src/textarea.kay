@@ -4,8 +4,7 @@ import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
-const textarea = recipe({ parts: { root: 'kui-field-input' } })
+const look = recipe({ parts: { root: 'kui-field-input' } })
 
 const { value, onInput, onChange, onBlur, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.

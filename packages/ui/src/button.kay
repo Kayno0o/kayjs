@@ -8,7 +8,6 @@ import BusyButton from './internal/busy-button.kay'
 import { buttonOf, linkOf } from './button-props'
 import Icon from './icon.kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({
   parts: { root: 'kui-btn', spinner: 'kui-spinner' },
   variants: {
@@ -66,7 +65,7 @@ else if linkOf(attributes) as link
 else if buttonOf(attributes) as button
   button({...button} part="root" data-variant={variant} data-size={size} aria-busy={busy ? 'true' : undefined})
     if busy
-      Icon(icon="spinner" class="kui-spinner")
+      Icon(icon="spinner" part="spinner")
     else if icon
       Icon(icon={icon})
     | {label}

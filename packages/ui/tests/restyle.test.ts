@@ -13,6 +13,7 @@ const OUT = join(ROOT, 'node_modules', '.cache', 'out')
 const MARKERS = /<!--[[\]]-->/g
 
 let html = ''
+let browser = ''
 
 beforeAll(async () => {
   if (!existsSync(LINK)) {
@@ -28,6 +29,13 @@ beforeAll(async () => {
   const { Page } = await import(build.outputs[0]!.path) as { Page: (props: Record<string, unknown>) => unknown }
 
   html = child(Page({})).replace(MARKERS, '')
+
+  const dom = await Bun.build({ entrypoints: [join(ROOT, 'src/entry.ts')], outdir: join(OUT, 'dom'), target: 'browser', plugins: [kay({ root: ROOT, target: 'dom' })] })
+
+  if (!dom.success)
+    throw new AggregateError(dom.logs, 'browser build failed')
+
+  browser = await dom.outputs[0]!.text()
 }, 60_000)
 
 afterAll(async () => rm(OUT, { recursive: true, force: true }))
@@ -47,7 +55,12 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-field-input min-h-32',
     'kui-dialog-title text-xl',
     'kui-dialog-footer justify-end',
+    'kui-table-wrap gap-3',
     'kui-table text-sm',
+    'kui-icon kui-table-sort-icon size-4',
+    'kui-field-input kui-table-filter-input w-64',
+    'kui-table-count text-xs',
+    'kui-table-selection mb-2',
     'kui-table-head-cell uppercase',
     'kui-table-cell py-4',
     'kui-avatar-initial font-bold',
@@ -64,6 +77,20 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
 
   test('a button with an onClick takes the restyle of Button once, not twice', () => {
     expect(html).toMatch(/<button id="busy"[^>]* class="kui-btn tracking-wide">/)
+  })
+
+  test('a busy button and a busy link draw the spinner part restyled, a button with an onClick its own spinner part', () => {
+    expect(html.match(/class="kui-icon kui-spinner size-5"/g)).toHaveLength(2)
+    expect(html.match(/class="kui-icon kui-spinner"/g)).toHaveLength(1)
+  })
+
+  test('a class string on a button with an onClick joins the restyle', () => {
+    expect(html).toMatch(/<button id="single"[^>]* class="kui-btn rounded-none">/)
+  })
+
+  test('the browser build of an island carries the restyled classes as well', () => {
+    for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none'])
+      expect(browser).toContain(classes)
   })
 
   test('a part nothing restyles keeps its kui class alone', () => {

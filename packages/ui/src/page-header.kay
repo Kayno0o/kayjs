@@ -2,7 +2,6 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({ parts: { root: 'kui-page-header', head: 'kui-page-header-head', title: 'kui-page-header-title', meta: 'kui-page-header-meta', actions: 'kui-page-header-actions', description: 'kui-page-header-description' } })
 
 const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {

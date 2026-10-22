@@ -9,7 +9,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/text-input.kay': { parts: 'h-12' },
   '@kaynooo/kayjs-ui/textarea.kay': { parts: 'min-h-32' },
   '@kaynooo/kayjs-ui/dialog.kay': { parts: { title: 'text-xl', footer: 'justify-end' } },
-  '@kaynooo/kayjs-ui/table.kay': { parts: { table: 'text-sm', headCell: 'uppercase', cell: 'py-4' } },
+  '@kaynooo/kayjs-ui/table.kay': { parts: { root: 'gap-3', table: 'text-sm', headCell: 'uppercase', cell: 'py-4', sortIcon: 'size-4', filterInput: 'w-64', count: 'text-xs', selection: 'mb-2' } },
   '@kaynooo/kayjs-ui/avatar.kay': { parts: { initial: 'font-bold' } },
   '@kaynooo/kayjs-ui/stat.kay': { parts: { value: 'tabular-nums' } },
   '@kaynooo/kayjs-ui/page-header.kay': { parts: { title: 'tracking-tight' } },

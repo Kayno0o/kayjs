@@ -5,7 +5,6 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({ parts: { root: 'kui-stat-badge', value: 'kui-stat-value', label: 'kui-stat-label' } })
 
 const { value, label, icon, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {

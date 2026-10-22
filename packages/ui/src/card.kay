@@ -2,8 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
-const card = recipe({ parts: { root: 'kui-card', head: 'kui-card-head', title: 'kui-card-title', body: 'kui-card-body' } })
+const look = recipe({ parts: { root: 'kui-card', head: 'kui-card-head', title: 'kui-card-title', body: 'kui-card-body' } })
 
 const { title, level = 3, head, bare = false, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   // Engraved along the top, on a rule of its own.

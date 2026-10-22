@@ -4,7 +4,6 @@ import type { JSX } from 'kay'
 import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, signal } from 'kay'
 
-// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
 const look = recipe({ parts: { root: 'kui-avatar', image: 'kui-avatar-image', initial: 'kui-avatar-initial' } })
 
 const { src, name, size = 'md', label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {

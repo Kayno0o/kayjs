@@ -21,6 +21,10 @@ Card#card(title="Hi" class={{ body: 'p-9' }}) Body
 Button#plain(label="Plain" tone="danger")
 Button#busy(label="Busy" variant="inline" icon="info" onClick={() => undefined})
 Button#link(label="Link" href="/" variant="inline")
+Button#spinning(label="Saving" busy)
+Button#spinning-click(label="Saving" busy onClick={() => undefined})
+Button#spinning-link(label="Saving" busy href="/")
+Button#single(label="Single" onClick={() => undefined} class="rounded-none")
 Badge#badge(label="New" tone="success")
 Notice#notice(label="Saved" tone="danger")
 TextInput#text(name="a")
@@ -29,7 +33,7 @@ Dialog#dialog(open={true} title="Rename" onOpenChange={() => undefined})
   @footer
     p footer
   p body
-Table#table(columns={[{ key: 'name', header: 'Name', sortValue: true as const }]} rows={planets} rowKey="id")
+Table#table(columns={[{ key: 'name', header: 'Name', sortValue: true as const }]} rows={planets} rowKey="id" sort={{ key: 'name', direction: 'asc' }} filter={['name'] as const} selectable)
 Avatar#avatar(name="Mars")
 Stat#stat(value={3} label="moons")
 PageHeader#header(title="Planets")
