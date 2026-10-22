@@ -61,6 +61,13 @@ describe('kayjs-mail\'s texts next to another library\'s catalog', () => {
     expect(code).toBe(0)
   }, TIMEOUT)
 
+  it('check an app with i18n on English and French and no file of its own, the libraries wording English inline', async () => {
+    const { code, output } = await check(await project(['ui', 'mail'], I18N, {}))
+
+    expect(output.slice(0, 600)).toMatch(CLEAN)
+    expect(code).toBe(0)
+  }, TIMEOUT)
+
   it('check an app with i18n on English and French', async () => {
     const { code, output } = await check(await project(['ui', 'mail'], I18N, { ...APP_EN, ...APP_FR }))
 

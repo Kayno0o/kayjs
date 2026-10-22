@@ -32,7 +32,8 @@ export function authWords(mail: AuthMail): AuthWords {
   const maxAge = mail.maxAge ?? mail.expires
   const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? wording('mail.auth.once', ', once') : '')
   const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? wording(`mail.auth.${kind}.lasts`, english.lasts ?? '') : ''
-  const code = maxAge?.code === undefined ? wording('mail.auth.codeWorks', 'The code works for {duration}, typed where you asked for it.', { duration: wording('mail.auth.codeLasts', '10 minutes') }) : wording('mail.auth.codeWorks', 'The code works for {duration}, typed where you asked for it.', { duration: durationWords(maxAge.code, mail.locale) })
+  const duration = maxAge?.code === undefined ? wording('mail.auth.codeLasts', '10 minutes') : durationWords(maxAge.code, mail.locale)
+  const code = wording('mail.auth.codeWorks', 'The code works for {duration}, typed where you asked for it.', { duration })
   const ending = [lasts === '' ? undefined : wording('mail.auth.linkWorks', 'The link works for {duration}.', { duration: lasts }), mail.code === undefined ? undefined : code, of('ending')]
 
   return {

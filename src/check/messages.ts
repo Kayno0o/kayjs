@@ -178,8 +178,8 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   const libraries = extensionMessageFiles(root, extensions, locale).filter(existsSync)
   const own = existsSync(path)
 
-  // An extension's catalog stands in for an app with no text of its own in that locale.
-  if (!own && libraries.length === 0)
+  // An extension's catalog stands in for an app with no text of its own in that locale, and the default locale needs none while a library ships one in another, as `loadI18n` reads it.
+  if (!own && libraries.length === 0 && !(locale === config.defaultLocale && config.locales.some(other => extensionMessageFiles(root, extensions, other).some(existsSync))))
     return { problem: { file, line: 1, message: `is missing: i18n lists ${locale}, so its messages go here, export default defineMessages({ ... })` } }
 
   const tree = own ? (await import(path) as { default?: unknown }).default : {}
