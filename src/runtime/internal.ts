@@ -24,7 +24,10 @@ type Written<T> = T extends Signal<infer Value> ? Value : T
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
 
 // What a `let` may be assigned through the helper: a signal it holds takes its value or another signal; anything else is left to the assignment the helper sits in, which the declaration types, as the argument is narrowed where it is written.
-type BackValue<Current> = true extends (Current extends Signal<unknown> ? true : false) ? Current | Written<Current> : unknown
+type BackValue<Current> = [HeldSignal<Current>] extends [never] ? unknown : Current | Written<Current>
+
+// The signals among what `T` may be, matched by inferring what each holds, as a `Signal<number>` is no `Signal<unknown>`.
+type HeldSignal<T> = T extends Signal<infer Held> ? Signal<Held> : never
 
 // The signal a property holds, found without running an accessor: a getter alone is read, since assigning to it would throw, while a setter is the property's own way to be written. `read` answers what that getter returned, so a caller needing the value does not run it twice.
 function heldAt(object: unknown, key: PropertyKey): { held: Signal<unknown> | undefined, read: boolean, value?: unknown } {
