@@ -7,7 +7,7 @@ import { Elysia } from 'elysia'
 import { cacheReads, countJobRun, jobRuns } from '../src/runtime/counters'
 import { liveConnections } from '../src/server/live'
 import { statusOf } from '../src/server/log'
-import { metricsAllowed, warnMetricsOpen } from '../src/server/metrics'
+import { metricsAllowed } from '../src/server/metrics'
 import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
 import { pages } from './shared-pages'
 
@@ -198,7 +198,7 @@ describe('metrics', () => {
 
     expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
     expect(await status(`${url}/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect([200, 301, 308]).toContain((await fetch(`${url}/metrics`, { redirect: 'manual' })).status)
+    expect((await fetch(`${url}/metrics`, { redirect: 'manual' })).status).toBe(200)
   })
 
   it('counts no live connection while none is open', async () => {
@@ -208,15 +208,23 @@ describe('metrics', () => {
     expect(liveConnections()).toBe(0)
   })
 
-  it('warns at boot of a proxy without a token, and of nothing else', () => {
+  it('warns at boot of a proxy without a token, and of nothing else', async () => {
     const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnings = () => logged.mock.calls.flat().filter(line => String(line).includes('metrics is read by any request')).length
+    const proxy = { key: 'x-upstream-key' }
+    const env = { KAY_PROXY_KEY: KEY }
 
     try {
-      warnMetricsOpen(undefined)
-      warnMetricsOpen({ key: 'x-upstream-key' })
-      process.env.KAY_METRICS_TOKEN = TOKEN
-      warnMetricsOpen({ key: 'x-upstream-key' })
-      expect(logged.mock.calls.flat().filter(line => String(line).includes('metrics is read by any request'))).toHaveLength(1)
+      await listening({ metrics: true }, env)
+      expect(warnings()).toBe(0)
+      // A page at the path keeps it, so kay serves no metrics there.
+      await listening({ metrics: { path: '/contact' }, proxy }, env)
+      expect(warnings()).toBe(0)
+      await listening({ metrics: true, proxy }, { ...env, KAY_METRICS_TOKEN: TOKEN })
+      expect(warnings()).toBe(0)
+      delete process.env.KAY_METRICS_TOKEN
+      await listening({ metrics: true, proxy }, env)
+      expect(warnings()).toBe(1)
     }
     finally {
       logged.mockRestore()

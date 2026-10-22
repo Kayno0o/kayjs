@@ -111,6 +111,12 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
     return `${out.join('\n')}\n`
   }
 
+  // Known once every claim is in: an app file at the path keeps it, and kay serves nothing there.
+  app.onStart(() => {
+    if (options.holds())
+      warnMetricsOpen(options.proxy)
+  })
+
   // Answered as the request arrives, before routing, like the health route, so no extension's hook stands between a collector and the answer.
   app.onRequest(({ request, server }) => {
     if (!asked(request)) {
@@ -169,7 +175,7 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
 }
 
 // A proxy in front and no token: a proxy on this host that forwards the path without a mark of its own reads as a collector.
-export function warnMetricsOpen(proxy: ProxyConfig | undefined): void {
+function warnMetricsOpen(proxy: ProxyConfig | undefined): void {
   if (proxy !== undefined && metricsToken() === undefined)
     kayLog('warn', `metrics is read by any request from this machine or a private network that carries no proxy mark, and a proxy is set: do not forward its path, or set ${TOKEN_VARIABLE} so only a request with the token is answered`)
 }
