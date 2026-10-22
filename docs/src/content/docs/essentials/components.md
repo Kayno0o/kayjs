@@ -166,7 +166,7 @@ A prop is always a value: a parent hands a signal's value, `Toggle(open={open()}
 
 Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal is an error, `uncalled-signal`. Call it there.
 
-Assigning works on a signal held in a `const`, an import, a `let`, an object's property or an array element: `box.count = 1`, `list[2]++`. Where kay cannot tell a signal from a plain value, the runtime does, writing a signal and assigning anything else, and `kay check` types the write by what the target holds, so `box.count = 'x'` is a type error for a `Signal<number>`.
+Assigning works on a signal held in a `const`, an import, a `let`, an object's property or an array element: `box.count = 1`, `list[2]++`. Where kay cannot tell a signal from a plain value, the runtime does, writing a signal and assigning anything else, and `kay check` types the write by what the target holds, so `box.count = 'x'` is a type error for a `Signal<number>`. A `readonly` property or array element is an error as it is in plain code.
 
 A field of `this`, a write beside another write, a `let` written with an `await`, a compound write holding an `await`, and a `let` update whose value is read stay plain assignments, so write the signal there with `.set`.
 

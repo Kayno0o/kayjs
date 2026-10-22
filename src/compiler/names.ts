@@ -14,6 +14,8 @@ export const DEFAULTED = 'KayDefault('
 export const HANDED = 'KayHanded('
 // What an assignment to a property, an element or a `let` that may hold a signal becomes, the signal being told from anything else when it runs: `KayWriteTo(box, "count", 1)`, `c = KayWriteBack(c, 1)`. Type checking imports the same ones, whose signatures type the write by what the target holds.
 export const WRITE_HELPERS = { to: 'KayWriteTo', update: 'KayUpdateTo', back: 'KayWriteBack', updateBack: 'KayUpdateBack' } as const
+// What type checking passes a signal write after its value, never called: TypeScript judges the plain assignment in it, so a readonly key is an error as it is in plain code.
+export const PROBE = '(KayTarget, KayKey) => { KayTarget[KayKey] = undefined as never }'
 // A `case` block's subject, read once for every `when`.
 export const SUBJECT = 'KaySubject'
 // The server fence's function, which hands its data to the template.

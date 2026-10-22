@@ -883,6 +883,72 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a readonly property, a readonly array element and a getter-only accessor written as plain code does, and leaves generic, union and writable targets alone', async () => {
+    const box = [
+      'import { signal } from \'kay\'',
+      '',
+      'export interface Fixed { readonly id: number, n: number, count: ReturnType<typeof signal<number>> }',
+      'export function makeBox() {',
+      '  return { id: 1, n: 1, count: signal(0), rows: [1] as readonly number[], open: [1], get level() { return 1 } } as { readonly id: number, n: number, count: ReturnType<typeof signal<number>>, readonly rows: readonly number[], open: number[], readonly level: number }',
+      '}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import type { Fixed } from \'../box\'',
+      'import { makeBox } from \'../box\'',
+      '',
+      'const box = makeBox()',
+      'let picked = makeBox().n',
+      '',
+      'function generic<T extends { n: number }>(item: T) {',
+      '  item.n = 1',
+      '  item.n++',
+      '  item.n += 2',
+      '}',
+      '',
+      'function union(item: { n: number } | { n: number, extra: string }) {',
+      '  item.n = 1',
+      '}',
+      '',
+      'function writable() {',
+      '  box.n = 2',
+      '  box.count = 3',
+      '  box.open[0] = 4',
+      '  box.n++',
+      '  picked = 5',
+      '  picked++',
+      '}',
+      '',
+      'function readonly(fixed: Fixed, mixed: Fixed | { id: number, n: number }) {',
+      '  box.id = 2',
+      '  box.id++',
+      '  box.id += 1',
+      '  box.rows[0] = 2',
+      '  --box.rows[0]',
+      '  box.level = 3',
+      '  fixed.id = 2',
+      '  mixed.id = 2',
+      '}',
+      '---',
+      'button(onClick={() => generic({ n: 1 })}) generic',
+      'button(onClick={() => union({ n: 1 })}) union',
+      'button(onClick={writable}) writable',
+      'button(onClick={() => readonly({ id: 1, n: 1, count: box.count }, { id: 1, n: 1 })}) readonly',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[28, 'TS2540'], [29, 'TS2540'], [30, 'TS2540'], [31, 'TS2542'], [32, 'TS2542'], [33, 'TS2540'], [34, 'TS2540'], [35, 'TS2540']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves plain code as typed: generics, a private field, a narrowed let and a logical assignment', async () => {
     const box = [
       'export function makeBox() {',

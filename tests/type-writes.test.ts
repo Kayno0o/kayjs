@@ -13,12 +13,26 @@ function compiled(source: string, output: Output, check = false) {
   expect(result.diagnostics.map(d => d.message)).toEqual([])
   expect(() => parser.parse(result.tsx, { sourceType: 'module', plugins: ['typescript', 'jsx'] })).not.toThrow()
 
-  return result.tsx
+  // The probe type checking adds is read apart, in the test of it.
+  return check ? result.tsx.replaceAll(/(?:, undefined)?, \(KayTarget, KayKey\) => \{ KayTarget\[KayKey\] = undefined as never \}/g, '') : result.tsx
 }
 
 const SCRIPT = '---\nimport { makeBox } from \'./box\'\nconst box = makeBox()\nlet picked = makeBox().count\nfunction f() {\n  box.count = 1\n  box.list[2] = 3\n  box.count += 2\n  box.count++\n  --box.list[0]\n  picked = 4\n  picked *= 2\n  picked++\n}\n---\nbutton(onClick={() => box.count++}) go\n'
 
 describe('assignments the runtime tells from a write', () => {
+  it('hand type checking a probe of the plain assignment, and the browser and the server none', () => {
+    const probe = '(KayTarget, KayKey) => { KayTarget[KayKey] = undefined as never }'
+    const raw = (output: Output, check = false) => compileKay(SCRIPT, 'test.kay', check ? { check: true } : { output }).tsx
+    const checked = raw(undefined, true)
+
+    expect(checked).toContain(`KayWriteTo(box, "count", 1, ${probe})`)
+    expect(checked).toContain(`KayUpdateTo(box, "count", (KayCurrent) => KayCurrent + (2), undefined, ${probe})`)
+    expect(checked).toContain(`KayUpdateTo(box, "count", (KayCurrent) => ++KayCurrent, "post", ${probe})`)
+    expect(checked).toContain(`KayUpdateTo(box.list, 0, (KayCurrent) => --KayCurrent, undefined, ${probe})`)
+    expect(raw('dom')).not.toContain('KayTarget')
+    expect(raw('html')).not.toContain('KayTarget')
+  })
+
   it('write a property, an element and a let through helpers in an island, on the server and when type checking', () => {
     for (const code of [compiled(SCRIPT, 'dom'), compiled(SCRIPT, 'html'), compiled(SCRIPT, undefined, true)]) {
       expect(code).toContain('KayWriteTo(box, "count", 1)')

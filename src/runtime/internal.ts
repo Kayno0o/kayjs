@@ -20,6 +20,9 @@ type Keyed = Record<PropertyKey, unknown>
 // What a write to a place holding `T` takes: the value of a signal, anything else as it is.
 type Written<T> = T extends Signal<infer Value> ? Value : T
 
+// What type checking hands a write beside its value, `(KayTarget, KayKey) => { KayTarget[KayKey] = undefined as never }`: never called, it makes TypeScript judge the write as plain code, so a readonly key is an error and a generic or union target is typed as it is anywhere.
+type Probe<Target, Key extends keyof Target, Next extends Written<Target[Key]>> = (target: Target, key: Key) => void
+
 // What a `let` holds once written: the signal it held, else the value.
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
 
@@ -47,7 +50,7 @@ function heldAt(object: unknown, key: PropertyKey): { held: Signal<unknown> | un
 }
 
 // An assignment to `object[key]` whose target may hold a signal (a function, a signal included, replaces it, since a signal holds none), which `kay dev` and `kay build` run no types to learn: a signal is written, anything else is assigned as written. Type checking reads the same signature, so the target is typed by what it holds.
-export function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value): Value {
+export function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key>): Value {
   const { held } = heldAt(object, key)
 
   if (held !== undefined && typeof value !== 'function')
@@ -60,7 +63,7 @@ export function writeTo<Target, Key extends keyof Target, Value extends Written<
 
 // `object[key] += 1` and `object[key]++`: `update` gives the next value from the current one, `post` makes the expression the number it had, and `logical` (`||=`, `??=`) writes nothing when the value stays.
 // The expression is typed by what `update` gives, so `(box.list ??= []).push(item)` reads a list where the place may hold none.
-export function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: 'post' | 'logical'): Next {
+export function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: 'post' | 'logical', _probe?: Probe<Target, Key>): Next {
   const { held, read, value } = heldAt(object, key)
   let before: unknown
 
@@ -79,7 +82,7 @@ export function updateTo<Target, Key extends keyof Target, Next extends Written<
   }
 
   // `++` answers the number it read, not the string or the object it was.
-  return form === 'post' ? (typeof before === 'bigint' ? before : Number(before)) as Next : next
+  return form === 'post' ? (typeof before === 'bigint' ? before : Number(before)) as Next : next as Written<Target[Key]>
 }
 
 // A `let` assigned a signal's place, `variable = writeBack(variable, value)`: a signal is written and stays the variable's value, anything else is replaced. What type checking cannot tell a plain `let` from is left unchecked.

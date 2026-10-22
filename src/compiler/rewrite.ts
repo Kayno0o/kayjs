@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
+import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
 
 const LIVE_WRITES = new Set(['set', 'delete'])
 
@@ -860,7 +860,10 @@ class RewriteFinder {
       return
 
     if (node.type === 'UpdateExpression') {
-      const tail = `(${CURRENT}) => ${node.operator}${CURRENT}${node.prefix ? '' : ', "post"'})`
+      const checking = this.input.check === true
+      // The probe is the last argument, so a prefix update names the form it leaves out.
+      const form = node.prefix ? '' : ', "post"'
+      const tail = `(${CURRENT}) => ${node.operator}${CURRENT}${checking ? `${node.prefix ? ', undefined' : form}, ${PROBE}` : form})`
 
       if (node.prefix)
         rewrites.set(start, { replace: `${WRITE_HELPERS.update}(`, end: from })
@@ -897,7 +900,15 @@ class RewriteFinder {
       rewrites.set(opening, { replace: `, ${key}${head}`, end: rightFrom })
     }
 
-    this.insert(last + 1, LOGICAL.has(operator) ? '), "logical")' : `)${compound ? ')' : ''}`)
+    const probe = this.input.check === true ? `, ${PROBE}` : ''
+
+    if (LOGICAL.has(operator))
+      this.insert(last + 1, `), "logical"${probe})`)
+    else if (compound)
+      this.insert(last + 1, `)${probe ? `, undefined${probe}` : ''})`)
+    else
+      this.insert(last + 1, `${probe})`)
+
     writes.add(compound ? 'update' : 'to')
   }
 
