@@ -84,6 +84,8 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
 
 // Array methods whose argument only tests or orders the items, so what it reads or writes is not passed on.
 const PREDICATE_METHODS = new Set(['find', 'findLast', 'findIndex', 'findLastIndex', 'some', 'every', 'filter', 'sort', 'toSorted'])
+// Array methods passing on what their callback returns, so a callback returning data builds data.
+const BUILDER_METHODS = new Set(['map', 'flatMap'])
 
 // Whether an expression may hold a function, a class or an instance of one, which no static parent can send an island: it writes one, or reads one of `names`.
 export function mayHoldFunction(code: string, names: ReadonlySet<string>): boolean {
@@ -107,6 +109,12 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
 
     if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && PREDICATE_METHODS.has(node.callee.property.name))
       return visit(node.callee.object)
+
+    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && BUILDER_METHODS.has(node.callee.property.name)) {
+      const [callback, ...rest] = node.arguments
+
+      return visit(node.callee.object) || visit(callback?.type === 'ArrowFunctionExpression' && !callback.async ? callback.body : callback) || visit(rest)
+    }
 
     if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression')
       return true

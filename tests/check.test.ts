@@ -631,6 +631,8 @@ describe.concurrent('kay check, edge cases', () => {
       icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
       found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
       from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
+      dated: ['const days = Array.from({ length: 2 }, (_, index) => new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10))', 'Child(format={days})'],
+      indexed: ['const hours = [\'a\', \'b\']', 'Child(format={[{ values: hours.map((_, index) => index) }]})'],
       ordered: ['const ids = [3, 1].map(id => id + 1)\nconst sorted = ids.filter(id => id > 1).slice(0, 1)', 'Child(format={sorted})'],
     }
     const functions: Record<string, [script: string, call: string]> = {
@@ -645,6 +647,7 @@ describe.concurrent('kay check, edge cases', () => {
       local: ['const make = () => { const run = () => 1; return run }\nconst made = make()', 'Child(format={made})'],
       optional: ['const { getHandler } = props<{ getHandler?: () => void }>()\nconst got = getHandler?.()', 'Child(format={got})'],
       model: ['const money = Money.from(5)', 'Child(format={money})'],
+      handed: ['const hours = [\'a\']', 'Child(format={hours.map(hour => () => hour)})'],
       tested: ['function handler() {}\nconst { rows } = props<{ rows: unknown[] }>()', 'Child(format={[handler].find(one => one === rows[0])})'],
     }
     const all = { ...data, ...functions }

@@ -479,6 +479,8 @@ const STATICS = new Map([['Array', new Set(['from', 'of'])], ['Object', new Set(
 const LIST_BUILDERS = new Set(['map', 'flatMap'])
 const LIST_ORDERS = new Set(['filter', 'sort', 'toSorted'])
 const LIST_PLAIN = new Set(['slice', 'concat', 'flat', 'reverse', 'toReversed', 'join', 'split'])
+// The methods of dates, numbers and strings that return a string or a number whatever they are called on, such as a date's `toISOString()`.
+const PRIMITIVE_METHODS = new Set(['toISOString', 'toJSON', 'toString', 'toFixed', 'toPrecision', 'toLocaleString', 'toLocaleDateString', 'toLocaleTimeString', 'getTime', 'toLowerCase', 'toUpperCase', 'trim', 'trimStart', 'trimEnd', 'padStart', 'padEnd', 'replace', 'replaceAll'])
 
 // A call whose result is plain data: a list method or static over data, or a call to a function of the script returning data.
 function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
@@ -496,6 +498,9 @@ function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
 
   if (owner !== undefined && STATICS.has(owner))
     return STATICS.get(owner)!.has(method) && call.arguments.every((argument, index) => owner === 'Array' && method === 'from' && index === 1 ? callbackReturnsData(argument, scope) : plain(argument))
+
+  if (PRIMITIVE_METHODS.has(method))
+    return call.arguments.every(plain)
 
   if (holdsFunction(callee.object, scope))
     return false
