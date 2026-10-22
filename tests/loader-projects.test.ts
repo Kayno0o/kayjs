@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { plugin } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { loaderLoaded, registerEarlyLoader, registerLoader } from '../src/server/loader'
+import { loaderLoaded, loaderRoot, registerEarlyLoader, registerLoader } from '../src/server/loader'
 import { renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -32,6 +32,16 @@ async function project(name: string, icon?: string): Promise<string> {
   roots.push(root)
 
   return root
+}
+
+// The library installed where no project holds it, so the loader meets its modules under no root.
+async function looseLibrary(): Promise<string> {
+  const dir = await scratchDir('loader-loose-')
+
+  roots.push(dir)
+  await Promise.all(Object.entries(LIBRARY).map(async ([file, text]) => Bun.write(join(dir, 'node_modules/kay-lib', file), text)))
+
+  return dir
 }
 
 async function badge(root: string): Promise<string> {
@@ -111,6 +121,28 @@ describe('the .kay loader with several projects', () => {
     await Promise.all([registerLoader(root, {}), registerLoader(root, {})])
 
     expect(loaderLoaded(root)).toBe(true)
+    expect(await badge(root)).toContain('hi default:hi')
+  })
+
+  it('loads the modules under no root for the project the process serves, not a fixture registered after it', async () => {
+    const [loose, fixture] = await Promise.all([looseLibrary(), project('z', 'app-z')])
+
+    await registerLoader(fixture)
+
+    expect(loaderRoot()).not.toBe(fixture)
+    await badge(loose)
+
+    // The file compiled into the served project's cache, not the fixture's.
+    expect(existsSync(join(loaderRoot()!, '.kay/cache'))).toBe(true)
+    expect(existsSync(join(fixture, '.kay/cache'))).toBe(false)
+  })
+
+  it('settles a guess for concurrent calls naming other settings', async () => {
+    const root = await project('k', 'app-k')
+
+    await registerEarlyLoader(root)
+    await Promise.all([registerLoader(root, {}), registerLoader(root, {})])
+
     expect(await badge(root)).toContain('hi default:hi')
   })
 })
