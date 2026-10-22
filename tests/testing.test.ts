@@ -424,3 +424,45 @@ describe('the test preload after an app preload', () => {
     }
   })
 })
+
+describe('the test preload reading .env as Bun did', () => {
+  async function run(setup: string | undefined, envFile: string, shell: Record<string, string>, expected: string, want: unknown[]): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-env-read-'))
+
+    try {
+      await Bun.write(join(dir, '.env'), envFile)
+      const preload = setup === undefined ? [] : ['./setup.ts']
+
+      if (setup !== undefined)
+        await Bun.write(join(dir, 'setup.ts'), setup)
+
+      await Bun.write(join(dir, 'bunfig.toml'), `[test]\npreload = [${[...preload, join(import.meta.dir, '../src/test/preload.ts')].map(path => `"${path}"`).join(', ')}]\n`)
+      const test = `import { expect, it } from 'bun:test'\nit('env', () => expect(JSON.stringify(${expected})).toBe(JSON.stringify(${JSON.stringify(want)})))\n`
+
+      // Two files, so --parallel runs them in workers.
+      await Bun.write(join(dir, 'env.test.ts'), test)
+      await Bun.write(join(dir, 'env-again.test.ts'), test)
+
+      const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'NODE_ENV'))
+
+      for (const args of [['test'], ['test', '--parallel=2']]) {
+        const child = Bun.spawn([process.execPath, ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...shell } })
+        const [code, output] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+        expect(output).toContain('2 pass')
+        expect(code).toBe(0)
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('drops a variable expanding a shell value for a name .env also sets', async () => {
+    await run(undefined, 'A=1\nB=$A\n', { A: 'shell' }, '[process.env.A, process.env.B]', ['shell', null])
+  })
+
+  it('drops a variable expanding a shell variable an earlier preload changed', async () => {
+    await run('process.env.KAY_BASE = \'changed\'\n', 'U=$KAY_BASE/x\n', { KAY_BASE: 'shell' }, '[process.env.KAY_BASE, process.env.U]', ['changed', null])
+  })
+})

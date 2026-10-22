@@ -17,16 +17,18 @@ function envOf(dir: string, files: string[], base: Record<string, string> = {}):
   return JSON.parse(read.stdout.toString()) as Record<string, string>
 }
 
-// The names the shell gave `bun test`, before Bun added what the `.env` files hold, which Linux keeps apart.
+// The variables the shell gave `bun test`, before Bun added what the `.env` files hold, which Linux keeps apart.
 // A `--parallel` worker starts with its coordinator's variables, `.env`'s included, so it reads the coordinator's start instead.
-function shellEnv(): Set<string> | undefined {
+function shellEnv(): Record<string, string> | undefined {
   if (!existsSync('/proc/self/environ'))
     return undefined
 
   // A run of one file under --parallel stays in the coordinator, which is no worker though it sets BUN_TEST_WORKER_ID.
   const worker = readFileSync('/proc/self/cmdline', 'utf8').split('\0').includes('--test-worker')
 
-  return new Set(readFileSync(`/proc/${worker ? process.ppid : 'self'}/environ`, 'utf8').split('\0').map(entry => entry.slice(0, entry.indexOf('='))))
+  const entries = readFileSync(`/proc/${worker ? process.ppid : 'self'}/environ`, 'utf8').split('\0').filter(Boolean).map((entry): [string, string] => [entry.slice(0, entry.indexOf('=')), entry.slice(entry.indexOf('=') + 1)])
+
+  return Object.fromEntries(entries)
 }
 
 // `bun test` loads the developer's `.env` as well as `.env.test` and `.env.test.local`, whatever NODE_ENV says, so a test would reach the real mail server or database it names.
@@ -37,17 +39,18 @@ export function isolateEnv(dir = process.cwd()): void {
   if (Object.keys(names).length === 0)
     return
 
-  // Read again with the process's variables bar `.env`'s own, so a value expanding `$HOME` reads as it did for Bun, and a preload's pin is the only difference left.
-  const outside = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && !(entry[0] in names)))
+  // Read again from the shell's own variables, as Bun did, so a value expanding `$HOME` or a name `.env` also sets reads the same, and a preload's change is the only difference left.
+  // Without /proc, the process's variables bar `.env`'s own stand in for them.
+  const shell = shellEnv()
+  const outside = shell ?? Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && !(entry[0] in names)))
   const read = envOf(dir, ['.env'], outside)
   const own = Object.entries(names).map(([name, plain]): [string, string] => [name, read[name] ?? plain])
 
   const test = envOf(dir, ['.env.test', '.env.test.local'])
-  const shell = shellEnv()
 
   for (const [name, value] of own) {
     // A value `.env` does not give is the shell's or an earlier preload's, and Linux's record of the starting environment names the shell's.
-    const kept = process.env[name] !== value || shell?.has(name)
+    const kept = process.env[name] !== value || (shell !== undefined && name in shell)
 
     if (!(name in test) && !kept)
       delete process.env[name]
