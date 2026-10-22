@@ -2,7 +2,7 @@
 import type { CropHandle, CropRect } from '@kaynooo/utils/browser/canvas'
 import type { JSX, Snippet } from 'kay'
 import { createCenteredCrop, moveCrop, pointerToNatural, resizeCrop } from '@kaynooo/utils/browser/canvas'
-import { effect, elementSize, onMount, signal, untrack } from 'kay'
+import { effect, elementSize, onMount, recipe, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 
 interface ImageSize { width: number, height: number }
@@ -13,7 +13,9 @@ const KEY_STEP = 0.01
 const KEY_STEP_LARGE = 0.1
 const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.cropLabel', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-image-cropper', stage: 'kui-image-cropper-stage', image: 'kui-image-cropper-image', crop: 'kui-image-cropper-crop', gridCols: 'kui-image-cropper-grid-cols', gridRows: 'kui-image-cropper-grid-rows', handle: 'kui-image-cropper-handle' } })
+
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.cropLabel', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined
@@ -32,7 +34,6 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   onLoad?: ((size: ImageSize) => void) | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
   footer?: Snippet<[reset: () => void]> | undefined
-  class?: string | undefined
 }>()
 
 const size = signal<ImageSize | undefined>(undefined)
@@ -144,17 +145,17 @@ const area = () => {
   return `left: ${x * factor}px; top: ${y * factor}px; width: ${w * factor}px; height: ${h * factor}px; background-image: url(${JSON.stringify(src)}); background-size: ${(known?.width ?? 0) * factor}px ${(known?.height ?? 0) * factor}px; background-position: ${-x * factor}px ${-y * factor}px`
 }
 ---
-.kui-image-cropper({...rest} class={className})
-  .kui-image-cropper-stage(ref={element => { stage = element; stageSize.ref(element) }} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
+div({...rest} part="root")
+  div(part="stage" ref={element => { stage = element; stageSize.ref(element) }} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
     // kay-allow unsized-image
-    img.kui-image-cropper-image(ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
+    img(part="image" ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
     if crop().w > 0
-      .kui-image-cropper-crop(role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
+      div(part="crop" role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
         if grid
-          span.kui-image-cropper-grid-cols
-          span.kui-image-cropper-grid-rows
+          span(part="gridCols")
+          span(part="gridRows")
         // Pointer only: the keyboard resizes through the crop area itself.
         for handle of HANDLES key={handle}
-          span.kui-image-cropper-handle(data-handle={handle} onPointerDown={event => start(event, handle)})
+          span(part="handle" data-handle={handle} onPointerDown={event => start(event, handle)})
   if footer
     | {footer(reset)}

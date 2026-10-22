@@ -1,11 +1,13 @@
 --- <Point extends ScatterPoint>
 import type { JSX } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
-import { memo } from 'kay'
+import { memo, recipe } from 'kay'
 import { axisExtent, axisPercent, dotSize } from './plot'
 import { wording } from 'kay/words'
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const look = recipe({ parts: { root: 'kui-scatter-chart', axisLabel: 'kui-scatter-chart-axis-label', plot: 'kui-scatter-chart-plot', grid: 'kui-scatter-chart-grid', tick: 'kui-scatter-chart-tick', guide: 'kui-scatter-chart-guide', corner: 'kui-scatter-chart-corner', dot: 'kui-scatter-chart-dot' } })
+
+const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -18,7 +20,6 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, 
   emptyLabel?: string | undefined
   // Describes the chart for screen readers.
   label: string
-  class?: string | undefined
 }>()
 
 const xExtent = memo(() => axisExtent(points.map(point => point.x), x))
@@ -32,27 +33,27 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty(id={rest.id} class={className}) {emptyLabel ?? wording('ui.scatterChart.emptyLabel', 'No data yet.')}
+  p.kui-scatter-chart-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.emptyLabel', 'No data yet.')}
 else
-  figure.kui-scatter-chart({...rest} aria-label={label} class={className})
+  figure({...rest} part="root" aria-label={label})
     if y.label
-      span.kui-scatter-chart-axis-label(data-axis="y") {y.label}
-    .kui-scatter-chart-plot
+      span(part="axisLabel" data-axis="y") {y.label}
+    div(part="plot")
       for tick of y.ticks ?? [] key={tick.value}
-        span.kui-scatter-chart-grid(data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
-          span.kui-scatter-chart-tick {tick.label}
+        span(part="grid" data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
+          span(part="tick") {tick.label}
       for tick of x.ticks ?? [] key={tick.value}
-        span.kui-scatter-chart-grid(data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
-          span.kui-scatter-chart-tick {tick.label}
+        span(part="grid" data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
+          span(part="tick") {tick.label}
       if quadrant
-        span.kui-scatter-chart-guide(data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
-        span.kui-scatter-chart-guide(data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
+        span(part="guide" data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
+        span(part="guide" data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
       for entry of cornerEntries() key={entry[0]}
-        span.kui-scatter-chart-corner(data-corner={entry[0]}) {entry[1]}
+        span(part="corner" data-corner={entry[0]}) {entry[1]}
       for point of points key={point.key}
         if onSelect
-          button.kui-scatter-chart-dot(type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
+          button(part="dot" type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
         else
-          span.kui-scatter-chart-dot(role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
+          span(part="dot" role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
     if x.label
-      span.kui-scatter-chart-axis-label(data-axis="x") {x.label}
+      span(part="axisLabel" data-axis="x") {x.label}

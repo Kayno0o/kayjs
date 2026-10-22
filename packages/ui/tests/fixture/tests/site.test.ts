@@ -516,14 +516,14 @@ describe('charts', () => {
       ['Hades', 'Hades', 'left: 25%; bottom: 100%; --kui-dot-size: 1.75rem'],
       ['Celeste', 'Celeste, 30h', 'left: 75%; bottom: 0%; --kui-dot-size: 1.1875rem'],
     ])
-    expect(scatter).toContain('<span class="kui-scatter-chart-grid" data-axis="x" style="left: 50%"><span class="kui-scatter-chart-tick">20h</span></span><span class="kui-scatter-chart-guide" data-axis="y" style="bottom: 50%"></span><span class="kui-scatter-chart-guide" data-axis="x" style="left: 50%"></span><span class="kui-scatter-chart-corner" data-corner="topRight">Long and loved</span>')
+    expect(scatter).toContain('<span class="kui-scatter-chart-grid" data-part="grid" data-axis="x" style="left: 50%"><span class="kui-scatter-chart-tick" data-part="tick">20h</span></span><span class="kui-scatter-chart-guide" data-part="guide" data-axis="y" style="bottom: 50%"></span><span class="kui-scatter-chart-guide" data-part="guide" data-axis="x" style="left: 50%"></span><span class="kui-scatter-chart-corner" data-part="corner" data-corner="topRight">Long and loved</span>')
     expect(scatter).not.toContain('<button')
-    expect(await page('no-scatter-label')).toBe('<p class="kui-scatter-chart-empty">No titles</p>')
+    expect(await page('no-scatter-label')).toBe('<p class="kui-scatter-chart-empty kui-scatter-chart" data-part="root">No titles</p>')
   })
 
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
-    const cells = [...graph.matchAll(/<span class="kui-contribution-cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
+    const cells = [...graph.matchAll(/<span class="kui-contribution-cell" data-part="cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
 
     expect(cells.slice(0, 3)).toEqual([
       ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],
@@ -531,7 +531,7 @@ describe('charts', () => {
       ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
     ])
     expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
-    expect(graph).toMatch(/^<div role="group" aria-label="Contributions" class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
+    expect(graph).toMatch(/^<div data-part="root" role="group" aria-label="Contributions" class="kui-contribution-graph-months kui-contribution-graph"><span class="kui-contribution-month" data-part="month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
   })
 })
 
@@ -598,7 +598,7 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   const inline = await element('/paging', 'qr-inline')
 
   expect(inline).not.toContain('<img')
-  expect(inline).toContain('<div role="img" aria-label="Inline" style="width: 120px; height: 120px" class="kui-qr-code"><svg')
+  expect(inline).toContain('<div data-part="root" role="img" aria-label="Inline" style="width: 120px; height: 120px" class="kui-qr-code"><svg')
   expect(inline).toContain('currentColor')
   expect(inline).toContain('var(--color-accent)')
   expect(await element('/paging', 'qr-decor')).toContain('alt aria-hidden="true"')

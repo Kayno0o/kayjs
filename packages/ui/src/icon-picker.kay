@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { IconChoice } from './icon-picker'
-import { batch, effect, flush, onCleanup, signal } from 'kay'
+import { batch, effect, flush, onCleanup, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { onFormDefaults, onFormReset } from './form-reset'
@@ -11,7 +11,9 @@ import { wording } from 'kay/words'
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 200
 
-const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker.searchLabel', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.gridLabel', 'Icons'), searchingLabel = wording('ui.iconPicker.searchingLabel', 'Searching…'), emptyLabel = wording('ui.iconPicker.emptyLabel', 'No icons found.'), errorLabel = wording('ui.iconPicker.errorLabel', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clearLabel', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.moreLabel', 'Show more'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
+
+const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker.searchLabel', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.gridLabel', 'Icons'), searchingLabel = wording('ui.iconPicker.searchingLabel', 'Searching…'), emptyLabel = wording('ui.iconPicker.emptyLabel', 'No icons found.'), errorLabel = wording('ui.iconPicker.errorLabel', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clearLabel', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.moreLabel', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
   search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
@@ -29,7 +31,6 @@ const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker
   errorLabel?: string | undefined
   clearLabel?: string | undefined
   moreLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const picked = signal(value)
@@ -151,25 +152,25 @@ function keepEnter(event: KeyboardEvent) {
     event.preventDefault()
 }
 ---
-.kui-icon-picker({...rest} ref={ref} class={className})
+div({...rest} part="root" ref={ref})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
-  ul.kui-icon-grid(aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
+  input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  ul(part="grid" aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li
-        button.kui-icon-grid-option(type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
+        button(part="option" type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
-      li.kui-icon-grid-empty {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
-  .kui-icon-grid-bar
+      li(part="empty") {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
+  div(part="bar")
     if picked()
-      span.kui-icon-grid-selection(aria-live="polite")
+      span(part="selection" aria-live="polite")
         if chosen() as icon
           Icon(icon={icon})
         | {nameOf(picked())}
-        IconButton(icon="close" label={clearLabel} size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
+        IconButton(icon="close" label={clearLabel} size="xs" variant="inline" part="clear" onClick={() => pick('')})
     if failed() && icons().length > 0
-      span.kui-icon-grid-error(role="alert") {errorLabel}
+      span(part="error" role="alert") {errorLabel}
     if more()
-      button.kui-icon-grid-more(type="button" onClick={showMore}) {moreLabel}
+      button(part="more" type="button" onClick={showMore}) {moreLabel}

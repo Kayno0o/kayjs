@@ -1,7 +1,9 @@
 ---
-import { onCleanup, onMount } from 'kay'
+import { onCleanup, onMount, recipe } from 'kay'
 
 const SCROLLING = new Set(['auto', 'scroll', 'overlay'])
+
+const look = recipe({ parts: { root: 'kui-when-visible' } })
 
 const { onVisible, margin = 600 } = props<{
   // Loads the next rows: called once the sentinel comes into view, and again whenever the list around it grows and leaves it there, so a list too short to scroll keeps filling. A call returning a promise is not repeated before it settles, and a rejection goes unhandled, so wrap the call in `attempt`.
@@ -84,4 +86,4 @@ onMount(() => {
 })
 ---
 // The infinite-scroll sentinel, rendered after a list only while there is more to load, so a list that stops growing is simply left alone.
-.kui-when-visible(ref={element => sentinel = element} aria-hidden="true")
+div(part="root" ref={element => sentinel = element} aria-hidden="true")

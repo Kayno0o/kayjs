@@ -2,7 +2,7 @@
 import type { Axis, ChartRect, FixedScaleAxis, LineChart as LineChartClass, LineChartOptions } from 'chartist'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
-import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
+import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
 import type { LabelContext } from './chart-axis'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
 import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
@@ -13,7 +13,9 @@ const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const look = recipe({ parts: { root: 'kui-line-chart', frame: 'kui-line-chart-frame', plot: 'kui-line-chart-plot', cursor: 'kui-line-chart-cursor', dot: 'kui-line-chart-dot', band: 'kui-line-chart-band', overlay: 'kui-line-chart-overlay', tooltip: 'kui-line-chart-tooltip', tooltipLabel: 'kui-line-chart-tooltip-label', tooltipRow: 'kui-line-chart-tooltip-row', tooltipName: 'kui-line-chart-tooltip-name', tooltipValue: 'kui-line-chart-tooltip-value', swatch: 'kui-line-chart-swatch', data: 'kui-line-chart-data', hint: 'kui-line-chart-hint', legend: 'kui-line-chart-legend', legendItem: 'kui-line-chart-legend-item', key: 'kui-line-chart-key' } })
+
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -36,7 +38,6 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   rangeHint?: string | undefined
   // Names the chart for screen readers, which read its values from a table they alone see.
   label: string
-  class?: string | undefined
 }>()
 
 const id = uid()
@@ -374,31 +375,31 @@ function pointerLeave(event: PointerEvent) {
     hovered.set(null)
 }
 ---
-.kui-line-chart({...rest} role="figure" aria-label={label} class={className})
-  .kui-line-chart-frame
-    .kui-line-chart-plot(ref={element => canvas = element} aria-hidden="true")
+div({...rest} part="root" role="figure" aria-label={label})
+  div(part="frame")
+    div(part="plot" ref={element => canvas = element} aria-hidden="true")
     if cursor() !== null
-      .kui-line-chart-cursor(style={`left: ${cursor()}px; top: ${plot()!.rect.y2}px; height: ${plot()!.rect.height()}px`})
+      div(part="cursor" style={`left: ${cursor()}px; top: ${plot()!.rect.y2}px; height: ${plot()!.rect.height()}px`})
       for item, index of series key={item.name}
         if dot(index)
-          .kui-line-chart-dot(style={dot(index)})
+          div(part="dot" style={dot(index)})
     if band() !== null
-      .kui-line-chart-band(style={band()})
-    .kui-line-chart-overlay(role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={pointerLeave})
+      div(part="band" style={band()})
+    div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={pointerLeave})
   if hovered()
-    .kui-line-chart-tooltip(ref={watchTip} style={tipPlace()} aria-hidden="true")
-      .kui-line-chart-tooltip-label {heading(hovered()!.index)}
+    div(part="tooltip" ref={watchTip} style={tipPlace()} aria-hidden="true")
+      div(part="tooltipLabel") {heading(hovered()!.index)}
       for item, index of series key={item.name}
-        .kui-line-chart-tooltip-row
-          span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})
-          span.kui-line-chart-tooltip-name {item.name}
-          span.kui-line-chart-tooltip-value {reading(index)}
+        div(part="tooltipRow")
+          span(part="swatch" style={`background-color: ${colors()[index]}`})
+          span(part="tooltipName") {item.name}
+          span(part="tooltipValue") {reading(index)}
       if stacked
-        .kui-line-chart-tooltip-row.kui-line-chart-tooltip-total
-          span.kui-line-chart-tooltip-name {totalLabel}
-          span.kui-line-chart-tooltip-value {totalText(hovered()!.index)}
+        div.kui-line-chart-tooltip-total(part="tooltipRow")
+          span(part="tooltipName") {totalLabel}
+          span(part="tooltipValue") {totalText(hovered()!.index)}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
-  .kui-line-chart-data
+  div(part="data")
     table
       caption {label}
       thead
@@ -417,10 +418,10 @@ function pointerLeave(event: PointerEvent) {
             if stacked
               td {totalText(index)}
   if onRange
-    span.kui-line-chart-hint(id={`${id}-hint`}) {rangeHint}
+    span(part="hint" id={`${id}-hint`}) {rangeHint}
   if legend ?? series.length > 1
-    ul.kui-line-chart-legend
+    ul(part="legend")
       for item, index of series key={item.name}
-        li.kui-line-chart-legend-item
-          span.kui-line-chart-key(style={dashSample(colors()[index]!, dashes()[index]!)})
+        li(part="legendItem")
+          span(part="key" style={dashSample(colors()[index]!, dashes()[index]!)})
           | {item.name}

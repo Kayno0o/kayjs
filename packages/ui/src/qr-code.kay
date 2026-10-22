@@ -1,10 +1,12 @@
 ---
 import type { QrCodeSvgOptions } from '@kaynooo/utils/tools/QrCode'
 import type { JSX } from 'kay'
-import { trustHtml } from 'kay'
+import { recipe, trustHtml } from 'kay'
 import { qrCodeDataUri, qrCodeSvg } from '@kaynooo/utils/tools/QrCode'
 
-const { value, label, size, options, inline = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML'> & {
+const look = recipe({ parts: { root: 'kui-qr-code' } })
+
+const { value, label, size, options, inline = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML'> & {
   // What the code holds, such as a URL.
   value: string
   // What a screen reader says in place of the code, such as where it leads. Without it the code is decorative and hidden from assistive technology.
@@ -15,11 +17,10 @@ const { value, label, size, options, inline = false, class: className, ...rest }
   options?: Omit<QrCodeSvgOptions, 'size' | 'title' | 'ariaLabel'> | undefined
   // Draws the SVG in the page rather than as an image, so `foreground`, `eyeColor` and `background` may be CSS colours: `currentColor`, `var(--color-accent)`.
   inline?: boolean | undefined
-  class?: string | undefined
 }>()
 ---
 // An SVG drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads. An image by default, which cannot read the page's CSS; inline, the SVG sits in the page and can.
 if inline
-  .kui-qr-code({...rest} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} style={size === undefined ? undefined : `width: ${size}px; height: ${size}px`} innerHTML={trustHtml(qrCodeSvg(value, options))} class={className})
+  div({...rest} part="root" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} style={size === undefined ? undefined : `width: ${size}px; height: ${size}px`} innerHTML={trustHtml(qrCodeSvg(value, options))})
 else
-  img.kui-qr-code({...rest} src={qrCodeDataUri(value, options)} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={size} height={size} class={className})
+  img({...rest} part="root" src={qrCodeDataUri(value, options)} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={size} height={size})

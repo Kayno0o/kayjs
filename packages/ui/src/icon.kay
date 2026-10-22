@@ -1,4 +1,5 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
@@ -6,13 +7,14 @@ import { addedIcons } from './added-icons'
 import settings from './settings'
 
 // `icon` is a slot the app's settings map onto its set, or an icon imported from `~icons/<prefix>/<name>`.
-const { icon, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['svg'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-icon' } })
+
+const { icon, label, ...rest } = props<Omit<JSX.IntrinsicElements['svg'], 'class' | 'children'> & {
   icon: IconSlot | IconProps
   // Names the icon for screen readers; without it the icon is decorative.
   label?: string | undefined
-  class?: string | undefined
 }>()
 
 const drawn = () => typeof icon === 'string' ? settings.icons[icon] ?? addedIcons[icon as keyof typeof addedIcons] : icon
 ---
-svg.kui-icon({...drawn()} {...rest} class={className} role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})
+svg({...drawn()} {...rest} part="root" role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})

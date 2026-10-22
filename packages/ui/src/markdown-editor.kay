@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import type { TextEdit, ToolbarAction } from './markdown-edit'
 import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
-import { effect, onMount, signal, uid, untrack } from 'kay'
+import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
@@ -21,7 +21,9 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
   image: imageEdit,
 }
 
-const { value = '', onInput, onImage, toolbar = true, preview, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed' } })
+
+const { value = '', onInput, onImage, toolbar = true, preview, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -39,7 +41,6 @@ const { value = '', onInput, onImage, toolbar = true, preview, previewClass, upl
   previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
   keysHint?: string | undefined
-  class?: string | undefined
 }>()
 
 const uploading = signal(0)
@@ -321,13 +322,13 @@ function drop(event: DragEvent) {
 ---
 // A markdown field that writes like an editor, under a toolbar and beside a preview if asked: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
-.kui-markdown
-  .kui-markdown-grid(data-preview={previewing() ? '' : undefined})
-    textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+div(part="wrap")
+  div(part="grid" data-preview={previewing() ? '' : undefined})
+    textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview
-      .kui-markdown-bar(role="toolbar" aria-label={wording('ui.markdownEditor.toolbarLabel', 'Formatting')})
+      div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbarLabel', 'Formatting')})
         if toolbarFailed()
-          span.kui-markdown-bar-failed(role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
+          span(part="barFailed" role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}
           View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
     if previewing() && preview

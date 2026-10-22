@@ -1,11 +1,14 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import type { ContributionDay } from './contribution'
 import { monthStarts } from './contribution'
 import { shade } from './shade'
 import { wording } from 'kay/words'
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-contribution-graph', month: 'kui-contribution-month', cell: 'kui-contribution-cell' } })
+
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -16,7 +19,6 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   label?: string | undefined
   // Names each month above the week it starts in, placing every cell by hand.
   months?: boolean | undefined
-  class?: string | undefined
 }>()
 
 // A day without a description is read as how full it is, which its colour alone shows.
@@ -30,9 +32,9 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-.kui-contribution-graph({...rest} role="group" aria-label={label} class={[{ 'kui-contribution-graph-months': months }, className]})
+div({...rest} part="root" role="group" aria-label={label} class={{ 'kui-contribution-graph-months': months }})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
-      span.kui-contribution-month(aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
+      span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
   for day, index of days key={day.day}
-    span.kui-contribution-cell(role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})
+    span(part="cell" role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})

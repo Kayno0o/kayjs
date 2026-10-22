@@ -1,14 +1,15 @@
 ---
 import type { JSX } from 'kay'
 import { stringToHexColor } from '@kaynooo/utils/colors'
-import { effect, signal } from 'kay'
+import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 
-const { src, name, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-site-favicon', img: 'kui-site-favicon-img', icon: 'kui-site-favicon-icon' } })
+
+const { src, name, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   src?: string | null | undefined
   // Names the site: it colours the fallback icon, and goes unused once the image loads.
   name: string
-  class?: string | undefined
 }>()
 
 const failed = signal(false)
@@ -20,9 +21,9 @@ effect(() => {
 })
 ---
 // A site's icon, or the globe slot in a colour of the site's own when it has none or it fails to load.
-span.kui-site-favicon({...rest} class={className})
+span({...rest} part="root")
   if src && !failed()
     // kay-allow unsized-image
-    img.kui-site-favicon-img(src={src} alt="" onError={() => failed.set(true)})
+    img(part="img" src={src} alt="" onError={() => failed.set(true)})
   else
-    Icon(icon="globe" class="kui-site-favicon-icon" style={`color: ${stringToHexColor(name)}`})
+    Icon(icon="globe" part="icon" style={`color: ${stringToHexColor(name)}`})

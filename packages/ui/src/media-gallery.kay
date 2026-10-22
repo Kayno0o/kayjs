@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { MediaItem } from './media'
-import { effect, onCleanup, signal } from 'kay'
+import { effect, onCleanup, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
@@ -11,7 +11,9 @@ import { wording } from 'kay/words'
 // How far a finger moves sideways before a swipe turns the gallery.
 const SWIPE_PX = 48
 
-const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previousLabel', 'Previous'), nextLabel = wording('ui.mediaGallery.nextLabel', 'Next'), closeLabel = wording('ui.mediaGallery.closeLabel', 'Close'), openLabel = wording('ui.mediaGallery.openLabel', 'Open full size'), itemLabel = wording('ui.mediaGallery.itemLabel', 'Media {n}'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-media-gallery', empty: 'kui-media-gallery-empty', stage: 'kui-media-gallery-stage', frame: 'kui-media-gallery-frame', zoom: 'kui-media-gallery-zoom', step: 'kui-media-gallery-step', counter: 'kui-media-gallery-counter', caption: 'kui-media-gallery-caption', strip: 'kui-media-gallery-strip', thumb: 'kui-media-gallery-thumb', thumbImage: 'kui-media-gallery-thumb-image', play: 'kui-media-gallery-play', lightbox: 'kui-media-gallery-lightbox', full: 'kui-media-gallery-full', close: 'kui-media-gallery-close' } })
+
+const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previousLabel', 'Previous'), nextLabel = wording('ui.mediaGallery.nextLabel', 'Next'), closeLabel = wording('ui.mediaGallery.closeLabel', 'Close'), openLabel = wording('ui.mediaGallery.openLabel', 'Open full size'), itemLabel = wording('ui.mediaGallery.itemLabel', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   items: MediaItem[]
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
@@ -27,7 +29,6 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousL
   openLabel?: string | undefined
   // Names an item with no title, `{n}` standing for its number.
   itemLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const nothing = () => emptyLabel ?? wording('ui.mediaGallery.emptyLabel', 'No media.')
@@ -150,48 +151,48 @@ effect(() => {
 ---
 if !current()
   // The app's id and class stay on whichever element shows.
-  p.kui-media-gallery-empty(id={rest.id} class={className}) {nothing()}
+  p.kui-media-gallery-empty(part="root" id={rest.id}) {nothing()}
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
-  .kui-media-gallery({...rest} class={className} onKeyDown={keyDown})
-    .kui-media-gallery-stage(style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+  div({...rest} part="root" onKeyDown={keyDown})
+    div(part="stage" style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       // Keyed on the item, so a video and its player are made afresh for each.
       for item of [current()!] key={item.key}
         if isPlayable(item)
-          video.kui-media-gallery-frame(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
+          video(part="frame" ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
             if item.captions
               track(kind="captions" src={item.captions} default)
         else
-          button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
+          button(part="zoom" type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
             // kay-allow unsized-image
-            img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
+            img(part="frame" src={item.preview} alt={item.title ?? ''})
       if items.length > 1
-        IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
-        IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-media-gallery-step" data-side="next" onClick={() => step(1)})
-        span.kui-media-gallery-counter {active() + 1} / {items.length}
+        IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
+        IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
+        span(part="counter") {active() + 1} / {items.length}
       if current()!.title
-        span.kui-media-gallery-caption {current()!.title}
+        span(part="caption") {current()!.title}
     if items.length > 1
-      .kui-media-gallery-strip(ref={element => strip = element})
+      div(part="strip" ref={element => strip = element})
         for item, position of items key={item.key}
-          button.kui-media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? named(position)} onClick={() => go(position)})
+          button(part="thumb" type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? named(position)} onClick={() => go(position)})
             // kay-allow unsized-image
-            img.kui-media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
+            img(part="thumbImage" src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
-              Icon(icon="play" class="kui-media-gallery-play")
-    dialog.kui-media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+              Icon(icon="play" part="play")
+    dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
           if isPlayable(item)
-            video.kui-media-gallery-full(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
+            video(part="full" ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
               if item.captions
                 track(kind="captions" src={item.captions} default)
           else
             // kay-allow unsized-image
-            img.kui-media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
+            img(part="full" src={item.full ?? item.preview} alt={item.title ?? ''})
         if items.length > 1
-          IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
-          IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-media-gallery-step" data-side="next" onClick={() => step(1)})
+          IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
+          IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
         if current()!.title
-          span.kui-media-gallery-caption {current()!.title}
-        IconButton(icon="close" label={closeLabel} variant="ghost" class="kui-media-gallery-close" onClick={() => zoomed.set(false)})
+          span(part="caption") {current()!.title}
+        IconButton(icon="close" label={closeLabel} variant="ghost" part="close" onClick={() => zoomed.set(false)})

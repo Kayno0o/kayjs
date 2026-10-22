@@ -1,12 +1,14 @@
 ---
 import type { Duration, JSX } from 'kay'
-import { durationMs, effect, listen, onCleanup, onMount, signal } from 'kay'
+import { durationMs, effect, listen, onCleanup, onMount, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
 import { stepIndex } from './cycle'
 import { wording } from 'kay/words'
 
-const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previousLabel', 'Previous slide'), nextLabel = wording('ui.carousel.nextLabel', 'Next slide'), pauseLabel = wording('ui.carousel.pauseLabel', 'Pause'), playLabel = wording('ui.carousel.playLabel', 'Play'), slideLabel = wording('ui.carousel.slideLabel', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dotLabel', 'Go to slide {n}'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-carousel', viewport: 'kui-carousel-viewport', slide: 'kui-carousel-slide', image: 'kui-carousel-image', controls: 'kui-carousel-controls', step: 'kui-carousel-step', dot: 'kui-carousel-dot', pause: 'kui-carousel-pause' } })
+
+const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previousLabel', 'Previous slide'), nextLabel = wording('ui.carousel.nextLabel', 'Next slide'), pauseLabel = wording('ui.carousel.pauseLabel', 'Pause'), playLabel = wording('ui.carousel.playLabel', 'Play'), slideLabel = wording('ui.carousel.slideLabel', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dotLabel', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
@@ -25,7 +27,6 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
   // `{n}` stands for the slide's number and `{count}` for how many there are.
   slideLabel?: string | undefined
   dotLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const shown = signal(index)
@@ -85,17 +86,17 @@ function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
 }
 ---
-section.kui-carousel({...rest} ref={ref} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
-  .kui-carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
+section({...rest} part="root" ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+  div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
-      .kui-carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
+      div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
         // kay-allow unsized-image
-        img.kui-carousel-image(src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
+        img(part="image" src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
   if slides.length > 1
-    .kui-carousel-controls
-      IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-carousel-step" data-side="previous" onClick={() => step(-1)})
+    div(part="controls")
+      IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
       for slide, position of slides key={slide.src}
-        button.kui-carousel-dot(type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
-      IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-carousel-step" data-side="next" onClick={() => step(1)})
+        button(part="dot" type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
       if autoplay
-        IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" class="kui-carousel-pause" onClick={() => paused.set(!paused())})
+        IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" part="pause" onClick={() => paused.set(!paused())})
