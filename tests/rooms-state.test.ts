@@ -1,5 +1,5 @@
 import type { SocketOf } from '../src/runtime/live'
-import type { AsyncRoomStore, Rooms, RoomStore } from '../src/server/rooms'
+import type { AsyncRooms, AsyncRoomStore, Rooms, RoomStore, StoreRooms } from '../src/server/rooms'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -209,6 +209,34 @@ describe('a room\'s state over a store of either kind', () => {
     live.join(connection(), 'hall', 'ada')
     expect(await live.update('hall', state => ({ ...state, round: 2 }))).toEqual({ round: 2, scores: {} })
     expect(await live.state('hall')).toEqual({ round: 2, scores: {} })
+  })
+})
+
+describe('the type of rooms over a store of either kind', () => {
+  type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+
+  it('is StoreRooms, which takes either kind of rooms where the union of the two did not name one type', () => {
+    // Over a parameter, as a declared union would be narrowed to RoomStore by what it is assigned.
+    const over = (store: RoomStore | AsyncRoomStore) => rooms<Message, string, State>({ ...options, store })
+    const either = over(memoryRooms())
+    const sync = rooms<Message, string, State>(options)
+    const asynchronous = rooms<Message, string, State>({ ...options, store: memoryRooms() as unknown as AsyncRoomStore })
+    const isStoreRooms: Same<typeof either, StoreRooms<Message, string, State>> = true
+    const syncIsRooms: Same<typeof sync, Rooms<Message, string, State>> = true
+    const asyncIsAsyncRooms: Same<typeof asynchronous, AsyncRooms<Message, string, State>> = true
+    const notUnion: Same<typeof either, Rooms<Message, string, State> | AsyncRooms<Message, string, State>> = false
+    const accepts = (given: StoreRooms<Message, string, State>) => given
+
+    // Both kinds of rooms go where a store's rooms are asked for.
+    accepts(sync)
+    accepts(asynchronous)
+
+    // @ts-expect-error: rooms over a store of either kind are not sync, so they cannot stand for Rooms
+    const refused: Rooms<Message, string, State> = either
+    // @ts-expect-error: nor can they stand for AsyncRooms, as their state may come without a promise
+    const alsoRefused: AsyncRooms<Message, string, State> = either
+
+    expect([isStoreRooms, syncIsRooms, asyncIsAsyncRooms, notUnion, refused, alsoRefused].length).toBe(6)
   })
 })
 
