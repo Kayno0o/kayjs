@@ -1,8 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { scanApi } from '../src/server/api-modules'
-import { withMovedApi } from '../src/server/rewrite'
+import { rewriteRequests, withMovedApi } from '../src/server/rewrite'
 import { scratchDir } from './scratch'
 
 const MOVED = [{ former: '/cms', prefix: '/_kay/cms' }]
@@ -67,4 +68,14 @@ it('does not take a module mounted at /api for one serving /api/cms', () => {
 
   expect(rewrite(url('/api/cms/entries'), request)).toBe('/_kay/cms/entries')
   expect(rewrite(url('/api'), request)).toBeUndefined()
+})
+
+it('serves the moved path through the hook, and leaves every other request alone, under a base', async () => {
+  const app = new Elysia()
+
+  rewriteRequests(app, withMovedApi(undefined, MOVED, '/api', '/site', ['/api/other'])!, app)
+  app.get('/site/_kay/cms/dev', () => 'moved').get('/site/api/cms/dev', () => 'former').get('/site/pricing', () => 'page')
+
+  expect(await (await app.handle(new Request('http://site.test/site/api/cms/dev'))).text()).toBe('moved')
+  expect(await (await app.handle(new Request('http://site.test/site/pricing'))).text()).toBe('page')
 })

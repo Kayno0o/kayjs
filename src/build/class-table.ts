@@ -223,7 +223,7 @@ function warnUnloaded(root: string, failure: string | undefined): void {
 
 // Which classes of `words` another of them overrides, from what the app's own Tailwind makes of each: the table the runtime merges with.
 // Left out are the classes that meet no other, so an app using few utilities ships a small table; undefined when the app has no Tailwind or none of its classes conflicts.
-export async function buildClassTable(root: string, words: Iterable<string>, references: string[] = []): Promise<ClassTable | undefined> {
+export async function buildClassTable(root: string, words: Iterable<string>, references: string[]): Promise<ClassTable | undefined> {
   const loaded = await tailwindDesign(root, references)
   const design = loaded?.design
 

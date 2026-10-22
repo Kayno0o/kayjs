@@ -338,7 +338,7 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
 // Only an app with Tailwind reads them, and only its sources: a test or a hidden file read here would be one more input a test edit makes `kay dev` build again for.
-export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>, references: string[] = []): Promise<ClassTable | undefined> {
+export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>, references: string[]): Promise<ClassTable | undefined> {
   if (await tailwindDesign(root, references) === undefined)
     return undefined
 
@@ -365,7 +365,7 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
 
 // The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
 // The server keeps the whole table; none is sent when no island has two classes to merge, nor when the app has no island or no Tailwind.
-export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, references: string[] = [], graph?: ImportGraph): Promise<ClassTable | undefined> {
+export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, references: string[], graph?: ImportGraph): Promise<ClassTable | undefined> {
   const { islands, libraries, shorthand } = sources
 
   if (islands.size === 0 || await tailwindDesign(root, references) === undefined)

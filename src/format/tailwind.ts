@@ -34,8 +34,8 @@ const loads = new Map<string, { entry: string, loaded: Promise<Loaded> }>()
 
 // Tailwind's own order for a class list, from the design system of the app's `tailwindcss` and its entry stylesheet, as `eslint-plugin-better-tailwindcss` orders a class string: unknown classes first as written, then by Tailwind's index.
 // Undefined when the app does not use Tailwind or its design system does not load, which leaves the classes as written; a design system that did not load is tried again on the next call.
-export async function tailwindSorter(root: string, references?: string[]): Promise<ClassSorter | undefined> {
-  return (await tailwindLoad(root, false, references ?? await configReferences(root)))?.sorter
+export async function tailwindSorter(root: string): Promise<ClassSorter | undefined> {
+  return (await tailwindLoad(root, false, await configReferences(root)))?.sorter
 }
 
 // The design system of the app's Tailwind, loaded as the sorter's is and kept while no stylesheet it read changes; undefined when the app does not use Tailwind, and a `failure` instead of the design when it does not load.

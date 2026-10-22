@@ -63,9 +63,10 @@ describe('the dev class check of an app applying a kui utility with no @referenc
     const check = await tailwindClasses(root, [css], referencesOf([ui()]))
 
     expect(check).toBeDefined()
+    // A compiler keeps the words it was asked, so the negative asks a fresh one.
     expect((await tailwindClasses(root, [css], referencesOf([ui()])))!(['frobnicate'], 'frobnicate')).toBe(false)
     expect(check!(['bg-kui-mantle'], 'bg-kui-mantle')).toBe(true)
-    expect(await tailwindClasses(root, [css])).toBeUndefined()
+    expect(await tailwindClasses(root, [css], [])).toBeUndefined()
   }, 120_000)
 })
 

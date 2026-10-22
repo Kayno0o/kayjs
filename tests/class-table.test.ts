@@ -48,7 +48,7 @@ describe('the class table', () => {
   let table: Awaited<ReturnType<typeof buildClassTable>>
 
   beforeEach(async () => {
-    table ??= await buildClassTable(await project('@import "tailwindcss";\n@theme { --color-brand: #c00; }\n@utility tab-* { tab-size: --value(integer); }\n'), WORDS)
+    table ??= await buildClassTable(await project('@import "tailwindcss";\n@theme { --color-brand: #c00; }\n@utility tab-* { tab-size: --value(integer); }\n'), WORDS, [])
     installClassTable(table)
   })
 
@@ -63,13 +63,13 @@ describe('the class table', () => {
   })
 
   it('is built for an app importing only Tailwind\'s theme and utilities', async () => {
-    const parts = await buildClassTable(await project('@import "tailwindcss/theme.css" layer(theme);\n@import "tailwindcss/utilities.css" layer(utilities);\n'), WORDS)
+    const parts = await buildClassTable(await project('@import "tailwindcss/theme.css" layer(theme);\n@import "tailwindcss/utilities.css" layer(utilities);\n'), WORDS, [])
 
     expect(parts?.classes['p-4']).toBeDefined()
   })
 
   it('has none without Tailwind', async () => {
-    expect(await buildClassTable(await project('body { margin: 0 }\n'), WORDS)).toBeUndefined()
+    expect(await buildClassTable(await project('body { margin: 0 }\n'), WORDS, [])).toBeUndefined()
   })
 
   it('lets the later class win', () => {

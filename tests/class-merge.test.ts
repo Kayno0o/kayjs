@@ -79,7 +79,7 @@ describe('the table of the island entry', () => {
     await Bun.write(join(copy, 'src/components/toggle.kay'), '---\nconst on = signal(false)\n---\nbutton.mt-2(onClick={() => on.set(true)}) toggle\n')
 
     try {
-      expect(await islandClassTableOf(copy, await readClientSources(copy))).toBeUndefined()
+      expect(await islandClassTableOf(copy, await readClientSources(copy), [])).toBeUndefined()
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -92,7 +92,7 @@ describe('the table of the island entry', () => {
     await Bun.write(join(copy, 'src/ui.ts'), 'import { defineUi } from \'kay\'\n\nexport default defineUi({ \'./components/box.kay\': { parts: { root: \'mb-3 mb-9\' } } })\n')
 
     try {
-      const table = await islandClassTableOf(copy, await readClientSources(copy))
+      const table = await islandClassTableOf(copy, await readClientSources(copy), [])
 
       expect(Object.keys(table?.classes ?? {})).toEqual(expect.arrayContaining(['mb-3', 'mb-9']))
     }
@@ -255,16 +255,16 @@ describe('Tailwind present but not loading', () => {
 
     try {
       await Bun.write(join(project, 'src/app.css'), '@import "tailwindcss";\n@import "./missing.css";\n')
-      expect(await buildClassTable(project, ['p-4', 'p-6'])).toBeUndefined()
-      expect(await buildClassTable(project, ['p-4', 'p-6'])).toBeUndefined()
+      expect(await buildClassTable(project, ['p-4', 'p-6'], [])).toBeUndefined()
+      expect(await buildClassTable(project, ['p-4', 'p-6'], [])).toBeUndefined()
       expect(logs).toHaveLength(1)
       expect(logs[0]).toContain('design system did not load')
       expect(logs[0]).toContain('later class does not override')
 
       await Bun.write(join(project, 'src/app.css'), '@import "tailwindcss";\n')
-      expect(await buildClassTable(project, ['p-4', 'p-6'])).toBeDefined()
+      expect(await buildClassTable(project, ['p-4', 'p-6'], [])).toBeDefined()
       await Bun.write(join(project, 'src/app.css'), '@import "tailwindcss";\n@import "./missing.css";\n')
-      expect(await buildClassTable(project, ['p-4', 'p-6'])).toBeUndefined()
+      expect(await buildClassTable(project, ['p-4', 'p-6'], [])).toBeUndefined()
       expect(logs).toHaveLength(2)
     }
     finally {
@@ -279,7 +279,7 @@ describe('Tailwind present but not loading', () => {
 
     try {
       await Bun.write(join(project, 'src/app.css'), 'body { margin: 0 }\n')
-      expect(await buildClassTable(project, ['p-4', 'p-6'])).toBeUndefined()
+      expect(await buildClassTable(project, ['p-4', 'p-6'], [])).toBeUndefined()
       expect(spy).not.toHaveBeenCalled()
     }
     finally {
