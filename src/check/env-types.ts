@@ -8,7 +8,7 @@ import { join, relative, resolve } from 'node:path'
 import { ASSET_EXTENSIONS } from '../build/assets'
 import { TS_FILE, TSX_FILE } from '../build/files'
 import { componentName } from '../compiler'
-import { CONFIG_FILE } from '../config'
+import { CONFIG_FILE, serverExtensions } from '../config'
 import { projectPaths } from '../project'
 import { OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
 import { publicEnvFiles } from '../server/env-state'
@@ -94,9 +94,10 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
   const app = await exportsApp(paths.entry) ? modulePath(paths.entry) : undefined
-  const servers = (options.extensions ?? []).some(extension => extension.server !== undefined || extension.serverModule !== undefined)
+  const serverExts = serverExtensions(root, options.extensions)
+  const servers = serverExts.some(extension => extension.server !== undefined || extension.serverModule !== undefined)
   // The modules extensions take their server plugin from, which the check types the locals off, skipping one that does not resolve (the build reports it).
-  const serverModules = (options.extensions ?? []).flatMap(({ serverModule }) => {
+  const serverModules = serverExts.flatMap(({ serverModule }) => {
     if (serverModule === undefined)
       return []
 
@@ -142,7 +143,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const publicEnv = publicTypes.length === 0 ? '' : `, publicEnv: ${publicTypes.join(' & ')}`
   const inferred = [
     ...app === undefined ? [] : [`app: typeof import(${importSpecifier(app)}).app`, `locals: LocalsOf<typeof import(${importSpecifier(app)}).app>`],
-    ...!servers || config === undefined ? [] : [`extensions: ${[`ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`, ...serverModules.map(({ module, name }) => `ServerOfModule<typeof import(${importSpecifier(module)}), ${JSON.stringify(name)}>`)].join(' | ')}`],
+    ...servers ? [`extensions: ${[...config === undefined ? [] : [`ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`], ...serverModules.map(({ module, name }) => `ServerOfModule<typeof import(${importSpecifier(module)}), ${JSON.stringify(name)}>`)].join(' | ') || 'never'}`] : [],
   ]
 
   return [

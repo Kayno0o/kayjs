@@ -22,7 +22,7 @@ import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
@@ -435,6 +435,18 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
+}
+
+// The directory of the app's own server plugins, whose files `pages()` uses before the extensions', in the order of their names.
+export const PLUGINS_DIR = 'src/plugins'
+const PLUGIN_FILE = /^[^_.][^.]*\.ts$/
+
+// The app's `src/plugins/*.ts` as extensions carrying a server module, then the config's extensions: every server plugin `pages()` mounts, in the order it mounts them.
+export function serverExtensions(root: string, extensions: KayExtension[] | undefined): KayExtension[] {
+  const dir = join(root, PLUGINS_DIR)
+  const files = existsSync(dir) ? readdirSync(dir).filter(name => PLUGIN_FILE.test(name)).sort() : []
+
+  return [...files.map(name => ({ name: `${PLUGINS_DIR}/${name}`, serverModule: { path: `./${PLUGINS_DIR}/${name}` } })), ...extensions ?? []]
 }
 
 // The server plugins the extensions carry, in their order, those given as a function built now.

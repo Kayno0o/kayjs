@@ -20,8 +20,8 @@ export const welcomeMails = queue(
 ```
 
 ```ts
-// src/server.ts
-new Elysia().use(welcomeMails).use(await pages()).listen(3000)
+// src/plugins/jobs.ts, or `.use(welcomeMails)` before `pages()` in src/server.ts
+export { welcomeMails as default } from '../jobs'
 ```
 
 ### Delay a job or keep one per key

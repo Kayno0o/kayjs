@@ -11,7 +11,7 @@ import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { extensionServers } from '../config'
+import { extensionServers, serverExtensions } from '../config'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -177,7 +177,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   void Promise.allSettled([loadingClient])
 
   // Imported while the client builds; the content config is already imported, so an extension or API module may read the collections at import time.
-  const extensions = prerendering ? Promise.resolve([]) : extensionServers(config.extensions, root)
+  const extensions = prerendering ? Promise.resolve([]) : extensionServers(serverExtensions(root, config.extensions), root)
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
   void Promise.allSettled([extensions, api])

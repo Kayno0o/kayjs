@@ -18,6 +18,17 @@ const auth = new Elysia({ name: 'auth' })
 export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
 
+### Mount a server plugin
+
+Each `src/plugins/<name>.ts` default-exports an Elysia plugin, or a function building one, and `pages()` uses it before the pages in the order of the file names, with no `src/server.ts` and no `export const app`: `ctx.locals` is typed from them.
+
+```ts
+// src/plugins/jobs.ts
+import { schedule } from 'kay/server'
+
+export default schedule('30s', collectMetrics)
+```
+
 ### Keep a session
 
 `session()` from `kay/server` is an Elysia plugin adding `session` to the context, and a `store` keeps the data on the server:
@@ -28,7 +39,7 @@ import { session, sqliteStore } from 'kay/server'
 export const sessions = session<{ userId: string }>({ store: sqliteStore('sessions.sqlite') })
 ```
 
-The server entry exports the app using it before the pages: `export const app = new Elysia().use(sessions).use(await pages())`.
+Mount it from `src/plugins/session.ts` (`export default sessions`, see above), or in the server entry before the pages: `export const app = new Elysia().use(sessions).use(await pages())`.
 
 ### Sign a visitor in
 
@@ -156,7 +167,8 @@ export default defineConfig({ requireGuards: true })
 
 ### Locals
 
-- `ctx.locals` is the Elysia context of the request, typed from the app the server entry exports: what the plugins it uses before the pages add.
+- `ctx.locals` is the Elysia context of the request, typed from the plugins in `src/plugins/` and from the app the server entry exports: what the plugins they use before the pages add.
+- `src/plugins/*.ts` are used before the extensions' plugins and the pages, in the order of their file names; one needing another `.use`s it, Elysia deduping by `name`. A name starting with `_`, `*.test.ts` and `*.d.ts` are skipped. They load only as the server starts (not for `kay check`, which types them off the module), and `kay build --compile` holds them.
 - Elysia's own `cookie`, `query`, `headers`, `body`, `url` and `path` are not parsed for it: `ctx.request` and `ctx.url` give them, and `ctx.cookies` outside endpoints.
 - A value for later goes through a plugin's `derive` or `resolve`, not onto `ctx.locals`.
 - `kay check`, the editor and `kay dev` read `export const app` off `src/server.ts`, or the entry `--entry` names to `kay check`, `kay dev` and `kay build`, without running it, and type `ctx.locals.user` from it; an entry exporting no `app` leaves `ctx.locals` empty.

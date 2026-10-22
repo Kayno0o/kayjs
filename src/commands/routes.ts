@@ -10,7 +10,7 @@ import { checkContent } from '../check/project'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { loadConfig } from '../config'
+import { loadConfig, PLUGINS_DIR, serverExtensions } from '../config'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
@@ -172,7 +172,7 @@ function pluginRoutes(config: KayConfig): Listed[] {
 // What adds routes no file or setting tells of: the server entry, and the extensions' server plugins given as a function or a module.
 function unlistedServers(root: string, config: KayConfig): string[] {
   const entry = projectPaths(root, config).entry
-  const built = (config.extensions ?? []).filter(({ server, serverModule }) => typeof server === 'function' || serverModule !== undefined).map(({ name }) => `the extension ${name}'s server plugin`)
+  const built = serverExtensions(root, config.extensions).filter(({ server, serverModule }) => typeof server === 'function' || serverModule !== undefined).map(({ name }) => name.startsWith(`${PLUGINS_DIR}/`) ? name : `the extension ${name}'s server plugin`)
 
   return [...existsSync(entry) ? [shown(entry)] : [], ...built]
 }
