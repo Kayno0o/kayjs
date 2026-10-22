@@ -135,7 +135,7 @@ function readsOf(file: KayFile): string[] {
     const own = binders(node)
 
     for (const span of own) {
-      for (const name of text(span).match(WORD) ?? [])
+      for (const name of bindingNames(text(span)))
         bound.add(name)
     }
 

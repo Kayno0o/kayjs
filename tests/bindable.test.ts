@@ -99,6 +99,11 @@ describe('bind: on a component', () => {
     }
   })
 
+  it('imports a kay value a snippet parameter type or a pattern key only names', () => {
+    for (const template of ['snippet row(x: typeof route)\n  a(href={route("/a")}) x\nrow(1)\n', 'const { route: r } = { route: 1 }\na(href={route("/a")}) {r}\n'])
+      expect(compile(`---\n---\n${template}`, 'html').tsx).toMatch(/import \{[^}]*\broute\b[^}]*\} from 'kay'/)
+  })
+
   it('refuses a bind on a member of the rest props, a value, and says to spread them', () => {
     const rest = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { label, ...rest } = props<{ label: string, open: Bindable<boolean> }>()\n---\nToggle(bind:open={rest.open})\n'
 

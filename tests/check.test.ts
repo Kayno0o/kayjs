@@ -644,7 +644,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([])
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -943,6 +943,47 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[28, 'TS2540'], [29, 'TS2540'], [30, 'TS2540'], [31, 'TS2542'], [32, 'TS2542'], [33, 'TS2540'], [34, 'TS2540'], [35, 'TS2540']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('writes a signal held by a readonly property, a readonly array element or a getter, which the runtime writes through', async () => {
+    const box = [
+      'import { signal } from \'kay\'',
+      '',
+      'export const frozen = { count: signal(0), list: [signal(0)] } as const',
+      'export class Store {',
+      '  readonly count = signal(0)',
+      '  get level() { return signal(1) }',
+      '}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { frozen, Store } from \'../box\'',
+      '',
+      'const store = new Store()',
+      '',
+      'function write() {',
+      '  frozen.count = 1',
+      '  frozen.list[0] = 2',
+      '  frozen.count++',
+      '  store.count = 3',
+      '  store.count += 1',
+      '  store.level = 4',
+      '}',
+      '---',
+      'button(onClick={write}) write',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

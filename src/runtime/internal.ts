@@ -21,7 +21,8 @@ type Keyed = Record<PropertyKey, unknown>
 type Written<T> = T extends Signal<infer Value> ? Value : T
 
 // What type checking hands a write beside its value, `(KayTarget, KayKey) => { KayTarget[KayKey] = undefined as never }`: never called, it makes TypeScript judge the write as plain code, so a readonly key is an error and a generic or union target is typed as it is anywhere.
-type Probe<Target, Key extends keyof Target, Next extends Written<Target[Key]>> = (target: Target, key: Key) => void
+// A key holding a signal is written through it whatever its `readonly`, so its probe gets a target with that key loose.
+type Probe<Target, Key extends keyof Target, Next extends Written<Target[Key]>> = (target: Target[Key] extends Signal<infer _Held> ? Record<Key, unknown> : Target, key: Key) => void
 
 // What a `let` holds once written: the signal it held, else the value.
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
