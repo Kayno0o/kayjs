@@ -133,6 +133,11 @@ export function currentRequest(): Request | undefined {
   return request && inFlight.has(request) ? request : undefined
 }
 
+// The request this async context was started for, even once its answer is made: a streamed block renders after it, and a library reading per-request state it keyed by the request still finds it. Not for logging, which `currentRequest` limits to the answer.
+export function requestOfContext(): Request | undefined {
+  return answering.getStore()
+}
+
 // Runs kay's answer to `request`, a page or an action, so a message logged on the way says which request it was, until the answer is made.
 // Entering the context from an Elysia hook instead, which cannot wrap the handler, leaked it into the caller and stalled image requests.
 export async function answeringRequest<T>(request: Request, run: () => Promise<T>): Promise<T> {

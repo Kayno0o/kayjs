@@ -3,6 +3,10 @@ import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import UserMenu from '../../../components/user-menu.kay'
+import { loadViewer } from '../../../viewer'
+
+// The account is behind a guard that read the user already, so UserMenu shows with the first bytes whether or not `viewer` is on.
+await loadViewer(ctx.request)
 
 const features = ctx.locals.auth.features()
 const current = ctx.url.pathname

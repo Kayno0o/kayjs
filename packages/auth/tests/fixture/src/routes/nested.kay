@@ -1,0 +1,11 @@
+--- server
+export const page = { guards: false }
+---
+---
+import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
+import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+---
+nav
+  SignedIn
+    p#member Member
+    UserMenu

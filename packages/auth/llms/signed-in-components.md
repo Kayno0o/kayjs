@@ -4,7 +4,7 @@
 
 ### Show or hide a part for the signed-in user
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, and so can hand an island its slots:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, so a layout can hand an island its slots:
 
 ```kay
 ---
@@ -23,7 +23,8 @@ nav
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
 - `UserMenu` shows the user's username or email, a link to their account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button back to the pages' home. The account pages' own header is one.
 - A guest is signed out for all three.
-- They read the request being answered, so a prerendered page throws naming them: render the page per request.
+- `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
+- They read the request being answered, so a page with `prerender: true` fails the build naming them: render it per request. They nest in one another and in the app's own `await` blocks.
 
 ### Show them with the first bytes
 

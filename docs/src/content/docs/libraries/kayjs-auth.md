@@ -158,7 +158,7 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## The signed-in user in templates
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, and can hand an island its slots:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, so a layout can hand an island its slots:
 
 ```kay
 ---
@@ -177,7 +177,8 @@ nav
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
 - `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button. The account pages' own header is one.
 - A guest is signed out for all three.
-- They read the request being answered, so a prerendered page throws naming them: render the page per request.
+- `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
+- They read the request being answered, so a page with `prerender: true` fails the build naming them: render it per request. They nest in one another and in the app's own `await` blocks.
 
 `auth({ module: './src/auth', viewer: true })` reads the user before every page renders, so the three show in the first bytes, with JavaScript off too. Without it they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `viewer: true` reads the session on every page, so no cache shares one between visitors.
 

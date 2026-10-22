@@ -133,6 +133,11 @@ describe('the prebuilt pages', () => {
 
     await store.users.update((await store.users.findByEmail('nav@example.com'))!.id, { roles: ['admin'] })
     expect(text(await ada.visit('/nav'), '#admin')).toBe('Admin')
+
+    const nested = await ada.visit('/nested')
+
+    expect(text(nested, '#member')).toBe('Member')
+    expect(nested.find('.kayjs-auth form button').map(button => button.text)).toEqual(['Sign out'])
   })
 
   test('the pages reached before signing in open under the app\'s guard asking for a session, which keeps its own pages', async () => {

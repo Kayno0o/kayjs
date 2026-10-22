@@ -1,11 +1,11 @@
 import type { Auth } from '../src/auth'
-import type { User } from '../src/core'
+import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
-import { currentRequest } from 'kay/library'
+import { requestOfContext } from 'kay/library'
 import { currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `createAuth` set goes back after each test.
-afterEach(() => readRequestWith(currentRequest))
+afterEach(() => readRequestWith(requestOfContext))
 
 const user = (fields: Partial<User>) => ({ id: 'u1', roles: [], guest: false, ...fields }) as User
 const isGranted = (role: string, found: User) => found.roles.includes(role)
@@ -14,7 +14,7 @@ function answering(found: User | null) {
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { user: async () => {
+  registerViewer(request, { auth: { bareUser: async () => {
     reads++
 
     return found
@@ -65,7 +65,7 @@ test('a failed read ahead leaves it to the component, which reads again', async 
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { user: async () => {
+  registerViewer(request, { auth: { bareUser: async () => {
     if (reads++ === 0)
       throw new Error('store down')
 
