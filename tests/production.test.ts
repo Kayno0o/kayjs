@@ -689,7 +689,7 @@ describe('revalidation', () => {
 
   it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
     const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
-    const app = await build.serve({ routes, api: 'tests/fixtures/production/src/api', prebuilt: true, security: false, log: false })
+    const app = await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })
 
     Bun.gc(true)
     await Bun.sleep(50)
