@@ -666,9 +666,9 @@ describe('revalidation', () => {
       before = now
     }
 
+    // Mounts the fixture's API modules, which kept the last app they were mounted in (kaynooo/kayjs#1895).
     const dropped = await (async () => {
-      // An API module's app keeps the last app it was mounted in (kaynooo/kayjs#1895), so this one mounts none.
-      const app = await build.serve({ prebuilt: true, security: false, log: false, api: 'src/no-api' })
+      const app = await build.serve({ prebuilt: true, security: false, log: false, api: resolve(PRODUCTION, 'src/api') })
 
       await app.handle(new Request('http://localhost/news'))
 

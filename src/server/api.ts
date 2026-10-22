@@ -128,7 +128,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (cors)
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
 
-      return group
+      const mounting = group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted }) => {
           owners.set(request, instance)
@@ -240,10 +240,33 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         .use(instance)
         // After the module's own `onError`, which may answer the error itself.
         .onError(({ request, error, code, set }) => reportThrown({ request, error, code, set }, options))
+
+      letGoOfParent(instance, group)
+
+      return mounting
     })
   }
 
   return { limits, routeLimits, mounted }
+}
+
+// What Elysia's `.use` binds a plugin to in its parent, which are protected there.
+interface Parent {
+  getServer: () => unknown
+  getGlobalRoutes: () => unknown
+  getGlobalDefinitions: () => unknown
+}
+
+// `.use(instance)` leaves closures on the module's instance, which the module cache keeps for the process, pointing at the group and so the whole app (kaynooo/kayjs#1895): they are rebound to a weak reference, so an app nothing else holds can be collected.
+function letGoOfParent(instance: object, group: object): void {
+  const parent = new WeakRef(group as unknown as Parent)
+
+  Object.assign(instance, {
+    getParent: () => parent.deref() ?? null,
+    getServer: () => parent.deref()?.getServer() ?? null,
+    getGlobalRoutes: () => parent.deref()?.getGlobalRoutes() ?? [],
+    getGlobalDefinitions: () => parent.deref()?.getGlobalDefinitions() ?? { type: {}, error: {} },
+  })
 }
 
 // An answer to a request whose guards or session read who sent it is for that caller alone, unless the route set its own caching; a Response of the route's own keeps its headers, as the context's never overwrite them.
