@@ -89,14 +89,14 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
       const marked = window as { kayActions?: number }
 
       marked.kayActions = 0
-      window.fetch = async (...args) => {
+      window.fetch = (async (...args: Parameters<typeof fetch>) => {
         const response = await original(...args)
 
         if (String(args[0] instanceof Request ? args[0].url : args[0]).includes('/_kay/action'))
           marked.kayActions!++
 
         return response
-      }
+      }) as typeof fetch
     })
 
     if (transition) {
