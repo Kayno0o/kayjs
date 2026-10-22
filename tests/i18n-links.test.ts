@@ -4,8 +4,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { browserPath, testSite } from '../src/test'
 import { eagerJs, scriptUrls } from '../scripts/eager-js'
+import { browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
 const chrome = browserPath()
