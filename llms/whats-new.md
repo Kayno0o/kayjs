@@ -10,7 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay add ui` and `kay add auth` add kayjs-ui and kayjs-auth: `ui()` mounts the theme, one Toaster and one TooltipHost on every page, and an extension may name a `layout` wrapping every page ([Scaffold with kay new and kay add](project-new-and-add.md), [Extensions](component-libraries.md#extensions), [Setup](../packages/ui/llms/setup.md)).
 - kayjs-auth and kayjs-mail register like every library, with `auth({ module: './src/auth' })` and `mail({ module: './src/mail' })`, and `kay check` types the module's locals ([Component libraries](component-libraries.md), [Setup](../packages/auth/llms/setup.md), [Writing and sending](../packages/mail/llms/writing-and-sending.md)).
 - Rate limits are named `rateLimit` and `key` across the libraries: kayjs-ai's `ai({ rateLimit, key })` and `ask({ key })`, kayjs-auth's `createAuth({ rateLimit })`, kayjs-mail's `smtp({ rateLimit: { max, window } })` ([Limits](../packages/ai/llms/limits.md)); `kay upgrade` renames the old names.
-- kayjs-ui: a SaveForm over signal state takes `dirty` and `onSave` instead of `action`, and `status` for the bar ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui: a SaveForm over signal state takes `dirty` and `onSave` instead of `action`, and `status` for the bar ([Forms and Steps](../packages/ui/llms/forms-and-steps.md)).
 - An extension's `check` hands `kay check` and the editor the problems with how the app configured it, with no server started; kayjs-cms reports its collection and layout warnings through it ([Component libraries](component-libraries.md)).
 - The libraries throw a `config-invalid` `KayError` for a setting they refuse at boot, worded as kay's, and every error class they export ends in `Error` with a `code`; kay's own (`HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`) do too, the old names kept as `@deprecated` aliases ([Upgrading](upgrading.md)).
 - kayjs-ui: `Table(exportable)` downloads the rows on screen as CSV, `Table(virtual)` and `VirtualList` draw only the rows in view ([Tables](../packages/ui/llms/tables-navigation-and-layout.md), [Lists](../packages/ui/llms/charts-drag-and-media.md)).
@@ -59,7 +59,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `site` is the origin everywhere: kayjs-auth's `createAuth({ site, name })` takes kay's own `site` by default and `url` goes ([kayjs-auth](../packages/auth/llms/setup.md)); `kay upgrade` renames the old form.
 - kayjs-ui: DateInput, DateRangeInput and TimeInput ([Forms](../packages/ui/llms/forms.md)).
 - kayjs-ui's Card, Button, Table and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
-- kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md), [Forms and Steps](../packages/ui/llms/forms-and-steps.md)).
 - kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
 
 ## 1.69.0
