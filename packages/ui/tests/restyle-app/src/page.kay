@@ -1,4 +1,6 @@
 ---
+import type { Action } from 'kay'
+import { infiniteList } from '@kaynooo/kayjs-ui'
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
@@ -15,6 +17,7 @@ import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
@@ -22,11 +25,13 @@ import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
@@ -60,13 +65,21 @@ import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
 const planets = [{ id: 1, name: 'Mars' }]
+
+// An action as the server renders it: a call with its `url`, every reading of it empty.
+const fakeAction = new Proxy(Object.assign(async () => undefined, { url: '/_kay/action/form/fake' }), { get: (target, key) => key in target ? Reflect.get(target, key) : () => undefined }) as unknown as Action<never, unknown>
+
+const feed = infiniteList([{ id: 1 }], { pageSize: 1, key: row => row.id, load: async () => undefined })
 ---
 //- Renders components `src/ui.ts` restyles, for the library's restyle test.
 Card#card(title="Hi" class={{ body: 'p-9' }}) Body
@@ -143,7 +156,7 @@ AppHeader#appheader(label="App" current="/" links={[{ href: '/', label: 'Home' }
     span brand
   @end
     span end
-Pagination#pager(page={2} pages={5} url="/list")
+Pagination#pager(page={10} pages={20} url="/list")
 SplitLayout#split(sidebarTitle="Filters" resizableList)
   @sidebar
     p side
@@ -167,11 +180,12 @@ Masonry#masonry(items={[1, 2]} key={item => item})
   @tile(item)
     p {item}
 MediaGallery#gallery(items={[{ key: 1, kind: 'image', thumb: '/t.png', preview: '/p.png' }, { key: 2, kind: 'image', thumb: '/u.png', preview: '/q.png' }]})
+MediaGallery#gallery-empty(items={[]})
 ImageCropper#cropper(src="/a.png")
 ZoomPane#zoom(label="Map")
   p content
 QrCode#qr(value="https://kay.dev")
-SiteFavicon#favicon(name="Kay")
+SiteFavicon#favicon(name="Kay" src="/favicon.png")
 IconPicker#icon-picker(search={async () => []})
 MarkdownEditor#markdown
 BarChart#bars(label="Runs" labels={['a', 'b']} xLabels legend series={[{ name: 'S', values: [1, 2] }, { name: 'T', values: [2, 1] }]})
@@ -182,3 +196,10 @@ Skeleton#skeleton(lines={2})
 Progress#progress(value={30} label="Upload")
 Breadcrumb#breadcrumb(label="Trail" items={[{ label: 'Home', href: '/' }, { label: 'Docs', href: '/docs' }, { label: 'Page' }]})
 RadioGroup#radios(label="Plan" value="a" options={[{ value: 'a', label: 'A', description: 'First' }, { value: 'b', label: 'B' }]})
+Toaster#toaster
+TooltipHost#tooltips
+FormDialog#form-dialog(open={true} title="Rename" action={fakeAction} submitLabel="Rename" failure="Could not rename" onOpenChange={() => undefined})
+  TextInput(name="name")
+ContactForm#contact(action={fakeAction})
+LoadMore#more(list={feed})
+WhenVisible#visible(onVisible={() => undefined})

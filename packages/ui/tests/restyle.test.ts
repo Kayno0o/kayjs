@@ -167,6 +167,22 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-radio-choice p-2',
     'kui-radio-label font-medium',
     'kui-radio-description text-xs',
+    'kui-toaster z-50',
+    'kui-toaster-live gap-2',
+    'kui-tooltip text-xs',
+    'kui-form-dialog-footer pt-4',
+    'kui-form-dialog-actions gap-3',
+    'kui-form-grid gap-5',
+    'kui-contact-form gap-7',
+    'kui-when-visible min-h-4',
+    'kui-icon kui-collapsible-section-chevron size-6',
+    'kui-icon kui-tabs-icon size-3',
+    'kui-icon kui-site-nav-toggle-menu size-6',
+    'kui-icon kui-tree-view-icon size-3',
+    'kui-icon kui-chip-icon size-3',
+    'kui-pagination-gap opacity-50',
+    'kui-site-favicon-img rounded-sm',
+    'kui-load-more py-6',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {
@@ -194,6 +210,16 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('the browser build of an island carries the restyled classes as well', () => {
     for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none', 'w-72', 'h-9'])
       expect(browser).toContain(classes)
+  })
+
+  test('the browser build draws the parts of a reactive recipe with the restyle: Tabs, Toggle, MultiSelect, IconPicker and DateInput', () => {
+    for (const [part, classes] of [['tab', 'px-5'], ['track', 'w-12'], ['option', 'py-2'], ['option', 'rounded-xl'], ['day', 'h-9']] as const)
+      expect(browser).toMatch(new RegExp(`look\\d+\\(__props, "${part}"\\), "${classes}"`))
+  })
+
+  test('an empty BarList and an empty MediaGallery take the classes of their root part', () => {
+    expect(html).toMatch(/<p class="kui-bar-list-empty kui-bar-list text-gray-500" data-part="root" id="bars-empty">/)
+    expect(html).toMatch(/<p class="kui-media-gallery-empty kui-media-gallery text-center"[^>]*id="gallery-empty"/)
   })
 
   test('a component used as a part of another keeps the part name its caller hands it', () => {
