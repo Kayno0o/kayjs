@@ -2,13 +2,8 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.70.0
+## Unreleased
 
-- A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
-- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
-- kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg` without the default icons, `Textarea` takes a parent's write while focused with `writeFocused`, and Chat draws its field with Textarea and its Try again button without kayjs-ui's default icons ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
-- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
 - `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, islands, the service worker, prefetching and kayjs-cms follow it, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
 - Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages, in the order of the file names, and types `ctx.locals`, so sessions, jobs and derives need no `src/server.ts` ([Mount a server plugin](server.md#mount-a-server-plugin)).
 - `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item with no `path` links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
@@ -16,6 +11,14 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `cache(load, { ttl, tags })` and `cacheTag()` from `kay/cache` give a cached function whose key comes from its module and name, with `.invalidate()` on it and tags to drop a group, so no string key can be mistyped ([Cache a function with no key to type](rendering.md#cache-a-function-with-no-key-to-type)).
 - `import.meta.glob('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })` bundles just the icons it names, for an icon known by name at runtime ([Icons](images.md#icons)).
 - An action declared in a page types `ctx.params` from that page's route, a matcher's value as it gives it ([Actions](actions.md#declaring-an-action)); a guard's and a layout's stay `unknown`.
+
+## 1.70.0
+
+- A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
+- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
+- kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg` without the default icons, `Textarea` takes a parent's write while focused with `writeFocused`, and Chat draws its field with Textarea and its Try again button without kayjs-ui's default icons ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
+- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).

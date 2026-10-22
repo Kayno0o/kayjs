@@ -2,7 +2,7 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.70.0
+## 1.71.0
 
 ### `src/plugins` holds server plugins
 
@@ -11,6 +11,8 @@ Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a
 ### A page action's `ctx.params` has the types of the route
 
 Under `[id=integer]`, `ctx.params.id` is a `number`, so a cast such as `ctx.params.id as string` is now a type error: drop the cast.
+
+## 1.70.0
 
 ### `part` names a part of a component
 
