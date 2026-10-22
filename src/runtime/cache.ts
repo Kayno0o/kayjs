@@ -65,6 +65,10 @@ const entries = new Map<string, Entry>()
 const stores = new Set<CacheStore>()
 // The drops of stored rows still running in the background, which a read of a store waits for so it never meets a row an `invalidate` already dropped.
 const settling = new Set<Promise<void>>()
+// Counts the invalidations, so a stored row read while one ran is read again.
+let invalidations = 0
+// The stores whose last read failed: a streak logs once.
+const readFailing = new WeakSet<CacheStore>()
 // The app's `store.cache`, for each call naming no store of its own.
 let appCache: CacheStore | undefined
 // The keys whose value the app's store could not hold, warned about once each, up to a bound so per-visitor keys cannot grow it.
@@ -86,9 +90,13 @@ const clockListeners = new Set<(at: number) => void>()
 // Stands for every key, in the reads of a render or a load that read more than the server tracks: any invalidation reaches it.
 export const ALL_READS = '\0all'
 // What the stored text of a value built from other keys opens with: those keys as JSON, then a line break, then the value. A value with none is the bare text, as older versions wrote every one.
-const DEPS_PREFIX = '#deps '
+export const DEPS_PREFIX = '#deps '
 // Past this many keys, the least recently written goes first.
 const MAX_ENTRIES = 10_000
+// The most times a stored row is read again because an invalidation ran meanwhile.
+const MAX_REREADS = 3
+// How many stored rows an invalidation deletes at once.
+const DELETE_BATCH = 50
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
 const RETRY_MS = 60_000
 
@@ -236,11 +244,22 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     trackStore(store)
 
   if (!entry && store) {
-    if (settling.size > 0)
-      await Promise.all(settling)
+    let kept: Entry | undefined
 
-    const read = readStored(store, key)
-    const kept = read instanceof Promise ? await read : read
+    // A row read while an `invalidate` ran may be the one it drops: read again once its drop is done.
+    for (let tries = 0; tries < MAX_REREADS; tries++) {
+      const before = invalidations
+
+      if (settling.size > 0)
+        await Promise.all(settling)
+
+      const read = readStored(store, key)
+
+      kept = read instanceof Promise ? await read : read
+
+      if (before === invalidations)
+        break
+    }
 
     // Another call may have loaded the key while this one waited on the store.
     entry = entries.get(key)
@@ -401,6 +420,8 @@ export function refreshLocally(key: string): void {
 
 // Drops the entries and stored rows `named` matches, and those built from a read `built` matches, then tells the key listeners; `dropped` gathers the keys, which `invalidate` sends on.
 function dropAndTell(named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): void {
+  invalidations++
+
   for (const name of dropEntries(named, built))
     dropped.add(name)
 
@@ -454,19 +475,23 @@ async function forget(work: Promise<void>): Promise<void> {
 
 async function dropStored(store: CacheStore, names: Promise<string[]>, named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): Promise<void> {
   try {
-    const known = await store.dependencies?.()
+    const [listed, known] = await Promise.all([names, store.dependencies?.()])
     const late = new Set<string>()
+    const doomed: string[] = []
 
-    for (const name of await names) {
+    for (const name of listed) {
       const reads = known ? known.get(name) ?? [] : await storedReadsLater(store, name)
 
       if (named(name) || dropped.has(name) || (!entries.has(name) && reads.some(read => read === ALL_READS || built(read)))) {
-        await store.delete(name)
+        doomed.push(name)
 
         if (!dropped.has(name))
           late.add(name)
       }
     }
+
+    for (let from = 0; from < doomed.length; from += DELETE_BATCH)
+      await Promise.all(doomed.slice(from, from + DELETE_BATCH).map(async name => store.delete(name)))
 
     if (late.size === 0)
       return
@@ -681,8 +706,23 @@ function readStored(store: CacheStore, key: string): Entry | undefined | Promise
   return kept instanceof Promise ? storedEntry(store, key, kept) : entryOf(store, key, kept)
 }
 
+// A store that cannot be read, down or slow, is a miss: the value loads and stays in memory, as a write that fails does.
 async function storedEntry(store: CacheStore, key: string, pending: Promise<StoredValue | undefined>): Promise<Entry | undefined> {
-  return entryOf(store, key, await pending)
+  try {
+    const kept = await pending
+
+    readFailing.delete(store)
+
+    return entryOf(store, key, kept)
+  }
+  catch (error) {
+    if (!readFailing.has(store))
+      kayLog('error', `cached('${key}') could not read its store; loading it`, error)
+
+    readFailing.add(store)
+
+    return undefined
+  }
 }
 
 function entryOf(store: CacheStore, key: string, kept: StoredValue | undefined): Entry | undefined {
@@ -706,6 +746,16 @@ function storedReads(store: CacheStore, key: string): string[] {
   const kept = store.get(key) as StoredValue | undefined
 
   return kept ? splitDeps(kept.text).deps ?? [] : []
+}
+
+// The keys a stored line names, or every key when it does not parse, which no invalidation then misses.
+export function readsOf(line: string): string[] {
+  try {
+    return JSON.parse(line) as string[]
+  }
+  catch {
+    return [ALL_READS]
+  }
 }
 
 function splitDeps(stored: string): { deps?: string[], text: string } {

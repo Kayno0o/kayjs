@@ -69,7 +69,7 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 
 ### Your own store
 
-A store is an object of `CacheStore`, from `kay/cache`. Its methods are synchronous, so `invalidate` is done when it returns.
+A store is an object of `CacheStore`, from `kay/cache`. Its methods are synchronous for a file, so `invalidate` is done when it returns. A store reached over a network may answer with promises: `invalidate` then drops its rows in the background, and a `cached` read waits for that.
 
 ```ts
 import type { CacheStore } from 'kay/cache'

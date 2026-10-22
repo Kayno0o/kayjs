@@ -1,4 +1,3 @@
-import type { SQL } from 'bun'
 import type { RateStore } from '../runtime/action'
 import type { PgHandle } from './pg-data'
 import type { SessionData, SessionStore } from './session'
@@ -7,6 +6,7 @@ import { parse, stringify } from 'devalue'
 import { durationSeconds, legacyMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
+import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 import { matchesSession } from './session'
 import { sharedKey } from './stamp'
@@ -18,14 +18,6 @@ const SWEEP_SESSIONS_MS = 60 * 60 * 1000
 const SWEEP_RATES_MS = 60_000
 const RATES_KEY_BYTES = 32
 const RATES_KEY = 'rates_key'
-
-// The database's clock in ms since the epoch, so replicas whose clocks disagree still count one window.
-const NOW = 'floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint'
-
-// A query whose text carries the clock, its values `$1` on.
-async function query<Row>(db: SQL, text: string, values: (string | number)[] = []): Promise<Row[]> {
-  return rowsOf<Row>(db.unsafe(text, values))
-}
 
 // Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions and deletes the ones `match` returns true for.
 export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
@@ -76,7 +68,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
       if (++writes % SWEEP_EVERY === 0)
         await sweep()
 
-      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, seconds * 1000])
+      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(seconds * 1000)])
     },
     async delete(id) {
       const db = await pg.db()
@@ -89,7 +81,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
       const ids = live.filter(row => matchesSession(row.data, match)).map(row => row.id)
 
       if (ids.length > 0)
-        await db`DELETE FROM kay_sessions WHERE id IN ${db(ids)}`
+        await query(db, 'DELETE FROM kay_sessions WHERE id IN (SELECT jsonb_array_elements_text($1::text::jsonb))', [JSON.stringify(ids)])
 
       return ids.length
     },
@@ -133,7 +125,7 @@ export function pgRates(pg: PgHandle): RateStore {
       }
 
       // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
-      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, length])
+      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, Math.round(length)])
 
       return { count: row!.count, resetAt: Number(row!.reset_at) }
     },

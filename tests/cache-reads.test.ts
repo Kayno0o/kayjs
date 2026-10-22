@@ -294,3 +294,88 @@ describe('onClockHeard', () => {
     expect(heard).toEqual([5])
   })
 })
+
+// A store reached over a network: every call takes a moment, and a read answers with the row as it was when asked.
+function networkStore(failing: { keys?: boolean, get?: boolean } = {}) {
+  const rows = new Map<string, { text: string, freshUntil: number }>()
+  const store: CacheStore = {
+    get: async (key) => {
+      const row = rows.get(key)
+
+      await Bun.sleep(10)
+
+      if (failing.get)
+        throw new Error('get down')
+
+      return row
+    },
+    set: async (key, text, freshUntil) => {
+      await Bun.sleep(5)
+      rows.set(key, { text, freshUntil })
+    },
+    delete: async (key) => {
+      await Bun.sleep(5)
+      rows.delete(key)
+    },
+    keys: async () => {
+      await Bun.sleep(5)
+
+      if (failing.keys)
+        throw new Error('keys down')
+
+      return [...rows.keys()]
+    },
+  }
+
+  return { store, rows }
+}
+
+async function waitForRow(rows: Map<string, unknown>, key: string): Promise<void> {
+  for (let tries = 0; tries < 100 && !rows.has(key); tries++)
+    await Bun.sleep(5)
+
+  expect(rows.has(key)).toBe(true)
+}
+
+describe('a store answering with promises', () => {
+  it('is not read back as a row an invalidate dropped, however the two overlap', async () => {
+    const { store, rows } = networkStore()
+    const before = await restart('network-before')
+
+    expect(await before.cached('k', '600s', () => 'old', { store })).toBe('old')
+    await waitForRow(rows, 'k')
+
+    const after = await restart('network-after')
+
+    after.trackStore(store)
+    after.invalidate('k')
+    expect(await after.cached('k', '600s', () => 'new', { store })).toBe('new')
+  })
+
+  it('reads a row again when an invalidate ran while the read was in flight', async () => {
+    const { store, rows } = networkStore()
+    const before = await restart('network-flight-before')
+
+    await before.cached('k', '600s', () => 'old', { store })
+    await waitForRow(rows, 'k')
+
+    const after = await restart('network-flight-after')
+
+    after.trackStore(store)
+
+    const pending = after.cached('k', '600s', () => 'new', { store })
+
+    after.invalidate('k')
+    expect(await pending).toBe('new')
+  })
+
+  it('loads a value its store cannot be read for, and logs a failing listing without leaving a rejection', async () => {
+    const { store } = networkStore({ keys: true, get: true })
+    const mod = await restart('network-down')
+
+    mod.trackStore(store)
+    mod.invalidate('k')
+    expect(await mod.cached('k', '600s', () => 'loaded', { store })).toBe('loaded')
+    await Bun.sleep(50)
+  })
+})

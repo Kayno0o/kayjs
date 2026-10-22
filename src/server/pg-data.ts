@@ -34,7 +34,7 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
       await tx`CREATE TABLE IF NOT EXISTS kay_sessions (id text PRIMARY KEY, data text NOT NULL, expires bigint NOT NULL)`
       await tx`CREATE INDEX IF NOT EXISTS kay_sessions_expires ON kay_sessions (expires)`
-      await tx`CREATE TABLE IF NOT EXISTS kay_cache (key text PRIMARY KEY, value text NOT NULL, fresh_until bigint NOT NULL)`
+      await tx`CREATE TABLE IF NOT EXISTS kay_cache (key text PRIMARY KEY, value text NOT NULL, fresh_until bigint NOT NULL, reads text)`
       await tx`CREATE TABLE IF NOT EXISTS kay_events (id bigserial PRIMARY KEY, origin text NOT NULL, message text NOT NULL, at bigint NOT NULL)`
       await tx`CREATE INDEX IF NOT EXISTS kay_events_at ON kay_events (at)`
       await tx`CREATE TABLE IF NOT EXISTS kay_rates (key text PRIMARY KEY, count integer NOT NULL, reset_at bigint NOT NULL)`

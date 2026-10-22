@@ -4,7 +4,7 @@ import type { PgHandle } from './pg-data'
 import type { RoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
-import { rowsOf } from './pg-jobs'
+import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 
 // How often a process says it is alive, and how long after its last word its members stop counting.
@@ -14,7 +14,8 @@ const EXPIRY = 10_000
 const KEPT = 30_000
 const WATCH_KEPT = 30_000
 const DEFAULT_POLL = optionMs('250ms', '')
-const NOW = 'floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint'
+// Ids this far behind the last one read are read again, as a transaction that began earlier may commit its message after a later one.
+const OVERLAP = 100
 
 interface Own {
   room: string
@@ -24,10 +25,6 @@ interface Own {
 }
 
 type Listener = Parameters<RoomStore['subscribe']>[0]
-
-async function query<Row>(db: SQL, text: string, values: (string | number | null)[] = []): Promise<Row[]> {
-  return rowsOf<Row>(db.unsafe(text, values))
-}
 
 // Runs a write once the ones before it did, its failure logged: the writes of a store go to Postgres in the order they were made.
 async function chained(prior: Promise<void>, what: string, work: () => Promise<unknown>): Promise<void> {
@@ -55,6 +52,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
   let last: number | undefined
+  const recent = new Set<number>()
   let reading: ReturnType<typeof setInterval> | undefined
   let beating: ReturnType<typeof setInterval> | undefined
   let polling = false
@@ -110,7 +108,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       return
 
     const names = [...watched.keys()]
-    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = ANY($1::text[]) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [`{${names.map(name => JSON.stringify(name)).join(',')}}`, self])
+    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room IN (SELECT jsonb_array_elements_text($1::text::jsonb)) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [JSON.stringify(names), self])
     const byRoom = new Map<string, Own[]>()
 
     for (const row of rows)
@@ -133,12 +131,30 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       return
     }
 
-    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY id', [last, self])) {
-      last = Number(row.id)
+    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY id', [last - OVERLAP, self])) {
+      const id = Number(row.id)
+
+      if (recent.has(id))
+        continue
+
+      recent.add(id)
+      last = Math.max(last, id)
 
       for (const listener of listeners)
         listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
     }
+
+    for (const id of recent) {
+      if (id <= last - OVERLAP)
+        recent.delete(id)
+    }
+  }
+
+  const stopReading = () => {
+    clearInterval(reading)
+    reading = undefined
+    last = undefined
+    recent.clear()
   }
 
   const read = async () => {
@@ -163,6 +179,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     finally {
       polling = false
     }
+
+    // Rooms nobody asks about any more may have ended the reading.
+    if (watched.size === 0 && listeners.size === 0)
+      stopReading()
   }
 
   // The process says it is alive only while it holds a connection, and reads the others' members and messages only while it has someone to tell or something asked.
@@ -187,9 +207,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       void read()
     }
     else if (!wanted && reading !== undefined) {
-      clearInterval(reading)
-      reading = undefined
-      last = undefined
+      stopReading()
     }
   }
 

@@ -1,8 +1,9 @@
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
-import { ALL_READS, trackStore, untrackStore } from '../runtime/cache'
+import { DEPS_PREFIX, readsOf, trackStore, untrackStore } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
+import { NOW } from './pg-sql'
 import { onReload } from './reload'
 
 // How often a process reads what the others sharing a store invalidated, and how long a message is kept for one that reads late.
@@ -10,17 +11,8 @@ const POLL_MS = 500
 const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
 const PROCESS = crypto.randomUUID()
-const NOW = 'floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint'
-
-// The keys a stored line names, or every key when it does not parse, which no invalidation then misses.
-function readsOf(line: string): string[] {
-  try {
-    return JSON.parse(line) as string[]
-  }
-  catch {
-    return [ALL_READS]
-  }
-}
+// Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
+const OVERLAP = 100
 
 // Values kept in Postgres: they survive restarts and deploys, and every replica shares them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
 // Every call answers with a promise, so `invalidate` drops the stored rows in the background, and a read right after it waits for that.
@@ -30,6 +22,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   const writing = new Set<Promise<unknown>>()
   let poller: ReturnType<typeof setInterval> | undefined
   let seen: number | undefined
+  const recent = new Set<number>()
   let polling = false
   // A streak of failed reads logs once, as the poll runs twice a second.
   let failing = false
@@ -64,11 +57,22 @@ export function pgCache(pg: PgHandle): CacheStore {
         return
       }
 
-      for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${seen}::bigint AND origin != ${PROCESS} ORDER BY id`)) {
-        seen = Number(event.id)
+      for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${seen - OVERLAP}::bigint AND origin != ${PROCESS} ORDER BY id`)) {
+        const id = Number(event.id)
+
+        if (recent.has(id))
+          continue
+
+        recent.add(id)
+        seen = Math.max(seen, id)
 
         for (const listener of listeners)
           listener(event.message)
+      }
+
+      for (const id of recent) {
+        if (id <= seen - OVERLAP)
+          recent.delete(id)
       }
 
       failing = false
@@ -84,7 +88,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     }
   }
 
-  // Started by the first call that needs the database, so a module naming the store connects to nothing in a build, a check or a test.
+  // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects.
   const start = () => {
     if (poller !== undefined || closed)
       return
@@ -103,21 +107,29 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       return row ? { text: row.value, freshUntil: Number(row.fresh_until) } : undefined
     },
+    // Registered with `write` before the connection is reached, so a listing of the keys right after waits for it.
     async set(key, text, freshUntil) {
       start()
 
-      const db = await pg.db()
+      const end = text.startsWith(DEPS_PREFIX) ? text.indexOf('\n') : -1
+      const reads = end > 0 ? text.slice(DEPS_PREFIX.length, end) : null
 
-      await write(rowsOf(db`INSERT INTO kay_cache (key, value, fresh_until) VALUES (${key}, ${text}, ${freshUntil}::bigint) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until`))
+      await write((async () => {
+        const db = await pg.db()
+
+        await rowsOf(db`INSERT INTO kay_cache (key, value, fresh_until, reads) VALUES (${key}, ${text}, ${Math.round(freshUntil)}::bigint, ${reads}) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until, reads = excluded.reads`)
+      })())
     },
     async delete(key) {
-      const db = await pg.db()
+      await write((async () => {
+        const db = await pg.db()
 
-      await write(rowsOf(db`DELETE FROM kay_cache WHERE key = ${key}`))
+        await rowsOf(db`DELETE FROM kay_cache WHERE key = ${key}`)
+      })())
     },
     async dependencies() {
       const db = await pg.db()
-      const rows = await rowsOf<{ key: string, reads: string }>(db`SELECT key, substr(value, 7, strpos(value, E'\n') - 7) AS reads FROM kay_cache WHERE value LIKE '#deps %' AND strpos(value, E'\n') > 0`)
+      const rows = await rowsOf<{ key: string, reads: string }>(db`SELECT key, reads FROM kay_cache WHERE reads IS NOT NULL`)
 
       return new Map(rows.map(row => [row.key, readsOf(row.reads)]))
     },

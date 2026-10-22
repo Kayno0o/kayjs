@@ -1,7 +1,7 @@
 import type { SyncCacheStore } from './cache'
 import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
-import { ALL_READS, trackStore, untrackStore } from './cache'
+import { readsOf, trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
 import { openSqlite } from './sqlite.server'
 
@@ -12,18 +12,8 @@ const EVENT_TTL_MS = 60_000
 const PROCESS = crypto.randomUUID()
 
 export { invalidatePage } from '../server/stale-pages'
-export type { CachedFunction, CacheFunctionOptions, CacheOptions, CacheStore, CacheTag } from './cache'
+export type { CachedFunction, CacheFunctionOptions, CacheOptions, CacheStore, CacheTag, StoredValue, SyncCacheStore } from './cache'
 export { cache, cached, cacheTag, invalidate } from './cache'
-
-// The keys a stored line names, or every key when it does not parse, which no invalidation then misses.
-function readsOf(line: string): string[] {
-  try {
-    return JSON.parse(line) as string[]
-  }
-  catch {
-    return [ALL_READS]
-  }
-}
 
 // The file with its tables, triggers and statements ready.
 function openCache(path: string) {
