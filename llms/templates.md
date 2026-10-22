@@ -313,13 +313,13 @@ for product of products
 - `bind:name={signal}` on a component binds a prop typed `Bindable<T>` ([Components](components.md#bind-a-prop-to-the-parents-signal)).
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
 - On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
-- `bind:group={signal}` on `input(type="radio")` holds the checked one's `value` (a `string`, or a union of strings), and on `input(type="checkbox")` an array of the checked ones' values; the `type` is written out, and the box is checked on the server when the group holds its `value`.
-- `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing, a signal set to `true` opening the dialog non-modal and `false` closing it, a modal one included.
-- `bind:files={signal}` on `input(type="file")` holds the picked `FileList`, `null` clears the input, and the server renders nothing for it.
-- `bind:` next to a spread sets the value after the spread's and writes back from the event, a handler the spread brings for that event running first; a `type` or `value` only the spread brings is not seen, so write them on the element.
-- `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, merged after the written `style`, and left out while the value is `null`, `undefined` or `false`; on an element only, and next to a spread it merges into the `style` the spread brings.
-- `onSubmit|preventDefault={save}` calls the event method first, `|stopPropagation` likewise, and the two chain; the handler of an element only, run in an island like any handler, so a form posts natively without JavaScript.
-- `ref={el => ...}` receives the DOM element, and may return a cleanup that runs when the element goes away.
+- `bind:group={signal}` on `input(type="radio")` holds the checked one's `value`, and on `input(type="checkbox")` an array of the checked values; write the `type` out.
+- `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing: `true` opens it non-modal, `false` closes it, a modal one too.
+- `bind:files={signal}` on `input(type="file")` holds the picked `FileList`, `null` clears it.
+- `bind:` next to a spread sets the value after the spread's; write a `type` or `value` on the element, as one only a spread brings is not seen.
+- `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, left out while the value is `null`, `undefined` or `false`; on an element only.
+- `onSubmit|preventDefault={save}` calls the event method first, `|stopPropagation` likewise, and the two chain; on an element only, so a form posts natively without JavaScript.
+- `ref={el => ...}` receives the DOM element, and may return a cleanup.
 - A function prop that is no handler, `class` or `style` (a slot or a formatter passed to a plain element) writes no attribute on the server either, as in the browser. Only what a component, an element or an island rendered counts as markup in `{}`: an object with a `t` string from JSON, such as a database column, renders nothing, like any other object.
 - `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`.
 - Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own, and so is a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }` then `innerHTML={waves}`; a package's file, a derived string and a name a `for`, `snippet`, alias or `const` of the template rebinds are not.
