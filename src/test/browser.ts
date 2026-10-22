@@ -183,8 +183,8 @@ const VIEWPORTS = {
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
-// What a navigation says when the page navigated on its own meanwhile, as a dev server's live reload does, or when the host's network changed under it (an address or an interface coming or going), which DevTools' offline emulation does not cause.
-const NAVIGATED = /navigated or closed|ERR_NETWORK_CHANGED/
+// What a navigation says when it is worth trying once more: the page navigated on its own meanwhile, as a dev server's live reload does, or the host's network changed under it.
+const RETRIED = /navigated or closed|ERR_NETWORK_CHANGED/
 // How long a click or a hover waits for a loading page to finish before it scrolls: a page that never finishes, as with a stalled image, is acted on after it.
 const LOAD_WAIT_MS = 1000
 // How a click scrolls the element into the view in turn, for one covered where another alignment puts it, such as under a fixed bar.
@@ -235,6 +235,19 @@ try {
   afterAll(closeBrowser)
 }
 catch {}
+
+// A navigation made again once when it failed for a reason RETRIED names, unless the page is gone.
+export async function retriedOnce(navigate: () => Promise<void>, gone: () => boolean): Promise<void> {
+  try {
+    await navigate()
+  }
+  catch (error) {
+    if (gone() || !RETRIED.test(error instanceof Error ? error.message : String(error)))
+      throw error
+
+    await navigate()
+  }
+}
 
 // The browser pages are opened in, or undefined when there is none: for `describe.skipIf(browserPath() === undefined)`.
 export function browserPath(path?: string): string | undefined {
@@ -611,18 +624,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       origin = target.origin
 
-      // Navigated again once when the page navigated on its own meanwhile or the host's network changed.
-      const navigate = async () => {
-        try {
-          await live(async () => view.navigate(target.href))
-        }
-        catch (error) {
-          if (gone || !NAVIGATED.test(error instanceof Error ? error.message : String(error)))
-            throw error
-
-          await live(async () => view.navigate(target.href))
-        }
-      }
+      const navigate = async () => retriedOnce(async () => live(async () => view.navigate(target.href)), () => gone)
 
       // A page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
       if (await within(navigate(), timeout) === TIMED_OUT)
@@ -764,7 +766,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {
-      await live(async () => view.reload())
+      await retriedOnce(async () => live(async () => view.reload()), () => gone)
       await settle(ready, 'the page to reload and hydrate its islands')
     }),
     close: () => {

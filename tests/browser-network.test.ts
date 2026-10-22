@@ -2,6 +2,7 @@ import type { TestPage } from '../src/test'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
+import { retriedOnce } from '../src/test/browser'
 import { createNetwork } from '../src/test/network'
 
 const path = browserPath()
@@ -642,5 +643,36 @@ describe('the interception of a kay/test page', () => {
     await Bun.sleep(20)
     expect(errors).toEqual([])
     network.close()
+  })
+})
+
+describe('a navigation the host\'s network change aborts', () => {
+  const changed = () => new Error('net::ERR_NETWORK_CHANGED')
+
+  it('is made again once', async () => {
+    let calls = 0
+
+    await retriedOnce(async () => {
+      if (++calls === 1)
+        throw changed()
+    }, () => false)
+    expect(calls).toBe(2)
+  })
+
+  it('fails when the second try fails too, or the page is gone, or the error is another', async () => {
+    let calls = 0
+
+    await expect(retriedOnce(async () => {
+      calls++
+
+      throw changed()
+    }, () => false)).rejects.toThrow('ERR_NETWORK_CHANGED')
+    expect(calls).toBe(2)
+    await expect(retriedOnce(async () => {
+      throw changed()
+    }, () => true)).rejects.toThrow('ERR_NETWORK_CHANGED')
+    await expect(retriedOnce(async () => {
+      throw new Error('net::ERR_NAME_NOT_RESOLVED')
+    }, () => false)).rejects.toThrow('NAME_NOT_RESOLVED')
   })
 })
