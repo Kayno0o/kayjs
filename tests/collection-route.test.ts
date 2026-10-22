@@ -301,14 +301,23 @@ describe('a collection route read beyond the entries', () => {
     expect(linked.entryFiles).toEqual(['/later/y.txt'])
 
     // A read that fails leaves the list as it was.
+    let reads = 0
     const down = collection({ name: 'route-files-down', load: () => {
+      reads++
+
       throw new Error('down')
     } }, { schema, route: '/down/*slug' })
     const kept = { ...base, entryFiles: ['/down/a.html'] }
 
     followEntryFiles(kept, [down])
     down.invalidate()
-    await Bun.sleep(50)
+
+    // The loader being called proves the listener ran; the failed read settles a few turns later.
+    for (let waited = 0; reads === 0 && waited < 2000; waited += 10)
+      await Bun.sleep(10)
+
+    expect(reads).toBe(1)
+    await Bun.sleep(20)
     expect(kept.entryFiles).toEqual(['/down/a.html'])
   })
 
