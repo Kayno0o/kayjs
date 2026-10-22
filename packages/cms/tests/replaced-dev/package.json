@@ -1,0 +1,9 @@
+{
+  "name": "kayjs-cms-replaced-dev-fixture",
+  "private": true,
+  "dependencies": {
+    "@iconify-json/tabler": "*",
+    "@kaynooo/kayjs-cms": "link:../..",
+    "@kaynooo/kayjs-ui": "*"
+  }
+}
