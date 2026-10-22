@@ -102,7 +102,7 @@ A plain Elysia app, or one mounting the plugin by hand, gives `auth({ plugin: fa
 - kayjs-ui is a peer of kayjs-auth, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
 - kayjs-auth and kayjs-ui are released with kay at its version and peer on kay's minor: the app installs the ones matching its kay and moves them together.
 
-`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, captcha, scopes, prefix, oauthServer, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
+`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, password, magicLink, twoFactor, captcha, scopes, prefix, oauthServer, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
 
 ### Signed-in user rules
 

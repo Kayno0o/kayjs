@@ -1,4 +1,8 @@
+import type { Switches } from '../src/core'
 import { describe, expect, test } from 'bun:test'
+import { memoryAuthStore } from '../src/memoryStore'
+import { totpCode, totpStep } from '../src/totp'
+import { hasWayIn } from '../src/wayIn'
 import { testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 
@@ -58,7 +62,6 @@ describe('feature switches', () => {
     expect(await ada.call('features')).toMatchObject({ twoFactor: false })
     expect(await ada.call('setUpTwoFactor', { password: PASSWORD })).toEqual(OFF)
     expect(await ada.call('enableTwoFactor', '123456')).toEqual(OFF)
-    expect(await ada.call('regenerateRecoveryCodes', { password: PASSWORD })).toEqual(OFF)
 
     await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpSecret: 'sealed', totpEnabledAt: new Date() })
 
@@ -66,6 +69,46 @@ describe('feature switches', () => {
 
     expect(await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
     expect(await again.call('twoFactorPending')).toBe(true)
+  })
+
+  test('twoFactor: false leaves a user who has it the sign-in code, their recovery codes and the way to turn it off', async () => {
+    const store = memoryAuthStore()
+    const ada = testApp({ store }).browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+    const { recoveryCodes } = await ada.callOk('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    const again = testApp({ store, twoFactor: false }).browser()
+
+    expect(await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
+    expect(await again.call('twoFactorPending')).toBe(true)
+    expect(await again.call('verifyTwoFactor', recoveryCodes[0]!)).toMatchObject({ ok: true })
+
+    const renewed = await again.callOk('regenerateRecoveryCodes', { password: PASSWORD, code: recoveryCodes[1]! })
+
+    expect(await again.call('disableTwoFactor', { password: PASSWORD, code: renewed.recoveryCodes[0]! })).toEqual({ ok: true })
+  })
+
+  test('twoFactor: false cannot be asked of forwardAuth, which sends users to set it up', () => {
+    expect(() => testApp({ url: 'http://localhost', twoFactor: false, forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).toThrow('twoFactor: false')
+    expect(() => testApp({ url: 'http://localhost', forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).not.toThrow()
+  })
+
+  test('a way in that is switched off is no way in when a user unlinks or revokes the last', async () => {
+    const store = memoryAuthStore()
+    const identity = { provider: 'discord', providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() }
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date(), passwordHash: 'hash' }))
+    await store.identities.create(identity)
+    await store.passkeys.create({ id: 'p1', userId: 'u1', publicKey: new Uint8Array(), counter: 0, transports: [], name: 'Key', userVerified: true, createdAt: new Date() } as never)
+
+    const core = (switches: Partial<Switches>) => ({ store, email: {}, switches: { password: true, passkeys: true, magicLink: true, twoFactor: true, ...switches } }) as never
+
+    expect(await hasWayIn(core({}), 'u1', { identity })).toBe(true)
+    expect(await hasWayIn(core({ password: false, magicLink: false, passkeys: false }), 'u1', { identity })).toBe(false)
+    expect(await hasWayIn(core({ password: false, magicLink: false }), 'u1', { identity })).toBe(true)
+    expect(await hasWayIn(core({ password: false, magicLink: false }), 'u1', { identity: { ...identity, providerId: '2' } })).toBe(true)
   })
 
   test('passkeys: false closes every passkey method, though the site has an origin', async () => {

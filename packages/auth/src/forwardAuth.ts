@@ -29,7 +29,7 @@ const MAX_URL_LENGTH = 2048
 const PLAIN_HEADER = /^[\u0020-\u007E]*$/
 
 // The domains `forwardAuth` names, each a hostname of two labels at least with no scheme, port or path, so one misspelt as `com` or `https://example.com/` stops the app at startup rather than opening a whole suffix or nothing. A public suffix of two labels (`co.uk`, `github.io`) passes: kay carries no suffix list, so naming the app's own domain is the app's to get right.
-export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefined): ForwardAuthCore | undefined {
+export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefined, twoFactor = true): ForwardAuthCore | undefined {
   if (option === undefined)
     return undefined
 
@@ -46,6 +46,9 @@ export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefine
     if (parsed === null || parsed.hostname !== domain)
       throw configError(`\`forwardAuth\` domain '${domain}' is not a hostname such as 'example.com': no scheme, port or path, and at least two labels`)
   }
+
+  if (requireTwoFactor && !twoFactor)
+    throw configError('`forwardAuth.requireTwoFactor` sends users to set two-factor up, which `twoFactor: false` switches off: turn one of them off')
 
   return { domains: listed, requireTwoFactor }
 }

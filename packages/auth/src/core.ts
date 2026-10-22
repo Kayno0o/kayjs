@@ -95,7 +95,7 @@ export interface Off {
   error: 'off'
 }
 
-export const OFF: Off = { ok: false, error: 'off' }
+export const OFF: Off = Object.freeze({ ok: false, error: 'off' })
 
 // The features `auth({ password, passkeys, magicLink, twoFactor })` switch, on unless set to false.
 export interface Switches {

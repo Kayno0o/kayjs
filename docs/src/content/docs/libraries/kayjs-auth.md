@@ -389,7 +389,9 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: 'off' }`, and `auth.features()` says `false` for it, so your own pages can follow.
 
-Turning `twoFactor` off only stops new users from setting it up. A user who already turned it on is still asked for the code when they sign in, so switching it off never weakens an account.
+Turning `twoFactor` off only stops new users from setting it up. A user who already turned it on is still asked for the code when they sign in, and can renew their recovery codes or turn it off, so switching it off never weakens an account. The `forwardAuth` option `requireTwoFactor` needs it on.
+
+A way in that is switched off no longer counts as one when kayjs-auth checks that a user keeps another: with `password: false`, a user cannot unlink their last provider because they have a password.
 
 ## Passkeys in `createAuth`
 

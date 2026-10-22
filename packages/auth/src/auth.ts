@@ -71,7 +71,7 @@ import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLa
 import { mergedData, userDataRules } from './userData'
 import { readRequestWith, registerViewer } from './viewer'
 
-export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
+export type { AuthSessionData, BareUser, OAuthApp, Off, Profile, User } from './core'
 
 const STATE = Symbol('kayjs-auth.state')
 const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
@@ -736,8 +736,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // A new set of recovery codes, the old ones void.
-  async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' } | Off> {
-    return !this.core.switches.twoFactor ? OFF : regenerateRecoveryCodes(this[STATE], proof)
+  async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
+    return regenerateRecoveryCodes(this[STATE], proof)
   }
 
   // How many unused recovery codes the signed-in user has, to warn when few are left.
@@ -1883,7 +1883,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
     },
     oauthServer: oauthServerOf(options, pages),
-    forward: forwardOf(options.forwardAuth),
+    forward: forwardOf(options.forwardAuth, options.twoFactor !== false),
     get oauth() {
       return bind().oauth
     },

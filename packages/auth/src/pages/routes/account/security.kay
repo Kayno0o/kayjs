@@ -109,10 +109,9 @@ if features.twoFactor || user.twoFactor
         Message(text={failure(twoFactorError)})
       if user.twoFactor
         p#kauth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
-        if features.twoFactor
-          form.flex.flex-col.gap-3(action={regenerate})
-            Proof(user={user} secondFactor)
-            Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
+        form.flex.flex-col.gap-3(action={regenerate})
+          Proof(user={user} secondFactor)
+          Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
         form.flex.flex-col.gap-3(action={disable})
           Proof(user={user} secondFactor)
           Button(type="submit" tone="danger" label={wording('auth.account.twoFactor.disable', 'Turn off')})

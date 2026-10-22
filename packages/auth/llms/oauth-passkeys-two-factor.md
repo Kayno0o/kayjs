@@ -70,9 +70,9 @@ catch (caught) {
 
 ### Switching features off
 
-- `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })`, and the same keys of `createAuth`, switch a feature off; each is on by default where it works. A method of a feature that is off answers `{ ok: false, error: 'off' }`: `register`, `signInWithPassword`, `requestPasswordReset`, `resetPassword` and `changePassword` for `password`; `requestMagicLink`, `signInWithMagicLink` and `signInWithEmailCode` for `magicLink`; the passkey sign-in, adding and proof methods for `passkeys`; `setUpTwoFactor`, `enableTwoFactor` and `regenerateRecoveryCodes` for `twoFactor`. `passkeySignInOptions` throws.
+- `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })`, and the same keys of `createAuth`, switch a feature off; each is on by default where it works. A method of a feature that is off answers `{ ok: false, error: 'off' }`: `register`, `signInWithPassword`, `requestPasswordReset`, `resetPassword` and `changePassword` for `password`; `requestMagicLink`, `signInWithMagicLink` and `signInWithEmailCode` for `magicLink`; the passkey sign-in, adding and proof methods for `passkeys`; `setUpTwoFactor` and `enableTwoFactor` for `twoFactor`. `passkeySignInOptions` throws.
 - `features()` has `password`, `magicLink` and `twoFactor` besides `passkeys`, false for a feature off (`magicLink` also without mail), and the prebuilt pages show none of it: no password form, mail form, passkey button or account section, and the register and reset pages answer 404.
-- `twoFactor: false` stops new enrolments only: a user who turned it on is still asked for the code at sign-in, and can still turn it off.
+- `twoFactor: false` stops new enrolments only: a user who turned it on is still asked for the code at sign-in, and can still renew their recovery codes and turn it off. `forwardAuth.requireTwoFactor` needs `twoFactor` on. A switched-off way in no longer counts for the last one a user cannot unlink or revoke.
 
 ### Passkey rules
 
