@@ -18,7 +18,7 @@ export interface ContactMailProps {
   fields: MailField[]
   site: string
   /** @deprecated The old name of `site`, given until 1.73. */
-  origin: string
+  origin?: string
 }
 
 // A line break in the name would let it write its own mail headers.

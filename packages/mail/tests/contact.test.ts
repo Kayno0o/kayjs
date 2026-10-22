@@ -2,6 +2,7 @@ import type { Action } from 'kay'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { action, s } from 'kay'
 import { testSite } from 'kay/test'
+import type { ContactMailProps } from '../src/contact'
 import { contactForm } from '../src/contact'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
@@ -30,6 +31,17 @@ beforeEach(() => outbox.clear())
 async function site() {
   return testSite({ root: 'tests/fixture' })
 }
+
+describe('the default contact mail', () => {
+  it('renders from `site` alone, without the deprecated `origin`', async () => {
+    const { default: view } = await import('../src/contact-mail.kay' as string) as { default: never }
+    const props = { subject: 'Hi', name: 'Ada', email: 'ada@example.com', message: 'Hello', fields: [], site: 'https://fixture.test' } satisfies ContactMailProps
+
+    await mailer({ from: 'a@fixture.test' }).send({ to: 'team@fixture.test', subject: props.subject, view, props })
+
+    expect(outbox.to('team@fixture.test')[0]!.text).toContain('Sent from the contact form of https://fixture.test.')
+  })
+})
 
 describe('contactForm', () => {
   it('mails the answers to the site with the visitor in replyTo and the message quoted', async () => {
