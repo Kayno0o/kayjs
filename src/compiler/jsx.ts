@@ -810,8 +810,8 @@ export class JsxTemplate {
           return
         }
 
-        // A custom property starts with dashes, which a JSX name cannot, so the types see it after a word.
-        if (name.startsWith('style:--')) {
+        // A custom property or a vendor prefix starts with a dash, which a JSX name cannot, so the types see it after a word.
+        if (name.startsWith('style:-')) {
           b.wrap(attribute.name, () => b.add(`style:custom${name.slice(6)}`)).add('={').addSource(attribute.expression).add('}')
 
           return

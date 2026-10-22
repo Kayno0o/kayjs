@@ -18,7 +18,7 @@ const WHITESPACE_RUN = /[ \t\r\n]+/g
 // A `class="` that ends its line, which opens a value over several lines.
 const LINE_BREAK_AFTER = /[ \t]*\r?\n/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
-const EVENT_MODIFIERS = /(?:\|[\w-]*)+/y
+const MODIFIERS = /(?:\|[\w-]*)+/y
 // The name a bare `{name}` attribute takes from its variable, and the last member of `{post.title}`.
 const SHORTHAND_NAME = /^[\p{ID_Start}_$][\p{ID_Continue}$]*$/u
 const MEMBER_CHAIN = /^(?:[\p{ID_Start}_$][\p{ID_Continue}$]*\??\.)+([\p{ID_Start}_$][\p{ID_Continue}$]*)$/u
@@ -1128,8 +1128,8 @@ class TemplateParser {
 
       this.pos = name.end
 
-      EVENT_MODIFIERS.lastIndex = this.pos
-      const modifiers = EVENT_MODIFIERS.exec(this.src)
+      MODIFIERS.lastIndex = this.pos
+      const modifiers = MODIFIERS.exec(this.src)
       const modified = modifiers ? { start: this.pos, end: this.pos + modifiers[0].length } : undefined
 
       if (modified)

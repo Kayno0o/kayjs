@@ -13,7 +13,7 @@ type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check'
 const BINDABLE: ReadonlyMap<string, ReadonlySet<string>> = new Map([['value', new Set(['input', 'textarea', 'select'])], ['checked', new Set(['input', 'textarea', 'select'])], ['group', new Set(['input'])], ['files', new Set(['input'])], ['open', new Set(['details', 'dialog'])]])
 const EVENT_NAME = /^on[A-Z]/
 const STYLE_PROP = 'style:'
-const STYLE_PROPERTY = /^(?:--[\w-]+|[a-z][a-z-]*)$/i
+const STYLE_PROPERTY = /^(?:--[\w-]+|-?[a-z][a-z-]*)$/
 const GROUP_TYPES = new Set(['radio', 'checkbox'])
 const TRANSITION_PART = 'transition:'
 
@@ -554,7 +554,7 @@ class Validator {
     if (element.component)
       this.error(attribute.name, '`style:` sets a property of an element, not of a component', { help: 'pass the value as a prop and set it on the element the component renders' })
     else if (attribute.kind !== 'expression')
-      this.error(attribute.name, `\`${name}\` needs a value`, { help: `\`${name}={value}\`, or write the property in \`style\`` })
+      this.error(attribute.name, `\`${name}\` takes an expression`, { help: `\`${name}={value}\`, or write the property in \`style\`` })
     else if (!STYLE_PROPERTY.test(name.slice(STYLE_PROP.length)))
       this.error(attribute.name, `\`${name}\` names no CSS property`, { help: 'write it as CSS does: `style:background-color={color}`, or a custom property `style:--gap={gap}`' })
     else if (element.attributes.some(candidate => candidate.kind === 'spread'))

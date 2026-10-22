@@ -2217,7 +2217,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('bind: on c
 
       expect(await page.evaluate(() => [document.querySelector<HTMLDialogElement>('dialog.modal')!.open, document.querySelector('dialog.modal')!.matches(':modal')])).toEqual([false, false])
 
-      await page.evaluate(() => document.querySelector<HTMLDialogElement>('dialog.modal')!.showModal())
+      await page.click('button.show')
+      await page.waitFor('p.out', { text: 'shown' })
       await page.evaluate(() => document.querySelector<HTMLDialogElement>('dialog.modal')!.close())
       await page.waitFor('p.out', { text: 'hidden' })
 

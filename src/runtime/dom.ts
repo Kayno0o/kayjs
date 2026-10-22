@@ -1380,7 +1380,7 @@ export function property(element: Element, name: string, value: unknown, written
   }
 
   // Dropping the `open` of a modal dialog would leave it in the top layer, inert page and backdrop included.
-  if (name === 'open' && value !== true && element.localName === 'dialog' && (element as HTMLDialogElement).open)
+  if (name === 'open' && Boolean(value) === false && element.localName === 'dialog' && (element as HTMLDialogElement).open)
     (element as HTMLDialogElement).close()
   else if (VOID_PROPERTIES.has(name) && name in element)
     (element as ElementRecord)[name] = name === 'value' ? (value ?? '') : value

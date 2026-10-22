@@ -271,7 +271,7 @@ export abstract class TemplateWriter {
         continue
 
       if (attributeName.startsWith('style:') && attribute.kind === 'expression') {
-        styleProps.push({ property: attributeName.slice(6), expression: attribute.expression })
+        styleProps.push({ property: attributeName.slice('style:'.length), expression: attribute.expression })
       }
       else if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
         const property = attributeName.slice(5)

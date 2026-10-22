@@ -314,7 +314,7 @@ for product of products
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
 - On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `bind:group={signal}` on `input(type="radio")` holds the checked one's `value` (a `string`, or a union of strings), and on `input(type="checkbox")` an array of the checked ones' values; the `type` is written out, and the box is checked on the server when the group holds its `value`.
-- `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing, a signal set to `true` opening the dialog non-modal.
+- `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing, a signal set to `true` opening the dialog non-modal and `false` closing it, a modal one included.
 - `bind:files={signal}` on `input(type="file")` holds the picked `FileList`, `null` clears the input, and the server renders nothing for it.
 - A `bind:` on an element that also spreads is an error, as the spread may carry the value and the handler: bind a child, or write both.
 - `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, merged after the written `style`, and left out while the value is `null`, `undefined` or `false`; on an element only, with no spread next to it.
