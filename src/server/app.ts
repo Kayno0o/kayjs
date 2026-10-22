@@ -633,7 +633,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), renderOptions), securityOptions, security)
 
-  const fallback = source.fallback(paths.routes, mounts)
+  const fallback = await source.fallback(paths.routes, mounts)
 
   const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback, respond })
 

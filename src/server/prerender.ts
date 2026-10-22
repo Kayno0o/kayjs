@@ -294,7 +294,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const request = new Request('http://localhost/_kay-dictionary')
     const token = pageToken('/_kay-dictionary', tokens)
     const render = async () => withPageToken(token, async () => {
-      const response = await renderUnmatched(source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: judged({}), prerendering: true })
+      const response = await renderUnmatched(await source.fallback(project.paths.routes, mounts), { request }, client, { ...renderOptions, onError: judged({}), prerendering: true })
 
       return response.status === 404 && response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
     })

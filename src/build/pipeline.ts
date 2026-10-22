@@ -51,6 +51,7 @@ import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packages
 import { readStoredReport, storedReport, writeStoredReport } from './report'
 import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
+import { clearServerRecord, writeServerRecord } from './server-record'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig, removeLastExport } from './static'
 import { pruneScopedStyles } from './styles'
@@ -129,6 +130,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   let bundleMs = 0
 
   resetCacheCounts()
+  await clearServerRecord(project.paths.output)
 
   if (options.fresh)
     await rm(project.paths.cache, { recursive: true, force: true })
@@ -282,6 +284,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   }
 
   await recordContextReads(project)
+  await writeServerRecord(project)
 
   if (options.compile) {
     const stage = performance.now()

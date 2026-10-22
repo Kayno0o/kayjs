@@ -155,6 +155,11 @@ export function clearContentMode(value: ContentMode, built?: string): void {
   }
 }
 
+// Where the build holds the entries, when the running server set it.
+export function contentOutput(): string | undefined {
+  return output
+}
+
 export function contentMode(): ContentMode {
   return mode ?? modeOf()
 }

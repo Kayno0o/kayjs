@@ -216,7 +216,7 @@ describe('a production server started from disk', () => {
   }
 
   async function build(options: string): Promise<void> {
-    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n }, { check: false })\nif (built.failed) throw built.failed.error\n`)
   }
 
   // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.
@@ -224,6 +224,13 @@ describe('a production server started from disk', () => {
     const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst response = await app.handle(new Request('http://localhost${path}', { headers: { 'x-user': 'Ada', 'x-roles': 'admin' } }))\nconsole.log(JSON.stringify({ status: response.status, html: await response.text() }))\n`
 
     return JSON.parse(await run(script, failing)) as { status: number, html: string }
+  }
+
+  // The pages of the server started from the build in `options` in a process of its own, with the files of the compiler it loaded.
+  async function boot(options: string, paths: string[], headers: Record<string, string> = { 'x-user': 'Ada', 'x-roles': 'admin' }) {
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { headers: ${JSON.stringify(headers)} }))\n  answers.push({ status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+
+    return JSON.parse(await run(script)) as { answers: { status: number, html: string }[], loaded: number }
   }
 
   // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
@@ -294,6 +301,102 @@ describe('a production server started from disk', () => {
     delete answers.reads['lib/gate.kay']
     await Bun.write(record, JSON.stringify(answers))
     await expect(run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nawait pages(options)\n`, true)).rejects.toThrow()
+  }, 120_000)
+
+  for (const base of [undefined, '/repo']) {
+    it(`boots without loading the compiler and serves every page, however it reaches its parts, base ${base ?? 'unset'}`, async () => {
+      const { options } = await project([EXTENSION], base)
+
+      await build(options)
+
+      const { answers, loaded } = await boot(options, ['/gated', '/globbed', '/deep', '/plain', '/missing'])
+
+      expect(answers.map(answer => answer.status)).toEqual([200, 200, 200, 200, 404])
+      expect(answers[0]!.html).toContain('<p id="who">Ada</p>')
+      expect(answers[1]!.html).toContain('id="inside"')
+      expect(loaded).toBe(0)
+    }, 120_000)
+  }
+
+  it('loads the compiler when the build recorded no modules', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+    await rm(resolve(outputDir(root), 'server-modules.json'))
+
+    const { answers, loaded } = await boot(options, ['/gated'])
+
+    expect(answers[0]!.status).toBe(200)
+    expect(loaded).toBeGreaterThan(0)
+  }, 120_000)
+
+  it('serves a dynamic route and each locale of a page from the record', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'src/routes/[slug].kay'), '--- server\nconst slug: string = ctx.params.slug\n---\np#slug {slug}\n')
+
+    const i18n = JSON.stringify({ ...JSON.parse(options), i18n: I18N })
+
+    await build(i18n)
+
+    const { answers, loaded } = await boot(i18n, ['/gated', '/fr/gated', '/fr/anything', '/anything'])
+
+    expect(answers.map(answer => answer.status)).toEqual([200, 200, 200, 200])
+    expect(answers[1]!.html).toContain('<p id="who">Ada</p>')
+    expect(answers[2]!.html).toContain('<p id="slug">anything</p>')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('registers the actions of a page from the record, as the page imports them', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'src/routes/enter.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const enter = action(t.Object({ name: t.String() }), async (_input, ctx) => {\n  ctx.redirect(\'/plain\')\n})\n---\nform(method="post" action={enter.url})\n  input(name="name")\n  button Go\n')
+    await build(options)
+
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst page = await (await app.handle(new Request('http://localhost/enter'))).text()\nconst url = /action="([^"]+)"/.exec(page)[1]\nconst posted = await app.handle(new Request('http://localhost' + url, { method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/x-www-form-urlencoded' }, body: 'name=Ada' }))\nconsole.log(JSON.stringify({ status: posted.status, location: posted.headers.get('location'), loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+
+    expect(JSON.parse(await run(script))).toEqual({ status: 303, location: '/plain', loaded: 0 })
+  }, 120_000)
+
+  it('maps the stack of an error in a recorded component to its .kay lines', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'src/shared/boom.kay'), '--- module\nexport function explode(): never {\n  throw new Error(\'Boom\')\n}\n---\np boom\n')
+    await Bun.write(resolve(root, 'src/routes/lazy.kay'), '---\nconst load = () => import(\'../shared/boom.kay\')\n---\np {String(load)}\n')
+    await build(options)
+
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nawait pages(options)\nconst { describeThrown } = await import(${JSON.stringify(resolve('src/build/sourcemap'))})\nlet text = ''\ntry {\n  const { explode } = await import(${JSON.stringify(resolve(root, 'src/shared/boom.kay'))})\n  explode()\n}\ncatch (error) {\n  text = describeThrown(error)\n}\nconsole.log(JSON.stringify(text))\n`
+
+    expect(JSON.parse(await run(script)) as string).toContain('boom.kay:3:')
+  }, 120_000)
+
+  it('boots from the build in another directory than the one it was made in', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    // A directory whose name holds what a pattern reads, which the loader's filters match paths against.
+    const moved = resolve(await scratchDir('request-values-moved (odd) $x+[a]-'))
+
+    await Bun.spawn(['cp', '-a', `${root}/.`, moved]).exited
+
+    const { answers, loaded } = await boot(options.replaceAll(root, moved), ['/gated', '/globbed'])
+
+    expect(answers.map(answer => answer.status)).toEqual([200, 200])
+    expect(answers[1]!.html).toContain('id="inside"')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('compiles a component edited since the build, and keeps loading the others from the record', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+    await Bun.write(resolve(root, 'lib/gate.kay'), `${await Bun.file(resolve(root, 'lib/gate.kay')).text()}p#edited Edited\n`)
+
+    const { answers } = await boot(options, ['/gated', '/globbed'])
+
+    expect(answers[0]!.html).toContain('<p id="edited">Edited</p>')
+    expect(answers[1]!.html).toContain('id="inside"')
   }, 120_000)
 
   it('writes no record without a context', async () => {

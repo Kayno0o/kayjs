@@ -27,12 +27,12 @@ export interface ProjectSource {
   root: (fallback: string) => string
   config: <Options extends KayConfig>(root: string, options: Options) => Promise<KayConfig & Options>
   client: (project: Project) => Promise<ClientBuild>
-  // Lets the `.kay` modules it imports compile as they load.
-  prepare: (root: string, settings?: Record<string, string>) => Promise<void>
+  // Lets the `.kay` modules it imports compile as they load, or load as the build at `built` recorded them when it holds a record.
+  prepare: (root: string, settings?: Record<string, string>, built?: string) => Promise<void>
   has: (file: string) => boolean
   // A server started from the build reads which templates read `ctx` from its record, not from the templates.
   routes: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<Route[]>
-  fallback: (routesDir: string, mounts: RouteMount[]) => SpecialPages
+  fallback: (routesDir: string, mounts: RouteMount[]) => Promise<SpecialPages>
   api: (root: string, config: Pick<KayConfig, 'api' | 'extensions'>) => Promise<ApiModule[]>
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The file names under `src/plugins`: an executable holds the ones it was built with.
@@ -79,10 +79,15 @@ const DISK: ProjectSource = {
     return buildClient(root, options)
   },
   // Imported as it is asked for, as it needs Bun, which eslint's bundle of the shadow types runs without.
-  prepare: async (root, settings) => (await import('./loader')).registerLoader(root, settings),
+  prepare: async (root, settings, built) => {
+    if (built !== undefined && await (await import('./prebuilt-loader')).registerPrebuiltLoader(root, built))
+      return
+
+    await (await import('./loader')).registerLoader(root, settings)
+  },
   has: file => existsSync(file),
   routes: async ({ root, mode, paths }, mounts) => scanRoutes(paths.routes, mounts, mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
-  fallback: (routesDir, mounts) => specialPagesOf(routeTrees(routesDir, mounts), ''),
+  fallback: async (routesDir, mounts) => specialPagesOf(routeTrees(routesDir, mounts), ''),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
   endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),
@@ -115,7 +120,8 @@ function embeddedSource(bundle: Bundle): ProjectSource {
     has: file => file in bundle.modules,
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     routes: async () => bundle.routes,
-    fallback: () => bundle.fallback,
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
+    fallback: async () => bundle.fallback,
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     api: async () => bundle.api ?? [],
     // eslint-disable-next-line ts/require-await -- the interface returns a promise

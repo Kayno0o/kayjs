@@ -78,7 +78,7 @@ function ownEntry(entry: string): string {
 // The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
 export async function compileServer(project: Project, options: CompileOptions): Promise<string> {
   const { root, config, paths } = project
-  const { routes: routesDir, public: publicDir, output: clientBase } = paths
+  const { public: publicDir, output: clientBase } = paths
   const entry = options.entry === undefined ? ownEntry(paths.entry) : resolve(root, options.entry)
   const outfile = resolve(root, options.outfile)
 
@@ -88,24 +88,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new KayError('executable-invalid', `kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
-  const mounts = routeMounts(root, config.extensions)
-  const routes = await scanRoutes(routesDir, mounts)
-
-  refuseClashes(routesDir, routes)
-
-  const fallback = specialPagesOf(routeTrees(routesDir, mounts), '')
-  const contentConfig = paths.content
-  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and every locale's messages, its extensions' included.
-  const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
-  const locales = config.i18n?.locales ?? [config.lang ?? DEFAULT_LANG]
-  const extensionMessages = Object.fromEntries(locales.map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
-  const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
-  // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
-  const api = await projectApi(root, config)
-  const plugins = pluginFiles(root)
-  const endpoints = await scanEndpoints(routesDir, mounts)
-  const editor = extensionEditor(root, config.extensions)
-  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  const { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules } = await serverParts(project)
   const configFile = join(root, CONFIG_FILE)
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
@@ -200,6 +183,32 @@ export async function compileServer(project: Project, options: CompileOptions): 
   await Promise.all(build.outputs.filter(output => output.kind === 'sourcemap').map(async output => rm(output.path, { force: true })))
 
   return outfile
+}
+
+// What the server serves and every module it runs, as the project's routes, API, plugins, extensions and content config name them: for an executable to embed and for a server on disk to find compiled.
+export async function serverParts(project: Project) {
+  const { root, config, paths } = project
+  const { routes: routesDir } = paths
+  const mounts = routeMounts(root, config.extensions)
+  const routes = await scanRoutes(routesDir, mounts)
+
+  refuseClashes(routesDir, routes)
+
+  const fallback = await specialPagesOf(routeTrees(routesDir, mounts), '')
+  const contentConfig = paths.content
+  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and every locale's messages, its extensions' included.
+  const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
+  const locales = config.i18n?.locales ?? [config.lang ?? DEFAULT_LANG]
+  const extensionMessages = Object.fromEntries(locales.map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
+  const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
+  // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
+  const api = await projectApi(root, config)
+  const plugins = pluginFiles(root)
+  const endpoints = await scanEndpoints(routesDir, mounts)
+  const editor = extensionEditor(root, config.extensions)
+  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+
+  return { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules }
 }
 
 // Every module a route renders or runs: its page, layouts, special pages and guards, its layouts' own included.

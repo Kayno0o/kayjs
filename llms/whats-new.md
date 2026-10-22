@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A link whose page the server does not send within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, instead of leaving the click pending ([Navigation](navigation.md)).
 - A link clicked during a view transition skips it and is followed, instead of being ignored ([Navigation](navigation.md)).
 - A `refresh()` landing during a link, `navigate()` or Back no longer cancels it: it waits for the swap and is dropped when the swap changed the URL, so an island polling an action needs no `{ refresh: false }` ([Navigation](navigation.md)).
+- A server started from disk imports the modules `kay build` recorded in `.kay/client/server-modules.json` and loads no compiler at boot ([Build and start](build-and-start.md)).
 - kayjs-cms's entry screen swaps its form for a notice linking the collection, the renamed entry or the created one when a leave after a delete, a rename or a create is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
 - `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).

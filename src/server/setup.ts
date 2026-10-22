@@ -104,7 +104,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   void Promise.allSettled([logoDrawn])
 
-  await source.prepare(root, config.settings)
+  await source.prepare(root, config.settings, mode.prebuilt ? paths.output : undefined)
   // Scanned beside the routes, which the refusals before the build need.
   const scanning = Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
 

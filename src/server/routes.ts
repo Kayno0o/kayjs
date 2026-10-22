@@ -231,7 +231,7 @@ export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): P
   const reads: ContextReads = { keys: new Map(), edges: new Map(), recorded: false }
 
   await scanRoutes(routesDir, mounts, reads)
-  specialPagesOf(routeTrees(routesDir, mounts), '')
+  await specialPagesOf(routeTrees(routesDir, mounts), '', reads)
 
   return reads
 }
@@ -239,7 +239,7 @@ export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): P
 // The app's pages, then each mounted library's that no page of the app serves the path of.
 // `reads` is what `kay build` recorded of the imports and the templates reading `ctx`, which a server started from disk walks in place of the compiler; given with `recorded` unset, the scan fills it in for the build to write.
 export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], reads?: ContextReads): Promise<Route[]> {
-  await openReaches(mounts, reads)
+  await openReaches(mounts, reads, true)
 
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
@@ -270,7 +270,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
 
         const actionModules = directoriesUp(at).flatMap(dir => fileAt(trees, dir, ACTIONS) ?? []).reverse()
 
-        own.push({ ...route, layouts, ...keys !== undefined && { contextKeys: keys }, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
+        own.push({ ...route, layouts, ...keys !== undefined && { contextKeys: keys }, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesIn(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
       }
     }
 
@@ -414,29 +414,27 @@ function ownLayouts(trees: RouteMount[], at: string, file: string, read: Layouts
   return [...outers, ...layouts]
 }
 
-// What each project root reaches, opened by the scan of the routes: the compiler it needs stays out of a served app until a mount asks for it.
-const reached = new Map<string, Reach>()
+// What each project root reaches, opened by the scan of the routes or by the first lookup of special pages: the compiler it needs stays out of a served app until a mount asks for it.
+// A scan opens it afresh, as the files may have changed; a lookup of special pages uses what is open over the same `reads`, or over none given.
+const reached = new Map<string, { reach: Reach, reads: ContextReads | undefined }>()
 
-async function openReaches(mounts: RouteMount[], reads: ContextReads | undefined): Promise<void> {
-  const roots = new Set(mounts.flatMap(mount => mount.reaching === undefined ? [] : [mount.root]))
-
-  if (roots.size === 0)
-    return
-
-  if (reads?.recorded) {
-    for (const root of roots) {
-      if (root !== undefined)
-        reached.set(root, reachOver(recordedData(reads)))
-    }
-
-    return
-  }
-
-  const { openReach } = await import('./reach-walk')
+async function openReaches(mounts: RouteMount[], reads: ContextReads | undefined, fresh: boolean): Promise<void> {
+  const roots = new Set(mounts.flatMap(mount => mount.reaching === undefined || mount.root === undefined ? [] : [mount.root]))
 
   for (const root of roots) {
-    if (root !== undefined)
-      reached.set(root, await openReach(root, reads))
+    const open = reached.get(root)
+
+    if (!fresh && open !== undefined && (reads === undefined || open.reads === reads))
+      continue
+
+    if (reads?.recorded) {
+      reached.set(root, { reach: reachOver(recordedData(reads)), reads })
+    }
+    else {
+      const { openReach } = await import('./reach-walk')
+
+      reached.set(root, { reach: await openReach(root, reads), reads })
+    }
   }
 }
 
@@ -456,9 +454,9 @@ function reachOf(tree: RouteMount): Reach {
   const found = tree.root === undefined ? undefined : reached.get(tree.root)
 
   if (found === undefined)
-    throw new KayError('route-invalid', 'kay: the layouts of the extensions are placed before scanRoutes opened what the pages reach')
+    throw new KayError('route-invalid', 'kay: the layouts of the extensions are placed before what the pages reach was opened')
 
-  return found
+  return found.reach
 }
 
 function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
@@ -677,7 +675,7 @@ function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile
     const dir = virtualDir(trees, dirname(file))
 
     // A guard on the routes directory covers every layout, so its special pages render bare.
-    return { file, special: dir === '' ? withoutLayouts(specialPagesOf(trees, dir, read)) : specialPagesOf(trees, parentOf(dir), read) }
+    return { file, special: dir === '' ? withoutLayouts(specialPagesIn(trees, dir, read)) : specialPagesIn(trees, parentOf(dir), read) }
   })
 }
 
@@ -689,7 +687,14 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
-export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = new Map()): SpecialPages {
+// Opens what the layouts reaching files need when no scan did, from `reads` as `scanRoutes` takes them.
+export async function specialPagesOf(trees: RouteMount[], at: string, reads?: ContextReads): Promise<SpecialPages> {
+  await openReaches(trees, reads, false)
+
+  return specialPagesIn(trees, at, new Map())
+}
+
+function specialPagesIn(trees: RouteMount[], at: string, read: LayoutsRead): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
     for (const dir of directoriesUp(at)) {
       const tree = treeHolding(trees, dir, name)

@@ -26,7 +26,7 @@ import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
 import { feedItem, feedXml } from './feed'
 import { isCollection } from './index'
-import { draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
+import { contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
 import { ContentError, decodeEntries } from './validate'
 
@@ -66,7 +66,7 @@ export async function namedCollections(root: string, config?: string): Promise<[
   }
 
   // Its components are `.kay` files.
-  await source.prepare(root)
+  await source.prepare(root, undefined, source.contentBuild(root, contentMode().prebuilt, contentOutput()))
 
   const module = await importModule<Record<string, unknown>>(file)
 

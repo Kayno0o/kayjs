@@ -80,6 +80,19 @@ test('a special page reaching the files is wrapped, a page setting layouts: fals
   expect(() => routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: ['lib/missing.kay'] } }])).toThrow('does not exist')
 })
 
+test('the special pages of a root answer with no scan of the routes before, a glob in their imports included', async () => {
+  const root = await project()
+  const routes = join(root, 'src/routes')
+  const mounts = routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: ['lib/widget.kay'] } }])
+  const first = await specialPagesOf(routeTrees(routes, mounts), '')
+
+  // A scan opens the reach afresh, and the special pages looked up after it use that one.
+  await scanRoutes(routes, mounts)
+
+  expect(first.notFound!.layouts).toHaveLength(1)
+  expect((await specialPagesOf(routeTrees(routes, mounts), '')).notFound!.layouts).toHaveLength(1)
+})
+
 test('an executable names the layout and reaching files of a bundled library without finding them on disk', async () => {
   const root = await project()
   const layout = { file: '/$bunfs/root/../viewer-layout/_layout.kay', reaching: ['/$bunfs/root/../components/signed-in.kay'] }
@@ -105,12 +118,12 @@ test('an import.meta.glob pattern of a library script expands against the projec
 
   const mountsReaching = (target: string) => routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: [target] } }])
   const wrapping = async (target: string) => (await scanRoutes(join(root, 'src/routes'), mountsReaching(target))).filter(route => route.layouts.length > 0).map(route => route.pattern)
-  const fallback = (target: string) => specialPagesOf(routeTrees(join(root, 'src/routes'), mountsReaching(target)), '').notFound!.layouts.length
+  const fallback = async (target: string) => (await specialPagesOf(routeTrees(join(root, 'src/routes'), mountsReaching(target)), '')).notFound!.layouts.length
 
   expect(await wrapping('lib/widget.kay')).toContain('/globbed')
   expect(await wrapping('lib/other.kay')).not.toContain('/globbed')
-  expect(fallback('lib/widget.kay')).toBe(1)
-  expect(fallback('lib/other.kay')).toBe(0)
+  expect(await fallback('lib/widget.kay')).toBe(1)
+  expect(await fallback('lib/other.kay')).toBe(0)
 })
 
 test('the scan and the route sizes read one import graph per project root, and the sizes follow a glob as the scan does', async () => {
