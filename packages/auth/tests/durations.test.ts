@@ -92,7 +92,7 @@ describe('time options take a Duration', () => {
 
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     expect(windows).toContain(2 * 60 * 60)
-    expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('kayjs-auth: rateLimit.signIn.window is \'-5m\'')
+    expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('rateLimit.signIn.window is \'-5m\'')
   })
 
   test('limits, the old name of rateLimit, still counts, and rateLimit wins where both name a limit', async () => {
