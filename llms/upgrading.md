@@ -49,6 +49,7 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 ### An action reads its own outcome
 
 `ctx.failed(add)` and `ctx.succeeded(add)` are `add.failed()` and `add.succeeded()`, which read the same in a page, a component and an island. The old form works three minors, and `kay upgrade` rewrites it (the `deprecated-ctx-outcome` lint). `ActionError` now extends `ApiError`, so `error instanceof ApiError` catches an action's refusal too, and `refusalMessage()` reads its form-wide message.
+
 ### `mountComponent` takes the component
 
 `mountComponent('src/components/toggle.kay', props)` of `kay/test` is `mountComponent(Toggle, props)` with `Toggle` imported in the test, which types the props. The path works three minors, and `kay upgrade` imports the component and passes it (the `deprecated-mount-component` lint).

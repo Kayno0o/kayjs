@@ -231,7 +231,7 @@ it('keeps the dashboard to members and the member list to admins', async () => {
 })
 ```
 
-See [Locals, sessions and guards](server.md#locals) and [kayjs-auth](packages/auth/llms.txt).
+See [Locals, sessions and guards](server.md#locals) and [kayjs-auth setup](../packages/auth/llms/setup.md).
 
 ### Publish a blog with tags, an RSS feed and a sitemap
 
@@ -355,3 +355,9 @@ it('serves the posts, their tag pages, the feed and the sitemap', async () => {
 ```
 
 See [Content collections](content.md) and [Sitemap, favicon, offline, search and fonts](sitemap-search-fonts.md).
+
+## Reference
+
+- A database CRUD: [Actions](actions.md), [Test databases and setup](testing-setup.md).
+- A dashboard behind sign-in: [Locals, sessions and guards](server.md#locals), [kayjs-auth setup](../packages/auth/llms/setup.md).
+- A blog: [Content collections](content.md), [Sitemap, favicon, offline, search and fonts](sitemap-search-fonts.md).
