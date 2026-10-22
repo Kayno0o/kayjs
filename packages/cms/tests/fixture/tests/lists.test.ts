@@ -347,11 +347,12 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
 
     element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + 4, clientY: box.top + 4 }))
   })
-  await page.waitUntil(() => document.querySelectorAll('.kcms-list-bar').length === 1)
+  // The bar moves on the scroll and the pointer event, a frame or two later on a loaded machine.
+  await page.waitUntil(() => {
+    const bars = document.querySelectorAll('.kcms-list-bar')
 
-  const [under, covered] = await page.evaluate(() => [document.querySelector('.kcms-list-bar')!.getBoundingClientRect().bottom, document.querySelector('.kcms-editor-open')!.getBoundingClientRect().top])
-
-  expect(under).toBeLessThanOrEqual(covered! + 0.5)
+    return bars.length === 1 && bars[0]!.getBoundingClientRect().bottom <= document.querySelector('.kcms-editor-open')!.getBoundingClientRect().top + 0.5
+  })
 }, 60_000)
 
 interface Box { left: number, right: number, top: number, bottom: number }
