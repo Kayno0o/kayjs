@@ -164,7 +164,7 @@ The first page is `/blog`, the others `/blog/2`, `/blog/3`. `/blog/1`, a page pa
 
 As the `prerender` or `sitemap` key of `page`, it lists every page, `kay build --static` included. [Pagination](/ui/pagination) from kayjs-ui draws the links.
 
-<ReadMore href="/llms/content#pagination">How links follow the locale, `base` and `trailingSlash`, and how localized collections count pages, are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-markdown-to-caching#pagination">How links follow the locale, `base` and `trailingSlash`, and how localized collections count pages, are in the full content reference.</ReadMore>
 
 ## Components in Markdown
 
@@ -418,7 +418,7 @@ The server renders it with Bun.markdown and the island with marked, and both wri
 
 It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
 
-<ReadMore href="/llms/content#rendering-markdown">The few cases where the island and the server differ, and how the island stays fast on hostile input, are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-markdown-to-caching#rendering-markdown">The few cases where the island and the server differ, and how the island stays fast on hostile input, are in the full content reference.</ReadMore>
 
 ## Preview mode
 

@@ -206,7 +206,7 @@ A snippet called with a loop row, `{show(row)}`, is drawn again whenever a new c
 
 A snippet is for markup used in one file. Markup used by several files is a component.
 
-<ReadMore href="/llms/templates#snippets">How a snippet is scoped, what a name clash reports, and what an argument that reads a signal redraws.</ReadMore>
+<ReadMore href="/llms/templates-elements-slots-snippets#snippets">How a snippet is scoped, what a name clash reports, and what an argument that reads a signal redraws.</ReadMore>
 
 ## Events and bindings
 
@@ -336,7 +336,7 @@ An `await` block inside a `try` of the same template needs no `catch` of its own
 
 A component's own `await` does not reach the `try` around the component.
 
-<ReadMore href="/llms/islands#error-fallbacks">How an island reports the error to the server, and what the head keeps.</ReadMore>
+<ReadMore href="/llms/islands-state-to-ids#error-fallbacks">How an island reports the error to the server, and what the head keeps.</ReadMore>
 
 ## Comments and slots
 

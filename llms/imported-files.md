@@ -2,7 +2,13 @@
 
 The images, fonts, media, PDFs and wasm modules a component or module imports for their URL, and the workers an island starts. Public files and stylesheets: [Styles and assets](styles-and-assets.md).
 
-## Imported files
+## Common tasks
+
+- Show an imported image, or start a worker from an island: the tasks of [Styles and assets](styles-and-assets.md#common-tasks).
+
+## Reference
+
+### Imported files
 
 A component script, a server fence or a `.ts` module imports an image, font, video, audio file, PDF or wasm module for its URL, typed as a `string`:
 

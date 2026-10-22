@@ -221,7 +221,7 @@ describe('the TypeScript packages', () => {
   })
 })
 
-// The naming rules of llms/component-libraries.md ("Conventions") that a scan can check. A rule whose rename has not landed lists its known drift in `known`, each entry naming the issue that removes it: the test is green today, fails for any new drift, and fails for an entry whose drift is gone, so the entry goes with the fix.
+// The naming rules of llms/component-library-conventions.md that a scan can check. A rule whose rename has not landed lists its known drift in `known`, each entry naming the issue that removes it: the test is green today, fails for any new drift, and fails for an entry whose drift is gone, so the entry goes with the fix.
 interface Drift { library: string, match: RegExp, issue: string }
 
 const folders = libraries.map(({ path }) => path.slice('packages/'.length, path.lastIndexOf('/')))

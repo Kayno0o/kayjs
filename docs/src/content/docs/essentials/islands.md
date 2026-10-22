@@ -195,7 +195,7 @@ export const fade: TransitionClasses = {
 
 Visitors who ask for reduced motion see no animation. The server leaves the attributes out of the markup.
 
-<ReadMore href="/llms/islands#transitions">Which element plays, what does not animate, and the errors for a wrong phase.</ReadMore>
+<ReadMore href="/llms/islands-state-to-ids#transitions">Which element plays, what does not animate, and the errors for a wrong phase.</ReadMore>
 
 ## Hand a value down without props
 
@@ -419,7 +419,7 @@ const column = elementSize()
 
 `width()` and `height()` read the element's content box in pixels and change as it is resized. They are 0 on the server and until the browser has measured the element. An element that appears later, inside an `if` for instance, is measured as soon as it does.
 
-<ReadMore href="/llms/islands#element-size">Keeping the element too, and what the values are before the first measure.</ReadMore>
+<ReadMore href="/llms/islands-state-to-ids#element-size">Keeping the element too, and what the values are before the first measure.</ReadMore>
 
 ## A page kay does not serve
 
