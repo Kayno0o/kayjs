@@ -4,7 +4,11 @@ description: A labelled list of radios to pick one option from, each with an opt
 
 <Demo name="radio-group/basic" />
 
-`value` is the option picked to start with, or `null` for none, and a group whose parent passes another follows it. `onChange` gets the picked option's own value, a number for a number option. An option carries a `label`, an optional `description` under it that screen readers read after the label, and may be `disabled`, or `disabled` on the group disables every option. Inside a form, the group posts the picked option under `name`, with no JavaScript. Use [Segmented](/ui/segmented) for a compact row of options.
+`value` is the option picked to start with, or `null` for none, and a group whose parent passes another follows it. `onChange` gets the picked option's own value, a number for a number option. An option carries a `label`, an optional `description` under it that screen readers read after the label, and may be `disabled`. Inside a form, the group posts the picked option under `name`, with no JavaScript. Use [Segmented](/ui/segmented) for a compact row of options.
+
+## Disabled
+
+`disabled` on the group disables every option, as on [Segmented](/ui/segmented). An option's own `disabled` still applies when the group's is false.
 
 ## Field error
 
