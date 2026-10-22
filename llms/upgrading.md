@@ -155,10 +155,4 @@ Write `guards: false` and `layouts: false` as the literal in a page, layout, end
 
 `kay upgrade` removes the `// kay-allow identity-key` comments and the `identity-key` entry in `lints` (the `deprecated-identity-key` lint, kept three minors), which would otherwise go unrecognised. A `for` over objects with no `id` needs no `key`, as the runtime keeps each row through immutable edits ([Templates](templates.md)).
 
-## 1.65.0
-
-### kayjs-cms stops at boot for `form.body` on a collection with no Markdown body
-
-Remove `body` from that collection's `form` in `cms({ collections })`: it worded a body the collection does not have, and the server now logs the collection's name and exits.
-
-Releases before 1.65 are in [Upgrading, older releases](upgrading-archive.md).
+Releases before 1.69 are in [Upgrading, older releases](upgrading-archive.md).

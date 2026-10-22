@@ -80,7 +80,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Queues](llms/queues.md): jobs that survive a restart
 - [Proxies, security headers and compression](llms/proxy-and-security.md): proxy, security headers and CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
-- [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.65
+- [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.69
 - [What's new](llms/whats-new.md): what each recent release adds
 - [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.70
 - [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person
