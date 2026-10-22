@@ -210,6 +210,11 @@ describe('browser-only globals read while rendering', () => {
     expect(reads(source.replace('listen(window,', 'listen(document.title.length ? window : window,'))).toEqual([])
     expect(reads(source.replace('listen(window,', 'listen(window[localStorage.key(0)!] as Window, document.title,')).map(read => read.text)).toEqual(['document'])
 
+    expect(reads(source.replace('listen(window,', 'listen(document,'))).toEqual([])
+    expect(reads(source.replace('listen(window,', 'listen(document.body,'))).toEqual([])
+    expect(reads(source.replace('listen(window,', 'listen(document.documentElement,'))).toEqual([])
+    expect(reads(source.replace('listen(window,', 'listen(() => document,'))).toEqual([])
+
     for (const output of ['dom', 'html'] as const) {
       expect(compiled(output)).toContain('listen(() => (window), \'keydown\'')
       expect(compiled(output)).toContain('listen(() => (window.visualViewport!), \'resize\'')

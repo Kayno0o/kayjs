@@ -105,7 +105,7 @@ kay check --only seo
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog`, on an element without `tabindex="-1"`. |
 | `dangling-label` | warn | a11y | A `label(for="...")` pointing at an id nothing in the template has. |
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
-| `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, such as `presentation` or `region`. |
+| `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, such as `presentation` or `region`; a `dialog` role or `aria-modal` is left alone. |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` listing an id nothing in the template has. |
 | `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label` (ignored on a role-less `span` or `div`), `aria-labelledby` or `aria-describedby` speaks for, and whose content is not just the tooltip's own text. |
 | `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |

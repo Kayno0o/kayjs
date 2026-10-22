@@ -576,6 +576,7 @@ describe('a11y lints', () => {
     expect(only('unreachable-click', source)).toEqual(['unreachable-click div'])
     expect(only('unannounced-click', source)).toEqual(['unannounced-click div', 'unannounced-click section'])
     expect(compileKay(source, 'list.kay', { check: true }).diagnostics.find(d => d.code === 'unreachable-click')?.help).toContain('// kay-allow unreachable-click')
+    expect(only('unannounced-click', 'div(role="dialog" onClick={close})\ndiv(role="alertdialog" onClick={close})\ndiv(role="presentation" aria-modal="true" onClick={close})\ndiv(role="presentation dialog" onClick={close})\ndiv(role="region" onClick={close})\n')).toEqual(['unannounced-click div'])
     expect(only('unannounced-click', '// kay-allow unannounced-click\ndiv(role="presentation" onClick={close})\n')).toEqual([])
   })
 

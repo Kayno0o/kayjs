@@ -567,10 +567,11 @@ class Validator {
     if (!names.has('onClick') || widgetRole || INTERACTIVE_TAGS.has(element.name))
       return
 
+    // A dialog, or an element marked `aria-modal`, is a backdrop whose click is a pointer shortcut for Escape, so it is left alone.
     // A role naming no widget, as a backdrop's `presentation`, was taken as reachable once: a warning, so such apps keep building.
     if (role === undefined)
       this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a widget\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler; `// kay-allow unreachable-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
-    else
+    else if (!names.has('aria-modal') && !(role.kind === 'static' && role.text.trim().toLowerCase().split(WHITESPACE).some(token => token === 'dialog' || token === 'alertdialog')))
       this.lint(at, 'unannounced-click', `This \`${element.name}\` reacts to \`onClick\` but its \`role\` names no widget, so screen readers do not announce it as one`, { help: 'use a `button`, or a widget\'s `role`, such as `button` or `option`; `// kay-allow unannounced-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
   }
 
