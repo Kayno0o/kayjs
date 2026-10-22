@@ -689,10 +689,18 @@ describe('revalidation', () => {
 
   it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
     const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
+    // A throwaway app mounts the same modules first; once it is collected a collection certainly ran, whatever the engine skipped before.
+    const thrown = await (async () => new WeakRef(await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })))()
+
+    for (let attempt = 0; attempt < 40 && thrown.deref() !== undefined; attempt++) {
+      Bun.gc(true)
+      await Bun.sleep(50)
+    }
+
+    expect(thrown.deref()).toBeUndefined()
+
     const app = await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })
 
-    Bun.gc(true)
-    await Bun.sleep(50)
     Bun.gc(true)
     expect(echo.getParent()).not.toBeNull()
     expect(echo.getGlobalRoutes().length).toBeGreaterThan(0)

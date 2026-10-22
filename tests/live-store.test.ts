@@ -228,6 +228,8 @@ process.exit(0)`)
 
     expect(declare(0, 'test:evicted', 'evicted')()).toBe(0)
     expect(declare(0, 'test:recent', 'recent')()).toBe(2)
+    // Declared, so the rows heard leave the process-global count the next test meets.
+    declare(0, 'test:bulk', 'bulk')
     setLiveStore(undefined)
   })
 
