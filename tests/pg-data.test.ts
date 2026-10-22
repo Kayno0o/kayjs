@@ -117,6 +117,15 @@ pgDescribe('pgData', () => {
     await poller
   })
 
+  pgIt('builds again an index a failed concurrent build left invalid', async () => {
+    const sql = await fresh()
+
+    await createDataTables(sql)
+    await sql.unsafe('UPDATE pg_index SET indisvalid = false WHERE indexrelid = to_regclass(\'kay_jobs_due\')')
+    await createDataTables(sql)
+    expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
+  })
+
   pgIt('creates the tables once when replicas open it at once', async () => {
     await fresh()
 

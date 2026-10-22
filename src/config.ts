@@ -507,13 +507,23 @@ function isUnder(root: string, file: string): boolean {
   return inside !== '' && inside !== '..' && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
 }
 
+// Whether something is at the path: a link leading nowhere, or a path through a file, which cannot be told apart from it.
+function linked(file: string): boolean {
+  try {
+    return lstatSync(file, { throwIfNoEntry: false }) !== undefined
+  }
+  catch {
+    return true
+  }
+}
+
 // The real path of a file or, for one not written yet, of its nearest folder that exists with the rest of the name after it; undefined for a link that leads nowhere.
 function realPathOf(file: string): string | undefined {
   try {
     return realpathSync(file)
   }
   catch {
-    if (lstatSync(file, { throwIfNoEntry: false }) !== undefined)
+    if (linked(file))
       return undefined
 
     const parent = dirname(file)
@@ -531,8 +541,9 @@ function realPathOf(file: string): string | undefined {
 // An executable holds copies of the files, so no link is followed there.
 function appFileOf(root: string, extension: string, name: string, path: string): string {
   const file = resolve(root, path)
-  const real = bundled() === undefined ? realPathOf(file) : file
-  const realRoot = bundled() === undefined ? realPathOf(root) : root
+  const held = bundled() !== undefined
+  const real = held ? file : realPathOf(file)
+  const realRoot = held ? root : realPathOf(root)
 
   if (!isUnder(root, file) || real === undefined || realRoot === undefined || !isUnder(realRoot, real))
     throw new KayError('config-invalid', `kay: the extension ${extension} names its file ${name} as ${path}, which is not under the project root`)

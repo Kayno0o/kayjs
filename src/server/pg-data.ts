@@ -3,7 +3,7 @@ import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { SessionStore } from './session'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, tablesMissing, withMissingIndexes } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { pgRates, pgSessions, pgVitals } from './pg-stores'
@@ -42,7 +42,7 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
     await createJobTables(db)
 
     // Tables already there are not locked again: a CREATE INDEX IF NOT EXISTS takes a share lock on its table, which would wait on, and deadlock with, a replica writing several tables. An index they lack is created on its own.
-    if (!await tablesMissing(db, OWN_TABLES)) {
+    if (!await relationsMissing(db, OWN_TABLES)) {
       await createMissingIndexes(db, OWN_INDEXES)
 
       return
@@ -78,7 +78,7 @@ export function pgHandle(db: SQL): PgHandle {
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await tablesMissing(db, OWN_TABLES))
+    if (!await relationsMissing(db, OWN_TABLES))
       return withMissingIndexes(db, OWN_INDEXES)
 
     try {

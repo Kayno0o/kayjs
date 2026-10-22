@@ -55,7 +55,11 @@ function portOf(): number {
 // Whether a server an entry started serves the app: it answers with the app's `fetch`, or takes the port kay would listen on, which a second listen could not.
 // A server for metrics or websockets, on a port of its own and with a fetch of its own, leaves the pages to kay.
 function serving(started: Served[], app: AnyElysia, plugin: AnyElysia): boolean {
-  return started.some(({ fetch, port }) => fetch === app.fetch || fetch === plugin.fetch || port === undefined || port === portOf())
+  // The own `fetch` of an instance, as reading its getter would compile it.
+  const own = (instance: AnyElysia): unknown => Object.getOwnPropertyDescriptor(instance, 'fetch')?.value
+  const fetches = new Set<unknown>([own(app), own(plugin)].filter(fetch => fetch !== undefined))
+
+  return started.some(({ fetch, port }) => fetches.has(fetch) || port === undefined || port === portOf())
 }
 
 // The app `pages()` was used in, however deep: Elysia gives a used instance its parent, which is not in its types and which `tests/auto-listen.test.ts` pins.
@@ -132,6 +136,7 @@ export function listenWhenIdle(plugin: AnyElysia): void {
   }
 }
 
+// Waiting again for a later `pages()` costs nothing, as the main module is cached by then.
 async function listenAfterEntry(): Promise<void> {
   try {
     await import(Bun.main)
@@ -141,6 +146,9 @@ async function listenAfterEntry(): Promise<void> {
     kayLog('error', 'the server was not listened, as its entry did not run to its end', error)
 
     return
+  }
+  finally {
+    watching = false
   }
 
   listenIdleApps()

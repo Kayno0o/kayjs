@@ -42,6 +42,15 @@ export const app = new Elysia().get('/mine', () => 'mine').use(await pages())
 Bun.serve({ port: Number(process.env.PORT), hostname: '127.0.0.1', fetch: app.fetch })
 `
 
+// An entry serving the app's own fetch on a port other than PORT.
+const SERVED_ELSEWHERE = `import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+export const app = new Elysia().get('/mine', () => 'mine').use(await pages())
+
+Bun.serve({ port: Number(process.env.METRICS_PORT), hostname: '127.0.0.1', fetch: app.fetch })
+`
+
 // An entry with a second server of its own beside the pages, on a port of its own.
 const METRICS = `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
@@ -98,10 +107,11 @@ describe('an entry that does not listen', () => {
   let deep: string
   let served: string
   let metrics: string
+  let elsewhere: string
 
   beforeAll(async () => {
-    [idle, late, deep, served, metrics] = await Promise.all([project('auto-listen-idle-', IDLE), project('auto-listen-late-', LATE), project('auto-listen-deep-', DEEP), project('auto-listen-served-', SERVED), project('auto-listen-metrics-', METRICS)])
-    await Promise.all([idle, late, deep, served, metrics].map(async (dir) => {
+    [idle, late, deep, served, metrics, elsewhere] = await Promise.all([project('auto-listen-idle-', IDLE), project('auto-listen-late-', LATE), project('auto-listen-deep-', DEEP), project('auto-listen-served-', SERVED), project('auto-listen-metrics-', METRICS), project('auto-listen-elsewhere-', SERVED_ELSEWHERE)])
+    await Promise.all([idle, late, deep, served, metrics, elsewhere].map(async (dir) => {
       const build = Bun.spawn([process.execPath, cli, 'build', dir, '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
       const [errors, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
 
@@ -111,7 +121,7 @@ describe('an entry that does not listen', () => {
   })
 
   afterAll(async () => {
-    await Promise.all([idle, late, deep, served, metrics].map(async dir => Bun.$`rm -rf ${dir}`.quiet()))
+    await Promise.all([idle, late, deep, served, metrics, elsewhere].map(async dir => Bun.$`rm -rf ${dir}`.quiet()))
   })
 
   async function started(dir: string, port: number, host?: string, shift = 0): Promise<Subprocess> {
@@ -158,6 +168,21 @@ describe('an entry that does not listen', () => {
     }
 
     expect(await new Response(child.stderr).text()).not.toContain('could not listen')
+  }, 60_000)
+
+  it('is not listened a second time when the entry serves the app\'s fetch on another port', async () => {
+    const port = freePort()
+    const second = freePort()
+    const child = Bun.spawn([process.execPath, cli, 'start', elsewhere], { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore', env: { ...process.env, PORT: String(port), METRICS_PORT: String(second) } })
+
+    try {
+      expect(await until(async () => body(`http://127.0.0.1:${second}/mine`))).toBe('mine')
+      await Bun.sleep(300)
+      await expect(fetch(`http://127.0.0.1:${port}/mine`)).rejects.toThrow()
+    }
+    finally {
+      child.kill()
+    }
   }, 60_000)
 
   it('is listened beside a second server the entry starts for something else', async () => {

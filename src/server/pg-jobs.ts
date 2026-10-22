@@ -53,7 +53,7 @@ export async function withMissingIndexes(db: SQL, indexes: readonly PgIndex[]): 
 }
 
 // Whether one of these relations does not exist.
-export async function tablesMissing(db: SQL, names: readonly string[]): Promise<boolean> {
+export async function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean> {
   const [found] = await rowsOf<{ missing: boolean }>(db.unsafe(`SELECT ${names.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`))
 
   return found?.missing === true
@@ -62,8 +62,15 @@ export async function tablesMissing(db: SQL, names: readonly string[]): Promise<
 // Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
 export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
   for (const index of indexes) {
-    if (!await tablesMissing(db, [index.name]))
-      continue
+    if (!await relationsMissing(db, [index.name])) {
+      // A concurrent build that failed leaves an invalid index, which is dropped to be built again.
+      const [found] = await rowsOf<{ valid: boolean }>(db.unsafe(`SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
+
+      if (found?.valid !== false)
+        continue
+
+      await db.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
+    }
 
     try {
       await db.unsafe(indexStatement(index, true))
@@ -105,7 +112,7 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
-    if (await tablesMissing(db, jobTables)) {
+    if (await relationsMissing(db, jobTables)) {
       await db.begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
         await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`
@@ -152,7 +159,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
   }
 
   const create = async (db: SQL): Promise<SQL> => {
-    if (!await tablesMissing(db, jobTables))
+    if (!await relationsMissing(db, jobTables))
       return withMissingIndexes(db, JOB_INDEXES)
 
     try {
