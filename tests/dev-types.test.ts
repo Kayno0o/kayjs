@@ -1,9 +1,12 @@
 import type { DevError } from '../src/server/dev-errors'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { KAY_DIR, testWorker } from '../src/build/assets'
 import { dev } from '../src/dev'
+import { CHECK, REFUSE } from '../src/dev/refuse'
+import { TypesProcess } from '../src/dev/types-process'
 import { DEV_ERRORS_FILE } from '../src/server/dev-errors'
 import { scratchDir } from './scratch'
 
@@ -26,6 +29,39 @@ async function project(files: Record<string, string>): Promise<string> {
   await Promise.all(Object.entries({ 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
+}
+
+// Whether any process of the group is left.
+function groupAlive(pid: number): boolean {
+  try {
+    process.kill(-pid, 0)
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+async function midCheck(): Promise<{ types: TypesProcess, pid: number, stdin: { end: () => unknown } }> {
+  const root = await project({ 'src/routes/index.kay': 'h1 Home\n' })
+  const types = new TypesProcess(root, undefined)
+  const checking = types.write(false, REFUSE, CHECK)
+  const current = () => (types as unknown as { child?: { pid: number, stdin: { end: () => unknown } } }).child
+
+  void (async () => {
+    try {
+      await checking
+    }
+    catch {}
+  })()
+  await until(() => current() !== undefined)
+
+  const child = current()!
+
+  await until(() => groupAlive(child.pid))
+
+  return { types, pid: child.pid, stdin: child.stdin }
 }
 
 function listedTypeErrors(root: string): DevError[] {
@@ -128,6 +164,25 @@ describe('the type check beside kay dev', () => {
       finally {
         await stop()
       }
+    }
+  }, 60_000)
+
+  it('leaves no process of its group once closed mid-check', async () => {
+    const { types, pid } = await midCheck()
+
+    types.close()
+    await until(() => !groupAlive(pid), 10_000)
+  }, 60_000)
+
+  it('ends its whole group when its stdin closes mid-check, as a kay dev killed outright leaves it', async () => {
+    const { types, pid, stdin } = await midCheck()
+
+    try {
+      void stdin.end()
+      await until(() => !groupAlive(pid), 10_000)
+    }
+    finally {
+      types.close()
     }
   }, 60_000)
 })

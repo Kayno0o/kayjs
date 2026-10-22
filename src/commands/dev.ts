@@ -64,6 +64,7 @@ export const dev: Command = {
       // Before the first types are written, which a signal may come during.
       process.once('SIGINT', interrupted)
       process.once('SIGTERM', interrupted)
+      process.once('SIGHUP', interrupted)
 
       try {
         try {
@@ -90,6 +91,7 @@ export const dev: Command = {
       finally {
         process.off('SIGINT', interrupted)
         process.off('SIGTERM', interrupted)
+        process.off('SIGHUP', interrupted)
       }
     }
     // Called in-process, as a test does, what follows prints to stdout again.

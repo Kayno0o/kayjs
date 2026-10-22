@@ -130,7 +130,24 @@ async function answer(line: string): Promise<void> {
   process.stdout.write(`\n${MODULES}${JSON.stringify(loadedModules())}\n\n${ANSWER}${code}\n`)
 }
 
+// The answers run one at a time, apart from the loop reading stdin, which sees it close while a check runs.
+let turn: Promise<void> = Promise.resolve()
+
 for await (const line of console) {
-  if (line !== '')
-    await answer(line)
+  if (line !== '') {
+    const previous = turn
+
+    turn = (async () => {
+      await previous
+      await answer(line)
+    })()
+  }
+}
+
+// `kay dev` is gone, however it ended, and a group of its own no longer gets the terminal's signals: this one ends whole, the checker it spawned with it.
+try {
+  process.kill(-process.pid, 'SIGKILL')
+}
+catch {
+  process.exit(0)
 }
