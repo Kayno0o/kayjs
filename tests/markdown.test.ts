@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
-import { markdownHtml as islandMarkdown } from '../src/runtime/markdown.client'
+import { markdownHtml as islandMarkdown } from '../src/runtime/markdown-render.client'
 import { markdownHtml } from '../src/runtime/markdown.server'
 import { leavesSite } from '../src/runtime/outside'
 
@@ -154,7 +154,7 @@ describe('markdownHtml', () => {
     expect(markdownHtml('- [ ] title\n  ---')).toContain('task-list-item')
   })
 
-  it('weighs only on the islands importing it', async () => {
+  it('weighs on no island until the first Markdown is drawn', async () => {
     const base = join(import.meta.dir, '../node_modules/.cache')
 
     await mkdir(base, { recursive: true })
@@ -173,11 +173,12 @@ describe('markdownHtml', () => {
       const marked = (modules: { name: string }[] | undefined) => (modules ?? []).some(module => module.name.includes('marked/lib'))
 
       expect(note!.file).toBe('src/note.kay')
-      expect(marked(note!.modules)).toBe(true)
+      expect(marked(note!.modules)).toBe(false)
       expect(marked(counter!.modules)).toBe(false)
       expect(marked(report!.entry!.modules)).toBe(false)
-      // marked and the renderer matching Bun.markdown's HTML, minified and gzipped, plus the runtime modules only the note uses, which its own chunk carries.
-      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_150)
+      // The renderer is a chunk of its own that the first call fetches: the note island only carries the stand-in drawing the text as written.
+      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(600)
+      expect((await readdir(join(root, '.kay/client/dist'))).some(file => file.startsWith('markdown-render.client-'))).toBe(true)
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { markdownHtml as islandMarkdown } from '../src/runtime/markdown.client'
+import { markdownHtml as islandMarkdown } from '../src/runtime/markdown-render.client'
 import { markdownHtml } from '../src/runtime/markdown.server'
 import { setSite } from '../src/runtime/site'
 

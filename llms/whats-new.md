@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `mountComponent` names the island and the imports down to the server module a browser cannot take, as `kay build` does, and the error says an island cannot import a server module ([Browser-only components](browser-only.md#browser-only-components)).
+- `markdownHtml` from `kay/markdown` loads marked in an island on its first call instead of with the island, showing the text as written until it arrives, which takes about 17 KB gzip off every chat island ([Content](content.md)).
 
 ## 1.71.0
 

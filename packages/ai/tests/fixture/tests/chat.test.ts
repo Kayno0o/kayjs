@@ -50,6 +50,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('the markdown renderer loads with the first message to draw, not with the empty chat', async () => {
+    const page = await site.open('/assistant')
+    const loaded = () => page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')))
+
+    expect(await loaded()).toBe(false)
+
+    fakeAi.reply('Here is **bold**.')
+    await page.fill('textarea', 'Hello')
+    await page.click('button[type="submit"]')
+    await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'bold' })
+
+    expect(await loaded()).toBe(true)
+  })
+
   test('a reply that fails shows an alert and Try again asks for it once more without a second copy of the message', async () => {
     const page = await site.open('/assistant')
 

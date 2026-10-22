@@ -1,7 +1,7 @@
 import type { Progress } from '../src/types'
 import { describe, expect, it } from 'bun:test'
 import { safeCode } from 'kay/library'
-import { markdownHtml as clientMarkdown } from '../../../src/runtime/markdown.client'
+import { markdownHtml as clientMarkdown } from '../../../src/runtime/markdown-render.client'
 import { closedFences, highlighting, scanFences } from '../src/highlight'
 import { MARK, withoutMarker } from '../src/marker'
 import { createReply } from '../src/reply'
