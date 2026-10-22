@@ -262,7 +262,7 @@
     "@kaynooo/kayjs-cms": "workspace:*",
     "@kaynooo/kayjs-mail": "workspace:*",
     "@kaynooo/kayjs-ui": "workspace:*",
-    "@kaynooo/pg-orm": "^7.0.4",
+    "@kaynooo/pg-orm": "^7.1.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.3",
     "bun-plugin-tailwind": "^0.1.2",
