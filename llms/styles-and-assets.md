@@ -168,6 +168,7 @@ export default defineConfig({ inlineStyles: false })
 - Each page links one stylesheet per layout, outermost first, then its own, holding the CSS of every component it renders, islands included, and of those a server fence imports.
 - A component or a stylesheet imported in a server fence counts as one the component script imports, though the stylesheets of the `.ts` modules a server fence imports do not.
 - Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.
+- A component stylesheet may use `@layer components { }`: the layer order the app states, `@layer theme, base, components, utilities;`, still holds though the component sorts before it.
 - `import theme from './theme.css' with { type: 'text' }` gives the file's text as written (a Tailwind entry's source, not its build) as a string instead, in server code, the compiled executable and an island's script alike, and joins no page stylesheet.
 - A name without the attribute is the `css-import-without-text` error.
 - By default a page writes those stylesheets into its head as `style` elements when together they gzip under 14,000 bytes, and links them above that, in production and prerendered pages alike, `kay dev` always linking them. The sum is the page's own (its layouts' and its page's), so two pages of one app can differ, and a stylesheet alone over the limit is never inlined.

@@ -29,6 +29,7 @@ import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './as
 import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
+import { hoistLayerOrder } from './layer-order'
 import { fileWords, reachedFrom, reachesAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
@@ -588,13 +589,14 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
   const fallbacks = options.fonts === undefined ? new Map<string, FontFallback>() : fontFallbacks(root, options.fonts)
   const base = options.base ?? ''
 
-  if (base !== '' || fallbacks.size > 0) {
-    await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async (output) => {
-      const css = withFontFallbacks(await Bun.file(output.path).text(), fallbacks)
+  await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async (output) => {
+    const written = await Bun.file(output.path).text()
+    const css = withFontFallbacks(hoistLayerOrder(written), fallbacks)
+    const rebased = base === '' ? css : rebaseCss(css, base)
 
-      await Bun.write(output.path, base === '' ? css : rebaseCss(css, base))
-    }))
-  }
+    if (rebased !== written)
+      await Bun.write(output.path, rebased)
+  }))
 
   return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses, server }
 }
