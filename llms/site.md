@@ -128,6 +128,14 @@ form(action={comment})
   button Send
 ```
 
+### Sign visitors in or use ready-made components
+
+`kay add auth` writes the sign-in and account pages, `kay add ui` the buttons, dialogs, toasts, tables and form controls, and `kay add mail` the mails; each library ships its own docs in its package, see [Component libraries and extensions](component-libraries.md) and the libraries listed in `llms.txt`:
+
+```sh
+kay add auth,ui
+```
+
 ## Reference
 
 ### Overview

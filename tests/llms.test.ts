@@ -59,6 +59,21 @@ describe('llms.txt and its docs', () => {
     expect(files.filter(file => Bun.file(join(root, file)).size >= MAX_DOC_BYTES).map(file => `${file}: ${Bun.file(join(root, file)).size}`)).toEqual([])
   })
 
+  it('links each library\'s llms.txt from llms.txt, and each library ships its llms.txt and llms/', async () => {
+    const index = await Bun.file(join(root, 'llms.txt')).text()
+
+    for (const manifest of new Bun.Glob('packages/*/package.json').scanSync({ cwd: root })) {
+      const folder = manifest.slice(0, -'/package.json'.length)
+      const { files, private: hidden } = await Bun.file(join(root, manifest)).json() as { files?: string[], private?: boolean }
+
+      if (hidden)
+        continue
+
+      expect(index).toContain(`](${folder}/llms.txt)`)
+      expect(files).toEqual(expect.arrayContaining(['llms.txt', 'llms']))
+    }
+  })
+
   it('says in llms.txt the release each archive starts before, as the archive itself does', async () => {
     const index = await Bun.file(join(root, 'llms.txt')).text()
     const before = (text: string) => BEFORE.exec(text)?.[0]
