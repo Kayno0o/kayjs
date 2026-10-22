@@ -482,7 +482,7 @@ function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRea
 let contextReader: ((source: string) => boolean) | undefined
 
 function loadedFirst(): never {
-  throw new Error('kay: the templates reading ctx are read before scanRoutes loaded the compiler')
+  throw new KayError('route-invalid', 'kay: the templates reading ctx are read before scanRoutes loaded the compiler')
 }
 
 async function loadContextReader(mounts: RouteMount[]): Promise<void> {
