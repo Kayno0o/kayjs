@@ -1,6 +1,5 @@
-import type { AuthRequirement } from './auth'
+import type { Auth, AuthRequirement } from './auth'
 import { guard as kayGuard } from 'kay'
-import { Auth } from './auth'
 
 /** What `guard()` takes, as `auth.guard()` does: where an anonymous visitor goes, the requirement a user meets and the scope a token holds. */
 export interface GuardOptions {
@@ -14,7 +13,7 @@ export function guard(options: GuardOptions = {}) {
   return kayGuard<{ auth: Auth }>(async (ctx) => {
     const { auth } = ctx.locals
 
-    if (!(auth instanceof Auth))
+    if (typeof auth?.guarded !== 'function')
       throw new Error('kayjs-auth: no `auth` in this context; add auth() to kay.config.ts, or `.use(auth.plugin)` before the routes')
 
     await auth.guarded(ctx, options as Parameters<Auth['guarded']>[1])

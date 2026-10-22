@@ -358,22 +358,30 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
         writes.set(path, merged)
     }
     else if (was !== content && disk !== content) {
-      if (was === undefined && disk === undefined)
+      if (was === undefined && disk === undefined) {
         writes.set(path, content)
-      else if (was === undefined)
+      }
+      else if (was === undefined) {
         conflicts.push(`${path} exists and is not the file the feature writes: add\n${handEdit(disk!, content)}`)
+      }
       // A file both sets write, differently: replaced while it is still what `kay new` wrote.
-      else if (disk === was)
+      else if (disk === was) {
         writes.set(path, content)
-      else if (disk === undefined)
+      }
+      else if (disk === undefined) {
         notes.push(`${path} was deleted, so it is not written back: add it by hand if the feature needs it`)
-      // The config carries kayjs-auth's store line, which a project of the former form keeps in src/auth.ts and an edited config is not rewritten for: a hand edit to apply, never a reason to refuse the rest.
-      else if (path === 'kay.config.ts' && existsSync(join(dir, 'src/auth.ts')))
-        continue
-      else if (path === 'kay.config.ts')
+      }
+      // The config carries kayjs-auth's store line, which a project of the former form keeps in src/auth.ts and an edited config is not rewritten for: the note names that file, never a reason to refuse the rest.
+      else if (path === 'kay.config.ts' && existsSync(join(dir, 'src/auth.ts'))) {
+        if (core.includes('postgres'))
+          notes.push('src/auth.ts holds this app\'s kayjs-auth store: point its store at the new database, `pgStore(db)` from `@kaynooo/kayjs-auth/pg`')
+      }
+      else if (path === 'kay.config.ts') {
         notes.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)
-      else if (!SOFT_FILES.has(path))
+      }
+      else if (!SOFT_FILES.has(path)) {
         conflicts.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)
+      }
     }
   }
 

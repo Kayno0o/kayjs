@@ -55,6 +55,16 @@ describe('guard() from kayjs-auth', () => {
     expect(await run(guardContext({}))).toContain('no `auth` in this context')
   })
 
+  test('asks an auth that is not an instance of this copy of Auth, as a second copy of kayjs-auth would load', async () => {
+    const asked: unknown[] = []
+    const other = { guarded: async (_ctx: unknown, options: unknown) => {
+      asked.push(options)
+    } }
+
+    expect(await run(guardContext({ auth: other }), { redirect: '/in' })).toBe('passed')
+    expect(asked).toEqual([{ redirect: '/in' }])
+  })
+
   test('stops an anonymous visitor as auth.guard() does, with no import of the createAuth result', async () => {
     const { auth } = testApp({ pages: true })
     const anonymous = await contextOf(auth.plugin)
