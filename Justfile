@@ -7,7 +7,7 @@ minor: (release "minor") # v0.X.0
 
 major: (release "major") # vX.0.0
 
-# bump kay and every library to one version, then push the branch and its new tag in one atomic push; a rejected push drops the bump so a retry starts clean
+# bump kay and every library to one version, then push the branch and its new tag in one atomic push and wait for their runs and the registry (ft release); a rejected push drops the bump so a retry starts clean
 release level:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -16,40 +16,13 @@ release level:
 	git fetch -q origin main
 	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
 	bun scripts/version.ts {{level}}
-	tag=$(git tag --points-at HEAD)
 	# A deprecation past its three minors fails only once the version moves, so it is caught here rather than on the tag's CI.
 	if ! bun test tests/upgrade.test.ts; then
-	  git tag -d "$tag"
+	  git tag -d "$(git tag --points-at HEAD)"
 	  git reset --keep HEAD~1
 	  exit 1
 	fi
-	before=$(tea actions runs ls -o json --limit 1 | jq -r '.[0].id // 0')
-	if ! git push --atomic origin HEAD "$tag"; then
-	  git tag -d "$tag"
-	  git reset --keep HEAD~1
-	  exit 1
-	fi
-	just watch-runs "$before"
-
-# wait for the Forgejo runs started after run <after>, failing on the first one that fails
-watch-runs after:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	for _ in $(seq 1 90); do
-	  # Sleeping first gives a push's runs time to all appear, so one finishing early is not taken for the lot.
-	  sleep 10
-	  runs=$(tea actions runs ls -o json --limit 10 | jq -c --argjson after {{after}} '[.[] | select((.id | tonumber) > $after) | {id, status}]')
-	  if jq -e 'any(.status == "failure" or .status == "cancelled")' <<<"$runs" >/dev/null; then
-	    echo "a run failed: $runs" >&2
-	    exit 1
-	  fi
-	  if jq -e 'length > 0 and all(.status == "success" or .status == "skipped")' <<<"$runs" >/dev/null; then
-	    echo "every run passed: $runs"
-	    exit 0
-	  fi
-	done
-	echo "the runs did not finish in 15 minutes: $runs" >&2
-	exit 1
+	ft release --tagged
 
 # land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; landings verify side by side and take turns only to push, one that finds main moved verifying again; one line per step, their output in the git folder's land.log
 land:
@@ -57,7 +30,7 @@ land:
 
 # wait for the CI run covering a commit on main, origin's tip by default, printing what failed
 ci sha="":
-	bun scripts/ci.ts {{sha}}
+	ft ci {{sha}} --workflow test.yml --job test
 
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}
