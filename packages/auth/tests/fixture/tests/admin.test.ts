@@ -147,6 +147,9 @@ describe('the admin pages', () => {
 
     expect([refused.status, refused.find('[data-impersonating]').length, refused.find('.kui-tab-nav').length]).toEqual([403, 1, 0])
 
+    // A user's page sends the acting admin there rather than answering 404.
+    expect((await root.visitor.visit(from)).url).toBe('/auth/admin')
+
     const back = await root.visitor.fetch('/auth/stop-impersonating', { method: 'POST', body: new URLSearchParams({ redirect: '/auth/admin' }) })
 
     expect([back.status, back.headers.get('location')]).toEqual([303, '/auth/admin'])
@@ -169,6 +172,10 @@ describe('the admin pages', () => {
 
     expect(await forms(other.id)).toEqual([0, 0, ['editor']])
     expect(await forms(ada.id)).toEqual([1, 1, ['admin', 'editor']])
+
+    // A ban set before the role came stays liftable.
+    await store.users.update(other.id, { bannedAt: new Date(), bannedUntil: null, banReason: null })
+    expect((await root.visitor.visit(`/auth/admin/users/${other.id}`)).find('form button').map(button => button.text)).toContain('Lift the suspension')
   })
 
   test('the audit log page opens for an admin only, and a cursor that is no date shows an empty page', async () => {

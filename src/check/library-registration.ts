@@ -285,7 +285,7 @@ function bareAuthCalls(ast: t.File, source: string, file: string, root: string, 
       return
 
     const last = properties.at(-1)
-    let edit: Edit = { start: node.start!, end: node.end!, text: 'auth({ plugin: false })' }
+    let edit: Edit = { start: node.start!, end: node.end!, text: `${node.callee.name}({ plugin: false })` }
 
     if (options !== undefined)
       edit = last === undefined ? { start: options.start!, end: options.end!, text: '{ plugin: false }' } : { start: last.end!, end: last.end!, text: ', plugin: false' }

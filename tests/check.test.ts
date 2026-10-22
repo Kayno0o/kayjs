@@ -3885,6 +3885,11 @@ describe.concurrent('kay check, unused code', () => {
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(kept)
 
+      // An aliased import is the bare call too, and its fix keeps the alias.
+      await Bun.write(join(root, 'kay.config.ts'), 'import { auth as kayAuth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [kayAuth()] })\n')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth as kayAuth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [kayAuth({ plugin: false })] })\n')
+
       // A call named auth that is not the import, and a spread that may carry the module, are not the bare call.
       await Bun.write(join(root, 'kay.config.ts'), 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nconst shadowed = (auth: () => unknown) => auth()\nconst options = {}\n\nexport default defineConfig({ extensions: [auth({ module: \'./src/auth\' }), auth({ ...options })], shadowed })\n')
       expect((await runCheck(root)).output).not.toContain('deprecated-library-registration')

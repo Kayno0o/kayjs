@@ -86,8 +86,13 @@ const auth = ctx.locals.auth
 const features = auth.features()
 const found = await auth.getUser(String(ctx.params.id))
 
-if (!found.ok)
-  ctx.notFound()
+// Only an admin acting as a user is refused, and the admin index shows them the way back.
+if (!found.ok) {
+  if (found.error === 'not-found')
+    ctx.notFound()
+
+  ctx.redirect(localize(`${features.pages?.prefix ?? features.prefix}/admin`))
+}
 
 const user = found.user
 const me = await auth.user()
@@ -139,8 +144,8 @@ PageSection(title={wording('auth.admin.user.roles', 'Roles')})
             for role of grantable key={role}
               option(value={role}) {role}
         Button(type="submit" label={wording('auth.admin.user.grant', 'Give the role')})
-// An admin is neither banned, acted as nor deleted from here: the methods refuse it.
-if !own && !found.admin
+// An admin is neither banned, acted as nor deleted from here, as the methods refuse it; a ban set before the role came stays liftable.
+if !own && (!found.admin || user.ban)
   PageSection(title={wording('auth.admin.user.ban', 'Suspend the account')})
     if user.ban
       p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.at) })}
@@ -148,23 +153,24 @@ if !own && !found.admin
         p.text-kui-muted {user.ban.reason}
       form(action={unban})
         Button(type="submit" label={wording('auth.admin.user.unban', 'Lift the suspension')})
-    else
+    else if !found.admin
       form.flex.flex-col.gap-3(action={ban})
         FormField(label={wording('auth.admin.user.banReason', 'Reason')})
           input(name="reason" maxlength="500")
         FormField(label={wording('auth.admin.user.banUntil', 'Until')} hint={wording('auth.admin.user.banUntilHint', 'The suspension ends at the close of that day, UTC. Leave empty to suspend for good.')})
           input(type="date" name="until")
         Button(type="submit" tone="danger" label={wording('auth.admin.user.ban', 'Suspend the account')})
-  PageSection(title={wording('auth.admin.user.impersonate', 'Act as this user')})
-    form(action={impersonate})
-      Button(type="submit" label={wording('auth.admin.user.impersonate', 'Act as this user')})
-  PageSection(title={wording('auth.admin.user.delete', 'Delete the account')})
-    form.flex.flex-col.gap-3(action={remove})
-      p {wording('auth.admin.user.deleteIntro', 'The account and everything tied to it are deleted for good. This cannot be undone.')}
-      label.flex.items-center.gap-2
-        input(type="checkbox" name="confirm" required)
-        | {wording('auth.admin.user.deleteConfirm', 'I understand')}
-      Button(type="submit" tone="danger" label={wording('auth.admin.user.delete', 'Delete the account')})
+  if !found.admin
+    PageSection(title={wording('auth.admin.user.impersonate', 'Act as this user')})
+      form(action={impersonate})
+        Button(type="submit" label={wording('auth.admin.user.impersonate', 'Act as this user')})
+    PageSection(title={wording('auth.admin.user.delete', 'Delete the account')})
+      form.flex.flex-col.gap-3(action={remove})
+        p {wording('auth.admin.user.deleteIntro', 'The account and everything tied to it are deleted for good. This cannot be undone.')}
+        label.flex.items-center.gap-2
+          input(type="checkbox" name="confirm" required)
+          | {wording('auth.admin.user.deleteConfirm', 'I understand')}
+        Button(type="submit" tone="danger" label={wording('auth.admin.user.delete', 'Delete the account')})
 if entries.length > 0
   PageSection(title={wording('auth.admin.user.activity', 'Recent activity')})
     .flex.flex-col.gap-2
