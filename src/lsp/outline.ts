@@ -47,6 +47,9 @@ export function documentSymbols(source: string): DocumentSymbol[] {
     fences.push({ label: 'module', span: file.module, declared: analysis.fence ? declarations(analysis.fence, symbol) : [] })
   }
 
+  if (file.style)
+    fences.push({ label: 'style', span: file.style, declared: [] })
+
   const fenced = fences.sort((first, second) => first.span.start - second.span.start).map(({ label, span, declared }) => symbol(label, MODULE, { start: fenceLineStart(source, span.start), end: span.end }, { start: fenceLineStart(source, span.start), end: span.start }, undefined, declared))
   const template = file.template.flatMap(node => nodeSymbols(node, source, symbol))
 

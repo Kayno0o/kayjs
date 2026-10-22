@@ -1,6 +1,6 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
-import type { Attribute, Diagnostic, Node, Span } from './ast'
+import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
 import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
@@ -21,6 +21,7 @@ import { parseExpanded } from './markdown-block'
 import { markupProps } from './markup-props'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
+import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
 import { templateReads } from './template-reads'
 import { ISLAND_TWIN } from './twin'
@@ -227,6 +228,9 @@ export function compileKay(original: string, filename: string, options: CompileO
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, options.root))
 
+  if (file.style)
+    scopeElements(file, scopeAttribute(islandId(filename, options.root)))
+
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
   // Pages, layouts and special pages render on the server: a package they import never switches them.
@@ -395,6 +399,14 @@ function constantSignals(source: string, fences: (Span | undefined)[], found: Na
       checkOnly: true,
     }
   })
+}
+
+// A component with a `--- style` fence marks every element it writes, which the fence's selectors end on; a component's root is the caller's to reach through `class`.
+function scopeElements(file: KayFile, attribute: string): void {
+  for (const element of elementsIn(file.template)) {
+    if (!element.component && element.outlet === undefined)
+      element.fixed = `${element.fixed ?? ''} ${attribute}`
+  }
 }
 
 export function islandId(filename: string, root = process.cwd()): string {

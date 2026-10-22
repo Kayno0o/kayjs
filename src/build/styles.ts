@@ -2,9 +2,10 @@ import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
-import { withoutTwin } from '../compiler'
+import { islandId, withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
-import { projectPaths } from '../project'
+import { scopeAttribute, scopeCss } from '../compiler/scoped-style'
+import { cacheDir, projectPaths } from '../project'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
@@ -65,7 +66,9 @@ function importing(paths: string[]): string {
 
 // What the stylesheet build reads of a module it follows: its imports, and whether a component renders the entries of a collection. An edit leaving them alone leaves the stylesheets as they were.
 export async function styleSignature(path: string, source: string): Promise<string> {
-  return JSON.stringify([await importsOf(path, source), KAY_FILE.test(path) && rendersContent(parseKay(source).template)])
+  const file = KAY_FILE.test(path) ? parseKay(source) : undefined
+
+  return JSON.stringify([await importsOf(path, source), file !== undefined && rendersContent(file.template), file?.style && source.slice(file.style.start, file.style.end)])
 }
 
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
@@ -95,6 +98,17 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
     await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root, dist)))
 
     return importing(note(importer, paths.filter(followed)))
+  }
+  // A `--- style` fence reaches the bundler as a stylesheet of its own, written under the cache with its selectors scoped.
+  const scopedStylesheet = async (path: string, css: string) => {
+    const moduleId = islandId(path, root)
+    const file = join(cacheDir(root, 'scoped'), `${Bun.hash(moduleId).toString(36)}.css`)
+    const contents = scopeCss(css, scopeAttribute(moduleId))
+
+    if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents)
+      await Bun.write(file, contents)
+
+    return importing(note(path, [file]))
   }
   // Server code never reaches the bundler, but the assets it imports, through the project's modules too, are written all the same.
   const walked = new Set<string>()
@@ -146,7 +160,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
         loaded?.add(path)
 
         const source = await Bun.file(path).text()
-        const { script, server, module, template } = parseKay(source)
+        const { script, server, module, style, template } = parseKay(source)
+        const scoped = style ? await scopedStylesheet(path, source.slice(style.start, style.end)) : ''
         const styles = server ? serverStyles(source.slice(server.start, server.end), path) : ''
         const [contents, moduleContents, content] = await Promise.all([
           script ? imports(source.slice(script.start, script.end), path, 'ts') : '',
@@ -158,7 +173,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
         // A component `src/ui.ts` restyles has the classes written there, which the page using it keeps the rules of.
         const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, [join(root, UI_FILE)]))
 
-        return { contents: classes + contents + moduleContents + styles + content + restyled, loader: 'js' }
+        return { contents: classes + contents + moduleContents + scoped + styles + content + restyled, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
         loaded?.add(path)

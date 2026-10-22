@@ -83,7 +83,7 @@ const KEYWORD = keyword('if|else[ \\t]+if|else|for|await|then|catch|try|pending|
 
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
-  const fences: Partial<Record<'script' | 'server' | 'module', Span>> = {}
+  const fences: Partial<Record<'script' | 'server' | 'module' | 'style', Span>> = {}
   let typeParameters: Span | undefined
   let client: Span | undefined
   let templateStart = 0
@@ -104,7 +104,7 @@ export function parseKay(source: string): KayFile {
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
-    const closing = closingFence(source, bodyStart)
+    const closing = closingFence(source, bodyStart, kind === 'style')
     const span = { start: bodyStart, end: closing ? closing.start : source.length }
 
     templateStart = closing ? closing.end : source.length
@@ -118,8 +118,8 @@ export function parseKay(source: string): KayFile {
         diagnostics.push(unclosed)
     }
 
-    if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- server` for server code, or `--- module` for module-level code that exports values' })
+    if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module' && kind !== 'style'))
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
     else if (fences[kind])
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'script' ? 'script' : `\`--- ${kind}\``} fence` })
     else
@@ -141,15 +141,15 @@ export function parseKay(source: string): KayFile {
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, module: fences.module, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, module: fences.module, style: fences.style, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
 }
 
 // The line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds: a `---` line, consumed, or a labeled one opening the next fence, left to it.
 // Code that leaves a template literal open falls back to the first such line, so the template still parses.
-function closingFence(source: string, bodyStart: number): Span | undefined {
+function closingFence(source: string, bodyStart: number, css = false): Span | undefined {
   CLOSING_FENCE.lastIndex = bodyStart
 
-  const start = new TemplateParser(source, bodyStart, []).closingLine() ?? CLOSING_FENCE.exec(source)?.index
+  const start = (css ? undefined : new TemplateParser(source, bodyStart, []).closingLine()) ?? CLOSING_FENCE.exec(source)?.index
 
   if (start === undefined)
     return undefined

@@ -61,7 +61,7 @@ export interface FormatOptions {
 // Adjacent fences share one line, the second one's labeled opening, which closes the first.
 function formatFences(file: KayFile): string[] {
   const out: string[] = []
-  const bodies = [file.script, file.server, file.module].filter(body => body !== undefined).sort((a, b) => a.start - b.start)
+  const bodies = [file.script, file.server, file.module, file.style].filter(body => body !== undefined).sort((a, b) => a.start - b.start)
 
   for (const body of bodies) {
     const open = FENCE_OPEN.exec(file.source.slice(file.source.lastIndexOf('\n', body.start - 2) + 1, body.start - 1))
