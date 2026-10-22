@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 async function loaded(mode: 'outbox' | 'smtp' | 'dev'): Promise<{ before: string[], after: string[] }> {
-  const run = Bun.spawn(['bun', `${import.meta.dir}/probes/loaded.ts`, mode], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_ROOT: `${import.meta.dir}/fixture` } })
+  const run = Bun.spawn([process.execPath, `${import.meta.dir}/probes/loaded.ts`, mode], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_ROOT: `${import.meta.dir}/fixture` } })
   const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
 
   if (!out.trim())

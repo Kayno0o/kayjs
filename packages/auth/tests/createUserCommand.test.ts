@@ -337,7 +337,7 @@ describe('the kay command line', () => {
   test('lists the command and runs it on a piped password in the project of the current directory', async () => {
     const cli = `${import.meta.dir}/../../../src/cli.ts`
     const spawn = async (args: string[], stdin?: string) => {
-      const child = Bun.spawn(['bun', cli, ...args], { cwd: FIXTURE, stdin: stdin === undefined ? 'ignore' : new Blob([stdin]), stdout: 'pipe', stderr: 'pipe' })
+      const child = Bun.spawn([process.execPath, cli, ...args], { cwd: FIXTURE, stdin: stdin === undefined ? 'ignore' : new Blob([stdin]), stdout: 'pipe', stderr: 'pipe' })
 
       return { code: await child.exited, out: await new Response(child.stdout).text(), err: await new Response(child.stderr).text() }
     }

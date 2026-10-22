@@ -11,7 +11,7 @@ async function run(source: string) {
 
   await writeFile(file, `import { test } from 'bun:test'\n${source}`)
 
-  const child = Bun.spawn(['bun', 'test', file], { cwd: join(import.meta.dir, '..'), stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, 'test', file], { cwd: join(import.meta.dir, '..'), stdout: 'pipe', stderr: 'pipe' })
   const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
 
   return { code: await child.exited, output: out + err }

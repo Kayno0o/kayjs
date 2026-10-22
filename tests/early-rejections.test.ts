@@ -5,7 +5,7 @@ import { fixtureCopy } from './scratch'
 
 // `bun test` fails a test on a rejection nothing has taken yet, as a server crashes on one, so the cases run in processes of their own.
 async function spawn(script: string) {
-  const run = Bun.spawn(['bun', join(import.meta.dir, 'fixtures/early', script)], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+  const run = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/early', script)], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [stdout, stderr, code] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
 
   return { stdout, stderr, code }

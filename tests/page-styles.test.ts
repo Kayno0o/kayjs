@@ -644,7 +644,7 @@ describe('a page kept at build time under a mount point', () => {
 // Starts the fixture's server in production in a copy of it, and tells where it listens.
 async function startFixture(env: Record<string, string> = {}): Promise<{ dir: string, server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>, origin: string }> {
   const dir = await copyOfFixture()
-  const server = spawnSuiteServer(['bun', 'server.ts'], { cwd: dir, env: { ...process.env, NODE_ENV: 'production', ...env } })
+  const server = spawnSuiteServer([process.execPath, 'server.ts'], { cwd: dir, env: { ...process.env, NODE_ENV: 'production', ...env } })
 
   return { dir, server, origin: `http://localhost:${await listeningPort(server, 'the fixture', LISTENING)}` }
 }

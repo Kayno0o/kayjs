@@ -20,7 +20,7 @@ let origin: string
 
 // A server of the navigation fixture on a port of its own, and the origin it answers on.
 async function startFixture(): Promise<{ server: Fixture, origin: string }> {
-  const started: Fixture = spawnSuiteServer(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
+  const started: Fixture = spawnSuiteServer([process.execPath, 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
 
   return { server: started, origin: `http://localhost:${await listeningPort(started, 'the navigation fixture', LISTENING)}` }
 }

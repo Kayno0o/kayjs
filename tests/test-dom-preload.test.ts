@@ -81,7 +81,7 @@ it('keeps every web global native, with a document beside them', () => {
 })
 `)
 
-  const child = Bun.spawn(['bun', 'test', '--preload', join(SRC, 'preload.ts'), '--preload', join(SRC, 'dom.ts'), file], { cwd: dir, stdout: 'pipe', stderr: 'pipe', stdin: 'ignore', env: { ...process.env, KAY_TEST_CHILD: '1' } })
+  const child = Bun.spawn([process.execPath, 'test', '--preload', join(SRC, 'preload.ts'), '--preload', join(SRC, 'dom.ts'), file], { cwd: dir, stdout: 'pipe', stderr: 'pipe', stdin: 'ignore', env: { ...process.env, KAY_TEST_CHILD: '1' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   expect(`${out}${err}`).toContain('4 pass')

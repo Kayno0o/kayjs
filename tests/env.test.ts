@@ -78,7 +78,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('differs between project paths', async () => {
-    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
     const a = await project({ 'a.txt': '' })
     const b = await project({ 'a.txt': '' })
 
@@ -87,7 +87,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('mixes in a random seed kept in the checkout\'s .kay, so the same path elsewhere gives another value', async () => {
-    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
     const root = await project({ 'a.txt': '' })
     const first = await run(root)
 
@@ -106,7 +106,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('writes the seed again when its file is empty or cut short, and fails clearly when .kay cannot be written', async () => {
-    const run = async (cwd: string) => Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; try { console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A) } catch (error) { console.log(error.message) }`}`.cwd(cwd).quiet().text()
+    const run = async (cwd: string) => Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; try { console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A) } catch (error) { console.log(error.message) }`}`.cwd(cwd).quiet().text()
     const root = await project({ '.kay/dev-secret': 'short' })
     const first = (await run(root)).trim()
 

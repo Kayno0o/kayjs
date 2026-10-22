@@ -315,7 +315,7 @@ describe('kay build --format json', () => {
 
     it('fails when another process answers on the port and the executable exits once it did', async () => {
       const wait = 'for (;;) { try { await fetch(`http://127.0.0.1:${process.env.PORT}/`); break } catch { await Bun.sleep(10) } } await Bun.sleep(50)'
-      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 2000)' >/dev/null 2>&1 &\nbun -e '${wait}'\necho "address in use" >&2\nexit 1\n`)
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n'${process.execPath}' -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 2000)' >/dev/null 2>&1 &\n'${process.execPath}' -e '${wait}'\necho "address in use" >&2\nexit 1\n`)
 
       await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
     }, 30_000)
@@ -361,13 +361,13 @@ describe('kay build --format json', () => {
 
     it.skipIf(process.platform !== 'linux')('does not take the answer of a process outside the server\'s own tree, though the server binds late', async () => {
       // The subshell ends at once, which leaves the listener to init, outside the server's tree.
-      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid bun -e '${listening}' >/dev/null 2>&1 &)\nbun -e '${answered}'\nsleep 0.5\necho "address in use" >&2\nexit 1\n`)
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid '${process.execPath}' -e '${listening}' >/dev/null 2>&1 &)\n'${process.execPath}' -e '${answered}'\nsleep 0.5\necho "address in use" >&2\nexit 1\n`)
 
       await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
     }, 30_000)
 
     it.skipIf(process.platform !== 'linux')('takes the answer of a process the server started, though it left the group', async () => {
-      const leaving = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nsetsid bun -e '${listening}' >/dev/null 2>&1 &\nwait\n`)
+      const leaving = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nsetsid '${process.execPath}' -e '${listening}' >/dev/null 2>&1 &\nwait\n`)
 
       expect(await verifyExecutable(leaving.file, leaving.root, undefined)).toBeGreaterThan(0)
     }, 30_000)
@@ -409,7 +409,7 @@ describe('kay build --format json', () => {
     })
 
     it.skipIf(process.platform !== 'linux')('looks at the sockets of the server now and then while another process answers', async () => {
-      const foreign = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid bun -e '${listening}' >/dev/null 2>&1 &)\nsleep 4\n`)
+      const foreign = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid '${process.execPath}' -e '${listening}' >/dev/null 2>&1 &)\nsleep 4\n`)
       let checks = 0
 
       await expect(verifyExecutable(foreign.file, foreign.root, undefined, { startTimeoutMs: 2000, ownershipChecked: () => checks++ })).rejects.toThrow('did not answer within 2 s')
@@ -418,7 +418,7 @@ describe('kay build --format json', () => {
     }, 30_000)
 
     it('names the signal that killed a server which had answered', async () => {
-      const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL"); process.exit()' &\nwait\n`)
+      const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n'${process.execPath}' -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL"); process.exit()' &\nwait\n`)
 
       await expect(verifyExecutable(killed.file, killed.root, undefined)).rejects.toThrow(/killed by SIGKILL/)
     }, 30_000)

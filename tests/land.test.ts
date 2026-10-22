@@ -94,7 +94,7 @@ describe('parallel landings of the whats-new and upgrading files', () => {
 
     await branch(work, 'marked', text => text.replace('- first\n', '- first\n=======\n'))
 
-    const land = await $`bun ${join(ROOT, 'scripts/land.ts')}`.cwd(work).nothrow().quiet()
+    const land = await $`${process.execPath} ${join(ROOT, 'scripts/land.ts')}`.cwd(work).nothrow().quiet()
 
     expect(land.exitCode).toBe(2)
     expect(land.stderr.toString()).toContain('llms/whats-new.md:6 (=======)')
@@ -117,7 +117,7 @@ async function landings(...names: string[]) {
   await Bun.write(join(seed, 'package.json'), JSON.stringify({ name: 'landing', scripts: { lint: 'bun lint.ts', check: 'true', test: 'true' } }))
   await Bun.write(join(seed, 'shared.txt'), 'one\n')
   await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nif (process.env.LAND_LEAK)\n  Bun.spawn([\'setsid\', \'sleep\', \'30\'], { stdout: \'inherit\', stderr: \'inherit\' }).unref()\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
-  await $`bun install --silent`.cwd(seed).quiet()
+  await $`${process.execPath} install --silent`.cwd(seed).quiet()
   await git(seed, 'add', '-A')
   await git(seed, 'commit', '-qm', 'base')
   await git(seed, 'push', '-q', 'origin', 'HEAD:main')
@@ -133,7 +133,7 @@ async function landings(...names: string[]) {
 
   // Runs a landing in a clone, its output and exit code once it ends; its rebase commits, so it gets an identity CI's git has none of.
   const land = (name: string, env: Record<string, string> = {}) => {
-    const child = Bun.spawn(['bun', LAND], { cwd: clones[name]!, env: { ...process.env, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, LAND], { cwd: clones[name]!, env: { ...process.env, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
 
     let out = ''
 
@@ -291,7 +291,7 @@ describe('landing', () => {
     const bin = await scratchDir('land-bin-')
 
     for (const tool of ['bun', 'git', 'sh', 'flock', 'cat', 'true'])
-      await symlink(Bun.which(tool)!, join(bin, tool))
+      await symlink(tool === 'bun' ? process.execPath : Bun.which(tool)!, join(bin, tool))
 
     await Bun.write(join(clones.a!, '.forgejo/workflows/test.yml'), 'on: push\n')
     await git(clones.a!, 'add', '-A')

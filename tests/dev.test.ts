@@ -800,7 +800,7 @@ describe.concurrent('kay dev', () => {
       for (const [dotenv, expected] of [['', 'http://localhost:4123'], ['SITE_URL=https://shop.example\n', 'https://shop.example'], ['ORIGIN=https://old.example\n', 'undefined']] as const) {
         await Bun.write(join(root, '.env'), dotenv)
 
-        const child = Bun.spawn(['bun', cli, 'dev', root, '--port', '4123'], { stdout: 'ignore', stderr: 'pipe', env })
+        const child = Bun.spawn([process.execPath, cli, 'dev', root, '--port', '4123'], { stdout: 'ignore', stderr: 'pipe', env })
 
         await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
         child.kill('SIGTERM')
@@ -826,7 +826,7 @@ describe.concurrent('kay dev', () => {
     try {
       // An entry file in place of the directory, as `kay dev` took before, runs in the current directory.
       for (const [args, expected, cwd] of [[[root], `server|${root}|${port}`, undefined], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}|${port}`, undefined], [['src/other.ts'], `other|${root}|${port}`, root], [[root, '--port', '4123'], `server|${root}|4123`, undefined]] as const) {
-        const child = Bun.spawn(['bun', cli, 'dev', ...args], { cwd: cwd ?? process.cwd(), stdout: 'ignore', stderr: 'pipe' })
+        const child = Bun.spawn([process.execPath, cli, 'dev', ...args], { cwd: cwd ?? process.cwd(), stdout: 'ignore', stderr: 'pipe' })
 
         await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
         child.kill('SIGTERM')
@@ -838,7 +838,7 @@ describe.concurrent('kay dev', () => {
       await Bun.write(join(root, 'kay.config.ts'), 'export default { entry: \'src/other.ts\' }\n')
 
       for (const [args, expected] of [[[root], `other|${root}|${port}`], [[root, '--entry', join(root, 'src/server.ts')], `server|${root}|${port}`]] as const) {
-        const child = Bun.spawn(['bun', cli, 'dev', ...args], { stdout: 'ignore', stderr: 'pipe' })
+        const child = Bun.spawn([process.execPath, cli, 'dev', ...args], { stdout: 'ignore', stderr: 'pipe' })
 
         await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
         child.kill('SIGTERM')
@@ -848,22 +848,22 @@ describe.concurrent('kay dev', () => {
 
       await rm(join(root, 'kay.config.ts'))
 
-      const refused = Bun.spawn(['bun', cli, 'dev', join(root, 'src/server.ts'), '--entry', 'src/other.ts'], { stdout: 'ignore', stderr: 'pipe' })
+      const refused = Bun.spawn([process.execPath, cli, 'dev', join(root, 'src/server.ts'), '--entry', 'src/other.ts'], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await refused.exited).toBe(1)
       expect(await new Response(refused.stderr).text()).toContain('is not a directory, and --entry names the server entry already')
 
-      const notPort = Bun.spawn(['bun', cli, 'dev', root, '--port', '70000'], { stdout: 'ignore', stderr: 'pipe' })
+      const notPort = Bun.spawn([process.execPath, cli, 'dev', root, '--port', '70000'], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await notPort.exited).toBe(1)
       expect(await new Response(notPort.stderr).text()).toContain('--port takes a port number, not 70000')
 
-      const exposed = Bun.spawn(['bun', cli, 'dev', root, '--inspect=0.0.0.0:0'], { stdout: 'ignore', stderr: 'pipe' })
+      const exposed = Bun.spawn([process.execPath, cli, 'dev', root, '--inspect=0.0.0.0:0'], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await exposed.exited).toBe(1)
       expect(await new Response(exposed.stderr).text()).toContain('--inspect=0.0.0.0:0 opens the debugger past this machine')
 
-      const missing = Bun.spawn(['bun', cli, 'dev', join(root, 'typo')], { stdout: 'ignore', stderr: 'pipe' })
+      const missing = Bun.spawn([process.execPath, cli, 'dev', join(root, 'typo')], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await missing.exited).toBe(1)
       expect(await new Response(missing.stderr).text()).toContain('is neither a directory nor a file')
@@ -1490,7 +1490,7 @@ describe.concurrent('kay dev', () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
 
     await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\n')
-    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     let output = ''
     const reading = (async () => {
       for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
@@ -1530,7 +1530,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
 
-    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdout: 'pipe', stderr: 'ignore' })
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdout: 'pipe', stderr: 'ignore' })
     let output = ''
     const reading = (async () => {
       for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
@@ -1558,7 +1558,7 @@ describe.concurrent('kay dev', () => {
     const spawned = `${root}-spawned.txt`
 
     await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(spawned)}, String(Bun.env.BUN_INSPECT))\nBun.serve({ port: 0, fetch: () => new Response() })\n`)
-    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, '--inspect=0'], { stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', root, '--inspect=0'], { stdout: 'pipe', stderr: 'pipe' })
     const sockets = async () => Array.fromAsync(new Bun.Glob(`kay-inspect-${child.pid}-*`).scan({ cwd: tmpdir(), onlyFiles: false }))
     const output: string[] = []
     let port = 0
@@ -1642,7 +1642,7 @@ describe.concurrent('kay dev', () => {
       await Bun.sleep(500)
       expect(output.slice(3).filter(line => !line.includes('restarted in'))).toEqual([])
 
-      const second = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'ignore', stderr: 'pipe' })
+      const second = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await second.exited).toBe(1)
       expect(await new Response(second.stderr).text()).toBe(`kay dev: the debugger address localhost:${port} is in use\n`)

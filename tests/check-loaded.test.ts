@@ -13,7 +13,7 @@ test('listing the loaded files does not load the parser', async () => {
 
   await writeFile(join(dir, 'probe.ts'), script)
 
-  expect((await $`bun probe.ts`.cwd(dir).quiet().text()).trim()).toBe('false')
+  expect((await $`${process.execPath} probe.ts`.cwd(dir).quiet().text()).trim()).toBe('false')
 })
 
 test('a root that cannot be resolved is listed without throwing', () => {

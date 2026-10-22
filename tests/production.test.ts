@@ -1523,7 +1523,7 @@ describe('compression', () => {
 describe('footprint', () => {
   it('serves without loading the compiler or resvg, which only development and the build need', async () => {
     // A process of its own, as this one compiled `.kay` files already; Babel is CommonJS, so loading it fills require.cache.
-    const probe = Bun.spawn(['bun', '-e', 'await import(\'./src/server/index.ts\'); await import(\'./src/server/internal.ts\'); console.log(Object.keys(require.cache).filter(key => key.includes(\'@babel\') || key.includes(\'@resvg\')).join(\'\\n\'))'], { stdout: 'pipe' })
+    const probe = Bun.spawn([process.execPath, '-e', 'await import(\'./src/server/index.ts\'); await import(\'./src/server/internal.ts\'); console.log(Object.keys(require.cache).filter(key => key.includes(\'@babel\') || key.includes(\'@resvg\')).join(\'\\n\'))'], { stdout: 'pipe' })
 
     expect((await new Response(probe.stdout).text()).trim()).toBe('')
     expect(await probe.exited).toBe(0)
@@ -1533,7 +1533,7 @@ describe('footprint', () => {
 describe('lifecycle', () => {
   // A server in a process of its own, with the port kay's first line printed and what it prints after.
   async function startServer(env: Record<string, string> = {}) {
-    const server = Bun.spawn(['bun', 'tests/fixtures/production/server.ts'], { env: { ...process.env, NODE_ENV: 'production', ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const server = Bun.spawn([process.execPath, 'tests/fixtures/production/server.ts'], { env: { ...process.env, NODE_ENV: 'production', ...env }, stdout: 'pipe', stderr: 'pipe' })
     const reader = server.stdout.getReader()
     let output = ''
 

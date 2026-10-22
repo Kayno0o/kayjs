@@ -213,7 +213,7 @@ describe('the TypeScript packages', () => {
   })
 
   it('give an app the tsgo command running the native compiler', async () => {
-    const run = Bun.spawn(['bun', 'src/tsgo.ts', '--version'], { stdout: 'pipe', stderr: 'pipe' })
+    const run = Bun.spawn([process.execPath, 'src/tsgo.ts', '--version'], { stdout: 'pipe', stderr: 'pipe' })
 
     expect(await new Response(run.stdout).text()).toMatch(/^Version 7\./)
     expect(await run.exited).toBe(0)
@@ -428,6 +428,29 @@ describe('package scripts', () => {
       for (const [name, command] of Object.entries(scripts)) {
         if ((/(?:^|[^\w$./-])bun(?:\s|$)/).test(command))
           found.push(`${path}: ${name}: ${command}`)
+      }
+    }
+
+    expect(found).toEqual([])
+  })
+})
+
+// The same trap in the tests: a spawned bare `bun` resolves through the PATH a package script sets, so it runs that old Bun, not the one running the test (#1956). The matchers cover a spawn array, a shell template and a stub script's own command line.
+const BARE_BUN_SPAWNS = [/\[\s*['"`]bunx?['"`]\s*[,\]]/, /\$`\s*bunx?(?:\s|`)/, /(?:setsid |\\n)bunx?\s/]
+
+describe('the tests that spawn Bun', () => {
+  it('spawn process.execPath, never a bare bun', async () => {
+    const found: string[] = []
+
+    for (const path of await Array.fromAsync(new Glob('{tests,packages/*/tests}/**/*.{ts,tsx,js,mjs}').scan())) {
+      if (path.includes('node_modules'))
+        continue
+
+      const lines = (await Bun.file(path).text()).split('\n')
+
+      for (const [index, line] of lines.entries()) {
+        if (BARE_BUN_SPAWNS.some(pattern => pattern.test(line)))
+          found.push(`${path}:${index + 1}: ${line.trim().slice(0, 100)}`)
       }
     }
 

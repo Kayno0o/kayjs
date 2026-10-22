@@ -19,7 +19,7 @@ async function marks(): Promise<string[]> {
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page opened from a search hit in Chromium', () => {
   beforeAll(async () => {
-    server = spawnSuiteServer(['bun', 'tests/fixtures/arrival/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
+    server = spawnSuiteServer([process.execPath, 'tests/fixtures/arrival/server.ts'], { env: { ...process.env, NODE_ENV: 'production' } })
     origin = `http://localhost:${await listeningPort(server, 'the arrival fixture', LISTENING)}`
     page = await browse(origin, { path })
   }, 60_000)

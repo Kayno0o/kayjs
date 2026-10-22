@@ -415,7 +415,7 @@ describe('a room\'s state in a SQLite file', () => {
       process.exit(0)
     `)
 
-    const child = Bun.spawn(['bun', script], { stdout: 'inherit', stderr: 'inherit' })
+    const child = Bun.spawn([process.execPath, script], { stdout: 'inherit', stderr: 'inherit' })
     const store = sqliteRooms(path)
 
     try {

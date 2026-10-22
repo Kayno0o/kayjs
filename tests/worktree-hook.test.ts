@@ -17,7 +17,7 @@ async function emptyRepo(): Promise<string> {
   for (const dir of PACKAGES) {
     await mkdir(join(repo, dir), { recursive: true })
     await writeFile(join(repo, dir, 'package.json'), '{ "name": "empty" }\n')
-    await $`bun install --save-text-lockfile`.cwd(join(repo, dir)).quiet()
+    await $`${process.execPath} install --save-text-lockfile`.cwd(join(repo, dir)).quiet()
   }
 
   await writeFile(join(repo, '.gitignore'), 'node_modules\n.claude/worktrees\n')
@@ -29,7 +29,7 @@ async function emptyRepo(): Promise<string> {
 test('worktrees created at the same time each come up usable', async () => {
   const repo = await emptyRepo()
   const names = Array.from({ length: 6 }, (_, index) => `at-once-${index}`)
-  const results = await Promise.all(names.map(async name => $`bun ${HOOK} create ${name}`.cwd(repo).quiet().nothrow()))
+  const results = await Promise.all(names.map(async name => $`${process.execPath} ${HOOK} create ${name}`.cwd(repo).quiet().nothrow()))
 
   expect(results.map(result => result.stderr.toString())).toEqual(names.map(() => ''))
   expect(results.map(result => result.exitCode)).toEqual(names.map(() => 0))
@@ -50,7 +50,7 @@ test('a worktree waits for the git steps of another to finish', async () => {
 
   await mkdir(lock)
 
-  const created = $`bun ${HOOK} create waits`.cwd(repo).quiet().nothrow()
+  const created = $`${process.execPath} ${HOOK} create waits`.cwd(repo).quiet().nothrow()
 
   await Bun.sleep(500)
   expect(existsSync(join(repo, '.claude/worktrees/waits'))).toBe(false)

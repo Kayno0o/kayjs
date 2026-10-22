@@ -142,7 +142,7 @@ describe('kay fmt --stdin', () => {
   const CLI = join(import.meta.dir, '../src/cli.ts')
 
   async function run(args: string[], stdin: string, cwd?: string): Promise<{ out: string, err: string, status: number }> {
-    const child = Bun.spawn(['bun', CLI, 'fmt', ...args], { cwd: cwd ?? process.cwd(), stdin: new Blob([stdin]), stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, CLI, 'fmt', ...args], { cwd: cwd ?? process.cwd(), stdin: new Blob([stdin]), stdout: 'pipe', stderr: 'pipe' })
     const [out, err, status] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
     return { out, err, status }
