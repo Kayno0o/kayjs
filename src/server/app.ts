@@ -40,7 +40,7 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { checkRequestIdHeader, healthTimeoutMs, remoteLimits } from './config-limits'
 import { corsRule } from './cors'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
@@ -48,6 +48,7 @@ import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { holdPublicEnv, servePublicEnv } from './env'
 import { PUBLIC_ENV_PATH, publicEnvFiles } from './env-state'
+import { browserStackMapper, devStackMapper } from './error-maps'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
@@ -533,8 +534,14 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (mcpAt !== undefined && document)
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
+  const mapStack = mode.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR))
+
   useAppOnError(options.onError)
-  serveErrorReports(app, options.onError, mode.dev ? undefined : join(client.dir, '..', MAPS_DIR))
+  serveErrorReports(app, options.onError, mapStack)
+
+  if (mode.dev)
+    app.post(DEV_STACK, async ({ request }) => devStack(request, mapStack))
+
   serveLive(app, options.live)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)

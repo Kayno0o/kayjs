@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
-import { COMPRESSED_MAP, decodeBundleMappings } from '../build/sourcemap'
+import { join, resolve } from 'node:path'
+import { COMPRESSED_MAP, decodeBundleMappings, mapBundleToKay } from '../build/sourcemap'
 
 interface LoadedMap {
   sources: string[]
@@ -45,6 +45,33 @@ export function browserStackMapper(dir: string): (stack: string) => Promise<stri
     return map
   }
 
+  return mapFrames(load)
+}
+
+// The same for `kay dev`, whose maps are in `dir` beside the chunks: each is pointed at `.kay` lines on its first need, and a source is named by its absolute path, as a server stack names it.
+export function devStackMapper(dir: string): (stack: string) => Promise<string> {
+  async function load(name: string): Promise<LoadedMap | undefined> {
+    const file = join(dir, `${name}.map`)
+
+    if (!CHUNK_NAME.test(name) || !(await Bun.file(file).exists()))
+      return undefined
+
+    try {
+      await mapBundleToKay(file)
+
+      const { sources, mappings } = await Bun.file(file).json() as { sources: string[], mappings: string }
+
+      return { sources: sources.map(source => resolve(dir, source)), lines: decodeBundleMappings(mappings) }
+    }
+    catch {
+      return undefined
+    }
+  }
+
+  return mapFrames(load)
+}
+
+function mapFrames(load: (name: string) => Promise<LoadedMap | undefined>): (stack: string) => Promise<string> {
   return async (stack) => {
     const lines = stack.split('\n')
 

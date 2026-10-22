@@ -548,6 +548,35 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.ui.floating')).not.toBeNull()
   })
 
+  it('shows the stack of an uncaught error on the `.kay` lines the server maps it to, as sent when the server cannot', async () => {
+    const stack = 'TypeError: count is undefined\n    at click (http://localhost/_kay/counter-aaaaaaaa.js:11:1)'
+    const mapped = 'TypeError: count is undefined\n    at click (/app/src/counter.kay:4:9)'
+    const posted: unknown[] = []
+    const answer = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      if (!String(url).endsWith('/_kay/dev/stack'))
+        return new Response(null, { status: 404 })
+
+      posted.push(JSON.parse(String(init?.body)))
+
+      return posted.length === 1 ? Response.json({ stack: mapped }) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+    const push = (error: Error) => (window as unknown as { $kayProblems: { push: (problem: unknown) => void } }).$kayProblems.push({ level: 'error', kind: 'uncaught', text: `Uncaught ${error.message}`, error })
+
+    tool = startDevTool()
+    push(Object.assign(new TypeError('count is undefined'), { stack }))
+    await Bun.sleep(20)
+
+    expect(posted).toEqual([{ stack }])
+    expect(problems()).toEqual([['error', mapped]])
+    expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('.actions button[title^="Copy"]')!)).toContain('/app/src/counter.kay:4:9')
+
+    push(Object.assign(new TypeError('other'), { stack: 'TypeError: other\n    at f (http://localhost/_kay/counter-bbbbbbbb.js:2:2)' }))
+    await Bun.sleep(20)
+
+    expect(problems().at(-1)).toEqual(['error', 'TypeError: other\n    at f (http://localhost/_kay/counter-bbbbbbbb.js:2:2)'])
+    answer.mockRestore()
+  })
+
   it('dismisses the problems shown for the rest of the browser tab, drops what the page logged as a swap starts, and reads what kay check finds again as it ends', async () => {
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title'])
     tool = startDevTool()

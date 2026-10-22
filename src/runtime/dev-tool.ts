@@ -21,6 +21,9 @@ const REQUEST_URL = '/_kay/dev/request'
 const SIZES_URL = '/_kay/dev/sizes'
 const FOOTPRINT_URL = '/_kay/dev/footprint'
 const NOT_FOUND_URL = '/_kay/dev/not-found'
+const STACK_URL = '/_kay/dev/stack'
+// A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
+const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
 const MAX_NAVIGATIONS = 5
 // The most requests one navigation lists, the rest counted.
@@ -1386,6 +1389,18 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
     setIcon(close, 'Dismiss this problem', 'x')
     close.onclick = () => dismiss([problem.text])
     text.append(...withPositions(problem.text, tool))
+
+    if (CHUNK_FRAME.test(problem.text)) {
+      void (async () => {
+        const mapped = await onKayLines(doc.defaultView!, problem.text)
+
+        if (mapped !== undefined) {
+          problem.text = mapped
+          text.replaceChildren(...withPositions(mapped, tool))
+        }
+      })()
+    }
+
     element.append(tool.icon(problem.level === 'error' ? 'circle-x' : 'triangle-alert'), text, close, times)
 
     if (kind === 'a11y') {
@@ -3476,6 +3491,18 @@ async function copyText(button: HTMLButtonElement, text: string): Promise<void> 
   copyResets.set(button, setTimeout(() => {
     label.textContent = 'Copy'
   }, COPIED_MS))
+}
+
+// The stack with its chunk frames on `.kay` lines as the server maps them; none when it cannot.
+async function onKayLines(win: Window, stack: string): Promise<string | undefined> {
+  try {
+    const response = await ownFetch(win, STACK_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ stack }), cache: 'no-store' })
+
+    return response.ok ? (await response.json() as { stack: string }).stack : undefined
+  }
+  catch {
+    return undefined
+  }
 }
 
 // A file named alone or by its line opens at its first line or column.

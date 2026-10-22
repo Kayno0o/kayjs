@@ -242,7 +242,7 @@ While it runs, `kay dev` also writes its address to `.kay/dev/server-<pid>.json`
 | `compile` | The project failed to compile. `problems` holds each position |
 | `boot` | The server failed to start |
 | `request` | A request threw |
-| `browser` | An island met an error, under its page's path |
+| `browser` | An island met an error, under its page's path, its stack on `.kay` lines like the dev tool's Problems tab shows it |
 | `type` | A type error the check beside `kay dev` found, one entry each at its `.kay` line, replaced whenever the check ends |
 
 A request's errors stay across restarts, the latest 50 kept. A server not run by `kay dev` writes none.

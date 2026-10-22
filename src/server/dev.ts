@@ -28,6 +28,7 @@ import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './c
 import { recordTypeErrors } from './dev-errors'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
+import { readCapped } from './errors'
 import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
 import { requestId } from './protection'
@@ -40,6 +41,7 @@ const DEV_EXTENSION = '/_kay/dev/extension/'
 
 export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
+export const DEV_STACK = '/_kay/dev/stack'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
 export const DEV_STYLES = '/_kay/dev/styles.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
@@ -59,6 +61,7 @@ const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 const STYLES_SOURCE = resolve(import.meta.dir, '../runtime/dev-styles.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
+const MAX_STACK_BYTES = 16 * 1024
 const LIVE_RELOAD_HEADER = 'x-kay-live-reload'
 // The entry the live reload's fetches are answered with, copied in dev-tool.ts.
 const LIVE_RELOAD_TIMING = 'kay-live-reload'
@@ -319,6 +322,22 @@ function bootEvent(failed: boolean, hot?: HotSwap): string {
   announcedCode ??= process.env.KAY_DEV_CODE
 
   return `event: boot\ndata: ${bootId} ${failed ? bootId : announcedCode ?? bootId}${hot && !failed ? ` ${JSON.stringify(hot)}` : ''}\n\n`
+}
+
+// Maps the frames of a browser stack the dev tool's Problems tab holds to `.kay` lines with the maps of the chunks the page loaded; a frame no map covers stays as sent.
+export async function devStack(request: Request, mapStack: (stack: string) => Promise<string>): Promise<Response> {
+  if (request.headers.get(OPEN_HEADER) === null || isCrossSite(request))
+    return new Response(null, { status: 403 })
+
+  try {
+    const text = await readCapped(request, MAX_STACK_BYTES)
+    const stack = text === undefined ? undefined : (JSON.parse(text) as { stack?: unknown }).stack
+
+    return typeof stack === 'string' ? Response.json({ stack: await mapStack(stack) }) : new Response(null, { status: 400 })
+  }
+  catch {
+    return new Response(null, { status: 400 })
+  }
 }
 
 // A run of the server, which a reload follows in the same process: the pages it serves are the ones to tell once it has taken over.
