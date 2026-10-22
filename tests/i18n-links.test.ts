@@ -13,7 +13,8 @@ const chrome = browserPath()
 // The check for a visitor asking to save data, which islands with no `hydrate` wait on, costs about 105 to 140 bytes here, read before the first island hydrates so it cannot wait in a chunk.
 // This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.
 // Marking each signal so an assignment to a property or a let holding one writes it costs about 45 bytes here.
-const EAGER_JS_BUDGET = 15_446
+// The file test of a link, `FILE_EXTENSION` and `namesFile` (a collection route takes a dotted slug, an entry file stays a page), costs about 186 bytes here: an island writes links, so it cannot wait in a chunk.
+const EAGER_JS_BUDGET = 15_632
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
 describe('an island of an app with locales', () => {
