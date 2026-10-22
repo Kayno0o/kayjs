@@ -27,7 +27,7 @@ export async function installFingerprint(root: string): Promise<string> {
   return hasher.digest('hex')
 }
 
-// Drops every `.eslintcache*` of `folder` (default `root`) when the install changed since they were written, and records the install the next lint runs against. A library passes its own folder with the repo root, as the workspace installs its dependencies there. A bumped dependency always moves the lockfile or the `node_modules` mtime, so the fingerprint covers it.
+// Drops every `.eslintcache*` of `folder` (default `root`) when the install changed since they were written, and records the install the next lint runs against. A library passes its own folder with the repo root, as the workspace installs its dependencies there. A bumped registry dependency moves the lockfile or the `node_modules` mtime, so the fingerprint covers it; a linked or edited-in-place package changes neither.
 export async function dropStaleLintCache(root: string, folder = root): Promise<boolean> {
   const current = await installFingerprint(root)
   const state = Bun.file(join(folder, STATE))
