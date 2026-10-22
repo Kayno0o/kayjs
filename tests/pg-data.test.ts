@@ -5,7 +5,7 @@ import { cached } from '../src/runtime/cache'
 import { rateLimit, rooms } from '../src/server'
 import { appStore, setupStore } from '../src/server/app-store'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
-import { indexStatement } from '../src/server/pg-jobs'
+import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
@@ -182,6 +182,72 @@ pgDescribe('pgData', () => {
     await build
     expect(errors).toEqual([])
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
+  })
+
+  pgIt('holds a replica that lost the lock until the unique index is valid, so a keyed job is not enqueued twice meanwhile', async () => {
+    const sql = await fresh()
+    const [holder, first, second] = replicas(3) as [SQL, SQL, SQL]
+
+    await createDataTables(sql)
+    await sql.unsafe('DROP INDEX kay_jobs_key')
+
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const holding = holder.begin('ISOLATION LEVEL REPEATABLE READ', async (tx) => {
+      await tx.unsafe('SELECT count(*) FROM kay_jobs')
+      await held
+    })
+    const building = async (): Promise<boolean> => (await rows<{ found: boolean }>(sql, 'SELECT EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = to_regclass(\'kay_jobs_key\')) AS found'))[0]!.found
+    const build = createDataTables(first)
+    const job = (id: string): Parameters<ReturnType<typeof pgJobs>['add']>[0] => ({ id, queue: 'q', payload: '{}', attempts: 0, runAt: 0, key: 'same' })
+    const store = pgJobs(second)
+    let added = 0
+    const adds = (async (): Promise<void> => {
+      await Promise.all([store.add(job('a')), store.add(job('b'))])
+      added = 2
+    })()
+
+    try {
+      await waitFor(building, 'the first build')
+      await Bun.sleep(1500)
+      expect(added).toBe(0)
+    }
+    finally {
+      release()
+      await holding
+    }
+
+    await build
+    await adds
+    expect(await rows(sql, 'SELECT id FROM kay_jobs WHERE job_key = \'same\'')).toHaveLength(1)
+    expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_key\')')).toEqual([{ indisvalid: true }])
+  })
+
+  pgIt('takes the indexes over from a replica holding the lock that builds nothing', async () => {
+    const sql = await fresh()
+    const [holder, other] = replicas(2) as [SQL, SQL]
+
+    await createDataTables(sql)
+    await sql.unsafe('DROP INDEX kay_jobs_key')
+
+    const reserved = await holder.reserve()
+
+    await reserved.unsafe('SELECT pg_advisory_lock(hashtext(\'kay_indexes\'))')
+
+    let done = false
+    const waiting = (async (): Promise<void> => {
+      await createMissingIndexes(other, [{ name: 'kay_jobs_key', on: 'kay_jobs (queue, job_key) WHERE job_key IS NOT NULL AND NOT failed', unique: true }])
+      done = true
+    })()
+
+    await Bun.sleep(1000)
+    expect(done).toBe(false)
+    await reserved.unsafe('SELECT pg_advisory_unlock(hashtext(\'kay_indexes\'))')
+    reserved.release()
+    await waiting
+    expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_key\')')).toEqual([{ indisvalid: true }])
   })
 
   pgIt('creates a missing index once when replicas start at once, neither failing', async () => {

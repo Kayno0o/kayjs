@@ -177,7 +177,9 @@ export const db = new Database({ url: env.DATABASE_URL, tables: [...tables, ...j
 
 kay lists pg-orm as an optional peer, so an app without it installs and builds as before. The app template connects with `app_rw`, which may not create tables. That is fine, because the migration, run by the owner, already created them.
 
-Without pg-orm migrations, `pgJobs` creates the tables when they are missing and its role may. If the role may not, the owner creates them once, in a boot script, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once. pg-orm does not know tables made that way, so tell it to leave them alone with `ignoreTables: [...jobTables]`, where `jobTables` comes from `kay/server` and lists their names.
+Without pg-orm migrations, `pgJobs` creates the tables when they are missing and its role may. If the role may not, the owner creates them once, in a boot script, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once.
+
+When an index is missing, one replica builds it and the others wait until the unique ones are valid before they go on. That lock is a Postgres session lock, so run it on a direct or session-mode connection, not behind a transaction-mode pooler such as pgbouncer's. pg-orm does not know tables made that way, so tell it to leave them alone with `ignoreTables: [...jobTables]`, where `jobTables` comes from `kay/server` and lists their names.
 
 A claim and its hold use the database's clock, so replicas need not keep their clocks in agreement.
 
