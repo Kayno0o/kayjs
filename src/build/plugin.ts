@@ -13,7 +13,7 @@ import { dominantColorOf } from '../server/image-color'
 import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
 import { directImports } from './direct-imports'
-import { scriptLoader } from './files'
+import { SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
@@ -62,7 +62,6 @@ const ICON_NAMESPACE = 'kay-icon'
 const ANY = /.*/
 // `new URL('file', import.meta.url)`, the way a module names a file shipped beside it: a relative path with no scheme, query or template part.
 const FILE_URL = /new\s+URL\(\s*(["'`])((?:\.{1,2}\/)*[\w@-][^"'`\n$?#:]*)\1\s*,\s*import\.meta\.url\s*\)/g
-const SCRIPT_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const WASM_FILE = /\.wasm$/i
 const WORKER_BUNDLE = join(import.meta.dir, 'worker-bundle.ts')
 

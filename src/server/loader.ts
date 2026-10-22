@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 import { plugin } from 'bun'
 import { underKayDev } from '../build/assets'
-import { scriptLoader } from '../build/files'
+import { SCRIPT_FILE, scriptLoader } from '../build/files'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 
@@ -25,12 +25,15 @@ interface Project {
   loads: Load[]
 }
 
-const SCRIPT = /\.(?:[cm]?[jt]s|[jt]sx)$/
-
 // Every project this process loads `.kay` modules of, by root. Each registers a plugin of its own, as Bun cannot take one back.
 const projects = new Map<string, Project>()
-// The project registered last: it owns the modules under no project's root, such as a library linked from elsewhere.
+// The project registered last.
 let current: Project | undefined
+
+// The project that owns the modules under no project's root, such as a library linked from elsewhere: the one this process serves, not a fixture registered after it.
+function fallback(): Project | undefined {
+  return [...projects.values()].find(project => !project.early) ?? current
+}
 
 // A module of a name the plugins make up, such as an icon, is registered once and read from the current project.
 type Virtual = () => { contents: string, loader: 'js' }
@@ -54,17 +57,19 @@ function ownerOf(path: string): Project | undefined {
     }
   }
 
-  return owner ?? current
+  return owner ?? fallback()
 }
 
 // Bun runs the first callback whose filter matches and wants an object from it, so each callback a project's plugin registers hands the file to the callback of the project owning it, which a project's plugin registered for the same kind of file.
-// A library's file under another project's root, such as one linked into a fixture below the checkout, loads for that root's project, and one under no root for the last registered: Bun keeps the first compile of a file, so two projects cannot differ on one shared library file.
+// A library's file under another project's root, such as one linked into a fixture below the checkout, loads for that root's project, and one under no root for the project this process serves: Bun keeps the first compile of a file, so two projects cannot differ on one shared library file.
 // A shared file the owner has no callback for, such as a linked library's settings module under a project setting none, loads as it is.
 function scoped(project: Project, inner: BunPlugin): BunPlugin {
   return {
     name: inner.name,
     async setup(build) {
       const view = {
+        onStart: () => undefined,
+        onEnd: () => undefined,
         config: build.config,
         onResolve: build.onResolve.bind(build),
         onLoad: (options: { filter: RegExp, namespace?: string }, callback: Load['callback']) => {
@@ -77,7 +82,7 @@ function scoped(project: Project, inner: BunPlugin): BunPlugin {
             if (load !== undefined)
               return load.callback(args)
 
-            return owner !== project && SCRIPT.test(args.path) ? { contents: await Bun.file(args.path).text(), loader: scriptLoader(args.path) } : callback(args)
+            return owner !== project && SCRIPT_FILE.test(args.path) ? { contents: await Bun.file(args.path).text(), loader: scriptLoader(args.path) } : callback(args)
           })
         },
         module: (name: string, callback: Virtual) => {
@@ -87,7 +92,7 @@ function scoped(project: Project, inner: BunPlugin): BunPlugin {
 
           if (!virtualModules.has(name)) {
             virtualModules.set(name, callbacks)
-            build.module(name, () => (callbacks.get(current!) ?? [...callbacks.values()][0]!)())
+            build.module(name, () => (callbacks.get(fallback()!) ?? [...callbacks.values()][0]!)())
           }
         },
       } as unknown as PluginBuilder
@@ -105,18 +110,26 @@ export async function registerLoader(root: string, settings?: Record<string, str
   const chosen = settings ?? config.settings ?? {}
   const key = JSON.stringify(Object.entries(chosen).sort(([a], [b]) => a.localeCompare(b)))
   const at = resolve(root)
-  const known = projects.get(at)
+  let known = projects.get(at)
 
   if (known?.early === true) {
-    await known.ready
+    const guess = known
 
+    await guess.ready
+
+    // A concurrent call may have settled the guess already.
     // `pages()` names other settings than `kay dev` guessed: the loader starts over with them, for the modules still to load.
-    if (known.settings !== key)
-      projects.delete(at)
-    else
-      known.early = false
+    if (projects.get(at) === guess) {
+      if (guess.settings !== key)
+        projects.delete(at)
+      else
+        guess.early = false
+    }
+
+    known = projects.get(at)
   }
-  else if (known !== undefined && known.settings !== key) {
+
+  if (known !== undefined && known.settings !== key) {
     throw new Error(`kay: the .kay loader is registered for ${at} with other library settings than ${JSON.stringify(chosen)}; one project renders libraries with one set`)
   }
 
@@ -136,6 +149,11 @@ export async function registerLoader(root: string, settings?: Record<string, str
   current = projects.get(at)
 
   await current!.ready
+}
+
+// Whether a project of this root registered its loader in this process.
+export function loaderLoaded(root: string): boolean {
+  return projects.has(resolve(root))
 }
 
 // The project this process serves, once one is settled: `kay dev`'s early guess may still change.

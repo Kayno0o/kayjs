@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { plugin } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { registerEarlyLoader, registerLoader } from '../src/server/loader'
+import { loaderLoaded, registerEarlyLoader, registerLoader } from '../src/server/loader'
 import { renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -102,5 +102,15 @@ describe('the .kay loader with several projects', () => {
     await registerLoader(root, { 'kay-lib': './src/ui-settings.ts' })
 
     await expect(registerLoader(root, {})).rejects.toThrow('other library settings')
+  })
+
+  it('settles a guess for concurrent calls once, whatever the settings they name', async () => {
+    const root = await project('h', 'app-h')
+
+    await registerEarlyLoader(root)
+    await Promise.all([registerLoader(root, {}), registerLoader(root, {})])
+
+    expect(loaderLoaded(root)).toBe(true)
+    expect(await badge(root)).toContain('hi default:hi')
   })
 })

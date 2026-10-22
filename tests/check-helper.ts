@@ -8,6 +8,7 @@ import { build } from '../src/commands/build'
 import { check } from '../src/commands/check'
 import { runCommand } from '../src/commands/command'
 import { USAGES } from '../src/commands/usages'
+import { loaderLoaded } from '../src/server/loader'
 
 interface Capture {
   stdout: string[]
@@ -19,6 +20,22 @@ const STDOUT = ['log', 'info'] as const
 const STDERR = ['error', 'warn'] as const
 let installed = false
 
+// The writes a run makes to the process streams, such as a page logging under `--format json`, go to its capture too.
+function route(stream: 'stdout' | 'stderr'): void {
+  const original = process[stream].write.bind(process[stream])
+
+  process[stream].write = (chunk: string | Uint8Array, ...rest: unknown[]) => {
+    const capture = capturing.getStore()
+
+    if (capture === undefined)
+      return (original as (...args: unknown[]) => boolean)(chunk, ...rest)
+
+    capture[stream].push(typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk))
+
+    return true
+  }
+}
+
 // Routes what `kay check` prints to the run that printed it, whichever run started it, so checks run together in one process without sharing a console.
 function install(): void {
   if (installed)
@@ -28,6 +45,9 @@ function install(): void {
   // The spawned command always wrote to pipes, so never in colour; this process may sit on a terminal.
   delete process.env.FORCE_COLOR
   process.env.NO_COLOR = '1'
+
+  route('stdout')
+  route('stderr')
 
   for (const [methods, stream] of [[STDOUT, 'stdout'], [STDERR, 'stderr']] as const) {
     for (const name of methods) {
@@ -103,7 +123,8 @@ export async function kayBuild(args: string[], env: Record<string, string> = { N
   const stamp = existsSync(root) ? await stampOf(root) : ''
   const seen = built.get(root) ?? new Set<string>()
 
-  if (seen.size > 0 && !seen.has(stamp))
+  // A root this process loaded another way keeps its modules in the module cache, as does one built before its files changed.
+  if (seen.size > 0 ? !seen.has(stamp) : loaderLoaded(root))
     return kayBuildSpawned(args, env)
 
   seen.add(stamp)
