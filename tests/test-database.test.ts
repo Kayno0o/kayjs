@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { readdirSync, symlinkSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -72,11 +72,47 @@ async function project(seeded: boolean, migrationsDir?: string): Promise<string>
 // The runner's own DATABASE_URL would win over the project's `.env.test`.
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'DATABASE_URL'))
 
-async function run(dir: string, args: string[]): Promise<{ code: number, report: string }> {
-  const child = Bun.spawn([process.execPath, 'test', ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_ROOT: dir } })
+async function run(dir: string, args: string[], root = dir): Promise<{ code: number, report: string }> {
+  const child = Bun.spawn([process.execPath, 'test', ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_ROOT: root } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, report: out + err }
+}
+
+const APP_DB = `import { Database, defineTable } from '@kaynooo/pg-orm'
+
+export const Member = defineTable('member', f => ({
+  id: f.serial().primaryKey(),
+  name: f.varchar(40).unique(),
+}))
+
+export const db = new Database({ url: process.env.DATABASE_URL, tables: [Member] })
+const close = db.close.bind(db)
+
+db.close = async () => {
+  console.log('CLOSED ' + process.env.DATABASE_URL)
+  await close()
+}
+`
+
+// A project whose config imports its \`src/db\` module, read by one test that expects the seeded row from the copy.
+async function appDbProject(): Promise<string> {
+  const dir = await project(true)
+
+  await Bun.write(join(dir, 'src', 'db.ts'), APP_DB)
+  await Bun.write(join(dir, 'pg-orm.config.ts'), 'import { defineConfig } from \'@kaynooo/pg-orm\'\nimport { db } from \'./src/db\'\n\nexport default defineConfig({ db })\n')
+  await Bun.write(join(dir, 'tests', 'seed.ts'), 'import { Member } from \'../src/db\'\n\nexport default async function seed(db) {\n  await db.repo(Member).write.insertOne({ name: \'Ada\' })\n}\n')
+  await Bun.write(join(dir, 'tests', 'one.test.ts'), `import { expect, it } from 'bun:test'
+import { Member, db } from '../src/db'
+
+it('queries the copy', async () => {
+  expect((await db.repo(Member).read.findMany()).map(member => member.name)).toEqual(['Ada'])
+  console.log('URL ' + process.env.DATABASE_URL)
+})
+`)
+  await rm(join(dir, 'tests', 'two.test.ts'))
+
+  return dir
 }
 
 describe('kay/test/preload\'s database for each test file', () => {
@@ -110,6 +146,40 @@ it('queries the copy', async () => {
     expect(report).toContain('1 pass')
     expect(code).toBe(0)
     expect(report).not.toContain('URL sqlite://data/test.db')
+  }, 60_000)
+
+  it('points a module an earlier preload loaded at the copy too', async () => {
+    const dir = await appDbProject()
+
+    await Bun.write(join(dir, 'earlier.ts'), 'import \'./src/db\'\n')
+    await Bun.write(join(dir, 'bunfig.toml'), `[test]\npreload = [${JSON.stringify(join(dir, 'earlier.ts'))}, ${JSON.stringify(PRELOAD)}]\n`)
+
+    const { code, report } = await run(dir, ['--isolate'])
+
+    expect(report).toContain('1 pass')
+    expect(code).toBe(0)
+    expect(report).not.toContain('URL sqlite://data/test.db')
+  }, 60_000)
+
+  it('points the app modules at the copy when the root is reached through a symlink', async () => {
+    const dir = await appDbProject()
+    const link = `${dir}-link`
+
+    symlinkSync(dir, link)
+
+    const { code, report } = await run(dir, ['--isolate'], link)
+
+    expect(report).toContain('1 pass')
+    expect(code).toBe(0)
+    expect(report).not.toContain('URL sqlite://data/test.db')
+  }, 60_000)
+
+  it('closes the db the config built before the copy replaced it', async () => {
+    const dir = await appDbProject()
+    const { code, report } = await run(dir, ['--isolate'])
+
+    expect(report).toContain('CLOSED sqlite://')
+    expect(code).toBe(0)
   }, 60_000)
 
   it('gives each file a copy of the migrated, seeded database, and drops it after, from the config alone', async () => {

@@ -1,5 +1,5 @@
 import type { Database, PgOrmConfig } from '@kaynooo/pg-orm'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll } from 'bun:test'
@@ -21,7 +21,6 @@ export async function copyTestDatabase(root: string): Promise<void> {
     throw new Error('kay: this project has a test database, which every test file would share without isolation and see each other\'s rows in: run the tests as `kay test`, or `bun test --isolate`')
 
   const { testDatabase } = await import('@kaynooo/pg-orm')
-  const before = new Set(Object.keys(require.cache))
   const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: Partial<PgOrmConfig> | undefined }).default ?? {}
 
   if (db === undefined)
@@ -37,9 +36,15 @@ export async function copyTestDatabase(root: string): Promise<void> {
 
   process.env.DATABASE_URL = database.url
 
-  // A config importing the app's own modules (`./src/db`) built their `db` on the original url: forgetting them makes the test file's imports build it again on the copy.
+  // Closed before it is forgotten: the config's `db` was built on the original url and nothing else will end its connections.
+  await db.close()
+
+  // The app's own modules (`./src/db`) were built on the original url, whether the config or an earlier preload loaded them: forgetting them makes the test file's imports build them again on the copy. `require.cache` holds real paths, so a root reached through a symlink is compared by both names, and kay's own modules stay, as they hold state.
+  const roots = new Set([root, realpathSync(root)])
+  const own = `${resolve(import.meta.dir, '..')}/`
+
   for (const path of Object.keys(require.cache)) {
-    if (!before.has(path) && path.startsWith(`${root}/`) && !path.includes('/node_modules/'))
+    if (!path.startsWith(own) && !path.includes('/node_modules/') && [...roots].some(prefix => path.startsWith(`${prefix}/`)))
       delete require.cache[path]
   }
 

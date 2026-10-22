@@ -228,7 +228,7 @@ Each file gets a copy of the database the migrations build, with what `seed` add
 
 An app that wrote its own `tests/database.ts` with `testDatabase()` deletes that file and its line in `bunfig.toml`, and moves its seed to `tests/seed.ts`.
 
-`pg-orm.config.ts` may import the app's own `db` module: the modules it loads are loaded again once the copy is made, so they connect to the copy.
+`pg-orm.config.ts` may import the app's own `db` module: the app's modules, whether the config or an earlier preload loaded them, are loaded again once the copy is made, and the config's own `db` is closed, so they connect to the copy.
 
 Sessions kept with `sqliteStore` stay in memory under `bun test`, so no test leaves a file or shares a session with another file, and the app writes no `NODE_ENV` check for it.
 
