@@ -575,6 +575,32 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a component promoted to an island, unless it says so with `// kay-island`, and a `// kay-static` on one', async () => {
+    const component = (marker: string) => `---\n${marker}import Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Said from \'../components/said.kay\'\nimport Denied from \'../components/denied.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nSaid\nDenied\nPlain\n',
+      'src/components/bare.kay': component(''),
+      'src/components/said.kay': component('// kay-island\n'),
+      'src/components/denied.kay': component('// kay-static\n'),
+      'src/components/plain.kay': '---\nimport Child from \'./plain-child.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
+      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
+      'src/components/plain-child.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'island-marker')
+
+      expect(found.map(d => [d.code, d.file.slice(root.length + 1), d.message.slice(0, 35)])).toEqual([
+        ['promoted-island', 'src/components/bare.kay', 'This component renders as an island'],
+        ['island-marker', 'src/components/denied.kay', 'This component renders as an island'],
+      ])
+      expect((await check(root, { lints: { 'promoted-island': 'allow' } })).filter(d => d.code === 'promoted-island')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('follows the imports of a promoted component to the island it reaches, a library\'s included, and reads the modules it imports as the browser\'s', async () => {
     const island = '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: () => void }>()\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n'
     const passing = (child: string, module: string) => `---\nimport ${child === 'Lib' ? 'Lib from \'ui-lib/card.kay\'' : `Child from './${child}.kay'`}\nimport { disk } from '../${module}'\n\nfunction pick() {}\n---\n${child === 'Lib' ? 'Lib' : 'Child'}(format={pick})\np {disk.name}\n`
@@ -2017,7 +2043,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       const sent = 'A layout, or a page with a server fence, sends an island its props serialized'
 
-      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.column, d.message.includes(sent)])).toEqual([
+      expect((await check(root)).filter(d => d.code !== 'promoted-island').map(d => [d.file.slice(root.length + 1), d.line, d.column, d.message.includes(sent)])).toEqual([
         ['src/routes/index.kay', 10, 62, true],
         ['src/routes/index.kay', 11, 6, true],
         ['src/routes/index.kay', 12, 14, true],
@@ -2205,7 +2231,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect(await check(islandOnly)).toEqual([])
-      expect((await check(alsoStatic)).map(d => [relative(alsoStatic, d.file), d.line])).toEqual([['src/components/wrapper.kay', 7], ['src/components/wrapper.kay', 8]])
+      expect((await check(alsoStatic)).filter(d => d.code !== 'promoted-island').map(d => [relative(alsoStatic, d.file), d.line])).toEqual([['src/components/wrapper.kay', 7], ['src/components/wrapper.kay', 8]])
     }
     finally {
       await Promise.all([islandOnly, alsoStatic].map(async root => rm(root, { recursive: true, force: true })))

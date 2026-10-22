@@ -1026,8 +1026,14 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 
 // What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, as `onPick passed to Picker, line 8`: the first in the template.
 export function promotionCause(file: KayFile, script: ScriptAnalysis): string | undefined {
+  return promotionSite(file, script)?.cause
+}
+
+// The call that makes a static component promotable, with the span of its tag.
+export function promotionSite(file: KayFile, script: ScriptAnalysis): { cause: string, span: Span } | undefined {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
   let cause: string | undefined
+  let span: Span | undefined
 
   visitNodes(file.template, (node) => {
     if (node.kind === 'snippet')
@@ -1049,10 +1055,12 @@ export function promotionCause(file: KayFile, script: ScriptAnalysis): string | 
       cause = `a block taking parameters passed to ${node.name}, line ${lineOf(file.source, node.start)}`
     }
 
+    span = node.tag
+
     return cause !== undefined
   })
 
-  return cause
+  return cause === undefined || span === undefined ? undefined : { cause, span }
 }
 
 // The first thing that makes a component interactive, so an island: `onClick, line 4`, `bind:value, line 9`, `ref, line 3`, `signal from kay` or a `--- client` fence.

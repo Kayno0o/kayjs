@@ -140,3 +140,8 @@ export interface FoldingRange {
   endLine: number
   kind?: 'comment' | 'imports' | 'region' | undefined
 }
+
+export interface CodeLens {
+  range: Range
+  command: { title: string, command: string }
+}

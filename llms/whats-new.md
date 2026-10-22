@@ -4,6 +4,16 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark what a component is meant to be (`island-marker`), and the editor shows a lens saying whether it is an island and why ([Islands](islands.md#islands)).
+- The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, a fix-all-on-save action and import updates when a `.kay` file is renamed ([Editor](editor-and-agent-commands.md)).
+- `style:prop={value}` sets one CSS property of an element, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` before a handler ([Templates](templates.md)).
+- `bind:group` on radios and checkboxes, `bind:open` on `details` and `dialog`, `bind:files` on file inputs, and a `ref` returning a cleanup ([Templates](templates.md)).
+- A class held in data, `color: 'text-blue-200'` in rows a parent hands a child writing `class={item.color}` or in a JSON file it imports, keeps its rule on the page with no warning and no `@source inline` ([Styles and assets](styles-and-assets.md)).
+- A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
+- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
+- kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg` without the default icons, `Textarea` takes a parent's write while focused with `writeFocused`, and Chat draws its field with Textarea and its Try again button without kayjs-ui's default icons ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
+- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
 - `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, islands, the service worker, prefetching and kayjs-cms follow it, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
 - Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages, in the order of the file names, and types `ctx.locals`, so sessions, jobs and derives need no `src/server.ts` ([Mount a server plugin](server.md#mount-a-server-plugin)).
 - `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item with no `path` links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).

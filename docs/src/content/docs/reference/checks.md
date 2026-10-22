@@ -82,6 +82,8 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `island-action` | deny | islands | An action handed to an island that never types a prop with `Action` from `kay`, which its chunk needs to revive it |
+| `island-marker` | deny | islands | A `// kay-island` or `// kay-static` comment the component contradicts |
+| `promoted-island` | warn | islands | A static component that renders as an island for the function it passes one, unless `// kay-island` says it is meant |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |

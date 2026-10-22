@@ -6,7 +6,7 @@ import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { RouteMount } from '../server/routes'
-import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -33,6 +33,7 @@ import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { routeMounts } from '../server/routes'
 import { componentInterface } from './component-props'
+import { islandLens } from './island-lens'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
 import { importEdits } from './renames'
@@ -168,6 +169,7 @@ export class KayLanguageServer {
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
     client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => this.renamedFiles(files))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
@@ -224,6 +226,7 @@ export class KayLanguageServer {
         documentFormattingProvider: true,
         documentSymbolProvider: true,
         foldingRangeProvider: true,
+        codeLensProvider: {},
       },
       workspace: { fileOperations: { willRename: { filters: [{ pattern: { glob: '**/*.kay' } }, { pattern: { glob: '**', matches: 'folder' } }] } } },
       serverInfo: { name: 'kay' },
@@ -770,6 +773,12 @@ export class KayLanguageServer {
     const document = this.documents.get(uri)
 
     return document ? documentSymbols(document.source) : []
+  }
+
+  private lenses(uri: string): CodeLens[] {
+    const document = this.documents.get(uri)
+
+    return document ? islandLens(document.source, filePath(uri)) : []
   }
 
   private folds(uri: string): FoldingRange[] {

@@ -103,7 +103,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'server-only-import', 'island-action'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'server-only-import', 'island-action', 'island-marker', 'promoted-island'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {

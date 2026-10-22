@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
-import { promotedChecks } from '../compiler'
+import { browserRole, promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, isRetiredLint, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -112,9 +112,9 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  // Following the imports of every component is worth it only when some module or component names the entry.
+  // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache'))
+  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache')) || [...componentTexts].some(([file, text]) => browserRole(text, file) === 'promotable')
   const { modules: inBrowser, promoted } = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts) : { modules: new Set<string>(), promoted: new Set<string>() }
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
     const levelAt = lintLevels(source, levels)

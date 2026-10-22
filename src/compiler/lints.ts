@@ -332,6 +332,21 @@ export const LINTS = {
     wrong: '---\n// src/components/caller.kay\nconst { run } = props<{ run: (input: { name: string }) => Promise<string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
     right: '---\n// src/components/caller.kay\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
   },
+  'island-marker': {
+    level: 'deny',
+    group: 'islands',
+    summary: 'A `// kay-island` or `// kay-static` comment that the component contradicts: `// kay-static` on one with an `on*` handler, a `bind:`, a `ref`, a value used from `kay` or a `--- client` fence, or on a static one that passes an island a function and so renders as one; `// kay-island` on a page or a layout, or on a component nothing makes an island.',
+    wrong: '---\n// kay-static\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+    right: '---\n// kay-island\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+  },
+  'promoted-island': {
+    level: 'warn',
+    group: 'islands',
+    typed: true,
+    summary: 'A static component that renders as an island because it passes one a function or a block taking parameters, which cannot be serialized. Its own props then travel to the browser, and it hydrates. `// kay-island` in the component says it is meant.',
+    wrong: '---\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
+    right: '---\n// kay-island\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
+  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',

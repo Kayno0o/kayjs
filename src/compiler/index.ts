@@ -10,8 +10,9 @@ import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandCause, islandMessages, promotionCause, typesAction } from './codegen'
+import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite, typesAction } from './codegen'
 import { asyncReplies, cssImportsWithoutText, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
+import { islandMarker, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
@@ -165,8 +166,12 @@ export function promotedChecks(original: string): Diagnostic[] {
   const source = file.source
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
+  const site = promotionSite(file, script)
+  const marker = islandMarker(source)
+  const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
+  const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${site.cause}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
 
-  return script.fence === undefined ? [] : serverOnlyImports(script.fence)
+  return [...script.fence === undefined ? [] : serverOnlyImports(script.fence), ...announced, ...contradicted]
 }
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
@@ -235,6 +240,11 @@ export function compileKay(original: string, filename: string, options: CompileO
 
     diagnostics.push(...unboundedFields(server), ...fenceLints, ...script.fence ? markupProps(script.fence) : [], ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
   }
+
+  const marker = checked ? islandMarker(source) : undefined
+
+  if (marker !== undefined)
+    diagnostics.push(...markerMismatch(marker, { route: routeFile, island: island !== undefined, why, promotion }))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })

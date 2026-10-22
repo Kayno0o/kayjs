@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { messageKeys } from '../src/check/messages'
 import { componentInterface } from '../src/lsp/component-props'
+import { islandLens } from '../src/lsp/island-lens'
 import { documentSymbols, foldingRanges } from '../src/lsp/outline'
 import { importEdits } from '../src/lsp/renames'
 import { templateContext } from '../src/lsp/template-completion'
@@ -61,6 +62,16 @@ describe('component interface', () => {
 
     expect(componentInterface(named)).toEqual({ props: [{ name: 'title', optional: false }, { name: 'tone', optional: true }, { name: 'onPick', optional: false }, { name: 'extra', optional: true }], blocks: ['actions'] })
     expect(componentInterface('p x')).toEqual({ props: [], blocks: [] })
+  })
+})
+
+describe('the island lens', () => {
+  const title = (source: string) => islandLens(source, 'src/components/part.kay')[0]!.command.title
+
+  it('says whether a component is an island and why, or static', () => {
+    expect(title('button(onClick={() => 1}) a\n')).toBe('Island: `onClick`, line 1')
+    expect(title('p a\n')).toBe('Static: ships no JavaScript')
+    expect(title('---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n')).toContain('Static unless it passes an island what only an island sends: `format` passed to Picker')
   })
 })
 
