@@ -57,3 +57,7 @@ TreeView(nodes={[{ id: 'work', label: 'Work', children: [{ id: 'specs', label: '
 - Nested nodes, such as folders: a `TreeNode` (from the package) has an `id`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one; ids are strings, or numbers in a `TreeNode<number>[]`. `label` names the tree for screen readers.
 - `selected` marks a node, drawn with the branches holding it open from the server's HTML on, and a tree whose parent passes another follows it, opening those branches; `expanded` lists the branches open to start with. `onSelect(id)` runs on a click on a row, or Enter or Space on the focused one, and the chevron opens or closes its branch alone.
 - One stop in the tab order. The arrows walk the rows shown, as the ARIA tree pattern has it: Right opens a branch, then goes to its first child, Left closes it, else goes to the branch holding the row, Home and End go to the first and the last, a letter to the next row whose label starts with it. Chords stay the browser's.
+
+## Reference
+
+- The words of these components, their props and the tokens they read are listed in their sections above; a component taking a function or a block with parameters renders as an island, as [Tables, navigation and layout](tables-navigation-and-layout.md) says under Reference.

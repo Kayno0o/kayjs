@@ -4298,33 +4298,33 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
-  const config = [
-    'import { createAuth } from \'@kaynooo/kayjs-auth\'',
-    'import { files } from \'kay/server\'',
-    '',
-    'const rememberMaxAge = \'30d\'',
-    '',
-    'export const a = createAuth({ rememberMaxAge, email: { expires: { \'reset-password\': \'2h\' } }, organizations: { invitationMaxAge: \'3d\' } })',
-    'export const b = createAuth({ rememberMaxAge: \'1d\', remember: { maxAge: \'2d\' } })',
-    'export const c = files.url(\'a.png\', { expires: \'1d\' })',
-    '',
-  ].join('\n')
-  const root = await scratchProject({
-    'kay.config.ts': 'export default {}\n',
-    'src/auth.ts': config,
+    const config = [
+      'import { createAuth } from \'@kaynooo/kayjs-auth\'',
+      'import { files } from \'kay/server\'',
+      '',
+      'const rememberMaxAge = \'30d\'',
+      '',
+      'export const a = createAuth({ rememberMaxAge, email: { expires: { \'reset-password\': \'2h\' } }, organizations: { invitationMaxAge: \'3d\' } })',
+      'export const b = createAuth({ rememberMaxAge: \'1d\', remember: { maxAge: \'2d\' } })',
+      'export const c = files.url(\'a.png\', { expires: \'1d\' })',
+      '',
+    ].join('\n')
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/auth.ts': config,
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-option-name/g)).toHaveLength(5)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe(config.replace('createAuth({ rememberMaxAge, email: { expires:', 'createAuth({ remember: { maxAge: rememberMaxAge }, email: { maxAge:').replace('invitationMaxAge: \'3d\'', 'invitations: { maxAge: \'3d\' }').replace('files.url(\'a.png\', { expires:', 'files.url(\'a.png\', { maxAge:'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
-
-  try {
-    const { output } = await runCheck(root)
-
-    expect(output.match(/deprecated-option-name/g)).toHaveLength(5)
-    await runCheck(root, '--fix')
-    expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe(config.replace('createAuth({ rememberMaxAge, email: { expires:', 'createAuth({ remember: { maxAge: rememberMaxAge }, email: { maxAge:').replace('invitationMaxAge: \'3d\'', 'invitations: { maxAge: \'3d\' }').replace('files.url(\'a.png\', { expires:', 'files.url(\'a.png\', { maxAge:'))
-  }
-  finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
 
   it('--fix removes the reason of a sole identity-key kay-allow comment with it, and keeps the reason of one naming other lints', async () => {
     const root = await scratchProject({
